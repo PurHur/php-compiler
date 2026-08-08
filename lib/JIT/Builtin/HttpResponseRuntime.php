@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPCompiler\ext\standard\VmSapiHeaderGuard;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -180,19 +183,7 @@ final class HttpResponseRuntime
         $context->builder->branchIf($isSetLong, $bbSetL, $bbAfterSetLProbe);
 
         $context->builder->positionAtEnd($bbSetL);
-        self::emitWriteFromSetSentinel(
-            $context,
-            JitNestedHelperCoerce::extractLongFromHelperResult(
-                $context,
-                JitNestedHelperCoerce::callHelper(
-                    $context,
-                    self::helperFunction($context, self::APPLY_SET_HELPER),
-                    [$intval]
-                ),
-                $i64
-            ),
-            $outPtr
-        );
+        self::emitSetLongGuarded($context, $intval, $outPtr);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bbAfterSetLProbe);
@@ -247,20 +238,7 @@ final class HttpResponseRuntime
             $context->lookupFunction('__value__readLong'),
             $boxedPtr
         );
-        $i64Box = $context->getTypeFromString('int64');
-        self::emitWriteFromSetSentinel(
-            $context,
-            JitNestedHelperCoerce::extractLongFromHelperResult(
-                $context,
-                JitNestedHelperCoerce::callHelper(
-                    $context,
-                    self::helperFunction($context, self::APPLY_SET_HELPER),
-                    [$boxedLong]
-                ),
-                $i64Box
-            ),
-            $outPtr
-        );
+        self::emitSetLongGuarded($context, $boxedLong, $outPtr);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bbBoxBadType);
@@ -396,7 +374,38 @@ final class HttpResponseRuntime
             $context->lookupFunction('__value__readLong'),
             $boxedPtr
         );
+        self::emitSetLongGuarded($context, $boxedLong, $outPtr);
+    }
+
+    /**
+     * php-src head.c — refuse SET when headers already sent; Warning + false (#28929).
+     *
+     * Reads {@see ObStorageLlvm} / ObOutput `__phpc_sapi_output_started` directly so a thin
+     * `__phpc_headers_sent` stub (always 0) cannot mask body output (#20932).
+     */
+    private static function emitSetLongGuarded(Context $context, Value $codeI64, Value $outPtr): void
+    {
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof LlvmFunction);
+        ++self::$emitSerial;
+        $sid = (string) self::$emitSerial;
+
+        $bbSent = $fn->appendBasicBlock('hr_set_hdr_sent_'.$sid);
+        $bbOk = $fn->appendBasicBlock('hr_set_hdr_ok_'.$sid);
+        $bbDone = $fn->appendBasicBlock('hr_set_hdr_done_'.$sid);
+
+        $sent = self::emitLoadHeadersSentFlag($context);
+        $isSent = $context->builder->icmp(Builder::INT_NE, $sent, $i32->constInt(0, false));
+        $context->builder->branchIf($isSent, $bbSent, $bbOk);
+
+        $context->builder->positionAtEnd($bbSent);
+        self::emitCannotSetResponseCodeWarning($context);
+        self::emitWriteBool($context, $outPtr, false);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbOk);
         self::emitWriteFromSetSentinel(
             $context,
             JitNestedHelperCoerce::extractLongFromHelperResult(
@@ -404,11 +413,54 @@ final class HttpResponseRuntime
                 JitNestedHelperCoerce::callHelper(
                     $context,
                     self::helperFunction($context, self::APPLY_SET_HELPER),
-                    [$boxedLong]
+                    [$codeI64]
                 ),
                 $i64
             ),
             $outPtr
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /** @return Value i32 — nonzero when SAPI body output has started */
+    private static function emitLoadHeadersSentFlag(Context $context): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        // Type::initialize links HttpResponse before ObOutput; create the global here so the
+        // load is not constant-folded to 0 and DCE'd (#28929).
+        $sapi = $context->module->getNamedGlobal('__phpc_sapi_output_started');
+        if (null === $sapi) {
+            $sapi = $context->module->addGlobal($i32, '__phpc_sapi_output_started');
+            $sapi->setInitializer($i32->constInt(0, false));
+        }
+
+        return $context->builder->load(
+            $context->builder->pointerCast($sapi, $i32->pointerType(0))
+        );
+    }
+
+    private static function emitCannotSetResponseCodeWarning(Context $context): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringTriggerError::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+
+        $message = VmSapiHeaderGuard::CANNOT_SET_RESPONSE_CODE;
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
         );
     }
 

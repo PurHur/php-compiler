@@ -22,7 +22,9 @@ final class HttpResponseCodeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/HttpResponseRuntime.php');
         $this->assertStringContainsString('HttpResponseJitHelper', $source);
-        $this->assertStringNotContainsString('addGlobal($i32,', $source);
+        // Status remains in HttpResponseJitHelper PHP; only SAPI headers-sent flag is an LLVM global (#28929).
+        $this->assertStringNotContainsString('__phpc_http_response_status_explicit', $source);
+        $this->assertStringContainsString('__phpc_sapi_output_started', $source);
     }
 
     /** HttpResponseRuntime: JitVmHelperLink::ensureCompiled — no hand-rolled NestedJit compile (#21441). */

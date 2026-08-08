@@ -46,8 +46,9 @@ final class HttpResponseJitHelper
     }
 
     /**
-     * http_response_code($code) setter — -1 invalid (unused), -2 first-set true, else previous status.
+     * http_response_code($code) setter — -1 invalid/headers-sent (false), -2 first-set true, else previous status.
      * Code 0 triggers getter semantics (#9306). php-src accepts any other int (#12153).
+     * Callers must refuse when headers already sent before invoking (#28929); AOT guards in HttpResponseRuntime.
      */
     public static function applySetLong(int $code): int
     {

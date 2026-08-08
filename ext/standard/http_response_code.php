@@ -41,6 +41,11 @@ final class http_response_code extends Internal
             }
             $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
             if (0 !== $code) {
+                if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
+                    VmSapiHeaderGuard::warnCannotSetResponseCode($frame);
+
+                    return;
+                }
                 VmHttpResponse::writeHttpResponseCode($code);
             }
 
@@ -74,6 +79,13 @@ final class http_response_code extends Internal
                 VmHttpResponse::readHttpResponseCode($ctx),
                 $ctx
             );
+
+            return;
+        }
+        // php-src head.c: SG(headers_sent) → Warning + false, status unchanged (#28929).
+        if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
+            VmSapiHeaderGuard::warnCannotSetResponseCode($frame);
+            VmHttpResponse::assignWriteResult($frame->returnVar, false, $ctx);
 
             return;
         }
