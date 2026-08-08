@@ -46,6 +46,11 @@ final class VmClosureCall
     {
         $copies = [];
         foreach ($args as $arg) {
+            // Preserve call_user_func_array([&$x]) / HT reference elements (#28793).
+            if ($arg->isIndirect()) {
+                $copies[] = $arg;
+                continue;
+            }
             $copy = new Variable();
             $copy->copyFrom($arg);
             $copies[] = $copy;

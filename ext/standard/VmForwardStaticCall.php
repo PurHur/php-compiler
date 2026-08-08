@@ -61,6 +61,17 @@ final class VmForwardStaticCall
             $methodName
         );
         $vm = $frame->vmContext->runtime->vm;
+        try {
+            [, , $func] = self::locateStaticMethod($frame->vmContext, $methodOwner, $methodName);
+            VmCallable::warnPhpFuncByRefValueArgs(
+                $frame->vmContext,
+                $frame,
+                $func,
+                $extraArgs
+            );
+        } catch (\Throwable) {
+            // locate already validated by assertForwardStaticCallable; ignore warn failures.
+        }
 
         return $vm->invokeDeclaredStaticWithCalledScope(
             $methodOwner,
@@ -141,7 +152,12 @@ final class VmForwardStaticCall
         }
         $ht = $params->toArray();
         $args = [];
-        foreach ($ht->iterate(true) as $value) {
+        foreach ($ht->iterate(false) as $value) {
+            // Preserve TYPE_INDIRECT so [&$x] writeback matches call_user_func_array (#28793).
+            if (Variable::TYPE_INDIRECT === $value->type) {
+                $args[] = $value;
+                continue;
+            }
             $copy = new Variable();
             $copy->copyFrom($value);
             $args[] = $copy;
