@@ -83,7 +83,7 @@ final class DomLivingBuiltinClasses
         self::registerParentAndChildNodeInterfaces($ctx);
 
         // Dom\DOMException — php-src stub: legacy DOMException is @alias Dom\DOMException (#20983).
-        // Share the ThrowableManifest DOMException ClassEntry (class_alias() rejects internals).
+        // Share the ThrowableManifest DOMException ClassEntry (boot-time registry; #29084).
         $domException = $ctx->classes[ThrowableManifest::LC_DOM_EXCEPTION] ?? null;
         if (null !== $domException
             && !isset($ctx->classes[VmDomLiving::CLASS_DOM_EXCEPTION])

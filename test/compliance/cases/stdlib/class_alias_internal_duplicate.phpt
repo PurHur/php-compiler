@@ -1,12 +1,9 @@
 --TEST--
-stdlib class_alias() duplicate internal class alias throws ValueError (#18290, ext/standard/basic_functions.c)
+stdlib class_alias() duplicate internal name warns + false (#29084, re-#18290, Zend/zend_builtin_functions.c)
 --FILE--
 <?php
-try {
-    class_alias('stdClass', 'stdClass');
-    echo "alias ok\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+var_export(class_alias('stdClass', 'stdClass'));
+echo "\n";
 --EXPECT--
-ValueError: class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given
+PHP Warning:  Cannot declare class stdClass, because the name is already in use
+false

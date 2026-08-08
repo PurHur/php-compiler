@@ -1,15 +1,17 @@
 --TEST--
-stdlib class_alias() rejects internal class targets (#9211, Zend/zend_builtin_functions.c)
+stdlib class_alias() allows internal class originals (#29084, re-#9211/#18290, Zend/zend_builtin_functions.c)
 --FILE--
 <?php
-try {
-    class_alias('stdClass', 'SC9211');
-    echo "alias ok\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
-var_export(class_exists('SC9211', false));
+var_export(class_alias('stdClass', 'SC9211'));
+echo "\n";
+var_export((new SC9211()) instanceof stdClass);
+echo "\n";
+var_export(class_alias('Exception', 'E29084'));
+echo "\n";
+var_export((new E29084('x')) instanceof Exception);
 echo "\n";
 --EXPECT--
-ValueError: class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given
-false
+true
+true
+true
+true
