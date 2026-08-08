@@ -58,6 +58,14 @@ final class FilterEmailValidate
     private static function isLocalPart(string $local, bool $unicode): bool
     {
         $len = \strlen($local);
+        if (0 === $len) {
+            return false;
+        }
+        // php-src atom / Michael Rushton regex: no leading, trailing, or consecutive '.' (#29014).
+        // Quoted-string locals (which may embed '..') are outside this NestedJIT subset.
+        if ('.' === $local[0] || '.' === $local[$len - 1] || \str_contains($local, '..')) {
+            return false;
+        }
         for ($i = 0; $i < $len; ++$i) {
             $o = \ord($local[$i]);
             if ($unicode && $o >= 0x80) {
