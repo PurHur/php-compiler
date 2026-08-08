@@ -376,10 +376,14 @@ final class VmMbstring
         return $mode;
     }
 
-    /** php-src mbstring.c pseudo-encoding for htmlentities / html_entity_decode round-trip. */
+    /**
+     * php-src / libmbfl HTML-ENTITIES (aliases HTML / html; #11212, #22631, #28983).
+     *
+     * Not htmlentities(): ASCII (incl. <>&) stays literal.
+     */
     public static function isHtmlEntitiesEncoding(string $encoding): bool
     {
-        return 0 === strcasecmp($encoding, 'HTML-ENTITIES');
+        return 'HTML-ENTITIES' === (MbstringEncodingRegistry::resolve($encoding) ?? '');
     }
 
     /**
@@ -389,10 +393,16 @@ final class VmMbstring
      */
     public static function isBase64Encoding(string $encoding): bool
     {
-        return 0 === strcasecmp($encoding, 'BASE64');
+        return 'BASE64' === (MbstringEncodingRegistry::resolve($encoding) ?? '');
     }
 
-    /** Pseudo-encodings accepted by mb_convert_encoding() beyond CharsetEngine charsets. */
+    /**
+     * Pseudo-encodings accepted by mb_convert_encoding() beyond CharsetEngine charsets.
+     *
+     * UUENCODE / Quoted-Printable are valid for mb_encoding_aliases / mb_list_encodings (#28983)
+     * but convert bodies remain sibling issues (#28981 / #28982) — not accepted here yet so
+     * convert still ValueErrors like an unknown charset until those land.
+     */
     public static function isMbConvertPseudoEncoding(string $encoding): bool
     {
         return self::isHtmlEntitiesEncoding($encoding) || self::isBase64Encoding($encoding);
@@ -588,6 +598,7 @@ final class VmMbstring
             return self::convertBytesWithIllegalSubst('UTF-8', $to, $utf8);
         }
         if ($toHtml) {
+            self::deprecateHtmlEntitiesViaMbstring($frame, $function);
             $utf8 = self::convertBytesWithIllegalSubst($from, 'UTF-8', $source);
             if (false === $utf8) {
                 return false;
@@ -600,12 +611,18 @@ final class VmMbstring
     }
 
     /**
-     * PHP 8.2+ E_DEPRECATED when BASE64 is resolved via php_mb_get_encoding ($to_encoding).
+     * PHP 8.2+ E_DEPRECATED when a libmbfl transfer encoding is resolved via php_mb_get_encoding.
      *
      * php-src: ext/mbstring/mbstring.c php_mb_get_encoding — from-encoding lists do not deprecate.
      */
-    public static function deprecateBase64ViaMbstring(?Frame $frame, string $function = 'mb_convert_encoding'): void
-    {
+    public static function deprecateSpecialTransferEncodingViaMbstring(
+        string $canonical,
+        ?Frame $frame,
+        string $function
+    ): void {
+        if (!MbstringEncodingRegistry::isSpecialTransferEncoding($canonical)) {
+            return;
+        }
         if (version_compare(CompilerVersion::languageProfileVersion(), '8.2.0', '<')) {
             return;
         }
@@ -620,14 +637,45 @@ final class VmMbstring
                 $frame = [] !== $frames ? $frames[0] : null;
             }
         }
-        $vm->context->errors->internalDeprecated(
-            sprintf(
+        $message = match ($canonical) {
+            'BASE64' => sprintf(
                 '%s(): Handling Base64 via mbstring is deprecated; use base64_encode/base64_decode instead',
                 $function
             ),
-            $vm->context,
-            $frame
-        );
+            'UUENCODE' => sprintf(
+                '%s(): Handling Uuencode via mbstring is deprecated; use convert_uuencode/convert_uudecode instead',
+                $function
+            ),
+            'Quoted-Printable' => sprintf(
+                '%s(): Handling QPrint via mbstring is deprecated; use quoted_printable_encode/quoted_printable_decode instead',
+                $function
+            ),
+            'HTML-ENTITIES' => sprintf(
+                '%s(): Handling HTML entities via mbstring is deprecated; use htmlspecialchars, htmlentities, or mb_encode_numericentity/mb_decode_numericentity instead',
+                $function
+            ),
+            default => null,
+        };
+        if (null === $message) {
+            return;
+        }
+        $vm->context->errors->internalDeprecated($message, $vm->context, $frame);
+    }
+
+    /**
+     * PHP 8.2+ E_DEPRECATED when BASE64 is resolved via php_mb_get_encoding ($to_encoding).
+     *
+     * php-src: ext/mbstring/mbstring.c php_mb_get_encoding — from-encoding lists do not deprecate.
+     */
+    public static function deprecateBase64ViaMbstring(?Frame $frame, string $function = 'mb_convert_encoding'): void
+    {
+        self::deprecateSpecialTransferEncodingViaMbstring('BASE64', $frame, $function);
+    }
+
+    /** PHP 8.2+ E_DEPRECATED for HTML-ENTITIES / HTML / html via php_mb_get_encoding (#28983). */
+    public static function deprecateHtmlEntitiesViaMbstring(?Frame $frame, string $function = 'mb_convert_encoding'): void
+    {
+        self::deprecateSpecialTransferEncodingViaMbstring('HTML-ENTITIES', $frame, $function);
     }
 
     /**
@@ -1089,6 +1137,8 @@ final class VmMbstring
         if (self::isBase64Encoding($name)) {
             return 'BASE64';
         }
+        // UUENCODE / Quoted-Printable are valid names for lists/aliases (#28983); convert
+        // from-list still rejects until #28981 / #28982 implement bodies.
         $canonical = MbstringEncodingRegistry::resolve($name);
         if (null !== $canonical && null !== CharsetEngine::parseEncodingSpec($canonical)) {
             return $canonical;

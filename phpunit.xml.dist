@@ -125,6 +125,7 @@
             <file>./test/compliance/FilterVarValidateEmailDomainLiteralJITTest.php</file>
             <file>./test/compliance/FilterVarDefaultStripEncodeVMTest.php</file>
             <file>./test/compliance/FilterVarDefaultStripEncodeJITTest.php</file>
+            <file>./test/compliance/MbEncodingAliasesSpecialVMTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
