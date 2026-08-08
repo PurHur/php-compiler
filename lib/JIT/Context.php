@@ -1466,6 +1466,9 @@ class Context {
         // NumberFormatter::create / format — avoid ExternalMethod silent NULL on thin AOT (#27385, #28648).
         $this->functionProxies['numberformatter::create'] = new Call\NumberFormatterCreate();
         $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();
+        // IntlDateFormatter::create / format — avoid ExternalMethod silent NULL on thin AOT (#27361).
+        $this->functionProxies['intldateformatter::create'] = new Call\IntlDateFormatterCreate();
+        $this->functionProxies['intldateformatter::format'] = new Call\IntlDateFormatterFormat();
         // Collator::compare — avoid ExternalMethod silent NULL on thin AOT (#28649).
         $this->functionProxies['collator::compare'] = new Call\CollatorCompare();
         // Normalizer::normalize — avoid ExternalMethod silent NULL / segfault on thin AOT (#28654).

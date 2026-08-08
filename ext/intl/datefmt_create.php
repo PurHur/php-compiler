@@ -79,6 +79,6 @@ final class datefmt_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('datefmt_create() is not implemented for JIT in this compiler build (issue #20837)');
+        return JitIntlDateFormatterCreate::invoke($context, ...$args);
     }
 }
