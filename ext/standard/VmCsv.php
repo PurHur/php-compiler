@@ -177,7 +177,9 @@ final class VmCsv
         $needsQuotes = false;
         for ($i = 0, $len = \strlen($field); $i < $len; ++$i) {
             $c = $field[$i];
-            if ($c === $delim || $c === $enc || (null !== $esc && $c === $esc) || "\n" === $c || "\r" === $c) {
+            // php-src FPUTCSV_FLD_CHK: delim, enclosure, escape, CR/LF, space, tab (#29058).
+            if ($c === $delim || $c === $enc || (null !== $esc && $c === $esc)
+                || "\n" === $c || "\r" === $c || ' ' === $c || "\t" === $c) {
                 $needsQuotes = true;
                 break;
             }
