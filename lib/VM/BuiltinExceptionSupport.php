@@ -73,9 +73,13 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_TYPE_ERROR, $message, $file, $line);
     }
 
-    public static function materializeArgumentCountError(Context $ctx, string $message): Variable
-    {
-        return self::materializeThrowable($ctx, self::CLASS_ARGUMENT_COUNT_ERROR, $message);
+    public static function materializeArgumentCountError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_ARGUMENT_COUNT_ERROR, $message, $file, $line);
     }
 
     public static function materializeValueError(
@@ -105,9 +109,13 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_ERROR, $message, $file, $line);
     }
 
-    public static function materializeFiberError(Context $ctx, string $message): Variable
-    {
-        return self::materializeThrowable($ctx, self::CLASS_FIBER_ERROR, $message);
+    public static function materializeFiberError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_FIBER_ERROR, $message, $file, $line);
     }
 
     public static function materializeFiberStackOverflow(
@@ -718,7 +726,7 @@ final class BuiltinExceptionSupport
             return self::materializeDivisionByZeroError($ctx, $error->getMessage(), $file, $line);
         }
         if ($error instanceof \ArithmeticError) {
-            return self::materializeArithmeticError($ctx, $error->getMessage());
+            return self::materializeArithmeticError($ctx, $error->getMessage(), $file, $line);
         }
         if ($error instanceof \AssertionError) {
             return self::materializeAssertionError($ctx, $error->getMessage(), $file, $line);
@@ -762,9 +770,13 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_DIVISION_BY_ZERO_ERROR, $message, $file, $line);
     }
 
-    public static function materializeArithmeticError(Context $ctx, string $message): Variable
-    {
-        return self::materializeThrowable($ctx, self::CLASS_ARITHMETIC_ERROR, $message);
+    public static function materializeArithmeticError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_ARITHMETIC_ERROR, $message, $file, $line);
     }
 
     /**
