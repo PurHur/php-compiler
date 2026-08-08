@@ -26,41 +26,69 @@ final class VmVarDump
         bool $showRefMarker = false,
         ?Frame $frame = null
     ): void {
+        /** @var \SplObjectStorage<object, true> $visited */
+        $visited = new \SplObjectStorage();
+        self::dumpNested($vm, $var, $level, $showRefMarker, $frame, $visited);
+    }
+
+    /**
+     * @param \SplObjectStorage<object, true> $visited
+     */
+    private static function dumpNested(
+        VM $vm,
+        Variable $var,
+        int $level,
+        bool $showRefMarker,
+        ?Frame $frame,
+        \SplObjectStorage $visited
+    ): void {
         TypedPropertyCheck::assertReadable($var);
         if ($level > 1) {
             // Avoid \str_repeat — NestedJIT of this SSOT may lack __compiler_str_repeat (#23540 / peer #22981).
             self::write(self::spaces($level - 1));
         }
+        // php-src php_var_dump: unwrap IS_REFERENCE first, but PUTS("*RECURSION*") skips COMMON (&).
+        // Resolve before writing '&' so circular refs print "*RECURSION*" not "&*RECURSION*" (#28795).
+        $isRef = false;
         if ($showRefMarker && Variable::TYPE_INDIRECT === $var->type) {
-            self::write('&');
+            $isRef = true;
             $var = $var->resolveIndirect();
         }
-        if (self::tryWriteScalarPayload($var)) {
+        if (self::tryWriteScalarPayload($var, $isRef)) {
             return;
         }
         $resourceDump = VmVarFormat::tryFormatVarDump($var);
         if (null !== $resourceDump) {
+            if ($isRef) {
+                self::write('&');
+            }
             self::write($resourceDump);
 
             return;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            self::dumpArray($vm, $var->toArray(), $level, $frame);
+            self::dumpArray($vm, $var->toArray(), $level, $frame, $visited, $isRef);
 
             return;
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            self::dumpObject($vm, $var->toObject(), $level, $frame);
+            self::dumpObject($vm, $var->toObject(), $level, $frame, $visited, $isRef);
 
             return;
         }
         if (Variable::TYPE_ENUM_CASE === $var->type) {
+            if ($isRef) {
+                self::write('&');
+            }
             $case = $var->toEnumCase();
             self::write('enum('.$case->enumClass->name.'::'.$case->caseName.")\n");
 
             return;
         }
 
+        if ($isRef) {
+            self::write('&');
+        }
         self::write("unknown()\n");
     }
 
@@ -79,38 +107,54 @@ final class VmVarDump
         if ($level > 1) {
             self::write(self::spaces($level - 1));
         }
+        $isRef = false;
         if ($showRefMarker && Variable::TYPE_INDIRECT === $var->type) {
-            self::write('&');
+            $isRef = true;
             $var = $var->resolveIndirect();
         }
 
-        return self::tryWriteScalarPayload($var);
+        return self::tryWriteScalarPayload($var, $isRef);
     }
 
     /** @return bool true when $var is a scalar/null arm that was written */
-    private static function tryWriteScalarPayload(Variable $var): bool
+    private static function tryWriteScalarPayload(Variable $var, bool $isRef = false): bool
     {
         if (Variable::TYPE_INTEGER === $var->type) {
+            if ($isRef) {
+                self::write('&');
+            }
             self::write('int('.$var->toInt().")\n");
 
             return true;
         }
         if (Variable::TYPE_FLOAT === $var->type) {
+            if ($isRef) {
+                self::write('&');
+            }
             self::write('float('.VmFloatDtoa::formatVarDump($var->toFloat()).")\n");
 
             return true;
         }
         if (Variable::TYPE_STRING === $var->type) {
+            if ($isRef) {
+                self::write('&');
+            }
             self::write('string('.\strlen($var->toString()).') "'.$var->toString()."\"\n");
 
             return true;
         }
         if (Variable::TYPE_BOOLEAN === $var->type) {
+            if ($isRef) {
+                self::write('&');
+            }
             self::write('bool('.($var->toBool() ? 'true' : 'false').")\n");
 
             return true;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            if ($isRef) {
+                self::write('&');
+            }
             self::write("NULL\n");
 
             return true;
@@ -124,46 +168,95 @@ final class VmVarDump
         OutputBuffer::append($chunk);
     }
 
-    private static function dumpArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): void
-    {
-        $count = 0;
-        foreach ($table->iterateKeyed(false) as $_) {
-            ++$count;
+    /**
+     * @param \SplObjectStorage<object, true> $visited
+     */
+    private static function dumpArray(
+        VM $vm,
+        VM\HashTable $table,
+        int $level,
+        ?Frame $frame,
+        \SplObjectStorage $visited,
+        bool $isRef = false
+    ): void {
+        // php-src ext/standard/var.c — GC_IS_RECURSIVE → PUTS("*RECURSION*") without COMMON (&) (#28795).
+        if ($visited->contains($table)) {
+            self::write("*RECURSION*\n");
+
+            return;
         }
-        self::write('array('.$count.") {\n");
-        foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            // php-src php_array_element_dump: "%*c" with level+1; recurse level+2 (#23726).
-            self::write(self::spaces($level + 1));
-            self::write(self::formatKey($key)."\n");
-            self::dumpVariable($vm, $value, $level + 2, true, $frame);
+        if ($isRef) {
+            self::write('&');
         }
-        if ($level > 1) {
-            self::write(self::spaces($level - 1));
+        $visited->attach($table);
+        try {
+            $count = 0;
+            foreach ($table->iterateKeyed(false) as $_) {
+                ++$count;
+            }
+            self::write('array('.$count.") {\n");
+            foreach ($table->iterateKeyed(false) as [$key, $value]) {
+                // php-src php_array_element_dump: "%*c" with level+1; recurse level+2 (#23726).
+                self::write(self::spaces($level + 1));
+                self::write(self::formatKey($key)."\n");
+                self::dumpNested($vm, $value, $level + 2, true, $frame, $visited);
+            }
+            if ($level > 1) {
+                self::write(self::spaces($level - 1));
+            }
+            self::write("}\n");
+        } finally {
+            $visited->detach($table);
         }
-        self::write("}\n");
     }
 
-    private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): void
-    {
+    /**
+     * @param \SplObjectStorage<object, true> $visited
+     */
+    private static function dumpObject(
+        VM $vm,
+        VM\ObjectEntry $object,
+        int $level,
+        ?Frame $frame,
+        \SplObjectStorage $visited,
+        bool $isRef = false
+    ): void {
         if (EnumCaseSupport::isEnumCase($object)) {
+            if ($isRef) {
+                self::write('&');
+            }
             self::write('enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n");
 
             return;
         }
-        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
-        $count = \count($props);
-        $className = VmObjectDebugType::fromClassName($object->class->name);
-        self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
-        foreach ($props as $name => $value) {
-            // php-src php_object_property_dump: "%*c" with level+1; recurse level+2 (#23726).
-            self::write(self::spaces($level + 1));
-            self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
-            self::dumpVariable($vm, $value, $level + 2, true, $frame);
+        // php-src Z_IS_RECURSIVE_P → PUTS("*RECURSION*") without COMMON (&) (#28795).
+        if ($visited->contains($object)) {
+            self::write("*RECURSION*\n");
+
+            return;
         }
-        if ($level > 1) {
-            self::write(self::spaces($level - 1));
+        if ($isRef) {
+            self::write('&');
         }
-        self::write("}\n");
+        $visited->attach($object);
+        try {
+            $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
+            $count = \count($props);
+            $className = VmObjectDebugType::fromClassName($object->class->name);
+            self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
+            foreach ($props as $name => $value) {
+                // php-src php_object_property_dump: "%*c" with level+1; recurse level+2 (#23726).
+                self::write(self::spaces($level + 1));
+                self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
+                self::dumpNested($vm, $value, $level + 2, true, $frame, $visited);
+            }
+            if ($level > 1) {
+                self::write(self::spaces($level - 1));
+            }
+            self::write("}\n");
+        } finally {
+            $visited->detach($object);
+        }
     }
 
     /** NestedJIT-safe spaces without \str_repeat (#23540 / peer PackEngineEncode #22981). */

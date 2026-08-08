@@ -27,6 +27,22 @@ final class VmDebugZval
         bool $showRefMarker = false,
         ?Frame $frame = null
     ): void {
+        /** @var \SplObjectStorage<object, true> $visited */
+        $visited = new \SplObjectStorage();
+        self::dumpNested($vm, $var, $level, $showRefMarker, $frame, $visited);
+    }
+
+    /**
+     * @param \SplObjectStorage<object, true> $visited
+     */
+    private static function dumpNested(
+        VM $vm,
+        Variable $var,
+        int $level,
+        bool $showRefMarker,
+        ?Frame $frame,
+        \SplObjectStorage $visited
+    ): void {
         TypedPropertyCheck::assertReadable($var);
         if ($showRefMarker) {
             if (Variable::TYPE_INDIRECT === $var->type) {
@@ -42,7 +58,7 @@ final class VmDebugZval
             if ($aliasCount > 0) {
                 $refcount = $aliasCount + 1;
                 self::write(self::indent($level).'reference refcount('.$refcount.") {\n");
-                self::dumpVariable($vm, $var, $level + 1, false, $frame);
+                self::dumpNested($vm, $var, $level + 1, false, $frame, $visited);
                 self::write(self::indent($level)."}\n");
 
                 return;
@@ -85,12 +101,12 @@ final class VmDebugZval
             return;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            self::dumpArray($vm, $var->toArray(), $level, $frame);
+            self::dumpArray($vm, $var->toArray(), $level, $frame, $visited);
 
             return;
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            self::dumpObject($vm, $var->toObject(), $level, $frame);
+            self::dumpObject($vm, $var->toObject(), $level, $frame, $visited);
 
             return;
         }
@@ -204,44 +220,82 @@ final class VmDebugZval
         return $count;
     }
 
-    private static function dumpArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): void
-    {
-        $count = 0;
-        foreach ($table->iterateKeyed(false) as $_) {
-            ++$count;
+    /**
+     * @param \SplObjectStorage<object, true> $visited
+     */
+    private static function dumpArray(
+        VM $vm,
+        VM\HashTable $table,
+        int $level,
+        ?Frame $frame,
+        \SplObjectStorage $visited
+    ): void {
+        // php-src php_debug_zval_dump — GC_IS_RECURSIVE → PUTS("*RECURSION*") (#28795).
+        if ($visited->contains($table)) {
+            self::write("*RECURSION*\n");
+
+            return;
         }
-        self::write('array('.$count.') refcount('.$table->getGcRefcount()."){\n");
-        foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            self::write(self::indent($level + 1));
-            self::write(self::formatKey($key)."\n");
-            self::dumpVariable($vm, $value, $level + 1, true, $frame);
+        $visited->attach($table);
+        try {
+            $count = 0;
+            foreach ($table->iterateKeyed(false) as $_) {
+                ++$count;
+            }
+            self::write('array('.$count.') refcount('.$table->getGcRefcount()."){\n");
+            foreach ($table->iterateKeyed(false) as [$key, $value]) {
+                self::write(self::indent($level + 1));
+                self::write(self::formatKey($key)."\n");
+                self::dumpNested($vm, $value, $level + 1, true, $frame, $visited);
+            }
+            if ($level > 0) {
+                self::write(self::indent($level));
+            }
+            self::write("}\n");
+        } finally {
+            $visited->detach($table);
         }
-        if ($level > 0) {
-            self::write(self::indent($level));
-        }
-        self::write("}\n");
     }
 
-    private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): void
-    {
+    /**
+     * @param \SplObjectStorage<object, true> $visited
+     */
+    private static function dumpObject(
+        VM $vm,
+        VM\ObjectEntry $object,
+        int $level,
+        ?Frame $frame,
+        \SplObjectStorage $visited
+    ): void {
         if (EnumCaseSupport::isEnumCase($object)) {
             self::write('enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n");
 
             return;
         }
-        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
-        $count = \count($props);
-        $className = VmObjectDebugType::fromClassName($object->class->name);
-        self::write('object('.$className.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
-        foreach ($props as $name => $value) {
-            self::write(self::indent($level + 1));
-            self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
-            self::dumpVariable($vm, $value, $level + 1, true, $frame);
+        // php-src Z_IS_RECURSIVE_P → PUTS("*RECURSION*") (#28795).
+        if ($visited->contains($object)) {
+            self::write("*RECURSION*\n");
+
+            return;
         }
-        if ($level > 0) {
-            self::write(self::indent($level));
+        $visited->attach($object);
+        try {
+            $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
+            $count = \count($props);
+            $className = VmObjectDebugType::fromClassName($object->class->name);
+            self::write('object('.$className.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
+            foreach ($props as $name => $value) {
+                self::write(self::indent($level + 1));
+                self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
+                self::dumpNested($vm, $value, $level + 1, true, $frame, $visited);
+            }
+            if ($level > 0) {
+                self::write(self::indent($level));
+            }
+            self::write("}\n");
+        } finally {
+            $visited->detach($object);
         }
-        self::write("}\n");
     }
 
     private static function formatKey(Variable $key): string
