@@ -10447,6 +10447,9 @@ class JIT {
                             if (OpCode::TYPE_PLUS === $op->type) {
                                 $vm->applyIncrement();
                             } else {
+                                if ('' !== $literal && !is_numeric($literal)) {
+                                    $this->emitNonNumericStringDecrementDeprecation();
+                                }
                                 $vm->applyDecrement();
                             }
                             $this->assignOperand($resultOp, $this->jitVariableFromVmConstant($vm), true);
@@ -17866,6 +17869,10 @@ class JIT {
             if ($increment) {
                 $vm->applyIncrement();
             } else {
+                // php-src zend_operators.c — non-numeric string -- is a no-op with E_DEPRECATED (#29088).
+                if ('' !== $literal && !is_numeric($literal)) {
+                    $this->emitNonNumericStringDecrementDeprecation();
+                }
                 $vm->applyDecrement();
             }
             $newVar = $this->jitVariableFromVmConstant($vm);
@@ -18104,6 +18111,40 @@ class JIT {
             $msgPtr,
             $sizeT->constInt(\strlen($message), false),
             $i32->constInt(VM\ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
+    /**
+     * PHP 8.3+ E_DEPRECATED for -- on non-numeric string (zend_operators.c, #29088).
+     */
+    private function emitNonNumericStringDecrementDeprecation(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
+            return;
+        }
+        if (JIT\NestedJitCompileScope::isActive()) {
+            return;
+        }
+        JIT\Builtin\StringTriggerError::ensureLinked($this->context);
+        $message = 'Decrement on non-numeric string has no effect and is deprecated';
+        $i8p = $this->context->getTypeFromString('int8*');
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i32 = $this->context->getTypeFromString('int32');
+        $msgPtr = $this->context->builder->pointerCast(
+            $this->context->constantFromString($message),
+            $i8p
+        );
+        $emptyFile = $this->context->builder->pointerCast(
+            $this->context->constantFromString(''),
+            $i8p
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(VM\ErrorReporter::E_DEPRECATED, false),
             $emptyFile,
             $i32->constInt(0, false)
         );
