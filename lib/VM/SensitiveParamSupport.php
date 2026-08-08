@@ -150,6 +150,30 @@ final class SensitiveParamSupport
         return $out;
     }
 
+    /**
+     * Packed args for internal/builtin throw frames (no user Block::func) — #29026.
+     *
+     * php-src zend_exceptions.c keeps execute_data args on ValueError/TypeError traces
+     * when EG(exception_ignore_args) is Off (`array_rand(Array)`).
+     */
+    public static function buildBuiltinCalledArgsArray(Frame $handlerFrame): Variable
+    {
+        if ([] === $handlerFrame->calledArgs) {
+            return self::emptyArgsArray();
+        }
+
+        $out = new Variable();
+        $out->newArray();
+        $ht = $out->toArray();
+        foreach ($handlerFrame->calledArgs as $arg) {
+            $copy = new Variable();
+            $copy->copyFrom($arg->resolveIndirect());
+            $ht->append($copy);
+        }
+
+        return $out;
+    }
+
     private static function emptyArgsArray(): Variable
     {
         $out = new Variable();

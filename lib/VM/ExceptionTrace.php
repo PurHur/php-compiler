@@ -203,7 +203,16 @@ final class ExceptionTrace
         $ht = $trace->toArray();
         $omitBuiltin = self::omitOpcodeBuiltinTypeErrorFrame($object, $builtinName);
         if ('' !== $builtinName && !$omitBuiltin) {
-            $ht->append(VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $builtinName));
+            // php-src keeps execute_data args on builtin ValueError/TypeError frames (#29026).
+            $includeArgs = 0 === (self::traceCaptureOptions() & VmDebugBacktrace::IGNORE_ARGS);
+            $ht->append(VmDebugBacktrace::builtinInvokeFrameEntry(
+                $callerFrame,
+                $builtinName,
+                '',
+                '',
+                $handlerFrame,
+                $includeArgs,
+            ));
         }
         $opts = self::traceCaptureOptions();
         $userTrace = self::sanitizeCapturedTrace(VmDebugBacktrace::build($callerFrame, $opts));
@@ -371,7 +380,16 @@ final class ExceptionTrace
             }
         }
 
-        return VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $methodName, $className, '->');
+        $includeArgs = 0 === (self::traceCaptureOptions() & VmDebugBacktrace::IGNORE_ARGS);
+
+        return VmDebugBacktrace::builtinInvokeFrameEntry(
+            $callerFrame,
+            $methodName,
+            $className,
+            '->',
+            $handlerFrame,
+            $includeArgs,
+        );
     }
 
     private static function generatorThrowFrameTrace(Frame $frame): Variable
