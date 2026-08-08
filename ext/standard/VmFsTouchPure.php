@@ -10,6 +10,13 @@ namespace PHPCompiler\ext\standard;
  * Bootstrap path: VmFsOpenNative exclusive create + host touch() for mtime/atime.
  *
  * php-src: ext/standard/filestat.c — php_touch
+ *
+ * Existence probes must not write {@see VmStatCache}: a positive hit from the probe
+ * would make the first post-touch filemtime()/stat() return “now” instead of the
+ * utime timestamps (#28995). Host \\stat() during the probe still fills Zend’s
+ * BG(CurrentStatFile); clear that path after a successful host touch so the next
+ * uncached VmStatNative read sees the new times — without clearing VmStatCache
+ * positive entries (php-src keeps those until clearstatcache, #25853).
  */
 final class VmFsTouchPure
 {
@@ -24,7 +31,8 @@ final class VmFsTouchPure
             return false;
         }
 
-        if (!VmStatPath::exists($path)) {
+        // Uncached exists — do not use VmStatPath::exists() / VmStatCache (#28995).
+        if (false === VmStatNative::stat($path)) {
             $handle = VmFsOpenNative::open($path, 'c');
             if (false === $handle) {
                 return false;
@@ -36,7 +44,12 @@ final class VmFsTouchPure
 
         if (null === $mtime && null === $atime) {
             if (\function_exists('touch')) {
-                return @\touch($path);
+                $ok = @\touch($path);
+                if ($ok) {
+                    self::clearHostStatCache($path);
+                }
+
+                return $ok;
             }
             $handle = VmFsOpenNative::open($path, 'a');
             if (false === $handle) {
@@ -50,6 +63,20 @@ final class VmFsTouchPure
             return false;
         }
 
-        return @\touch($path, $mtime, $atime);
+        // php-src: omitted atime uses mtime (2-arg form). Passing null is Z_PARAM_LONG_OR_NULL unset.
+        $ok = @\touch($path, $mtime, $atime);
+        if ($ok) {
+            self::clearHostStatCache($path);
+        }
+
+        return $ok;
+    }
+
+    /** Flush host PHP BG stat cache for $path only — leave VmStatCache alone (#25853). */
+    private static function clearHostStatCache(string $path): void
+    {
+        if (\function_exists('clearstatcache')) {
+            @\clearstatcache(true, $path);
+        }
     }
 }
