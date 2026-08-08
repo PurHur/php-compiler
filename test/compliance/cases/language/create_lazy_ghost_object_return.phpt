@@ -1,5 +1,5 @@
 --TEST--
-Language: newLazyGhost() ghost initializer object return ignored (#12309, #28414)
+Language: newLazyGhost() initializer object return → TypeError (#29169, Zend/zend_lazy_objects.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
@@ -14,14 +14,25 @@ if (!PHPCompiler\CompilerVersion::supportsLazyObjectFactories()) {
 --FILE--
 <?php
 class C {
-    public int $v = 0;
+    public int $x = 1;
 }
-$rc = new ReflectionClass(C::class);
-$ghost = $rc->newLazyGhost(function (C $o) {
-    $o->v = 42;
-    return $o;
+$r = new ReflectionClass(C::class);
+$g = $r->newLazyGhost(function ($obj) {
+    return new C();
 });
-echo $ghost->v, "\n";
+try {
+    echo $g->x;
+    echo "NO_ERROR\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage();
+}
+echo "\n";
+
+$ok = $r->newLazyGhost(function ($obj) {
+    return;
+});
+echo $ok->x, "\n";
 ?>
 --EXPECT--
-42
+TypeError:Lazy object initializer must return NULL or no value
+1

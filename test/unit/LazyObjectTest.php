@@ -429,25 +429,37 @@ PHP;
         );
     }
 
-    /** @covers issue #12309 */
-    public function testCreateLazyGhostIgnoresObjectReturnFromInitializer(): void
+    /** @covers issue #29169 */
+    public function testCreateLazyGhostObjectReturnThrowsTypeError(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-class Svc {
-    public int $v = 0;
+class C {
+    public int $x = 1;
 }
-$rc = new ReflectionClass(Svc::class);
-$ghost = $rc->newLazyGhost(function (Svc $o) {
-    $o->v = 42;
-    return $o;
+$r = new ReflectionClass(C::class);
+$g = $r->newLazyGhost(function ($obj) {
+    return new C();
 });
-echo $ghost->v, "\n";
+try {
+    echo $g->x;
+    echo "NO_ERROR\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage();
+}
+echo "\n";
+$ok = $r->newLazyGhost(function ($obj) {
+    return;
+});
+echo $ok->x, "\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'create_lazy_ghost_object_return.php'));
-        $this->assertSame("42\n", ob_get_clean());
+        $this->assertSame(
+            "TypeError:Lazy object initializer must return NULL or no value\n1\n",
+            ob_get_clean()
+        );
     }
 
     /** @covers issue #21126 */
