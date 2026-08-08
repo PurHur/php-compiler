@@ -1748,6 +1748,17 @@ final class BuiltinClasses
         }
         $dt->methods['getlasterrors'] = new DateTimeGetLastErrors();
         $dt->methodVisibility['getlasterrors'] = $pubStatic;
+        // php-src php_date.stub.php — getMicrosecond(): int; setMicrosecond(): static (#28711)
+        if (CompilerVersion::supportsDateTimeMicrosecond()) {
+            $intRet = ReflectionTypeSupport::cfgTypeFromLabel('int');
+            $staticRet = ReflectionTypeSupport::cfgTypeFromLabel('static');
+            if (null !== $intRet) {
+                $dt->methodReturnDeclaredTypes['getmicrosecond'] = $intRet;
+            }
+            if (null !== $staticRet) {
+                $dt->methodReturnDeclaredTypes['setmicrosecond'] = $staticRet;
+            }
+        }
         $dt->methods['__set_state'] = new DateTimeSetState(
             DateTimeSupport::CLASS_DATETIME,
             'DateTime'
@@ -1800,6 +1811,17 @@ final class BuiltinClasses
         }
         $dti->methods['getlasterrors'] = new DateTimeGetLastErrors();
         $dti->methodVisibility['getlasterrors'] = $pubStatic;
+        // php-src php_date.stub.php — getMicrosecond(): int; setMicrosecond(): static (#28711)
+        if (CompilerVersion::supportsDateTimeMicrosecond()) {
+            $intRet = ReflectionTypeSupport::cfgTypeFromLabel('int');
+            $staticRet = ReflectionTypeSupport::cfgTypeFromLabel('static');
+            if (null !== $intRet) {
+                $dti->methodReturnDeclaredTypes['getmicrosecond'] = $intRet;
+            }
+            if (null !== $staticRet) {
+                $dti->methodReturnDeclaredTypes['setmicrosecond'] = $staticRet;
+            }
+        }
         $dti->methods['__set_state'] = new DateTimeSetState(
             DateTimeSupport::CLASS_DATETIMEIMMUTABLE,
             'DateTimeImmutable'
