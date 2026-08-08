@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionFunction::__construct($function) — VM (#3354, #3355). */
+/** ReflectionFunction::__construct($function) — VM (#3354, #3355, #28939). */
 final class ReflectionFunctionConstruct extends VmClassMethod
 {
     public function __construct()
@@ -35,7 +35,7 @@ final class ReflectionFunctionConstruct extends VmClassMethod
             );
         } else {
             $name = VmReflection::normalizeGlobalIntrospectionName(
-                VmReflection::stringArg($target, 'ReflectionFunction::__construct() name', 1)
+                VmReflection::stringArg($target, 'ReflectionFunction::__construct() function', 1)
             );
             $func = ReflectionSupport::resolveFunctionForReflection($ctx, $name);
             $receiver->reflectionClosureState = null;

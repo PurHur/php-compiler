@@ -52,6 +52,11 @@ final class BuiltinParamNames
             'dateperiod::createfromiso8601string' => ['specification', 'options='],
             // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
             'reflectionmethod::getclosure' => ['object='],
+            // php-src ext/reflection/php_reflection.stub.php — ctor names vs InternalArgInfo (#28939)
+            'reflectionfunction::__construct' => ['function'],
+            'reflectionclass::__construct' => ['objectOrClass'],
+            'reflectionmethod::__construct' => ['objectOrMethod', 'method='],
+            'reflectionproperty::__construct' => ['class', 'property'],
             // php-src ext/reflection/php_reflection.stub.php — PHP 8.4+; absent from InternalArgInfo (#27599)
             'reflectionproperty::getrawvalue' => ['object'],
             'reflectionproperty::setrawvalue' => ['object', 'value'],

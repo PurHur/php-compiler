@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionClass::__construct($class) — VM (#1936). */
+/** ReflectionClass::__construct($objectOrClass) — VM (#1936, #28939). */
 final class ReflectionClassConstruct extends VmClassMethod
 {
     public function __construct()
