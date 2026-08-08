@@ -25452,10 +25452,11 @@ class Compiler {
         // Stmt-level `(string)$obj` then `$obj($arg)` must not steal the Cast (#22894).
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $cfgCallOp);
         $cast = null;
+        // Prefer the Cast nearest the call (last in oldest-first producers) so
+        // array_keys((array)(object)[...]) binds Array_ cast, not Object_ (#28822).
         foreach ($producers as $producer) {
             if ($producer instanceof Op\Expr\Cast) {
                 $cast = $producer;
-                break;
             }
         }
         if (null === $cast) {

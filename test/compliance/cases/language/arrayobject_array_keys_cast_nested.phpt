@@ -12,8 +12,14 @@ try {
 }
 $k = array_keys((array) $a);
 echo implode(',', $k), "\n";
+var_export(array_keys((array) (object) ['p' => 1, 'q' => 2]));
+echo "\n";
 ?>
 --EXPECT--
 a,b,c
 a,b,c
 a,b,c
+array (
+  0 => 'p',
+  1 => 'q',
+)
