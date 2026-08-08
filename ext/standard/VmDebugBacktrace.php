@@ -210,12 +210,18 @@ final class VmDebugBacktrace
 
     /**
      * Synthetic trace row for an internal builtin throw (Zend zend_exceptions.c, #11677).
+     *
+     * When {@param $includeArgs} is true and {@param $handlerFrame} is set, store
+     * {@see SensitiveParamSupport::buildBuiltinCalledArgsArray} so getTraceAsString
+     * renders `array_rand(Array)` like php-src (#29026 / #21998).
      */
     public static function builtinInvokeFrameEntry(
         Frame $callerFrame,
         string $builtinName,
         string $className = '',
         string $callType = '',
+        ?Frame $handlerFrame = null,
+        bool $includeArgs = false,
     ): Variable {
         $entry = new Variable();
         $entry->newArray();
@@ -245,6 +251,10 @@ final class VmDebugBacktrace
         $fnVar = new Variable(Variable::TYPE_STRING);
         $fnVar->string($builtinName);
         $ht->add('function', $fnVar);
+
+        if ($includeArgs && null !== $handlerFrame) {
+            $ht->add('args', SensitiveParamSupport::buildBuiltinCalledArgsArray($handlerFrame));
+        }
 
         return $entry;
     }
