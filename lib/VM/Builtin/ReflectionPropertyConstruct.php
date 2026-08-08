@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionProperty::__construct($class, $name) — VM (#3354). */
+/** ReflectionProperty::__construct($class, $property) — VM (#3354, #28939). */
 final class ReflectionPropertyConstruct extends VmClassMethod
 {
     public function __construct()
@@ -26,7 +26,7 @@ final class ReflectionPropertyConstruct extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $classArg = $frame->calledArgs[1]->resolveIndirect();
         $entry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
-        $property = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionProperty::__construct() name', 2);
+        $property = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionProperty::__construct() property', 2);
         $instanceName = VmReflection::findInstancePropertyName($entry, $property, $ctx);
         $staticKey = VmReflection::findStaticPropertyKey($entry, $property, $ctx);
         $enumPseudo = VmReflection::isEnumReflectionPseudoProperty($entry, $property);

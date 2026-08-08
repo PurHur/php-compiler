@@ -357,6 +357,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['object', '...args='], BuiltinParamNames::forClassMethod('ReflectionMethod::invoke'));
     }
 
+    /** @covers issue #28939 — Reflection ctor Zend stub names (php_reflection.stub.php) */
+    public function testReflectionCtorNamedParameters(): void
+    {
+        $fn = 'ReflectionFunction::__construct';
+        $cls = 'ReflectionClass::__construct';
+        $meth = 'ReflectionMethod::__construct';
+        $prop = 'ReflectionProperty::__construct';
+        self::assertSame(['function'], BuiltinParamNames::forClassMethod($fn));
+        self::assertSame(['objectOrClass'], BuiltinParamNames::forClassMethod($cls));
+        self::assertSame(['objectOrMethod', 'method='], BuiltinParamNames::forClassMethod($meth));
+        self::assertSame(['class', 'property'], BuiltinParamNames::forClassMethod($prop));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($fn), 'function', $fn));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($cls), 'objectOrClass', $cls));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($meth), 'objectOrMethod', $meth));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($meth), 'method', $meth));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($prop), 'property', $prop));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($fn), 'name', $fn));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($cls), 'argument', $cls));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($meth), 'class_or_method', $meth));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($prop), 'name', $prop));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionFunction', '__construct'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('ReflectionFunction', '__construct'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionClass', '__construct'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionMethod', '__construct'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('ReflectionMethod', '__construct'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionProperty', '__construct'));
+    }
+
     /** @covers issue #26237 — stub shape callback + args (basic_functions.stub.php) */
     public function testForwardStaticCallArrayNamedParamMetadata(): void
     {
