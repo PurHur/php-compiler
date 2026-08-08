@@ -123,6 +123,8 @@
             <file>./test/compliance/FilterVarValidateIpBracketsJITTest.php</file>
             <file>./test/compliance/FilterVarValidateEmailDomainLiteralVMTest.php</file>
             <file>./test/compliance/FilterVarValidateEmailDomainLiteralJITTest.php</file>
+            <file>./test/compliance/FilterVarDefaultStripEncodeVMTest.php</file>
+            <file>./test/compliance/FilterVarDefaultStripEncodeJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

@@ -577,7 +577,7 @@ final class VmFilter
             self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
             self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject, $flags),
             self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
-            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
+            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => self::sanitizeUnsafeRaw($subject, $flags),
             default => null,
         };
         if (null === $sanitized) {
@@ -611,7 +611,7 @@ final class VmFilter
             self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
             self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject, $flags),
             self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
-            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
+            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => self::sanitizeUnsafeRaw($subject, $flags),
             default => '',
         };
     }
@@ -649,14 +649,77 @@ final class VmFilter
     private static function sanitizeString(string $subject, int $flags): string
     {
         $out = VmString::stripTags($subject);
-        if (0 !== ($flags & self::FILTER_FLAG_STRIP_LOW)) {
-            $out = self::stripCharsBelow($out, 32);
+        $out = self::filterStrip($out, $flags);
+
+        return $out;
+    }
+
+    /**
+     * php-src php_filter_unsafe_raw — strip then optional HTML numeric entities (#29064).
+     */
+    private static function sanitizeUnsafeRaw(string $subject, int $flags): string
+    {
+        if (0 === $flags || '' === $subject) {
+            return $subject;
         }
-        if (0 !== ($flags & self::FILTER_FLAG_STRIP_HIGH)) {
-            $out = self::stripCharsAbove($out, 127);
+        $out = self::filterStrip($subject, $flags);
+        if (0 === ($flags & (self::FILTER_FLAG_ENCODE_AMP | self::FILTER_FLAG_ENCODE_LOW | self::FILTER_FLAG_ENCODE_HIGH))) {
+            return $out;
         }
-        if (0 !== ($flags & self::FILTER_FLAG_STRIP_BACKTICK)) {
-            $out = str_replace('`', '', $out);
+
+        return self::filterEncodeHtml($out, $flags);
+    }
+
+    /**
+     * php-src php_filter_strip — STRIP_HIGH uses `c >= 127` (removes DEL + high bytes).
+     */
+    private static function filterStrip(string $s, int $flags): string
+    {
+        $stripLow = 0 !== ($flags & self::FILTER_FLAG_STRIP_LOW);
+        $stripHigh = 0 !== ($flags & self::FILTER_FLAG_STRIP_HIGH);
+        $stripTick = 0 !== ($flags & self::FILTER_FLAG_STRIP_BACKTICK);
+        if (!$stripLow && !$stripHigh && !$stripTick) {
+            return $s;
+        }
+        $out = '';
+        $len = strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            $c = ord($s[$i]);
+            if ($stripHigh && $c >= 127) {
+                continue;
+            }
+            if ($stripLow && $c < 32) {
+                continue;
+            }
+            if ($stripTick && 96 === $c) { // '`'
+                continue;
+            }
+            $out .= $s[$i];
+        }
+
+        return $out;
+    }
+
+    /**
+     * php-src php_filter_encode_html for unsafe_raw encode flags.
+     */
+    private static function filterEncodeHtml(string $s, int $flags): string
+    {
+        $encodeAmp = 0 !== ($flags & self::FILTER_FLAG_ENCODE_AMP);
+        $encodeLow = 0 !== ($flags & self::FILTER_FLAG_ENCODE_LOW);
+        $encodeHigh = 0 !== ($flags & self::FILTER_FLAG_ENCODE_HIGH);
+        $out = '';
+        $len = strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            $c = ord($s[$i]);
+            $enc = ($encodeAmp && 38 === $c)
+                || ($encodeLow && $c < 32)
+                || ($encodeHigh && $c >= 127);
+            if ($enc) {
+                $out .= '&#'.$c.';';
+            } else {
+                $out .= $s[$i];
+            }
         }
 
         return $out;
@@ -716,32 +779,6 @@ final class VmFilter
     private static function sanitizeUrl(string $subject): string
     {
         return FilterUrlValidate::sanitize($subject);
-    }
-
-    private static function stripCharsBelow(string $s, int $threshold): string
-    {
-        $out = '';
-        $len = strlen($s);
-        for ($i = 0; $i < $len; ++$i) {
-            if (ord($s[$i]) >= $threshold) {
-                $out .= $s[$i];
-            }
-        }
-
-        return $out;
-    }
-
-    private static function stripCharsAbove(string $s, int $threshold): string
-    {
-        $out = '';
-        $len = strlen($s);
-        for ($i = 0; $i < $len; ++$i) {
-            if (ord($s[$i]) <= $threshold) {
-                $out .= $s[$i];
-            }
-        }
-
-        return $out;
     }
 
     /**
