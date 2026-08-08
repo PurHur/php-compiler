@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\standard\HtmlEntityTable;
 use PHPCompiler\ext\standard\mail as MailBuiltin;
@@ -12,6 +13,7 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmPregMatches;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
@@ -381,6 +383,22 @@ final class VmMbstring
     }
 
     /**
+     * php-src / libmbfl Base64 transfer encoding (deprecated in 8.2+; #28980).
+     *
+     * Listed by mb_list_encodings(); mb_convert_encoding routes through base64_encode/decode.
+     */
+    public static function isBase64Encoding(string $encoding): bool
+    {
+        return 0 === strcasecmp($encoding, 'BASE64');
+    }
+
+    /** Pseudo-encodings accepted by mb_convert_encoding() beyond CharsetEngine charsets. */
+    public static function isMbConvertPseudoEncoding(string $encoding): bool
+    {
+        return self::isHtmlEntitiesEncoding($encoding) || self::isBase64Encoding($encoding);
+    }
+
+    /**
      * mb_detect_encoding() — guess byte-string encoding (php-src ext/mbstring/mbstring.c; #3075).
      *
      * @param list<string>|null $encodingList
@@ -522,15 +540,43 @@ final class VmMbstring
     }
 
     /**
-     * mb_convert_encoding() core — charset + HTML-ENTITIES pseudo-encoding (#11212, #22631).
+     * mb_convert_encoding() core — charset + HTML-ENTITIES / BASE64 pseudo-encodings
+     * (#11212, #22631, #28980).
      *
      * php-src / libmbfl HTML-ENTITIES is not htmlentities(): ASCII (incl. <>&) stays literal;
      * named HTML entities for mapped non-ASCII; numeric &#N; for everything else (e.g. あ → &#12354;).
      *
+     * BASE64 (libmbfl transfer encoding): to-BASE64 is base64_encode($source) of the raw input
+     * bytes (from-charset is not re-encoded); from-BASE64 is base64_decode with illegal-byte
+     * substitution and returns the decoded byte string without a further charset pass. PHP 8.2+
+     * deprecates resolving BASE64 as $to_encoding (php_mb_get_encoding in mbstring.c).
+     *
      * Illegal bytes honor MBSTRG(filter_illegal_*) even when $from === $to (#25207).
      */
-    public static function convertEncoding(string $source, string $to, string $from): string|false
-    {
+    public static function convertEncoding(
+        string $source,
+        string $to,
+        string $from,
+        ?Frame $frame = null,
+        string $function = 'mb_convert_encoding'
+    ): string|false {
+        $toB64 = self::isBase64Encoding($to);
+        $fromB64 = self::isBase64Encoding($from);
+        if ($fromB64) {
+            if ($toB64) {
+                self::deprecateBase64ViaMbstring($frame, $function);
+
+                return \base64_encode($source);
+            }
+
+            return self::decodeBase64Pseudo($source);
+        }
+        if ($toB64) {
+            self::deprecateBase64ViaMbstring($frame, $function);
+
+            return \base64_encode($source);
+        }
+
         $toHtml = self::isHtmlEntitiesEncoding($to);
         $fromHtml = self::isHtmlEntitiesEncoding($from);
         if ($fromHtml) {
@@ -551,6 +597,107 @@ final class VmMbstring
         }
 
         return self::convertBytesWithIllegalSubst($from, $to, $source);
+    }
+
+    /**
+     * PHP 8.2+ E_DEPRECATED when BASE64 is resolved via php_mb_get_encoding ($to_encoding).
+     *
+     * php-src: ext/mbstring/mbstring.c php_mb_get_encoding — from-encoding lists do not deprecate.
+     */
+    public static function deprecateBase64ViaMbstring(?Frame $frame, string $function = 'mb_convert_encoding'): void
+    {
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.2.0', '<')) {
+            return;
+        }
+        $vm = VM::running();
+        if (null === $vm) {
+            return;
+        }
+        if (null === $frame) {
+            $frame = $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $vm->context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
+        }
+        $vm->context->errors->internalDeprecated(
+            sprintf(
+                '%s(): Handling Base64 via mbstring is deprecated; use base64_encode/base64_decode instead',
+                $function
+            ),
+            $vm->context,
+            $frame
+        );
+    }
+
+    /**
+     * libmbfl Base64 input filter — soft alphabet decode with illegal-char substitution (#28980).
+     *
+     * Valid alphabet/whitespace/= uses PHP base64_decode; illegal bytes emit
+     * mb_substitute_character() into the output and reset the quartet state (Zend 8.2).
+     */
+    public static function decodeBase64Pseudo(string $source): string
+    {
+        if (1 === \preg_match('/^[A-Za-z0-9+\/\s=]*$/', $source)) {
+            $decoded = \base64_decode($source, false);
+
+            return false === $decoded ? '' : $decoded;
+        }
+
+        $out = '';
+        $buf = 0;
+        $bits = 0;
+        $illegal = 0;
+        $len = \strlen($source);
+        for ($i = 0; $i < $len; ++$i) {
+            $c = $source[$i];
+            $o = \ord($c);
+            if (0x20 === $o || 0x09 === $o || 0x0A === $o || 0x0D === $o) {
+                continue;
+            }
+            if ('=' === $c) {
+                break;
+            }
+            $v = self::base64AlphabetValue($c);
+            if ($v < 0) {
+                ++$illegal;
+                // libmbfl: illegal input emits subst into the byte stream but does not
+                // clear the pending sextet buffer (Q!Q== → "?A", not "?").
+                $out .= MbstringState::substitutionOutput('8BIT', null);
+                continue;
+            }
+            $buf = ($buf << 6) | $v;
+            $bits += 6;
+            if ($bits >= 8) {
+                $bits -= 8;
+                $out .= \chr(($buf >> $bits) & 0xFF);
+                $buf &= (1 << $bits) - 1;
+            }
+        }
+        MbstringState::addIllegalChars($illegal);
+
+        return $out;
+    }
+
+    private static function base64AlphabetValue(string $c): int
+    {
+        if ($c >= 'A' && $c <= 'Z') {
+            return \ord($c) - 65;
+        }
+        if ($c >= 'a' && $c <= 'z') {
+            return \ord($c) - 71;
+        }
+        if ($c >= '0' && $c <= '9') {
+            return \ord($c) + 4;
+        }
+        if ('+' === $c) {
+            return 62;
+        }
+        if ('/' === $c) {
+            return 63;
+        }
+
+        return -1;
     }
 
     /**
@@ -805,7 +952,7 @@ final class VmMbstring
             );
         }
         if (1 === \count($fromList)) {
-            return self::convertEncoding($source, $to, $fromList[0]);
+            return self::convertEncoding($source, $to, $fromList[0], $frame);
         }
         // MBSTRG(strict_detection) is Off in this build (MbstringState::getInfo).
         $detected = self::detectEncoding($source, $fromList, false);
@@ -823,7 +970,7 @@ final class VmMbstring
             return false;
         }
 
-        return self::convertEncoding($source, $to, $detected);
+        return self::convertEncoding($source, $to, $detected, $frame);
     }
 
     /**
@@ -938,6 +1085,9 @@ final class VmMbstring
     ): string {
         if (self::isHtmlEntitiesEncoding($name)) {
             return 'HTML-ENTITIES';
+        }
+        if (self::isBase64Encoding($name)) {
+            return 'BASE64';
         }
         $canonical = MbstringEncodingRegistry::resolve($name);
         if (null !== $canonical && null !== CharsetEngine::parseEncodingSpec($canonical)) {

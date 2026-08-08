@@ -33,7 +33,7 @@ final class mb_convert_variables extends Internal
             ));
         }
         $to = VmMbstring::coerceEncodingString($frame->calledArgs[0], 'mb_convert_variables', 0);
-        if (!VmMbstring::isHtmlEntitiesEncoding($to) && null === CharsetEngine::parseEncodingSpec($to)) {
+        if (!VmMbstring::isMbConvertPseudoEncoding($to) && null === CharsetEngine::parseEncodingSpec($to)) {
             throw new \ValueError(\sprintf(
                 'mb_convert_variables(): Argument #1 ($to_encoding) is not a supported encoding, "%s" given',
                 $to
