@@ -143,6 +143,20 @@ try {
         $this->assertStringNotContainsString('Undefined variable', (string) $stderr);
     }
 
+    /**
+     * Issue #29145: after var ??= materializes an array, dim ??= must write the live CV
+     * (not a stale ??= expression snapshot synced into a later call arg).
+     */
+    public function testNullCoalesceAssignVarThenDim(): void
+    {
+        $code = file_get_contents(__DIR__ . '/../repro/issue_29145_coalesce_var_then_dim.php');
+        $this->assertNotFalse($code);
+        $this->assertVmOutput(
+            $code,
+            "array (\n  'x' => 1,\n)\narray (\n  'x' => 0,\n  'y' => 2,\n)\n"
+        );
+    }
+
     /** Issue #28954: nested dim ??= auto-vivifies intermediates without Undefined array key. */
     public function testNullCoalesceAssignNestedDimAutovivify(): void
     {
