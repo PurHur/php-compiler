@@ -149,6 +149,9 @@ final class BuiltinIntrospectionPolicy
         if ('grapheme_strimwidth' === $lc) {
             return IntlExtensionPolicy::advertisesGraphemeStrimwidth();
         }
+        if ('grapheme_levenshtein' === $lc) {
+            return IntlExtensionPolicy::advertisesGraphemeLevenshtein();
+        }
         if (\in_array($lc, [
             'grapheme_strlen',
             'grapheme_substr',

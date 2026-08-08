@@ -2552,22 +2552,32 @@ final class CompilerVersion
     }
 
     /**
-     * grapheme_levenshtein() — never shipped by Zend/php-src (ext/intl/grapheme/grapheme.stub.php).
+     * grapheme_levenshtein() — PHP 8.5+ (php-src ext/intl/php_intl.stub.php; #27591).
      *
-     * Prior registration (#6998) was wrong-direction: ICU levenshtein RFC never landed in stubs
-     * (php/php-src#10180). Always withheld — #22661.
+     * Withheld on ≤8.4 / 8.4.0-dev reference so function_exists matches Zend (#22661 phantom removal).
+     * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5}.
+     * Registration still requires loaded host ext/intl ({@see IntlExtensionPolicy::advertisesBuiltins()}).
      */
     public static function supportsGraphemeLevenshtein(): bool
     {
-        return false;
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
-     * grapheme_levenshtein() visible to function_exists() — always false (Zend never ships it; #22661).
+     * grapheme_levenshtein() visible to function_exists() — PROFILE≥8.5 + loaded ext/intl (#27591).
      */
     public static function advertisesGraphemeLevenshtein(): bool
     {
-        return false;
+        return self::supportsGraphemeLevenshtein();
     }
 
     /**

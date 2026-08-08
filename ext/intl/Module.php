@@ -368,7 +368,7 @@ class Module extends ModuleAbstract
             new grapheme_strrpos(),
             new grapheme_strripos(),
             new grapheme_extract(),
-            // Never shipped by Zend — withhold on every profile (#22661 / #6998).
+            // PHP 8.5+ — withhold on PROFILE≤8.4 (#22661 phantom; #27591 real API).
             ...(CompilerVersion::supportsGraphemeLevenshtein() ? [new grapheme_levenshtein()] : []),
             ...(CompilerVersion::supportsGraphemeStrSplit() ? [new grapheme_str_split()] : []),
             ...(CompilerVersion::supportsGraphemeStrimwidth() ? [new grapheme_strimwidth()] : []),

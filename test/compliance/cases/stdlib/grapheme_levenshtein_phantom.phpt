@@ -1,5 +1,5 @@
 --TEST--
-stdlib grapheme_levenshtein() — not advertised on any profile (Zend never ships; #22661 / #6998)
+stdlib grapheme_levenshtein() — not advertised on default ≤8.4 profile (#22661 / #27591)
 --FILE--
 <?php
 echo function_exists('grapheme_levenshtein') ? "fail\n" : "ok\n";

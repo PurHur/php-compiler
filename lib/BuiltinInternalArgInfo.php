@@ -257,6 +257,8 @@ final class BuiltinInternalArgInfo
             'grapheme_stripos',
             'grapheme_strrpos',
             'grapheme_strripos' => 'int|false',
+            // ext/intl/php_intl.stub.php — PHP 8.5+ (#27591)
+            'grapheme_levenshtein' => 'int|false',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
             'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
@@ -694,6 +696,12 @@ final class BuiltinInternalArgInfo
             'grapheme_strpos', 'grapheme_stripos', 'grapheme_strrpos', 'grapheme_strripos' => match ($index) {
                 0, 1 => 'string',
                 2 => 'int',
+                default => null,
+            },
+            // ext/intl/php_intl.stub.php — PHP 8.5+ costs + locale (#27591)
+            'grapheme_levenshtein' => match ($index) {
+                0, 1, 5 => 'string',
+                2, 3, 4 => 'int',
                 default => null,
             },
             // ext/hash/hash.stub.php — typed params; length/binary/options optional (#25469)

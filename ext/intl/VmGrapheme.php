@@ -428,49 +428,81 @@ final class VmGrapheme
     }
 
     /**
-     * grapheme_levenshtein() — grapheme-cluster edit distance (php-src ext/intl/grapheme; #6998).
+     * grapheme_levenshtein() — grapheme-cluster edit distance (php-src ext/intl/grapheme_string.c; #6998, #27591).
+     *
+     * @return int|false distance, or false when input is not valid UTF-8
      */
-    public static function levenshtein(string $string1, string $string2): int
-    {
+    public static function levenshtein(
+        string $string1,
+        string $string2,
+        int $insertionCost = 1,
+        int $replacementCost = 1,
+        int $deletionCost = 1
+    ): int|false {
         $graphemes1 = self::splitGraphemes($string1);
         if (null === $graphemes1) {
-            return -1;
+            return false;
         }
         $graphemes2 = self::splitGraphemes($string2);
         if (null === $graphemes2) {
-            return -1;
+            return false;
         }
 
-        return self::levenshteinGraphemeArrays($graphemes1, $graphemes2);
+        return self::levenshteinGraphemeArrays(
+            $graphemes1,
+            $graphemes2,
+            $insertionCost,
+            $replacementCost,
+            $deletionCost
+        );
     }
 
     /**
      * @param list<string> $graphemes1
      * @param list<string> $graphemes2
      */
-    private static function levenshteinGraphemeArrays(array $graphemes1, array $graphemes2): int
-    {
+    private static function levenshteinGraphemeArrays(
+        array $graphemes1,
+        array $graphemes2,
+        int $insertionCost = 1,
+        int $replacementCost = 1,
+        int $deletionCost = 1
+    ): int {
         $len1 = \count($graphemes1);
         $len2 = \count($graphemes2);
         if (0 === $len1) {
-            return $len2;
+            return $len2 * $insertionCost;
         }
         if (0 === $len2) {
-            return $len1;
+            return $len1 * $deletionCost;
+        }
+
+        // php-src: when all costs equal and string1 shorter, swap to save memory/CPU.
+        if ($len1 < $len2
+            && $insertionCost === $replacementCost
+            && $replacementCost === $deletionCost
+        ) {
+            $tmp = $graphemes1;
+            $graphemes1 = $graphemes2;
+            $graphemes2 = $tmp;
+            $len1 = \count($graphemes1);
+            $len2 = \count($graphemes2);
         }
 
         $prev = [];
         for ($j = 0; $j <= $len2; ++$j) {
-            $prev[$j] = $j;
+            $prev[$j] = $j * $insertionCost;
         }
         for ($i = 1; $i <= $len1; ++$i) {
             $cur = [];
-            $cur[0] = $i;
+            $cur[0] = $i * $deletionCost;
             for ($j = 1; $j <= $len2; ++$j) {
-                $subst = self::graphemesEqual($graphemes1[$i - 1], $graphemes2[$j - 1]) ? 0 : 1;
+                $subst = self::graphemesEqual($graphemes1[$i - 1], $graphemes2[$j - 1])
+                    ? 0
+                    : $replacementCost;
                 $cur[$j] = min(
-                    $cur[$j - 1] + 1,
-                    $prev[$j] + 1,
+                    $cur[$j - 1] + $insertionCost,
+                    $prev[$j] + $deletionCost,
                     $prev[$j - 1] + $subst
                 );
             }
