@@ -230,7 +230,6 @@ class VMTest extends BaseTest {
             if (!CompilerVersion::supportsBuiltinStubEnums()
                 && (str_contains($name, 'pad_type_enum')
                     || str_contains($name, 'string_trim_mode')
-                    || str_contains($name, 'memory_usage_enum')
                     || str_contains($name, 'session_status_enum')
                     || str_contains($name, 'phpinfo_infoview')
                     || str_contains($name, 'filter_input_phpinputfilter')
@@ -248,7 +247,10 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'connection_status_enum')
                 && !str_contains($name, 'requestmethod_enum')
                 // ParseUrl phantom retired (#28536) — absence cases always run.
-                && !str_contains($name, 'parse_url_enum')) {
+                && !str_contains($name, 'parse_url_enum')
+                // MemoryUsage phantom retired (#28411) — absence cases always run.
+                && !str_contains($name, 'memory_usage_enum')
+                && !str_contains($name, 'memory_get_usage_enum')) {
                 continue;
             }
             if (CompilerVersion::supportsBuiltinStubEnums()

@@ -50,7 +50,7 @@ final class VmMemory
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #1 ($real_usage) must be of type MemoryUsage|bool, %s given',
+                '%s(): Argument #1 ($real_usage) must be of type bool, %s given',
                 $fn,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
@@ -63,7 +63,7 @@ final class VmMemory
         }
 
         throw new \TypeError(sprintf(
-            '%s(): Argument #1 ($real_usage) must be of type MemoryUsage|bool, %s given',
+            '%s(): Argument #1 ($real_usage) must be of type bool, %s given',
             $fn,
             EnumCaseSupport::typeNameForVariable($var)
         ));

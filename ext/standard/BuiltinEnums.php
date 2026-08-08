@@ -24,7 +24,7 @@ final class BuiltinEnums
             // ExitStatus retired — php-src never ships it (#28500, re-#28200 / #7294)
             self::registerStringTrimMode($ctx);
             self::registerPadType($ctx);
-            self::registerMemoryUsage($ctx);
+            // MemoryUsage retired — php-src never ships it (#28411, re-#7247)
             // ConnectionStatus / ResponseCode / RequestMethod retired — php-src never ships them (#28931)
             // Sorting / SortDirection retired — php-src never ships them (#28930, re-#12362 / #7229 / #7261)
             // ParseUrl retired — php-src never ships it (#28536, re-#7260)
@@ -209,32 +209,6 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'padtype';
-        $ctx->classes[$lc] = $entry;
-        $ctx->enums[$lc] = true;
-    }
-
-    /**
-     * PHP 8.4 MemoryUsage: int-backed enum for memory_get_usage()/memory_get_peak_usage() (#7247).
-     *
-     * php-src: ext/standard/basic_functions.stub.php — enum MemoryUsage: int
-     */
-    private static function registerMemoryUsage(Context $ctx): void
-    {
-        if (isset($ctx->classes['memoryusage'])) {
-            return;
-        }
-
-        $entry = new ClassEntry('MemoryUsage');
-        $entry->isEnum = true;
-        $entry->backedType = 'int';
-
-        self::registerBackedEnumCase($entry, 'Default', 0);
-        self::registerBackedEnumCase($entry, 'RealUsage', 1);
-
-        EnumSupport::ensureBuiltinCasesMethod($entry);
-        EnumSupport::ensureBuiltinEnumInterfaces($entry);
-
-        $lc = 'memoryusage';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
