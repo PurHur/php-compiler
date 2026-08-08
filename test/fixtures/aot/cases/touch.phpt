@@ -22,20 +22,24 @@ if ($m === $t) {
 } else {
     echo 'badmtime', "\n";
 }
+// Separate path so 3-arg assert is not poisoned by the prior filemtime (#25853).
+$path2 = $base . '/marker2.txt';
+@unlink($path2);
 $mtime = 1000000100;
 $atime = 1000000200;
-if (touch($path, $mtime, $atime)) {
+if (touch($path2, $mtime, $atime)) {
     echo 'atime_set', "\n";
 } else {
     echo 'noatime', "\n";
 }
-$s = stat($path);
+$s = stat($path2);
 if ($s['mtime'] === $mtime && $s['atime'] === $atime) {
     echo 'atime_ok', "\n";
 } else {
     echo 'badatime', "\n";
 }
 @unlink($path);
+@unlink($path2);
 --EXPECT--
 create
 set
