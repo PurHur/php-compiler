@@ -7,13 +7,21 @@ namespace PHPCompiler;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject PHP 7 curly-brace array/string offset syntax ($s{0}, "abc"{1}) (#5313).
+ * Reject PHP 7 curly-brace array/string offset syntax ($s{0}, "abc"{1}) (#5313, #29098).
  *
- * php-src: Zend/zend_language_scanner.l — removed in PHP 8.0.
+ * php-src: Zend/zend_language_scanner.l (removed in 8.0) → Zend/zend_language_parser.y
+ * (8.4+ surfaces ParseError `syntax error, unexpected token "{"…`; ≤8.3 keeps E_COMPILE_ERROR).
  */
 final class CurlyBraceOffsetRejector
 {
-    private const MESSAGE = 'Array and string offset access syntax with curly braces is no longer supported';
+    /** Zend ≤8.3 compile fatal (zend_language_scanner.l era). */
+    private const MESSAGE_LEGACY_FATAL = 'Array and string offset access syntax with curly braces is no longer supported';
+
+    /** Zend ≥8.4 after bare `$var` (#29098 / zend_language_parser.y). */
+    private const MESSAGE_PARSE_AFTER_VAR = 'syntax error, unexpected token "{", expecting "," or ";"';
+
+    /** Zend ≥8.4 after string / ] / ) lhs. */
+    private const MESSAGE_PARSE_UNEXPECTED_BRACE = 'syntax error, unexpected token "{"';
 
     public static function reject(string $code, string $filename = 'unknown'): string
     {
@@ -64,10 +72,36 @@ final class CurlyBraceOffsetRejector
             }
 
             $line = self::lineForToken($tokens, $i);
-            throw new CompileFatal($filename, $line, self::MESSAGE);
+            throw new CompileFatal($filename, $line, self::rejectMessage($tokens, $i));
         }
 
         return $code;
+    }
+
+    /**
+     * PROFILE≥8.4 / stable 8.4.0+ — Zend ParseError channel (#29098).
+     * Unset PROFILE keeps 8.4.0-dev languageProfileVersion below 8.4.0 → legacy Fatal.
+     */
+    private static function usesParseErrorChannel(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function rejectMessage(array $tokens, int $braceIndex): string
+    {
+        if (!self::usesParseErrorChannel()) {
+            return self::MESSAGE_LEGACY_FATAL;
+        }
+
+        $prev = self::previousSignificantToken($tokens, $braceIndex - 1);
+        if (\is_array($prev) && T_VARIABLE === $prev[0]) {
+            return self::MESSAGE_PARSE_AFTER_VAR;
+        }
+
+        return self::MESSAGE_PARSE_UNEXPECTED_BRACE;
     }
 
     /**
