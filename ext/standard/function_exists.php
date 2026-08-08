@@ -20,9 +20,8 @@ final class function_exists extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('function_exists() requires exactly one argument');
-        }
+        // php-src Zend/zend_builtin_functions.stub.php — ArgumentCountError (#28475).
+        $this->requireExactArgCount($frame, 'function_exists', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -34,8 +33,9 @@ final class function_exists extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('function_exists() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #28475.
+        if (!$this->requireExactJitArgCount($context, $args, 'function_exists', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         return JitFunctionExists::invoke($context, $args[0]);
