@@ -1721,10 +1721,12 @@ final class VmSerialize
     }
 
     /** php-src ext/standard/var.c — reject class@anonymous before __serialize/__sleep. */
+    /** php-src ext/standard/var.c — reject anonymous classes before __serialize/__sleep (#28840). */
     private static function rejectAnonymousClassSerialization(ObjectEntry $entry): void
     {
         if (str_contains($entry->class->name, '@anonymous')) {
-            throw new \Exception("Serialization of 'class@anonymous' is not allowed");
+            $label = VmObjectDebugType::fromClassName($entry->class->name);
+            throw new \Exception("Serialization of '{$label}' is not allowed");
         }
     }
 
