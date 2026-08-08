@@ -3340,6 +3340,7 @@ require_once __DIR__.'/../../../ext/standard/VmFsTempnamNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsTempnamPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsTouchNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsTouchPure.php';
+require_once __DIR__.'/../../../ext/standard/VmFsTouchLibcThinAbi.php';
 require_once __DIR__.'/../../../ext/standard/VmFsUnlink.php';
 require_once __DIR__.'/../../../ext/standard/VmFsUnlinkPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsWriteNative.php';
@@ -5169,6 +5170,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MessageFormatterFormatRuntime.ph
 require_once __DIR__.'/../../../lib/JIT/Builtin/TransliteratorTransliterateRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FputcsvRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FsDirRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/TouchLibcRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FsGlobVecRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FtokRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FunctionExistsRuntime.php';

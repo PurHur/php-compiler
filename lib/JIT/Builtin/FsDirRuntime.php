@@ -24,8 +24,6 @@ final class FsDirRuntime
 {
     private const HELPER_PATH = '/ext/standard/FsDirJitHelper.php';
 
-    private const TOUCH_HELPER = 'PHPCompiler\\ext\\standard\\FsDirJitHelper::touch';
-
     private const MKDIR_HELPER = 'PHPCompiler\\ext\\standard\\FsDirJitHelper::mkdir';
 
     private const TEMPNAM_HELPER = 'PHPCompiler\\ext\\standard\\FsDirJitHelper::tempnam';
@@ -34,7 +32,7 @@ final class FsDirRuntime
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::TOUCH_HELPER,
+        // touch → TouchLibcRuntime (libc utime); NestedJIT cannot set times under AOT (#28995).
         self::MKDIR_HELPER,
         self::TEMPNAM_HELPER,
         self::TEMPNAM_NOTICE_HELPER,
@@ -129,29 +127,8 @@ final class FsDirRuntime
 
     private static function implementTouchBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('fdr_touch_entry');
-        $fail = $fn->appendBasicBlock('fdr_touch_fail');
-        $body = $fn->appendBasicBlock('fdr_touch_body');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $path = $fn->getParam(0);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull());
-        $context->builder->branchIf($isNull, $fail, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ok = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::TOUCH_HELPER),
-            [$path, $fn->getParam(1), $fn->getParam(2)]
-        );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $ok, $i32)
-        );
-
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($i32->constInt(0, false));
+        // Thin libc utime — NestedJIT FsDirJitHelper::touch cannot set times under AOT (#28995).
+        TouchLibcRuntime::emit($context, $fn);
     }
 
     private static function implementMkdirBridge(Context $context, LlvmFunction $fn): void
