@@ -32,8 +32,9 @@ use PHPLLVM\Value;
  * implode() with glue and array of scalar values (subset of PHP; JIT/AOT via JitImplode).
  *
  * $separator soft-null DEP+coerce on PROFILE=8.4 (#21210, reverts #19894; php-src string.c).
- * PROFILE≥8.4 frameless implode(2) rejects array-first + explicit null (#26277); join keeps
- * zif_implode array-first (php-src string_arginfo.h — frameless only on implode).
+ * PROFILE≥8.4 frameless implode(2) requires string $separator — any array-first two-arg call
+ * TypeErrors as Arg #1 ($separator) (#26277, #29087); join keeps zif_implode array-first
+ * (php-src string_arginfo.h — frameless only on implode).
  * PROFILE≥8.4 string+null pieces TypeError names arg #2 ($array) (#26278; php-src string.c).
  */
 final class implode extends Internal
@@ -66,7 +67,7 @@ final class implode extends Internal
             if (Variable::TYPE_ARRAY === $first->type) {
                 if (Variable::TYPE_NULL === $second->type) {
                     // Zend 8.4+ frameless implode(2) requires string $separator (#26277).
-                    if (self::rejectsArrayFirstExplicitNullPieces($this->getName())) {
+                    if (self::rejectsArrayFirstAsSeparator($this->getName())) {
                         throw new \TypeError(sprintf(
                             '%s(): Argument #1 ($separator) must be of type string, array given',
                             $this->getName()
@@ -129,7 +130,7 @@ final class implode extends Internal
             // PROFILE≥8.4 frameless implode(2): array + null → $separator TypeError (#26277).
             if (self::jitArgIsDefinitelyNull($args[1])) {
                 if (self::jitArgIsDefinitelyArray($args[0])) {
-                    if (self::rejectsArrayFirstExplicitNullPieces($this->getName())) {
+                    if (self::rejectsArrayFirstAsSeparator($this->getName())) {
                         self::emitSeparatorArrayTypeErrorAndAbort($context, $this->getName());
 
                         return $context->getTypeFromString('__string__*')->constNull();
@@ -293,9 +294,9 @@ final class implode extends Internal
 
     /**
      * Zend 8.4+ registers frameless implode(2) requiring string $separator; join keeps zif_implode
-     * array-first when pieces is explicit null (#26277; php-src string.c / string_arginfo.h).
+     * array-first (#26277 / #29087; php-src string.c / string_arginfo.h).
      */
-    private static function rejectsArrayFirstExplicitNullPieces(string $function): bool
+    private static function rejectsArrayFirstAsSeparator(string $function): bool
     {
         if ('implode' !== $function) {
             return false;
@@ -328,10 +329,17 @@ final class implode extends Internal
     /**
      * php-src Z_PARAM_ARRAY_HT_OR_STR + Z_PARAM_ARRAY_HT_OR_NULL — array-first two-arg form (#16401).
      *
-     * When argument #1 is an array, invalid glue is reported on argument #2 ($array).
+     * PROFILE≥8.4 frameless implode(2): array first always Arg #1 ($separator) TypeError (#29087).
+     * Older profiles / join: invalid glue is reported on argument #2 ($array); array+array → Arg #1.
      */
     private static function rejectArrayFirstTwoArgForm(Frame $frame, string $function): void
     {
+        if (self::rejectsArrayFirstAsSeparator($function)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($separator) must be of type string, array given',
+                $function
+            ));
+        }
         $second = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_ARRAY === $second->type) {
             throw new \TypeError(sprintf(
@@ -359,6 +367,41 @@ final class implode extends Internal
         return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 
+    /**
+     * Boxed __value__ holds an array — VM tag TYPE_ARRAY (6) or JIT TYPE_HASHTABLE (#29087).
+     * Matches {@see JitArrayElem} valueBoxIsArray (private there).
+     */
+    private static function jitValueBoxIsArray(Context $context, Value $valuePtr): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(Variable::TYPE_ARRAY, false)
+        );
+        $isJitHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $hasHt = $context->builder->icmp(
+            Builder::INT_NE,
+            $ht,
+            $ht->typeOf()->constNull()
+        );
+
+        return $context->builder->or($context->builder->or($isVmArray, $isJitHt), $hasHt);
+    }
+
     /** Boxed first + null pieces (#19566). */
     private function jitTwoArgNullPiecesBoxedFirst(
         Context $context,
@@ -368,19 +411,10 @@ final class implode extends Internal
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $firstArg);
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
         $arrayBlock = BasicBlockHelper::append($context, 'implode_null_pieces_array');
         $stringBlock = BasicBlockHelper::append($context, 'implode_null_pieces_string');
         $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_ARRAY, false)
-            ),
+            self::jitValueBoxIsArray($context, $valuePtr),
             $arrayBlock,
             $stringBlock
         );
@@ -390,7 +424,7 @@ final class implode extends Internal
         self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
         $context->builder->positionAtEnd($arrayBlock);
         // PROFILE≥8.4 frameless implode(2): array + null → $separator TypeError (#26277).
-        if (self::rejectsArrayFirstExplicitNullPieces($function)) {
+        if (self::rejectsArrayFirstAsSeparator($function)) {
             self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
 
             return $context->getTypeFromString('__string__*')->constNull();
@@ -451,11 +485,16 @@ final class implode extends Internal
         $context->builder->positionAtEnd($arraySepBlock);
         self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
         $context->builder->positionAtEnd($otherBlock);
-        JitArrayElem::requireArrayParam($context, $secondArg, $function, 2, 'array', '?array');
-        $context->builder->call($context->lookupFunction('abort'));
+        // PROFILE≥8.4 frameless implode(2): string/int/object glue → Arg #1 ($separator) (#29087).
+        if (self::rejectsArrayFirstAsSeparator($function)) {
+            self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
+        } else {
+            JitArrayElem::requireArrayParam($context, $secondArg, $function, 2, 'array', '?array');
+            $context->builder->call($context->lookupFunction('abort'));
+        }
         $context->builder->positionAtEnd($nullBlock);
         // PROFILE≥8.4 frameless implode(2): array + null → $separator TypeError (#26277).
-        if (self::rejectsArrayFirstExplicitNullPieces($function)) {
+        if (self::rejectsArrayFirstAsSeparator($function)) {
             self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
 
             return $context->getTypeFromString('__string__*')->constNull();
@@ -515,6 +554,12 @@ final class implode extends Internal
         JITVariable $secondArg,
         string $function
     ): void {
+        // PROFILE≥8.4 frameless implode(2): never treat array-first as pieces (#29087).
+        if (self::rejectsArrayFirstAsSeparator($function)) {
+            self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
+
+            return;
+        }
         if (self::jitArgIsDefinitelyArray($secondArg)) {
             self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
 
@@ -532,25 +577,24 @@ final class implode extends Internal
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $firstArg);
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
         $arrayBlock = BasicBlockHelper::append($context, 'implode_two_arg_array_first');
         $modernBlock = BasicBlockHelper::append($context, 'implode_two_arg_modern');
         $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_ARRAY, false)
-            ),
+            self::jitValueBoxIsArray($context, $valuePtr),
             $arrayBlock,
             $modernBlock
         );
         $context->builder->positionAtEnd($arrayBlock);
-        self::jitRejectArrayFirstTwoArgForm($context, $secondArg, $function);
-        $context->builder->call($context->lookupFunction('abort'));
+        // emitSeparatorArrayTypeErrorAndAbort terminates (ExceptionBridge / abort); do not
+        // append a second terminator (#29087 module-verify).
+        if (self::rejectsArrayFirstAsSeparator($function)) {
+            self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
+        } elseif (self::jitArgIsDefinitelyArray($secondArg)) {
+            self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
+        } else {
+            self::jitRejectArrayFirstTwoArgForm($context, $secondArg, $function);
+            $context->builder->call($context->lookupFunction('abort'));
+        }
         $context->builder->positionAtEnd($modernBlock);
         // Soft-null boxed separator on PROFILE=8.4 (#21210, reverts #19894).
         $glue = self::lowerSeparatorSoftNull($context, $firstArg, $function);
@@ -617,15 +661,12 @@ final class implode extends Internal
         );
     }
 
-    /** AOT standalone: libc abort like JitArrayElem::emitErrorAndAbort (#4160). */
+    /** AOT/JIT: catchable TypeError under try/catch; uncaught still aborts (#29087, #19894). */
     private static function emitSeparatorArrayTypeErrorAndAbort(Context $context, string $function): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, sprintf(
+        ExceptionBridge::emitTypeErrorAndAbort($context, sprintf(
             '%s(): Argument #1 ($separator) must be of type string, array given',
             $function
         ));
-        $context->builder->call($context->lookupFunction('abort'));
     }
 }
