@@ -517,7 +517,13 @@ final class filter_var extends Internal
         switch ($filterId) {
             case VmFilter::FILTER_DEFAULT:
             case VmFilter::FILTER_UNSAFE_RAW:
-                return JitFilter::boxFilterDefault($context, $value);
+                // php_filter_unsafe_raw honors STRIP_*/ENCODE_* via FilterSanitizeJitHelper (#29064).
+                return JitFilter::sanitize(
+                    $context,
+                    $value,
+                    $context->getTypeFromString('int64')->constInt($filterId, false),
+                    $flags
+                );
             case VmFilter::FILTER_VALIDATE_INT:
                 $result = JitFilter::validateInt($context, $value, $flags);
                 $result = $applyNull
