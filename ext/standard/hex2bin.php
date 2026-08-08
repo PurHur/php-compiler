@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringHex2bin;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -34,15 +34,7 @@ final class hex2bin extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \ArgumentCountError('hex2bin() expects at least 1 argument, 0 given');
-        }
-        if ($argc > 1) {
-            throw new \ArgumentCountError(
-                \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
-            );
-        }
+        $this->requireExactArgCount($frame, 'hex2bin', 1);
         $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'hex2bin', 0, 'string');
         $len = VmString::byteLength($data);
         if ($len > 0 && 0 !== ($len & 1)) {
@@ -86,19 +78,9 @@ final class hex2bin extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1) {
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'hex2bin() expects at least 1 argument, 0 given'
-            );
-            $slot = JitValueBox::alloc($context);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ($argc > 1) {
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitArgumentCountError(
+        if (1 !== $argc) {
+            // AndAbort so standalone AOT actually throws (#27763); pending-only is silent NULL.
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
                 \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
             );
