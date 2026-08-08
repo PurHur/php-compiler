@@ -36,6 +36,76 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * XPath 1.0 name-test count for compile-time XML (user-script AOT; #29139).
+     *
+     * Unprefixed tests match null/empty namespace only — not default-NS elements
+     * (php-src ext/dom/xpath.c / libxml; same as VmDomXPath::elementMatchesTag).
+     * Prefixed tests expand via $registeredNamespaces (registerNamespace map).
+     *
+     * @param array<string, string> $registeredNamespaces prefix → URI
+     *
+     * @return null when a prefixed QName has no registered URI (undefined prefix)
+     */
+    public static function countXPathNameTestArgv(
+        string $xml,
+        string $tag,
+        array $registeredNamespaces = []
+    ): ?int {
+        $tag = trim($tag);
+        if ('' === $tag) {
+            return 0;
+        }
+        if ('*' === $tag) {
+            return \count(self::walkElementsInScopeNamespaces($xml));
+        }
+
+        $colon = strpos($tag, ':');
+        if (false !== $colon) {
+            $prefix = substr($tag, 0, $colon);
+            $local = substr($tag, $colon + 1);
+            if ('' === $local || !isset($registeredNamespaces[$prefix])) {
+                return null;
+            }
+            $wantUri = $registeredNamespaces[$prefix];
+
+            return self::countElementsMatchingNameTest($xml, $local, $wantUri);
+        }
+
+        // Unprefixed name test — null/empty namespace URI only (#21125 / #29139).
+        return self::countElementsMatchingNameTest($xml, $tag, null);
+    }
+
+    /**
+     * @param string|null $wantUri null = unprefixed (empty NS only); string = expanded URI
+     */
+    private static function countElementsMatchingNameTest(
+        string $xml,
+        string $localName,
+        ?string $wantUri
+    ): int {
+        $localName = strtolower($localName);
+        $count = 0;
+        foreach (self::walkElementsInScopeNamespaces($xml) as $element) {
+            if ('*' !== $localName && 0 !== strcasecmp($element['local'], $localName)) {
+                continue;
+            }
+            $prefix = $element['prefix'];
+            $ns = $element['inScope'][$prefix] ?? '';
+            if (null !== $wantUri) {
+                if ($ns === $wantUri) {
+                    ++$count;
+                }
+                continue;
+            }
+            if ('' === $ns) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
      * @return null|array{0: int, 1: string} match count and first text content
      */
     public static function matchDescendantAttributeArgv(

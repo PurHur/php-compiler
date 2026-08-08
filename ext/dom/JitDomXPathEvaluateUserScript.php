@@ -207,7 +207,14 @@ final class JitDomXPathEvaluateUserScript
         if ('*' === $tag) {
             return null;
         }
-        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+        $count = DomParseSimpleXmlJitHelper::countXPathNameTestArgv(
+            $xml,
+            $tag,
+            JitDomXPathRegisterUserScript::namespaces()
+        );
+        if (null === $count) {
+            return null;
+        }
 
         return $count > 0 ? $tag : '';
     }
@@ -324,8 +331,16 @@ final class JitDomXPathEvaluateUserScript
             return null;
         }
         $tag = $matches[1];
-        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+        $count = DomParseSimpleXmlJitHelper::countXPathNameTestArgv(
+            $xml,
+            $tag,
+            JitDomXPathRegisterUserScript::namespaces()
+        );
+        if (null === $count) {
+            return null;
+        }
         $sum = 0.0;
+        // Prefer QName scan for text when unprefixed null-NS; fall back to literal tag walk.
         for ($i = 1; $i <= $count; ++$i) {
             $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $tag, $i);
             if (null === $text) {
@@ -356,8 +371,19 @@ final class JitDomXPathEvaluateUserScript
             return null;
         }
         $tag = $matches[1];
+        $registeredNs = JitDomXPathRegisterUserScript::namespaces();
         if (!isset($matches[2]) || '' === $matches[2]) {
-            return DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+            return DomParseSimpleXmlJitHelper::countXPathNameTestArgv($xml, $tag, $registeredNs);
+        }
+        if (false !== strpos($tag, ':')) {
+            return null;
+        }
+        $nsCount = DomParseSimpleXmlJitHelper::countXPathNameTestArgv($xml, $tag, $registeredNs);
+        if (0 === $nsCount) {
+            return 0;
+        }
+        if ($nsCount !== DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag)) {
+            return null;
         }
         $numeric = isset($matches[4]) && '' !== $matches[4];
         $attrValue = $numeric ? $matches[4] : ($matches[3] ?? '');
