@@ -1692,11 +1692,8 @@ final class VmFilter
         if ('' === $s) {
             return false;
         }
-        $addr = $s;
-        if (str_starts_with($s, '[') && str_ends_with($s, ']')) {
-            $addr = substr($s, 1, -1);
-        }
-        $packed = VmInetPure::inet_pton($addr);
+        // php-src php_filter_validate_ip does not strip URI-style [IPv6] brackets (#29063).
+        $packed = VmInetPure::inet_pton($s);
         if (false === $packed) {
             return false;
         }

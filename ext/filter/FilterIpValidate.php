@@ -48,15 +48,11 @@ final class FilterIpValidate
         if ('' === $s) {
             return 0;
         }
-        $addr = $s;
-        if (\str_starts_with($s, '[') && \str_ends_with($s, ']')) {
-            $addr = \substr($s, 1, \strlen($s) - 2);
-        }
-
-        $isV4 = self::parseIpv4($addr);
+        // php-src php_filter_validate_ip rejects URI-style [IPv6] brackets (#29063).
+        $isV4 = self::parseIpv4($s);
         $isV6 = 0;
         if (0 === $isV4) {
-            $isV6 = self::isIpv6Text($addr);
+            $isV6 = self::isIpv6Text($s);
             if (0 === $isV6) {
                 return 0;
             }
@@ -88,7 +84,7 @@ final class FilterIpValidate
             }
         }
         if (($noPriv || $noRes || $globalOnly) && 1 === $isV6) {
-            if ($noRes && 1 === self::ipv6IsReservedNoRes($addr)) {
+            if ($noRes && 1 === self::ipv6IsReservedNoRes($s)) {
                 return 0;
             }
         }
