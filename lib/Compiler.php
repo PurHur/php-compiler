@@ -29647,6 +29647,15 @@ class Compiler {
         ) {
             return true;
         }
+        // var_dump($s->contains($o), $s[$o], count($s)) — ArrayDimFetch between MethodCall and the
+        // multi-arg consumer breaks firstSibling during reentrant stmt walk (#28821). Detect
+        // structurally without firstSibling so contains() is deferred and EXEC_RETURN is forced.
+        if (
+            $op instanceof Op\Expr\MethodCall
+            && null !== $this->multiArgConsumerAfterMethodCallDimFetchSibling($ops, $producerIndex)
+        ) {
+            return true;
+        }
         $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
         if (null !== $consumerIndex) {
             $consumer = $ops[$consumerIndex] ?? null;
@@ -29793,6 +29802,70 @@ class Compiler {
     }
 
     /**
+     * Multi-arg call after MethodCall with an ArrayDimFetch sibling between them (#28821).
+     *
+     * @param Op[] $ops
+     */
+    private function multiArgConsumerAfterMethodCallDimFetchSibling(array $ops, int $producerIndex): ?int
+    {
+        $opCount = \count($ops);
+        $sawDimFetch = false;
+        for ($j = $producerIndex + 1; $j < $opCount; ++$j) {
+            $next = $ops[$j] ?? null;
+            if ($next instanceof Op\Expr\ArrayDimFetch) {
+                $sawDimFetch = true;
+                continue;
+            }
+            if (
+                $next instanceof Op\Expr\FuncCall
+                || $next instanceof Op\Expr\NsFuncCall
+                || $next instanceof Op\Expr\MethodCall
+                || $next instanceof Op\Expr\StaticCall
+            ) {
+                if (!$sawDimFetch) {
+                    return null;
+                }
+                if (
+                    !$this->isSiblingMultiArgInlineCallConsumer($next)
+                    || !\is_array($next->args ?? null)
+                    || \count($next->args) < 2
+                    || $this->deadInlineTemporaryArgCount($next) < 2
+                ) {
+                    // Single-arg count() etc. — keep looking for var_dump/f(...).
+                    if (
+                        ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
+                        && (!\is_array($next->args ?? null) || \count($next->args) < 2)
+                    ) {
+                        continue;
+                    }
+
+                    return null;
+                }
+                // Distance must stay within dead-temp window (+ trailing FuncCall siblings).
+                if (($j - $producerIndex) > $this->deadInlineTemporaryArgCount($next) + 1) {
+                    return null;
+                }
+
+                return $j;
+            }
+            if (
+                $next instanceof Op\Expr\ConstFetch
+                || $next instanceof Op\Expr\ClassConstFetch
+                || $next instanceof Op\Expr\PropertyFetch
+                || $next instanceof Op\Expr\NullsafePropertyFetch
+                || $next instanceof Op\Expr\StaticPropertyFetch
+                || $this->isUnaryInlineSiblingCallArgExpr($next)
+            ) {
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
      * @param Op[] $ops
      */
     private function deferredSiblingInlineCallArgConsumerIndex(Op $op, array $ops, int $producerIndex): ?int
@@ -29887,6 +29960,15 @@ class Compiler {
                 continue;
             }
             if ($next instanceof Op\Expr\New_ || $next instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            // var_dump($s->contains($o), $s[$o], count($s)) — dim is a sibling arg, not a chain end (#28821).
+            if (
+                $next instanceof Op\Expr\ArrayDimFetch
+                || $next instanceof Op\Expr\PropertyFetch
+                || $next instanceof Op\Expr\NullsafePropertyFetch
+                || $next instanceof Op\Expr\StaticPropertyFetch
+            ) {
                 continue;
             }
             if ($next instanceof Op\Expr\ArrowFunction
@@ -32178,10 +32260,8 @@ class Compiler {
                 --$i;
                 continue;
             }
-            if (
-                $child instanceof Op\Expr\ArrayDimFetch
-                && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
-            ) {
+            // var_dump($m(), $a[$k]) — ArrayDimFetch is a sibling call arg (#28821).
+            if ($child instanceof Op\Expr\ArrayDimFetch) {
                 --$i;
                 continue;
             }
@@ -32333,10 +32413,9 @@ class Compiler {
                 --$i;
                 continue;
             }
-            if (
-                $child instanceof Op\Expr\ArrayDimFetch
-                && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
-            ) {
+            // var_dump($s->contains($o), $s[$o], count($s)) — ArrayDimFetch is a sibling arg; do not
+            // break the MethodCall/FuncCall chain (#28821, peer PropertyFetch #19719).
+            if ($child instanceof Op\Expr\ArrayDimFetch) {
                 --$i;
                 continue;
             }
@@ -32426,10 +32505,8 @@ class Compiler {
                 ++$first;
                 continue;
             }
-            if (
-                $skip instanceof Op\Expr\ArrayDimFetch
-                && $this->isArrayDimFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
-            ) {
+            // Call-arg ArrayDimFetch between MethodCall and FuncCall (#28821).
+            if ($skip instanceof Op\Expr\ArrayDimFetch) {
                 ++$first;
                 continue;
             }
@@ -55234,6 +55311,8 @@ class Compiler {
                 ) {
                     continue;
                 }
+                // Multi-sibling chain (MethodCall + FuncCall around ArrayDimFetch) (#28821).
+                return true;
             }
         }
 
