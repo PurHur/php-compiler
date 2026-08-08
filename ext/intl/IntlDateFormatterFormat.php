@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
 /**
  * IntlDateFormatter::format() — ICU pattern subset (php-src dateformat_format.c; #19549 / #5201).
@@ -43,5 +46,10 @@ final class IntlDateFormatterFormat extends VmClassMethod
             return;
         }
         $frame->returnVar->string($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        return JitIntlDateFormatterFormat::invokeMethod($context, ...$args);
     }
 }

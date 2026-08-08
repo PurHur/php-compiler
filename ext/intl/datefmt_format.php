@@ -53,6 +53,6 @@ final class datefmt_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('datefmt_format() is not implemented for JIT in this compiler build (issue #20837)');
+        return JitIntlDateFormatterFormat::invokeProcedural($context, ...$args);
     }
 }

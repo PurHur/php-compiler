@@ -20,6 +20,7 @@ use PHPCompiler\VM;
  * #17694, #19593, #19594, #6366, #6171, #6139, #6187, #6188, #20035, #20630, #22691).
  * JIT/AOT: {@see JitNumberFormatterCreate} (#27385); {@see JitNumberFormatterFormat} /
  * {@see NumberFormatterFormatJitHelper} (#28648);
+ * {@see JitIntlDateFormatterCreate} / {@see JitIntlDateFormatterFormat} (#27361);
  * {@see JitMessageFormatterFormat} / {@see MessageFormatterFormatJitHelper} (#28655);
  * {@see JitTransliteratorCreate} / {@see JitTransliteratorTransliterate} (#28657);
  * {@see JitNormalizerNormalize} / {@see NormalizerNormalizeJitHelper} (#28654).

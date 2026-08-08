@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
+use PHPLLVM\Value;
 
 /**
  * IntlDateFormatter::create() — ICU pattern subset (php-src dateformat_create.c; #19549 / #5201).
@@ -74,5 +77,10 @@ final class IntlDateFormatterCreate extends VmClassMethod
         }
         IntlError::clear();
         $frame->returnVar->object($object);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        return JitIntlDateFormatterCreate::invoke($context, ...$args);
     }
 }

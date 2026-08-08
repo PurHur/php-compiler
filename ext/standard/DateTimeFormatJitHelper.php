@@ -69,6 +69,19 @@ final class DateTimeFormatJitHelper
         if ('Ymd' === $format) {
             return self::digits4($year).self::digits2($month).self::digits2($day);
         }
+        // en_US IntlDateFormatter SHORT date (ICU M/d/yy → PHP n/j/y) (#27361).
+        // Avoid `$year % 100` / digits2 under NestedJIT — `%` has miscompiled to 0 (#27361).
+        if ('n/j/y' === $format) {
+            $yy = $year - (intdiv($year, 100) * 100);
+            if ($yy < 0) {
+                $yy = -$yy;
+            }
+            if ($yy < 10) {
+                return (string) $month.'/'.(string) $day.'/0'.(string) $yy;
+            }
+
+            return (string) $month.'/'.(string) $day.'/'.(string) $yy;
+        }
 
         return self::formatTokensScalar(
             $format,
@@ -147,6 +160,17 @@ final class DateTimeFormatJitHelper
                 $out = $out.(string) $month;
             } elseif ('j' === $ch) {
                 $out = $out.(string) $day;
+            } elseif ('y' === $ch) {
+                // Prefer intdiv over `%` — NestedJIT `%` miscompile (#27361).
+                $y2 = $year - (intdiv($year, 100) * 100);
+                if ($y2 < 0) {
+                    $y2 = -$y2;
+                }
+                if ($y2 < 10) {
+                    $out = $out.'0'.(string) $y2;
+                } else {
+                    $out = $out.(string) $y2;
+                }
             } elseif ('G' === $ch) {
                 $out = $out.(string) $hour;
             } else {
