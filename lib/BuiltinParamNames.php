@@ -1122,11 +1122,8 @@ final class BuiltinParamNames
             case 'mt_rand':
                 return ['min=', 'max='];
             case 'hex2bin':
-                return \PHPCompiler\CompilerVersion::supportsHex2binStrict()
-                    ? ['string', 'strict']
-                    : ['string'];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says
-            // binary_number/hexadecimal_number/octal_number/decimal_number (#24788)
+                // php-src arity 1 — no $strict (#27763; ext/standard/string.c / string.stub.php)
+                return ['string'];
             case 'bindec':
                 return ['binary_string'];
             case 'hexdec':

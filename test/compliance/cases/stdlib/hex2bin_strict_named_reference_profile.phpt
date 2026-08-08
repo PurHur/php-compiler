@@ -1,5 +1,5 @@
 --TEST--
-stdlib hex2bin() — strict: unknown named parameter on 8.2 reference profile (#16177, ext/standard/string.c)
+stdlib hex2bin() — strict: unknown named parameter (#27763 / #16177, ext/standard/string.c)
 --FILE--
 <?php
 try {

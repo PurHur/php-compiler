@@ -3482,10 +3482,12 @@ apply_php_types_never_method_overlay() {
   apply_php_types_never_type_overlay
 }
 
+# Revert phantom hex2bin $strict from InternalArgInfo (#27763 — php-src arity 1 only).
 apply_php_types_hex2bin_strict_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
-  if grep -q "'hex2bin' => \['string', 'data' => 'string', 'strict=' => 'bool'\]" "$target" 2>/dev/null; then
-    echo "Skip php-types-hex2bin-strict.patch (already applied)"
+  if grep -q "'hex2bin' => \['string', 'data' => 'string'\]," "$target" 2>/dev/null \
+    && ! grep -q "'hex2bin' => \['string', 'data' => 'string', 'strict=' => 'bool'\]" "$target" 2>/dev/null; then
+    echo "Skip php-types-hex2bin-strict-revert (already arity 1)"
     return 0
   fi
   python3 - "$target" <<'PY'
@@ -3494,16 +3496,17 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-old = "        'hex2bin' => ['string', 'data' => 'string'],\n"
-new = "        'hex2bin' => ['string', 'data' => 'string', 'strict=' => 'bool'],\n"
+old = "        'hex2bin' => ['string', 'data' => 'string', 'strict=' => 'bool'],\n"
+new = "        'hex2bin' => ['string', 'data' => 'string'],\n"
 if old not in text:
-    sys.stderr.write("php-types-hex2bin-strict: hex2bin anchor not found\n")
+    if new in text:
+        raise SystemExit(0)
+    sys.stderr.write("php-types-hex2bin-strict-revert: hex2bin anchor not found\n")
     raise SystemExit(1)
 path.write_text(text.replace(old, new, 1))
 PY
-  echo "Applied php-types-hex2bin-strict.patch (overlay)"
+  echo "Applied php-types-hex2bin-strict-revert (overlay, #27763)"
 }
-
 apply_php_types_str_bool_fns_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
   if grep -q "'str_contains' => \['bool'" "$target" 2>/dev/null; then

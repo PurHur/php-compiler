@@ -2380,7 +2380,7 @@ class InternalArgInfo
         'headers_sent' => ['bool', '&file=' => 'string', '&line=' => 'int'],
         'hebrevc' => ['string', 'str' => 'string', 'max_chars_per_line=' => 'int'],
         'hebrev' => ['string', 'str' => 'string', 'max_chars_per_line=' => 'int'],
-        'hex2bin' => ['string', 'data' => 'string', 'strict=' => 'bool'],
+        'hex2bin' => ['string', 'data' => 'string'],
         'hexdec' => ['int', 'hexadecimal_number' => 'string'],
         'highlight_file' => ['bool', 'file_name' => 'string', 'return=' => 'bool'],
         'highlight_string' => ['bool', 'string' => 'string', 'return=' => 'bool'],

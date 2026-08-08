@@ -12,8 +12,8 @@ set_error_handler(static function (int $errno, string $message): bool {
 
 try {
     hex2bin('abc', true);
-    echo "FAIL: expected Error on odd length\n";
+    echo "FAIL: expected ArgumentCountError on second arg\n";
     exit(1);
-} catch (\Error $e) {
+} catch (\ArgumentCountError $e) {
     echo 'E:', $e->getMessage(), "\n";
 }
