@@ -14501,7 +14501,14 @@ restart:
         return null;
     }
 
-    /** Reject unset() on readonly properties; returns catch frame or throws when uncaught. */
+    /**
+     * Reject unset() on readonly properties; returns catch frame or throws when uncaught.
+     *
+     * php-src zend_std_unset_property / verify_readonly_initialization_access (#29131):
+     * uninitialized readonly may be unset from declaring-class scope (same window as first
+     * init), including inside __construct, so a later write can initialize. Once initialized,
+     * unset always Errors — even mid-construction.
+     */
     private function enforceReadonlyPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
         if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
@@ -14515,6 +14522,25 @@ restart:
         $declaringClass = $this->readonlyPropertyDeclaringClass($object, $propName);
         if (null === $declaringClass) {
             return null;
+        }
+
+        // Uninitialized + declaring-class scope → allow (reinit via later assign; #29131).
+        if ($this->allowReadonlyPropertyFirstInit($object, $propName, $frame)) {
+            return null;
+        }
+
+        $uninitialized = !$object->hasProperty($propName)
+            || VM\TypedPropertyCheck::isUninitialized($object->getProperty($propName));
+        if ($uninitialized) {
+            return $this->dispatchVmError(
+                sprintf(
+                    'Cannot unset readonly property %s::$%s from %s',
+                    $declaringClass,
+                    $propName,
+                    $this->propertyWriteScopeLabel($frame)
+                ),
+                $frame
+            );
         }
 
         return $this->dispatchVmError(
