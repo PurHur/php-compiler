@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringWordwrap;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
@@ -31,17 +32,17 @@ final class wordwrap extends Internal
     {
         // php-src ext/standard/string.c — ArgumentCountError (#23164).
         $this->requireArgCountRange($frame, 'wordwrap', 1, 4);
-        $argc = \count($frame->calledArgs);
         if (null === $frame->returnVar) {
             return;
         }
+        // Named skips (e.g. break: without width) leave sparse calledArgs — use isset, not argc (#28938).
         $text = self::vmStringArg($frame, 0, 'string');
         $width = 75;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $width = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'wordwrap', 2, 'width');
         }
         $break = "\n";
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $break = VmString::coerceZparamStrBuiltinArg(
                 $frame->calledArgs[2],
                 'wordwrap',
@@ -50,7 +51,7 @@ final class wordwrap extends Internal
             );
         }
         $cut = false;
-        if (4 === $argc) {
+        if (isset($frame->calledArgs[3])) {
             $c = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $c->type) {
                 throw new \LogicException('wordwrap() cut must be a boolean in this compiler build');
@@ -67,12 +68,11 @@ final class wordwrap extends Internal
         if (!$this->requireArgCountRangeJit($context, $args, 'wordwrap', 1, 4)) {
             return $context->getTypeFromString('__string__*')->constNull();
         }
-        $argc = \count($args);
         $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
-            $width = self::compileTimeWidth($args, $argc);
-            $break = self::compileTimeBreak($args, $argc);
-            $cut = self::compileTimeCut($context, $args, $argc);
+            $width = self::compileTimeWidth($args);
+            $break = self::compileTimeBreak($args);
+            $cut = self::compileTimeCut($context, $args);
             if (null !== $width && null !== $break) {
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::wordwrap($literal, $width, $break, $cut))
@@ -82,17 +82,17 @@ final class wordwrap extends Internal
 
         $i64 = $context->getTypeFromString('int64');
         $width = $i64->constInt(75, false);
-        if ($argc >= 2) {
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             $width = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'wordwrap', 2, 'width');
         }
-        if ($argc >= 3) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $break = JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'wordwrap', 2, 'break');
         } else {
             $break = $context->builder->load($context->constantStringFromString("\n"));
         }
         $i8 = $context->getTypeFromString('int8');
         $cutI8 = $i8->constInt(0, false);
-        if (4 === $argc) {
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             if (JITVariable::TYPE_NATIVE_BOOL !== $args[3]->type) {
                 throw new \LogicException('wordwrap() cut must be a boolean in this compiler build');
             }
@@ -151,27 +151,27 @@ final class wordwrap extends Internal
         );
     }
 
-    private static function compileTimeWidth(array $args, int $argc): ?int
+    private static function compileTimeWidth(array $args): ?int
     {
-        if ($argc < 2) {
+        if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             return 75;
         }
 
         return self::compileTimeInt($args[1], null);
     }
 
-    private static function compileTimeBreak(array $args, int $argc): ?string
+    private static function compileTimeBreak(array $args): ?string
     {
-        if ($argc < 3) {
+        if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             return "\n";
         }
 
         return JitStringArg::compileTimeLiteral($args[2]);
     }
 
-    private static function compileTimeCut(Context $context, array $args, int $argc): bool
+    private static function compileTimeCut(Context $context, array $args): bool
     {
-        if ($argc < 4) {
+        if (!isset($args[3]) || NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             return false;
         }
         if (JITVariable::TYPE_NATIVE_BOOL !== $args[3]->type || JITVariable::KIND_VALUE !== $args[3]->kind) {
