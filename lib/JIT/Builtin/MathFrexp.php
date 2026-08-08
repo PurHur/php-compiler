@@ -11,12 +11,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for frexp() via FrexpJitHelper PHP (#15201, #22575).
+ * JIT/AOT link for frexp() via FrexpJitHelper PHP (#15201, #22575, #29156).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519).
+ * NestedJIT-safe peel lives in {@see \PHPCompiler\ext\standard\FrexpJitHelper}
+ * (nextafter #28716 shape — no VmMath floor/log/pow-of-two under helper compile).
  * Replaces libc `frexp` LLVM lookup in ext/standard/frexp.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
- * php-src: ext/standard/math.c — PHP_FUNCTION(frexp)
+ * php-src: frexp(3) / ext/standard/math.c (userland frexp is a php-src phantom — #24133)
  */
 final class MathFrexp
 {
