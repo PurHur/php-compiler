@@ -61,6 +61,18 @@ final class UnpackEngineTest extends TestCase
         $this->assertSame(\unpack('C2foo', 'AB'), UnpackEngine::unpack('C2foo', 'AB'));
     }
 
+    public function testSpacePadAFixedWidthMatchesZend(): void
+    {
+        // Fixed-width A must strip trailing pad chars like A* (#29006 / php-src pack.c).
+        $this->assertSame(\unpack('A4', 'ab  '), UnpackEngine::unpack('A4', 'ab  '));
+        $this->assertSame(\unpack('A3', 'ab '), UnpackEngine::unpack('A3', 'ab '));
+        $this->assertSame(\unpack('A5', "ab\t\r\n"), UnpackEngine::unpack('A5', "ab\t\r\n"));
+        $this->assertSame(\unpack('A4', "ab\0\0"), UnpackEngine::unpack('A4', "ab\0\0"));
+        $this->assertSame(\unpack('A5', '  ab '), UnpackEngine::unpack('A5', '  ab '));
+        $this->assertSame(\unpack('a4', 'ab  '), UnpackEngine::unpack('a4', 'ab  '));
+        $this->assertSame(\unpack('A*', 'ab  '), UnpackEngine::unpack('A*', 'ab  '));
+    }
+
     public function testUnpackEngineDoesNotUseHostFloatUnpack(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnpackEngine.php');
