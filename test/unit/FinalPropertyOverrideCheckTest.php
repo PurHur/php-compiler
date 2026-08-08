@@ -816,6 +816,45 @@ PHP;
     }
 
     /**
+     * @covers issue #28956 — exact issue-body (re-#28816): `final public string`
+     * isFinal=1 + wrote=c; sibling override CompileFatal under PROFILE=8.4/8.5.
+     */
+    public function testIssue28956IssueBodyIsFinalWriteAndOverride(): void
+    {
+        $isfinal = dirname(__DIR__) . '/repro/issue_28956_final_plain_isfinal_write.php';
+        $override = dirname(__DIR__) . '/repro/issue_28956_final_plain_override.php';
+        self::assertFileExists($isfinal);
+        self::assertFileExists($override);
+        $isfinalCode = file_get_contents($isfinal);
+        $overrideCode = file_get_contents($override);
+        self::assertNotFalse($isfinalCode);
+        self::assertNotFalse($overrideCode);
+
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $_ENV['PHP_COMPILER_PROFILE'] = $profile;
+            self::assertTrue(
+                \PHPCompiler\CompilerVersion::supportsFinalProperties(),
+                'PROFILE='.$profile.' must support final properties'
+            );
+
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($isfinalCode, 'issue_28956_isfinal_'.$profile.'.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("isFinal=1\nwrote=c\n", ob_get_clean(), 'PROFILE='.$profile);
+
+            try {
+                $runtime->parseAndCompile($overrideCode, 'issue_28956_override_'.$profile.'.php');
+                $this->fail('Expected CompileFatal on sibling override (#28956) PROFILE='.$profile);
+            } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+                self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+                self::assertStringStartsWith('PHP Fatal error:', $e->zendStderrLine());
+            }
+        }
+    }
+
+    /**
      * @covers issue #27818 — trait-imported final plain property: isFinal=1 + child
      * override CompileFatal (same Zend inheritance rules as class-declared finals).
      */
