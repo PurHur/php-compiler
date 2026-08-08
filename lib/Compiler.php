@@ -4684,6 +4684,7 @@ class Compiler {
             && null !== ($stmtCoalesce = $this->findStmtCoalesceImmediatelyBeforeFuncCall($cfgCallOp, $block))
         ) {
             $firstArg = $cfgCallOp->args[0] ?? null;
+            $resultOverride = $this->coalesceAssignLvalueOperand($stmtCoalesce);
             $hasOtherCoalesceFedArg = false;
             foreach ($cfgCallOp->args ?? [] as $idx => $otherArg) {
                 if ((int) $idx === $argIndex || null === $otherArg) {
@@ -4691,21 +4692,23 @@ class Compiler {
                 }
                 if (
                     [] !== $this->findEmbeddedCoalesces($otherArg)
-                    || $this->operandsReferToSameVariable($stmtCoalesce->result, $otherArg)
-                    || $this->operandsReferToSameVariable($stmtCoalesce->left, $otherArg)
+                    || $this->callArgMatchesCoalesceExpressionValue($otherArg, $stmtCoalesce, $resultOverride)
                 ) {
                     $hasOtherCoalesceFedArg = true;
                     break;
                 }
             }
+            // Named first args (gettype($a) after `$a['x'] ??…`) are containers, not the ?? value (#29112).
             if (
                 !$hasOtherCoalesceFedArg
                 && null !== $firstArg
                 && !$this->isEmbeddedCallLiteralArg($arg)
                 && (
-                    $this->operandsReferToSameVariable($firstArg, $arg)
-                    || $this->operandsReferToSameVariable($stmtCoalesce->result, $arg)
-                    || $this->operandsReferToSameVariable($stmtCoalesce->left, $arg)
+                    $this->callArgMatchesCoalesceExpressionValue($arg, $stmtCoalesce, $resultOverride)
+                    || (
+                        $this->callArgIsDeadInlineTemporary($firstArg)
+                        && $this->operandsReferToSameVariable($firstArg, $arg)
+                    )
                 )
             ) {
                 return true;
@@ -4742,6 +4745,7 @@ class Compiler {
             $stmtCoalesce = $this->findStmtCoalesceImmediatelyBeforeFuncCall($cfgCallOp, $block);
             if (null !== $stmtCoalesce) {
                 $firstArg = $cfgCallOp->args[0] ?? null;
+                $resultOverride = $this->coalesceAssignLvalueOperand($stmtCoalesce);
                 $hasOtherCoalesceFedArg = false;
                 foreach ($cfgCallOp->args ?? [] as $idx => $otherArg) {
                     if ((int) $idx === $argIndex || null === $otherArg) {
@@ -4749,8 +4753,7 @@ class Compiler {
                     }
                     if (
                         [] !== $this->findEmbeddedCoalesces($otherArg)
-                        || $this->operandsReferToSameVariable($stmtCoalesce->result, $otherArg)
-                        || $this->operandsReferToSameVariable($stmtCoalesce->left, $otherArg)
+                        || $this->callArgMatchesCoalesceExpressionValue($otherArg, $stmtCoalesce, $resultOverride)
                     ) {
                         $hasOtherCoalesceFedArg = true;
                         break;
@@ -4761,9 +4764,11 @@ class Compiler {
                     && null !== $firstArg
                     && !$this->isEmbeddedCallLiteralArg($arg)
                     && (
-                        $this->operandsReferToSameVariable($firstArg, $arg)
-                        || $this->operandsReferToSameVariable($stmtCoalesce->result, $arg)
-                        || $this->operandsReferToSameVariable($stmtCoalesce->left, $arg)
+                        $this->callArgMatchesCoalesceExpressionValue($arg, $stmtCoalesce, $resultOverride)
+                        || (
+                            $this->callArgIsDeadInlineTemporary($firstArg)
+                            && $this->operandsReferToSameVariable($firstArg, $arg)
+                        )
                     )
                 ) {
                     $coalesce = $stmtCoalesce;
@@ -4778,6 +4783,44 @@ class Compiler {
         }
 
         return $valueSlot;
+    }
+
+    /**
+     * True when $callArg is the ?? / ??= expression value — not the dim/prop container (#29112).
+     *
+     * Matching coalesce->left is unsafe: for `$a['x'] ?? …` / `??=` the left is the element
+     * temp, and a following `gettype($a)` / `json_encode($a)` must keep the array/object CV.
+     */
+    private function callArgMatchesCoalesceExpressionValue(
+        Operand $callArg,
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        ?Operand $resultOverride
+    ): bool {
+        if (
+            $this->operandsChainEqual($callArg, $coalesce->result)
+            || $this->operandsReferToSameVariable($callArg, $coalesce->result)
+        ) {
+            return true;
+        }
+        if (
+            null !== $resultOverride
+            && (
+                $this->operandsChainEqual($callArg, $resultOverride)
+                || $this->operandsReferToSameVariable($callArg, $resultOverride)
+            )
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Resolve ??= / `$dst = … ?? …` assign destination recorded for a coalesce stmt (#29112).
+     */
+    private function coalesceAssignLvalueOperand(Op\Expr\BinaryOp\Coalesce $coalesce): ?Operand
+    {
+        return $this->coalesceAssignLvalues[spl_object_id($coalesce)] ?? null;
     }
 
     /**
@@ -4835,11 +4878,7 @@ class Compiler {
                 ) {
                     continue;
                 }
-                if (
-                    $this->operandsChainEqual($callArg, $coalesce->result)
-                    || $this->operandsReferToSameVariable($callArg, $coalesce->result)
-                    || $this->operandsReferToSameVariable($callArg, $coalesce->left)
-                ) {
+                if ($this->callArgMatchesCoalesceExpressionValue($callArg, $coalesce, $resultOverride)) {
                     $targetArg = $callArg;
                     break;
                 }
@@ -4849,11 +4888,17 @@ class Compiler {
                 if (null !== $ordinalTarget) {
                     $targetArg = $ordinalTarget;
                 } else {
+                    // First-arg fallback is only for php-cfg dead expression temps
+                    // (`foo($a['x'] ?? 'y')`), never named containers like gettype($a) (#29112).
                     $firstArg = $next->args[0] ?? null;
                     if (
                         null !== $firstArg
                         && !$this->isCallArgUnrelatedToPriorStmtCoalesce($firstArg)
                         && $this->onlyInlineCallArgProducersBetweenIndices($ops, $coalesceIdx, $j)
+                        && (
+                            $this->callArgMatchesCoalesceExpressionValue($firstArg, $coalesce, $resultOverride)
+                            || $this->callArgIsDeadInlineTemporary($firstArg)
+                        )
                     ) {
                         $targetArg = $firstArg;
                     }
@@ -5317,15 +5362,12 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return false;
         }
+        $resultOverride = $this->coalesceAssignLvalueOperand($coalesce);
         foreach ($callOp->args as $callArg) {
             if (
                 null !== $callArg
                 && !$this->isCallArgUnrelatedToPriorStmtCoalesce($callArg)
-                && (
-                    $this->operandsChainEqual($callArg, $coalesce->result)
-                    || $this->operandsReferToSameVariable($callArg, $coalesce->result)
-                    || $this->operandsReferToSameVariable($callArg, $coalesce->left)
-                )
+                && $this->callArgMatchesCoalesceExpressionValue($callArg, $coalesce, $resultOverride)
             ) {
                 return true;
             }
@@ -5336,8 +5378,8 @@ class Compiler {
             && !$this->isCallArgUnrelatedToPriorStmtCoalesce($firstArg)
             && $this->onlyInlineCallArgProducersBetweenIndices($ops, $coalesceIndex, $callIndex)
             && (
-                $this->operandsChainEqual($firstArg, $coalesce->result)
-                || $this->operandsReferToSameVariable($firstArg, $coalesce->result)
+                $this->callArgMatchesCoalesceExpressionValue($firstArg, $coalesce, $resultOverride)
+                || $this->callArgIsDeadInlineTemporary($firstArg)
             )
         ) {
             return true;
