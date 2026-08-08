@@ -88,12 +88,105 @@ final class FilterIpValidate
             }
         }
         if (($noPriv || $noRes || $globalOnly) && 1 === $isV6) {
-            if ($noRes && ('::1' === $addr || '::' === $addr)) {
+            if ($noRes && 1 === self::ipv6IsReservedNoRes($addr)) {
                 return 0;
             }
         }
 
         return 1;
+    }
+
+    /**
+     * php-src ≤8.2 FILTER_FLAG_NO_RES_RANGE IPv6 set (logical_filters.c) (#29009).
+     *
+     * @return int 1 when address must be rejected under NO_RES_RANGE
+     */
+    private static function ipv6IsReservedNoRes(string $addr): int
+    {
+        if ('::1' === $addr || '::' === $addr) {
+            return 1;
+        }
+        $h = self::ipv6LeadingHextets($addr);
+        if (null === $h) {
+            return 0;
+        }
+        // fe80::/10 link-local
+        if ($h[0] >= 0xfe80 && $h[0] <= 0xfebf) {
+            return 1;
+        }
+        // 2001:db8::/32 documentation + 2001:10::/28 ORCHID
+        if (0x2001 === $h[0] && (0x0db8 === $h[1] || ($h[1] >= 0x0010 && $h[1] <= 0x001f))) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /**
+     * First two 16-bit hextets (handles leading :: and normal forms). NestedJIT-safe (no by-ref).
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private static function ipv6LeadingHextets(string $addr): ?array
+    {
+        $len = \strlen($addr);
+        if (0 === $len) {
+            return null;
+        }
+        if (\str_starts_with($addr, '::')) {
+            return [0, 0];
+        }
+        $parsed0 = self::parseHextetFrom($addr, 0, $len);
+        if (null === $parsed0) {
+            return null;
+        }
+        $h0 = $parsed0[0];
+        $i = $parsed0[1];
+        if ($i >= $len || ':' !== $addr[$i]) {
+            return null;
+        }
+        ++$i;
+        if ($i < $len && ':' === $addr[$i]) {
+            return [$h0, 0];
+        }
+        $parsed1 = self::parseHextetFrom($addr, $i, $len);
+        if (null === $parsed1) {
+            return null;
+        }
+
+        return [$h0, $parsed1[0]];
+    }
+
+    /**
+     * @return array{0: int, 1: int}|null [value, indexAfter]
+     */
+    private static function parseHextetFrom(string $addr, int $i, int $len): ?array
+    {
+        $val = 0;
+        $n = 0;
+        while ($i < $len) {
+            $o = \ord($addr[$i]);
+            if ($o >= 48 && $o <= 57) {
+                $v = $o - 48;
+            } elseif ($o >= 97 && $o <= 102) {
+                $v = $o - 87;
+            } elseif ($o >= 65 && $o <= 70) {
+                $v = $o - 55;
+            } else {
+                break;
+            }
+            $val = ($val << 4) | $v;
+            ++$n;
+            ++$i;
+            if ($n > 4) {
+                return null;
+            }
+        }
+        if (0 === $n) {
+            return null;
+        }
+
+        return [$val, $i];
     }
 
     /** @return int 1=parsed into self::$o0..$o3 */

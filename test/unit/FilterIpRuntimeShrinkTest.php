@@ -56,6 +56,22 @@ final class FilterIpRuntimeShrinkTest extends TestCase
         $this->assertSame(0, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('999.0.0.1'));
     }
 
+    /** #29009 — NestedJIT path rejects documentation prefix under NO_RES_RANGE. */
+    public function testFilterIpValidateNoResRangeDocumentationPrefix(): void
+    {
+        $flag = 0x00400000; // FILTER_FLAG_NO_RES_RANGE
+        $this->assertSame(0, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('2001:db8::1', $flag));
+        $this->assertSame(0, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('2001:db8:1::', $flag));
+        $this->assertSame(0, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('fe80::1', $flag));
+        $this->assertSame(1, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('2001:4860:4860::8888', $flag));
+        $this->assertSame(1, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('2001:db8::1', 0));
+        $this->assertFalse(\PHPCompiler\ext\filter\VmFilter::isValidIpAddress('2001:db8::1', $flag));
+        $this->assertSame(
+            \PHPCompiler\ext\filter\VmFilter::isValidIpAddress('2001:db8::1', $flag),
+            \PHPCompiler\ext\filter\FilterIpValidate::isValid('2001:db8::1', $flag)
+        );
+    }
+
     public function testSpineBundleIncludesFilterIpValidate(): void
     {
         $spine = (string) \file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');

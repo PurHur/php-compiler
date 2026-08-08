@@ -232,6 +232,26 @@ final class VmFilterTest extends TestCase
         $this->assertTrue(VmFilter::isValidIpAddress('[2001:db8::1]'));
     }
 
+    /** #29009 — 2001:db8::/32 reserved under FILTER_FLAG_NO_RES_RANGE (php-src ≤8.2). */
+    public function testValidateIpNoResRangeRejectsDocumentationPrefix(): void
+    {
+        $flag = VmFilter::FILTER_FLAG_NO_RES_RANGE;
+        $this->assertFalse(VmFilter::isValidIpAddress('2001:db8::1', $flag));
+        $this->assertFalse(VmFilter::isValidIpAddress('2001:db8:1::', $flag));
+        $this->assertFalse(VmFilter::isValidIpAddress('fe80::1', $flag));
+        $this->assertFalse(VmFilter::isValidIpAddress('::1', $flag));
+        $this->assertTrue(VmFilter::isValidIpAddress('2001:4860:4860::8888', $flag));
+        $this->assertTrue(VmFilter::isValidIpAddress('2001:db8::1', 0));
+
+        $v = new Variable();
+        $v->string('2001:db8::1');
+        $options = new Variable();
+        $options->array(self::flagsOptions($flag));
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_IP, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
     public function testIsValidIpAddressRejectsInvalidIpv4(): void
     {
         $this->assertFalse(VmFilter::isValidIpAddress('999.999.999.999'));
