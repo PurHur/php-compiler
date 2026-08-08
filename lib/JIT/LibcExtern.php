@@ -39,7 +39,7 @@ final class LibcExtern
             'strcasecmp' => [$i32, false, [$i8p, $i8p]],
             'strncasecmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
             'strcoll' => [$i32, false, [$i8p, $i8p]],
-            'strcspn' => [$sizeT, false, [$i8p, $i8p]],
+            // strcspn dropped (#29050): parse_str AOT kernel + StringStrspn use __compiler_strcspn.
             'strchr' => [$i8p, false, [$i8p, $i32]],
             'strstr' => [$i8p, false, [$i8p, $i8p]],
             'strrchr' => [$i8p, false, [$i8p, $i32]],
@@ -83,6 +83,7 @@ final class LibcExtern
             // routes through MathSqrt::invoke.
             // Dead FS/string/process decls removed (#28850): ChownRuntime / StringStrspn /
             // StringStrpbrk / sync helpers own PHP or phpc_* ABIs — no lookupFunction remains.
+            // libc strcspn removed (#29050): last consumer was JitParseStrUserScriptCstrKernel.
 
             // x86_64 SYS_* trampoline — MCJIT relocates varargs libc better than write(2) (#21109)
             'syscall' => [$i64, true, [$i64]],

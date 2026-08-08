@@ -18,6 +18,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Nested {@see ParseStrJitHelper::parseIntoNative} segfaults at {@code main_after_init}; this
  * hand-lowering mirrors {@see ParseStrEngine} for runtime libc getenv strings.
  * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19466 / #19500.
+ * Bracket-key split uses {@see StringStrspn} {@code __compiler_strcspn} (#29050), not libc.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class JitParseStrUserScriptCstrKernel
@@ -561,8 +562,9 @@ final class JitParseStrUserScriptCstrKernel
 
         $context->builder->positionAtEnd($initBb);
         $bracketSet = self::cstrLiteral($context, '[');
+        // PHP-owned ABI (#29050) — not libc strcspn (name collision / LibcExtern shrink).
         $baseLen = $context->builder->zExt(
-            $context->builder->call($context->lookupFunction('strcspn'), $raw, $bracketSet),
+            $context->builder->call($context->lookupFunction('__compiler_strcspn'), $raw, $bracketSet),
             $i64
         );
         $hasBase = $context->builder->icmp(Builder::INT_UGT, $baseLen, $i64->constInt(0, false));
