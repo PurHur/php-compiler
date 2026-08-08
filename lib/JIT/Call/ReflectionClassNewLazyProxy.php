@@ -33,7 +33,7 @@ final class ReflectionClassNewLazyProxy implements Call
         if (null === $initProxy) {
             throw new \LogicException('ReflectionClass::newLazyProxy() expects a callable');
         }
-        $initIndex = LazyObjectHelper::registerInitProxy($context, $initProxy);
+        $initIndex = LazyObjectHelper::registerInitProxy($context, $initProxy, $args[1]);
 
         $classIdVal = self::loadClassIdFromReflection($context, $args[0]);
         $obj = $context->type->object->allocateForRuntimeClassId($classIdVal);

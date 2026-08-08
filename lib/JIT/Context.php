@@ -74,6 +74,15 @@ class Context {
 
     /** @var array<int, Call> lazy initializer proxies keyed by __object__.lazy_init_index (#4940, #5318) */
     public array $lazyInitProxies = [];
+
+    /**
+     * Original Closure JIT variables for getLazyInitializer identity (#29152).
+     *
+     * Parallel to {@see $lazyInitProxies} — same index as lazy_init_index on the object.
+     *
+     * @var array<int, Variable>
+     */
+    public array $lazyInitClosures = [];
     /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */
     public array $externalMethodStubs = [];
     public array $functionReturnType = [];

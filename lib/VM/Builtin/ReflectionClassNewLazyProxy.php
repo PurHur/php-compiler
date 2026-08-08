@@ -33,7 +33,7 @@ final class ReflectionClassNewLazyProxy extends VmClassMethod
         if ($entry->isTrait || $entry->isEnum) {
             throw new \LogicException('Cannot create lazy proxy of '.$entry->name);
         }
-        $initializer = LazyObjectSupport::extractRequiredCallable(
+        $initializerClosure = LazyObjectSupport::extractRequiredCallableObject(
             $frame->calledArgs[1],
             'ReflectionClass::newLazyProxy',
             1,
@@ -43,7 +43,12 @@ final class ReflectionClassNewLazyProxy extends VmClassMethod
         if (\count($frame->calledArgs) >= 3) {
             $options = $frame->calledArgs[2]->resolveIndirect()->toInt();
         }
-        $lazy = LazyObjectSupport::createProxy($entry, $initializer, $options);
+        $lazy = LazyObjectSupport::createProxy(
+            $entry,
+            $initializerClosure->closureState,
+            $options,
+            $initializerClosure
+        );
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);

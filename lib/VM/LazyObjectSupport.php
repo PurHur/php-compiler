@@ -55,6 +55,18 @@ final class LazyObjectSupport
         int $argNum,
         string $paramName
     ): ClosureState {
+        return self::extractRequiredCallableObject($arg, $functionName, $argNum, $paramName)->closureState;
+    }
+
+    /**
+     * Callable Closure object for lazy factories — retains identity for getLazyInitializer (#29152).
+     */
+    public static function extractRequiredCallableObject(
+        Variable $arg,
+        string $functionName,
+        int $argNum,
+        string $paramName
+    ): ObjectEntry {
         $arg = $arg->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $arg->type) {
             throw new \TypeError(
@@ -70,7 +82,7 @@ final class LazyObjectSupport
             );
         }
 
-        return $initObject->closureState;
+        return $initObject;
     }
 
     public static function extractOptionalCallable(
@@ -85,6 +97,23 @@ final class LazyObjectSupport
         }
 
         return self::extractRequiredCallable($arg, $functionName, $argNum, $paramName);
+    }
+
+    /**
+     * Optional callable Closure object — null when omitted (#29152).
+     */
+    public static function extractOptionalCallableObject(
+        Variable $arg,
+        string $functionName,
+        int $argNum,
+        string $paramName
+    ): ?ObjectEntry {
+        $arg = $arg->resolveIndirect();
+        if ($arg->isUndefined() || Variable::TYPE_NULL === $arg->type) {
+            return null;
+        }
+
+        return self::extractRequiredCallableObject($arg, $functionName, $argNum, $paramName);
     }
 
     /**
@@ -118,7 +147,7 @@ final class LazyObjectSupport
         return self::countLazyInstanceProperties($class) > 0;
     }
 
-    public static function createProxy(ClassEntry $class, ClosureState $initializer, int $options = 0): ObjectEntry
+    public static function createProxy(ClassEntry $class, ClosureState $initializer, int $options = 0, ?ObjectEntry $initializerClosure = null): ObjectEntry
     {
         // Interfaces have no instance properties but still need a pending proxy placeholder
         // so the factory runs on first use (Zend/zend_lazy_objects.c; #9999 / #28414).
@@ -132,17 +161,16 @@ final class LazyObjectSupport
         }
         $object = new ObjectEntry($class);
         $object->constructed = false;
-        $object->lazyInitializer = $initializer;
+        self::assignInitializer($object, $initializer, $initializerClosure);
         $object->lazyPending = true;
         $object->lazyGhost = false;
-        $object->lazyResetInitializer = $initializer;
         self::clearLazyRawInitializedProperties($object);
         self::applyUserOptions($object, $options, false);
 
         return $object;
     }
 
-    public static function createGhost(ClassEntry $class, ?ClosureState $initializer, int $options = 0): ObjectEntry
+    public static function createGhost(ClassEntry $class, ?ClosureState $initializer, int $options = 0, ?ObjectEntry $initializerClosure = null): ObjectEntry
     {
         if (!self::classCanBeLazy($class)) {
             // zend_object_make_lazy early-return: ordinary object, initializer discarded (#21570).
@@ -158,10 +186,9 @@ final class LazyObjectSupport
             $var->type = Variable::TYPE_UNDEFINED;
         }
         $object->constructed = false;
-        $object->lazyInitializer = $initializer;
+        self::assignInitializer($object, $initializer, $initializerClosure);
         $object->lazyPending = true;
         $object->lazyGhost = true;
-        $object->lazyResetInitializer = $initializer;
         self::clearLazyRawInitializedProperties($object);
         self::applyUserOptions($object, $options, false);
 
@@ -200,6 +227,7 @@ final class LazyObjectSupport
         $object->lazyInitException = $resolved->toObject();
         if (null !== $object->lazyResetInitializer) {
             $object->lazyInitializer = $object->lazyResetInitializer;
+            $object->lazyInitializerClosure = $object->lazyResetInitializerClosure;
         }
         $object->lazyPending = true;
         $object->constructed = false;
@@ -238,8 +266,9 @@ final class LazyObjectSupport
         }
 
         $initializer = $object->lazyInitializer;
-        self::archiveResetInitializer($object, $initializer);
+        self::archiveResetInitializer($object, $initializer, $object->lazyInitializerClosure);
         $object->lazyInitializer = null;
+        $object->lazyInitializerClosure = null;
 
         if ($object->lazyGhost) {
             self::applyPropertyDefaults($object);
@@ -332,6 +361,27 @@ final class LazyObjectSupport
         return null;
     }
 
+    /**
+     * Original factory Closure for ReflectionClass::getLazyInitializer() (#29152).
+     *
+     * Returns the same ObjectEntry passed to newLazyGhost/newLazyProxy/resetAsLazy*
+     * (Zend zend_lazy_objects.c stores/returns the user factory closure).
+     */
+    public static function getInitializerClosure(ObjectEntry $object): ?ObjectEntry
+    {
+        if (!$object->lazyPending) {
+            return null;
+        }
+        if (null !== $object->lazyInitializerClosure) {
+            return $object->lazyInitializerClosure;
+        }
+        if (null !== $object->lazyInitializer && null !== $object->lazyInitializer->ownerObject) {
+            return $object->lazyInitializer->ownerObject;
+        }
+
+        return null;
+    }
+
     /** ReflectionClass::getLazyProxyFactory — pending proxy factory only (#6776). */
     public static function getProxyFactory(ObjectEntry $object): ?ClosureState
     {
@@ -343,6 +393,19 @@ final class LazyObjectSupport
         }
 
         return $object->lazyInitializer;
+    }
+
+    /** Pending proxy factory Closure object (#29152 / #6776). */
+    public static function getProxyFactoryClosure(ObjectEntry $object): ?ObjectEntry
+    {
+        if ($object->lazyGhost) {
+            return null;
+        }
+        if (!$object->lazyPending || null === $object->lazyInitializer) {
+            return null;
+        }
+
+        return self::getInitializerClosure($object);
     }
 
     /** Zend zend_object_is_lazy && !zend_lazy_object_initialized (#6054, #6068). */
@@ -422,8 +485,9 @@ final class LazyObjectSupport
             return $object;
         }
         self::applyPropertyDefaults($object);
-        self::archiveResetInitializer($object, $object->lazyInitializer);
+        self::archiveResetInitializer($object, $object->lazyInitializer, $object->lazyInitializerClosure);
         $object->lazyInitializer = null;
+        $object->lazyInitializerClosure = null;
         $object->lazyPending = false;
         $object->constructed = true;
         $object->lazyInitException = null;
@@ -474,11 +538,11 @@ final class LazyObjectSupport
         \PHPCompiler\VM $vm,
         ObjectEntry $object,
         ClosureState $initializer,
-        int $options = 0
+        int $options = 0,
+        ?ObjectEntry $initializerClosure = null
     ): void {
         if ($object->lazyPending) {
-            $object->lazyInitializer = $initializer;
-            $object->lazyResetInitializer = $initializer;
+            self::assignInitializer($object, $initializer, $initializerClosure);
             self::applyUserOptions($object, $options, true);
 
             return;
@@ -497,10 +561,9 @@ final class LazyObjectSupport
         if (!self::classCanBeLazy($object->class)) {
             $object->constructed = true;
             $object->destructorInvoked = false;
-            $object->lazyInitializer = null;
+            self::clearInitializer($object);
             $object->lazyPending = false;
             $object->lazyGhost = false;
-            $object->lazyResetInitializer = null;
             $object->lazyInitException = null;
             self::clearLazyRawInitializedProperties($object);
             self::applyUserOptions($object, $options, true);
@@ -510,10 +573,9 @@ final class LazyObjectSupport
 
         $object->constructed = false;
         $object->destructorInvoked = false;
-        $object->lazyInitializer = $initializer;
+        self::assignInitializer($object, $initializer, $initializerClosure);
         $object->lazyPending = true;
         $object->lazyGhost = true;
-        $object->lazyResetInitializer = $initializer;
         self::clearLazyRawInitializedProperties($object);
         self::applyUserOptions($object, $options, true);
     }
@@ -525,7 +587,8 @@ final class LazyObjectSupport
         \PHPCompiler\VM $vm,
         ObjectEntry $object,
         ClosureState $factory,
-        int $options = 0
+        int $options = 0,
+        ?ObjectEntry $factoryClosure = null
     ): void {
         if ($object->lazyPending) {
             throw new \ReflectionException('Object is already lazy');
@@ -544,10 +607,9 @@ final class LazyObjectSupport
         if (!self::classCanBeLazy($object->class)) {
             $object->constructed = true;
             $object->destructorInvoked = false;
-            $object->lazyInitializer = null;
+            self::clearInitializer($object);
             $object->lazyPending = false;
             $object->lazyGhost = false;
-            $object->lazyResetInitializer = null;
             $object->lazyInitException = null;
             self::clearLazyRawInitializedProperties($object);
             self::applyUserOptions($object, $options, true);
@@ -557,10 +619,9 @@ final class LazyObjectSupport
 
         $object->constructed = false;
         $object->destructorInvoked = false;
-        $object->lazyInitializer = $factory;
+        self::assignInitializer($object, $factory, $factoryClosure);
         $object->lazyPending = true;
         $object->lazyGhost = false;
-        $object->lazyResetInitializer = $factory;
         self::clearLazyRawInitializedProperties($object);
         self::applyUserOptions($object, $options, true);
     }
@@ -591,14 +652,44 @@ final class LazyObjectSupport
         $object->constructed = false;
         $object->destructorInvoked = false;
         $object->lazyInitializer = $initializer;
+        $object->lazyInitializerClosure = $object->lazyResetInitializerClosure;
         $object->lazyPending = true;
         self::clearLazyRawInitializedProperties($object);
     }
 
-    private static function archiveResetInitializer(ObjectEntry $object, ?ClosureState $initializer): void
+    /**
+     * Bind pending + archived initializer state, retaining Closure identity (#29152).
+     */
+    private static function assignInitializer(
+        ObjectEntry $object,
+        ?ClosureState $initializer,
+        ?ObjectEntry $initializerClosure
+    ): void {
+        $object->lazyInitializer = $initializer;
+        $closure = $initializerClosure ?? $initializer?->ownerObject;
+        $object->lazyInitializerClosure = $closure;
+        $object->lazyResetInitializer = $initializer;
+        $object->lazyResetInitializerClosure = $closure;
+    }
+
+    private static function clearInitializer(ObjectEntry $object): void
     {
+        $object->lazyInitializer = null;
+        $object->lazyInitializerClosure = null;
+        $object->lazyResetInitializer = null;
+        $object->lazyResetInitializerClosure = null;
+    }
+
+    private static function archiveResetInitializer(
+        ObjectEntry $object,
+        ?ClosureState $initializer,
+        ?ObjectEntry $initializerClosure = null
+    ): void {
         if (null !== $initializer) {
             $object->lazyResetInitializer = $initializer;
+            $object->lazyResetInitializerClosure = $initializerClosure
+                ?? $object->lazyInitializerClosure
+                ?? $initializer->ownerObject;
         }
     }
 

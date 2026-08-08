@@ -54,7 +54,8 @@ final class ReflectionClassResetAsLazyGhost extends VmClassMethod
             $vm,
             $object,
             $initObject->closureState,
-            $options
+            $options,
+            $initObject
         );
     }
 

@@ -39,7 +39,7 @@ final class JitCreateLazyProxy
         if (null === $initProxy) {
             throw new \LogicException(self::NAME.'() expects a callable factory');
         }
-        $initIndex = LazyObjectHelper::registerInitProxy($context, $initProxy);
+        $initIndex = LazyObjectHelper::registerInitProxy($context, $initProxy, $args[1]);
 
         [$cstr, $len] = ReflectionSetup::stringVarAsCstr($context, $args[0]);
         $classIdVal = $context->type->object->classIdFromRuntimeName($cstr, $len);

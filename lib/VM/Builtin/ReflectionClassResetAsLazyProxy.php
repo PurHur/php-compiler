@@ -54,7 +54,8 @@ final class ReflectionClassResetAsLazyProxy extends VmClassMethod
             $vm,
             $object,
             $factoryObject->closureState,
-            $options
+            $options,
+            $factoryObject
         );
     }
 

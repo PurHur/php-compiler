@@ -443,6 +443,12 @@ final class ClosureState
 
     public function wrapObject(Context $ctx): ObjectEntry
     {
+        // Reuse the owning Closure object so identity is stable across
+        // ReflectionClass::getLazyInitializer() / Fiber::getCallable()-style re-wraps
+        // (Zend/zend_lazy_objects.c stores the user factory Closure; #29152).
+        if (null !== $this->ownerObject) {
+            return $this->ownerObject;
+        }
         $entry = new ObjectEntry($ctx->classes['closure']);
         $entry->closureState = $this;
         $entry->constructed = true;

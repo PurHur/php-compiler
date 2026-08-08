@@ -15,10 +15,13 @@ use PHPLLVM\Value;
  */
 final class LazyObjectHelper
 {
-    public static function registerInitProxy(Context $context, Call $proxy): int
+    public static function registerInitProxy(Context $context, Call $proxy, ?Variable $closure = null): int
     {
         $index = \count($context->lazyInitProxies);
         $context->lazyInitProxies[$index] = $proxy;
+        if (null !== $closure) {
+            $context->lazyInitClosures[$index] = $closure;
+        }
 
         return $index;
     }

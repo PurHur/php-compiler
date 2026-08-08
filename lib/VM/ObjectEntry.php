@@ -89,6 +89,14 @@ class ObjectEntry {
     /** Initializer for lazy proxy objects (#3317). */
     public ?ClosureState $lazyInitializer = null;
 
+    /**
+     * Original Closure object for ReflectionClass::getLazyInitializer() identity (#29152).
+     *
+     * Kept separately from {@see $lazyInitializer} so === matches Zend even if
+     * ClosureState::ownerObject is rebound by wrapObject().
+     */
+    public ?ObjectEntry $lazyInitializerClosure = null;
+
     /** True until first property access or method call runs the lazy initializer. */
     public bool $lazyPending = false;
 
@@ -102,6 +110,9 @@ class ObjectEntry {
 
     /** Archived initializer for ReflectionClass::resetAsLazyObject() (#6125). */
     public ?ClosureState $lazyResetInitializer = null;
+
+    /** Archived Closure object for getLazyInitializer / resetAsLazyObject (#29152). */
+    public ?ObjectEntry $lazyResetInitializerClosure = null;
 
     /** Pending initializer failure for ReflectionClass::getLazyInitializationException() (#6514). */
     public ?ObjectEntry $lazyInitException = null;
@@ -213,10 +224,12 @@ class ObjectEntry {
         $this->datePeriodIterator = null;
         $this->closureState = null;
         $this->lazyInitializer = null;
+        $this->lazyInitializerClosure = null;
         $this->lazyPending = false;
         $this->lazyGhost = false;
         $this->lazyUserFlags = 0;
         $this->lazyResetInitializer = null;
+        $this->lazyResetInitializerClosure = null;
         $this->lazyInterfaceProxyTarget = null;
         $this->lazyRawInitializedProperties = [];
         $this->fiberState = null;

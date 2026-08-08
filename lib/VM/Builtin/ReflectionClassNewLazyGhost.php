@@ -33,7 +33,7 @@ final class ReflectionClassNewLazyGhost extends VmClassMethod
         if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
             throw new \LogicException('Cannot create lazy ghost of '.$entry->name);
         }
-        $initializer = LazyObjectSupport::extractRequiredCallable(
+        $initializerClosure = LazyObjectSupport::extractRequiredCallableObject(
             $frame->calledArgs[1],
             'ReflectionClass::newLazyGhost',
             1,
@@ -43,7 +43,12 @@ final class ReflectionClassNewLazyGhost extends VmClassMethod
         if (\count($frame->calledArgs) >= 3) {
             $options = $frame->calledArgs[2]->resolveIndirect()->toInt();
         }
-        $lazy = LazyObjectSupport::createGhost($entry, $initializer, $options);
+        $lazy = LazyObjectSupport::createGhost(
+            $entry,
+            $initializerClosure->closureState,
+            $options,
+            $initializerClosure
+        );
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);
