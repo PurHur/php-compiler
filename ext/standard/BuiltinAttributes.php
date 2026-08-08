@@ -119,7 +119,8 @@ final class BuiltinAttributes
         $entry->methodVisibility['__construct'] = $pub;
 
         // PHP 8.4: function|method|class constant (zend_attributes.c).
-        // PHP 8.5+: +TARGET_CLASS (traits via validate_deprecated) +TARGET_CONSTANT (#23701, #22989).
+        // PHP 8.5+: +TARGET_CLASS so traits pass the mask; validate_deprecated then
+        // rejects class/interface/enum (#23701, #22989, #26307, #28892) +TARGET_CONSTANT.
         $targets = AttributeSupport::TARGET_METHOD
             | AttributeSupport::TARGET_FUNCTION
             | AttributeSupport::TARGET_CLASS_CONSTANT;

@@ -1,5 +1,5 @@
 --TEST--
-Language: #[\Deprecated] on enum is a compile fatal on PHP 8.5+ (#26307, Zend/zend_attributes.c validate_deprecated)
+Language: #[\Deprecated] on enum is a compile fatal on PHP 8.5+ (#26307 / #28892, Zend/zend_attributes.c validate_deprecated)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {

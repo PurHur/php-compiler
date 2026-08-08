@@ -1,5 +1,5 @@
 --TEST--
-Language: #[\Deprecated] on interface is a compile fatal on PHP 8.5+ (#22989, Zend/zend_attributes.c)
+Language: #[\Deprecated] on interface is a compile fatal on PHP 8.5+ (#22989 / #28892, Zend/zend_attributes.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {

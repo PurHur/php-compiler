@@ -348,11 +348,14 @@ final class AttributeNames
 
     /**
      * Zend 8.5+ validate_deprecated: #[\Deprecated] on class-likes is traits-only
-     * (zend_attributes.c, rfc:deprecated_traits, #22989 / #26307 / #26329).
+     * (zend_attributes.c, rfc:deprecated_traits, #22989 / #26307 / #26329 / #28892).
      *
      * TARGET_CLASS on the builtin is required so traits pass the Attribute target mask;
      * this validator then fatals for class / interface / enum (same message shape as php-src).
      * Delayed by `#[\DelayedTargetValidation]`.
+     *
+     * Recurring false Done-when: accepting Deprecated on classes under PROFILE=8.5.
+     * Live php-src still fatals (`Cannot apply #[\Deprecated] to class …`); keep reject.
      *
      * @param list<string>              $names
      * @param list<AttributeEntry>|null $entries

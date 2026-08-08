@@ -624,10 +624,11 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.5+ #[\Deprecated] on traits — use-site E_USER_DEPRECATED + reject on interfaces/classes
-     * (Zend/zend_attributes.c validate_deprecated, rfc:deprecated_traits, #22989).
+     * PHP 8.5+ #[\Deprecated] on traits — use-site E_USER_DEPRECATED + reject on class/interface/enum
+     * (Zend/zend_attributes.c validate_deprecated, rfc:deprecated_traits, #22989 / #26307 / #28892).
      *
-     * Withheld on ≤8.4 profiles (matches Zend 8.4 — attribute on traits is inert; interfaces not fatal yet).
+     * TARGET_CLASS on the stub is not “Deprecated on any class-like”: validate_deprecated still
+     * fatals for non-traits. Withheld on ≤8.4 (Zend 8.4 has no TARGET_CLASS / trait path).
      * Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` forward profile.
      */
     public static function supportsDeprecatedTraitAttribute(): bool
