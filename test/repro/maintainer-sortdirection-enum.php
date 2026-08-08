@@ -1,11 +1,9 @@
 <?php
-// Repro for #7261 — SortDirection enum (ext/standard/basic_functions.stub.php).
+// Repro for #28930 / re-#7261 — SortDirection phantom absent.
 
 echo 'SortDirection enum: ', enum_exists('SortDirection', false) ? 'yes' : 'no', "\n";
-if (!enum_exists('SortDirection', false)) {
-    fwrite(STDERR, "FAIL: SortDirection enum missing\n");
+if (enum_exists('SortDirection', false)) {
+    fwrite(STDERR, "FAIL: SortDirection phantom still registered\n");
     exit(1);
 }
-echo 'unit enum: ', unitenum_exists('SortDirection') ? 'yes' : 'no', "\n";
-echo 'Ascending: ', SortDirection::Ascending->name, "\n";
-echo 'Descending: ', SortDirection::Descending->name, "\n";
+echo "absent_ok\n";

@@ -78,7 +78,7 @@ final class VmArraySort
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                'array_multisort(): Argument must be of type array|int|Sorting, %s given',
+                'array_multisort(): Argument must be of type array|int, %s given',
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }

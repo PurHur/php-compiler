@@ -8,78 +8,43 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #7229 */
+/** Sorting / SortDirection phantom retirement — SORT_* ints only (#28930, re-#12362). */
 final class SortingEnumTest extends TestCase
 {
-    private function requireSortingEnum(): void
+    protected function tearDown(): void
     {
-        if (!CompilerVersion::supportsSortingEnum()) {
-            $this->markTestSkipped('Sorting enum withheld on reference profile');
-        }
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        parent::tearDown();
     }
 
-    public function testSortingBuiltinEnumExists(): void
+    public function testSortingPhantomsAbsentOnProfile84(): void
     {
-        $this->requireSortingEnum();
+        $this->assertFalse(CompilerVersion::supportsSortingEnum());
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 var_export(enum_exists('Sorting', false));
 echo "\n";
-var_export(Sorting::Ascending->name);
+var_export(enum_exists('SortDirection', false));
 echo "\n";
-var_export(Sorting::Ascending->value);
-echo "\n";
-var_export(Sorting::Descending->value);
-PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'sorting_enum.php'));
-        $this->assertSame("true\n'Ascending'\n4\n3", ob_get_clean());
-    }
-
-    public function testArrayMultisortAcceptsSortingEnumCases(): void
-    {
-        $this->requireSortingEnum();
-        $runtime = new Runtime();
-        $code = <<<'PHP'
-<?php
 $a = [3, 1, 2];
 $b = ['c', 'a', 'b'];
-array_multisort($a, Sorting::Ascending, $b);
-echo implode(',', $a), "\n";
-$a = [3, 1, 2];
-$b = ['c', 'a', 'b'];
-array_multisort($a, Sorting::Descending, $b);
+array_multisort($a, SORT_ASC, $b);
 echo implode(',', $a), "\n";
 PHP;
         ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'sorting_multisort.php'));
-        $this->assertSame("1,2,3\n3,2,1\n", ob_get_clean());
-    }
-
-    /** @covers issue #9947 */
-    public function testSortAcceptsSortingEnumAsFlags(): void
-    {
-        $this->requireSortingEnum();
-        $runtime = new Runtime();
-        $code = <<<'PHP'
-<?php
-$a = [3, 1, 2];
-sort($a, Sorting::Ascending);
-echo implode(',', $a), "\n";
-$b = [3, 1, 2];
-sort($b, flags: Sorting::Ascending);
-echo implode(',', $b), "\n";
-PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'sort_sorting_enum.php'));
-        $this->assertSame("1,2,3\n1,2,3\n", ob_get_clean());
+        $runtime->run($runtime->parseAndCompile($code, 'sorting_phantom.php'));
+        $this->assertSame("false\nfalse\n1,2,3\n", ob_get_clean());
     }
 
     /** @covers issue #17429 #26142 — php-src never added SortDirection to usort* */
-    public function testUserSortRejectsPhantomSortDirection(): void
+    public function testUserSortRejectsPhantomDirectionArity(): void
     {
-        $this->requireSortingEnum();
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -89,13 +54,13 @@ foreach (['usort', 'uksort', 'uasort'] as $fn) {
 }
 $a = [3, 1, 2];
 try {
-    usort($a, 'strcmp', SortDirection::Ascending);
+    usort($a, 'strcmp', 1);
     echo "positional=ok\n";
 } catch (Throwable $e) {
     echo get_class($e), "\n";
 }
 try {
-    usort(array: $a, callback: 'strcmp', direction: SortDirection::Ascending);
+    usort(array: $a, callback: 'strcmp', direction: 1);
     echo "named=ok\n";
 } catch (Throwable $e) {
     echo $e->getMessage(), "\n";

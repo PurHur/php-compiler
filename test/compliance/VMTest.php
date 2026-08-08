@@ -217,17 +217,7 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'forward')) {
                 continue;
             }
-            if (!CompilerVersion::supportsSortingEnum()
-                && str_contains($name, 'sort_sorting_enum')
-                && !str_contains($name, 'sorting_enum_phantom')
-                && !str_contains($name, 'usort_phantom_direction')
-                && !str_contains($name, 'usort_sort_direction')) {
-                continue;
-            }
-            if (CompilerVersion::supportsSortingEnum()
-                && str_contains($name, 'sorting_enum_phantom')) {
-                continue;
-            }
+            // Sorting / SortDirection phantoms retired (#28930) — absence cases always run.
             if (!CompilerVersion::supportsRange()
                 && str_contains($name, 'range_from_84')
                 && !str_contains($name, 'range_phantom')) {
