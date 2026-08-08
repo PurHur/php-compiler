@@ -45,7 +45,7 @@ final class mb_convert_encoding extends Internal
         $fromList = 2 === $argc
             ? [MbstringState::internalEncoding()]
             : VmMbstring::coerceMbConvertFromEncodingList($frame->calledArgs[2]);
-        if (!VmMbstring::isHtmlEntitiesEncoding($to) && null === CharsetEngine::parseEncodingSpec($to)) {
+        if (!VmMbstring::isMbConvertPseudoEncoding($to) && null === CharsetEngine::parseEncodingSpec($to)) {
             throw new \ValueError(sprintf(
                 'mb_convert_encoding(): Argument #2 ($to_encoding) must be a valid encoding, "%s" given',
                 $to
@@ -108,14 +108,14 @@ final class mb_convert_encoding extends Internal
             }
             foreach ($fromList as $from) {
                 if (
-                    !VmMbstring::isHtmlEntitiesEncoding($from)
+                    !VmMbstring::isMbConvertPseudoEncoding($from)
                     && null === CharsetEngine::parseEncodingSpec($from)
                 ) {
                     return self::foldFalse($context);
                 }
             }
             if (
-                !VmMbstring::isHtmlEntitiesEncoding($toLit)
+                !VmMbstring::isMbConvertPseudoEncoding($toLit)
                 && null === CharsetEngine::parseEncodingSpec($toLit)
             ) {
                 return self::foldFalse($context);

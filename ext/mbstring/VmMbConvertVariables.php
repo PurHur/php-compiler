@@ -236,7 +236,7 @@ final class VmMbConvertVariables
 
     private static function assertSupportedFromEncoding(string $from, string $function, int $argIndex): void
     {
-        if (VmMbstring::isHtmlEntitiesEncoding($from)) {
+        if (VmMbstring::isMbConvertPseudoEncoding($from)) {
             return;
         }
         if (null === \PHPCompiler\ext\iconv\CharsetEngine::parseEncodingSpec($from)) {
