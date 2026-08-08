@@ -251,6 +251,86 @@ PHP;
         }
     }
 
+    /**
+     * php-src validate_deprecated: TARGET_CLASS is traits-only (#26307 / #28892).
+     *
+     * @dataProvider provideDeprecatedClassLikeRejectsUnderProfile85
+     */
+    public function testDeprecatedOnNonTraitClassLikeIsCompileFatalUnderProfile85(
+        string $code,
+        string $message
+    ): void {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsDeprecatedTraitAttribute()) {
+                $this->markTestSkipped('requires PROFILE≥8.5 deprecated trait attribute');
+            }
+            $runtime = new Runtime();
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage($message);
+            $runtime->parseAndCompile($code, 'deprecated_classlike_reject_85.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function provideDeprecatedClassLikeRejectsUnderProfile85(): iterable
+    {
+        yield 'class' => [
+            "<?php\n#[\\Deprecated('old')]\nclass OldC {}\n",
+            'Cannot apply #[\\Deprecated] to class OldC',
+        ];
+        yield 'interface' => [
+            "<?php\n#[\\Deprecated('old')]\ninterface I {}\n",
+            'Cannot apply #[\\Deprecated] to interface I',
+        ];
+        yield 'enum' => [
+            "<?php\n#[\\Deprecated('old')]\nenum E {}\n",
+            'Cannot apply #[\\Deprecated] to enum E',
+        ];
+    }
+
+    /** @covers issue #28892 — trait path remains green under PROFILE=8.5 */
+    public function testDeprecatedTraitUseEmitsNoticeUnderProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsDeprecatedTraitAttribute()) {
+                $this->markTestSkipped('requires PROFILE≥8.5 deprecated trait attribute');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+ini_set('error_reporting', '32767');
+ini_set('display_errors', '0');
+#[\Deprecated('old trait')]
+trait T {}
+class C { use T; }
+$last = error_get_last();
+echo $last['message'] ?? 'none';
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'deprecated_trait_use_85.php'));
+            $this->assertSame(
+                'Trait T used by C is deprecated, old trait',
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testFunctionCallRecordsDeprecation(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
