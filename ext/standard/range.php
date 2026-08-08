@@ -14,9 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\RangeIntRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -28,8 +28,6 @@ use PHPLLVM\Value;
  */
 final class range extends Internal
 {
-    private const STEP_RANGE_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
-
     private static int $jitGuardSeq = 0;
 
     public function execute(Frame $frame): void
@@ -193,10 +191,8 @@ final class range extends Internal
         $err = BasicBlockHelper::append($context, 'range_step_err_'.$tag);
         $context->builder->branchIf($isZero, $err, $ok);
         $context->builder->positionAtEnd($err);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitValueErrorAndAbort($context, RangeIntJitHelper::stepZeroErrorMessage());
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'range_step_err_dead_'.$tag);
         $context->builder->positionAtEnd($ok);
     }
 
@@ -210,10 +206,8 @@ final class range extends Internal
         $err = BasicBlockHelper::append($context, 'range_fstep_err_'.$tag);
         $context->builder->branchIf($isZero, $err, $ok);
         $context->builder->positionAtEnd($err);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitValueErrorAndAbort($context, RangeIntJitHelper::stepZeroErrorMessage());
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'range_fstep_err_dead_'.$tag);
         $context->builder->positionAtEnd($ok);
     }
 
@@ -250,10 +244,8 @@ final class range extends Internal
         $err = BasicBlockHelper::append($context, 'range_span_err_'.$tag);
         $context->builder->branchIf($bad, $err, $ok);
         $context->builder->positionAtEnd($err);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitValueErrorAndAbort($context, RangeIntJitHelper::stepOversizedErrorMessage());
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'range_span_err_dead_'.$tag);
         $context->builder->positionAtEnd($ok);
     }
 
@@ -286,10 +278,8 @@ final class range extends Internal
         $err = BasicBlockHelper::append($context, 'range_fspan_err_'.$tag);
         $context->builder->branchIf($bad, $err, $ok);
         $context->builder->positionAtEnd($err);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitValueErrorAndAbort($context, RangeIntJitHelper::stepOversizedErrorMessage());
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'range_fspan_err_dead_'.$tag);
         $context->builder->positionAtEnd($ok);
     }
 

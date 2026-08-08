@@ -74,6 +74,43 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         }
     }
 
+    public function testRangeStepSplitErrorsUnderForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertSame(
+                'range(): Argument #3 ($step) cannot be 0',
+                RangeIntJitHelper::stepZeroErrorMessage()
+            );
+            $this->assertSame(
+                'range(): Argument #3 ($step) must be less than the range spanned by argument #1 ($start) and argument #2 ($end)',
+                RangeIntJitHelper::stepOversizedErrorMessage()
+            );
+            try {
+                RangeIntJitHelper::intRangeCopy(1, 2, 0);
+                $this->fail('expected ValueError for zero step');
+            } catch (\ValueError $e) {
+                $this->assertSame('range(): Argument #3 ($step) cannot be 0', $e->getMessage());
+            }
+            try {
+                RangeIntJitHelper::intRangeCopy(1, 10, 100);
+                $this->fail('expected ValueError for oversized step');
+            } catch (\ValueError $e) {
+                $this->assertSame(
+                    'range(): Argument #3 ($step) must be less than the range spanned by argument #1 ($start) and argument #2 ($end)',
+                    $e->getMessage()
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testDeadBuildIntegerRangeLlvmDeletedFromHashTableWrite(): void
     {
         $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');

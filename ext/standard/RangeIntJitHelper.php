@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -18,12 +19,38 @@ use PHPCompiler\VM\Variable;
 final class RangeIntJitHelper
 {
     /** php-src 8.2 uses this text for both zero step and step larger than the span. */
-    private const STEP_RANGE_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
+    private const STEP_RANGE_ERROR_LEGACY = 'range(): Argument #3 ($step) must not exceed the specified range';
+
+    /** php-src 8.3+ zend_argument_value_error(3, "cannot be 0"). */
+    private const STEP_ZERO_ERROR_83 = 'range(): Argument #3 ($step) cannot be 0';
+
+    /** php-src 8.3+ boundary_error. */
+    private const STEP_OVERSIZED_ERROR_83 = 'range(): Argument #3 ($step) must be less than the range spanned by argument #1 ($start) and argument #2 ($end)';
+
+    /** Zero-step ValueError text (PROFILE≥8.3 split; #28537). */
+    public static function stepZeroErrorMessage(): string
+    {
+        if (CompilerVersion::supportsRangeStepSplitErrors()) {
+            return self::STEP_ZERO_ERROR_83;
+        }
+
+        return self::STEP_RANGE_ERROR_LEGACY;
+    }
+
+    /** Oversized-step ValueError text (PROFILE≥8.3 split; #28537). */
+    public static function stepOversizedErrorMessage(): string
+    {
+        if (CompilerVersion::supportsRangeStepSplitErrors()) {
+            return self::STEP_OVERSIZED_ERROR_83;
+        }
+
+        return self::STEP_RANGE_ERROR_LEGACY;
+    }
 
     public static function intRangeCopy(int $start, int $end, int $step): HashTable
     {
         if (0 === $step) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
+            throw new \ValueError(self::stepZeroErrorMessage());
         }
         if ($start <= $end && $step < 0) {
             $step = -$step;
@@ -34,7 +61,7 @@ final class RangeIntJitHelper
             $span = $start > $end ? ($start - $end) : ($end - $start);
             $stepAbs = $step < 0 ? -$step : $step;
             if ($span < $stepAbs) {
-                throw new \ValueError(self::STEP_RANGE_ERROR);
+                throw new \ValueError(self::stepOversizedErrorMessage());
             }
         }
 

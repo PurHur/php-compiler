@@ -16,9 +16,6 @@ use PHPCompiler\VM\Variable;
  */
 final class VmRange
 {
-    /** php-src 8.2 uses this text for both zero step and step larger than the span. */
-    private const STEP_RANGE_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
-
     public static function build(Frame $frame, Variable $startVar, Variable $endVar, ?Variable $stepVar): HashTable
     {
         $startVar = $startVar->resolveIndirect();
@@ -219,7 +216,7 @@ final class VmRange
             if (Variable::TYPE_FLOAT === $stepVar->type) {
                 $step = VmMath::floatToZendLong($stepVar->toFloat());
                 if (0 === $step) {
-                    throw new \ValueError(self::STEP_RANGE_ERROR);
+                    throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
                 }
 
                 return self::normalizeIntStepSign($start, $end, $step);
@@ -233,7 +230,7 @@ final class VmRange
                         $step = (int) $s;
                     }
                     if (0 === $step) {
-                        throw new \ValueError(self::STEP_RANGE_ERROR);
+                        throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
                     }
 
                     return self::normalizeIntStepSign($start, $end, $step);
@@ -248,7 +245,7 @@ final class VmRange
         }
         $step = $stepVar->toInt();
         if (0 === $step) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
+            throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
         }
 
         return self::normalizeIntStepSign($start, $end, $step);
@@ -295,7 +292,7 @@ final class VmRange
             );
         }
         if (0.0 === $step) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
+            throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
         }
 
         return self::normalizeFloatStepSign($start, $end, $step);
@@ -346,7 +343,7 @@ final class VmRange
             $step = $stepVar->toInt();
         }
         if (0 === $step) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
+            throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
         }
 
         return self::normalizeIntStepSign(ord($startChar), ord($endChar), $step);
@@ -395,7 +392,7 @@ final class VmRange
         $span = $start > $end ? ($start - $end) : ($end - $start);
         $stepAbs = $step < 0 ? -$step : $step;
         if ($span < $stepAbs) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
+            throw new \ValueError(RangeIntJitHelper::stepOversizedErrorMessage());
         }
     }
 
@@ -406,11 +403,11 @@ final class VmRange
         }
         $stepAbs = abs($step);
         if ($stepAbs <= 0.0) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
+            throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
         }
         $span = $start > $end ? ($start - $end) : ($end - $start);
         if ($span < $stepAbs) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
+            throw new \ValueError(RangeIntJitHelper::stepOversizedErrorMessage());
         }
     }
 

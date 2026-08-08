@@ -128,4 +128,27 @@ final class ExceptionBridge
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitValueError($context, $message);
     }
+
+    /**
+     * Builtin ValueError — catchable in active try/catch, fatal when uncaught (#28537).
+     */
+    public static function emitValueErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'ValueError', $message);
+
+            return;
+        }
+
+        TypeErrorRaise::emitValueError($context, $message);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+    }
 }
