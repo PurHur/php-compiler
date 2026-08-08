@@ -139,7 +139,7 @@ final class range extends Internal
     }
 
     /**
-     * php-src char path: single non-numeric letter endpoints (VmRange::charRangeLetter).
+     * php-src char path: non-numeric string endpoints via first byte (VmRange::charRangeLetter; #28830).
      *
      * @param list<JITVariable> $args
      */
@@ -169,21 +169,18 @@ final class range extends Internal
         return RangeIntRuntime::charRange($context, $start, $end, $step);
     }
 
-    /** Match {@see VmRange} charRangeLetter for compile-time string literals (#27563). */
+    /**
+     * Match {@see VmRange} charRangeLetter for compile-time string literals (#27563, #28830).
+     * Non-numeric multi-byte literals use byte 0 (php-src Z_STRVAL[0] char path).
+     */
     private static function charLetterLiteral(JITVariable $arg): ?string
     {
         $lit = JitStringArg::compileTimeLiteral($arg);
-        if (null === $lit) {
-            return null;
-        }
-        if (1 !== \strlen($lit)) {
-            return null;
-        }
-        if (is_numeric($lit)) {
+        if (null === $lit || '' === $lit || is_numeric($lit)) {
             return null;
         }
 
-        return $lit;
+        return $lit[0];
     }
 
     private static function emitZeroStepGuard(Context $context, Value $step): void

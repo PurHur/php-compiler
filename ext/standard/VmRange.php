@@ -55,20 +55,22 @@ final class VmRange
         return self::buildIntRange($start, $end, $step);
     }
 
+    /**
+     * php-src php_range_process_input / PHP_FUNCTION(range) char path (#28830):
+     * non-numeric strings use byte 0 (multi-byte endpoints discard subsequent bytes).
+     * Empty and numeric strings stay on the int/float paths.
+     */
     private static function charRangeLetter(Variable $var): ?string
     {
         if (Variable::TYPE_STRING !== $var->type) {
             return null;
         }
         $s = $var->toString();
-        if (1 !== \strlen($s)) {
-            return null;
-        }
-        if (is_numeric($s)) {
+        if ('' === $s || is_numeric($s)) {
             return null;
         }
 
-        return $s;
+        return $s[0];
     }
 
     private static function endpointPrefersFloat(Variable $var): bool
