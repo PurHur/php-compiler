@@ -84,8 +84,34 @@ final class JsonValidateBuiltinTest extends TestCase
         $frame->calledArgs = [$jsonVar, $depthVar, $flagsVar];
         $frame->returnVar = new VMVariable();
         $this->expectException(\ValueError::class);
-        $this->expectExceptionMessage('Argument #3 ($flags)');
+        $this->expectExceptionMessage(VmJsonFlags::VALIDATE_FLAGS_ERROR);
         $fn->execute($frame);
+    }
+
+    /** php-src json_validate: SUBSTITUTE is encode/decode-only (#29069). */
+    public function testSubstituteFlagThrows(): void
+    {
+        $runtime = new Runtime();
+        $fn = new json_validate();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $jsonVar = new VMVariable();
+        $jsonVar->string('[]');
+        $depthVar = new VMVariable();
+        $depthVar->int(512);
+        $flagsVar = new VMVariable();
+        $flagsVar->int(VmJsonFlags::INVALID_UTF8_SUBSTITUTE);
+        $frame->calledArgs = [$jsonVar, $depthVar, $flagsVar];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(VmJsonFlags::VALIDATE_FLAGS_ERROR);
+        $fn->execute($frame);
+    }
+
+    public function testIgnoreOrSubstituteComboThrows(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('JSON_INVALID_UTF8_IGNORE');
+        $this->runValidate('[]', 512, VmJsonFlags::INVALID_UTF8_IGNORE | VmJsonFlags::INVALID_UTF8_SUBSTITUTE);
     }
 
     public function testNullJsonSoftNullFalseOnForwardProfile84(): void

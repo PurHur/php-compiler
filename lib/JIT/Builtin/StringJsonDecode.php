@@ -153,7 +153,7 @@ final class StringJsonDecode
             $context,
             '__compiler_json_validate',
             self::VALIDATE_BRIDGE_ENTRY,
-            [$strPtr, $i64],
+            [$strPtr, $i64, $i64],
             $i64,
             self::VALIDATE_HELPER,
             self::VALIDATE_HELPER_PATH,

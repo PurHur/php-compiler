@@ -19,15 +19,17 @@ final class JsonValidateJitHelper
     private static int $lastError = 0;
 
     /** @return int 1 valid, 0 syntax error, -1 depth exceeded */
-    public static function validate(string $json, int $depth): int
+    public static function validate(string $json, int $depth, int $flags = 0): int
     {
         if ($depth < 1) {
             self::setLastError(1);
 
             return VmJsonScanner::RESULT_SYNTAX;
         }
+        // Caller (VM / json_validate::call) must enforce Zend 0|IGNORE (#29069); NestedJIT
+        // cannot lower catchable ValueError throws from this TU reliably.
 
-        $result = VmJsonScanner::validate($json, $depth, 0);
+        $result = VmJsonScanner::validate($json, $depth, $flags);
         self::setLastError(VmJson::lastError());
 
         return $result;

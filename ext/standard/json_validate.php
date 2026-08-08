@@ -6,7 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
@@ -15,10 +18,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * json_validate() — PHP 8.3 syntax check without building values (issue #3101, #4085).
+ * json_validate() — PHP 8.3 syntax check without building values (issue #3101, #4085, #29069).
  *
- * VM: VmJsonScanner (ext/json parity subset); JIT/AOT: __compiler_json_validate (flags=0 runtime).
- * Supported $flags: JSON_INVALID_UTF8_IGNORE | JSON_INVALID_UTF8_SUBSTITUTE (php-src ext/json/php_json.c).
+ * VM: VmJsonScanner; JIT/AOT: __compiler_json_validate(json, depth, flags).
+ * Supported $flags: exactly 0 or JSON_INVALID_UTF8_IGNORE (php-src ext/json/json.c).
  */
 final class json_validate extends Internal
 {
@@ -73,20 +76,45 @@ final class json_validate extends Internal
         if ($argc > 3) {
             throw new \LogicException('json_validate() accepts at most three arguments');
         }
-        $flags = self::resolveFlagsArg($context, $args);
+        $flagsConst = self::resolveFlagsArg($args);
+        $hasRuntimeFlags = isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2]) && null === $flagsConst;
         $depth = 512;
+        $depthIsConst = true;
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
-            if (JITVariable::TYPE_NATIVE_LONG === $args[1]->type && JITVariable::KIND_VALUE === $args[1]->kind) {
-                $depth = (int) $context->llvm->lib->LLVMConstIntGetZExtValue($args[1]->value->value);
+            $depthConst = self::compileTimeLong($args[1]);
+            if (null !== $depthConst) {
+                $depth = $depthConst;
                 if ($depth < 1) {
                     throw new \ValueError('json_validate(): Argument #2 ($depth) must be greater than 0');
                 }
             } else {
-                return JitJsonValidate::invoke($context, $args[0], $args[1]);
+                $depthIsConst = false;
             }
         }
-        if (null !== $flags && 0 !== $flags) {
-            VmJsonFlags::assertValidateFlags($flags);
+        // Compile-time flags: Zend exact 0|IGNORE — emit catchable ValueError (#29069).
+        if (null !== $flagsConst && !VmJsonFlags::isValidValidateFlags($flagsConst)) {
+            ExceptionBridge::emitValueErrorAndAbort($context, VmJsonFlags::VALIDATE_FLAGS_ERROR);
+            // Catchable throw terminates the block; open a dead continuation for the return slot.
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'json_validate_bad_flags_dead');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        // Runtime depth and/or flags → NestedJIT (ABI includes flags).
+        if (!$depthIsConst || $hasRuntimeFlags) {
+            $flagsArg = (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2]))
+                ? $args[2]
+                : null;
+            if ($depthIsConst) {
+                $jsonPtr = JsonStringOperandArg::jitJson($context, $args[0], 'json_validate');
+                $depthVal = $context->getTypeFromString('int64')->constInt($depth, false);
+                $flagsVal = null === $flagsArg
+                    ? $context->getTypeFromString('int64')->constInt($flagsConst ?? 0, false)
+                    : JitLongArg::lower($context, $flagsArg, 'json_validate() argument #3');
+
+                return JitJsonValidate::invokeWithDepth($context, $jsonPtr, $depthVal, $flagsVal);
+            }
+
+            return JitJsonValidate::invoke($context, $args[0], $args[1], $flagsArg);
         }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         // Null constant: soft-null DEP + coerce to '' then fold (Zend 8.4 / #28333; same as json_decode).
@@ -103,36 +131,44 @@ final class json_validate extends Internal
             $literal = '';
         }
         if (null !== $literal) {
-            // Compile-time fold via VmJsonValidate (same depth rules as VM). last_error is not
-            // updated at runtime for folded calls — AOT fixtures check the bool; VM/JIT cover
-            // json_last_error_msg (#23007). Non-literal json always hits NestedJIT below.
-            $ok = VmJsonValidate::validate($literal, $depth, $flags ?? 0);
+            // Compile-time fold via VmJsonValidate (same depth rules as VM).
+            $ok = VmJsonValidate::validate($literal, $depth, $flagsConst ?? 0);
 
             return $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false);
         }
-        if (null !== $flags && 0 !== $flags) {
-            throw new \LogicException('json_validate() flags not supported in this compiler build');
-        }
 
         $jsonPtr = JsonStringOperandArg::jitJson($context, $args[0], 'json_validate');
-        $depthConst = $context->getTypeFromString('int64')->constInt($depth, false);
+        $depthVal = $context->getTypeFromString('int64')->constInt($depth, false);
+        $flagsVal = $context->getTypeFromString('int64')->constInt($flagsConst ?? 0, false);
 
-        return JitJsonValidate::invokeWithDepth($context, $jsonPtr, $depthConst);
+        return JitJsonValidate::invokeWithDepth($context, $jsonPtr, $depthVal, $flagsVal);
     }
 
     /**
      * @param list<JITVariable> $args
      */
-    private static function resolveFlagsArg(Context $context, array $args): ?int
+    private static function resolveFlagsArg(array $args): ?int
     {
         if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             return 0;
         }
-        $flagsArg = $args[2];
-        if (JITVariable::TYPE_NATIVE_LONG !== $flagsArg->type || JITVariable::KIND_VALUE !== $flagsArg->kind) {
+
+        return self::compileTimeLong($args[2]);
+    }
+
+    private static function compileTimeLong(JITVariable $arg): ?int
+    {
+        if (null !== $arg->compileTimeLong) {
+            return (int) $arg->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type || JITVariable::KIND_VALUE !== $arg->kind) {
             return null;
         }
+        $const = $arg->value;
+        if ($const instanceof Value && $const->isConstant()) {
+            return (int) $const->constInt();
+        }
 
-        return (int) $context->llvm->lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
+        return null;
     }
 }
