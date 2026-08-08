@@ -175,6 +175,8 @@ final class BuiltinInternalArgInfo
             // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511, #26342, #28349)
             'gzencode', 'gzdecode', 'gzcompress', 'gzuncompress', 'gzdeflate', 'gzinflate',
             'zlib_encode', 'zlib_decode' => 'string|false',
+            // ext/readline/readline.stub.php — InternalArgInfo return string (missing |false) (#28342)
+            'readline' => 'string|false',
             // pecl-file_formats-lzf lzf.stub.php — InternalArgInfo return int (missing |false) (#28063)
             'lzf_optimized_for' => 'int|false',
             // ext/zlib/zlib.stub.php — InternalArgInfo return resource; Zend DeflateContext|false / InflateContext|false (#27627)
