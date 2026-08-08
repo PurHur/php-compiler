@@ -45,6 +45,9 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomDocumentElement::isDomDocumentElement($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj);
         }
+        if (\PHPCompiler\ext\dom\JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);
+        }
 
         return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId);
     }

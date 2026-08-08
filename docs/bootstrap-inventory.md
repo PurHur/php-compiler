@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7245 |
-| Phase A inventory files (M2 ratio SSOT) | 7245 |
+| PHP files on vm.php path | 7246 |
+| Phase A inventory files (M2 ratio SSOT) | 7246 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23372 |
+| Source constructs flagged (warnings) | 23377 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -434,6 +434,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateElement.php` | 0 | 8 |
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 6 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
+| `ext/dom/JitDomDocumentDoctype.php` | 0 | 3 |
 | `ext/dom/JitDomDocumentElement.php` | 0 | 12 |
 | `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 1 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 3 |
@@ -441,7 +442,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomGetElementById.php` | 0 | 3 |
 | `ext/dom/JitDomGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 2 |
-| `ext/dom/JitDomHtmlDocumentCreateFromString.php` | 0 | 4 |
+| `ext/dom/JitDomHtmlDocumentCreateFromString.php` | 0 | 6 |
 | `ext/dom/JitDomImportNode.php` | 0 | 3 |
 | `ext/dom/JitDomInsertBefore.php` | 0 | 9 |
 | `ext/dom/JitDomInstanceMethodKernel.php` | 0 | 1 |
@@ -8147,7 +8148,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
-- new ArgumentCountError (line 47)
+- new ArgumentCountError (line 53)
 - 2 class method(s)
 
 ### `ext/calendar/cal_to_jd.php`
@@ -9445,7 +9446,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleHtmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/dom/DomParseSimpleXmlIdsJitHelper.php`
 
@@ -9937,6 +9938,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 70)
 - 3 class method(s)
 
+### `ext/dom/JitDomDocumentDoctype.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 93)
+- new JITVariable (line 109)
+- 4 class method(s)
+
 ### `ext/dom/JitDomDocumentElement.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10001,7 +10009,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 41)
 - new JITVariable (line 167)
 - new JITVariable (line 173)
-- 5 class method(s)
+- new JITVariable (line 233)
+- new JITVariable (line 249)
+- 6 class method(s)
 
 ### `ext/dom/JitDomImportNode.php`
 
@@ -27512,9 +27522,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ArrayFindJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 121)
-- new Variable (line 123)
 - new Variable (line 125)
+- new Variable (line 127)
+- new Variable (line 129)
 - 5 class method(s)
 - 3 closure(s)
 
@@ -33681,7 +33691,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmArrayValueCallback.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 180)
+- new ArgumentCountError (line 184)
 - 9 class method(s)
 
 ### `ext/standard/VmArrayWalk.php`
@@ -44897,7 +44907,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1464)
+- new InternalArgInfo (line 1466)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -49959,10 +49969,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 97)
-- new Variable (line 118)
-- new Variable (line 150)
-- new Variable (line 279)
+- new Variable (line 100)
+- new Variable (line 121)
+- new Variable (line 153)
+- new Variable (line 282)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`

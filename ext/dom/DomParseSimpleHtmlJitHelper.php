@@ -64,6 +64,25 @@ final class DomParseSimpleHtmlJitHelper
     }
 
     /**
+     * Explicit HTML doctype name for Dom\HTMLDocument::createFromString AOT (#28940).
+     *
+     * Returns null when the source has no {@code <!DOCTYPE …>} (php-src fragment
+     * parse → {@code $doc->doctype === null}).
+     */
+    public static function doctypeNameArgv(string $html): ?string
+    {
+        $trimmed = trim($html);
+        if ('' === $trimmed) {
+            return null;
+        }
+        if (1 !== preg_match('/^<!DOCTYPE\s+([a-zA-Z_][\w:.-]*)/i', $trimmed, $m)) {
+            return null;
+        }
+
+        return strtolower($m[1]);
+    }
+
+    /**
      * Body element textContent for Dom\HTMLDocument::createFromString AOT (#27300).
      *
      * Mirrors loadHTML wrapping: explicit {@code <body>} wins; otherwise the
