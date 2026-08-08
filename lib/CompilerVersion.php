@@ -2207,6 +2207,18 @@ final class CompilerVersion
     }
 
     /**
+     * Zend 8.3+ allows {@code class_alias()} of internal classes; 8.1/8.2 throw ValueError (#29150).
+     *
+     * Uses {@see languageProfileVersion()} so explicit {@code PHP_COMPILER_PROFILE=8.1}/{@code 8.2}
+     * reject while unset PROFILE on 8.4.0-dev and PROFILE≥8.3 keep the #29084 allow path.
+     * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(class_alias).
+     */
+    public static function allowsClassAliasOfInternalClass(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ sockets SHUT_RD / SHUT_WR / SHUT_RDWR (ext/sockets/sockets.stub.php; #26760).
      *
      * Absent from Zend 8.2–8.4 sockets category; registered under `#ifdef SHUT_RDWR` from 8.5.

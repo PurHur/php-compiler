@@ -1247,6 +1247,53 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testAllowsClassAliasOfInternalClassDefaultAnd84(): void
+    {
+        // Unset PROFILE on 8.4.0-dev keeps #29084 allow (languageProfileVersion ≥ 8.3.0-dev).
+        $this->assertTrue(CompilerVersion::allowsClassAliasOfInternalClass());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::allowsClassAliasOfInternalClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAllowsClassAliasOfInternalClassFalseOn82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::allowsClassAliasOfInternalClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAllowsClassAliasOfInternalClassTrueOn83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::allowsClassAliasOfInternalClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsSocketShutConstantsFalseOnDefaultAnd84(): void
     {
         $this->assertFalse(CompilerVersion::supportsSocketShutConstants());
