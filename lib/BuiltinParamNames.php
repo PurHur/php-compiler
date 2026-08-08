@@ -282,13 +282,14 @@ final class BuiltinParamNames
             'simplexmlelement::addattribute' => ['qualifiedName', 'value', 'namespace'],
             'simplexmlelement::getnamespaces' => ['recursive'],
             'simplexmlelement::getdocnamespaces' => ['recursive', 'fromRoot'],
-            // php-src ext/xmlreader/php_xmlreader.stub.php (#23391)
+            // php-src ext/xmlreader/php_xmlreader.stub.php (#23391, #28712)
             'xmlreader::expand' => ['baseNode='],
             'xmlreader::getattributens' => ['name', 'namespace'],
             'xmlreader::movetoattributens' => ['name', 'namespace'],
             'xmlreader::next' => ['name'],
-            'xmlreader::open' => ['uri', 'encoding', 'flags'],
-            'xmlreader::xml' => ['source', 'encoding', 'flags'],
+            // encoding/?string=null, flags/int=0 — InternalArgInfo still has non-nullable encoding (#28712)
+            'xmlreader::open' => ['uri', 'encoding=', 'flags='],
+            'xmlreader::xml' => ['source', 'encoding=', 'flags='],
             // php-src ext/xmlreader/php_xmlreader.stub.php — PHP 8.4+ factories (#27713)
             'xmlreader::fromstring' => ['source', 'encoding=', 'flags='],
             'xmlreader::fromuri' => ['uri', 'encoding=', 'flags='],

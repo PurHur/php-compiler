@@ -1207,6 +1207,15 @@ final class BuiltinInternalArgInfo
                 2 => '?string',
                 default => null,
             },
+            // ext/xmlreader/php_xmlreader.stub.php — open/XML encoding ?string=null (#28712)
+            // InternalArgInfo still has encoding=string / options=int (pre-stub names).
+            'xmlreader::open',
+            'xmlreader::xml' => match ($index) {
+                0 => 'string',
+                1 => '?string',
+                2 => 'int',
+                default => null,
+            },
             // ext/xmlreader/php_xmlreader.stub.php — PHP 8.4+ factories (#27713)
             'xmlreader::fromstring' => match ($index) {
                 0 => 'string',
