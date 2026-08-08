@@ -28,15 +28,16 @@ use PHPLLVM\Value;
  * array_reduce() — string, closure, invokable, and object-array callables (ext/standard/array.c; #25763).
  *
  * JIT/AOT: compile-time string user-function names in this compile unit (#1213); array callables VM-only.
+ *
+ * Excess/missing argc → ArgumentCountError (#28473).
  */
 final class array_reduce extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.stub.php — ArgumentCountError (#28473).
+        $this->requireArgCountRange($frame, 'array_reduce', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
-        }
         $callback = $frame->calledArgs[1]->resolveIndirect();
         $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_reduce', 1, 'array');
         if (null === $frame->vmContext) {
@@ -185,10 +186,11 @@ final class array_reduce extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #28473.
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_reduce', 2, 3)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_reduce', 1, 'array');
         if ($args[1]->isNullConstant) {
             throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
