@@ -25,6 +25,6 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-memory_get_usage(): Argument #1 ($real_usage) must be of type MemoryUsage|bool, E given
-memory_get_peak_usage(): Argument #1 ($real_usage) must be of type MemoryUsage|bool, E given
+memory_get_usage(): Argument #1 ($real_usage) must be of type bool, E given
+memory_get_peak_usage(): Argument #1 ($real_usage) must be of type bool, E given
 memory_get_usage() expects at most 1 argument, 2 given

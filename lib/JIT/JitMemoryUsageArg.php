@@ -178,7 +178,7 @@ final class JitMemoryUsageArg
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise(
             $context,
-            sprintf('%s(): Argument #1 ($real_usage) must be of type MemoryUsage|bool, %s given', $fn, $given)
+            sprintf('%s(): Argument #1 ($real_usage) must be of type bool, %s given', $fn, $given)
         );
         $context->builder->call($context->lookupFunction('abort'));
     }
