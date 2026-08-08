@@ -2881,7 +2881,13 @@ restart:
         if (str_contains($str, '.') || str_contains(strtolower($str), 'e')) {
             $this->float((float) $str + $delta);
         } else {
-            $this->int((int) $str + $delta);
+            // Same INT_MAX/MIN → float promote as applyIncrement/Decrement (#29144).
+            $next = (int) $str + $delta;
+            if (\is_int($next)) {
+                $this->int($next);
+            } else {
+                $this->float((float) $next);
+            }
         }
     }
 
@@ -3014,6 +3020,13 @@ restart:
                 if ($this->isVmResource()) {
                     throw new \TypeError('Cannot increment resource');
                 }
+                // zend_operators.h fast_long_increment_function — PHP_INT_MAX → double (#29144).
+                // Never ++$this->integer: host typed int property TypeErrors as Variable::$integer.
+                if (\PHP_INT_MAX === $this->integer) {
+                    $this->float(VmIncDec::overflowIncrementFloat());
+
+                    return;
+                }
                 ++$this->integer;
 
                 return;
@@ -3081,6 +3094,12 @@ restart:
             case self::TYPE_INTEGER:
                 if ($this->isVmResource()) {
                     throw new \TypeError('Cannot decrement resource');
+                }
+                // zend_operators.h fast_long_decrement_function — PHP_INT_MIN → double (#29144).
+                if (\PHP_INT_MIN === $this->integer) {
+                    $this->float(VmIncDec::overflowDecrementFloat());
+
+                    return;
                 }
                 --$this->integer;
 

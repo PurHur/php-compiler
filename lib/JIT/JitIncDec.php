@@ -1,0 +1,169 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT;
+
+use PHPCompiler\VM\VmIncDec;
+use PHPLLVM\Builder;
+use PHPLLVM\Value as LlvmValue;
+
+/**
+ * JIT ++/-- with PHP_INT_MAX/MIN → double promotion (#29144).
+ *
+ * @see php-src Zend/zend_operators.h fast_long_increment_function /
+ *      fast_long_decrement_function
+ */
+final class JitIncDec
+{
+    /**
+     * Compile-time constant long: fold overflow to double, else ±1 long.
+     */
+    public static function tryFoldConstantLong(
+        Context $context,
+        Variable $read,
+        bool $increment
+    ): ?Variable {
+        if (Variable::KIND_VALUE !== $read->kind
+            || null === $read->value
+            || LlvmValue::KIND_CONSTANT_INT !== $read->value->getKind()
+        ) {
+            return null;
+        }
+        $const = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($read->value->value);
+        if ($increment) {
+            if (\PHP_INT_MAX === $const) {
+                return self::doubleConst($context, VmIncDec::overflowIncrementFloat());
+            }
+            $next = $const + 1;
+
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger($next, 'long')
+            );
+        }
+        if (\PHP_INT_MIN === $const) {
+            return self::doubleConst($context, VmIncDec::overflowDecrementFloat());
+        }
+        $next = $const - 1;
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->constantFromInteger($next, 'long')
+        );
+    }
+
+    /**
+     * Runtime long ++/-- into a value box (long or double on overflow).
+     */
+    public static function promoteLongIntoValueBox(
+        Context $context,
+        LlvmValue $cur,
+        bool $increment
+    ): Variable {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'incdec_overflow_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $long = $context->builder->intCast($cur, $i64);
+        $valuePtr = $context->builder->alloca($context->getTypeFromString('__value__'));
+
+        $limit = $i64->constInt($increment ? \PHP_INT_MAX : \PHP_INT_MIN, true);
+        $isOverflow = $context->builder->icmp(Builder::INT_EQ, $long, $limit);
+        $ovBlock = BasicBlockHelper::append($context, $increment ? 'inc_int_max' : 'dec_int_min');
+        $longBlock = BasicBlockHelper::append($context, 'incdec_long');
+        $doneBlock = BasicBlockHelper::append($context, 'incdec_done');
+        $context->builder->branchIf($isOverflow, $ovBlock, $longBlock);
+
+        $context->builder->positionAtEnd($ovBlock);
+        $ovFloat = $f64->constReal(
+            $increment ? VmIncDec::overflowIncrementFloat() : VmIncDec::overflowDecrementFloat()
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $valuePtr,
+            $ovFloat
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $one = $i64->constInt(1, false);
+        $newLong = $increment
+            ? $context->builder->add($long, $one)
+            : $context->builder->sub($long, $one);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $valuePtr,
+            $newLong
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $valuePtr);
+    }
+
+    /**
+     * Write ++/-- of a long into an existing value-box lvalue (in-place local).
+     */
+    public static function writeLongIncDecToValuePtr(
+        Context $context,
+        LlvmValue $cur,
+        LlvmValue $writePtr,
+        bool $increment
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'incdec_vbox_overflow_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $long = $context->builder->intCast($cur, $i64);
+
+        $limit = $i64->constInt($increment ? \PHP_INT_MAX : \PHP_INT_MIN, true);
+        $isOverflow = $context->builder->icmp(Builder::INT_EQ, $long, $limit);
+        $ovBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_int_max' : 'dec_vbox_int_min');
+        $longBlock = BasicBlockHelper::append($context, 'incdec_vbox_long');
+        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_done');
+        $context->builder->branchIf($isOverflow, $ovBlock, $longBlock);
+
+        $context->builder->positionAtEnd($ovBlock);
+        $ovFloat = $f64->constReal(
+            $increment ? VmIncDec::overflowIncrementFloat() : VmIncDec::overflowDecrementFloat()
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $writePtr,
+            $ovFloat
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $one = $i64->constInt(1, false);
+        $newLong = $increment
+            ? $context->builder->add($long, $one)
+            : $context->builder->sub($long, $one);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $writePtr,
+            $newLong
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        JitValueBox::publishAfterWrite($context, $writePtr);
+    }
+
+    private static function doubleConst(Context $context, float $f): Variable
+    {
+        $out = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::KIND_VALUE,
+            $context->constantFromFloat($f, 'double')
+        );
+        $out->compileTimeFloat = $f;
+
+        return $out;
+    }
+}

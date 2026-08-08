@@ -17958,10 +17958,6 @@ class JIT {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
-            $one = $cur->typeOf()->constInt(1, false);
-            $newLong = $increment
-                ? $this->context->builder->add($cur, $one)
-                : $this->context->builder->sub($cur, $one);
             if (!$prefix) {
                 $oldVar = new Variable(
                     $this->context,
@@ -17973,19 +17969,15 @@ class JIT {
             }
             $write = $this->context->getVariableFromOpInScopes($writeOp);
             $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeLong'),
-                $writePtr,
-                $newLong
-            );
-            JIT\JitValueBox::publishAfterWrite($this->context, $writePtr);
+            // zend_operators.h — PHP_INT_MAX/MIN overflow → double (#29144).
+            JIT\JitIncDec::writeLongIncDecToValuePtr($this->context, $cur, $writePtr, $increment);
             $this->invalidateScriptGlobalCompileTimeMetadata($write);
             if ($prefix) {
                 $newVar = new Variable(
                     $this->context,
-                    Variable::TYPE_NATIVE_LONG,
+                    Variable::TYPE_VALUE,
                     Variable::KIND_VALUE,
-                    $newLong
+                    $writePtr
                 );
                 $this->assignOperand($resultOp, $newVar, true);
             }
@@ -17995,17 +17987,21 @@ class JIT {
 
         if (Variable::TYPE_NATIVE_LONG === $read->type) {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
+            $folded = JIT\JitIncDec::tryFoldConstantLong($this->context, $read, $increment);
+            if (null !== $folded) {
+                if (!$prefix) {
+                    $this->assignOperand($resultOp, $read, true);
+                }
+                $this->assignOperand($writeOp, $folded, true);
+                if ($prefix) {
+                    $this->assignOperand($resultOp, $folded, true);
+                }
+
+                return;
+            }
             $cur = $this->context->helper->loadValue($read);
-            $one = $cur->typeOf()->constInt(1, false);
-            $newLong = $increment
-                ? $this->context->builder->add($cur, $one)
-                : $this->context->builder->sub($cur, $one);
-            $newVar = new Variable(
-                $this->context,
-                Variable::TYPE_NATIVE_LONG,
-                Variable::KIND_VALUE,
-                $newLong
-            );
+            // Runtime long may be PHP_INT_MAX/MIN — promote via value box (#29144).
+            $newVar = JIT\JitIncDec::promoteLongIntoValueBox($this->context, $cur, $increment);
             if (!$prefix) {
                 $oldVar = new Variable(
                     $this->context,
