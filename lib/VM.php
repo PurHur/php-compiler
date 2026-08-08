@@ -11846,6 +11846,14 @@ restart:
             return $this->dispatchVmTypeError($e, $frame);
         } catch (\ValueError $e) {
             return $this->dispatchVmValueError($e, $frame);
+        } catch (\OutOfBoundsException $e) {
+            // SplFixedArray OOB under PROFILE≥8.4 — before RuntimeException (parent) (#28819).
+            $resolved = $dst->resolveIndirect();
+            if ($resolved->isArrayAccessOffset()) {
+                $dst->null();
+            }
+
+            return $this->dispatchVmOutOfBoundsException($e, $frame);
         } catch (\RuntimeException $e) {
             // ArrayAccess dim write (e.g. SplFixedArray OOB) — same bridge as method calls (#21994).
             $resolved = $dst->resolveIndirect();
