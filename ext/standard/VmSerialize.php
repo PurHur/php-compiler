@@ -237,12 +237,8 @@ final class VmSerialize
             // php-src ext/enchant/enchant.stub.php — @not-serializable (#23112).
             EnchantSerializeDeny::rejectUnserialization($className);
             if (!self::isClassAllowedForUnserialize($className, $options)) {
-                $parsed = self::parseCustomObjectPayload($payload);
-                if (null === $parsed || !\is_array($parsed[1])) {
-                    return false;
-                }
-
-                return self::instantiateIncompleteObject($ctx, $className, $parsed[1]);
+                // Cell path so nested O: also honor allowed_classes (#29065).
+                return VmUnserializeFormat::decodeToVariableWithContext($ctx, $payload, $options, $frame);
             }
             $lcEarly = strtolower($className);
             if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcEarly)) {
@@ -353,7 +349,14 @@ final class VmSerialize
                 $inner = $m[4];
                 $propCount = (int) $m[3];
 
-                return VmUnserializeFormat::decodeObjectPropertyBag($ctx, $class, $propCount, $inner, $frame);
+                return VmUnserializeFormat::decodeObjectPropertyBag(
+                    $ctx,
+                    $class,
+                    $propCount,
+                    $inner,
+                    $frame,
+                    $options
+                );
             }
 
             return self::instantiatePlainObject($ctx, $class, $data, $frame);

@@ -38,36 +38,39 @@ final class JitUnserialize
         JITVariable $payload,
         array $options
     ): Value {
-        $literal = JitStringArg::compileTimeLiteral($payload);
-        if (null !== $literal) {
-            $decoded = VmUnserializeFormat::decodePayload($literal, $options);
-            if (false === $decoded) {
-                return JitJsonDecode::materializeScalar($context, false);
-            }
-            if (null === $decoded) {
-                return JitJsonDecode::materializeNull($context);
-            }
-            if (\is_bool($decoded)) {
-                return JitJsonDecode::materializeScalar($context, $decoded);
-            }
-            if (\is_int($decoded)) {
-                return JitJsonDecode::materializeScalar($context, $decoded);
-            }
-            if (\is_string($decoded)) {
-                return JitJsonDecode::materializeScalar($context, $decoded);
-            }
-            if (\is_array($decoded)) {
-                return JitJsonDecode::materializeArray($context, $decoded);
-            }
-
-            throw new \LogicException('unserialize() result type not supported in this compiler build');
-        }
-
         if ([] === $options || (1 === \count($options) && \array_key_exists('allowed_classes', $options) && true === $options['allowed_classes'])) {
             return self::decodeRuntime($context, $payload);
         }
 
-        throw new \LogicException('unserialize() runtime payload with options not supported for JIT in this compiler build');
+        $literal = JitStringArg::compileTimeLiteral($payload);
+        if (null !== $literal) {
+            // decodePayload cannot materialize O:/C:/E: cells (#29065) — only fold scalars/arrays.
+            if (!\preg_match('/(?:^|[{;])[OCE]:/', $literal)) {
+                $decoded = VmUnserializeFormat::decodePayload($literal, $options);
+                if (false === $decoded) {
+                    return JitJsonDecode::materializeScalar($context, false);
+                }
+                if (null === $decoded) {
+                    return JitJsonDecode::materializeNull($context);
+                }
+                if (\is_bool($decoded)) {
+                    return JitJsonDecode::materializeScalar($context, $decoded);
+                }
+                if (\is_int($decoded)) {
+                    return JitJsonDecode::materializeScalar($context, $decoded);
+                }
+                if (\is_string($decoded)) {
+                    return JitJsonDecode::materializeScalar($context, $decoded);
+                }
+                if (\is_array($decoded)) {
+                    return JitJsonDecode::materializeArray($context, $decoded);
+                }
+            }
+        }
+
+        throw new \LogicException(
+            'unserialize() runtime payload with options not supported for JIT in this compiler build'
+        );
     }
 
     public static function decodeRuntimeString(Context $context, Value $payloadString): Value
