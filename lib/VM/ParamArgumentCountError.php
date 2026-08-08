@@ -150,6 +150,10 @@ final class ParamArgumentCountError
 
     public static function formatUserFunctionName(string $name): string
     {
+        // php-cfg `{anonymous}#N` / `{closure}_N` → Zend `{closure}` (#29095, #29025).
+        if (str_starts_with($name, '{anonymous}') || str_starts_with($name, '{closure}')) {
+            return '{closure}';
+        }
         if (!str_contains($name, '@anonymous')) {
             return $name;
         }
