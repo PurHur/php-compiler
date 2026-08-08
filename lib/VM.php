@@ -55,6 +55,7 @@ use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\TypedPropertyReadSignal;
+use PHPCompiler\VM\VmIncDec;
 use PHPCompiler\VM\VmVarFetch;
 use PHPCompiler\VM\VmIsset;
 use PHPCompiler\VM\WeakRefRegistry;
@@ -10222,11 +10223,15 @@ restart:
         $working->copyFrom($read->resolveIndirect());
         try {
             if ($prefix) {
+                $before = new Variable();
+                $before->copyFrom($working);
                 if ($increment) {
                     $working->applyIncrement($this, $frame);
                 } else {
                     $working->applyDecrement($this, $frame);
                 }
+                // Typed int property: keep MAX/MIN and TypeError (zend_execute.c, #29144).
+                VmIncDec::throwIfTypedPropertyRejectsOverflow($write, $before, $working, $increment);
                 $write->copyFrom($working);
                 $result->copyFrom($working);
             } else {
@@ -10237,6 +10242,7 @@ restart:
                 } else {
                     $working->applyDecrement($this, $frame);
                 }
+                VmIncDec::throwIfTypedPropertyRejectsOverflow($write, $old, $working, $increment);
                 $write->copyFrom($working);
                 $result->copyFrom($old);
             }
@@ -10303,10 +10309,15 @@ restart:
 
         try {
             if ($prefix) {
+                $before = new Variable();
+                $before->copyFrom($working);
                 if ($increment) {
                     $working->applyIncrement($this, $frame);
                 } else {
                     $working->applyDecrement($this, $frame);
+                }
+                if (!$writeUsesMagic) {
+                    VmIncDec::throwIfTypedPropertyRejectsOverflow($write, $before, $working, $increment);
                 }
                 if ($writeUsesMagic) {
                     $this->invokeMagicSet($owner, $propName, $working);
@@ -10330,6 +10341,9 @@ restart:
                     $working->applyIncrement($this, $frame);
                 } else {
                     $working->applyDecrement($this, $frame);
+                }
+                if (!$writeUsesMagic) {
+                    VmIncDec::throwIfTypedPropertyRejectsOverflow($write, $old, $working, $increment);
                 }
                 if ($writeUsesMagic) {
                     $this->invokeMagicSet($owner, $propName, $working);
