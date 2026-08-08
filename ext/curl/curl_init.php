@@ -12,7 +12,10 @@ use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
- * curl_init() — minimal easy handle for share attachment (php-src ext/curl/interface.c; #6322).
+ * curl_init() — minimal easy handle for share attachment (php-src ext/curl/interface.c; #6322, #28563).
+ *
+ * Stub: `function curl_init(?string $url = null): CurlHandle|false` — explicit null must not
+ * emit null-to-string deprecation (Z_PARAM_STR_OR_NULL; php-src curl.stub.php).
  */
 final class curl_init extends Internal
 {
@@ -35,7 +38,13 @@ final class curl_init extends Internal
         }
         $url = null;
         if (isset($frame->calledArgs[0])) {
-            $url = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'curl_init', 0, 'url');
+            // ?string $url — honor nullable stub; do not DEP+coerce null as non-nullable string (#28563).
+            $url = VmString::coerceNullableStringBuiltinArg(
+                $frame->calledArgs[0],
+                'curl_init',
+                0,
+                'url'
+            );
         }
         $var = VmCurlEasy::init($url, $frame->vmContext);
         $frame->returnVar->object($var->toObject());
