@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 /**
- * VM-runtime sprintf() subset (%s, %d, %f, %a, %A, %%, %n$ positional, width/flags,
+ * VM-runtime sprintf() subset (%s, %d, %f, %%, %n$ positional, width/flags,
  * %'<char> pad, %* / %.* / %N$*M$ / %N$.*M$ star args, #3631, #9069, #22833, #22834).
+ * %a/%A are unknown on Zend (ValueError; #29085 / #29059 — retract #9059 phantom).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -453,12 +454,9 @@ final class VmSprintf
                 return self::formatGeneralFixed(self::argToFloat($var, $frame), false, $floatPrec, $showSign);
             case 'H':
                 return self::formatGeneralFixed(self::argToFloat($var, $frame), true, $floatPrec, $showSign);
-            case 'a':
-                return self::formatHexFloat(self::argToFloat($var, $frame), false, $precision, $showSign);
-            case 'A':
-                return self::formatHexFloat(self::argToFloat($var, $frame), true, $precision, $showSign);
             default:
-                // php-src formatted_print.c — unknown conversion → ValueError (#27826).
+                // php-src formatted_print.c — unknown conversion → ValueError (#27826, #29085).
+                // %a/%A are not PHP sprintf conversions (C99-only; retract #9059).
                 throw new \ValueError('Unknown format specifier "'.$spec.'"');
         }
     }
@@ -746,7 +744,6 @@ final class VmSprintf
      *
      * PHP 8.2 passes "INF" into php_sprintf_appendstring with is_negative set; with
      * default space padding the leading sign is never emitted, so -INF prints as INF.
-     * Uppercase INF for %f/%F/%e/%E/%g/%G/%h/%H; lowercase for %a (see formatHexFloat).
      */
     private static function formatInfinity(bool $upper): string
     {
@@ -777,95 +774,5 @@ final class VmSprintf
         $prefix = self::positiveFloatSignPrefix($value, $showSign);
 
         return '' === $prefix ? $formatted : $prefix.$formatted;
-    }
-
-    /**
-     * php-src ext/standard/sprintf.c — %a / %A (C99 hex float, issue #9059).
-     */
-    private static function formatHexFloat(
-        float $value,
-        bool $upper,
-        ?int $precision,
-        ?string $showSign = null
-    ): string {
-        if (\is_nan($value)) {
-            return $upper ? 'NAN' : 'nan';
-        }
-        if (\is_infinite($value)) {
-            // Same unsigned INF token as %f family (#23607); %a/%A case follows C99.
-            return self::formatInfinity($upper);
-        }
-
-        $prec = $precision ?? 13;
-        [$hi, $lo] = Ieee754::float64ToBits($value);
-        $signBit = ($hi >> 31) & 1;
-        $expField = ($hi >> 20) & 0x7FF;
-        $frac = (($hi & 0xFFFFF) << 32) | ($lo & 0xFFFFFFFF);
-
-        $pfx = $upper ? '0X' : '0x';
-        $pSep = $upper ? 'P' : 'p';
-        $hex = $upper ? '0123456789ABCDEF' : '0123456789abcdef';
-
-        $sign = '';
-        if (1 === $signBit) {
-            $sign = '-';
-        } elseif ('+' === $showSign) {
-            $sign = '+';
-        } elseif (' ' === $showSign) {
-            $sign = ' ';
-        }
-
-        if (0 === $expField && 0 === $frac) {
-            return $sign.$pfx.'0'.$pSep.'+0';
-        }
-
-        if ($expField > 0 && $expField < 0x7FF) {
-            $binExp = $expField - 1023;
-            $leadDigit = 1;
-        } else {
-            $binExp = -1022;
-            $leadDigit = 0;
-        }
-
-        $fracHex = '';
-        for ($i = 12; $i >= 0; --$i) {
-            $fracHex .= $hex[($frac >> ($i * 4)) & 0xF];
-        }
-        $fracHex = self::roundHexFraction($fracHex, $prec, $hex);
-        if (null === $precision) {
-            $fracHex = \rtrim($fracHex, '0');
-        }
-
-        $expSign = $binExp >= 0 ? '+' : '-';
-        $expDigits = self::intToDecimal(\abs($binExp));
-
-        if ('' === $fracHex) {
-            return $sign.$pfx.$leadDigit.$pSep.$expSign.$expDigits;
-        }
-
-        return $sign.$pfx.$leadDigit.'.'.$fracHex.$pSep.$expSign.$expDigits;
-    }
-
-    /** Round hex mantissa digits after the decimal point (php-src / libc %a precision). */
-    private static function roundHexFraction(string $digits, int $precision, string $hex): string
-    {
-        if ($precision <= 0) {
-            return '';
-        }
-        if (\strlen($digits) <= $precision) {
-            return \str_pad($digits, $precision, '0');
-        }
-        $out = \substr($digits, 0, $precision);
-        $next = \hexdec($digits[$precision]);
-        if ($next >= 8) {
-            $carry = 1;
-            for ($i = $precision - 1; $i >= 0 && $carry > 0; --$i) {
-                $n = \hexdec($out[$i]) + $carry;
-                $carry = intdiv($n, 16);
-                $out[$i] = $hex[$n % 16];
-            }
-        }
-
-        return $out;
     }
 }

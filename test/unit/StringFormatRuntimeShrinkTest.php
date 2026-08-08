@@ -213,7 +213,7 @@ final class StringFormatRuntimeShrinkTest extends TestCase
     {
         // php-src formatted_print.c — unknown conversion → ValueError (#27826).
         $blob = "\x01".\pack('q', 1);
-        foreach (['%Z', '%Y', '%\\', '%@'] as $format) {
+        foreach (['%Z', '%Y', '%\\', '%@', '%a', '%A'] as $format) {
             try {
                 SprintfJitHelper::sprintfArgv($format, $blob);
                 $this->fail('expected ValueError for '.$format);

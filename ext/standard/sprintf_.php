@@ -19,7 +19,8 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * sprintf() — %s %d %f %b %x %X %o %u %c %e %E %g %G %a %A %%, %n$ positional (LLVM JIT/AOT via __compiler_sprintf, #4156, #3631).
+ * sprintf() — %s %d %f %b %x %X %o %u %c %e %E %g %G %%, %n$ positional (LLVM JIT/AOT via __compiler_sprintf, #4156, #3631).
+ * %a/%A → ValueError like Zend (#29085; retract #9059 phantom).
  */
 final class sprintf_ extends Internal
 {
