@@ -119,6 +119,28 @@ final class VmFilterTest extends TestCase
         $this->assertSame('1,234.5e2', $out->toString());
     }
 
+    /** #29016 — FILTER_SANITIZE_URL RFC 1738 allow-list keeps <>()* etc. */
+    public function testSanitizeUrlKeepsAngleBracketsAndParens(): void
+    {
+        $cases = [
+            'http://ex.com/a b<script>' => 'http://ex.com/ab<script>',
+            'javascript:alert(1)' => 'javascript:alert(1)',
+            'http://ex.com/foo bar' => 'http://ex.com/foobar',
+        ];
+        foreach ($cases as $in => $expect) {
+            $v = new Variable();
+            $v->string($in);
+            $out = VmFilter::filterVar($v, VmFilter::FILTER_SANITIZE_URL);
+            $this->assertSame(Variable::TYPE_STRING, $out->type, $in);
+            $this->assertSame($expect, $out->toString(), $in);
+            $this->assertSame(
+                $expect,
+                \PHPCompiler\ext\filter\FilterUrlValidate::sanitize($in),
+                'FilterUrlValidate::sanitize '.$in
+            );
+        }
+    }
+
     /** #29007 — options[decimal] single-byte separator (php-src php_filter_float). */
     public function testValidateFloatCustomDecimalSeparator(): void
     {

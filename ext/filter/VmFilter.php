@@ -715,14 +715,10 @@ final class VmFilter
         ) ?? '';
     }
 
-    /** php-src php_filter_sanitize_url allow-list. */
+    /** php-src php_filter_url / FILTER_SANITIZE_URL allow-list (#29016). */
     private static function sanitizeUrl(string $subject): string
     {
-        return preg_replace(
-            '/[^-a-zA-Z0-9+&@#\/%?=~_|!:,.;]+/',
-            '',
-            $subject
-        ) ?? '';
+        return FilterUrlValidate::sanitize($subject);
     }
 
     private static function stripCharsBelow(string $s, int $threshold): string

@@ -53,6 +53,23 @@ final class FilterUrlValidate
         return 1;
     }
 
+    /**
+     * php_filter_url / FILTER_SANITIZE_URL — keep RFC 1738 §5 octets only (#29016).
+     */
+    public static function sanitize(string $subject): string
+    {
+        $out = '';
+        $len = \strlen($subject);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $subject[$i];
+            if (false !== \strpos(self::URL_ALLOWED, $ch)) {
+                $out .= $ch;
+            }
+        }
+
+        return $out;
+    }
+
     public static function isValidInt(string $s, int $flags = 0): int
     {
         $len = \strlen($s);
