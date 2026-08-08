@@ -31,7 +31,11 @@ final class defined_ extends Internal
         }
         $name = self::vmConstantNameArg($frame);
         $name = VmReflection::normalizeGlobalIntrospectionName($name);
-        $defined = VmConstants::constantDefined($frame->vmContext, $name);
+        $defined = VmConstants::constantDefined(
+            $frame->vmContext,
+            $name,
+            VmReflection::callerClassLcFromFrame($frame)
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($defined);
         }
@@ -57,8 +61,9 @@ final class defined_ extends Internal
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
+            $callerLc = self::jitCallerClassLc($context);
             if (null !== $context->runtime->vmContext
-                && VmConstants::constantDefined($context->runtime->vmContext, $literal)) {
+                && VmConstants::constantDefined($context->runtime->vmContext, $literal, $callerLc)) {
                 return $i1->constInt(1, false);
             }
             $nameStr = $context->builder->load($context->constantStringFromString($literal));
@@ -80,5 +85,15 @@ final class defined_ extends Internal
             0,
             'constant_name'
         );
+    }
+
+    /** Class scope for compile-time defined('Class::CONST') fold (#29130). */
+    private static function jitCallerClassLc(Context $context): ?string
+    {
+        if ('' === ($context->scope->className ?? '')) {
+            return null;
+        }
+
+        return strtolower(ltrim($context->scope->className, '\\'));
     }
 }

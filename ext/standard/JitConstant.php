@@ -36,9 +36,22 @@ final class JitConstant
             throw new \LogicException('constant() requires VM context');
         }
         $name = VmReflection::normalizeGlobalIntrospectionName($name);
-        $phpVar = VmConstants::constantLookup($context->runtime->vmContext, $name);
+        $callerLc = '' !== ($context->scope->className ?? '')
+            ? strtolower(ltrim($context->scope->className, '\\'))
+            : null;
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
+        try {
+            $phpVar = VmConstants::constantLookup($context->runtime->vmContext, $name, $callerLc);
+        } catch (\Error $e) {
+            // Visibility Error must be runtime so try/catch around constant() works (#29130).
+            ErrorRaise::registerDeclarations($context);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise($context, $e->getMessage());
+            $context->builder->call($context->lookupFunction('abort'));
+
+            return $ptr;
+        }
         if (null !== $phpVar) {
             self::writeVmVariable($context, $slot, $phpVar->resolveIndirect());
 
