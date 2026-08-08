@@ -98,16 +98,41 @@ final class JitDomXPathQueryUserScript
             return null;
         }
         $tag = $matches[1];
+        $registeredNs = self::registeredNamespaces();
         if (!isset($matches[2]) || '' === $matches[2]) {
+            $count = DomParseSimpleXmlJitHelper::countXPathNameTestArgv($xml, $tag, $registeredNs);
+            if (null === $count) {
+                // Undefined prefix — host invalid path above should have caught this; fall through.
+                return null;
+            }
             self::$lastCacheKey = null;
-            self::$lastQueryTag = strtolower($tag);
-            $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+            // Prefixed QNames are not live getElementsByTagName keys (#29139).
+            self::$lastQueryTag = false === strpos($tag, ':') ? strtolower($tag) : null;
             DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count, true);
 
             return self::boxNodeList($context, $count);
         }
+        // Attribute predicates on namespaced tags: require null-NS unprefixed match
+        // or fall through when the tag is prefixed (#29139).
+        if (false !== strpos($tag, ':')) {
+            return null;
+        }
         $numeric = isset($matches[4]) && '' !== $matches[4];
         $attrValue = $numeric ? $matches[4] : ($matches[3] ?? '');
+        $xpathCount = DomParseSimpleXmlJitHelper::countXPathNameTestArgv($xml, $tag, $registeredNs);
+        $naiveCount = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+        if (0 === $xpathCount) {
+            // Default-NS elements must not match unprefixed //tag[@attr] (#29139).
+            self::$lastCacheKey = null;
+            self::$lastQueryTag = null;
+            DomUserScriptLiveTagListLlvm::initCount($context, $tag, 0, true);
+
+            return self::boxNodeList($context, 0);
+        }
+        if ($xpathCount !== $naiveCount) {
+            // Mixed null-NS + default-NS same local name — naive attr scan is unsafe.
+            return null;
+        }
         $matched = DomParseSimpleXmlJitHelper::matchDescendantAttributeArgv(
             $xml,
             $tag,
@@ -202,6 +227,12 @@ final class JitDomXPathQueryUserScript
                 return null;
             }
             $xpath = new \DOMXPath($doc);
+            foreach (JitDomXPathRegisterUserScript::namespaces() as $prefix => $uri) {
+                if ('' === $prefix) {
+                    continue;
+                }
+                @$xpath->registerNamespace($prefix, $uri);
+            }
             $result = $xpath->query($expression);
         } catch (\Throwable) {
             restore_error_handler();
@@ -237,5 +268,11 @@ final class JitDomXPathQueryUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /** @return array<string, string> */
+    private static function registeredNamespaces(): array
+    {
+        return JitDomXPathRegisterUserScript::namespaces();
     }
 }

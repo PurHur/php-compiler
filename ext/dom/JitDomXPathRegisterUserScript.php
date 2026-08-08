@@ -59,6 +59,12 @@ final class JitDomXPathRegisterUserScript
         return self::$namespaces[$prefix] ?? null;
     }
 
+    /** @return array<string, string> */
+    public static function namespaces(): array
+    {
+        return self::$namespaces;
+    }
+
     /**
      * @return Value|null null = fall through to DomInstanceMethod (non-literal args)
      */
