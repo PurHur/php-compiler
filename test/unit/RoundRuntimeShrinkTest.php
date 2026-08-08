@@ -9,7 +9,9 @@ use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmRound;
 use PHPUnit\Framework\TestCase;
 
-/** round() JIT routes through RoundJitHelper PHP not JitRoundLowering LLVM (#15211). */
+/**
+ * round() NestedJIT via JitVmHelperLink::ensureBridge (#28913 / peer Floor #27650).
+ */
 final class RoundRuntimeShrinkTest extends TestCase
 {
     public function testRoundUsesJitHelperNotLoweringMonolith(): void
@@ -23,11 +25,9 @@ final class RoundRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathRound.php');
         $this->assertStringContainsString('RoundJitHelper', $bridge);
         $this->assertStringContainsString('phpc_round', $bridge);
-        $this->assertStringContainsString('ensureBridge', $bridge);
-        $this->assertMatchesRegularExpression(
-            '/hasNamedBridgeEntry\(.*?BRIDGE_ENTRY\).*?NestedJitCompileScope::isActive/s',
-            $bridge
-        );
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitRoundLowering.php');
     }
