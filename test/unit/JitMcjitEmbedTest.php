@@ -291,7 +291,7 @@ PHP;
         $this->assertStringNotContainsString('__phpcMcjitClassPad = false', $out);
     }
 
-    /** @covers issue #26424 — pad must not rewrite class text inside string / eval payloads */
+    /** @covers issue #26424 / #29030 — string/eval payloads are not class decls; still need MCJIT bootstrap */
     public function testDoesNotPadClassInsideDoubleQuotedString(): void
     {
         $in = <<<'PHP'
@@ -300,11 +300,12 @@ $code = "class PadProbe {}";
 eval($code);
 PHP;
         $out = JitMcjitEmbed::prepareClassless($in);
-        $this->assertSame($in, $out);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringContainsString('$code = "class PadProbe {}";', $out);
         $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
     }
 
-    /** @covers issue #26424 */
+    /** @covers issue #26424 / #29030 */
     public function testDoesNotPadClassInsideSingleQuotedEvalString(): void
     {
         $in = <<<'PHP'
@@ -313,8 +314,22 @@ eval('class PadProbeSq {}');
 echo class_exists('PadProbeSq') ? "ok\n" : "no\n";
 PHP;
         $out = JitMcjitEmbed::prepareClassless($in);
-        $this->assertSame($in, $out);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringContainsString("eval('class PadProbeSq {}');", $out);
         $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+    }
+
+    /** @covers issue #29030 — Dom classList-style error strings must not suppress MCJIT bootstrap */
+    public function testInjectsBootstrapWhenClassKeywordOnlyInsideStringLiteral(): void
+    {
+        $in = <<<'PHP'
+<?php
+$x = "class after ";
+echo "ok\n";
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringContainsString('$x = "class after ";', $out);
     }
 
     /** @covers issue #26424 — real top-level empty class still needs the MCJIT pad */
