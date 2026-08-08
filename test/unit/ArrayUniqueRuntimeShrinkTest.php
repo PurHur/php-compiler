@@ -86,6 +86,24 @@ final class ArrayUniqueRuntimeShrinkTest extends TestCase
         ArrayUniqueJitHelper::unique($ht, StdlibConstants::SORT_STRING);
     }
 
+    public function testArrayUniqueJitHelperSortNumericCollapsesIntFloatNumericString(): void
+    {
+        $ht = new HashTable();
+        foreach (['1', 1, '1.0', 1.0] as $i => $raw) {
+            $var = new Variable();
+            if (\is_int($raw)) {
+                $var->int($raw);
+            } elseif (\is_float($raw)) {
+                $var->float($raw);
+            } else {
+                $var->string((string) $raw);
+            }
+            $ht->addIndex($i, $var);
+        }
+        $out = ArrayUniqueJitHelper::unique($ht, StdlibConstants::SORT_NUMERIC);
+        $this->assertSame(1, self::countElements($out));
+    }
+
     public function testArrayUniqueJitHelperHasNoCastObjectToStringOrPregMatch(): void
     {
         $src = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayUniqueJitHelper.php');
