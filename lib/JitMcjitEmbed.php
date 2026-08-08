@@ -43,10 +43,14 @@ final class JitMcjitEmbed
         if (!preg_match('/^<\?php\s/', $code)) {
             return $code;
         }
+        // Detect declarations on comment/string-blanked text so literals like
+        // `"class after "` / `echo "enum X"` cannot suppress the MCJIT bootstrap
+        // (#29030 — Dom classList error strings; pad path already blanks, #26424).
+        $mask = self::blankPhpOpaqueRegionsPreservingLength($code);
         // Require a declaration form — `$class` / `get_class` must not suppress the embed
         // bootstrap (word-boundary `\bclass\b` matches those and forces a broken classless
         // MCJIT path; #27156).
-        if (!preg_match('/\b(class|interface|trait|enum)\s+([a-zA-Z_\x80-\xff\\\\]|\{)/i', $code)) {
+        if (!preg_match('/\b(class|interface|trait|enum)\s+([a-zA-Z_\x80-\xff\\\\]|\{)/i', $mask)) {
             return self::prependMcjitBootstrap($code);
         }
 
@@ -56,14 +60,14 @@ final class JitMcjitEmbed
             $code = self::prependMcjitBootstrap($code);
         }
         // Enum-only scripts still need a padded user class for MCJIT module init (#4964, #6487).
-        if (preg_match('/\benum\b/i', $code) && !str_contains($code, '__phpc_mcjit_embed_bootstrap')) {
+        if (preg_match('/\benum\b/i', $mask) && !str_contains($code, '__phpc_mcjit_embed_bootstrap')) {
             return self::prependMcjitBootstrap($code);
         }
         // Interface-only scripts take the full MCJIT path (requiresVmLowering=false) but never
         // receive a class property pad — without bootstrap, MCJIT segfaults (#27012 / #4964).
         if (
-            preg_match('/\binterface\b/i', $code)
-            && !preg_match('/\bclass\s+/i', $code)
+            preg_match('/\binterface\b/i', $mask)
+            && !preg_match('/\bclass\s+/i', $mask)
             && !str_contains($code, '__phpc_mcjit_embed_bootstrap')
         ) {
             return self::prependMcjitBootstrap($code);
