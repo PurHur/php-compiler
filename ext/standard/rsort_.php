@@ -96,8 +96,11 @@ final class rsort_ extends Internal
             } else {
                 VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
             }
-        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
-            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'rsort()');
+        } elseif (
+            (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first))
+            && VmInternalCompare::valuesAreEnumOrObjectOnly($values)
+        ) {
+            // Homogeneous object/enum arrays — php-src zend_compare on objects (#7466).
             if (self::objectSortUsesSpaceship($flags)) {
                 VmInternalCompare::sortVariableValuesBySpaceshipDesc($values);
             } else {
@@ -106,6 +109,7 @@ final class rsort_ extends Internal
                 );
             }
         } else {
+            // Mixed object+scalar: Zend coerces object→1 with Notice (#29121 / #12243).
             VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
         }
         $array->separateArrayForWrite();

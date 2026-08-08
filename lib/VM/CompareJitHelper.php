@@ -97,6 +97,42 @@ final class CompareJitHelper
                     return $stringableCmp;
                 }
             }
+            // NestedJIT-safe duplicate of CompareUnlikeHelper object-vs-number (#29121).
+            if (
+                Variable::TYPE_INTEGER === $left->type || Variable::TYPE_INTEGER === $right->type
+                || Variable::TYPE_FLOAT === $left->type || Variable::TYPE_FLOAT === $right->type
+            ) {
+                $objectOnLeft = Variable::TYPE_OBJECT === $left->type;
+                $object = $objectOnLeft ? $left : $right;
+                $number = $objectOnLeft ? $right : $left;
+                $asFloat = Variable::TYPE_FLOAT === $number->type;
+                $entry = $object->toObject();
+                if (!ResourceSupport::isResourceObject($entry) && !EnumCaseSupport::isEnumCase($entry)) {
+                    $context = $vm?->context ?? \PHPCompiler\Web\Superglobals::getActiveContext();
+                    if (null !== $context) {
+                        $frame = null;
+                        try {
+                            $frame = VmExecutingFrame::requireFromActiveContext();
+                        } catch (\LogicException) {
+                            $frame = null;
+                        }
+                        $context->errors->triggerError(
+                            $asFloat
+                                ? 'Object of class '.$entry->class->name.' could not be converted to float'
+                                : 'Object of class '.$entry->class->name.' could not be converted to int',
+                            ErrorReporter::E_NOTICE,
+                            null !== $frame && '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+                            $context,
+                            $frame
+                        );
+                    }
+                }
+                $cmp = $asFloat
+                    ? self::doubleSpaceship(1.0, $number->toFloat())
+                    : self::longSpaceship(1, $number->toInt());
+
+                return $objectOnLeft ? $cmp : -$cmp;
+            }
 
             return Variable::TYPE_OBJECT === $left->type ? 1 : -1;
         }
