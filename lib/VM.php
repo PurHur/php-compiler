@@ -8301,7 +8301,11 @@ restart:
                     }
                     $propertyObject = $var->toObject();
                     if (!VM\LazyObjectSupport::skipLazyInitForPropertyRead($propertyObject, $name)) {
-                        VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
+                        $catchFrame = $this->ensureLazyObjectInitialized($propertyObject, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                     }
                     $propertyObject = VM\LazyObjectSupport::getLazyInstance($propertyObject);
                     // __PHP_Incomplete_Class — block userland property ops (zend_object_handlers.c, #19632).
@@ -8871,7 +8875,11 @@ restart:
                         $dst->bool(!ext\standard\boolval::isTruthy($prop));
                         break;
                     }
-                    VM\LazyObjectSupport::ensureInitialized($this, $object);
+                    $catchFrame = $this->ensureLazyObjectInitialized($object, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $object = VM\LazyObjectSupport::getLazyInstance($object);
                     $catchFrame = $this->emptyObjectProperty(
                         $object,
@@ -9065,7 +9073,11 @@ restart:
                                 $frame = $catchFrame;
                                 goto restart;
                             }
-                            VM\LazyObjectSupport::ensureInitialized($this, $object);
+                            $catchFrame = $this->ensureLazyObjectInitialized($object, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             $object = VM\LazyObjectSupport::getLazyInstance($object);
                             if (!$op->issetForCoalesceAssign) {
                                 $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
@@ -12021,6 +12033,31 @@ restart:
         $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message, $file, $line);
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /**
+     * Run lazy ghost/proxy init; convert host Error/TypeError into catchable VM throwables (#29151).
+     *
+     * Captures the init throwable on the lazy object (getLazyInitializationException) before
+     * dispatch — ensureInitialized()'s finally clears lazyInitializingObject before this catch.
+     */
+    private function ensureLazyObjectInitialized(ObjectEntry $object, Frame $frame): ?Frame
+    {
+        try {
+            VM\LazyObjectSupport::ensureInitialized($this, $object);
+        } catch (\TypeError $e) {
+            $thrown = $this->makeEngineError($e->getMessage(), 'TypeError');
+            VM\LazyObjectSupport::captureLazyInitException($object, $thrown);
+
+            return $this->dispatchVmTypeError($e, $frame);
+        } catch (\Error $e) {
+            $thrown = $this->makeEngineError($e->getMessage());
+            VM\LazyObjectSupport::captureLazyInitException($object, $thrown);
+
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
     }
 
     /** php-src ext/dom/php_dom.c + DatePeriod write handlers (#15550, #20605, #26154). */
@@ -17560,7 +17597,10 @@ restart:
         $methodLc = strtolower($methodName);
         $object = $receiver->toObject();
         if ($object->lazyPending && 'marklazyobjectasinitialized' !== $methodLc) {
-            VM\LazyObjectSupport::ensureInitialized($this, $object);
+            $catchFrame = $this->ensureLazyObjectInitialized($object, $frame);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
         }
         $object = VM\LazyObjectSupport::getLazyInstance($object);
         if ($object !== $receiver->toObject()) {

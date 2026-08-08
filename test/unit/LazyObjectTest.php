@@ -395,6 +395,40 @@ PHP;
         $this->assertSame("99\nok\n", ob_get_clean());
     }
 
+    /** @covers issue #29151 */
+    public function testNewLazyProxyFactoryReturningProxyThrowsError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+}
+$r = new ReflectionClass(C::class);
+$proxy = $r->newLazyProxy(function ($obj) {
+    return $obj;
+});
+try {
+    echo $proxy->x;
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage();
+}
+echo "\n";
+$ok = $r->newLazyProxy(function (): C {
+    $o = new C();
+    $o->x = 9;
+    return $o;
+});
+echo $ok->x, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_proxy_factory_ret_lazy.php'));
+        $this->assertSame(
+            "Error:Lazy proxy factory must return a non-lazy object\n9\n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #12309 */
     public function testCreateLazyGhostIgnoresObjectReturnFromInitializer(): void
     {

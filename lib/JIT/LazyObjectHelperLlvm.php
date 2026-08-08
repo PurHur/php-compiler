@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\VM\VmLazyObject;
 use PHPLLVM\Builder;
@@ -186,6 +187,29 @@ final class LazyObjectHelperLlvm
                 $context->lookupFunction('__value__readObject'),
                 JitValueBox::coerceToValuePtrForStore($context, $result)
             );
+            // Zend/zend_lazy_objects.c — Z_OBJ(retval) == obj || zend_object_is_lazy (#29151).
+            $sameAsProxy = $context->builder->icmp(Builder::INT_EQ, $realObj, $obj);
+            $realPending = $context->builder->load(
+                $context->builder->structGep($realObj, $map[VmLazyObject::FIELD_LAZY_PENDING])
+            );
+            $realIsLazy = $context->builder->icmp(
+                Builder::INT_NE,
+                $realPending,
+                $i8->constInt(0, false)
+            );
+            $nonLazyBad = $context->builder->or($sameAsProxy, $realIsLazy);
+            $nonLazyOk = $fn->appendBasicBlock('lazy_proxy_nonlazy_ok_'.$idx);
+            $nonLazyFail = $fn->appendBasicBlock('lazy_proxy_nonlazy_bad_'.$idx);
+            $context->builder->branchIf($nonLazyBad, $nonLazyFail, $nonLazyOk);
+            $context->builder->positionAtEnd($nonLazyFail);
+            self::emitProxyMustReturnNonLazyError($context);
+            // Do not fall through to $done (would mark constructed). Catchable throw already
+            // terminates; uncaught abort needs unreachable for LLVM verify.
+            $failInsert = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null !== $failInsert && null === $failInsert->getTerminator()) {
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+            $context->builder->positionAtEnd($nonLazyOk);
             $realClassId = $context->builder->load(
                 $context->builder->structGep($realObj, $map[VmLazyObject::FIELD_CLASS_ID])
             );
@@ -228,5 +252,25 @@ final class LazyObjectHelperLlvm
             $context->getTypeFromString('int32')->constInt(-1, true),
             $context->builder->structGep($obj, $map[VmLazyObject::FIELD_LAZY_INIT_INDEX])
         );
+    }
+
+    /**
+     * Catchable Error inside try; pending + abort when uncaught (#29151).
+     *
+     * @see Zend/zend_lazy_objects.c "Lazy proxy factory must return a non-lazy object"
+     */
+    private static function emitProxyMustReturnNonLazyError(Context $context): void
+    {
+        $message = 'Lazy proxy factory must return a non-lazy object';
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError($context, 'Error', $message, null);
+
+            return;
+        }
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::ensureStandaloneBodies($context);
+        ErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
     }
 }

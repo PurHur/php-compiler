@@ -320,6 +320,10 @@ final class LazyObjectSupport
             throw new \LogicException('Lazy object initializer must return an object');
         }
         $real = $result->toObject();
+        // Zend/zend_lazy_objects.c — factory must not return the proxy or another lazy object (#29151).
+        if ($real === $object || self::isLazyObject($real)) {
+            throw new \Error('Lazy proxy factory must return a non-lazy object');
+        }
         if ($object->class->isInterface) {
             if (!InterfaceCheck::entryImplements($real->class, strtolower($object->class->name), $vm->context)) {
                 throw new \LogicException(
