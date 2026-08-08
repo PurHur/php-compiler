@@ -34,7 +34,9 @@ final class CsvFputcsvJitHelper
         $i = 0;
         while (isset($field[$i])) {
             $c = $field[$i];
-            if ($c === $delim || $c === $enc || ($hasEsc && $c === $esc) || "\n" === $c || "\r" === $c) {
+            // php-src FPUTCSV_FLD_CHK: delim, enclosure, escape, CR/LF, space, tab (#29058).
+            if ($c === $delim || $c === $enc || ($hasEsc && $c === $esc)
+                || "\n" === $c || "\r" === $c || ' ' === $c || "\t" === $c) {
                 $needsQuotes = true;
                 break;
             }

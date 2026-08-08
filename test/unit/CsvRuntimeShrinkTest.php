@@ -147,6 +147,8 @@ final class CsvRuntimeShrinkTest extends TestCase
             ['b,c', '"b,c"'],
             ['say "hi"', '"say ""hi"""'],
             ["x\ny", "\"x\ny\""],
+            ['a b', '"a b"'],
+            ["a\tb", "\"a\tb\""],
         ];
         foreach ($cases as [$in, $want]) {
             $this->assertSame(
