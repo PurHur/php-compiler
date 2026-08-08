@@ -346,6 +346,54 @@ echo count($tz), "\n";
         $this->assertStringNotContainsString('loadHashtablePointer on native string', $stderr);
     }
 
+    /**
+     * Mini-spine IncludeHelper path with REMAP=0 must not hit Undefined constant "defined" (#29111).
+     */
+    public function testConstFetchSpineRemapOffCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $entry = $repoRoot.'/test/selfhost/issue_29111_const_fetch_spine/main.php';
+        $this->assertFileExists($entry);
+
+        $outfile = tempnam(sys_get_temp_dir(), 'issue29111_aot_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+        $env['PHP_COMPILER_INCLUDE_SCOPE_REMAP'] = '0';
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $entry]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $code = proc_close($compile);
+        $combined = $stdout.$stderr;
+        $this->assertStringNotContainsString('Undefined constant "defined"', $combined);
+        $this->assertStringNotContainsString('Undefined constant \'defined\'', $combined);
+        $this->assertSame(0, $code, $combined);
+        $this->assertFileExists($outfile);
+        @unlink($outfile);
+    }
+
     /** Self-host AOT: `new Runtime()` must not segfault LLVM 9 (#2600). */
     public function testSelfHostAotNewRuntimeCompiles(): void
     {
