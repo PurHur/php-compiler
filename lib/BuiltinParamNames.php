@@ -495,6 +495,10 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — associative_array→associative (#23447)
             case 'localtime':
                 return ['timestamp=', 'associative='];
+            // php-src ext/date/php_date.stub.php — ?int $timestamp = null (#27981)
+            case 'strftime':
+            case 'gmstrftime':
+                return ['format', 'timestamp='];
             // php-src ext/standard/basic_functions.stub.php — exactly array+callback (#23875).
             // #6949 asked for optional $strict; php-src never shipped it.
             case 'array_all':

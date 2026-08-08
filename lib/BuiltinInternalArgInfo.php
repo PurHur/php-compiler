@@ -104,6 +104,8 @@ final class BuiltinInternalArgInfo
             'unixtojd' => 'int|false',
             // ext/date/php_date.stub.php — InternalArgInfo return string (missing |false) (#26358)
             'timezone_name_from_abbr' => 'string|false',
+            // ext/date/php_date.stub.php — InternalArgInfo return string (missing |false) (#27981)
+            'strftime', 'gmstrftime' => 'string|false',
             // ext/standard/string.stub.php — InternalArgInfo omits |false (#25442)
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             'strstr', 'stristr' => 'string|false',
@@ -547,6 +549,8 @@ final class BuiltinInternalArgInfo
             'getdate' => 0 === $index ? '?int' : null,
             // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int → 0) (#27980)
             'localtime' => 0 === $index ? '?int' : null,
+            // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int → 0) (#27981)
+            'strftime', 'gmstrftime' => 1 === $index ? '?int' : null,
             // ext/date/php_date.stub.php — absent from InternalArgInfo (#25392)
             'date_create', 'date_create_immutable' => match ($index) {
                 0 => 'string',
