@@ -117,17 +117,6 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'clamp_phantom')) {
                 continue;
             }
-            if (!CompilerVersion::supportsHex2binStrict()
-                && str_contains($name, 'hex2bin_strict')
-                && !str_contains($name, 'hex2bin_strict_arity_reference_profile')
-                && !str_contains($name, 'hex2bin_strict_named_reference_profile')) {
-                continue;
-            }
-            if (CompilerVersion::supportsHex2binStrict()
-                && (str_contains($name, 'hex2bin_strict_arity_reference_profile')
-                    || str_contains($name, 'hex2bin_strict_named_reference_profile'))) {
-                continue;
-            }
             if (!CompilerVersion::supportsFpow()
                 && str_contains($name, 'fpow')
                 && !str_contains($name, 'php84_math_string_builtins_phantom')

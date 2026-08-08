@@ -1,5 +1,5 @@
 --TEST--
-stdlib hex2bin() — second argument rejected on 8.2 reference profile (#13116, ext/standard/string.c)
+stdlib hex2bin() — second argument rejected on all profiles (#27763, ext/standard/string.c)
 --FILE--
 <?php
 try {

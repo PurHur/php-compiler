@@ -1,9 +1,14 @@
 --TEST--
-AOT: hex2bin() $strict on valid input (issue #4966)
+AOT: hex2bin() rejects phantom $strict (issue #27763 / #4966)
 --FILE--
 <?php
 echo bin2hex(hex2bin('4142')), "\n";
-echo bin2hex(hex2bin('4142', true)), "\n";
+try {
+    hex2bin('4142', true);
+    echo "fail\n";
+} catch (ArgumentCountError $e) {
+    echo "arity\n";
+}
 --EXPECT--
 4142
-4142
+arity

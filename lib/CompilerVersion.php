@@ -643,13 +643,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ hex2bin() optional $strict parameter (ext/standard/string.c, #13116, #16081).
+     * Phantom hex2bin() $strict — never part of php-src (#27763, reverts #13116/#16081).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 ArgumentCountError gate.
+     * Zend `ext/standard/string.c` is arity 1–1 (`ZEND_PARSE_PARAMETERS_START(1, 1)`).
+     * Always false for php-src-strict; do not re-enable under PROFILE≥8.4.
      */
     public static function supportsHex2binStrict(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /** PHP 8.4+ #[\EnumCases] builtin attribute class advertisement (Zend/zend_attributes.c, #13057). */

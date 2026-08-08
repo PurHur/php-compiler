@@ -649,12 +649,13 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsHex2binStrict());
     }
 
-    public function testSupportsHex2binStrictTrueOnForwardProfile(): void
+    public function testSupportsHex2binStrictFalseOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsHex2binStrict());
+            // php-src never grew hex2bin($strict); always false (#27763)
+            $this->assertFalse(CompilerVersion::supportsHex2binStrict());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
