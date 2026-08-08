@@ -152,7 +152,124 @@ final class SprintfJitHelper
         // return null / miss; do not echo the raw format string.
         self::throwIfIncompleteTrailingPercent($format, $fmtLen, $packedArgs, $packLen);
 
+        // php-src — unknown conversion / # flag → ValueError (#27826). Do not echo "%Z".
+        self::throwIfUnknownFormatSpecifier($format, $fmtLen);
+
         return $format;
+    }
+
+    /**
+     * php-src formatted_print.c — '#' flag and unknown type chars throw ValueError
+     * ("Unknown format specifier \"…\"") rather than printing the format (#27826).
+     *
+     * NestedJIT-safe: ++$pos walk only; no VmSprintf.
+     */
+    private static function throwIfUnknownFormatSpecifier(string $format, int $fmtLen): void
+    {
+        $pos = 0;
+        while ($pos < $fmtLen) {
+            if ('%' !== $format[$pos]) {
+                ++$pos;
+                continue;
+            }
+            ++$pos;
+            if ($pos >= $fmtLen) {
+                return;
+            }
+            if ('%' === $format[$pos]) {
+                ++$pos;
+                continue;
+            }
+            // Optional N$ value argnum.
+            while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                ++$pos;
+            }
+            if ($pos < $fmtLen && '$' === $format[$pos]) {
+                ++$pos;
+            }
+            while ($pos < $fmtLen) {
+                $flag = $format[$pos];
+                if ('-' === $flag || ' ' === $flag || '0' === $flag || '+' === $flag) {
+                    ++$pos;
+                    continue;
+                }
+                if (self::isByte($flag, 39)) {
+                    ++$pos;
+                    if ($pos >= $fmtLen) {
+                        throw new \ValueError('Missing padding character');
+                    }
+                    ++$pos;
+                    continue;
+                }
+                if ('#' === $flag) {
+                    throw new \ValueError('Unknown format specifier "#"');
+                }
+                break;
+            }
+            if ($pos < $fmtLen && '*' === $format[$pos]) {
+                ++$pos;
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    ++$pos;
+                }
+                if ($pos < $fmtLen && '$' === $format[$pos]) {
+                    ++$pos;
+                }
+            } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    ++$pos;
+                }
+            }
+            if ($pos < $fmtLen && '.' === $format[$pos]) {
+                ++$pos;
+                if ($pos < $fmtLen && '*' === $format[$pos]) {
+                    ++$pos;
+                    while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                        ++$pos;
+                    }
+                    if ($pos < $fmtLen && '$' === $format[$pos]) {
+                        ++$pos;
+                    }
+                } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                        ++$pos;
+                    }
+                }
+            }
+            if ($pos >= $fmtLen) {
+                return;
+            }
+            $spec = $format[$pos];
+            if (!self::isKnownConversionSpecifier($spec)) {
+                throw new \ValueError('Unknown format specifier "'.$spec.'"');
+            }
+            ++$pos;
+        }
+    }
+
+    /**
+     * php-src conversion letters plus %a/%A (VmSprintf hex-float; AOT fixture #9059).
+     * %i is unknown on Zend — omit so JIT throws ValueError like php-src.
+     */
+    private static function isKnownConversionSpecifier(string $spec): bool
+    {
+        return 's' === $spec
+            || 'd' === $spec
+            || 'f' === $spec
+            || 'F' === $spec
+            || 'b' === $spec
+            || 'x' === $spec
+            || 'X' === $spec
+            || 'o' === $spec
+            || 'u' === $spec
+            || 'c' === $spec
+            || 'e' === $spec
+            || 'E' === $spec
+            || 'g' === $spec
+            || 'G' === $spec
+            || 'h' === $spec
+            || 'H' === $spec
+            || 'a' === $spec
+            || 'A' === $spec;
     }
 
     /**
