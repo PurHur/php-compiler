@@ -16,6 +16,10 @@ final class CalInfoJitHelper
 {
     public static function calInfoArgv(int $calendar): HashTable
     {
+        // php-src calendar.c — calendar == -1 is the all-calendars sentinel (#28907)
+        if (-1 === $calendar) {
+            return VmCalendar::calInfoAll();
+        }
         if ($calendar < 0 || $calendar >= CalendarConstants::CAL_NUM_CALS) {
             throw new \ValueError(
                 'cal_info(): Argument #1 ($calendar) must be a valid calendar ID'

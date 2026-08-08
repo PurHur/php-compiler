@@ -28,6 +28,11 @@ final class JitCalInfo
 
         $folded = self::compileTimeLongArg($args[0]);
         if (null !== $folded) {
+            // php-src calendar.c — -1 all-calendars sentinel (#28907)
+            if (-1 === $folded) {
+                return CalInfoRuntime::emitAll($context);
+            }
+
             return CalInfoRuntime::emitOne($context, $folded);
         }
 

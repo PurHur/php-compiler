@@ -44,4 +44,24 @@ final class CalInfoRuntimeShrinkTest extends TestCase
         $this->expectExceptionMessage('must be a valid calendar ID');
         CalInfoJitHelper::calInfoArgv(99);
     }
+
+    /** @covers issue #28907 */
+    public function testJitHelperMinusOneReturnsAllCalendars(): void
+    {
+        $viaHelper = CalInfoJitHelper::calInfoArgv(-1);
+        $viaVm = VmCalendar::calInfoAll();
+        $this->assertSame(4, $viaHelper->getNumElements());
+        $this->assertSame(
+            $viaVm->findIndex(0)?->toArray()->find('calname')?->toString(),
+            $viaHelper->findIndex(0)?->toArray()->find('calname')?->toString()
+        );
+    }
+
+    /** @covers issue #28907 */
+    public function testJitHelperRejectsOtherNegativeIds(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('must be a valid calendar ID');
+        CalInfoJitHelper::calInfoArgv(-2);
+    }
 }

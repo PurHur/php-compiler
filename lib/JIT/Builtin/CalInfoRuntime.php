@@ -87,6 +87,7 @@ final class CalInfoRuntime
         $cal = $fn->getParam(0);
 
         $defaultBb = BasicBlockHelper::append($context, 'cal_info_invalid');
+        $allBb = BasicBlockHelper::append($context, 'cal_info_all');
         $mergeBb = BasicBlockHelper::append($context, 'cal_info_merge');
         $resultSlot = $context->builder->alloca($htPtr, 1, 'cal_info_result');
 
@@ -95,14 +96,16 @@ final class CalInfoRuntime
             $caseBlocks[$id] = BasicBlockHelper::append($context, 'cal_info_case_'.$id);
         }
 
+        // Cases: 0..CAL_NUM_CALS-1 + all-calendars sentinel -1 (#28907)
         $switch = $context->builder->branchSwitch(
             $cal,
             $defaultBb,
-            CalendarConstants::CAL_NUM_CALS
+            CalendarConstants::CAL_NUM_CALS + 1
         );
         for ($id = 0; $id < CalendarConstants::CAL_NUM_CALS; ++$id) {
             $switch->addCase($i64->constInt($id, false), $caseBlocks[$id]);
         }
+        $switch->addCase($i64->constInt(-1, true), $allBb);
 
         foreach ($caseBlocks as $id => $bb) {
             $context->builder->positionAtEnd($bb);
@@ -110,6 +113,11 @@ final class CalInfoRuntime
             $context->builder->store($embedded, $resultSlot);
             $context->builder->branch($mergeBb);
         }
+
+        $context->builder->positionAtEnd($allBb);
+        $embeddedAll = self::emitAll($context);
+        $context->builder->store($embeddedAll, $resultSlot);
+        $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($defaultBb);
         TypeErrorRaise::emitValueError(

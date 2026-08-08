@@ -425,6 +425,11 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0777],
             3 => ['kind' => 'null'],
         ],
+        // php-src ext/calendar/calendar.stub.php — int $calendar = -1 (#28907)
+        // InternalArgInfo int → inferred 0; Zend default is the all-calendars sentinel.
+        'cal_info' => [
+            0 => ['kind' => 'int', 'value' => -1],
+        ],
         // php-src ext/standard/basic_functions.stub.php — filename="" (#27998)
         // InternalArgInfo string= does not infer empty string for Reflection.
         'clearstatcache' => [
