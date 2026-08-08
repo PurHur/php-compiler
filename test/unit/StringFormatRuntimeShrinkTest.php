@@ -209,6 +209,35 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringFormatInventoryStubs.php', $spine);
     }
 
+    public function testSprintfJitHelperUnknownSpecifierThrowsValueError(): void
+    {
+        // php-src formatted_print.c — unknown conversion → ValueError (#27826).
+        $blob = "\x01".\pack('q', 1);
+        foreach (['%Z', '%Y', '%\\', '%@'] as $format) {
+            try {
+                SprintfJitHelper::sprintfArgv($format, $blob);
+                $this->fail('expected ValueError for '.$format);
+            } catch (\ValueError $e) {
+                $spec = \substr($format, 1);
+                $this->assertSame('Unknown format specifier "'.$spec.'"', $e->getMessage());
+            }
+        }
+        try {
+            SprintfJitHelper::sprintfArgv('%#x', $blob);
+            $this->fail('expected ValueError for %#x');
+        } catch (\ValueError $e) {
+            $this->assertSame('Unknown format specifier "#"', $e->getMessage());
+        }
+        $v = new Variable();
+        $v->int(1);
+        try {
+            VmSprintf::format('%Z', [$v]);
+            $this->fail('expected ValueError from VmSprintf');
+        } catch (\ValueError $e) {
+            $this->assertSame('Unknown format specifier "Z"', $e->getMessage());
+        }
+    }
+
     public function testEmitHelperRuntimeNoLongerMarksSprintfUnsafe(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../script/emit-helper-runtime-object.php');

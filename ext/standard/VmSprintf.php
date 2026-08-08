@@ -458,9 +458,8 @@ final class VmSprintf
             case 'A':
                 return self::formatHexFloat(self::argToFloat($var, $frame), true, $precision, $showSign);
             default:
-                throw new \LogicException(
-                    'sprintf() unsupported conversion specifier %'.$spec.' in this compiler build'
-                );
+                // php-src formatted_print.c — unknown conversion → ValueError (#27826).
+                throw new \ValueError('Unknown format specifier "'.$spec.'"');
         }
     }
 
