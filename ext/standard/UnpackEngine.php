@@ -303,11 +303,8 @@ final class UnpackEngine
                 $pos += $remaining;
                 break;
             case 'A':
-                $val = \substr($data, $pos, $remaining);
-                while ('' !== $val && \in_array($val[-1], ["\0", ' ', "\t", "\r", "\n"], true)) {
-                    $val = \substr($val, 0, -1);
-                }
-                self::store($result, $spec, 0, $val);
+                // SPACE-padded string: strip trailing NUL/space/tab/CR/LF (php-src pack.c).
+                self::store($result, $spec, 0, self::stripSpacePadString(\substr($data, $pos, $remaining)));
                 $pos += $remaining;
                 break;
             case 'Z':
@@ -401,9 +398,12 @@ final class UnpackEngine
         $dataLen = \strlen($data);
         switch ($code) {
             case 'a':
+                self::store($result, $spec, 0, \substr($data, $pos, $arg));
+                $pos += $arg;
+                break;
             case 'A':
-                $val = \substr($data, $pos, $arg);
-                self::store($result, $spec, 0, $val);
+                // Fixed-width SPACE-padded string — same trailing strip as A* (#29006).
+                self::store($result, $spec, 0, self::stripSpacePadString(\substr($data, $pos, $arg)));
                 $pos += $arg;
                 break;
             case 'Z':
@@ -474,6 +474,19 @@ final class UnpackEngine
         }
 
         return true;
+    }
+
+    /**
+     * SPACE-padded string trailing strip (php-src ext/standard/pack.c type A).
+     * Removes trailing NUL, space, tab, CR, LF; leading padding is kept.
+     */
+    private static function stripSpacePadString(string $val): string
+    {
+        while ('' !== $val && \in_array($val[-1], ["\0", ' ', "\t", "\r", "\n"], true)) {
+            $val = \substr($val, 0, -1);
+        }
+
+        return $val;
     }
 
     private static function isIeeeCode(string $code): bool
