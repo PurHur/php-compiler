@@ -271,6 +271,14 @@ final class Variable {
      */
     public ?array $compileTimeArray = null;
 
+    /**
+     * String-keyed constant array literals for builtin folds (filter_var options; #29046).
+     * null = invalidated; [] = empty / in-progress; non-empty = foldable assoc.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $compileTimeAssoc = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 

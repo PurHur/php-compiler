@@ -98,9 +98,10 @@ final class VmFilter
     public const INPUT_SERVER = 5;
 
     /**
-     * Active FILTER_* flags / identity for {@see failureResult()} THROW path (#28131).
+     * Active FILTER_* flags / identity for {@see failureResult()} THROW path (#28131)
+     * and options['default'] substitution (#29046 / php-src php_zval_filter handle_default).
      *
-     * @var array{flags: int, filterName: string, valueRepr: string}|null
+     * @var array{flags: int, filterName: string, valueRepr: string, filterOptions: ?HashTable}|null
      */
     private static ?array $failureCtx = null;
 
@@ -285,6 +286,7 @@ final class VmFilter
             'flags' => $flags,
             'filterName' => self::nameForFilterId($filter),
             'valueRepr' => self::valueReprForThrow($value),
+            'filterOptions' => $filterOptions,
         ];
         try {
             if (self::FILTER_VALIDATE_INT === $filter) {
@@ -318,7 +320,8 @@ final class VmFilter
                 return self::sanitize($value, $filter, $flags, $filterOptions);
             }
 
-            return self::failureResult(false, $flags);
+            // Unknown filter ID: php-src warns and returns false without options['default'] (#29046).
+            return self::failureResult(false, $flags, null, false);
         } finally {
             self::$failureCtx = $prevCtx;
         }
@@ -1014,10 +1017,17 @@ final class VmFilter
         return $out;
     }
 
+    /**
+     * php-src php_zval_filter handle_default — options['default'] overrides false/null failure
+     * (including FILTER_NULL_ON_FAILURE). FILTER_THROW_ON_FAILURE still throws first (#29046).
+     *
+     * @param bool $allowDefault false for unknown-filter / structural paths that skip default
+     */
     private static function failureResult(
         bool $nullOnFailure,
         ?int $flags = null,
-        ?string $explicitMessage = null
+        ?string $explicitMessage = null,
+        bool $allowDefault = true
     ): Variable {
         $effectiveFlags = $flags;
         if (null === $effectiveFlags && null !== self::$failureCtx) {
@@ -1037,6 +1047,18 @@ final class VmFilter
                 $name,
                 $repr
             ));
+        }
+        if ($allowDefault) {
+            $filterOptions = self::$failureCtx['filterOptions'] ?? null;
+            if (null !== $filterOptions) {
+                $defaultVar = $filterOptions->find('default');
+                if (null !== $defaultVar && !$defaultVar->isUndefined()) {
+                    $out = new Variable();
+                    $out->copyFrom($defaultVar);
+
+                    return $out;
+                }
+            }
         }
         $out = new Variable();
         if ($nullOnFailure) {
