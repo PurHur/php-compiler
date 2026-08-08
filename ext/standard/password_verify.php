@@ -21,9 +21,8 @@ final class password_verify extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('password_verify() requires exactly two arguments');
-        }
+        // php-src ext/standard/password.c — ArgumentCountError (#28476).
+        $this->requireExactArgCount($frame, 'password_verify', 2);
         // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21314, ext/standard/password.c).
         $password = VmString::trimFamilyStringArgForFrame($frame, 0, 'password_verify', 0, 'password');
         $hash = VmString::trimFamilyStringArgForFrame($frame, 1, 'password_verify', 1, 'hash');
@@ -37,8 +36,9 @@ final class password_verify extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('password_verify() requires exactly two arguments');
+        // Catchable ArgumentCountError (AOT/JIT) — #28476.
+        if (!$this->requireExactJitArgCount($context, $args, 'password_verify', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         return JitPassword::verify(
