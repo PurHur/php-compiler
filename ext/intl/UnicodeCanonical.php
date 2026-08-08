@@ -37,16 +37,32 @@ final class UnicodeCanonical
         if ('' === $utf8) {
             return [];
         }
-        if (!\preg_match_all('/./us', $utf8, $matches)) {
-            return [];
-        }
+        // Byte walk — NestedJIT-safe (no preg_match_all; #28654 Normalizer AOT).
         $cps = [];
-        foreach ($matches[0] as $char) {
-            $cp = self::utf8CharToCodepoint($char);
+        $len = \strlen($utf8);
+        $i = 0;
+        while ($i < $len) {
+            $b0 = \ord($utf8[$i]);
+            if ($b0 < 0x80) {
+                $cps[] = $b0;
+                ++$i;
+                continue;
+            }
+            $charLen = match (true) {
+                ($b0 & 0xE0) === 0xC0 => 2,
+                ($b0 & 0xF0) === 0xE0 => 3,
+                ($b0 & 0xF8) === 0xF0 => 4,
+                default => 0,
+            };
+            if (0 === $charLen || $i + $charLen > $len) {
+                return [];
+            }
+            $cp = self::utf8CharToCodepoint(\substr($utf8, $i, $charLen));
             if (null === $cp) {
                 return [];
             }
             $cps[] = $cp;
+            $i += $charLen;
         }
 
         return $cps;
