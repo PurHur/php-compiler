@@ -2790,7 +2790,7 @@ restart:
         }
         $strVar = self::TYPE_STRING === $left->type ? $left : (self::TYPE_STRING === $right->type ? $right : null);
         if (null !== $strVar) {
-            $this->applyStringIncDec($opCode, $strVar->toString());
+            $this->applyStringIncDec($opCode, $strVar->toString(), $vm, $frame);
 
             return;
         }
@@ -2802,8 +2802,17 @@ restart:
         $this->numericOp($opCode, $left, $right);
     }
 
-    private function applyStringIncDec(int $opCode, string $str): void
-    {
+    /**
+     * Zend decrement_function() string path (zend_operators.c).
+     *
+     * Non-numeric strings are a no-op; PHP 8.3+ emits E_DEPRECATED (#29088).
+     */
+    private function applyStringIncDec(
+        int $opCode,
+        string $str,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
         if (OpCode::TYPE_PLUS === $opCode) {
             if (self::isNumericStringForIncDec($str)) {
                 $this->storeNumericStringIncDec($str, 1);
@@ -2824,7 +2833,33 @@ restart:
 
             return;
         }
+        // php-src zend_operators.c — non-numeric string -- is a no-op with E_DEPRECATED (#29088).
+        self::warnDecrementNonNumericString($vm, $frame);
         $this->string($str);
+    }
+
+    /**
+     * PHP 8.3+ E_DEPRECATED for `$s--` / `--$s` when `$s` is a non-numeric string (#29088).
+     *
+     * Same profile gate as bool/null no-effect warnings ({@see supportsIncDecNoEffectWarning}).
+     */
+    private static function warnDecrementNonNumericString(
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
+        if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
+            return;
+        }
+        $context = $vm?->context ?? $frame?->vmContext;
+        if (null === $context) {
+            return;
+        }
+        $context->errors->internalDeprecated(
+            'Decrement on non-numeric string has no effect and is deprecated',
+            $context,
+            $frame,
+            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null
+        );
     }
 
     private static function isNumericStringForIncDec(string $str): bool
@@ -2980,7 +3015,7 @@ restart:
             case self::TYPE_STRING_OFFSET:
                 throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
             case self::TYPE_STRING:
-                $this->applyStringIncDec(OpCode::TYPE_PLUS, $this->string);
+                $this->applyStringIncDec(OpCode::TYPE_PLUS, $this->string, $vm, $frame);
 
                 return;
             case self::TYPE_ARRAY:
@@ -3048,7 +3083,7 @@ restart:
             case self::TYPE_STRING_OFFSET:
                 throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
             case self::TYPE_STRING:
-                $this->applyStringIncDec(OpCode::TYPE_MINUS, $this->string);
+                $this->applyStringIncDec(OpCode::TYPE_MINUS, $this->string, $vm, $frame);
 
                 return;
             case self::TYPE_ARRAY:
