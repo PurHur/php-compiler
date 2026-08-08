@@ -10101,12 +10101,14 @@ restart:
         if ((($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
             return true;
         }
+        // Closures only have $this when auto-bound / bindTo supplied an object.
+        // Scope class may still be set (created inside a method) while $this is NULL —
+        // static-method-created free closures (#28814) and top-level arrows (#10558).
+        // TYPE_UNDEFINED in scope must not count as bound (getFrame leaves that sentinel).
+        if (((int) ($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0) {
+            return !$this->closureFrameHasBoundThis($frame, $thisIdx);
+        }
         if (null === $func->class) {
-            // Top-level / global arrow fn `fn() => $this` — no lexical $this (#10558, zend_closures.c).
-            if (((int) ($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0) {
-                return !$this->closureFrameHasBoundThis($frame, $thisIdx);
-            }
-
             return false;
         }
 
