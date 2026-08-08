@@ -19,7 +19,7 @@ use PHPCompiler\Web\Superglobals;
  * — NestedJIT of these methods aborts (#27217). Host/VM still uses these PHP bodies via
  * {@see uksort_} / {@see uasort_} execute() paths that call {@see VmClosureCall} instead.
  *
- * Compare via {@see Variable::toInt()} on NestedClosureInvoke results when NestedJIT'd.
+ * Compare via {@see VmClosureCall::coerceUserSortCallbackResult} on NestedClosureInvoke results.
  *
  * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391).
  *
@@ -43,6 +43,8 @@ final class UsortJitHelper
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
+        // php-src PHP_ARRAY_CMP_FUNC_BACKUP — bool comparator E_DEPRECATED once (#29089).
+        VmClosureCall::beginUserSort('usort');
         $values = [];
         foreach ($ht->iterate() as $value) {
             $values[] = $value;
@@ -50,8 +52,11 @@ final class UsortJitHelper
         $n = \count($values);
         for ($i = 0; $i < $n - 1; ++$i) {
             for ($j = 0; $j < $n - $i - 1; ++$j) {
-                $cmpVar = VmClosureInvoke::invokeVariable($closure, $values[$j], $values[$j + 1]);
-                if ($cmpVar->toInt() > 0) {
+                // SSOT coerce (bool Deprecated / object Warning) — not raw toInt() (#29089, #29124).
+                $cmp = VmClosureCall::coerceUserSortCallbackResult(
+                    VmClosureInvoke::invokeVariable($closure, $values[$j], $values[$j + 1])
+                );
+                if ($cmp > 0) {
                     $tmp = $values[$j];
                     $values[$j] = $values[$j + 1];
                     $values[$j + 1] = $tmp;
@@ -76,6 +81,7 @@ final class UsortJitHelper
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
+        VmClosureCall::beginUserSort('uksort');
         $pairs = [];
         foreach ($ht->exportKeyValuePairs(true) as $pair) {
             $pairs[] = $pair;
@@ -85,8 +91,10 @@ final class UsortJitHelper
             for ($j = 0; $j < $n - $i - 1; ++$j) {
                 $left = $pairs[$j];
                 $right = $pairs[$j + 1];
-                $cmpVar = VmClosureInvoke::invokeVariable($closure, $left[0], $right[0]);
-                if ($cmpVar->toInt() > 0) {
+                $cmp = VmClosureCall::coerceUserSortCallbackResult(
+                    VmClosureInvoke::invokeVariable($closure, $left[0], $right[0])
+                );
+                if ($cmp > 0) {
                     $pairs[$j] = $right;
                     $pairs[$j + 1] = $left;
                 }
@@ -109,6 +117,7 @@ final class UsortJitHelper
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
+        VmClosureCall::beginUserSort('uasort');
         $pairs = [];
         foreach ($ht->exportKeyValuePairs(true) as $pair) {
             $pairs[] = $pair;
@@ -118,8 +127,10 @@ final class UsortJitHelper
             for ($j = 0; $j < $n - $i - 1; ++$j) {
                 $left = $pairs[$j];
                 $right = $pairs[$j + 1];
-                $cmpVar = VmClosureInvoke::invokeVariable($closure, $left[1], $right[1]);
-                if ($cmpVar->toInt() > 0) {
+                $cmp = VmClosureCall::coerceUserSortCallbackResult(
+                    VmClosureInvoke::invokeVariable($closure, $left[1], $right[1])
+                );
+                if ($cmp > 0) {
                     $pairs[$j] = $right;
                     $pairs[$j + 1] = $left;
                 }

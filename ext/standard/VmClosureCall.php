@@ -20,6 +20,21 @@ use PHPCompiler\Web\Superglobals;
  */
 final class VmClosureCall
 {
+    /** php-src ARRAYG(compare_deprecation_thrown) — once per usort/uasort/uksort (#29089). */
+    private static bool $compareDeprecationThrown = false;
+
+    /** Active usort-family name for bool-return E_DEPRECATED docref (#29089). */
+    private static string $activeUserSortFunction = 'usort';
+
+    /**
+     * php-src PHP_ARRAY_CMP_FUNC_BACKUP — reset bool-comparator deprecation gate (#29089).
+     */
+    public static function beginUserSort(string $function): void
+    {
+        self::$compareDeprecationThrown = false;
+        self::$activeUserSortFunction = $function;
+    }
+
     public static function isClosure(Variable $callback): bool
     {
         $callback = $callback->resolveIndirect();
@@ -189,13 +204,16 @@ final class VmClosureCall
     }
 
     /**
-     * php-src php_usort_compare / php_get_long on comparator retval (#13029, #29124).
-     * Bool true→1, false→-1; int/float sign-normalized; plain object → E_WARNING + 1.
+     * php-src php_usort_compare / php_get_long on comparator retval (#13029, #29124, #29089).
+     * Bool true→1, false→-1 (+ once-per-sort E_DEPRECATED); int/float sign-normalized;
+     * plain object → E_WARNING + 1.
      */
     public static function coerceUserSortCallbackResult(Variable $result): int
     {
         $result = $result->resolveIndirect();
         if (Variable::TYPE_BOOLEAN === $result->type) {
+            self::maybeEmitBoolCompareDeprecation();
+
             return $result->toBool() ? 1 : -1;
         }
         if (Variable::TYPE_INTEGER === $result->type) {
@@ -232,6 +250,31 @@ final class VmClosureCall
     /** php-src convert_to_long plain-object branch — E_WARNING + legacy 1 (#29124). */
     private static function emitPlainObjectToIntWarning(ObjectEntry $object): void
     {
+        self::triggerSortDiagnostic(
+            'Object of class '.$object->class->name.' could not be converted to int',
+            ErrorReporter::E_WARNING
+        );
+    }
+
+    /**
+     * php-src php_array_user_compare_unstable — once-per-sort E_DEPRECATED (#29089).
+     */
+    private static function maybeEmitBoolCompareDeprecation(): void
+    {
+        if (self::$compareDeprecationThrown) {
+            return;
+        }
+        self::$compareDeprecationThrown = true;
+        self::triggerSortDiagnostic(
+            self::$activeUserSortFunction
+                .'(): Returning bool from comparison function is deprecated, '
+                .'return an integer less than, equal to, or greater than zero',
+            ErrorReporter::E_DEPRECATED
+        );
+    }
+
+    private static function triggerSortDiagnostic(string $message, int $level): void
+    {
         $context = Superglobals::getActiveContext();
         if (null === $context) {
             return;
@@ -243,8 +286,8 @@ final class VmClosureCall
             $frame = null;
         }
         $context->errors->triggerError(
-            'Object of class '.$object->class->name.' could not be converted to int',
-            ErrorReporter::E_WARNING,
+            $message,
+            $level,
             null !== $frame && '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
             $context,
             $frame
@@ -260,8 +303,10 @@ final class VmClosureCall
         Context $context,
         array &$values,
         ClosureState $closure,
-        bool $descending = false
+        bool $descending = false,
+        string $function = 'usort'
     ): void {
+        self::beginUserSort($function);
         $cmp = static function (Variable $a, Variable $b) use ($context, $closure, $descending): int {
             $result = self::invokeTwo($context, $closure, $a, $b);
 
@@ -278,8 +323,10 @@ final class VmClosureCall
     public static function sortVariableValuesViaTarget(
         array &$values,
         Variable $closure,
-        bool $descending = false
+        bool $descending = false,
+        string $function = 'usort'
     ): void {
+        self::beginUserSort($function);
         $cmp = static function (Variable $a, Variable $b) use ($closure, $descending): int {
             $result = VmClosureInvoke::invokeVariableTwo($closure, $a, $b);
 
@@ -295,8 +342,10 @@ final class VmClosureCall
         Context $context,
         array &$pairs,
         ClosureState $closure,
-        bool $descending = false
+        bool $descending = false,
+        string $function = 'uksort'
     ): void {
+        self::beginUserSort($function);
         $cmp = static function (array $a, array $b) use ($context, $closure, $descending): int {
             $result = self::invokeTwo($context, $closure, $a[0], $b[0]);
 
@@ -311,8 +360,10 @@ final class VmClosureCall
     public static function sortKeyedPairsByKeyViaTarget(
         array &$pairs,
         Variable $closure,
-        bool $descending = false
+        bool $descending = false,
+        string $function = 'uksort'
     ): void {
+        self::beginUserSort($function);
         $cmp = static function (array $a, array $b) use ($closure, $descending): int {
             $result = VmClosureInvoke::invokeVariableTwo($closure, $a[0], $b[0]);
 
@@ -328,8 +379,10 @@ final class VmClosureCall
         Context $context,
         array &$pairs,
         ClosureState $closure,
-        bool $descending = false
+        bool $descending = false,
+        string $function = 'uasort'
     ): void {
+        self::beginUserSort($function);
         $cmp = static function (array $a, array $b) use ($context, $closure, $descending): int {
             $result = self::invokeTwo($context, $closure, $a[1], $b[1]);
 
@@ -344,8 +397,10 @@ final class VmClosureCall
     public static function sortKeyedPairsByValueViaTarget(
         array &$pairs,
         Variable $closure,
-        bool $descending = false
+        bool $descending = false,
+        string $function = 'uasort'
     ): void {
+        self::beginUserSort($function);
         $cmp = static function (array $a, array $b) use ($closure, $descending): int {
             $result = VmClosureInvoke::invokeVariableTwo($closure, $a[1], $b[1]);
 
@@ -353,4 +408,4 @@ final class VmClosureCall
         };
         ZendSort::sort($pairs, $cmp);
     }
-}
+}
