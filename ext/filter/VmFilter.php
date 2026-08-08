@@ -1821,9 +1821,12 @@ final class VmFilter
         } elseif (0x2001 === $ip[0] && 0x0002 === $ip[1] && 0 === $ip[2]) {
             // RFC 5180 — Benchmarking
         } elseif (0x2001 === $ip[0] && 0x0db8 === $ip[1]) {
-            // RFC 3849 — Documentation
+            // RFC 3849 — Documentation; php-src ≤8.2 treats as reserved under NO_RES_RANGE (#29009).
+            // php-src 8.3+ RFC 6890 table leaves reserved unset — reference profile is 8.2.
+            $reserved = true;
         } elseif (0x2001 === $ip[0] && $ip[1] >= 0x0010 && $ip[1] <= 0x001f) {
-            // RFC 4843 — ORCHID
+            // RFC 4843 — ORCHID; same 8.2 NO_RES_RANGE treatment as documentation (#29009).
+            $reserved = true;
         } elseif (0x2002 === $ip[0]) {
             // RFC 3056 — 6to4
         } elseif ($ip[0] >= 0xfc00 && $ip[0] <= 0xfdff) {
