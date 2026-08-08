@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Web\Superglobals;
+
 /**
  * Zend zend_compare() for unlike kinds involving array/object/null (#12033).
  *
@@ -56,6 +58,13 @@ final class CompareUnlikeHelper
                     return $stringableCmp;
                 }
             }
+            // Zend compare_function: plain object vs number → E_NOTICE + legacy 1 (#29121).
+            if (
+                Variable::TYPE_INTEGER === $left->type || Variable::TYPE_INTEGER === $right->type
+                || Variable::TYPE_FLOAT === $left->type || Variable::TYPE_FLOAT === $right->type
+            ) {
+                return self::objectVsNumberSpaceship($left, $right, $vm);
+            }
 
             return Variable::TYPE_OBJECT === $left->type ? 1 : -1;
         }
@@ -85,6 +94,62 @@ final class CompareUnlikeHelper
         }
 
         throw new \LogicException('zendUnlikeValueSpaceship requires array/object/null unlike-kind operands');
+    }
+
+    /**
+     * Zend convert_object_to_type(IS_LONG|IS_DOUBLE) during compare_function (#29121).
+     *
+     * Notice text is "converted to int" vs int and "converted to float" vs float; value is 1 / 1.0.
+     */
+    private static function objectVsNumberSpaceship(
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm
+    ): int {
+        $objectOnLeft = Variable::TYPE_OBJECT === $left->type;
+        $object = $objectOnLeft ? $left : $right;
+        $number = $objectOnLeft ? $right : $left;
+        $asFloat = Variable::TYPE_FLOAT === $number->type;
+        self::emitPlainObjectToNumberNotice($object, $asFloat ? 'float' : 'int', $vm);
+        if ($asFloat) {
+            $cmp = CompareJitHelper::doubleSpaceship(1.0, $number->toFloat());
+        } else {
+            $cmp = CompareJitHelper::longSpaceship(1, $number->toInt());
+        }
+
+        return $objectOnLeft ? $cmp : -$cmp;
+    }
+
+    /** @param 'int'|'float' $kind */
+    private static function emitPlainObjectToNumberNotice(
+        Variable $object,
+        string $kind,
+        ?\PHPCompiler\VM $vm
+    ): void {
+        $entry = $object->resolveIndirect()->toObject();
+        if (ResourceSupport::isResourceObject($entry) || EnumCaseSupport::isEnumCase($entry)) {
+            return;
+        }
+        $context = $vm?->context ?? Superglobals::getActiveContext();
+        if (null === $context) {
+            return;
+        }
+        $frame = null;
+        try {
+            $frame = VmExecutingFrame::requireFromActiveContext();
+        } catch (\LogicException) {
+            $frame = null;
+        }
+        $message = 'int' === $kind
+            ? 'Object of class '.$entry->class->name.' could not be converted to int'
+            : 'Object of class '.$entry->class->name.' could not be converted to float';
+        $context->errors->triggerError(
+            $message,
+            ErrorReporter::E_NOTICE,
+            null !== $frame && '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $context,
+            $frame
+        );
     }
 
     /** Zend zend_is_true() for compare tail — empty array is false (#12033). */
