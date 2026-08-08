@@ -96,6 +96,47 @@ final class ReadonlyClassGuard
             $failBlock = $fn->appendBasicBlock('readonly_violation_'.$id);
             $context->builder->branch($failBlock);
             $context->builder->positionAtEnd($failBlock);
+            $mayFirstInit = self::callerMayFirstInitReadonlyProperty(
+                $context,
+                $objectType,
+                $enclosingBlock,
+                $propName
+            );
+            // unset(): only uninitialized + declaring-class scope (zend_std_unset_property; #29131).
+            // Mid-ctor init-then-unset must Error — do not treat !constructed as a free pass.
+            if ('unset' === $violation) {
+                $isUninit = self::emitPropertySlotIsUninitialized($context, $lvalue);
+                $violatePlain = $fn->appendBasicBlock('readonly_unset_plain_'.$id);
+                $declaringClass = $objectType->classNameForId($id);
+                if ($mayFirstInit && null !== $isUninit) {
+                    $context->builder->branchIf($isUninit, $storeBlock, $violatePlain);
+                } elseif (null !== $isUninit) {
+                    $violateUninitScope = $fn->appendBasicBlock('readonly_unset_scope_'.$id);
+                    $context->builder->branchIf($isUninit, $violateUninitScope, $violatePlain);
+                    $context->builder->positionAtEnd($violateUninitScope);
+                    self::emitViolation(
+                        $context,
+                        $jit,
+                        self::unsetReadonlyWrongScopeMessage(
+                            $context,
+                            $objectType,
+                            $enclosingBlock,
+                            $declaringClass,
+                            $propName
+                        )
+                    );
+                } else {
+                    $context->builder->branch($violatePlain);
+                }
+                $context->builder->positionAtEnd($violatePlain);
+                self::emitViolation(
+                    $context,
+                    $jit,
+                    sprintf('Cannot unset readonly property %s::$%s', $declaringClass, $propName)
+                );
+                $checkBlock = $nextCheck;
+                continue;
+            }
             $constructed = $context->builder->load(
                 $context->builder->structGep($obj, $objMap['constructed'])
             );
@@ -108,12 +149,7 @@ final class ReadonlyClassGuard
             $violateBlock = $fn->appendBasicBlock('readonly_violate_'.$id);
             // Post-construction first init from declaring-class scope (#23475).
             $firstInitBlock = null;
-            if (self::callerMayFirstInitReadonlyProperty(
-                $context,
-                $objectType,
-                $enclosingBlock,
-                $propName
-            )) {
+            if ($mayFirstInit) {
                 $firstInitBlock = $fn->appendBasicBlock('readonly_first_init_'.$id);
                 $context->builder->branchIf($notConstructed, $storeBlock, $firstInitBlock);
                 $context->builder->positionAtEnd($firstInitBlock);
@@ -134,9 +170,7 @@ final class ReadonlyClassGuard
             $context->builder->positionAtEnd($violateBlock);
             $declaringClass = $objectType->classNameForId($id);
             $message = sprintf(
-                'unset' === $violation
-                    ? 'Cannot unset readonly property %s::$%s'
-                    : 'Cannot modify readonly property %s::$%s',
+                'Cannot modify readonly property %s::$%s',
                 $declaringClass,
                 $propName
             );
@@ -401,6 +435,36 @@ final class ReadonlyClassGuard
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Uninitialized readonly unset from non-declaring scope (#29131).
+     *
+     * php-src: verify_readonly_initialization_access(..., "unset").
+     */
+    private static function unsetReadonlyWrongScopeMessage(
+        Context $context,
+        Object_ $objectType,
+        ?Block $enclosingBlock,
+        string $declaringClass,
+        string $propName
+    ): string {
+        $callerClassId = self::callerClassId($context, $enclosingBlock);
+        if (null === $callerClassId) {
+            return sprintf(
+                'Cannot unset readonly property %s::$%s from global scope',
+                $declaringClass,
+                $propName
+            );
+        }
+        $callerClass = $objectType->classNameForId($callerClassId);
+
+        return sprintf(
+            'Cannot unset readonly property %s::$%s from scope %s',
+            $declaringClass,
+            $propName,
+            $callerClass
+        );
     }
 
     private static function isConstructBlock(?Block $block): bool

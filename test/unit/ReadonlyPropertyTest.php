@@ -269,6 +269,48 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset.php'));
     }
 
+    /** @covers issue #29131 — unset uninitialized readonly in ctor then reinit */
+    public function testReadonlyPropertyAllowsUnsetThenReinitInConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public readonly int $x;
+    public function __construct() {
+        unset($this->x);
+        $this->x = 1;
+    }
+}
+$a = new A();
+echo $a->x;
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset_ctor_reinit.php'));
+        $out = ob_get_clean();
+        $this->assertSame('1', $out);
+    }
+
+    /** @covers issue #29131 — initialized readonly cannot be unset even mid-ctor */
+    public function testReadonlyPropertyRejectsUnsetAfterInitInConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class B {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 0;
+        unset($this->x);
+    }
+}
+new B();
+PHP;
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot unset readonly property B::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset_after_init_ctor.php'));
+    }
+
     public function testReadonlyPropertyRejectsPostIncrementAfterConstruct(): void
     {
         $runtime = new Runtime();
