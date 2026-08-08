@@ -70,7 +70,7 @@
         <span class="badge badge--live">VM + JIT + AOT</span>
         <span class="badge badge--live">Closures · try/catch</span>
         <span class="badge badge--live">321 builtins</span>
-        <span class="badge badge--live">Spine **6702** / **6703** (1 deferred)</span>
+        <span class="badge badge--live">Spine **7249** / **7252** (3 deferred: #24115, #27103, #29111)</span>
         <span class="badge badge--live">M5 strict ✅</span>
         <span class="badge badge--live">M3 strict emit</span>
         <span class="badge badge--wip">MCJIT execute</span>
@@ -391,7 +391,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
         </div>
         <p class="overall-progress__note">
           <code>fix/spine-aot-jit-blockers</code> @ <a href="https://github.com/PurHur/php-compiler/commit/a8cffaa0e">a8cffaa0e</a> (15 Jun 2026, LLVM 9).
-          M2 spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>**7220** / **7222**</strong> Phase A inventory (literal coverage ✅).
+          M2 spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>**7249** / **7252**</strong> Phase A inventory (literal coverage ✅).
           M4: <code>make bootstrap-loop-probe</code> full ladder ✅.
           M5: <code>make north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; VM driver probe ~<strong>20ms</strong> in CI loops.
           Remaining: MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)); honest PHP <code>main()</code> in full spine AOT (native bundle-OK probe is bootstrap smoke).
@@ -437,7 +437,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M5</h4>
           <p>Vendor prelink <strong>3/3</strong> ✅; committed <code>.o</code> cold boot ✅;
-            <code>north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; spine <strong>**7220** / **7222**</strong>; prelinked gen-0 refreshed;
+            <code>north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; spine <strong>**7249** / **7252**</strong>; prelinked gen-0 refreshed;
             fast VM execute probe (~20ms); compiled-only cold boot via <code>BOOTSTRAP_M5_NO_ZEND=1</code> ✅
             (<a href="https://github.com/PurHur/php-compiler/issues/3053">#3053</a>,
             <a href="https://github.com/PurHur/php-compiler/issues/8559">#8559</a>,

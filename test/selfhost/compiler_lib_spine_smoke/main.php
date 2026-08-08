@@ -3203,7 +3203,6 @@ require_once __DIR__.'/../../../ext/standard/TanJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/TanhJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/TempnamJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ThrowableManifest.php';
-require_once __DIR__.'/../../../ext/standard/TimezoneAbbreviationsData.php';
 require_once __DIR__.'/../../../ext/standard/TimezoneFallbackData.php';
 require_once __DIR__.'/../../../ext/standard/TimezoneLocationJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/TimezoneOffsetJitHelper.php';
