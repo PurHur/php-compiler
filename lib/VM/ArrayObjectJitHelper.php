@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -108,9 +111,101 @@ final class ArrayObjectJitHelper
     {
         $ht = self::htPtr($context, self::loadObject($context, $receiver));
         $boxedKey = self::asValueBoxKey($context, $key);
+        // php-src spl_array_read_dimension — Undefined array key then null (#28820).
+        // Int-key HT reads do not warn; string-key reads do — gate both on offsetIsSet.
+        $isSet = HashTableHelper::offsetIsSetDim($context, $ht, $boxedKey);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $hitBb = $fn->appendBasicBlock('ao_offsetget_hit');
+        $missBb = $fn->appendBasicBlock('ao_offsetget_miss');
+        $doneBb = $fn->appendBasicBlock('ao_offsetget_done');
+        $context->builder->branchIf($isSet, $hitBb, $missBb);
 
-        // Not a PHP superglobal — pass null (HashTableReadLlvm 4th arg; #27244 / NestedJIT).
-        return HashTableReadLlvm::readValueBoxKeyToValueBox($context, $ht, $boxedKey, null)->value;
+        $context->builder->positionAtEnd($missBb);
+        self::emitUndefinedArrayKeyWarning($context, $boxedKey);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($hitBb);
+        // Key present — readValueBoxKeyToValueBox will not emit a duplicate string-key warning.
+        $box = HashTableReadLlvm::readValueBoxKeyToValueBox($context, $ht, $boxedKey, null);
+        JitValueBox::copyFromPointer(
+            $context,
+            $destPtr,
+            JitValueBox::pointer($context, $box->value)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $slot;
+    }
+
+    /**
+     * Emit Zend "Undefined array key …" for a boxed dim (#28820).
+     */
+    private static function emitUndefinedArrayKeyWarning(Context $context, JITVariable $boxedKey): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringTriggerErrorJit::implement($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'ao_undef_key_setup');
+        }
+
+        $valPtr = HashTableReadLlvm::valuePtrFromDim($context, $boxedKey);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $strBb = $fn->appendBasicBlock('ao_undef_key_str');
+        $longBb = $fn->appendBasicBlock('ao_undef_key_long');
+        $doneBb = $fn->appendBasicBlock('ao_undef_key_done');
+        $afterStr = $fn->appendBasicBlock('ao_undef_key_after_str');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_STRING, false)
+            ),
+            $strBb,
+            $afterStr
+        );
+        $context->builder->positionAtEnd($strBb);
+        $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
+        $strMap = $context->structFieldMap['__string__'];
+        $keyLen = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
+        $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
+        $i8p = $context->getTypeFromString('int8*');
+        $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
+            $keyCStr,
+            $keyLen
+        );
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($afterStr);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
+            ),
+            $longBb,
+            $doneBb
+        );
+        $context->builder->positionAtEnd($longBb);
+        $longKey = $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
+            $longKey
+        );
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
     }
 
     public static function compileOffsetSet(

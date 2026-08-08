@@ -482,7 +482,7 @@ final class ArrayIteratorOffsetGet extends VmClassMethod
         }
         SplIteratorSupport::copyReturnFrom(
             $frame,
-            SplArrayStorage::offsetGet($object, $frame->calledArgs[1])
+            SplArrayStorage::offsetGet($object, $frame->calledArgs[1], $frame)
         );
     }
 }

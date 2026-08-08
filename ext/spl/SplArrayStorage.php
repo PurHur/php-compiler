@@ -432,10 +432,22 @@ final class SplArrayStorage
         return $var;
     }
 
-    public static function offsetGet(ObjectEntry $object, Variable $offset): Variable
-    {
+    /**
+     * php-src spl_array_read_dimension / ArrayObject::offsetGet — missing keys emit
+     * E_WARNING "Undefined array key …" then null (#28820, ext/spl/spl_array.c).
+     */
+    public static function offsetGet(
+        ObjectEntry $object,
+        Variable $offset,
+        ?Frame $frame = null
+    ): Variable {
         $found = self::findOffset(self::state($object)['table'], $offset);
         if (null === $found || $found->resolveIndirect()->isUndefined()) {
+            $ctx = $frame?->vmContext;
+            if (null !== $ctx) {
+                $scriptFile = null !== $frame && '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                $ctx->errors->undefinedArrayKey($offset, $ctx, $frame, $scriptFile);
+            }
             $var = new Variable(Variable::TYPE_NULL);
             $var->null();
 
