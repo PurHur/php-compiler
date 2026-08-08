@@ -8,6 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\ext\standard\JitZendScalarCast;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPCfg\Func;
+use PHPLLVM\Builder;
 
 /**
  * Scalar return-type enforce/coerce at JIT/AOT return sites (#26427, zend_verify_return_type).
@@ -15,6 +16,9 @@ use PHPCfg\Func;
  * Class/enum returns stay in {@see ClassReturnCheck}. Literal native mismatches (e.g.
  * `: string` returning `int` 5) previously emitted raw LLVM of the wrong type and failed
  * module verify — under strict_types raise TypeError; under weak coerce like Zend.
+ *
+ * Value boxes (array dim / property reads) must be runtime-verified, not rejected as
+ * static "mixed" — Zend accepts `return $cfg['app_name']` when the cell is a string (#29001).
  */
 final class ScalarReturnCheck
 {
@@ -43,6 +47,28 @@ final class ScalarReturnCheck
         $callableName = self::callableName($block->func);
         $expectedLabel = self::expectedLabel($constraint, $block->returnLiteralBoolType);
         $givenLabel = self::givenLabel($return);
+        // Boxed cells: zend_verify_return_type inspects the runtime tag (#29001 MiniWebApp).
+        if (Variable::TYPE_VALUE === $return->type) {
+            if ($block->strictTypes) {
+                return self::enforceValueBoxStrict(
+                    $context,
+                    $return,
+                    $expectedJit,
+                    $constraint,
+                    $callableName,
+                    $expectedLabel
+                );
+            }
+            $coerced = self::coerceWeak($context, $return, $expectedJit);
+            if (null === $coerced) {
+                self::raiseReturnTypeError($context, $callableName, $expectedLabel, $givenLabel);
+
+                return false;
+            }
+            $return = $coerced;
+
+            return true;
+        }
         if ($block->strictTypes) {
             // Zend zend_verify_return_type: int→float widening under strict_types (#28615).
             if (
@@ -74,6 +100,186 @@ final class ScalarReturnCheck
         $return = $coerced;
 
         return true;
+    }
+
+    /**
+     * Runtime-verify a `__value__` box against a scalar return type (strict_types).
+     *
+     * @param-out Variable $return
+     *
+     * @return bool false when a TypeError path was emitted
+     */
+    private static function enforceValueBoxStrict(
+        Context $context,
+        Variable &$return,
+        int $expectedJit,
+        int $constraint,
+        ?string $callableName,
+        string $expectedLabel
+    ): bool {
+        $expectedVm = self::vmTypeFromVmConstraint($constraint);
+        if (null === $expectedVm) {
+            self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'mixed');
+
+            return false;
+        }
+
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $return);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $okBb = $fn->appendBasicBlock('scalar_return_value_ok');
+        $failBb = $fn->appendBasicBlock('scalar_return_value_fail');
+        $resumeBb = $fn->appendBasicBlock('scalar_return_value_resume');
+
+        $isMatch = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt($expectedVm, false)
+        );
+        // int→float widening under strict_types (#28615) for boxed integers.
+        if (Variable::TYPE_NATIVE_DOUBLE === $expectedJit) {
+            $isInt = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(VMVariable::TYPE_INTEGER, false)
+            );
+            $isMatch = $context->builder->or($isMatch, $isInt);
+        }
+        $context->builder->branchIf($isMatch, $okBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'mixed');
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+
+        $context->builder->positionAtEnd($okBb);
+        $unwrapped = self::unwrapValueBox($context, $valuePtr, $expectedJit, $kind);
+        $context->builder->branch($resumeBb);
+        $context->builder->positionAtEnd($resumeBb);
+        $return = $unwrapped;
+
+        return true;
+    }
+
+    private static function vmTypeFromVmConstraint(int $constraint): ?int
+    {
+        return match ($constraint) {
+            VMVariable::TYPE_INTEGER => VMVariable::TYPE_INTEGER,
+            VMVariable::TYPE_FLOAT => VMVariable::TYPE_FLOAT,
+            VMVariable::TYPE_BOOLEAN => VMVariable::TYPE_BOOLEAN,
+            VMVariable::TYPE_STRING => VMVariable::TYPE_STRING,
+            VMVariable::TYPE_ARRAY => VMVariable::TYPE_ARRAY,
+            default => null,
+        };
+    }
+
+    private static function unwrapValueBox(
+        Context $context,
+        \PHPLLVM\Value $valuePtr,
+        int $expectedJit,
+        \PHPLLVM\Value $kind
+    ): Variable {
+        $i8 = $context->getTypeFromString('int8');
+        switch ($expectedJit) {
+            case Variable::TYPE_STRING:
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->builder->call(
+                        $context->lookupFunction('__value__readString'),
+                        $valuePtr
+                    )
+                );
+            case Variable::TYPE_NATIVE_LONG:
+                return new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $context->builder->call(
+                        $context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    )
+                );
+            case Variable::TYPE_NATIVE_DOUBLE:
+                // Widen boxed int → float when the tag was integer.
+                $fn = $context->builder->getInsertBlock()->getParent();
+                assert($fn instanceof \PHPLLVM\Value\Function_);
+                $fromIntBb = $fn->appendBasicBlock('scalar_return_box_int_to_float');
+                $fromFloatBb = $fn->appendBasicBlock('scalar_return_box_float');
+                $joinBb = $fn->appendBasicBlock('scalar_return_box_float_join');
+                $isInt = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $kind,
+                    $i8->constInt(VMVariable::TYPE_INTEGER, false)
+                );
+                $context->builder->branchIf($isInt, $fromIntBb, $fromFloatBb);
+
+                $context->builder->positionAtEnd($fromIntBb);
+                $asLong = $context->builder->call(
+                    $context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                );
+                $widened = $context->builder->siToFp($asLong, $context->getTypeFromString('double'));
+                $intEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($joinBb);
+
+                $context->builder->positionAtEnd($fromFloatBb);
+                $asDouble = $context->builder->call(
+                    $context->lookupFunction('__value__readDouble'),
+                    $valuePtr
+                );
+                $floatEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($joinBb);
+
+                $context->builder->positionAtEnd($joinBb);
+                $phi = $context->builder->phi($context->getTypeFromString('double'));
+                $phi->addIncoming($widened, $intEnd);
+                $phi->addIncoming($asDouble, $floatEnd);
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_DOUBLE,
+                    Variable::KIND_VALUE,
+                    $phi
+                );
+            case Variable::TYPE_NATIVE_BOOL:
+                // Bool lives in the value-union first byte (same as JitBoolArg).
+                $map = $context->structFieldMap['__value__'];
+                $valueField = $context->builder->structGep($valuePtr, $map['value']);
+                $firstByte = $context->builder->inBoundsGEP(
+                    $valueField,
+                    $context->getTypeFromString('int32')->constInt(0, false),
+                    $context->getTypeFromString('int64')->constInt(0, false)
+                );
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::KIND_VALUE,
+                    $context->castToBool($context->builder->load($firstByte))
+                );
+            case Variable::TYPE_HASHTABLE:
+                return new Variable(
+                    $context,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $context->builder->call(
+                        $context->lookupFunction('__value__readHashtable'),
+                        $valuePtr
+                    )
+                );
+            default:
+                throw new \LogicException('ScalarReturnCheck: unsupported value-box unwrap');
+        }
     }
 
     private static function jitTypeFromVmConstraint(int $constraint): ?int

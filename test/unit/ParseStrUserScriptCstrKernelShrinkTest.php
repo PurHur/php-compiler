@@ -23,6 +23,12 @@ final class ParseStrUserScriptCstrKernelShrinkTest extends TestCase
         $this->assertStringContainsString('final class JitParseStrUserScriptCstrKernel', $kernel);
         $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $kernel);
         $this->assertStringContainsString('ensureSubhelpers', $kernel);
+        // strtok result must be stored before branching to the pair loop (#29001).
+        $this->assertStringContainsString(
+            'Store strtok result before branching',
+            $kernel,
+            'pairSlot store-before-branch guard comment (#29001)'
+        );
     }
 
     public function testSpineBundleIncludesParseStrUserScriptCstrKernelNotBuiltin(): void
