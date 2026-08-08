@@ -7719,7 +7719,14 @@ restart:
                         $value = $this->executePropertyDefaultInitBlock($initBlock, $resultSlot);
                         $arg1->copyFrom($value);
                     } else {
-                        $error = VM\ParamArgumentCountError::forTooFewAtReceive($frame, (int) $op->arg2);
+                        // Named/unpack omission of a required param (no default): Zend uses
+                        // "Argument #N ($name) not passed" when a later slot was supplied (#29095).
+                        $error = VM\ParamArgumentCountError::calledArgsHaveIndexAbove(
+                            $frame->calledArgs,
+                            $recvIdx
+                        )
+                            ? VM\ParamArgumentCountError::forNamedArgNotPassed($frame, (int) $op->arg2)
+                            : VM\ParamArgumentCountError::forTooFewAtReceive($frame, (int) $op->arg2);
                         $catchFrame = $this->dispatchVmArgumentCountError($error, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
