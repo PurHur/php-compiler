@@ -102,7 +102,7 @@ final class VmUnserializeFormat
         $slotForCell = [];
 
         return self::unwrapUnserializeRoot(
-            self::cellToVariableWithContext($ctx, $root, $canonical, $slotForCell, $frame)
+            self::cellToVariableWithContext($ctx, $root, $canonical, $slotForCell, $frame, $options)
         );
     }
 
@@ -118,13 +118,16 @@ final class VmUnserializeFormat
 
     /**
      * Decode O: property bag with r:1 self-reference (ext/standard/var_unserializer.re, #12082).
+     *
+     * @param array<string, mixed>|null $options unserialize() options (allowed_classes; #29065)
      */
     public static function decodeObjectPropertyBag(
         Context $ctx,
         ClassEntry $class,
         int $propCount,
         string $inner,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        ?array $options = null
     ): Variable|false {
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -147,7 +150,14 @@ final class VmUnserializeFormat
             \assert($child instanceof VmUnserializeCell);
             $localCanonical = [];
             $localSlotForCell = [];
-            $value = self::cellToVariableWithContext($ctx, $child, $localCanonical, $localSlotForCell, $frame);
+            $value = self::cellToVariableWithContext(
+                $ctx,
+                $child,
+                $localCanonical,
+                $localSlotForCell,
+                $frame,
+                $options
+            );
             $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
         }
 
@@ -623,15 +633,17 @@ final class VmUnserializeFormat
     }
 
     /**
-     * @param array<int, Variable> $canonical
-     * @param array<int, Variable> $slotForCell
+     * @param array<int, Variable>      $canonical
+     * @param array<int, Variable>      $slotForCell
+     * @param array<string, mixed>|null $options
      */
     private static function cellToVariableWithContext(
         Context $ctx,
         VmUnserializeCell $cell,
         array &$canonical,
         array &$slotForCell,
-        ?Frame $frame
+        ?Frame $frame,
+        ?array $options = null
     ): Variable {
         $id = spl_object_id($cell);
         if (isset($slotForCell[$id])) {
@@ -664,6 +676,18 @@ final class VmUnserializeFormat
 
         if ($cell->value instanceof VmUnserializeObjectPayload) {
             $payload = $cell->value;
+            // php-src var_unserializer.re — allowed_classes before class load (#29065 / #4638).
+            if (!VmSerialize::isClassAllowedForUnserialize($payload->className, $options)) {
+                return self::materializeIncompleteObjectFromPayload(
+                    $ctx,
+                    $payload,
+                    $canonical,
+                    $slotForCell,
+                    $frame,
+                    $options,
+                    $id
+                );
+            }
             $lc = strtolower($payload->className);
             if (!isset($ctx->classes[$lc])) {
                 $ctx->autoloadClass($payload->className);
@@ -686,7 +710,8 @@ final class VmUnserializeFormat
                 $canonical,
                 $slotForCell,
                 $frame,
-                $id
+                $id,
+                $options
             );
             if (null !== $dateRestored) {
                 return $dateRestored;
@@ -695,7 +720,14 @@ final class VmUnserializeFormat
                 $ht = new HashTable();
                 foreach ($payload->properties as $name => $child) {
                     \assert($child instanceof VmUnserializeCell);
-                    $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                    $slot = self::cellToVariableWithContext(
+                        $ctx,
+                        $child,
+                        $canonical,
+                        $slotForCell,
+                        $frame,
+                        $options
+                    );
                     if (\is_int($name)) {
                         $ht->addIndex($name, $slot);
                     } else {
@@ -715,7 +747,14 @@ final class VmUnserializeFormat
             $slotForCell[$id] = $objectVar;
             foreach ($payload->properties as $name => $child) {
                 \assert($child instanceof VmUnserializeCell);
-                $value = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                $value = self::cellToVariableWithContext(
+                    $ctx,
+                    $child,
+                    $canonical,
+                    $slotForCell,
+                    $frame,
+                    $options
+                );
                 $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
             }
 
@@ -743,7 +782,14 @@ final class VmUnserializeFormat
             $isList = self::isListCellMap($cell->value);
             foreach ($cell->value as $key => $child) {
                 \assert($child instanceof VmUnserializeCell);
-                $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                $slot = self::cellToVariableWithContext(
+                    $ctx,
+                    $child,
+                    $canonical,
+                    $slotForCell,
+                    $frame,
+                    $options
+                );
                 if ($isList) {
                     if ($slot->isIndirect()) {
                         $ht->updateIndirectIndex((int) $key, $slot);
@@ -770,13 +816,58 @@ final class VmUnserializeFormat
     }
 
     /**
+     * Zend __PHP_Incomplete_Class for disallowed (or filtered) O: cells (#29065).
+     *
+     * @param array<int, Variable>      $canonical
+     * @param array<int, Variable>      $slotForCell
+     * @param array<string, mixed>|null $options
+     */
+    private static function materializeIncompleteObjectFromPayload(
+        Context $ctx,
+        VmUnserializeObjectPayload $payload,
+        array &$canonical,
+        array &$slotForCell,
+        ?Frame $frame,
+        ?array $options,
+        int $id
+    ): Variable {
+        $icClass = $ctx->classes['__php_incomplete_class'] ?? null;
+        if (null === $icClass) {
+            throw new \LogicException('__PHP_Incomplete_Class is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($icClass);
+        $entry->constructed = true;
+        $nameProp = $entry->allocateProperty('__PHP_Incomplete_Class_Name');
+        $nameProp->string($payload->className);
+        $objectVar = new Variable();
+        $objectVar->object($entry);
+        $canonical[$id] = $objectVar;
+        $slotForCell[$id] = $objectVar;
+        foreach ($payload->properties as $name => $child) {
+            \assert($child instanceof VmUnserializeCell);
+            $value = self::cellToVariableWithContext(
+                $ctx,
+                $child,
+                $canonical,
+                $slotForCell,
+                $frame,
+                $options
+            );
+            $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
+        }
+
+        return $objectVar;
+    }
+
+    /**
      * php-src ext/date — nested DateTime / DateInterval / DateTimeZone / DatePeriod O: bags (#22447).
      *
      * Generic property copy leaves Zend wire keys (`date`, `timezone_type`, …) on the object
      * without {@see DateTimeSupport::markDateTimeLikeInitialized}, so format()/foreach fatals.
      *
-     * @param array<int, Variable> $canonical
-     * @param array<int, Variable> $slotForCell
+     * @param array<int, Variable>      $canonical
+     * @param array<int, Variable>      $slotForCell
+     * @param array<string, mixed>|null $options
      */
     private static function tryRestoreDateExtensionObject(
         Context $ctx,
@@ -785,22 +876,23 @@ final class VmUnserializeFormat
         array &$canonical,
         array &$slotForCell,
         ?Frame $frame,
-        int $id
+        int $id,
+        ?array $options = null
     ): ?Variable {
         if (DateTimeSupport::CLASS_DATETIME === $lc || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lc) {
-            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame);
+            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame, $options);
             $restored = DateTimeSupport::restoreFromZendSerialize($ctx, $lc, $data);
 
             return self::registerRestoredObject($restored, $canonical, $slotForCell, $id);
         }
         if (DateTimeSupport::CLASS_DATETIMEZONE === $lc) {
-            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame);
+            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame, $options);
             $restored = DateTimeSupport::restoreTimezoneFromZendSerialize($ctx, $data);
 
             return self::registerRestoredObject($restored, $canonical, $slotForCell, $id);
         }
         if (DateIntervalSupport::CLASS_DATEINTERVAL === $lc) {
-            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame);
+            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame, $options);
             $restored = DateIntervalSupport::restoreFromZendSerialize($ctx, $data);
             if (null === $restored) {
                 throw new \Error('Invalid serialization data for DateInterval object');
@@ -812,7 +904,14 @@ final class VmUnserializeFormat
             $ht = new HashTable();
             foreach ($payload->properties as $name => $child) {
                 \assert($child instanceof VmUnserializeCell);
-                $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                $slot = self::cellToVariableWithContext(
+                    $ctx,
+                    $child,
+                    $canonical,
+                    $slotForCell,
+                    $frame,
+                    $options
+                );
                 if (\is_int($name)) {
                     $ht->addIndex($name, $slot);
                 } else {
@@ -830,8 +929,10 @@ final class VmUnserializeFormat
     }
 
     /**
-     * @param array<int, Variable> $canonical
-     * @param array<int, Variable> $slotForCell
+     * @param array<int, Variable>      $canonical
+     * @param array<int, Variable>      $slotForCell
+     * @param array<string, mixed>|null $options
+     *
      * @return array<string, mixed>
      */
     private static function objectPayloadToPhpArray(
@@ -839,12 +940,20 @@ final class VmUnserializeFormat
         VmUnserializeObjectPayload $payload,
         array &$canonical,
         array &$slotForCell,
-        ?Frame $frame
+        ?Frame $frame,
+        ?array $options = null
     ): array {
         $data = [];
         foreach ($payload->properties as $name => $child) {
             \assert($child instanceof VmUnserializeCell);
-            $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+            $slot = self::cellToVariableWithContext(
+                $ctx,
+                $child,
+                $canonical,
+                $slotForCell,
+                $frame,
+                $options
+            );
             $data[(string) $name] = self::variableToPhpScalar($slot->resolveIndirect());
         }
 
