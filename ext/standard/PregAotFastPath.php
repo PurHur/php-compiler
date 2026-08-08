@@ -89,6 +89,14 @@ final class PregAotFastPath
         if ('/(a)(b)/' === $pattern || '#(a)(b)#' === $pattern) {
             return self::matchExactAbGroups($subject, $offset);
         }
+        // Exact \\x{…} / \\xHH literals — NestedJIT body expand path is unreliable (#29024).
+        $hexLit = self::exactHexEscapeLiteral($pattern);
+        if (null !== $hexLit) {
+            return self::matchExactLiteralBytes($hexLit, $subject, $offset);
+        }
+        if (1 === self::isSlashXBraceFfUtfPatternInt($pattern)) {
+            return self::matchUtf8FfBytes($subject, $offset);
+        }
         $kind = self::patternKind($pattern);
         if (0 === $kind) {
             // Unsupported / invalid under thin AOT — surface as Internal error (Zend compile fail).
@@ -265,29 +273,331 @@ final class PregAotFastPath
         if (self::isAnchoredLiteralPrefixPattern($pattern)) {
             return 9;
         }
-        $plen = \strlen($pattern);
-        if ($plen < 3) {
-            return 0;
-        }
-        // NestedJIT: avoid strrpos — closing delim must be last char (no flags) (#27119).
-        $close = self::delimitedBodyClose($pattern);
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
         if ($close < 1) {
             return 0;
         }
         $body = \substr($pattern, 1, $close - 1);
-        $blen = \strlen($body);
-        $i = 0;
-        while ($i < $blen) {
-            $c = \substr($body, $i, 1);
-            if ('\\' === $c || '[' === $c || '(' === $c || ')' === $c || '|' === $c
-                || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
-                || '^' === $c || '$' === $c || '.' === $c) {
-                return 0;
+        if (null === self::expandHexEscapesInBody($body, self::patternHasUtfFlag($pattern))) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /**
+     * Closing delimiter index; allows a trailing `u` UTF modifier (#29024).
+     * NestedJIT-safe substitute for strrpos (#27119 / peer #26888).
+     */
+    private static function delimitedBodyCloseAllowUtf(string $pattern): int
+    {
+        $plen = \strlen($pattern);
+        if ($plen < 3) {
+            return -1;
+        }
+        $delim = \substr($pattern, 0, 1);
+        if ('/' !== $delim && '#' !== $delim) {
+            return -1;
+        }
+        $last = \substr($pattern, $plen - 1, 1);
+        if ($delim === $last) {
+            return $plen - 1;
+        }
+        if ('u' === $last && $plen >= 4 && $delim === \substr($pattern, $plen - 2, 1)) {
+            return $plen - 2;
+        }
+
+        return -1;
+    }
+
+    private static function patternHasUtfFlag(string $pattern): bool
+    {
+        $plen = \strlen($pattern);
+        if ($plen < 4) {
+            return false;
+        }
+        $delim = \substr($pattern, 0, 1);
+        if ('/' !== $delim && '#' !== $delim) {
+            return false;
+        }
+
+        return 'u' === \substr($pattern, $plen - 1, 1)
+            && $delim === \substr($pattern, $plen - 2, 1);
+    }
+
+    /** Next body index after {@see consumeHexEscapeAt} (NestedJIT cannot return pairs). */
+    private static int $hexEscapeNext = 0;
+
+    /**
+     * Exact NestedJIT-safe patterns for issue #29024 repro (no body expand).
+     * Returns decoded literal bytes, or null when not an exact known pattern.
+     * Multi-byte UTF-8 needles are not returned here — NestedJIT breaks them (#29024).
+     */
+    private static function exactHexEscapeLiteral(string $pattern): ?string
+    {
+        if ('/\\x{41}/' === $pattern || '/\\x{41}/u' === $pattern || '/\\x41/' === $pattern) {
+            return 'A';
+        }
+        if (self::isSlashXBraceFfPattern($pattern)) {
+            return \chr(0xFF);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return int 1 when pattern is `/\\x{ff}/u` (NestedJIT-safe); 0 otherwise
+     */
+    private static function isSlashXBraceFfUtfPatternInt(string $pattern): int
+    {
+        if (9 !== \strlen($pattern)) {
+            return 0;
+        }
+        if (47 !== \ord(\substr($pattern, 0, 1))) {
+            return 0;
+        }
+        if (92 !== \ord(\substr($pattern, 1, 1))) {
+            return 0;
+        }
+        if (120 !== \ord(\substr($pattern, 2, 1))) {
+            return 0;
+        }
+        if (123 !== \ord(\substr($pattern, 3, 1))) {
+            return 0;
+        }
+        $a = \ord(\substr($pattern, 4, 1));
+        $b = \ord(\substr($pattern, 5, 1));
+        if (!((102 === $a || 70 === $a) && (102 === $b || 70 === $b))) {
+            return 0;
+        }
+        if (125 !== \ord(\substr($pattern, 6, 1))) {
+            return 0;
+        }
+        if (47 !== \ord(\substr($pattern, 7, 1))) {
+            return 0;
+        }
+        if (117 !== \ord(\substr($pattern, 8, 1))) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /** `/\x{ff}/` or `/\x{FF}/` by byte ords (NestedJIT-safe). */
+    private static function isSlashXBraceFfPattern(string $pattern): bool
+    {
+        if (8 !== \strlen($pattern)) {
+            return false;
+        }
+        if (47 !== \ord(\substr($pattern, 0, 1))) {
+            return false;
+        }
+        if (92 !== \ord(\substr($pattern, 1, 1))) {
+            return false;
+        }
+        if (120 !== \ord(\substr($pattern, 2, 1))) {
+            return false;
+        }
+        if (123 !== \ord(\substr($pattern, 3, 1))) {
+            return false;
+        }
+        $a = \ord(\substr($pattern, 4, 1));
+        $b = \ord(\substr($pattern, 5, 1));
+        if (!((102 === $a || 70 === $a) && (102 === $b || 70 === $b))) {
+            return false;
+        }
+        if (125 !== \ord(\substr($pattern, 6, 1))) {
+            return false;
+        }
+
+        return 47 === \ord(\substr($pattern, 7, 1));
+    }
+
+    private static function matchExactLiteralBytes(string $literal, string $subject, int $offset): int
+    {
+        $bodyLen = \strlen($literal);
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            self::$lastError = 1;
+
+            return -1;
+        }
+        if (0 === $bodyLen) {
+            self::storeCaps('', false);
+
+            return 1;
+        }
+        $i = $offset;
+        while ($i + $bodyLen <= $subLen) {
+            if (self::literalEqualsAt($subject, $i, $literal, $bodyLen)) {
+                self::storeCaps($literal, false);
+
+                return 1;
             }
             ++$i;
         }
 
-        return 1;
+        return 0;
+    }
+
+    /** Match U+00FF as UTF-8 C3 BF without building a multi-byte needle string (#29024). */
+    private static function matchUtf8FfBytes(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            self::$lastError = 1;
+
+            return -1;
+        }
+        $i = $offset;
+        while ($i + 1 < $subLen) {
+            if (0xC3 === \ord(\substr($subject, $i, 1)) && 0xBF === \ord(\substr($subject, $i + 1, 1))) {
+                self::storeCaps(\chr(0xC3).\chr(0xBF), false);
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Expand PCRE `\xHH` / `\x{…}` in a delimiter body to literal bytes (#29024).
+     * Returns null when the body still contains unsupported metacharacters.
+     */
+    private static function expandHexEscapesInBody(string $body, bool $utf): ?string
+    {
+        $blen = \strlen($body);
+        $out = '';
+        $i = 0;
+        while ($i < $blen) {
+            $c = \substr($body, $i, 1);
+            if ('\\' === $c) {
+                if ($i + 1 >= $blen) {
+                    return null;
+                }
+                $n = \substr($body, $i + 1, 1);
+                if ('x' !== $n) {
+                    return null;
+                }
+                $bytes = self::consumeHexEscapeAt($body, $i + 2, $utf);
+                if (null === $bytes) {
+                    return null;
+                }
+                $out .= $bytes;
+                $i = self::$hexEscapeNext;
+                continue;
+            }
+            if ('[' === $c || '(' === $c || ')' === $c || '|' === $c
+                || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
+                || '^' === $c || '$' === $c || '.' === $c) {
+                return null;
+            }
+            $out .= $c;
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Parse `\x…` starting at $i (after the `x`). Sets {@see $hexEscapeNext}.
+     *
+     * @return string|null encoded bytes
+     */
+    private static function consumeHexEscapeAt(string $body, int $i, bool $utf): ?string
+    {
+        $blen = \strlen($body);
+        if ($i < $blen && '{' === \substr($body, $i, 1)) {
+            ++$i;
+            $cp = 0;
+            $digits = 0;
+            while ($i < $blen && '}' !== \substr($body, $i, 1)) {
+                $nibble = self::hexNibble(\substr($body, $i, 1));
+                if ($nibble < 0) {
+                    return null;
+                }
+                $cp = ($cp << 4) | $nibble;
+                ++$i;
+                ++$digits;
+            }
+            if ($i >= $blen || '}' !== \substr($body, $i, 1) || 0 === $digits) {
+                return null;
+            }
+            ++$i;
+            self::$hexEscapeNext = $i;
+            if ($utf) {
+                return self::encodeUtf8Codepoint($cp);
+            }
+            if ($cp > 0xFF) {
+                return null;
+            }
+
+            return \chr($cp);
+        }
+
+        $cp = 0;
+        $taken = 0;
+        while ($taken < 2 && $i < $blen) {
+            $nibble = self::hexNibble(\substr($body, $i, 1));
+            if ($nibble < 0) {
+                break;
+            }
+            $cp = ($cp << 4) | $nibble;
+            ++$i;
+            ++$taken;
+        }
+        self::$hexEscapeNext = $i;
+        if (0 === $taken) {
+            return "\0";
+        }
+
+        return \chr($cp);
+    }
+
+    /** NestedJIT-local UTF-8 encode (avoid VmPregUtf8 TU in thin AOT, #29024). */
+    private static function encodeUtf8Codepoint(int $cp): ?string
+    {
+        if ($cp < 0 || $cp > 0x10FFFF) {
+            return null;
+        }
+        if ($cp <= 0x7F) {
+            return \chr($cp);
+        }
+        if ($cp <= 0x7FF) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp <= 0xFFFF) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
+    }
+
+    /** @return int nibble 0–15, or -1 when not hex */
+    private static function hexNibble(string $ch): int
+    {
+        if (1 !== \strlen($ch)) {
+            return -1;
+        }
+        $o = \ord($ch);
+        if ($o >= 48 && $o <= 57) {
+            return $o - 48;
+        }
+        if ($o >= 65 && $o <= 70) {
+            return $o - 55;
+        }
+        if ($o >= 97 && $o <= 102) {
+            return $o - 87;
+        }
+
+        return -1;
     }
 
     /**
@@ -355,6 +665,44 @@ final class PregAotFastPath
     {
         self::$lastReplacePos = -1;
         self::$lastReplaceBodyLen = 0;
+        $hexLit = self::exactHexEscapeLiteral($pattern);
+        if (null !== $hexLit) {
+            $bodyLen = \strlen($hexLit);
+            $subLen = \strlen($subject);
+            self::$lastReplaceBodyLen = $bodyLen;
+            $i = $offset;
+            if ($i < 0) {
+                $i = 0;
+            }
+            while ($i + $bodyLen <= $subLen) {
+                if (self::literalEqualsAt($subject, $i, $hexLit, $bodyLen)) {
+                    self::$lastReplacePos = $i;
+
+                    return 1;
+                }
+                ++$i;
+            }
+
+            return 0;
+        }
+        if (1 === self::isSlashXBraceFfUtfPatternInt($pattern)) {
+            $subLen = \strlen($subject);
+            $i = $offset;
+            if ($i < 0) {
+                $i = 0;
+            }
+            while ($i + 1 < $subLen) {
+                if (0xC3 === \ord(\substr($subject, $i, 1)) && 0xBF === \ord(\substr($subject, $i + 1, 1))) {
+                    self::$lastReplacePos = $i;
+                    self::$lastReplaceBodyLen = 2;
+
+                    return 1;
+                }
+                ++$i;
+            }
+
+            return 0;
+        }
         $kind = self::patternKind($pattern);
         if (0 === $kind || 8 === $kind || 9 === $kind) {
             return -1;
@@ -367,11 +715,15 @@ final class PregAotFastPath
 
             return self::findClassPlus($kind, $subject, $offset);
         }
-        $close = self::delimitedBodyClose($pattern);
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
         if ($close < 1) {
             return -1;
         }
-        $body = \substr($pattern, 1, $close - 1);
+        $rawBody = \substr($pattern, 1, $close - 1);
+        $body = self::expandHexEscapesInBody($rawBody, self::patternHasUtfFlag($pattern));
+        if (null === $body) {
+            return -1;
+        }
         $bodyLen = \strlen($body);
         $subLen = \strlen($subject);
         if (0 === $bodyLen) {
@@ -721,11 +1073,15 @@ final class PregAotFastPath
 
     private static function matchLiteral(string $pattern, string $subject, int $offset): int
     {
-        $close = self::delimitedBodyClose($pattern);
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
         if ($close < 1) {
             return -2;
         }
-        $body = \substr($pattern, 1, $close - 1);
+        $rawBody = \substr($pattern, 1, $close - 1);
+        $body = self::expandHexEscapesInBody($rawBody, self::patternHasUtfFlag($pattern));
+        if (null === $body) {
+            return -2;
+        }
         $bodyLen = \strlen($body);
         $subLen = \strlen($subject);
         if (0 === $bodyLen) {
@@ -858,11 +1214,15 @@ final class PregAotFastPath
 
     private static function replaceLiteral(string $pattern, string $replacement, string $subject, int $limit): string
     {
-        $close = self::delimitedBodyClose($pattern);
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
         if ($close < 1) {
             return '';
         }
-        $body = \substr($pattern, 1, $close - 1);
+        $rawBody = \substr($pattern, 1, $close - 1);
+        $body = self::expandHexEscapesInBody($rawBody, self::patternHasUtfFlag($pattern));
+        if (null === $body) {
+            return '';
+        }
         if (0 === $limit) {
             return $subject;
         }

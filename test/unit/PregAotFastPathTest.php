@@ -162,4 +162,22 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::splitStore('/\s+/', '', -1, 0));
         $this->assertSame(-1, PregAotFastPath::splitStore('/a/', 'xay', -1, 0));
     }
+
+    /** Issue #29024 — PCRE `\x{N}` / `\xHH` brace and bare hex escapes under thin AOT. */
+    public function testHexBraceEscapeLiterals(): void
+    {
+        $this->assertSame(1, PregAotFastPath::patternKind('/\x{41}/'));
+        $this->assertSame(1, PregAotFastPath::patternKind('/\x{41}/u'));
+        $this->assertSame(1, PregAotFastPath::patternKind('/\x41/'));
+        $this->assertSame(1, PregAotFastPath::patternKind('/\x{ff}/u'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/\x{41}/', 'A', 0));
+        $this->assertSame(0, PregAotFastPath::lastError());
+        $this->assertSame('A', PregAotFastPath::lastCap(0));
+        $this->assertSame(1, PregAotFastPath::matchCount('/\x{41}/u', 'A', 0));
+        $this->assertSame(1, PregAotFastPath::matchCount('/\x41/', 'A', 0));
+        $this->assertSame(1, PregAotFastPath::matchCount('/\x{ff}/u', "\xC3\xBF", 0));
+        $this->assertSame(0, PregAotFastPath::lastError());
+        $this->assertSame("\xC3\xBF", PregAotFastPath::lastCap(0));
+        $this->assertSame(0, PregAotFastPath::matchCount('/\x{41}/', 'B', 0));
+    }
 }

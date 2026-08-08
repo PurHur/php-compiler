@@ -157,6 +157,34 @@ final class VmPregUtf8
         return [$cp, $width];
     }
 
+    /**
+     * Encode a Unicode code point as UTF-8 bytes (PCRE2 \\x{…} under PCRE2_UTF, #29024).
+     *
+     * @return string|null UTF-8 bytes, or null when $cp is outside 0..0x10FFFF
+     */
+    public static function encodeCodepoint(int $cp): ?string
+    {
+        if ($cp < 0 || $cp > 0x10FFFF) {
+            return null;
+        }
+        if ($cp <= 0x7F) {
+            return \chr($cp);
+        }
+        if ($cp <= 0x7FF) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp <= 0xFFFF) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
+    }
+
     private static function decodeUtf8Codepoint(string $string, int $bytePos, int $width): ?int
     {
         $b0 = \ord($string[$bytePos]);
