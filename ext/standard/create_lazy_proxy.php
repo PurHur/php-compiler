@@ -42,7 +42,7 @@ final class create_lazy_proxy extends Internal
         $ctx = VmReflection::requireContext($frame);
         $className = VmString::coerceStringBuiltinArg($frame->calledArgs[0], self::NAME, 0, 'class');
         $entry = LazyObjectSupport::resolveClassForLazyFactory($ctx, $className, self::NAME, true);
-        $factory = LazyObjectSupport::extractRequiredCallable(
+        $factoryClosure = LazyObjectSupport::extractRequiredCallableObject(
             $frame->calledArgs[1],
             self::NAME,
             2,
@@ -57,7 +57,12 @@ final class create_lazy_proxy extends Internal
                 );
             }
         }
-        $lazy = LazyObjectSupport::createProxy($entry, $factory);
+        $lazy = LazyObjectSupport::createProxy(
+            $entry,
+            $factoryClosure->closureState,
+            0,
+            $factoryClosure
+        );
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);

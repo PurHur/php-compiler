@@ -36,7 +36,7 @@ final class ReflectionClassCreateLazyGhost extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $className = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'createLazyGhost', 0, 'class');
         $entry = LazyObjectSupport::resolveClassForLazyFactory($ctx, $className, 'createLazyGhost');
-        $initializer = LazyObjectSupport::extractRequiredCallable(
+        $initializerClosure = LazyObjectSupport::extractRequiredCallableObject(
             $frame->calledArgs[1],
             'createLazyGhost',
             2,
@@ -53,7 +53,12 @@ final class ReflectionClassCreateLazyGhost extends VmClassMethod
             }
             $options = $optionsVar->toInt();
         }
-        $lazy = LazyObjectSupport::createGhost($entry, $initializer, $options);
+        $lazy = LazyObjectSupport::createGhost(
+            $entry,
+            $initializerClosure->closureState,
+            $options,
+            $initializerClosure
+        );
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);

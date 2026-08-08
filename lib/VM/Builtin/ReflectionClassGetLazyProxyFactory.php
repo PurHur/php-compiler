@@ -9,7 +9,7 @@ use PHPCompiler\VM\ClosureSupport;
 use PHPCompiler\VM\LazyObjectSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionClass::getLazyProxyFactory() — VM (#6776, ext/reflection/php_reflection.c). */
+/** ReflectionClass::getLazyProxyFactory() — VM (#6776, #29152, ext/reflection/php_reflection.c). */
 final class ReflectionClassGetLazyProxyFactory extends VmClassMethod
 {
     public function __construct()
@@ -26,21 +26,30 @@ final class ReflectionClassGetLazyProxyFactory extends VmClassMethod
         if (Variable::TYPE_OBJECT !== $objectVar->type) {
             throw new \TypeError('ReflectionClass::getLazyProxyFactory(): Argument #1 ($object) must be of type object');
         }
-        $factory = LazyObjectSupport::getProxyFactory($objectVar->toObject());
+        $object = $objectVar->toObject();
+        $closure = LazyObjectSupport::getProxyFactoryClosure($object);
         if (null === $frame->returnVar) {
             return;
         }
-        if (null === $factory) {
-            $frame->returnVar->null();
+        if (null === $closure) {
+            $factory = LazyObjectSupport::getProxyFactory($object);
+            if (null === $factory) {
+                $frame->returnVar->null();
+
+                return;
+            }
+            $ctx = $frame->vmContext;
+            if (null === $ctx) {
+                throw new \LogicException('ReflectionClass::getLazyProxyFactory() requires VM context');
+            }
+            $out = new Variable(Variable::TYPE_OBJECT);
+            $out->object(ClosureSupport::wrapState($ctx, $factory));
+            $frame->returnVar->copyFrom($out);
 
             return;
         }
-        $ctx = $frame->vmContext;
-        if (null === $ctx) {
-            throw new \LogicException('ReflectionClass::getLazyProxyFactory() requires VM context');
-        }
         $out = new Variable(Variable::TYPE_OBJECT);
-        $out->object(ClosureSupport::wrapState($ctx, $factory));
+        $out->object($closure);
         $frame->returnVar->copyFrom($out);
     }
 }

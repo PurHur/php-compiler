@@ -42,7 +42,7 @@ final class create_lazy_ghost extends Internal
         $ctx = VmReflection::requireContext($frame);
         $className = VmString::coerceStringBuiltinArg($frame->calledArgs[0], self::NAME, 0, 'class');
         $entry = LazyObjectSupport::resolveClassForLazyFactory($ctx, $className, self::NAME);
-        $initializer = LazyObjectSupport::extractRequiredCallable(
+        $initializerClosure = LazyObjectSupport::extractRequiredCallableObject(
             $frame->calledArgs[1],
             self::NAME,
             2,
@@ -57,7 +57,12 @@ final class create_lazy_ghost extends Internal
                 );
             }
         }
-        $lazy = LazyObjectSupport::createGhost($entry, $initializer);
+        $lazy = LazyObjectSupport::createGhost(
+            $entry,
+            $initializerClosure->closureState,
+            0,
+            $initializerClosure
+        );
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);

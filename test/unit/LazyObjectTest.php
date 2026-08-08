@@ -267,6 +267,42 @@ PHP;
         $this->assertSame("uninit\ninit\n", ob_get_clean());
     }
 
+    /** @covers issue #29152 — getLazyInitializer() === factory Closure */
+    public function testGetLazyInitializerReturnsSameClosureInstance(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+}
+$r = new ReflectionClass(C::class);
+$init = function (C $obj) {
+    $obj->x = 4;
+};
+$o = $r->newLazyGhost($init);
+echo $r->getLazyInitializer($o) === $init ? "ghost_same\n" : "ghost_diff\n";
+echo $r->getLazyInitializer($o) === $init ? "ghost_again\n" : "ghost_again_diff\n";
+$proxyInit = static function (): C {
+    return new C();
+};
+$p = $r->newLazyProxy($proxyInit);
+echo $r->getLazyInitializer($p) === $proxyInit ? "proxy_same\n" : "proxy_diff\n";
+$resetInit = function (C $obj) {
+    $obj->x = 9;
+};
+$plain = new C();
+$r->resetAsLazyGhost($plain, $resetInit);
+echo $r->getLazyInitializer($plain) === $resetInit ? "reset_same\n" : "reset_diff\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_initializer_identity.php'));
+        $this->assertSame(
+            "ghost_same\nghost_again\nproxy_same\nreset_same\n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #5968 */
     public function testLazyObjectIntrospectionMethods(): void
     {

@@ -22,6 +22,7 @@ final class LazyGhostCreateLazyGhost extends VmClassMethod
     {
         $classEntry = $this->resolveTargetClass($frame);
         $initClosure = null;
+        $initClosureObject = null;
         if (\count($frame->calledArgs) >= 1) {
             $initVar = $frame->calledArgs[0]->resolveIndirect();
             if (!$initVar->isUndefined() && Variable::TYPE_NULL !== $initVar->type) {
@@ -39,10 +40,11 @@ final class LazyGhostCreateLazyGhost extends VmClassMethod
                     );
                 }
                 $initClosure = $initObject->closureState;
+                $initClosureObject = $initObject;
             }
         }
 
-        $lazy = LazyObjectSupport::createGhost($classEntry, $initClosure);
+        $lazy = LazyObjectSupport::createGhost($classEntry, $initClosure, 0, $initClosureObject);
         if (\count($frame->calledArgs) >= 2) {
             $propsVar = $frame->calledArgs[1]->resolveIndirect();
             if (!$propsVar->isUndefined() && Variable::TYPE_NULL !== $propsVar->type) {

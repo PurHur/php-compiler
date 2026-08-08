@@ -34,7 +34,7 @@ final class ReflectionClassCreateLazyProxy extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $className = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'createLazyProxy', 0, 'class');
         $entry = LazyObjectSupport::resolveClassForLazyFactory($ctx, $className, 'createLazyProxy', true);
-        $factory = LazyObjectSupport::extractRequiredCallable(
+        $factoryClosure = LazyObjectSupport::extractRequiredCallableObject(
             $frame->calledArgs[1],
             'createLazyProxy',
             2,
@@ -51,7 +51,12 @@ final class ReflectionClassCreateLazyProxy extends VmClassMethod
             }
             $options = $optionsVar->toInt();
         }
-        $lazy = LazyObjectSupport::createProxy($entry, $factory, $options);
+        $lazy = LazyObjectSupport::createProxy(
+            $entry,
+            $factoryClosure->closureState,
+            $options,
+            $factoryClosure
+        );
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);
