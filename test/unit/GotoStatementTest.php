@@ -71,6 +71,39 @@ PHP
         $runtime->parseAndCompile("<?php\nbreak;\n", 'break_outside_loop.php');
     }
 
+    public function testGotoIntoSwitchCompileError(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage("'goto' into loop or switch statement is disallowed");
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+goto a;
+switch (1) {
+  case 1:
+    a:
+    echo "HIT";
+}
+PHP
+            , 'goto_into_switch.php');
+    }
+
+    public function testGotoIntoForCompileError(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage("'goto' into loop or switch statement is disallowed");
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+goto a;
+for ($i = 0; $i < 1; $i++) {
+    a:
+    echo "HIT";
+}
+PHP
+            , 'goto_into_for.php');
+    }
+
     private function runCode(string $code): string
     {
         $runtime = new Runtime();

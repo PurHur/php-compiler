@@ -20,6 +20,8 @@ class GotoVMTest extends BaseTest
             'goto.phpt',
             'goto_try_finally_before_label.phpt',
             'goto_invalid_into_loop.phpt',
+            'goto_invalid_into_switch.phpt',
+            'goto_invalid_into_switch_eval.phpt',
             'goto_invalid_into_finally.phpt',
             'goto_invalid_out_of_finally.phpt',
             'break_outside_loop_fatal.phpt',
