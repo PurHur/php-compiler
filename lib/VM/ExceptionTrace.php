@@ -16,6 +16,18 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 final class ExceptionTrace
 {
     /**
+     * Builtins Zend lowers as opcodes — TypeError has no internal call frame (#28852).
+     *
+     * @var array<string, true>
+     */
+    private const OPCODE_TYPEERROR_OMIT_BUILTINS = [
+        'strlen' => true,
+        'count' => true,
+        'sizeof' => true,
+        'get_class' => true,
+    ];
+
+    /**
      * Snapshot caller frame for manual `new Throwable()` (not thrown) — Zend object_init_ex (#9905).
      */
     public static function captureOnManualConstruct(Context $ctx, Frame $constructFrame, ObjectEntry $object): void
@@ -156,6 +168,11 @@ final class ExceptionTrace
 
     /**
      * Builtin throw trace — Zend includes internal function name at user call site (#11677).
+     *
+     * Exception: ZEND_STRLEN / ZEND_COUNT / ZEND_GET_CLASS TypeErrors have no internal call
+     * frame in php-src (opcode handlers throw with the user execute_data). Omit the synthetic
+     * builtin row so getTrace()[0]['function'] is the caller (#28852). ArgumentCountError still
+     * keeps the builtin frame (Zend does for strlen() argc).
      */
     public static function captureOnBuiltinThrow(
         Context $ctx,
@@ -184,16 +201,45 @@ final class ExceptionTrace
         $trace = new Variable();
         $trace->newArray();
         $ht = $trace->toArray();
-        if ('' !== $builtinName) {
+        $omitBuiltin = self::omitOpcodeBuiltinTypeErrorFrame($object, $builtinName);
+        if ('' !== $builtinName && !$omitBuiltin) {
             $ht->append(VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $builtinName));
         }
-        $userTrace = self::sanitizeCapturedTrace(
-            VmDebugBacktrace::build($callerFrame, self::traceCaptureOptions())
-        );
+        $opts = self::traceCaptureOptions();
+        $userTrace = self::sanitizeCapturedTrace(VmDebugBacktrace::build($callerFrame, $opts));
+        // build() treats a direct user frame under {main} as top-level and returns [].
+        // Fall back so the caller appears (Zend argc: strlen + user; opcode TypeError: user only).
+        // Skip main — Zend bare opcode TypeError has an empty getTrace() (#28852).
+        if (
+            0 === $userTrace->toArray()->getNumElements()
+            && !(null !== $callerFrame->block && $callerFrame->block->isMainScript())
+        ) {
+            $userTrace = self::sanitizeCapturedTrace(
+                VmDebugBacktrace::buildFromFrames([$callerFrame], $opts)
+            );
+        }
         foreach ($userTrace->toArray()->iterate(true) as $frameVar) {
             $ht->append($frameVar);
         }
         $traceProp->duplicateFrom($trace);
+    }
+
+    /**
+     * php-src specialized opcodes throw TypeError without an internal execute_data frame.
+     *
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_vm_def.h ZEND_STRLEN / ZEND_COUNT / ZEND_GET_CLASS
+     */
+    private static function omitOpcodeBuiltinTypeErrorFrame(ObjectEntry $object, string $builtinName): bool
+    {
+        if ('' === $builtinName) {
+            return false;
+        }
+        $lcBuiltin = strtolower($builtinName);
+        if (!isset(self::OPCODE_TYPEERROR_OMIT_BUILTINS[$lcBuiltin])) {
+            return false;
+        }
+        // ArgumentCountError extends TypeError — keep its builtin frame (Zend strlen() argc).
+        return 'typeerror' === strtolower($object->class->name);
     }
 
     /** Generator throw-site snapshot when debug_backtrace cannot see isolated stack (#13418). */
@@ -296,8 +342,12 @@ final class ExceptionTrace
                 continue;
             }
             $fn = $fnVar->resolveIndirect();
-            if (Variable::TYPE_STRING === $fn->type && '{main}' === $fn->toString()) {
-                continue;
+            if (Variable::TYPE_STRING === $fn->type) {
+                $fnName = $fn->toString();
+                // `{main}` is synthesized in getTraceAsString(); empty names are not Zend frames.
+                if ('{main}' === $fnName || '' === $fnName) {
+                    continue;
+                }
             }
             $copy = new Variable();
             $copy->duplicateFrom($frameVar);
