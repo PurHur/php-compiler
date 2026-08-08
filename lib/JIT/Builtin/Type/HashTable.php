@@ -8,11 +8,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin\Type;
 
-use PHPCompiler\JIT\JitStringCompare;
-
 use PHPCompiler\JIT\Builtin\Refcount;
+use PHPCompiler\JIT\Builtin\StringNaturalCompare;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Builtin\Type;
+use PHPCompiler\JIT\JitStringCompare;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
 use PHPLLVM\Builder;
@@ -156,10 +157,8 @@ class HashTable extends Type
 
     public function implement(): void
     {
-        $this->ensureLibcStringCompare();
+        $this->ensureStringCompareAbis();
         $this->ensureLibcStrtol();
-        \PHPCompiler\JIT\Builtin\StringStrnatcmp::ensureLinked($this->context);
-        \PHPCompiler\JIT\Builtin\StringStrnatcasecmp::ensureLinked($this->context);
         $this->implementAlloc();
         $this->implementGrow();
         $this->implementSetLongAt();
@@ -222,34 +221,18 @@ class HashTable extends Type
         }
     }
 
-    private function ensureLibcStringCompare(): void
+    /**
+     * Length-aware string compare + PHP natural-order ABIs (#29019).
+     *
+     * Do not declare empty `strnatcmp`/`strnatcasecmp` externs — those are PHP algorithms
+     * owned by {@see StringNaturalCompare}, not libc. ksort string keys use
+     * {@see JitStringCompare::strcmp} (memcmp); locale sorts use {@see StringStrcoll}.
+     */
+    private function ensureStringCompareAbis(): void
     {
-        $i8p = $this->context->getTypeFromString('int8*');
-        $i32 = $this->context->getTypeFromString('int32');
-        $ft = $this->context->context->functionType($i32, false, $i8p, $i8p);
-        try {
-            $this->context->lookupFunction('strcmp');
-        } catch (\Throwable $e) {
-            $fn = $this->context->module->addFunction('strcmp', $ft);
-            $this->context->registerFunction('strcmp', $fn);
-        }
-        try {
-            $this->context->lookupFunction('strnatcmp');
-        } catch (\Throwable $e) {
-            $fn = $this->context->module->addFunction('strnatcmp', $ft);
-            $this->context->registerFunction('strnatcmp', $fn);
-        }
-        try {
-            $this->context->lookupFunction('strnatcasecmp');
-        } catch (\Throwable $e) {
-            $fn = $this->context->module->addFunction('strnatcasecmp', $ft);
-            $this->context->registerFunction('strnatcasecmp', $fn);
-        }
-        try {
-            $this->context->lookupFunction(StringStrcoll::ABI_STRCOLL);
-        } catch (\Throwable $e) {
-            StringStrcoll::ensureLinked($this->context);
-        }
+        LibcExtern::register($this->context);
+        StringNaturalCompare::ensureStandaloneBodies($this->context);
+        StringStrcoll::ensureLinked($this->context);
     }
 
     private function implementAlloc(): void
@@ -2191,12 +2174,9 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($compare);
         $keyCur = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['key']));
         $keyNext = $this->context->builder->load($this->context->builder->structGep($next, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($keyCur),
-            $this->stringDataPtr($keyNext)
-        );
-        $needsSwap = $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false));
+        $cmp = JitStringCompare::strcmp($this->context, $keyCur, $keyNext);
+        $i64 = $this->context->getTypeFromString('int64');
+        $needsSwap = $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i64->constInt(0, false));
         $swapBlock = $fn->appendBasicBlock('ksort_str_swap');
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
 
@@ -2305,7 +2285,7 @@ class HashTable extends Type
         $keyCur = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['key']));
         $keyNext = $this->context->builder->load($this->context->builder->structGep($next, $nodeMap['key']));
         $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcoll'),
+            $this->context->lookupFunction(StringStrcoll::ABI_STRCOLL),
             $this->stringDataPtr($keyCur),
             $this->stringDataPtr($keyNext)
         );
@@ -2417,12 +2397,9 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($compare);
         $keyCur = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['key']));
         $keyNext = $this->context->builder->load($this->context->builder->structGep($next, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($keyCur),
-            $this->stringDataPtr($keyNext)
-        );
-        $needsSwap = $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i32->constInt(0, false));
+        $cmp = JitStringCompare::strcmp($this->context, $keyCur, $keyNext);
+        $i64 = $this->context->getTypeFromString('int64');
+        $needsSwap = $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false));
         $swapBlock = $fn->appendBasicBlock('krsort_str_swap');
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
 
