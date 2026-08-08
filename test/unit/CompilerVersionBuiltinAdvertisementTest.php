@@ -1152,6 +1152,27 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testVmDoesNotRegisterHttpStubEnumsOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['connectionstatus', 'requestmethod', 'responsecode'] as $lc) {
+                $this->assertFalse(isset($ctx->classes[$lc]), $lc);
+            }
+        } finally {
+            unset($_ENV['PHP_COMPILER_PROFILE']);
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterJsonValidateOnDefault84DevReference(): void
     {
         $runtime = new Runtime();

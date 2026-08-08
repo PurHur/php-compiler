@@ -1,14 +1,10 @@
 --TEST--
-stdlib ResponseCode enum for http_response_code() (#7322, ext/standard/head.c)
+stdlib ResponseCode phantom absent; http_response_code() int only (#28931, re-#7322)
 --FILE--
 <?php
 var_export(enum_exists('ResponseCode', false));
 echo "\n";
-var_export(ResponseCode::NotFound->name);
-echo "\n";
-var_export(ResponseCode::NotFound->value);
-echo "\n";
-var_export(http_response_code(ResponseCode::NotFound));
+var_export(http_response_code(404));
 echo "\n";
 var_export(http_response_code());
 echo "\n";
@@ -24,9 +20,7 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-true
-'NotFound'
-404
+false
 true
 404
 404

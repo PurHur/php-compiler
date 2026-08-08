@@ -1,15 +1,12 @@
 --TEST--
-stdlib connection_status() JIT with ConnectionStatus enum (#7234)
+stdlib connection_status() JIT int; ConnectionStatus phantom (#28931, re-#7234)
 --FILE--
 <?php
+echo enum_exists('ConnectionStatus', false) ? 'enum' : 'noenum', "\n";
 $st = connection_status();
-if (is_object($st)) {
-    echo $st->value, "\n";
-    echo $st->value === CONNECTION_NORMAL ? "match\n" : "bad\n";
-} else {
-    echo $st, "\n";
-    echo $st === CONNECTION_NORMAL ? "match\n" : "bad\n";
-}
+echo $st, "\n";
+echo $st === CONNECTION_NORMAL ? "match\n" : "bad\n";
 --EXPECT--
+noenum
 0
 match

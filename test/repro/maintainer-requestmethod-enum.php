@@ -1,11 +1,9 @@
 <?php
-// Repro for #7230 — RequestMethod enum (ext/standard/basic_functions.stub.php).
+// Repro for #28931 / re-#7230 — RequestMethod phantom absent.
 
 echo 'RequestMethod enum: ', enum_exists('RequestMethod', false) ? 'yes' : 'no', "\n";
-if (!enum_exists('RequestMethod', false)) {
-    fwrite(STDERR, "FAIL: RequestMethod enum missing\n");
+if (enum_exists('RequestMethod', false)) {
+    fwrite(STDERR, "FAIL: RequestMethod phantom still registered\n");
     exit(1);
 }
-echo 'backed enum: ', enum_exists('RequestMethod', false) && !unitenum_exists('RequestMethod') ? 'yes' : 'no', "\n";
-echo 'Post: ', RequestMethod::Post->name, '=', RequestMethod::Post->value, "\n";
-echo 'Get: ', RequestMethod::Get->name, '=', RequestMethod::Get->value, "\n";
+echo "absent_ok\n";
