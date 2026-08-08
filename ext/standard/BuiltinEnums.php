@@ -25,11 +25,9 @@ final class BuiltinEnums
             self::registerStringTrimMode($ctx);
             self::registerPadType($ctx);
             self::registerMemoryUsage($ctx);
-            self::registerConnectionStatus($ctx);
-            self::registerResponseCode($ctx);
+            // ConnectionStatus / ResponseCode / RequestMethod retired — php-src never ships them (#28931)
             // Sorting / SortDirection retired — php-src never ships them (#28930, re-#12362 / #7229 / #7261)
             self::registerParseUrl($ctx);
-            self::registerRequestMethod($ctx);
             self::registerInfoView($ctx);
         }
         if (CompilerVersion::supportsClockGettime()) {
@@ -242,60 +240,6 @@ final class BuiltinEnums
     }
 
     /**
-     * PHP 8.4 ConnectionStatus: int-backed enum for connection_status() (#7234).
-     *
-     * php-src: ext/standard/basic_functions.stub.php — enum ConnectionStatus: int
-     */
-    private static function registerConnectionStatus(Context $ctx): void
-    {
-        if (isset($ctx->classes['connectionstatus'])) {
-            return;
-        }
-
-        $entry = new ClassEntry('ConnectionStatus');
-        $entry->isEnum = true;
-        $entry->backedType = 'int';
-
-        self::registerBackedEnumCase($entry, 'Normal', VmConnection::NORMAL);
-        self::registerBackedEnumCase($entry, 'Aborted', VmConnection::ABORTED);
-        self::registerBackedEnumCase($entry, 'Timeout', VmConnection::TIMEOUT);
-
-        EnumSupport::ensureBuiltinCasesMethod($entry);
-        EnumSupport::ensureBuiltinEnumInterfaces($entry);
-
-        $lc = 'connectionstatus';
-        $ctx->classes[$lc] = $entry;
-        $ctx->enums[$lc] = true;
-    }
-
-    /**
-     * PHP 8.4 ResponseCode: int-backed enum for http_response_code() (#7322).
-     *
-     * php-src: ext/standard/basic_functions.stub.php — enum ResponseCode: int
-     */
-    private static function registerResponseCode(Context $ctx): void
-    {
-        if (isset($ctx->classes['responsecode'])) {
-            return;
-        }
-
-        $entry = new ClassEntry('ResponseCode');
-        $entry->isEnum = true;
-        $entry->backedType = 'int';
-
-        foreach (HttpStatusEnumData::cases() as $name => $value) {
-            self::registerBackedEnumCase($entry, $name, $value);
-        }
-
-        EnumSupport::ensureBuiltinCasesMethod($entry);
-        EnumSupport::ensureBuiltinEnumInterfaces($entry);
-
-        $lc = 'responsecode';
-        $ctx->classes[$lc] = $entry;
-        $ctx->enums[$lc] = true;
-    }
-
-    /**
      * Historical ArrayPadType registration (#17240, #14993) — never enabled under php-src-strict (#24002).
      *
      * php-src has no ArrayPadType; {@see CompilerVersion::supportsArrayPadTypeEnum()} is always false.
@@ -384,33 +328,6 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'parseurl';
-        $ctx->classes[$lc] = $entry;
-        $ctx->enums[$lc] = true;
-    }
-
-    /**
-     * PHP 8.4 RequestMethod: string-backed enum for HTTP method introspection (#7230).
-     *
-     * php-src: ext/standard/basic_functions.stub.php — enum RequestMethod: string
-     */
-    private static function registerRequestMethod(Context $ctx): void
-    {
-        if (isset($ctx->classes['requestmethod'])) {
-            return;
-        }
-
-        $entry = new ClassEntry('RequestMethod');
-        $entry->isEnum = true;
-        $entry->backedType = 'string';
-
-        foreach (RequestMethodEnumData::cases() as $name => $value) {
-            self::registerStringBackedEnumCase($entry, $name, $value);
-        }
-
-        EnumSupport::ensureBuiltinCasesMethod($entry);
-        EnumSupport::ensureBuiltinEnumInterfaces($entry);
-
-        $lc = 'requestmethod';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
