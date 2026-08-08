@@ -224,12 +224,10 @@ final class JitDomImportNode
             return $context->builder->zExt($v, $i64);
         }
         $valPtr = JitValueBox::valuePtrFromVariable($context, $arg);
-        $asBool = $context->builder->call(
-            $context->lookupFunction('__value__readBool'),
-            $valPtr
-        );
+        // No __value__readBool — bool payload is int8 at value[0] (#29109 / #21892).
+        $boolByte = JitValueBox::readBoolByte($context, $valPtr);
 
-        return $context->builder->zExt($asBool, $i64);
+        return $context->builder->zExt($boolByte, $i64);
     }
 
     private static function boxObjectResult(Context $context, Value $object): Value
