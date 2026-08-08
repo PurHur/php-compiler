@@ -79,6 +79,27 @@ PHP,
         $this->assertStringNotContainsString('Undefined variable', (string) $stderr);
     }
 
+    /** Issue #29145: var ??= then dim ??= — live CV under bin/jit.php. */
+    public function testCoalesceAssignVarThenDimViaJitCli(): void
+    {
+        $script = $this->repoRoot.'/test/repro/issue_29145_coalesce_var_then_dim.php';
+        $proc = proc_open(
+            [PHP_BINARY, $this->repoRoot.'/bin/jit.php', $script],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $this->repoRoot
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, (string) $stderr);
+        $this->assertSame("array (\n  'x' => 1,\n)\narray (\n  'x' => 0,\n  'y' => 2,\n)\n", $stdout);
+    }
+
     private function assertMcjitOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();

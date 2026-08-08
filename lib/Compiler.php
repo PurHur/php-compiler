@@ -4850,11 +4850,16 @@ class Compiler {
             if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
                 continue;
             }
+            // Only the ??= tail Assign may sit between coalesce and an immediate call.
+            // Skipping general inline producers walked across later `$a["k"] ??= …` / `$a = …`
+            // and froze a pre-mutation snapshot into the call arg (#29145, re-#28954 shape).
+            if (
+                $next instanceof Op\Expr\Assign
+                && $this->isCoalesceAssignTail($next, $coalesce)
+            ) {
+                continue;
+            }
             if (!$next instanceof Op\Expr\FuncCall && !$next instanceof Op\Expr\NsFuncCall) {
-                if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
-                    continue;
-                }
-
                 return;
             }
             if (!property_exists($next, 'args') || !is_array($next->args) || [] === $next->args) {
@@ -4926,6 +4931,9 @@ class Compiler {
 
     /**
      * Stmt-level ??= immediately before FuncCall — expression value lives in a dead arg temp (#5337, #17458).
+     *
+     * "Immediately" means only the ??= tail Assign may intervene. Do not skip ArrayDimFetch /
+     * later ??= / other writes — those mutate the lvalue and the call must read the live CV (#29145).
      */
     private function coalesceAssignHasFollowingCallExpressionConsumer(
         Op\Expr\BinaryOp\Coalesce $coalesce,
@@ -4961,14 +4969,8 @@ class Compiler {
             if ($next instanceof Op\Expr\MethodCall || $next instanceof Op\Expr\StaticCall) {
                 return true;
             }
-            if ($next instanceof Op\Terminal\Echo) {
-                return false;
-            }
-            if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
-                continue;
-            }
-
-            break;
+            // Echo / dim ??= / plain assign / anything else: not an expression-value call consumer.
+            return false;
         }
 
         return false;
