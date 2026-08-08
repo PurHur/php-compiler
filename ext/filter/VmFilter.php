@@ -294,7 +294,7 @@ final class VmFilter
                 return self::validateBoolean($value, $nullOnFailure);
             }
             if (self::FILTER_VALIDATE_FLOAT === $filter) {
-                return self::validateFloat($value, $nullOnFailure, $filterOptions);
+                return self::validateFloat($value, $nullOnFailure, $filterOptions, $flags);
             }
             if (self::FILTER_VALIDATE_REGEXP === $filter) {
                 return self::validateRegexp($value, $filterOptions, $nullOnFailure);
@@ -1132,9 +1132,14 @@ final class VmFilter
     private static function validateFloat(
         Variable $value,
         bool $nullOnFailure = false,
-        ?\PHPCompiler\VM\HashTable $filterOptions = null
+        ?\PHPCompiler\VM\HashTable $filterOptions = null,
+        int $flags = 0
     ): Variable {
         $range = self::parseRangeOptions($filterOptions, true);
+        $decimal = self::parseDecimalOption($filterOptions);
+        if (null === $decimal) {
+            return self::failureResult($nullOnFailure);
+        }
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
         }
@@ -1164,12 +1169,140 @@ final class VmFilter
         if (Variable::TYPE_STRING !== $value->type) {
             return self::failureResult($nullOnFailure);
         }
-        $parsed = self::parseFloatString($value->toString());
+        $parsed = self::parseFloatString($value->toString(), $flags, $decimal);
         if (null === $parsed || !self::floatInRange($parsed, $range['min'], $range['max'])) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
         $out->float($parsed);
+
+        return $out;
+    }
+
+    /**
+     * php-src FETCH_STRING_OPTION(decimal) — must be exactly one character when set (#29007 / #29013).
+     * Returns null when invalid (caller fails validation / ValueError path deferred to failure).
+     */
+    public static function parseDecimalOption(?\PHPCompiler\VM\HashTable $filterOptions): ?string
+    {
+        if (null === $filterOptions) {
+            return '.';
+        }
+        $var = $filterOptions->find('decimal');
+        if (null === $var || $var->isUndefined() || Variable::TYPE_NULL === $var->type) {
+            return '.';
+        }
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $resolved->type) {
+            return null;
+        }
+        $d = $resolved->toString();
+        if (1 !== \strlen($d)) {
+            return null;
+        }
+
+        return $d;
+    }
+
+    /**
+     * php-src ext/filter/logical_filters.c — php_filter_float (trim + thousand/decimal parse).
+     *
+     * @param string $decimal single-byte decimal separator (default '.')
+     */
+    public static function parseFloatString(string $s, int $flags = 0, string $decimal = '.'): ?float
+    {
+        $s = trim($s);
+        if ('' === $s) {
+            return null;
+        }
+        if (1 !== \strlen($decimal)) {
+            return null;
+        }
+        $allowThousand = 0 !== ($flags & self::FILTER_FLAG_ALLOW_THOUSAND);
+        // Default thousand separators when option unset: "',." (php-src tsd_sep).
+        $thousandSeps = "',.";
+        $normalized = self::normalizeFloatFilterString($s, $decimal, $allowThousand, $thousandSeps);
+        if (null === $normalized) {
+            return null;
+        }
+        if (!preg_match('/^[+-]?((\d+(\.\d*)?)|(\.\d+))([eE][+-]?\d+)?$/', $normalized)) {
+            return null;
+        }
+        $f = (float) $normalized;
+
+        return is_finite($f) ? $f : null;
+    }
+
+    /**
+     * Rebuild a '.'-decimal numeric string per php_filter_float digit-group rules.
+     */
+    private static function normalizeFloatFilterString(
+        string $s,
+        string $decSep,
+        bool $allowThousand,
+        string $thousandSeps
+    ): ?string {
+        $len = \strlen($s);
+        $i = 0;
+        $out = '';
+        if ($i < $len && ('+' === $s[$i] || '-' === $s[$i])) {
+            $out .= $s[$i];
+            ++$i;
+        }
+        $first = true;
+        while (true) {
+            $n = 0;
+            while ($i < $len && $s[$i] >= '0' && $s[$i] <= '9') {
+                $out .= $s[$i];
+                ++$n;
+                ++$i;
+            }
+            if ($i === $len || $s[$i] === $decSep || 'e' === $s[$i] || 'E' === $s[$i]) {
+                if (!$first && 3 !== $n) {
+                    return null;
+                }
+                if ($i < $len && $s[$i] === $decSep) {
+                    $out .= '.';
+                    ++$i;
+                    while ($i < $len && $s[$i] >= '0' && $s[$i] <= '9') {
+                        $out .= $s[$i];
+                        ++$i;
+                    }
+                }
+                if ($i < $len && ('e' === $s[$i] || 'E' === $s[$i])) {
+                    $out .= $s[$i];
+                    ++$i;
+                    if ($i < $len && ('+' === $s[$i] || '-' === $s[$i])) {
+                        $out .= $s[$i];
+                        ++$i;
+                    }
+                    while ($i < $len && $s[$i] >= '0' && $s[$i] <= '9') {
+                        $out .= $s[$i];
+                        ++$i;
+                    }
+                }
+                break;
+            }
+            if ($allowThousand && false !== \strpos($thousandSeps, $s[$i])) {
+                if ($first ? ($n < 1 || $n > 3) : (3 !== $n)) {
+                    return null;
+                }
+                $first = false;
+                ++$i;
+            } else {
+                return null;
+            }
+        }
+        if ($i !== $len) {
+            return null;
+        }
+        if ('' === $out || '+' === $out || '-' === $out || '.' === $out
+            || '+.' === $out || '-.' === $out) {
+            // Must have at least one digit somewhere — preg_match below also guards.
+            if (!preg_match('/\d/', $out)) {
+                return null;
+            }
+        }
 
         return $out;
     }
@@ -1222,21 +1355,6 @@ final class VmFilter
         }
 
         return null;
-    }
-
-    /** php-src ext/filter/logical_filters.c — php_filter_float (trim + numeric parse). */
-    public static function parseFloatString(string $s): ?float
-    {
-        $s = trim($s);
-        if ('' === $s) {
-            return null;
-        }
-        if (!preg_match('/^[+-]?((\d+(\.\d*)?)|(\.\d+))([eE][+-]?\d+)?$/', $s)) {
-            return null;
-        }
-        $f = (float) $s;
-
-        return is_finite($f) ? $f : null;
     }
 
     private static function validateInt(

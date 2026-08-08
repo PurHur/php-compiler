@@ -202,7 +202,7 @@ final class filter_var extends Internal
         $context->builder->branchIf($isFloat, $floatBlock, $floatOtherBlock);
 
         $context->builder->positionAtEnd($floatBlock);
-        $floatResult = JitFilter::validateFloat($context, $value);
+        $floatResult = JitFilter::validateFloat($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $floatResult = JitFilter::applyNullOnFailure($context, $floatResult, $nullOnFailure);
         }
@@ -388,7 +388,7 @@ final class filter_var extends Internal
 
                 return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_FLOAT:
-                $result = JitFilter::validateFloat($context, $value);
+                $result = JitFilter::validateFloat($context, $value, $flags);
                 $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
