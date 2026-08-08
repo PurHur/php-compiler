@@ -40,6 +40,11 @@ final class UnixtojdRuntimeShrinkTest extends TestCase
                 VmCalendar::unixtojd(2440588 * 0 + 86400),
                 UnixtojdJitHelper::unixtojdArgv(86400)
             );
+            $this->assertFalse(VmCalendar::unixtojd(\PHP_INT_MAX));
+            $this->assertSame(
+                UnixtojdJitHelper::FALSE_SENTINEL,
+                UnixtojdJitHelper::unixtojdArgv(\PHP_INT_MAX)
+            );
         } finally {
             date_default_timezone_set($prev);
         }

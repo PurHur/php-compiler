@@ -230,6 +230,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src calendar.stub.php — InternalArgInfo return int (missing |false) (#28780). */
+    public function testUnixtojdReturnTypeIncludesFalse(): void
+    {
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('unixtojd'));
+    }
+
     /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
     public function testCeilFloorReflectionStubTypes(): void
     {

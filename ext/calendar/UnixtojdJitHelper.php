@@ -18,12 +18,22 @@ final class UnixtojdJitHelper
 
     private const SECS_PER_DAY = 86400;
 
+    /** NestedJIT ABI sentinel for false (JD for Unix timestamps is never negative). */
+    public const FALSE_SENTINEL = -1;
+
+    /**
+     * @return int Julian day, or {@see FALSE_SENTINEL} when php-src would RETURN_FALSE (#28780)
+     */
     public static function unixtojdArgv(int $timestamp): int
     {
         if ($timestamp < 0) {
             throw new \ValueError(
                 'unixtojd(): Argument #1 ($timestamp) must be greater than or equal to 0'
             );
+        }
+        // php-src cal_unix.c — php_localtime_r failure → RETURN_FALSE (#28780).
+        if ($timestamp > VmCalendar::UNIXTOJD_MAX_LOCALTIME_TS) {
+            return self::FALSE_SENTINEL;
         }
 
         return intdiv($timestamp, self::SECS_PER_DAY) + self::UNIX_EPOCH_JD;
