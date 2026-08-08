@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * LibcExtern drops dead FS/string/process decls after helper migrations (#28850).
+ * LibcExtern drops dead FS/string/process decls after helper migrations (#28850, #29050).
  *
  * Peer of {@see LibcExternMathRuntimeShrinkTest} (#28808).
  */
@@ -19,6 +19,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         return [
             'calloc',
             'strspn',
+            'strcspn',
             'strpbrk',
             'strncpy',
             'utime',
@@ -45,16 +46,17 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
+        $this->assertStringContainsString('#29050', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
-        foreach (['rename', 'chdir', 'chmod', 'strcspn', 'syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
+        foreach (['rename', 'chdir', 'chmod', 'syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
             $this->assertStringContainsString(
                 "'{$sym}' =>",
                 $source,
