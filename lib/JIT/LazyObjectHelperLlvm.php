@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\VM\VmLazyObject;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -175,8 +177,13 @@ final class LazyObjectHelperLlvm
             self::emitDetachLazyFlags($context, $obj);
             $thisVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
             $thisVar->addref();
-            $proxy->call($context, $thisVar);
-            $context->builder->branch($done);
+            $ghostResult = $proxy->call($context, $thisVar);
+            // Zend/zend_lazy_objects.c — Z_TYPE(retval) != IS_NULL → TypeError (#29169).
+            self::emitGhostInitializerMustReturnNullCheck($context, $ghostResult, $idx);
+            $ghostOkInsert = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null !== $ghostOkInsert && null === $ghostOkInsert->getTerminator()) {
+                $context->builder->branch($done);
+            }
 
             $context->builder->positionAtEnd($proxyBlock);
             self::emitDetachLazyFlags($context, $obj);
@@ -271,6 +278,64 @@ final class LazyObjectHelperLlvm
         ErrorRaise::ensureLinked($context);
         ErrorRaise::ensureStandaloneBodies($context);
         ErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    /**
+     * Ghost initializer return must be NULL/void — TypeError otherwise (#29169).
+     *
+     * @see Zend/zend_lazy_objects.c "Lazy object initializer must return NULL or no value"
+     */
+    private static function emitGhostInitializerMustReturnNullCheck(
+        Context $context,
+        Value $result,
+        int $idx
+    ): void {
+        $valuePtr = JitValueBox::coerceToValuePtrForStore($context, $result);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_NULL, false)
+        );
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_UNDEFINED, false)
+        );
+        $ok = $context->builder->or($isNull, $isUndef);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $okBlock = $fn->appendBasicBlock('lazy_ghost_ret_null_ok_'.$idx);
+        $badBlock = $fn->appendBasicBlock('lazy_ghost_ret_null_bad_'.$idx);
+        $context->builder->branchIf($ok, $okBlock, $badBlock);
+        $context->builder->positionAtEnd($badBlock);
+        self::emitGhostInitializerMustReturnNullTypeError($context);
+        $badInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null !== $badInsert && null === $badInsert->getTerminator()) {
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    /**
+     * Catchable TypeError inside try; pending + abort when uncaught (#29169).
+     */
+    private static function emitGhostInitializerMustReturnNullTypeError(Context $context): void
+    {
+        $message = 'Lazy object initializer must return NULL or no value';
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message, null);
+
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::ensureStandaloneBodies($context);
+        TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
     }
 }

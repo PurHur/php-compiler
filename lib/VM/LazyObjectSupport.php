@@ -283,11 +283,10 @@ final class LazyObjectSupport
                 $ctx->lazyGhostInitializing = $prev;
             }
             $result = $result->resolveIndirect();
+            // Zend/zend_lazy_objects.c — ghost initializer must return IS_NULL / void (#29169).
+            // Object returns are TypeError (not ignored); UNDEF is treated as void like VM call returns.
             if (!$result->isUndefined() && Variable::TYPE_NULL !== $result->type) {
-                // php-src ignores object returns from ghost initializers (#12309, zend_lazy_objects.c).
-                if (Variable::TYPE_OBJECT !== $result->type) {
-                    throw new \LogicException('Lazy object initializer must return NULL or no value');
-                }
+                throw new \TypeError('Lazy object initializer must return NULL or no value');
             }
             $object->constructed = true;
             $object->lazyPending = false;
