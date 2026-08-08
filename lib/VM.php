@@ -5035,6 +5035,9 @@ restart:
                             );
                         }
                         $container->array(new HashTable());
+                        // Zend defines the CV on FETCH_DIM_W — mark script globals / locals so a
+                        // later bare read does not emit Undefined variable (#29146, re-#21992).
+                        $this->markScopeSlotInitialized($frame, (int) $op->arg2);
                     }
                     $isGlobals = Variable::TYPE_ARRAY === $container->type
                         && $this->context->isGlobalsTable($container);

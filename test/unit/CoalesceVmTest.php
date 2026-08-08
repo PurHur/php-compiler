@@ -108,6 +108,41 @@ try {
         );
     }
 
+    /**
+     * Issue #29146: FETCH_DIM_W on undefined script CV must mark the global assigned so a later
+     * bare read (var_export($a)) does not emit Undefined variable (Zend/zend_execute.c).
+     */
+    public function testNullCoalesceAssignDimUndefVarQuietOnBareRead(): void
+    {
+        $code = file_get_contents(__DIR__ . '/../repro/issue_29146_coalesce_dim_undef_var_quiet.php');
+        $this->assertNotFalse($code);
+        $this->assertVmOutput(
+            $code,
+            "array (\n  'x' => 1,\n)\narray (\n  'k' => 'y',\n)\n"
+        );
+
+        $repoRoot = dirname(__DIR__, 2);
+        $cmd = [
+            PHP_BINARY,
+            '-d', 'display_errors=1',
+            '-d', 'error_reporting=E_ALL',
+            $repoRoot.'/bin/vm.php',
+            $repoRoot.'/test/repro/issue_29146_coalesce_dim_undef_var_quiet.php',
+        ];
+        $descriptors = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($cmd, $descriptors, $pipes, $repoRoot);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, $stderr);
+        $this->assertSame("array (\n  'x' => 1,\n)\narray (\n  'k' => 'y',\n)\n", $stdout);
+        $this->assertStringNotContainsString('Undefined variable', (string) $stderr);
+    }
+
     /** Issue #28954: nested dim ??= auto-vivifies intermediates without Undefined array key. */
     public function testNullCoalesceAssignNestedDimAutovivify(): void
     {

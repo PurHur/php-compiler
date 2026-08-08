@@ -57,6 +57,28 @@ PHP,
         );
     }
 
+    /** Issue #29146: dim ??= on undefined CV — bare read stays quiet under bin/jit.php. */
+    public function testCoalesceAssignDimUndefVarQuietViaJitCli(): void
+    {
+        $script = $this->repoRoot.'/test/repro/issue_29146_coalesce_dim_undef_var_quiet.php';
+        $proc = proc_open(
+            [PHP_BINARY, $this->repoRoot.'/bin/jit.php', $script],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $this->repoRoot
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, (string) $stderr);
+        $this->assertSame("array (\n  'x' => 1,\n)\narray (\n  'k' => 'y',\n)\n", $stdout);
+        $this->assertStringNotContainsString('Undefined variable', (string) $stderr);
+    }
+
     private function assertMcjitOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
