@@ -8657,7 +8657,8 @@ restart:
                     if (SplArrayStorage::hasArrayAsProps($propertyObject)) {
                         $key = new Variable(Variable::TYPE_STRING);
                         $key->string($name);
-                        $result->copyFrom(SplArrayStorage::offsetGet($propertyObject, $key));
+                        // php-src spl_array_read_property — Undefined array key (not property) (#28820).
+                        $result->copyFrom(SplArrayStorage::offsetGet($propertyObject, $key, $frame));
                         break;
                     }
                     // Undefined property on a non-null object: warn for both -> and ?-> (#23705).
