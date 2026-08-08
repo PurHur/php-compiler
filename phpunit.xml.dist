@@ -81,6 +81,7 @@
             <file>./test/compliance/FiberStackOverflowProfileJITTest.php</file>
             <file>./test/compliance/FiberGetCurrentReflectionVMTest.php</file>
             <file>./test/compliance/FiberGetReturnReflectionVMTest.php</file>
+            <file>./test/compliance/EngineErrorThrowSiteVMTest.php</file>
             <file>./test/compliance/DatePeriodCreateFromISO8601StringReflectionVMTest.php</file>
             <file>./test/compliance/LocaltimeReflectionVMTest.php</file>
             <file>./test/compliance/FuncGetArgReflectionMixedVMTest.php</file>

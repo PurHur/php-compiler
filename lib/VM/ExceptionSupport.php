@@ -558,7 +558,7 @@ final class ExceptionSupport
         bool $displayErrors = false,
         ?Variable $traceOverride = null,
     ): void {
-        $class = $native::class;
+        $class = self::uncaughtDisplayClass($native, $vmEntry);
         $message = $native->getMessage();
         $file = $native->getFile();
         $line = $native->getLine();
@@ -617,7 +617,7 @@ final class ExceptionSupport
         ?ObjectEntry $vmEntry = null,
         bool $displayErrors = false,
     ): void {
-        $class = $native::class;
+        $class = self::uncaughtDisplayClass($native, $vmEntry);
         $message = $native->getMessage();
         $file = $native->getFile();
         $line = $native->getLine();
@@ -651,6 +651,18 @@ final class ExceptionSupport
                 echo $thrownIn;
             }
         }
+    }
+
+    /**
+     * Zend uncaught class name — prefer VM entry (FiberError cannot be instantiated natively; #28832).
+     */
+    private static function uncaughtDisplayClass(\Throwable $native, ?ObjectEntry $vmEntry): string
+    {
+        if (null !== $vmEntry && '' !== $vmEntry->class->name) {
+            return $vmEntry->class->name;
+        }
+
+        return $native::class;
     }
 
     private static function formatUncaughtStackTrace(
@@ -849,8 +861,8 @@ final class ExceptionSupport
             }
         } elseif (self::CLASS_FIBER_ERROR === $lc) {
             // FiberError is reserved for internal use in Zend; cannot be instantiated from userland PHP.
-            // Map uncaught VM FiberError to a native Error for the test runner / CLI.
-            $native = new \Error('FiberError: '.$message);
+            // Map to native Error for bubble/test-runner paths; uncaught CLI uses VM class name (#28832).
+            $native = new \Error($message);
         } elseif (self::CLASS_FIBER_STACK_OVERFLOW === $lc) {
             if (\class_exists('FiberStackOverflow', false)) {
                 $native = new \FiberStackOverflow($message);

@@ -11871,7 +11871,13 @@ restart:
      */
     private function dispatchVmArgumentCountError(\ArgumentCountError $error, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeArgumentCountError($this->context, $error->getMessage());
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeArgumentCountError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
@@ -11897,7 +11903,13 @@ restart:
      */
     private function dispatchVmArithmeticError(\ArithmeticError $error, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeArithmeticError($this->context, $error->getMessage());
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeArithmeticError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
@@ -12357,7 +12369,13 @@ restart:
      */
     private function dispatchVmFiberError(VM\NativeFiberError $error, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeFiberError($this->context, $error->getMessage());
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeFiberError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
