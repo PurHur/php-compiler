@@ -37,6 +37,12 @@ final class cal_info extends Internal
             return;
         }
         $cal = CalendarArgs::requireInt($frame, 'cal_info', 1, 'calendar');
+        // php-src calendar.c — calendar == -1 returns all calendars (#28907)
+        if (-1 === $cal) {
+            $frame->returnVar->array(VmCalendar::calInfoAll());
+
+            return;
+        }
         CalendarArgs::assertValidCalendarId($cal, 'cal_info');
         $frame->returnVar->array(VmCalendar::calInfo($cal));
     }

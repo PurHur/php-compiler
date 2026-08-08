@@ -2982,6 +2982,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+    /** @covers issue #28907 — php-src calendar.stub.php calendar = -1 */
+    public function testCalInfoReflectionDefaultMinusOne(): void
+    {
+        $info = ['name' => 'calendar', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('cal_info', 0, $info, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'cal_info', 0, $info));
+        self::assertSame(Variable::TYPE_INTEGER, $dest->type);
+        self::assertSame(-1, $dest->toInt());
+    }
+
     /** @covers issue #25171 */
     public function testStrtokReflectionNullTokenDefaultNamedParams(): void
     {
