@@ -44,11 +44,18 @@ final class FilterEmailValidate
         }
         $local = \substr($s, 0, $at);
         $domain = \substr($s, $at + 1);
-        if ('' === $local || '' === $domain || !\str_contains($domain, '.')) {
+        if ('' === $local || '' === $domain) {
             return 0;
         }
         $unicode = 0 !== ($flags & self::FLAG_EMAIL_UNICODE);
-        if (!self::isLocalPart($local, $unicode) || !self::isDomainPart($domain)) {
+        if (!self::isLocalPart($local, $unicode)) {
+            return 0;
+        }
+        // php-src domain arm: DNS labels OR bracketed IPv4 / IPv6: literal (#29045).
+        if (self::isDomainLiteral($domain)) {
+            return 1;
+        }
+        if (!\str_contains($domain, '.') || !self::isDomainPart($domain)) {
             return 0;
         }
 
@@ -79,6 +86,32 @@ final class FilterEmailValidate
         }
 
         return true;
+    }
+
+    /**
+     * php-src email regex domain-literal arm: `[IPv4]` or `[IPv6:addr]` (`/i` → tag caseless).
+     * Bare `[::1]` is rejected — the `IPv6:` tag is required (#29045).
+     */
+    private static function isDomainLiteral(string $domain): bool
+    {
+        $len = \strlen($domain);
+        if ($len < 3 || '[' !== $domain[0] || ']' !== $domain[$len - 1]) {
+            return false;
+        }
+        $inner = \substr($domain, 1, $len - 2);
+        if ('' === $inner) {
+            return false;
+        }
+        // FILTER_FLAG_IPV4 / FILTER_FLAG_IPV6 — SSOT in FilterIpValidate (NestedJIT-safe).
+        $flagIpv4 = 0x00100000;
+        $flagIpv6 = 0x00200000;
+        if (\strlen($inner) >= 5 && 'ipv6:' === \strtolower(\substr($inner, 0, 5))) {
+            $addr = \substr($inner, 5);
+
+            return 1 === FilterIpValidate::isValidInt($addr, $flagIpv6);
+        }
+
+        return 1 === FilterIpValidate::isValidInt($inner, $flagIpv4);
     }
 
     /**
