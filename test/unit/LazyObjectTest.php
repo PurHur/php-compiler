@@ -429,6 +429,40 @@ PHP;
         );
     }
 
+    /** @covers issue #29170 */
+    public function testNewLazyProxyFactoryReturningNullThrowsTypeError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+}
+$r = new ReflectionClass(C::class);
+$proxy = $r->newLazyProxy(function ($obj) {
+    return null;
+});
+try {
+    echo $proxy->x;
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage();
+}
+echo "\n";
+$ok = $r->newLazyProxy(function (): C {
+    $o = new C();
+    $o->x = 9;
+    return $o;
+});
+echo $ok->x, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_proxy_factory_ret_null.php'));
+        $this->assertSame(
+            "TypeError:Lazy proxy factory must return an instance of a class compatible with C, null returned\n9\n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #29169 */
     public function testCreateLazyGhostObjectReturnThrowsTypeError(): void
     {

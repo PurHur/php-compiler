@@ -190,9 +190,37 @@ final class LazyObjectHelperLlvm
             $proxyThis = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
             $proxyThis->addref();
             $result = $proxy->call($context, $proxyThis);
+            $resultPtr = JitValueBox::coerceToValuePtrForStore($context, $result);
+            // Zend/zend_lazy_objects.c — non-object factory return → TypeError (#29170).
+            $valueMap = $context->structFieldMap['__value__'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($resultPtr, $valueMap['type'])
+            );
+            $typeKind = $context->builder->and(
+                $typeByte,
+                $i8->constInt(0x7f, false)
+            );
+            $isObjectRet = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeKind,
+                $i8->constInt(VmVariable::TYPE_OBJECT, false)
+            );
+            $objectRetOk = $fn->appendBasicBlock('lazy_proxy_object_ret_'.$idx);
+            $objectRetBad = $fn->appendBasicBlock('lazy_proxy_nonobject_ret_'.$idx);
+            $context->builder->branchIf($isObjectRet, $objectRetOk, $objectRetBad);
+            $context->builder->positionAtEnd($objectRetBad);
+            self::emitProxyMustReturnCompatibleTypeError(
+                $context,
+                $context->lazyInitProxyClassNames[$idx] ?? 'object'
+            );
+            $badInsert = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null !== $badInsert && null === $badInsert->getTerminator()) {
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+            $context->builder->positionAtEnd($objectRetOk);
             $realObj = $context->builder->call(
                 $context->lookupFunction('__value__readObject'),
-                JitValueBox::coerceToValuePtrForStore($context, $result)
+                $resultPtr
             );
             // Zend/zend_lazy_objects.c — Z_OBJ(retval) == obj || zend_object_is_lazy (#29151).
             $sameAsProxy = $context->builder->icmp(Builder::INT_EQ, $realObj, $obj);
@@ -337,5 +365,22 @@ final class LazyObjectHelperLlvm
         TypeErrorRaise::ensureStandaloneBodies($context);
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    /**
+     * Catchable TypeError inside try; pending + abort when uncaught (#29170).
+     *
+     * @see Zend/zend_lazy_objects.c "Lazy proxy factory must return an instance of a class compatible with %s, %s returned"
+     */
+    private static function emitProxyMustReturnCompatibleTypeError(Context $context, string $className): void
+    {
+        $message = 'Lazy proxy factory must return an instance of a class compatible with '
+            .$className.', null returned';
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message, null);
+
+            return;
+        }
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
     }
 }

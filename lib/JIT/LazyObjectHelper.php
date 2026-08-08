@@ -15,15 +15,30 @@ use PHPLLVM\Value;
  */
 final class LazyObjectHelper
 {
-    public static function registerInitProxy(Context $context, Call $proxy, ?Variable $closure = null): int
-    {
+    public static function registerInitProxy(
+        Context $context,
+        Call $proxy,
+        ?Variable $closure = null,
+        ?string $className = null
+    ): int {
         $index = \count($context->lazyInitProxies);
         $context->lazyInitProxies[$index] = $proxy;
         if (null !== $closure) {
             $context->lazyInitClosures[$index] = $closure;
         }
+        if (null !== $className && '' !== $className) {
+            $context->lazyInitProxyClassNames[$index] = $className;
+        }
 
         return $index;
+    }
+
+    /** Record proxy class name for Zend TypeError text when known at lower time (#29170). */
+    public static function setInitProxyClassName(Context $context, int $index, string $className): void
+    {
+        if ('' !== $className) {
+            $context->lazyInitProxyClassNames[$index] = $className;
+        }
     }
 
     public static function registerLazyObject(
