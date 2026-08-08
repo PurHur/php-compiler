@@ -539,6 +539,25 @@ final class ObjectStaticPropertyLlvm
                 $context->helper->loadValue($value)
             );
             $value->addref();
+        } elseif (Variable::TYPE_HASHTABLE === $value->type) {
+            // Boxed static ?array (e.g. UnicodeCanonical::$composeMapCache) — peer typed
+            // TYPE_HASHTABLE store above + NestedJIT i64 array temps (#20664 / #23580).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'static_prop_box_ht_store');
+            $stored = $context->helper->loadValue($value);
+            $storedTy = $context->getStringFromType($stored->typeOf());
+            if ('int64' === $storedTy || 'long long' === $storedTy) {
+                $stored = JitNestedHelperCoerce::i64ToTypedPtr(
+                    $context,
+                    $stored,
+                    $context->getTypeFromString('__hashtable__*')
+                );
+            }
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $heapPtr,
+                $stored
+            );
+            $value->addref();
         } elseif (Variable::TYPE_NATIVE_LONG === $value->type || Variable::TYPE_NATIVE_BOOL === $value->type) {
             $context->builder->call(
                 $context->lookupFunction('__value__writeLong'),
