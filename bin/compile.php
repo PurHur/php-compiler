@@ -35,6 +35,12 @@ function phpc_compile_skip_aot_bundle(string $normalized): bool
         return true;
     }
 
+    // Mini-spine for #29111: must exercise IncludeHelper inherit (not SourceBundler)
+    // so REMAP=0 Literal collision on CONST_FETCH is covered.
+    if (str_contains($normalized, 'test/selfhost/issue_29111_const_fetch_spine/')) {
+        return true;
+    }
+
     // Inventory compile_driver pulls Runtime's transitive closure through
     // LiteralIncludeDiscovery — bundling OOMs through 24GiB (#23970).
     return str_contains($normalized, 'test/selfhost/')

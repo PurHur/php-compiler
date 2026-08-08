@@ -376,7 +376,12 @@ class Block {
                 return $operand;
             }
             if ($operand instanceof Operand\Literal) {
-                $fallback = $operand;
+                // Keep the first Literal at this slot. inheritScopeFrom appends parent
+                // Literals after the callee's; overwriting would make CONST_FETCH resolve
+                // e.g. parent "defined" instead of callee "true" (#29111).
+                if (null === $fallback) {
+                    $fallback = $operand;
+                }
 
                 continue;
             }
@@ -904,6 +909,10 @@ class Block {
      *        assign fresh slots if the parent's index is already used so {@see getOperand()}
      *        cannot return a callee temp for a parent local (#22845 MiniWebApp nested
      *        $appName). CFG branch inheritance must keep shared slot indices (default).
+     *        Zend full-spine may set PHP_COMPILER_INCLUDE_SCOPE_REMAP=0 so VarOperand
+     *        indices stay shared for pace (#22642); Literal operands still remapped on
+     *        collision so CONST_FETCH cannot resolve a parent string (e.g. "defined")
+     *        instead of the callee's "true" (#29111).
      */
     public function inheritScopeFrom(Block $parent, bool $remapCollidingSlots = false): void
     {
@@ -913,8 +922,15 @@ class Block {
             }
             $parentSlot = $parent->scope[$operand];
             $slot = $parentSlot;
-            if ($remapCollidingSlots && null !== $this->operandForScopeSlot($slot)) {
-                $slot = $this->nextScopeSlot();
+            $occupant = $this->operandForScopeSlot($slot);
+            if (null !== $occupant) {
+                if ($remapCollidingSlots) {
+                    $slot = $this->nextScopeSlot();
+                } elseif ($operand instanceof Operand\Literal) {
+                    // REMAP=0 keeps VarOperand indices shared; never alias parent
+                    // Literals onto callee slots used by CONST_FETCH (#29111).
+                    $slot = $this->nextScopeSlot();
+                }
             }
             $this->scope[$operand] = $slot;
             if ($parent->args->contains($operand)) {
