@@ -192,6 +192,8 @@ final class BuiltinInternalArgInfo
             'dom_import_simplexml' => 'DOMAttr|DOMElement',
             // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#26464)
             'simplexml_import_dom' => '?SimpleXMLElement',
+            // ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo return resource; Zend XMLWriter|false (#28786)
+            'xmlwriter_open_memory', 'xmlwriter_open_uri' => 'XMLWriter|false',
             // pecl-networking-uuid uuid.stub.php — absent from InternalArgInfo (#27836)
             'uuid_generate_md5', 'uuid_generate_sha1' => 'string',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)

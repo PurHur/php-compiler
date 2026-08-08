@@ -577,6 +577,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['object'], BuiltinParamNames::paramNamesForInternalFunction('spl_object_id'));
     }
 
+    /** php-src ext/xmlwriter/php_xmlwriter.stub.php — XMLWriter|false; InternalArgInfo still resource (#28786). */
+    public function testXmlWriterOpenReflectionReturnUnion(): void
+    {
+        $this->assertSame('XMLWriter|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('xmlwriter_open_memory'));
+        $this->assertSame('XMLWriter|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('xmlwriter_open_uri'));
+    }
+
     /** php-src ext/curl/curl.stub.php — CurlHandle stubs; InternalArgInfo still resource/ch (#26186). */
     public function testCurlEasyReflectionStubTypes(): void
     {
