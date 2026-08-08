@@ -23,9 +23,8 @@ final class interface_exists_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1 || \count($frame->calledArgs) > 2) {
-            throw new \LogicException('interface_exists() requires one or two arguments in this compiler build');
-        }
+        // php-src Zend/zend_builtin_functions.stub.php — ArgumentCountError (#28475).
+        $this->requireArgCountRange($frame, 'interface_exists', 1, 2);
         $ctx = VmReflection::requireContext($frame);
         // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, zend_builtin_functions.c).
         $name = VmString::trimFamilyStringArgForFrame($frame, 0, 'interface_exists', 0, 'interface');
@@ -38,8 +37,9 @@ final class interface_exists_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('interface_exists() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #28475.
+        if (!$this->requireArgCountRangeJit($context, $args, 'interface_exists', 1, 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
