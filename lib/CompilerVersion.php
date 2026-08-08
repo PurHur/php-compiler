@@ -2922,6 +2922,32 @@ final class CompilerVersion
     }
 
     /**
+     * SplFixedArray OOB throws OutOfBoundsException (php-src 8.4+ ext/spl/spl_fixedarray.c; #28819).
+     *
+     * Pre-8.4 Zend (and this compiler's 8.4.0-dev reference / unset PROFILE) keep RuntimeException.
+     * Enable via stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4} / {@code 8.5}.
+     * Same withhold shape as {@see supportsPhp84ArraySearchFunctions()} — do not use
+     * {@see isForwardProfileAtLeast()}.
+     */
+    public static function supportsSplFixedArrayOutOfBoundsException(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4 final StreamBucket class (ext/standard/user_filters.stub.php; #26923).
      *
      * On ≤8.3 Zend, stream_bucket_new() returns stdClass and class_exists('StreamBucket')

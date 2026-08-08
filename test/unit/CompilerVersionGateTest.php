@@ -2334,6 +2334,67 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    /** SplFixedArray OOB stays RuntimeException on 8.4.0-dev reference (#28819). */
+    public function testSupportsSplFixedArrayOutOfBoundsExceptionFalseOnDefaultProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsSplFixedArrayOutOfBoundsException());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsSplFixedArrayOutOfBoundsExceptionFalseWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsSplFixedArrayOutOfBoundsException());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsSplFixedArrayOutOfBoundsExceptionTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSplFixedArrayOutOfBoundsException());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsSplFixedArrayOutOfBoundsExceptionTrueWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSplFixedArrayOutOfBoundsException());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsGetDeclaredExcludeDeprecatedFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsGetDeclaredExcludeDeprecated());

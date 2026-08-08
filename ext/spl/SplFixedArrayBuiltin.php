@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmArray;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmMath;
@@ -192,7 +193,7 @@ final class SplFixedArrayBuiltin
     {
         $index = self::coerceOffset($offset);
         if (!self::indexInRange($object, $index)) {
-            throw new \RuntimeException(self::RANGE_ERROR);
+            self::throwRangeError();
         }
         $result = new Variable();
         if (isset(self::state($object)['slots'][$index])) {
@@ -208,7 +209,7 @@ final class SplFixedArrayBuiltin
     {
         $index = self::coerceOffset($offset);
         if (!self::indexInRange($object, $index)) {
-            throw new \RuntimeException(self::RANGE_ERROR);
+            self::throwRangeError();
         }
         $copy = new Variable();
         $copy->copyFrom($value->resolveIndirect());
@@ -219,9 +220,21 @@ final class SplFixedArrayBuiltin
     {
         $index = self::coerceOffset($offset);
         if (!self::indexInRange($object, $index)) {
-            throw new \RuntimeException(self::RANGE_ERROR);
+            self::throwRangeError();
         }
         unset(self::$store[$object->id]['slots'][$index]);
+    }
+
+    /**
+     * php-src 8.4+ throws OutOfBoundsException; older lines keep RuntimeException (#28819).
+     */
+    private static function throwRangeError(): void
+    {
+        if (CompilerVersion::supportsSplFixedArrayOutOfBoundsException()) {
+            throw new \OutOfBoundsException(self::RANGE_ERROR);
+        }
+
+        throw new \RuntimeException(self::RANGE_ERROR);
     }
 
     /**
