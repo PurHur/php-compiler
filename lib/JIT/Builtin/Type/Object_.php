@@ -6097,7 +6097,7 @@ class Object_ extends Type {
         if ('self' === $name) {
             $declaringClass = $this->context->scope->className;
             if ('' === $declaringClass) {
-                PseudoClassScope::fatalInGlobalScope('self');
+                PseudoClassScope::fatalNoActiveClassScope('self');
             }
             $scopeLc = strtolower(ltrim($declaringClass, '\\'));
             if ($this->isTraitClass($scopeLc)) {
@@ -6122,11 +6122,11 @@ class Object_ extends Type {
             if ('' !== $this->context->scope->className) {
                 return $this->lookup($this->context->scope->className);
             }
-            PseudoClassScope::fatalInGlobalScope('static');
+            PseudoClassScope::fatalNoActiveClassScope('static');
         }
         if ('parent' === $name) {
             if ('' === $this->context->scope->className) {
-                PseudoClassScope::fatalInGlobalScope('parent');
+                PseudoClassScope::fatalNoActiveClassScope('parent');
             }
             $declaringClass = $this->context->scope->className;
             if (null !== $block?->func?->class) {

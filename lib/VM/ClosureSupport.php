@@ -1101,7 +1101,7 @@ final class ClosureSupport
         $lcClass = strtolower($className);
         if ('self' === $lcClass) {
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                PseudoClassScope::fatalInGlobalScope('self');
+                PseudoClassScope::fatalNoActiveClassScope('self');
             }
             $funcClassValue = $frame->block->func->class->value;
             $declaring = strtolower($funcClassValue);
@@ -1133,7 +1133,7 @@ final class ClosureSupport
         }
         if ('parent' === $lcClass) {
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                PseudoClassScope::fatalInGlobalScope('parent');
+                PseudoClassScope::fatalNoActiveClassScope('parent');
             }
             $funcClassValue = $frame->block->func->class->value;
             $declaring = strtolower($funcClassValue);
@@ -1151,7 +1151,7 @@ final class ClosureSupport
                 );
             }
             if (!isset($ctx->classes[$declaring])) {
-                PseudoClassScope::fatalInGlobalScope('parent');
+                PseudoClassScope::fatalNoActiveClassScope('parent');
             }
             $parentLc = $ctx->classes[$declaring]->parentLc;
             if (null === $parentLc) {
