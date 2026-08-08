@@ -23,6 +23,12 @@ final class VmCalendar
     private const UNIX_EPOCH_JD = 2440588;
     private const SECS_PER_DAY = 86400;
 
+    /**
+     * Last Unix timestamp where glibc {@see localtime_r} succeeds (tm_year fits in C int):
+     * 2147485547-12-31 23:59:59 UTC. php-src cal_unix.c returns false when localtime_r fails (#28780).
+     */
+    public const UNIXTOJD_MAX_LOCALTIME_TS = 67768036191676799;
+
     public static function calDaysInMonth(int $calendar, int $month, int $year): int
     {
         $sdnStart = self::calendarToSdn($calendar, $year, $month, 1);
@@ -86,7 +92,10 @@ final class VmCalendar
         };
     }
 
-    public static function unixtojd(?int $timestamp = null): int
+    /**
+     * @return int|false
+     */
+    public static function unixtojd(?int $timestamp = null): int|false
     {
         if (null === $timestamp) {
             $timestamp = VmDate::time();
@@ -94,6 +103,10 @@ final class VmCalendar
             throw new \ValueError(
                 'unixtojd(): Argument #1 ($timestamp) must be greater than or equal to 0'
             );
+        }
+        // php-src cal_unix.c — php_localtime_r failure → RETURN_FALSE (#28780).
+        if ($timestamp > self::UNIXTOJD_MAX_LOCALTIME_TS) {
+            return false;
         }
         $parts = VmDate::getdate($timestamp);
 

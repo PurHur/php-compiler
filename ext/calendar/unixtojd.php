@@ -30,7 +30,12 @@ final class unixtojd extends Internal
             return;
         }
         $timestamp = CalendarArgs::optionalInt($frame, 'unixtojd', 1, 'timestamp');
-        $frame->returnVar->int(VmCalendar::unixtojd($timestamp));
+        $jd = VmCalendar::unixtojd($timestamp);
+        if (false === $jd) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->int($jd);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

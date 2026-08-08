@@ -6,12 +6,16 @@ namespace PHPCompiler\ext\calendar;
 
 use PHPCompiler\ext\standard\JitChr;
 use PHPCompiler\ext\standard\JitDate;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\Builtin\UnixtojdRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for unixtojd() via UnixtojdRuntime (#27367). */
+/** LLVM lowering for unixtojd() via UnixtojdRuntime (#27367, #28780). */
 final class JitUnixtojd
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -27,7 +31,7 @@ final class JitUnixtojd
         if (0 === $argc || self::isCompileTimeNull($args[0])) {
             $ts = JitDate::time($context);
 
-            return UnixtojdRuntime::invoke($context, $ts);
+            return self::boxRuntimeJd($context, UnixtojdRuntime::invoke($context, $ts));
         }
 
         $folded = self::tryFoldCompileTime($context, $args[0]);
@@ -37,7 +41,7 @@ final class JitUnixtojd
 
         $timestamp = JitChr::lowerZParamLongArg($context, $args[0], 'unixtojd', 1, 'timestamp');
 
-        return UnixtojdRuntime::invoke($context, $timestamp);
+        return self::boxRuntimeJd($context, UnixtojdRuntime::invoke($context, $timestamp));
     }
 
     private static function tryFoldCompileTime(Context $context, JITVariable $arg): ?Value
@@ -54,7 +58,41 @@ final class JitUnixtojd
             return null;
         }
 
-        return $context->constantFromInteger($result, 'int64');
+        if (UnixtojdJitHelper::FALSE_SENTINEL === $result) {
+            return StringStrpos::boxIntOrFalse($context, false);
+        }
+
+        return StringStrpos::boxIntOrFalse($context, $result);
+    }
+
+    /** Box NestedJIT i64 JD / {@see UnixtojdJitHelper::FALSE_SENTINEL} as `__value__*` int|false. */
+    private static function boxRuntimeJd(Context $context, Value $jd): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'unixtojd_box');
+        $i64 = $context->getTypeFromString('int64');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $isFalse = $context->builder->icmp(
+            Builder::INT_EQ,
+            $jd,
+            $i64->constInt(UnixtojdJitHelper::FALSE_SENTINEL, true)
+        );
+        $falseBb = BasicBlockHelper::append($context, 'unixtojd_box_false');
+        $intBb = BasicBlockHelper::append($context, 'unixtojd_box_int');
+        $doneBb = BasicBlockHelper::append($context, 'unixtojd_box_done');
+        $context->builder->branchIf($isFalse, $falseBb, $intBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($intBb);
+        JitValueBox::writeLong($context, $slot, $jd);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $ptr;
     }
 
     private static function compileTimeLongArg(JITVariable $arg): ?int
