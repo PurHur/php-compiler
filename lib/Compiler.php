@@ -33373,6 +33373,29 @@ class Compiler {
         if ($this->inlineCallArgProducerFeedsConsumer($producer, $consumer)) {
             return false;
         }
+        // in_array(id('x'), ['x'], true) — dead-temp nested FuncCall + Array_/ConstFetch prelude
+        // must EXEC_RETURN; do not treat as stmt-level void (#28891, re-#16013).
+        if (
+            $producer instanceof Op\Expr
+            && (
+                $this->isNestedCallArgProducerForConsumer(
+                    $producer,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+                || $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $producer,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+            )
+        ) {
+            return false;
+        }
         $hasArrayPrelude = false;
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
@@ -35900,6 +35923,9 @@ class Compiler {
                     }
                 }
             }
+            // id(['b']) inside array_merge(['a'], id(['b'])) — preceding producers include the
+            // outer call's Array_; sole array arg binds to the nearest producer (#28891).
+            return $outer;
         }
 
         return $arrayProducers[$position];
