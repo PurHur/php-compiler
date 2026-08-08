@@ -106,6 +106,8 @@ final class BuiltinInternalArgInfo
             'timezone_name_from_abbr' => 'string|false',
             // ext/date/php_date.stub.php — InternalArgInfo return string (missing |false) (#27981)
             'strftime', 'gmstrftime' => 'string|false',
+            // ext/date/php_date.stub.php — InternalArgInfo return DateTimeZone (missing |false) (#27901)
+            'timezone_open' => 'DateTimeZone|false',
             // ext/standard/string.stub.php — InternalArgInfo omits |false (#25442)
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             'strstr', 'stristr' => 'string|false',
