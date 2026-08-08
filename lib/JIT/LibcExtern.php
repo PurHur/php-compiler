@@ -64,7 +64,8 @@ final class LibcExtern
             'chmod' => [$i32, false, [$i8p, $i32]],
             'mkstemp' => [$i32, false, [$i8p]],
             'mkdir' => [$i32, false, [$i8p, $i32]],
-            'rename' => [$i32, false, [$i8p, $i8p]],
+            // rename dropped (#29090): StringRename NestedJIT leaf declares rename(2)
+            // module-locally; RenameJitHelper SSOT is VmFs::rename (Unlink #19186 shape).
             'chdir' => [$i32, false, [$i8p]],
             'getenv' => [$i8p, false, [$i8p]],
             'putenv' => [$i32, false, [$i8p]],

@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * @internal libc getenv(3) kernel for GetenvJitHelper (#20644).
  *
  * Avoids VmEnvEnvironNative /proc walk when the helper TU is NestedJIT'd into
- * user-script AOT (same shape as {@see phpc_rename_kernel}).
+ * user-script AOT (NestedJIT FS leaf peer {@see \PHPCompiler\JIT\Builtin\StringRename}).
  */
 final class phpc_getenv_kernel extends Internal
 {

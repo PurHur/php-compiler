@@ -13,7 +13,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM lowering for {@see phpc_readfile_kernel} — thin libc open/read/write (#19966).
  *
  * Used inside {@see ReadfileJitHelper} so nested helper TUs do not recurse through
- * readfile()/fopen() under user-script AOT (#16075; same shape as {@see JitRenameKernel}).
+ * readfile()/fopen() under user-script AOT (#16075; NestedJIT FS leaf peer {@see \PHPCompiler\JIT\Builtin\StringRename}).
  * php-src: ext/standard/streamsfuncs.c — php_stream_passthru
  */
 final class JitReadfileLibc

@@ -6,13 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringRename;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * @internal libc rename(2) kernel for VmFsPathPure / RenameJitHelper (#19215).
+ * @internal NestedJIT rename(2) leaf for RenameJitHelper (#19215, #29090).
+ *
+ * Resolvable under NestedJIT before Context::registerModule (whitelist).
+ * LLVM body: {@see StringRename::invokeNestedLeaf} — module-local rename(2) decl.
  */
 final class phpc_rename_kernel extends Internal
 {
@@ -43,6 +47,6 @@ final class phpc_rename_kernel extends Internal
         $from = JitStringBuiltinArg::lowerPath($context, $args[0], 'phpc_rename_kernel', 0, 'from');
         $to = JitStringBuiltinArg::lowerPath($context, $args[1], 'phpc_rename_kernel', 1, 'to');
 
-        return JitRenameKernel::invoke($context, $from, $to);
+        return StringRename::invokeNestedLeaf($context, $from, $to);
     }
 }

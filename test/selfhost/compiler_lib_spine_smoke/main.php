@@ -2843,7 +2843,6 @@ require_once __DIR__.'/../../../ext/standard/JitRealpath.php';
 require_once __DIR__.'/../../../ext/standard/JitRealpathCache.php';
 require_once __DIR__.'/../../../ext/standard/JitRegisterShutdown.php';
 require_once __DIR__.'/../../../ext/standard/JitRename.php';
-require_once __DIR__.'/../../../ext/standard/JitRenameKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitRequestBody.php';
 require_once __DIR__.'/../../../ext/standard/JitRequestParseBodyKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitResolveIncludePath.php';

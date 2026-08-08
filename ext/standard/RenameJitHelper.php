@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * rename() for compiled JIT/AOT modules (#15533, php-in-PHP).
+ * rename() for compiled JIT/AOT modules (#15533, #29090, php-in-PHP).
  *
- * Kernel path: {@see phpc_rename_kernel}; VM SSOT remains VmFs rename.
+ * NestedJIT leaf: {@see phpc_rename_kernel} → {@see \PHPCompiler\JIT\Builtin\StringRename}
+ * module-local rename(2) (LibcExtern rename row removed). Full {@see VmFs::rename()} /
+ * {@code @rename} under NestedJIT is not yet a drop-in — Context only resolves whitelisted
+ * kernels before registerModule (#15417); plain rename stays an ExternalMethod stub.
  * Returns int 0/1 (not bool) so NestedJIT return lowering uses __value__readLong
  * (bool boxes have no readLong arm and always yield 0; see #20603 / HashEquals i32 ABI).
- * Null-byte checks must not use a PHP NUL-needle string search under NestedJIT
- * (it constant-folds the true branch and skips phpc_rename_kernel).
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class RenameJitHelper
