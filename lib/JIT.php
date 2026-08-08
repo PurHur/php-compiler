@@ -8542,6 +8542,15 @@ class JIT {
                         JIT\HashTableHelper::initArray($this->context, $value);
                         $this->context->setVariableOp($block->getOperand($op->arg2), $value);
                     }
+                    if ($forWrite) {
+                        // FETCH_DIM_W defines the CV — quiet later bare reads after undef
+                        // autovivify (#29146, re-#21992; Zend/zend_execute.c).
+                        JIT\UndefinedVariableHelper::markAssigned(
+                            $this->context,
+                            $block->getOperand($op->arg2),
+                            $value
+                        );
+                    }
                     if ($forWrite && Variable::TYPE_NATIVE_BOOL === $value->type) {
                         // Runtime: false→[] + E_DEPRECATED; true→Error (zend_execute.c / #22650, #22828).
                         $boolVal = $this->context->helper->loadValue($value);
