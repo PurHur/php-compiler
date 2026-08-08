@@ -21,6 +21,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -296,45 +297,8 @@ final class array_count extends Internal
         ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             $this->name.'(): Argument #1 ($value) must be of type Countable|array, '
-            .$this->jitArgTypeLabel($arg).' given'
+            .JitOperandTypeLabel::givenLabel($context, $arg).' given'
         );
         BasicBlockHelper::ensureOpenInsertBlock($context, 'count_te_cont');
-    }
-
-    private function jitArgTypeLabel(JITVariable $arg): string
-    {
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return 'int';
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return 'float';
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return 'bool';
-            case JITVariable::TYPE_STRING:
-                return 'string';
-            case JITVariable::TYPE_OBJECT:
-                return $this->jitCompileTimeObjectLabel($arg);
-            default:
-                return 'mixed';
-        }
-    }
-
-    private function jitCompileTimeObjectLabel(JITVariable $arg): string
-    {
-        if (JITVariable::KIND_VALUE !== $arg->kind) {
-            return 'object';
-        }
-        $objMap = $this->context->structFieldMap['__object__'] ?? null;
-        if (null === $objMap || !isset($objMap['class_id'])) {
-            return 'object';
-        }
-        $classIdVal = $this->context->builder->load(
-            $this->context->builder->structGep($arg->value, $objMap['class_id'])
-        );
-        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
-            return 'object';
-        }
-
-        return $this->context->type->object->classNameForId((int) $classIdVal->getConstantValue());
     }
 }

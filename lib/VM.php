@@ -16228,7 +16228,7 @@ restart:
         }
         $this->context->errors->triggerErrorWithHandlerFirst(
             'foreach() argument must be of type array|object, '
-            .TypeCheck::typeNameForConstraint($resolved->type).' given',
+            .VM\EnumCaseSupport::typeNameForTypeErrorActual($resolved).' given',
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $this->context,

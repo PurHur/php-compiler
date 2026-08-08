@@ -25,6 +25,6 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-badTrue(): Return value must be of type true, bool returned
-C25635::badFalse(): Return value must be of type false, bool returned
+badTrue(): Return value must be of type true, false returned
+C25635::badFalse(): Return value must be of type false, true returned
 badInt(): Return value must be of type int, array returned

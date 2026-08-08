@@ -27,9 +27,9 @@ foreach (false as $v) {
 }
 echo "suppressed-done\n";
 --EXPECT--
-W:foreach() argument must be of type array|object, bool given
+W:foreach() argument must be of type array|object, false given
 done
-W:foreach() argument must be of type array|object, bool given
+W:foreach() argument must be of type array|object, true given
 skipped
-W:foreach() argument must be of type array|object, bool given
+W:foreach() argument must be of type array|object, false given
 suppressed-done

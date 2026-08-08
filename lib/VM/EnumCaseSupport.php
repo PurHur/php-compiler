@@ -668,9 +668,10 @@ final class EnumCaseSupport
     }
 
     /**
-     * Zend {@see zend_type_to_string()} label for TypeError "… given" messages (#6236).
+     * Zend {@see zend_zval_type_name()} label (bool/int/…) for non-TypeError messages (#6236).
      *
      * Enum case operands surface the enum class name (E), not mixed/object.
+     * For TypeError "… given"/"… returned" use {@see typeNameForTypeErrorActual()}.
      */
     public static function typeNameForVariable(Variable $value): string
     {
@@ -690,6 +691,21 @@ final class EnumCaseSupport
             Variable::TYPE_OBJECT => $value->toObject()->class->name,
             default => 'mixed',
         };
+    }
+
+    /**
+     * Zend TypeError actual-value label ("… given" / "… returned") (#29097).
+     *
+     * Booleans use literal {@code true}/{@code false} (zend_execute.c), not {@code bool}.
+     */
+    public static function typeNameForTypeErrorActual(Variable $value): string
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? 'true' : 'false';
+        }
+
+        return self::typeNameForVariable($value);
     }
 
     public static function enumCaseNameForVariable(Variable $value): string

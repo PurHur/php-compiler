@@ -1668,29 +1668,8 @@ final class VmArray
 
     private static function valueTypeLabel(Variable $value): string
     {
-        $value = $value->resolveIndirect();
-        $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
-        if (null !== $enumClass) {
-            return $enumClass->name;
-        }
-        switch ($value->type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return $value->toObject()->class->name;
-            default:
-                return 'mixed';
-        }
+        // zend_execute.c — bool actuals print true/false (#29097).
+        return EnumCaseSupport::typeNameForTypeErrorActual($value);
     }
 
     /**

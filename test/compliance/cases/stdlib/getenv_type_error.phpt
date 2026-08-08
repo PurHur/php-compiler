@@ -19,7 +19,7 @@ try {
 }
 ?>
 --EXPECT--
-getenv(): Argument #1 ($name) must be of type ?string, bool given
+getenv(): Argument #1 ($name) must be of type ?string, false given
 getenv(): Argument #1 ($name) must be of type ?string, int given
 getenv(): Argument #1 ($name) must be of type ?string, int given
 getenv(): Argument #1 ($name) must be of type ?string, int given
