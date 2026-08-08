@@ -19,6 +19,54 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
+    /** Issue #29061: hex floats withheld on 8.4.0-dev reference (matches Zend 8.2). */
+    public function testSupportsHexFloatLiteralsFalseOnDefault84DevProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsHexFloatLiterals());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #29061: PROFILE=8.2 must not enable hex float literals. */
+    public function testSupportsHexFloatLiteralsFalseOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsHexFloatLiterals());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #29061: PROFILE=8.4 enables hex float literals. */
+    public function testSupportsHexFloatLiteralsTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsHexFloatLiterals());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsStrIncrementFalseOnPhp82Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

@@ -9,7 +9,10 @@ use PHPCompiler\HexFloat;
 use PhpParser\Error as ParserError;
 
 /**
- * Desugar PHP 8.4 hex float literals for nikic/php-parser on PHP < 8.4 hosts (#7041).
+ * Desugar PHP 8.4 hex float literals for nikic/php-parser on PHP < 8.4 hosts (#7041 / #29061).
+ *
+ * Gated on {@see CompilerVersion::supportsHexFloatLiterals()} (language profile ≥ 8.4.0) so
+ * PROFILE≤8.3 / unset 8.4.0-dev leave the literal for the host parser to reject like Zend 8.2.
  *
  * php-src: Zend/zend_language_scanner.l — HNUM / hex-float tokenization
  */

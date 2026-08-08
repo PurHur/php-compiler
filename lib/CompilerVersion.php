@@ -757,10 +757,16 @@ final class CompilerVersion
         return false;
     }
 
-    /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
+    /**
+     * PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, #7041 / #29061).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile and
+     * PROFILE≤8.3 match Zend 8.2 parse-error (bare VERSION 8.4.0-dev previously always enabled).
+     * Do not use {@see isForwardProfileAtLeast()} — that would re-enable on unset PROFILE.
+     */
     public static function supportsHexFloatLiterals(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
