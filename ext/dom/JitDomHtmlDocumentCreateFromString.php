@@ -186,6 +186,9 @@ final class JitDomHtmlDocumentCreateFromString
             $bodyJit,
             JITVariable::TYPE_OBJECT
         );
+        // Pin doctype before any PropertyFetch — undeclared slots get defineProperty'd
+        // as uninitialized externals and return garbage ints / segfault (#28940).
+        self::storeDoctypeProperty($context, $document, $source);
         DomUserScriptPinnedRootLlvm::pin($context, $body);
 
         $slot = JitValueBox::alloc($context);
@@ -199,6 +202,64 @@ final class JitDomHtmlDocumentCreateFromString
         return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
+    /**
+     * Initialize Dom\HTMLDocument::$doctype for user-script AOT (#28940).
+     *
+     * Fragments → null (php-src / #26924). Explicit {@code <!DOCTYPE name>} →
+     * DocumentType stand-in with name/publicId/systemId slots (peer
+     * {@see JitDomCreateDocumentType}).
+     */
+    private static function storeDoctypeProperty(
+        Context $context,
+        Value $document,
+        string $source
+    ): void {
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
+        }
+
+        $doctypeName = DomParseSimpleHtmlJitHelper::doctypeNameArgv($source);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
+        }
+        if (null === $doctypeName) {
+            $nullSlot = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $nullSlot)
+            );
+            $nullVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_VALUE,
+                JITVariable::KIND_VARIABLE,
+                $nullSlot
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCTYPE),
+                $nullVar,
+                JITVariable::TYPE_NULL
+            );
+
+            return;
+        }
+
+        $doctype = JitDomCreateDocumentType::materialize($context, $doctypeName, '', '');
+        $doctypeJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $doctype
+        );
+        // VALUE slot + detached fetch in {@see JitDomDocumentDoctype} (#28940).
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCTYPE),
+            $doctypeJit,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
     private static function ensureDocumentLayout(
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $docClassId
@@ -209,6 +270,7 @@ final class JitDomHtmlDocumentCreateFromString
         if (!$objectType->hasProperty($docClassId, VmDomLiving::PROP_BODY)) {
             $objectType->defineProperty($docClassId, VmDomLiving::PROP_BODY, JITVariable::TYPE_OBJECT);
         }
+        // doctype type chosen in storeDoctypeProperty (OBJECT when present, VALUE when null).
     }
 
     private static function ensureElementLayout(

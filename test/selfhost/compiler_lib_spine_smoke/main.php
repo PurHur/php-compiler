@@ -484,6 +484,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomCreateElement.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateElementNS.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateTextNode.php';
 require_once __DIR__.'/../../../ext/dom/JitDomDocumentElement.php';
+require_once __DIR__.'/../../../ext/dom/JitDomDocumentDoctype.php';
 require_once __DIR__.'/../../../ext/dom/JitDomDocumentMethodKernel.php';
 require_once __DIR__.'/../../../ext/dom/JitDomElementNavigationProperty.php';
 require_once __DIR__.'/../../../ext/dom/JitDomElementTextContent.php';
