@@ -345,9 +345,13 @@ class MagicStringResolver extends NodeVisitorAbstract
             $line = 0;
         }
 
+        // php-src Zend/zend_compile.c — parent class if present, else first
+        // implemented interface, else "class" (#28840).
         $prefix = 'class';
         if (!empty($node->extends) && !is_array($node->extends)) {
             $prefix = $node->extends->getLast();
+        } elseif (!empty($node->implements) && \is_array($node->implements) && isset($node->implements[0])) {
+            $prefix = $node->implements[0]->getLast();
         }
 
         $file = $this->compilationUnitFile;

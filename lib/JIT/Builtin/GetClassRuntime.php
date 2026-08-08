@@ -50,13 +50,17 @@ final class GetClassRuntime
     public static function emitDebugTypeClassNameFromId(Context $context, Value $classId): Value
     {
         self::seedThrowableClassNames($context);
+        // Display name: strip NUL provenance, keep Prefix@anonymous (#28840 / zend_compile.c).
         $name = self::emitSelectWalk($context, $classId);
-        $anonLabel = $context->builder->load($context->constantStringFromString('class@anonymous'));
         $result = $name;
         foreach ($context->type->object->allClassNamesById() as $id => $mapped) {
-            if (!str_contains((string) $mapped, '@anonymous')) {
+            $mappedStr = (string) $mapped;
+            if (!str_contains($mappedStr, '@anonymous')) {
                 continue;
             }
+            $nul = strpos($mappedStr, "\0");
+            $public = false !== $nul ? substr($mappedStr, 0, $nul) : $mappedStr;
+            $anonLabel = $context->builder->load($context->constantStringFromString($public));
             $expected = $context->constantFromInteger((int) $id, 'int64');
             $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
             $result = $context->builder->select($isId, $anonLabel, $result);
@@ -100,7 +104,8 @@ final class GetClassJitHelper
     {
         \$name = self::classNameFromClassId(\$classId);
         if (str_contains(\$name, '@anonymous')) {
-            return 'class@anonymous';
+            \$nul = strpos(\$name, "\\0");
+            return false !== \$nul ? substr(\$name, 0, \$nul) : \$name;
         }
 
         return \$name;
