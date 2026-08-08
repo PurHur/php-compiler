@@ -28,16 +28,32 @@ final class VmFromCallable
     public static function createClosureVariable(Context $context, Block $block, OpCode $op): JitVariable
     {
         $callableSlot = (int) $op->arg2;
-        if (isset($block->constants[$callableSlot])) {
-            $const = $block->constants[$callableSlot];
+        $fromCallableApi = $op->fromCallableApi;
+        $const = self::resolveConstantCallableValue($block, $callableSlot);
+        if (null !== $const) {
             if (VmVariable::TYPE_STRING === $const->type) {
                 return self::fromStringCallable(
                     $context,
                     $block,
                     $const->toString(),
-                    $op->fromCallableApi
+                    $fromCallableApi
                 );
             }
+            // Valid-looking array constants may still resolve via bound-method INIT_ARRAY below.
+            if (!(VmVariable::TYPE_ARRAY === $const->type && self::arrayConstantLooksCallable($const))) {
+                self::throwNonCallableConstant($const, $fromCallableApi);
+            }
+        }
+
+        // `$c = []; $c(...)` — INIT_ARRAY temp is not a block constant (#28937).
+        $arrayArity = self::resolveInitArrayElementCount($block, $callableSlot);
+        if (null !== $arrayArity && $arrayArity < 2) {
+            if ($fromCallableApi) {
+                throw new \TypeError(
+                    'Failed to create closure from callable: array callback must have exactly two members'
+                );
+            }
+            throw new \Error(CallableCheck::arrayCallbackTwoElementsMessage());
         }
 
         $methodLc = VmBoundMethodCallable::resolveMethodLcFromCalleeSlot($block, $callableSlot);
@@ -71,6 +87,196 @@ final class VmFromCallable
         }
 
         throw new \LogicException('TYPE_FROM_CALLABLE: unsupported callable form in JIT');
+    }
+
+    /**
+     * Walk ASSIGN / CONST_FETCH chains to a known callable value (e.g. `$c = null; $c(...)`) (#28937).
+     */
+    private static function resolveConstantCallableValue(Block $block, int $slot, array &$visited = []): ?VmVariable
+    {
+        $visitKey = spl_object_id($block).':'.$slot;
+        if (isset($visited[$visitKey])) {
+            return null;
+        }
+        $visited[$visitKey] = true;
+        if (isset($block->constants[$slot])) {
+            return $block->constants[$slot];
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && $op->arg1 === $slot) {
+                $resolved = self::constFetchToVariable($block, (int) $op->arg2);
+                if (null !== $resolved) {
+                    return $resolved;
+                }
+            }
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($op->arg2 !== $slot && $op->arg1 !== $slot) {
+                continue;
+            }
+            $resolved = self::resolveConstantCallableValue($block, (int) $op->arg3, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = self::resolveConstantCallableValue($parent, $slot, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        return null;
+    }
+
+    /** Map CONST_FETCH name slot to null/true/false Variable (#28937). */
+    private static function constFetchToVariable(Block $block, int $nameSlot): ?VmVariable
+    {
+        if (!isset($block->constants[$nameSlot])) {
+            return null;
+        }
+        $nameVar = $block->constants[$nameSlot];
+        if (VmVariable::TYPE_STRING !== $nameVar->type) {
+            return null;
+        }
+        switch (strtolower($nameVar->toString())) {
+            case 'null':
+                $v = new VmVariable(VmVariable::TYPE_NULL);
+                $v->null();
+
+                return $v;
+            case 'true':
+                $v = new VmVariable(VmVariable::TYPE_BOOLEAN);
+                $v->bool(true);
+
+                return $v;
+            case 'false':
+                $v = new VmVariable(VmVariable::TYPE_BOOLEAN);
+                $v->bool(false);
+
+                return $v;
+            default:
+                return null;
+        }
+    }
+
+    /** @throws \TypeError|\Error */
+    private static function throwNonCallableConstant(VmVariable $const, bool $fromCallableApi): void
+    {
+        if ($fromCallableApi) {
+            if (VmVariable::TYPE_ARRAY === $const->type) {
+                $table = $const->toArray();
+                if (2 !== $table->getNumElements()) {
+                    throw new \TypeError(
+                        'Failed to create closure from callable: array callback must have exactly two members'
+                    );
+                }
+            }
+            throw new \TypeError(
+                'Failed to create closure from callable: no array or string given'
+            );
+        }
+        if (VmVariable::TYPE_ARRAY === $const->type) {
+            $table = $const->toArray();
+            $idx0 = new VmVariable(VmVariable::TYPE_INTEGER);
+            $idx0->int(0);
+            $idx1 = new VmVariable(VmVariable::TYPE_INTEGER);
+            $idx1->int(1);
+            if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+                throw new \Error(CallableCheck::arrayCallbackTwoElementsMessage());
+            }
+            $receiver = $table->findVariable($idx0, false)->resolveIndirect();
+            $receiverOk = VmVariable::TYPE_OBJECT === $receiver->type
+                || VmVariable::TYPE_ENUM_CASE === $receiver->type
+                || VmVariable::TYPE_STRING === $receiver->type;
+            if (!$receiverOk) {
+                throw new \Error(CallableCheck::firstArrayMemberInvalidMessage());
+            }
+            $methodVar = $table->findVariable($idx1, false)->resolveIndirect();
+            if (VmVariable::TYPE_STRING !== $methodVar->type) {
+                throw new \Error(CallableCheck::secondArrayMemberInvalidMessage());
+            }
+        }
+        throw new \Error(CallableCheck::scalarNotCallableMessage($const));
+    }
+
+    private static function arrayConstantLooksCallable(VmVariable $const): bool
+    {
+        if (VmVariable::TYPE_ARRAY !== $const->type) {
+            return false;
+        }
+        $table = $const->toArray();
+        $idx0 = new VmVariable(VmVariable::TYPE_INTEGER);
+        $idx0->int(0);
+        $idx1 = new VmVariable(VmVariable::TYPE_INTEGER);
+        $idx1->int(1);
+        if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+            return false;
+        }
+        $receiver = $table->findVariable($idx0, false)->resolveIndirect();
+        $methodVar = $table->findVariable($idx1, false)->resolveIndirect();
+        $receiverOk = VmVariable::TYPE_OBJECT === $receiver->type
+            || VmVariable::TYPE_ENUM_CASE === $receiver->type
+            || VmVariable::TYPE_STRING === $receiver->type;
+
+        return $receiverOk && VmVariable::TYPE_STRING === $methodVar->type;
+    }
+
+    /**
+     * Count INIT_ARRAY + ADD_ARRAY_ELEMENT for `$c = […]` FCC operands (#28937).
+     *
+     * @return null|int null = not an INIT_ARRAY root; else element count
+     */
+    private static function resolveInitArrayElementCount(Block $block, int $slot, array &$visited = []): ?int
+    {
+        $visitKey = spl_object_id($block).':'.$slot;
+        if (isset($visited[$visitKey])) {
+            return null;
+        }
+        $visited[$visitKey] = true;
+        $arraySlot = VmBoundMethodCallable::resolveBoundMethodArrayRootSlot($block, $slot);
+        if (null === $arraySlot) {
+            // ASSIGN to a plain INIT_ARRAY (empty / one-element) still has a root.
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_ASSIGN === $op->type
+                    && ($op->arg2 === $slot || $op->arg1 === $slot)) {
+                    $nested = self::resolveInitArrayElementCount($block, (int) $op->arg3, $visited);
+                    if (null !== $nested) {
+                        return $nested;
+                    }
+                }
+            }
+            foreach ($block->parents as $parent) {
+                if (!$parent instanceof Block) {
+                    continue;
+                }
+                $nested = self::resolveInitArrayElementCount($parent, $slot, $visited);
+                if (null !== $nested) {
+                    return $nested;
+                }
+            }
+
+            return null;
+        }
+        $count = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && $op->arg1 === $arraySlot) {
+                if (null !== $op->arg2) {
+                    ++$count;
+                }
+            }
+            if (OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type && $op->arg1 === $arraySlot) {
+                ++$count;
+            }
+        }
+
+        return $count;
     }
 
     /**

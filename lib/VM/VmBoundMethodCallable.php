@@ -242,14 +242,61 @@ final class VmBoundMethodCallable
 
     /**
      * Invokable-object FCC `(new C)(...)` — callee slot holds object, not `[obj, method]` (#9605).
+     *
+     * Must not match null/scalar/array variables: those are runtime non-callables and must
+     * Error with Zend FCC wording (#28937), not lower as `__invoke` on a fake "object".
      */
     public static function resolveInvokableObjectReceiverOperand(Block $block, int $slot): ?Operand
     {
         if (null !== self::resolveBoundMethodArrayRootSlot($block, $slot)) {
             return null;
         }
+        // Require TYPE_NEW (or object-typed operand) — bare Variable/$tmp is not enough (#28937).
+        if (null === self::classNameFromObjectSlot($block, $slot)) {
+            $candidate = self::operandForInvokableObjectSlot($block, $slot);
+            $isObjectTyped = null !== $candidate->type && Type::TYPE_OBJECT === $candidate->type->type;
+            if (!$isObjectTyped && !self::slotHasNewOpcode($block, $slot)) {
+                return null;
+            }
+        }
 
         return self::resolveObjectOperandRoot($block, self::operandForInvokableObjectSlot($block, $slot));
+    }
+
+    /** True when $slot (or an assign-chain source) is defined by TYPE_NEW (#9605 / #28937). */
+    private static function slotHasNewOpcode(Block $block, int $slot, array &$visited = []): bool
+    {
+        $visitKey = spl_object_id($block).':'.$slot;
+        if (isset($visited[$visitKey])) {
+            return false;
+        }
+        $visited[$visitKey] = true;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type && $op->arg1 === $slot) {
+                return true;
+            }
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($op->arg2 !== $slot && $op->arg1 !== $slot) {
+                continue;
+            }
+            if (self::slotHasNewOpcode($block, (int) $op->arg3, $visited)) {
+                return true;
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            if (self::slotHasNewOpcode($parent, $slot, $visited)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function resolveInvokableObjectClassName(Block $block, int $slot): ?string
