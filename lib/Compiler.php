@@ -30064,12 +30064,10 @@ class Compiler {
                 continue;
             }
             // var_dump($s->contains($o), $s[$o], count($s)) — dim is a sibling arg, not a chain end (#28821).
-            if (
-                $next instanceof Op\Expr\ArrayDimFetch
-                || $next instanceof Op\Expr\PropertyFetch
-                || $next instanceof Op\Expr\NullsafePropertyFetch
-                || $next instanceof Op\Expr\StaticPropertyFetch
-            ) {
+            // Do not skip PropertyFetch: saveXML($d->documentElement, LIBXML_*) must not treat a
+            // prior stmt MethodCall (loadXML) as a deferred sibling across the property + LIBXML_*
+            // preludes — that steals ARG_SEND and dumps the full document (re-#25292 / #29076).
+            if ($next instanceof Op\Expr\ArrayDimFetch) {
                 continue;
             }
             if ($next instanceof Op\Expr\ArrowFunction
