@@ -69,13 +69,18 @@ final class VmArrayValueCallback
                     'array callback requires VM context in this compiler build'
                 );
             }
-
-            return VmClosureCall::invoke(
+            $closure = VmClosureCall::resolve($callback);
+            $arg0 = $keyFirst ? $key : $value;
+            $arg1 = $keyFirst ? $value : $key;
+            // Zend zend_call_function — by-ref predicate params warn per invocation (#28928).
+            VmCallable::warnPhpFuncByRefValueArgs(
                 $frame->vmContext,
-                VmClosureCall::resolve($callback),
-                $keyFirst ? $key : $value,
-                $keyFirst ? $value : $key,
+                $frame,
+                $closure->func,
+                [$arg0, $arg1]
             );
+
+            return VmClosureCall::invoke($frame->vmContext, $closure, $arg0, $arg1);
         }
         $name = $callback->toString();
         try {
@@ -97,13 +102,12 @@ final class VmArrayValueCallback
             );
         }
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
+        $arg0 = $keyFirst ? $key : $value;
+        $arg1 = $keyFirst ? $value : $key;
+        // Same by-ref Warning for named user predicates (#28928).
+        VmCallable::warnPhpFuncByRefValueArgs($frame->vmContext, $frame, $fn, [$arg0, $arg1]);
 
-        return VmUserCall::invokeTwo(
-            $frame->vmContext,
-            $fn,
-            $keyFirst ? $key : $value,
-            $keyFirst ? $value : $key,
-        );
+        return VmUserCall::invokeTwo($frame->vmContext, $fn, $arg0, $arg1);
     }
 
     /**
