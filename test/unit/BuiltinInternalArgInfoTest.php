@@ -1231,4 +1231,36 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNotNull($bucket);
         $this->assertSame('StreamBucket', $bucket['type']);
     }
+
+    /** php-src ext/xmlreader/php_xmlreader.stub.php — open/XML encoding ?string (#28712). */
+    public function testXmlReaderOpenXmlEncodingReflectionStubTypes(): void
+    {
+        foreach (['open', 'xml'] as $method) {
+            $this->assertSame(
+                '?string',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('xmlreader', $method, 1),
+                $method
+            );
+            $enc = BuiltinInternalArgInfo::paramInfoForClassMethod('XMLReader', $method, 1);
+            $this->assertNotNull($enc, $method);
+            // InternalArgInfo still labels encoding=string; stub override makes it ?string.
+            $this->assertSame('encoding', $enc['name'], $method);
+            $this->assertSame('?string', $enc['type'], $method);
+            $this->assertTrue($enc['isOptional'], $method);
+            $flags = BuiltinInternalArgInfo::paramInfoForClassMethod('XMLReader', $method, 2);
+            $this->assertNotNull($flags, $method);
+            // InternalArgInfo still says options=; BuiltinParamNames renames to flags for Reflection.
+            $this->assertSame('options', $flags['name'], $method);
+            $this->assertSame('int', $flags['type'], $method);
+            $this->assertTrue($flags['isOptional'], $method);
+        }
+        $this->assertSame(
+            ['uri', 'encoding=', 'flags='],
+            BuiltinParamNames::forClassMethod('xmlreader::open')
+        );
+        $this->assertSame(
+            ['source', 'encoding=', 'flags='],
+            BuiltinParamNames::forClassMethod('xmlreader::xml')
+        );
+    }
 }
