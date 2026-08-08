@@ -11,4 +11,4 @@ try {
 }
 ?>
 --EXPECT--
-parse_url(): Argument #2 ($component) must be of type int|ParseUrl, null given
+parse_url(): Argument #2 ($component) must be of type int, null given

@@ -27,7 +27,7 @@ final class BuiltinEnums
             self::registerMemoryUsage($ctx);
             // ConnectionStatus / ResponseCode / RequestMethod retired — php-src never ships them (#28931)
             // Sorting / SortDirection retired — php-src never ships them (#28930, re-#12362 / #7229 / #7261)
-            self::registerParseUrl($ctx);
+            // ParseUrl retired — php-src never ships it (#28536, re-#7260)
             self::registerInfoView($ctx);
         }
         if (CompilerVersion::supportsClockGettime()) {
@@ -296,38 +296,6 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'roundingmode';
-        $ctx->classes[$lc] = $entry;
-        $ctx->enums[$lc] = true;
-    }
-
-    /**
-     * PHP 8.4 ParseUrl: int-backed enum for parse_url() component (#7260).
-     *
-     * php-src: ext/standard/basic_functions.stub.php — enum ParseUrl: int
-     */
-    private static function registerParseUrl(Context $ctx): void
-    {
-        if (isset($ctx->classes['parseurl'])) {
-            return;
-        }
-
-        $entry = new ClassEntry('ParseUrl');
-        $entry->isEnum = true;
-        $entry->backedType = 'int';
-
-        self::registerBackedEnumCase($entry, 'Scheme', VmParseUrl::PHP_URL_SCHEME);
-        self::registerBackedEnumCase($entry, 'Host', VmParseUrl::PHP_URL_HOST);
-        self::registerBackedEnumCase($entry, 'Port', VmParseUrl::PHP_URL_PORT);
-        self::registerBackedEnumCase($entry, 'User', VmParseUrl::PHP_URL_USER);
-        self::registerBackedEnumCase($entry, 'Pass', VmParseUrl::PHP_URL_PASS);
-        self::registerBackedEnumCase($entry, 'Path', VmParseUrl::PHP_URL_PATH);
-        self::registerBackedEnumCase($entry, 'Query', VmParseUrl::PHP_URL_QUERY);
-        self::registerBackedEnumCase($entry, 'Fragment', VmParseUrl::PHP_URL_FRAGMENT);
-
-        EnumSupport::ensureBuiltinCasesMethod($entry);
-        EnumSupport::ensureBuiltinEnumInterfaces($entry);
-
-        $lc = 'parseurl';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
