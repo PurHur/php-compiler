@@ -1139,6 +1139,8 @@ final class BuiltinInternalArgInfo
             'splpriorityqueue::compare' => ($index === 0 || $index === 1) ? 'mixed' : null,
             // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string) (#25172)
             'datetimezone::listidentifiers' => 1 === $index ? '?string' : null,
+            // ext/date/php_date.stub.php — DateTimeInterface $datetime (InternalArgInfo lowercase datetime) (#28910)
+            'datetimezone::getoffset' => 0 === $index ? 'DateTimeInterface' : null,
             // ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (InternalArgInfo datetimezone) (#25166)
             'datetime::createfromformat',
             'datetimeimmutable::createfromformat' => 2 === $index ? '?DateTimeZone' : null,

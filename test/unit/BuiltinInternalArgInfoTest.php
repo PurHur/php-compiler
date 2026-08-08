@@ -276,6 +276,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('date_modify', 1)['type']);
     }
 
+    /** php-src php_date.stub.php — DateTimeZone::getOffset(DateTimeInterface $datetime) (#28910). */
+    public function testDateTimeZoneGetOffsetReflectionParamType(): void
+    {
+        $this->assertSame(
+            'DateTimeInterface',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('datetimezone', 'getoffset', 0)
+        );
+        $info = BuiltinInternalArgInfo::paramInfoForClassMethod('DateTimeZone', 'getOffset', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('datetime', $info['name']);
+        $this->assertSame('DateTimeInterface', $info['type']);
+        $this->assertFalse($info['isOptional']);
+    }
+
     /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
     public function testCeilFloorReflectionStubTypes(): void
     {
