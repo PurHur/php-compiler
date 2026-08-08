@@ -637,6 +637,12 @@ final class BuiltinInternalArgInfo
                 5 => '?string',
                 default => null,
             },
+            // ext/openssl/openssl.stub.php — int $length; &$strong_result untyped (InternalArgInfo integer / &bool) (#28858)
+            'openssl_random_pseudo_bytes' => match ($index) {
+                0 => 'int',
+                1 => '',
+                default => null,
+            },
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo; string $cipher_algo (#27916)
             'openssl_cipher_key_length' => 0 === $index ? 'string' : null,
             // ext/intl/grapheme/grapheme.stub.php — Zend names/types; &$next untyped (#27884)
