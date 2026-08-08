@@ -397,15 +397,26 @@ final class VmMbstring
     }
 
     /**
+     * php-src / libmbfl Quoted-Printable transfer encoding (deprecated in 8.2+; #28982).
+     *
+     * Aliases: qprint / QPrint / quoted-printable (registry + fuzzy resolve).
+     * Encode matches mb_wchar_to_qprint (soft wrap at 72); decode uses quoted_printable_decode.
+     */
+    public static function isQuotedPrintableEncoding(string $encoding): bool
+    {
+        return 'Quoted-Printable' === (MbstringEncodingRegistry::resolve($encoding) ?? '');
+    }
+
+    /**
      * Pseudo-encodings accepted by mb_convert_encoding() beyond CharsetEngine charsets.
      *
-     * UUENCODE / Quoted-Printable are valid for mb_encoding_aliases / mb_list_encodings (#28983)
-     * but convert bodies remain sibling issues (#28981 / #28982) — not accepted here yet so
-     * convert still ValueErrors like an unknown charset until those land.
+     * UUENCODE remains sibling #28981 — listed for aliases/lists (#28983) but not converted yet.
      */
     public static function isMbConvertPseudoEncoding(string $encoding): bool
     {
-        return self::isHtmlEntitiesEncoding($encoding) || self::isBase64Encoding($encoding);
+        return self::isHtmlEntitiesEncoding($encoding)
+            || self::isBase64Encoding($encoding)
+            || self::isQuotedPrintableEncoding($encoding);
     }
 
     /**
@@ -550,8 +561,8 @@ final class VmMbstring
     }
 
     /**
-     * mb_convert_encoding() core — charset + HTML-ENTITIES / BASE64 pseudo-encodings
-     * (#11212, #22631, #28980).
+     * mb_convert_encoding() core — charset + HTML-ENTITIES / BASE64 / Quoted-Printable
+     * (#11212, #22631, #28980, #28982).
      *
      * php-src / libmbfl HTML-ENTITIES is not htmlentities(): ASCII (incl. <>&) stays literal;
      * named HTML entities for mapped non-ASCII; numeric &#N; for everything else (e.g. あ → &#12354;).
@@ -560,6 +571,10 @@ final class VmMbstring
      * bytes (from-charset is not re-encoded); from-BASE64 is base64_decode with illegal-byte
      * substitution and returns the decoded byte string without a further charset pass. PHP 8.2+
      * deprecates resolving BASE64 as $to_encoding (php_mb_get_encoding in mbstring.c).
+     *
+     * Quoted-Printable (#28982): to-QP is libmbfl mb_wchar_to_qprint of raw input bytes
+     * (from-charset not re-encoded); from-QP is quoted_printable_decode → raw bytes. Soft wrap
+     * at 72 (not quot_print.c's 75). PHP 8.2+ deprecates resolving QP as $to_encoding.
      *
      * Illegal bytes honor MBSTRG(filter_illegal_*) even when $from === $to (#25207).
      */
@@ -585,6 +600,23 @@ final class VmMbstring
             self::deprecateBase64ViaMbstring($frame, $function);
 
             return \base64_encode($source);
+        }
+
+        $toQp = self::isQuotedPrintableEncoding($to);
+        $fromQp = self::isQuotedPrintableEncoding($from);
+        if ($fromQp) {
+            if ($toQp) {
+                self::deprecateQuotedPrintableViaMbstring($frame, $function);
+
+                return self::encodeQuotedPrintablePseudo($source);
+            }
+
+            return self::decodeQuotedPrintablePseudo($source);
+        }
+        if ($toQp) {
+            self::deprecateQuotedPrintableViaMbstring($frame, $function);
+
+            return self::encodeQuotedPrintablePseudo($source);
         }
 
         $toHtml = self::isHtmlEntitiesEncoding($to);
@@ -678,6 +710,12 @@ final class VmMbstring
         self::deprecateSpecialTransferEncodingViaMbstring('HTML-ENTITIES', $frame, $function);
     }
 
+    /** PHP 8.2+ E_DEPRECATED for Quoted-Printable / qprint via php_mb_get_encoding (#28982). */
+    public static function deprecateQuotedPrintableViaMbstring(?Frame $frame, string $function = 'mb_convert_encoding'): void
+    {
+        self::deprecateSpecialTransferEncodingViaMbstring('Quoted-Printable', $frame, $function);
+    }
+
     /**
      * libmbfl Base64 input filter — soft alphabet decode with illegal-char substitution (#28980).
      *
@@ -746,6 +784,58 @@ final class VmMbstring
         }
 
         return -1;
+    }
+
+    /**
+     * libmbfl Quoted-Printable output — mb_wchar_to_qprint (php-src mbfilter_qprint.c; #28982).
+     *
+     * Soft wrap at 72 (not quot_print.c QPRINT_MAXL=75). Raw bytes: NUL emitted + line reset;
+     * LF → CRLF; lone CR dropped; '=' and bytes ≥ 0x80 as =XX.
+     */
+    public static function encodeQuotedPrintablePseudo(string $source): string
+    {
+        $out = '';
+        $charsOutput = 0;
+        $len = \strlen($source);
+        for ($i = 0; $i < $len; ++$i) {
+            $w = \ord($source[$i]);
+            if (0 === $w) {
+                $out .= "\0";
+                $charsOutput = 0;
+
+                continue;
+            }
+            if (0x0A === $w) {
+                $out .= "\r\n";
+                $charsOutput = 0;
+
+                continue;
+            }
+            if (0x0D === $w) {
+                continue;
+            }
+            if ($charsOutput >= 72) {
+                $out .= "=\r\n";
+                $charsOutput = 0;
+            }
+            if ($w >= 0x80 || 0x3D === $w) {
+                $out .= sprintf('=%02X', $w);
+                $charsOutput += 3;
+            } else {
+                $out .= $source[$i];
+                ++$charsOutput;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * libmbfl Quoted-Printable input — equivalent to quoted_printable_decode for Zend 8.2 (#28982).
+     */
+    public static function decodeQuotedPrintablePseudo(string $source): string
+    {
+        return VmString::quoted_printable_decode($source);
     }
 
     /**
@@ -1137,8 +1227,10 @@ final class VmMbstring
         if (self::isBase64Encoding($name)) {
             return 'BASE64';
         }
-        // UUENCODE / Quoted-Printable are valid names for lists/aliases (#28983); convert
-        // from-list still rejects until #28981 / #28982 implement bodies.
+        if (self::isQuotedPrintableEncoding($name)) {
+            return 'Quoted-Printable';
+        }
+        // UUENCODE is valid for lists/aliases (#28983); convert from-list still rejects until #28981.
         $canonical = MbstringEncodingRegistry::resolve($name);
         if (null !== $canonical && null !== CharsetEngine::parseEncodingSpec($canonical)) {
             return $canonical;
