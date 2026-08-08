@@ -395,6 +395,13 @@ final class BuiltinInternalDefaultValues
         'localtime' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int → 0) (#27981)
+        'strftime' => [
+            1 => ['kind' => 'null'],
+        ],
+        'gmstrftime' => [
+            1 => ['kind' => 'null'],
+        ],
         // php-src ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
         'unixtojd' => [
             0 => ['kind' => 'null'],

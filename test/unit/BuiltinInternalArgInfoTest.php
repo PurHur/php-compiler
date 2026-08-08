@@ -314,6 +314,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src php_date.stub.php — strftime/gmstrftime string|false + ?int $timestamp = null (#27981). */
+    public function testStrftimeGmstrftimeReflectionStubs(): void
+    {
+        foreach (['strftime', 'gmstrftime'] as $fn) {
+            $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            $this->assertSame(['format', 'timestamp='], BuiltinParamNames::forFunction($fn), $fn);
+            $ts = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            $this->assertNotNull($ts, $fn);
+            $this->assertSame('timestamp', $ts['name'], $fn);
+            $this->assertSame('?int', $ts['type'], $fn);
+            $this->assertTrue($ts['isOptional'], $fn);
+        }
+    }
+
     /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
     public function testCeilFloorReflectionStubTypes(): void
     {
