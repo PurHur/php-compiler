@@ -1726,6 +1726,7 @@ final class VmString
 
     /**
      * PHP 8.4 (GH-12592): empty $mask returns full segment byte length (not NUL-terminated walk).
+     * PROFILE&lt;8.4: empty $mask stops at the first embedded NUL like classic php-src / C strcspn (#27716).
      */
     public static function strcspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
@@ -1735,7 +1736,19 @@ final class VmString
             return 0;
         }
         if ('' === $mask) {
-            return $len;
+            if (!self::strcspnEmptyMaskStopsAtNul()) {
+                return $len;
+            }
+            // PROFILE≤8.3 empty mask — stop at embedded NUL within the segment (#27716).
+            $count = 0;
+            for ($i = $start; $i < $start + $len; ++$i) {
+                if ("\0" === $str[$i]) {
+                    break;
+                }
+                ++$count;
+            }
+
+            return $count;
         }
         $mlen = self::byteLength($mask);
         $count = 0;
@@ -1747,6 +1760,22 @@ final class VmString
         }
 
         return $count;
+    }
+
+    /**
+     * Empty $characters + embedded NUL (#27716 / GH-12592).
+     *
+     * Explicit PROFILE&lt;8.4 matches Zend 8.2 (stop at NUL). Unset PROFILE and PROFILE≥8.4 keep
+     * the binary-safe full-segment length from #7088 (`strcspn_empty_characters_84`).
+     */
+    public static function strcspnEmptyMaskStopsAtNul(): bool
+    {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '<');
     }
 
     public static function strpbrk(string $str, string $mask) {
