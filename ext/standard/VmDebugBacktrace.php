@@ -392,11 +392,18 @@ final class VmDebugBacktrace
         if ($frame->hasHandler() && null !== $frame->parent) {
             return self::frameFile($frame->parent);
         }
-        if (null !== $frame->block) {
-            return $frame->block->scriptPath();
-        }
+        // Prefer the frame path (inherits caller when the callee block has no file ops, #29023).
         if ('' !== $frame->scriptPath) {
             return $frame->scriptPath;
+        }
+        if (null !== $frame->block) {
+            $path = $frame->block->scriptPath();
+            if ('' !== $path) {
+                return $path;
+            }
+        }
+        if (null !== $frame->parent) {
+            return self::frameFile($frame->parent);
         }
 
         return '';
