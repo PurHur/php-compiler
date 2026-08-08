@@ -108,6 +108,32 @@ try {
         );
     }
 
+    /** Issue #28954: nested dim ??= auto-vivifies intermediates without Undefined array key. */
+    public function testNullCoalesceAssignNestedDimAutovivify(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$a = [];
+$r = ($a["x"]["y"] ??= 1);
+echo $r, "\n";
+var_export($a);
+echo "\n";
+$r2 = ($a["x"]["y"] ??= 2);
+echo $r2, "\n";
+$b = [];
+$r3 = ($b["x"]["y"]["z"] ??= 3);
+echo $r3, "\n";
+var_export($b);
+echo "\n";
+$d = [];
+echo ($d["x"]["y"] ?? 5), "\n";
+var_export($d);
+echo "\n";
+',
+            "1\narray (\n  'x' => array (\n    'y' => 1,\n  ),\n)\n1\n3\narray (\n  'x' => array (\n    'y' => array (\n      'z' => 3,\n    ),\n  ),\n)\n5\narray (\n)\n"
+        );
+    }
+
     public function testNullCoalesceAssign(): void
     {
         $this->assertVmOutput(

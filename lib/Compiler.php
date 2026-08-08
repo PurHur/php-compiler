@@ -2605,6 +2605,12 @@ class Compiler {
                         break;
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
+                        && $this->isArrayDimFetchSkippedForCoalesce($child, $ops, $i, $block)
+                    ) {
+                        // Nested `$a['x']['y'] ??…` / `??=` — intermediates lowered inside compileCoalesce (#28954).
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\ArrayDimFetch
                         && null !== ($coalesceMatch = $this->findCoalesceUsingArrayDimFetchLeft($child, $ops, $i))
                     ) {
                         /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
@@ -5537,6 +5543,43 @@ class Compiler {
             }
             if ($next instanceof Op\Expr\PropertyFetch) {
                 // Property prelude for a later sibling dim (`$this->a[$k], $this->b[$k]`) (#24250).
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Skip intermediate ArrayDimFetch stmts in a nested `$a['x']['y'] ??…` / `??=` chain (#28954).
+     * The innermost dim is lowered via {@see findCoalesceUsingArrayDimFetchLeft}; intermediates must
+     * not emit FETCH_DIM_R (Undefined array key) before coalesce quiet/write lowering.
+     *
+     * @param Op[] $ops
+     */
+    private function isArrayDimFetchSkippedForCoalesce(
+        Op\Expr\ArrayDimFetch $fetch,
+        array $ops,
+        int $i,
+        Block $block
+    ): bool {
+        $opCount = count($ops);
+        for ($j = $i + 1; $j < $opCount; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\ArrayDimFetch) {
+                if (!$this->arrayDimFetchConsumesPriorResult($next, $fetch)) {
+                    // Sibling dim before a later coalesce left — keep scanning.
+                    continue;
+                }
+                if (null !== $this->findCoalesceUsingArrayDimFetchLeft($next, $ops, $j)) {
+                    return true;
+                }
+
+                return $this->isArrayDimFetchSkippedForCoalesce($next, $ops, $j, $block);
+            }
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
                 continue;
             }
 
@@ -14242,7 +14285,14 @@ class Compiler {
                 ? null
                 : $this->findCoalesceArrayDimFetch($expr->left, $block);
         }
-        if (null !== $dimFetch) {
+        $dimFetchChain = null !== $dimFetch
+            ? $this->collectArrayDimFetchChain($dimFetch, $block)
+            : [];
+        if ([] !== $dimFetchChain) {
+            foreach ($dimFetchChain as $chainFetch) {
+                $this->rejectArrayEmptyOffsetRead($chainFetch, $block);
+            }
+        } elseif (null !== $dimFetch) {
             $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
         }
         // ??= on $arr['key']: dim fetch temp is read on the left branch (#3792).
@@ -14256,24 +14306,38 @@ class Compiler {
         $resultSlot = $this->compileOperand($resultOperand, $block, false);
 
         $checkSlot = $this->compileBoolTemporary($block);
+        $nestedDimCoalesce = null !== $dimFetch && count($dimFetchChain) >= 2;
         $issetTarget = null !== $propFetch
             ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
             : (null !== $staticPropFetch
                 ? $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $block)
-                : (null !== $dimFetch
-                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                    : (null !== $expr->left
-                        ? $this->resolveCoalesceIssetTarget($expr->left, $block)
-                        : null)));
-        $useContainerIsset = null !== $issetTarget;
-        if ($useContainerIsset) {
+                : ($nestedDimCoalesce
+                    ? null
+                    : (null !== $dimFetch
+                        ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                        : (null !== $expr->left
+                            ? $this->resolveCoalesceIssetTarget($expr->left, $block)
+                            : null))));
+        $useContainerIsset = null !== $issetTarget || $nestedDimCoalesce;
+        if ($useContainerIsset && null !== $issetTarget) {
             [$containerSlot, $dimSlot] = $issetTarget;
             if (null === $containerSlot) {
                 $useContainerIsset = false;
             }
         }
         $evaluatedLeftSlot = null;
-        if ($useContainerIsset) {
+        if ($useContainerIsset && $nestedDimCoalesce) {
+            // Nested `$a['x']['y'] ??…` / `??=`: quiet FETCH_DIM_IS for intermediates (#28954).
+            [$prefixOps, $containerSlot] = $this->emitQuietDimFetchChainPrefix($dimFetchChain, $block);
+            foreach ($prefixOps as $prefixOp) {
+                $block->addOpCode($prefixOp);
+            }
+            $lastFetch = $dimFetchChain[count($dimFetchChain) - 1];
+            $dimSlot = null !== $lastFetch->dim
+                ? $this->compileOperand($lastFetch->dim, $block, true)
+                : null;
+            $block->addOpCode($this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, false));
+        } elseif ($useContainerIsset) {
             $issetOp = $this->makeIssetOpCode(
                 $checkSlot,
                 $containerSlot,
@@ -14328,7 +14392,12 @@ class Compiler {
             null !== $dimFetch
             && $this->operandsChainEqual($coalesceAssignTarget, $dimFetch->result)
         ) {
-            $this->compileArrayDimFetchWrite($dimFetch, $rightEmitBlock);
+            // Nested ??= must FETCH_DIM_W the whole chain so intermediates auto-vivify (#28954).
+            if (count($dimFetchChain) >= 2) {
+                $this->compileArrayDimFetchWriteChain($dimFetchChain, $rightEmitBlock);
+            } else {
+                $this->compileArrayDimFetchWrite($dimFetch, $rightEmitBlock);
+            }
         }
         if (
             null !== $propFetch
@@ -14357,7 +14426,11 @@ class Compiler {
         $leftBlock->inheritScopeFrom($block);
         if ($useContainerIsset) {
             if (null !== $dimFetch) {
-                $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
+                if (count($dimFetchChain) >= 2) {
+                    $this->compileArrayDimFetchReadChain($dimFetchChain, $leftBlock);
+                } else {
+                    $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
+                }
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
                 // ??= left branch: skip store when result is the assign lvalue (php-src: no write when set).
                 if (null !== $expr->left && !$this->operandsChainEqual($resultOperand, $expr->left)) {
@@ -14923,6 +14996,30 @@ class Compiler {
             $this->compileArrayDimFetchContainerSlot($fetch, $block),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
         ));
+    }
+
+    /**
+     * FETCH_DIM_W for each dim in an outermost-first nested ??= write chain (#28954).
+     *
+     * @param list<Op\Expr\ArrayDimFetch> $chain
+     */
+    private function compileArrayDimFetchWriteChain(array $chain, Block $block): void
+    {
+        foreach ($chain as $fetch) {
+            $this->compileArrayDimFetchWrite($fetch, $block);
+        }
+    }
+
+    /**
+     * Read each dim in an outermost-first nested ?? / ??= left branch (#28954).
+     *
+     * @param list<Op\Expr\ArrayDimFetch> $chain
+     */
+    private function compileArrayDimFetchReadChain(array $chain, Block $block): void
+    {
+        foreach ($chain as $fetch) {
+            $this->compileArrayDimFetchRead($fetch, $block);
+        }
     }
 
     /**
