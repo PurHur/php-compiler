@@ -189,6 +189,23 @@ final class VmString
     }
 
     /**
+     * php_strtr_array() replace_pairs key/value — zend convert_to_string, not Z_PARAM_STR (#28978).
+     *
+     * Nested arrays warn "Array to string conversion" and become "Array"; objects without
+     * __toString throw Error (not TypeError). php-src: ext/standard/string.c php_strtr_array().
+     */
+    public static function coerceStrtrReplacePairOperand(Variable $var, ?Frame $frame = null): string
+    {
+        $var = $var->resolveIndirect();
+        $vm = VM::running();
+        if (null !== $vm) {
+            return $vm->coerceVariableToString($var, $frame);
+        }
+
+        return $var->toString(null, $frame);
+    }
+
+    /**
      * Coerce a typed string builtin operand (php-src IS_STRING; rejects null, #12640).
      *
      * @throws \TypeError when the operand is null or cannot be converted like Zend PHP 8.x
@@ -4671,22 +4688,98 @@ final class VmString
     public const STRTR_EMPTY_REPLACEMENT_WARNING = 'strtr(): Ignoring replacement of empty string';
 
     /**
-     * strtr() replace_pairs HashTable form — nested JIT safe (numeric pair list, no string-key stores).
+     * strtr() replace_pairs HashTable form — php_strtr_array() parity (#28978).
+     *
+     * Keys are stringified up front (numeric keys via zend_long_to_str shape). Values use
+     * convert_to_string only when a match is selected (zval_get_tmp_string) — unused nested
+     * arrays must not warn. NestedJIT {@see StrtrArrayJitHelper} mirrors the lazy value cast.
      *
      * @see php/php-src ext/standard/string.c php_strtr_array()
      */
     public static function strtrArrayFromHashTable(string $string, HashTable $replacePairs, ?Frame $frame = null): string
     {
-        $tupleList = [];
-        // NestedJIT: `$pair[0]`/`$pair[1]` only — list-assign aborts (#27020 / #27056).
-        foreach ($replacePairs->exportKeyValuePairs(true) as $pair) {
-            $tupleList[] = [
-                self::coerceStringBuiltinArg($pair[0], 'strtr', 1, 'replace_pairs'),
-                self::coerceStringBuiltinArg($pair[1], 'strtr', 1, 'replace_pairs'),
-            ];
+        $slen = self::byteLength($string);
+        if (0 === $slen) {
+            return '';
         }
 
-        return self::strtrArrayFromPairTuples($string, $tupleList, $frame);
+        /** @var array<string, Variable> $byFrom */
+        $byFrom = [];
+        $minlen = $slen + 1;
+        $maxlen = 0;
+        $firstChars = [];
+        $lengths = [];
+
+        foreach ($replacePairs->exportKeyValuePairs(true) as $pair) {
+            $from = self::coerceStrtrReplacePairOperand($pair[0], $frame);
+            if ('' === $from) {
+                self::warnStrtrEmptyReplacement($frame);
+                continue;
+            }
+            $len = self::byteLength($from);
+            if ($len > $slen) {
+                continue;
+            }
+            if ($len < $minlen) {
+                $minlen = $len;
+            }
+            if ($len > $maxlen) {
+                $maxlen = $len;
+            }
+            $firstChars[\ord($from[0])] = true;
+            $lengths[$len] = true;
+            $byFrom[$from] = $pair[1];
+        }
+
+        if ($minlen > $maxlen || [] === $byFrom) {
+            return $string;
+        }
+
+        if (1 === \count($byFrom)) {
+            $fromKey = \array_key_first($byFrom);
+            $from = \is_string($fromKey) ? $fromKey : (string) $fromKey;
+            $to = self::coerceStrtrReplacePairOperand($byFrom[$fromKey], $frame);
+            if (1 === self::byteLength($from) && 1 === self::byteLength($to)) {
+                return self::strtr($string, $from, $to);
+            }
+
+            return self::strReplace($from, $to, $string);
+        }
+
+        $out = '';
+        $pos = 0;
+        $oldPos = 0;
+
+        while ($pos <= $slen - $minlen) {
+            if (isset($firstChars[\ord($string[$pos])])) {
+                $tryLen = $maxlen;
+                if ($tryLen > $slen - $pos) {
+                    $tryLen = $slen - $pos;
+                }
+                while ($tryLen >= $minlen) {
+                    if (isset($lengths[$tryLen])) {
+                        $key = self::byteSlice($string, $pos, $tryLen);
+                        if (isset($byFrom[$key])) {
+                            $out .= self::byteSlice($string, $oldPos, $pos - $oldPos);
+                            $out .= self::coerceStrtrReplacePairOperand($byFrom[$key], $frame);
+                            $oldPos = $pos + $tryLen;
+                            $pos = $oldPos - 1;
+                            break;
+                        }
+                    }
+                    --$tryLen;
+                }
+            }
+            ++$pos;
+        }
+
+        if ('' !== $out) {
+            $out .= self::byteSlice($string, $oldPos);
+
+            return $out;
+        }
+
+        return $string;
     }
 
     /**
@@ -4738,8 +4831,10 @@ final class VmString
             if (!\is_string($to)) {
                 $to = (string) $to;
             }
-            if (1 === self::byteLength($from)) {
-                return self::strtr($string, $from, self::byteSlice($to, 0, 1));
+            // Three-arg strtr() only maps 1-byte→1-byte; empty/multi-byte $to need str_replace
+            // (#28978 nested "Array", #28976 empty deletion).
+            if (1 === self::byteLength($from) && 1 === self::byteLength($to)) {
+                return self::strtr($string, $from, $to);
             }
 
             return self::strReplace($from, $to, $string);
@@ -4798,6 +4893,10 @@ final class VmString
         $lengths = [];
 
         foreach ($pairs as $from => $to) {
+            // PHP array keys coerce numeric-strings to int (#28977); stringify before byteLength.
+            if (!\is_string($from)) {
+                $from = (string) $from;
+            }
             $len = self::byteLength($from);
             if ($len < $minlen) {
                 $minlen = $len;

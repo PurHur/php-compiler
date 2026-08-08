@@ -28,12 +28,8 @@ final class strtr extends Internal
             if (Variable::TYPE_ARRAY !== $pairs->type) {
                 throw self::twoArgSecondTypeError($frame, $pairs);
             }
-            $replacePairs = [];
-            foreach ($pairs->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
-                $replacePairs[VmString::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs')] =
-                    VmString::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs');
-            }
-            $result = VmString::strtrArray($string, $replacePairs, $frame);
+            // php_strtr_array() — lazy zval_get_tmp_string on values (#28978).
+            $result = VmString::strtrArrayFromHashTable($string, $pairs->toArray(), $frame);
             BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->string($result));
 
             return;

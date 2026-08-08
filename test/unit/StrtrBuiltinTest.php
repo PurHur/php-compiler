@@ -55,6 +55,17 @@ PHP;
         $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
     }
 
+    /** Nested array replace values — convert_to_string / lazy zval_get_tmp_string (#28978). */
+    public function testVmNestedArrayReplaceValueMatchesZend(): void
+    {
+        $code = (string) file_get_contents(
+            dirname(__DIR__, 2).'/test/repro/issue_28978_strtr_nested_array_value.php'
+        );
+        $expect = "Hi\nunused_warns=[]\nArrayi\nused_warns=[\"2:Array to string conversion\"]\n"
+            ."Error:Object of class stdClass could not be converted to string\n";
+        $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
+    }
+
     /**
      * @group llvm
      * @group jit
