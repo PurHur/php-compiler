@@ -569,6 +569,12 @@ final class BuiltinInternalArgInfo
             },
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
+            // ext/calendar/calendar.stub.php — ?int $year = null, int $mode = 0 (#28781, re-#24509)
+            'easter_date', 'easter_days' => match ($index) {
+                0 => '?int',
+                1 => 'int',
+                default => null,
+            },
             // Zend/zend_builtin_functions.stub.php — mixed $object_or_class; InternalArgInfo empty (#26359)
             'is_a', 'is_subclass_of' => 0 === $index ? 'mixed' : null,
             // Zend/zend_builtin_functions.stub.php + basic_functions.stub.php — mixed $value; InternalArgInfo untyped (#26376)

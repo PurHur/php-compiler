@@ -399,6 +399,15 @@ final class BuiltinInternalDefaultValues
         'unixtojd' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/calendar/calendar.stub.php — ?int $year = null, int $mode = 0 (#28781)
+        'easter_date' => [
+            0 => ['kind' => 'null'],
+            1 => ['kind' => 'int', 'value' => 0],
+        ],
+        'easter_days' => [
+            0 => ['kind' => 'null'],
+            1 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/standard/array.stub.php — callback=null, mode=0 (#24843)
         'array_filter' => [
             1 => ['kind' => 'null'],
