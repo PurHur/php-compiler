@@ -8,6 +8,7 @@ use PHPLLVM\Value;
 use PHPCompiler\Block;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\LazyObjectHelper;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
 use PHPCompiler\VM\CloneSupport;
@@ -16,6 +17,9 @@ use PHPLLVM\Value\Function_;
 
 /**
  * TYPE_CLONE lowering — runtime object check matches Zend/zend_clones.c (#19097).
+ *
+ * Lazy objects: Zend/zend_lazy_objects.c zend_lazy_object_clone initializes
+ * before clone (#29171).
  */
 final class CloneOperandHelper
 {
@@ -64,6 +68,8 @@ final class CloneOperandHelper
         Value $srcObj
     ): void {
         self::emitDenyCloneGuard($jit, $context, $srcObj);
+        // zend_lazy_object_clone — initialize pending lazy before shallow copy (#29171).
+        LazyObjectHelper::emitEnsureInitialized($context, $srcObj);
         $cloned = $context->type->object->cloneObject($srcObj);
         $context->type->object->invokeCloneMagicIfPresent($block, $cloned);
         $objVar = new Variable(

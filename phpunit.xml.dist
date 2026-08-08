@@ -90,6 +90,8 @@
             <file>./test/compliance/AnonymousClassImplementsNameJITTest.php</file>
             <file>./test/compliance/IncompleteClassAccessWarningPrefixVMTest.php</file>
             <file>./test/compliance/IncompleteClassAccessWarningPrefixJITTest.php</file>
+            <file>./test/compliance/LazyGhostCloneInitializesVMTest.php</file>
+            <file>./test/compliance/LazyGhostCloneInitializesJITTest.php</file>
             <file>./test/compliance/DatePeriodCreateFromISO8601StringReflectionVMTest.php</file>
             <file>./test/compliance/LocaltimeReflectionVMTest.php</file>
             <file>./test/compliance/FuncGetArgReflectionMixedVMTest.php</file>
