@@ -21,11 +21,16 @@ final class VmConstants
 
     /**
      * constant() lookup — user/core constants and Class::CONST (#5926, basic_functions.c).
+     *
+     * @param ?string $callerClassLc active class scope for Class::CONST visibility (#29130)
      */
-    public static function constantLookup(Context $ctx, string $name): ?Variable
-    {
+    public static function constantLookup(
+        Context $ctx,
+        string $name,
+        ?string $callerClassLc = null
+    ): ?Variable {
         if (str_contains($name, '::')) {
-            return self::lookupClassConstant($ctx, $name);
+            return self::lookupClassConstant($ctx, $name, $callerClassLc);
         }
 
         return self::globalConstantLookup($ctx, $name);
@@ -46,11 +51,16 @@ final class VmConstants
 
     /**
      * defined() lookup — existence without materializing value (#4972, basic_functions.c).
+     *
+     * @param ?string $callerClassLc active class scope for Class::CONST visibility (#29130)
      */
-    public static function constantDefined(Context $ctx, string $name): bool
-    {
+    public static function constantDefined(
+        Context $ctx,
+        string $name,
+        ?string $callerClassLc = null
+    ): bool {
         if (str_contains($name, '::')) {
-            return self::isClassConstantDefined($ctx, $name);
+            return self::isClassConstantDefined($ctx, $name, $callerClassLc);
         }
 
         return self::globalConstantDefined($ctx, $name);
@@ -70,10 +80,13 @@ final class VmConstants
     }
 
     /**
-     * @see Zend zif_constant — zend_fetch_class + class constant table
+     * @see Zend zif_defined — class constant exists and is visible from caller scope (#29130)
      */
-    private static function isClassConstantDefined(Context $ctx, string $qualifiedName): bool
-    {
+    private static function isClassConstantDefined(
+        Context $ctx,
+        string $qualifiedName,
+        ?string $callerClassLc
+    ): bool {
         $pos = strrpos($qualifiedName, '::');
         if (false === $pos) {
             return false;
@@ -94,17 +107,20 @@ final class VmConstants
         if ($classEntry->isTrait) {
             return false;
         }
-        $constKey = VmReflection::findClassConstantKey($classEntry, $constName, $ctx);
-        if (null === $constKey) {
+        // Exact casing key (#25910) — do not strtolower; that missed visibility and treated private as public (#29130).
+        $decl = VmReflection::findClassConstantDecl($classEntry, $constName, $ctx);
+        if (null === $decl) {
             return false;
         }
-        $constLc = strtolower($constName);
-        $vis = $classEntry->constVisibility[$constLc] ?? CfgFunc::FLAG_PUBLIC;
+        $declaring = $decl['declaring'];
+        $constKey = $decl['constLc'];
+        $vis = $declaring->constVisibility[$constKey] ?? CfgFunc::FLAG_PUBLIC;
+        $declaringLc = strtolower(ltrim($declaring->name, '\\'));
         try {
             ClassConstVisibility::assertAccessible(
                 $vis,
-                null,
-                $classLc,
+                $callerClassLc,
+                $declaringLc,
                 $classEntry->name,
                 $constName,
                 static fn (string $callerLc, string $ancestorLc): bool => isset($ctx->classes[$callerLc])
@@ -118,10 +134,13 @@ final class VmConstants
     }
 
     /**
-     * @see Zend zif_constant — zend_fetch_class + class constant table
+     * @see Zend zif_constant — zend_fetch_class + class constant table + visibility (#29130)
      */
-    private static function lookupClassConstant(Context $ctx, string $qualifiedName): ?Variable
-    {
+    private static function lookupClassConstant(
+        Context $ctx,
+        string $qualifiedName,
+        ?string $callerClassLc
+    ): ?Variable {
         $pos = strrpos($qualifiedName, '::');
         if (false === $pos) {
             return null;
@@ -144,20 +163,21 @@ final class VmConstants
                 "Cannot access trait constant {$classEntry->name}::{$constName} directly"
             );
         }
-        $constLc = strtolower($constName);
         // Walk parentLc so subclass::CONST (e.g. RecursiveArrayIterator::ARRAY_AS_PROPS) resolves (#22348).
+        // Visibility keyed by ClassConstName::key (exact case), not strtolower (#29130 / #25910).
         $decl = VmReflection::findClassConstantDecl($classEntry, $constName, $ctx);
         if (null === $decl) {
             return null;
         }
         $declaring = $decl['declaring'];
         $constKey = $decl['constLc'];
-        $vis = $declaring->constVisibility[$constLc] ?? CfgFunc::FLAG_PUBLIC;
+        $vis = $declaring->constVisibility[$constKey] ?? CfgFunc::FLAG_PUBLIC;
+        $declaringLc = strtolower(ltrim($declaring->name, '\\'));
         try {
             ClassConstVisibility::assertAccessible(
                 $vis,
-                null,
-                $classLc,
+                $callerClassLc,
+                $declaringLc,
                 $classEntry->name,
                 $constName,
                 static fn (string $callerLc, string $ancestorLc): bool => isset($ctx->classes[$callerLc])

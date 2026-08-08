@@ -45,7 +45,11 @@ final class constant_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('constant() requires VM context');
         }
-        $value = VmConstants::constantLookup($frame->vmContext, $name);
+        $value = VmConstants::constantLookup(
+            $frame->vmContext,
+            $name,
+            VmReflection::callerClassLcFromFrame($frame)
+        );
         if (null !== $value) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->copyFrom($value);
