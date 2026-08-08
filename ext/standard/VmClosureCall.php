@@ -7,7 +7,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmExecutingFrame;
+use PHPCompiler\Web\Superglobals;
 
 /**
  * Invoke VM closures from builtin callbacks (array_map, array_filter, usort; issue #72).
@@ -182,7 +188,10 @@ final class VmClosureCall
         return $value > 0 ? 1 : ($value < 0 ? -1 : 0);
     }
 
-    /** php-src php_usort_compare — bool true→1, false→-1; int/float sign-normalized (#13029). */
+    /**
+     * php-src php_usort_compare / php_get_long on comparator retval (#13029, #29124).
+     * Bool true→1, false→-1; int/float sign-normalized; plain object → E_WARNING + 1.
+     */
     public static function coerceUserSortCallbackResult(Variable $result): int
     {
         $result = $result->resolveIndirect();
@@ -190,9 +199,7 @@ final class VmClosureCall
             return $result->toBool() ? 1 : -1;
         }
         if (Variable::TYPE_INTEGER === $result->type) {
-            $value = $result->toInt();
-
-            return $value > 0 ? 1 : ($value < 0 ? -1 : 0);
+            return self::normalizeCompareSign($result->toInt());
         }
         if (Variable::TYPE_FLOAT === $result->type) {
             $value = $result->toFloat();
@@ -205,8 +212,43 @@ final class VmClosureCall
 
             return 0;
         }
+        if (Variable::TYPE_OBJECT === $result->type) {
+            $object = $result->toObject();
+            if (!ResourceSupport::isResourceObject($object) && !EnumCaseSupport::isEnumCase($object)) {
+                $sxeInt = \PHPCompiler\ext\simplexml\VmSimpleXml::tryCastObjectToInt($object);
+                if (null !== $sxeInt) {
+                    return self::normalizeCompareSign($sxeInt);
+                }
+                // zend_operators convert_to_long — E_WARNING + legacy 1 (#29124).
+                self::emitPlainObjectToIntWarning($object);
 
-        return $result->toInt();
+                return 1;
+            }
+        }
+
+        return self::normalizeCompareSign($result->toInt());
+    }
+
+    /** php-src convert_to_long plain-object branch — E_WARNING + legacy 1 (#29124). */
+    private static function emitPlainObjectToIntWarning(ObjectEntry $object): void
+    {
+        $context = Superglobals::getActiveContext();
+        if (null === $context) {
+            return;
+        }
+        $frame = null;
+        try {
+            $frame = VmExecutingFrame::requireFromActiveContext();
+        } catch (\LogicException) {
+            $frame = null;
+        }
+        $context->errors->triggerError(
+            'Object of class '.$object->class->name.' could not be converted to int',
+            ErrorReporter::E_WARNING,
+            null !== $frame && '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $context,
+            $frame
+        );
     }
 
     /**
