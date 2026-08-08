@@ -6,18 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for round() via RoundJitHelper PHP (#15211, #26800).
+ * JIT/AOT link for round() via RoundJitHelper PHP (#15211, #26800, #28913).
  *
- * Replaces ~477 LOC inline LLVM in ext/standard/JitRoundLowering.php.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathFloor #27650 / MathNextafter #28716 shape).
+ * NestedJIT no longer skips the bridge — RoundJitHelper is NestedJIT-safe (no \floor/\ceil/\abs).
+ * Replaces ~477 LOC inline LLVM formerly in ext/standard/JitRoundLowering.php.
  * SSOT: {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.
  * php-src: ext/standard/math.c — _php_math_round
- *
- * Solo RoundJitHelper NestedJIT (algorithm is same-class — no cross-class stub).
- * Peer AbsJitHelper; metaphone needed HELPER_BUNDLE only because SSOT was elsewhere (#26794).
  */
 final class MathRound
 {
@@ -65,11 +63,6 @@ final class MathRound
             return;
         }
 
-        // Skip NestedJIT of RoundJitHelper inside another helper (#26862).
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $double = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
@@ -81,7 +74,7 @@ final class MathRound
             self::ROUND_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15211'
+            '#28913'
         );
     }
 }

@@ -50,7 +50,7 @@ final class Ieee754Test extends TestCase
         $this->assertSame(-INF, Ieee754::decodeFloat32(Ieee754::encodeFloat32(-INF, true), true));
     }
 
-    /** NestedJIT pack must not call \round() — MathRound skips under NestedJIT (#26862). */
+    /** NestedJIT pack must not call \round() — inline half-up (#26862; MathRound always ensureBridge #28913). */
     public function testEncodeAvoidsHostRoundBuiltin(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Ieee754.php');
