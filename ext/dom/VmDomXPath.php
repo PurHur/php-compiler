@@ -81,6 +81,10 @@ final class VmDomXPath
     public static function registerNamespace(ObjectEntry $xpath, string $prefix, string $namespaceUri): bool
     {
         self::ensureXPath($xpath);
+        // php-src xpath.c → xmlXPathRegisterNs: empty/NULL prefix fails (cannot register default NS this way).
+        if ('' === $prefix) {
+            return false;
+        }
         DomRegistry::state($xpath)->xpathNamespaces[$prefix] = $namespaceUri;
 
         return true;

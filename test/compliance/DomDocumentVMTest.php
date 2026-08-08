@@ -430,6 +430,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_node_c14n_xpath_nodeset.phpt',
             'dom_node_c14n_xpath_nodeset.phpt'
         );
+        yield 'dom_xpath_register_namespace_empty_prefix.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_xpath_register_namespace_empty_prefix.phpt',
+            'dom_xpath_register_namespace_empty_prefix.phpt'
+        );
     }
 
     public function setUp(): void
