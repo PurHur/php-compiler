@@ -2692,6 +2692,12 @@ class Compiler {
                         break;
                     } elseif ($this->isLoweredByFollowingThrow($child, $ops, $i)) {
                         break;
+                    } elseif (
+                        $child instanceof Op\Expr\Throw_
+                        && $this->throwResultFeedsFollowingIsset($child, $ops, $i)
+                    ) {
+                        // php-cfg emits Throw_ before Isset_ for isset(throw …); do not run the throw (#29086).
+                        $this->throwCompileError(self::ISSET_EXPRESSION_COMPILE_ERROR);
                     } elseif ($this->isUnreachableAfterThrow($child, $ops, $i)) {
                         break;
                     } elseif ($this->isUnreachableAfterNeverCall($child, $ops, $i)) {
@@ -14101,6 +14107,34 @@ class Compiler {
                 return true;
             }
             if (!$ops[$j] instanceof Op\Expr) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg emits `Throw_` then `Isset_(throw.result)` for `isset(throw …)`.
+     * Without a look-ahead, isUnreachableAfterThrow skips Isset_ and the throw runs (#29086).
+     *
+     * @param Op[] $ops
+     */
+    private function throwResultFeedsFollowingIsset(Op\Expr\Throw_ $throw, array $ops, int $index): bool
+    {
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\Isset_) {
+                foreach ($next->vars as $var) {
+                    if ($this->operandsChainEqual($throw->result, $var)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            if (!$next instanceof Op\Expr) {
                 return false;
             }
         }
