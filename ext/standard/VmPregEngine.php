@@ -831,9 +831,23 @@ final class VmPregEngine
     {
         $this->advance(1);
         if ($this->atEnd()) {
-            $this->abortCompile(); return new VmPregAstEmptyNode();
+            $this->abortCompile();
+
+            return [];
         }
         $ch = $this->peek();
+        if ('x' === $ch) {
+            $this->advance(1);
+            $bytes = $this->parseHexEscapeBytes();
+            if (null === $bytes || 1 !== \strlen($bytes)) {
+                // Multi-byte UTF-8 class members need codepoint-aware ClassNode (#29024 follow-up).
+                $this->abortCompile();
+
+                return [];
+            }
+
+            return [[$bytes, $bytes]];
+        }
         $this->advance(1);
 
         return match ($ch) {
@@ -869,16 +883,14 @@ final class VmPregEngine
         }
         if ('x' === $ch) {
             $this->advance(1);
-            $hex = '';
-            for ($i = 0; $i < 2 && !$this->atEnd() && \ctype_xdigit($this->peek()); ++$i) {
-                $hex .= $this->peek();
-                $this->advance(1);
-            }
-            if ('' === $hex) {
-                $this->abortCompile(); return new VmPregAstEmptyNode();
+            $bytes = $this->parseHexEscapeBytes();
+            if (null === $bytes) {
+                $this->abortCompile();
+
+                return new VmPregAstEmptyNode();
             }
 
-            return new VmPregAstCharNode(\chr((int) \hexdec($hex)), $this->caseless);
+            return new VmPregAstCharNode($bytes, $this->caseless);
         }
         if ('p' === $ch || 'P' === $ch) {
             $this->advance(1);
@@ -916,6 +928,55 @@ final class VmPregEngine
             'z' => new VmPregAstEolNode(false, true),
             default => new VmPregAstCharNode($ch, $this->caseless),
         };
+    }
+
+    /**
+     * Parse PCRE2 `\xHH` / `\x{…}` after the `x` has been consumed (#29024).
+     *
+     * Brace form: Unicode code point under `/u` (UTF-8 bytes); otherwise a single byte (≤0xFF).
+     * Bare form: up to two hex digits (empty → NUL byte, matching PCRE2).
+     *
+     * @return string|null encoded character bytes, or null on compile failure
+     */
+    private function parseHexEscapeBytes(): ?string
+    {
+        if (!$this->atEnd() && '{' === $this->peek()) {
+            $this->advance(1);
+            $hex = '';
+            while (!$this->atEnd() && '}' !== $this->peek()) {
+                $digit = $this->peek();
+                if (!\ctype_xdigit($digit)) {
+                    return null;
+                }
+                $hex .= $digit;
+                $this->advance(1);
+            }
+            if ($this->atEnd() || '}' !== $this->peek() || '' === $hex) {
+                return null;
+            }
+            $this->advance(1);
+            $cp = (int) \hexdec($hex);
+            if ($this->utf) {
+                return VmPregUtf8::encodeCodepoint($cp);
+            }
+            if ($cp > 0xFF) {
+                return null;
+            }
+
+            return \chr($cp);
+        }
+
+        $hex = '';
+        for ($i = 0; $i < 2 && !$this->atEnd() && \ctype_xdigit($this->peek()); ++$i) {
+            $hex .= $this->peek();
+            $this->advance(1);
+        }
+        if ('' === $hex) {
+            // PCRE2: `\x` with no digits is U+0000 / NUL (not a compile error).
+            return "\0";
+        }
+
+        return \chr((int) \hexdec($hex));
     }
 
     /** Parse `\p{L}` / `\P{L}` / `\pL` Unicode property escapes (PCRE2, #22003). */
@@ -1857,19 +1918,21 @@ final class VmPregAstCharNode implements VmPregAstNode
         array &$captures
     ): bool {
         unset($engine);
-        if ($pos >= $len) {
+        $want = $this->char;
+        $wantLen = \strlen($want);
+        if ($wantLen < 1 || $pos + $wantLen > $len) {
             return false;
         }
-        $sub = $subject[$pos];
-        $want = $this->char;
-        if ($this->caseless) {
+        $sub = $wantLen === 1 ? $subject[$pos] : \substr($subject, $pos, $wantLen);
+        if ($this->caseless && 1 === $wantLen) {
+            // ASCII caseless only for single-byte literals (PCRE2 Unicode caseless is separate).
             if (\strtolower($sub) !== \strtolower($want)) {
                 return false;
             }
         } elseif ($sub !== $want) {
             return false;
         }
-        $captures[0] = [$pos, $pos + 1];
+        $captures[0] = [$pos, $pos + $wantLen];
 
         return true;
     }
