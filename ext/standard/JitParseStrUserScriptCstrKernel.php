@@ -19,6 +19,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * hand-lowering mirrors {@see ParseStrEngine} for runtime libc getenv strings.
  * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19466 / #19500.
  * Bracket-key split uses {@see StringStrspn} {@code __compiler_strcspn} (#29050), not libc.
+ * Pair split uses module-local {@code __compiler_strtok_r} (#29091), not libc {@code strtok_r}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class JitParseStrUserScriptCstrKernel
@@ -41,6 +42,7 @@ final class JitParseStrUserScriptCstrKernel
         self::ensureLibc($context);
         self::ensureHashtableHelpers($context);
 
+        self::implementIfMissing($context, '__compiler_strtok_r', self::emitCompilerStrtokR(...));
         self::implementIfMissing($context, '__phpc_parse_str_cstr_to_string', self::emitCstrToString(...));
         self::implementIfMissing($context, '__phpc_parse_str_set_string_key', self::emitSetStringKey(...));
         self::implementIfMissing($context, '__phpc_parse_str_url_decode_inplace', self::emitUrlDecodeInplace(...));
@@ -89,6 +91,10 @@ final class JitParseStrUserScriptCstrKernel
         $voidPtr = $context->getTypeFromString('void*');
 
         return match ($name) {
+            '__compiler_strtok_r' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i8p, false, $i8p, $i8p, $i8p->pointerType(0))
+            ),
             '__phpc_parse_str_cstr_to_string' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($strPtr, false, $i8p)
@@ -138,7 +144,6 @@ final class JitParseStrUserScriptCstrKernel
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
-        $i8pp = $i8p->pointerType(0);
 
         self::ensureExternal($context, 'malloc', $context->context->functionType($voidPtr, false, $sizeT));
         self::ensureExternal($context, 'free', $context->context->functionType($voidTy, false, $i8p));
@@ -155,11 +160,7 @@ final class JitParseStrUserScriptCstrKernel
         self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
         self::ensureExternal($context, 'strchr', $context->context->functionType($i8p, false, $i8p, $i32));
         StringStrspn::ensureLinked($context);
-        self::ensureExternal(
-            $context,
-            'strtok_r',
-            $context->context->functionType($i8p, false, $i8p, $i8p, $i8pp)
-        );
+        // strtok_r → __compiler_strtok_r via ensureSubhelpers (#29091).
     }
 
     private static function ensureHashtableHelpers(Context $context): void
@@ -192,6 +193,127 @@ final class JitParseStrUserScriptCstrKernel
             $fn = $context->module->addFunction($name, $fnType);
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /**
+     * POSIX strtok_r for the parse_str single-char delimiter path (#29091).
+     *
+     * Delimiter string is treated as a set of separator bytes (kernel uses one char + NUL).
+     */
+    private static function emitCompilerStrtokR(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('strtok_r_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, false);
+        $zero8 = $i8->constInt(0, false);
+        $null = $i8p->constNull();
+
+        $strArg = $fn->getParam(0);
+        $delim = $fn->getParam(1);
+        $savePtr = $fn->getParam(2);
+
+        $strSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $isNullStr = $context->builder->icmp(Builder::INT_EQ, $strArg, $null);
+        $fromSave = $context->builder->load($savePtr);
+        $context->builder->store(
+            $context->builder->select($isNullStr, $fromSave, $strArg),
+            $strSlot
+        );
+
+        $strNow = $context->builder->load($strSlot);
+        $noStr = $context->builder->icmp(Builder::INT_EQ, $strNow, $null);
+        $retNullBb = $fn->appendBasicBlock('strtok_r_ret_null');
+        $skipDelimBb = $fn->appendBasicBlock('strtok_r_skip_delim');
+        $context->builder->branchIf($noStr, $retNullBb, $skipDelimBb);
+
+        $context->builder->positionAtEnd($retNullBb);
+        $context->builder->store($null, $savePtr);
+        $context->builder->returnValue($null);
+
+        // Skip leading delimiter bytes.
+        $context->builder->positionAtEnd($skipDelimBb);
+        $skipHead = $fn->appendBasicBlock('strtok_r_skip_head');
+        $skipBody = $fn->appendBasicBlock('strtok_r_skip_body');
+        $afterSkip = $fn->appendBasicBlock('strtok_r_after_skip');
+        $context->builder->branch($skipHead);
+
+        $context->builder->positionAtEnd($skipHead);
+        $p = $context->builder->load($strSlot);
+        $ch = $context->builder->load($p);
+        $atEnd = $context->builder->icmp(Builder::INT_EQ, $ch, $zero8);
+        $context->builder->branchIf($atEnd, $afterSkip, $skipBody);
+
+        $context->builder->positionAtEnd($skipBody);
+        $p = $context->builder->load($strSlot);
+        $ch = $context->builder->load($p);
+        $ch32 = $context->builder->zExt($ch, $i32);
+        $inDelim = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('strchr'), $delim, $ch32),
+            $null
+        );
+        $skipAdv = $fn->appendBasicBlock('strtok_r_skip_adv');
+        $context->builder->branchIf($inDelim, $skipAdv, $afterSkip);
+
+        $context->builder->positionAtEnd($skipAdv);
+        $p = $context->builder->load($strSlot);
+        $context->builder->store($context->builder->inBoundsGEP($p, $one), $strSlot);
+        $context->builder->branch($skipHead);
+
+        $context->builder->positionAtEnd($afterSkip);
+        $p = $context->builder->load($strSlot);
+        $ch = $context->builder->load($p);
+        $emptyTok = $context->builder->icmp(Builder::INT_EQ, $ch, $zero8);
+        $scanBb = $fn->appendBasicBlock('strtok_r_scan');
+        $context->builder->branchIf($emptyTok, $retNullBb, $scanBb);
+
+        $context->builder->positionAtEnd($scanBb);
+        $token = $context->builder->load($strSlot);
+        $tokenSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $context->builder->store($token, $tokenSlot);
+        $scanHead = $fn->appendBasicBlock('strtok_r_scan_head');
+        $scanBody = $fn->appendBasicBlock('strtok_r_scan_body');
+        $scanHit = $fn->appendBasicBlock('strtok_r_scan_hit');
+        $scanEnd = $fn->appendBasicBlock('strtok_r_scan_end');
+        $context->builder->branch($scanHead);
+
+        $context->builder->positionAtEnd($scanHead);
+        $p = $context->builder->load($strSlot);
+        $ch = $context->builder->load($p);
+        $atNul = $context->builder->icmp(Builder::INT_EQ, $ch, $zero8);
+        $context->builder->branchIf($atNul, $scanEnd, $scanBody);
+
+        $context->builder->positionAtEnd($scanBody);
+        $p = $context->builder->load($strSlot);
+        $ch = $context->builder->load($p);
+        $ch32 = $context->builder->zExt($ch, $i32);
+        $hitDelim = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('strchr'), $delim, $ch32),
+            $null
+        );
+        $scanInc = $fn->appendBasicBlock('strtok_r_scan_inc');
+        $context->builder->branchIf($hitDelim, $scanHit, $scanInc);
+
+        $context->builder->positionAtEnd($scanInc);
+        $p = $context->builder->load($strSlot);
+        $context->builder->store($context->builder->inBoundsGEP($p, $one), $strSlot);
+        $context->builder->branch($scanHead);
+
+        $context->builder->positionAtEnd($scanHit);
+        $p = $context->builder->load($strSlot);
+        $context->builder->store($zero8, $p);
+        $context->builder->store($context->builder->inBoundsGEP($p, $one), $savePtr);
+        $context->builder->returnValue($context->builder->load($tokenSlot));
+
+        $context->builder->positionAtEnd($scanEnd);
+        $context->builder->store($context->builder->load($strSlot), $savePtr);
+        $context->builder->returnValue($context->builder->load($tokenSlot));
     }
 
     private static function emitCstrToString(Context $context, LlvmFunction $fn): void
@@ -838,7 +960,7 @@ final class JitParseStrUserScriptCstrKernel
         $saveSlot = BasicBlockHelper::entryAlloca($context, $i8p);
 
         $pair = $context->builder->call(
-            $context->lookupFunction('strtok_r'),
+            $context->lookupFunction('__compiler_strtok_r'),
             $copy,
             $context->builder->pointerCast($delimSlot, $i8p),
             $saveSlot
@@ -947,7 +1069,7 @@ final class JitParseStrUserScriptCstrKernel
 
         $context->builder->positionAtEnd($skipBb);
         $next = $context->builder->call(
-            $context->lookupFunction('strtok_r'),
+            $context->lookupFunction('__compiler_strtok_r'),
             $i8p->constNull(),
             $context->builder->pointerCast($delimSlot, $i8p),
             $saveSlot

@@ -36,6 +36,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'fsync',
             'fdatasync',
             'sscanf',
+            'strtok_r',
         ];
     }
 

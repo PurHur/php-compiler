@@ -46,7 +46,7 @@ final class LibcExtern
             'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],
             'strtod' => [$dbl, false, [$i8p, $i8pp]],
             'strdup' => [$i8p, false, [$i8p]],
-            'strtok_r' => [$i8p, false, [$i8p, $i8p, $i8pp]],
+            // strtok_r dropped (#29091): parse_str AOT kernel uses __compiler_strtok_r.
             'fopen' => [$i8p, false, [$i8p, $i8p]],
             'fread' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
             'fwrite' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
