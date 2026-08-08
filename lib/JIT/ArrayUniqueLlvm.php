@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\strval;
+use PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -271,16 +272,14 @@ final class ArrayUniqueLlvm
     private static function signatureString(Context $context, Variable $valVar, int $sortType): Value
     {
         $valPtr = JitValueBox::valuePtrFromVariable($context, $valVar);
-        // SORT_NUMERIC: coerce a *copy* via __value__toNumeric so the kept entry stays pristine.
+        // SORT_NUMERIC: php-src numeric_compare_function — double equality (#29113).
+        // __value__toNumeric + strval left int "1" and float/string "1.0" in different buckets.
         if (StdlibConstants::SORT_NUMERIC === $sortType) {
-            $tmp = JitValueBox::alloc($context);
-            JitValueBox::copyFromPointer($context, $tmp, $valPtr);
-            $tmpPtr = JitValueBox::pointer($context, $tmp);
-            $context->builder->call($context->lookupFunction('__value__toNumeric'), $tmpPtr);
-            // toNumeric may leave a long or double — normalize via strval of the coerced box.
+            $double = self::valueAsNumericDouble($context, $valPtr);
+
             return $context->builder->call(
                 $context->lookupFunction('__string__separate'),
-                (new strval())->valueToString($context, $tmpPtr)
+                ZendDoubleStringRuntime::format($context, $double)
             );
         }
 
@@ -288,6 +287,111 @@ final class ArrayUniqueLlvm
             $context->lookupFunction('__string__separate'),
             (new strval())->valueToString($context, $valPtr)
         );
+    }
+
+    /**
+     * Coerce a value-box to double for SORT_NUMERIC signatures (zend numeric_compare_function).
+     * Strings use strtod so "1.0" and 1 share a key; longs widen via siToFp.
+     */
+    private static function valueAsNumericDouble(Context $context, Value $valuePtr): Value
+    {
+        LibcExtern::register($context);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+        $tag = (string) (++self::$seq);
+
+        $nullBb = BasicBlockHelper::append($context, 'au_num_null_'.$tag);
+        $longBb = BasicBlockHelper::append($context, 'au_num_long_'.$tag);
+        $boolBb = BasicBlockHelper::append($context, 'au_num_bool_'.$tag);
+        $doubleBb = BasicBlockHelper::append($context, 'au_num_double_'.$tag);
+        $stringBb = BasicBlockHelper::append($context, 'au_num_string_'.$tag);
+        $fallbackBb = BasicBlockHelper::append($context, 'au_num_fallback_'.$tag);
+        $doneBb = BasicBlockHelper::append($context, 'au_num_done_'.$tag);
+
+        $afterNull = BasicBlockHelper::append($context, 'au_num_after_null_'.$tag);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NULL, false)),
+            $nullBb,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterNull);
+        $afterLong = BasicBlockHelper::append($context, 'au_num_after_long_'.$tag);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NATIVE_LONG, false)),
+            $longBb,
+            $afterLong
+        );
+        $context->builder->positionAtEnd($longBb);
+        $longFp = $context->builder->siToFp(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr),
+            $double
+        );
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'au_num_after_bool_'.$tag);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)),
+            $boolBb,
+            $afterBool
+        );
+        $context->builder->positionAtEnd($boolBb);
+        $boolFp = $context->builder->uiToFp(
+            JitValueBox::readBoolByte($context, $valuePtr),
+            $double
+        );
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterDouble = BasicBlockHelper::append($context, 'au_num_after_double_'.$tag);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)),
+            $doubleBb,
+            $afterDouble
+        );
+        $context->builder->positionAtEnd($doubleBb);
+        $nativeDouble = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $doubleEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_STRING, false)),
+            $stringBb,
+            $fallbackBb
+        );
+        $context->builder->positionAtEnd($stringBb);
+        $str = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $strMap = $context->structFieldMap['__string__'];
+        $charPtr = $context->builder->structGep($str, $strMap['value']);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+        $stringFp = $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($fallbackBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($double);
+        $phi->addIncoming($zero, $nullBb);
+        $phi->addIncoming($longFp, $longEnd);
+        $phi->addIncoming($boolFp, $boolEnd);
+        $phi->addIncoming($nativeDouble, $doubleEnd);
+        $phi->addIncoming($stringFp, $stringEnd);
+        $phi->addIncoming($zero, $fallbackBb);
+
+        return $phi;
     }
 
     private static function stringValueBoxFromString(Context $context, Value $str): Variable

@@ -116,14 +116,13 @@ final class ArrayUniqueJitHelper
         $seen->append($copy);
     }
 
+    /**
+     * php-src numeric_compare_function — equality is double equality, so int 1 and
+     * float/string 1.0 must share one seen-set bucket (#29113, re-#4253).
+     */
     private static function numericSeenKey(Variable $value): string
     {
-        $n = self::numericUniqueScalar($value);
-        if (\is_float($n)) {
-            return 'f:'.(string) $n;
-        }
-
-        return 'i:'.(string) $n;
+        return 'n:'.(string) (float) self::numericUniqueScalar($value);
     }
 
     public static function normalizeFlagsForCall(int $flags): int
