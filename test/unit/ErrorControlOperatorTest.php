@@ -22,5 +22,34 @@ final class ErrorControlOperatorTest extends BaseTest
             __DIR__.'/../compliance/cases/language/error_control_operator.phpt',
             'error_control_operator.phpt'
         );
+        yield 'at_silence_assign_undef_rhs.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/language/at_silence_assign_undef_rhs.phpt',
+            'at_silence_assign_undef_rhs.phpt'
+        );
+    }
+
+    /** Issue #29132 — `$a = @$undef` must not print Undefined variable on stderr. */
+    public function testAssignUndefRhsSilenceLeavesStderrEmpty(): void
+    {
+        $code = <<<'PHP'
+        <?php
+        error_reporting(E_ALL);
+        $a = @$undef_assign_rhs_29132_stderr;
+        echo "ok\n";
+        PHP;
+        $repoRoot = dirname(__DIR__, 2);
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        self::applyLlvmToolchainEnv($env);
+        unset($env['PHP_COMPILER_SKIP_LLVM_PRELOAD']);
+        $cmd = array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN]);
+        [$stdout, $exitCode, $stderr] = self::runVmSubprocess($cmd, $repoRoot, $env, $code, __FUNCTION__);
+        $this->assertSame(0, $exitCode, $stderr);
+        $this->assertSame("ok\n", $stdout);
+        $this->assertStringNotContainsString('Undefined variable', $stderr);
     }
 }

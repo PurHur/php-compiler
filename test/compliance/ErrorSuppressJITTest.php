@@ -26,6 +26,10 @@ final class ErrorSuppressJITTest extends BaseTest
             __DIR__.'/cases/language/error_suppress_jit.phpt',
             'error_suppress_jit.phpt'
         );
+        yield 'at_silence_assign_undef_rhs.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/at_silence_assign_undef_rhs.phpt',
+            'at_silence_assign_undef_rhs.phpt'
+        );
     }
 
     public function setUp(): void
