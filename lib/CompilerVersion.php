@@ -970,6 +970,26 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ range() ValueError split for zero vs oversized step (ext/standard/array.c; #28537).
+     *
+     * php-src 8.2 uses one message for both; 8.3+ uses "cannot be 0" / "must be less than the
+     * range spanned…". Requires explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` / `8.5` so the
+     * 8.4.0-dev reference profile still matches Zend 8.2.
+     */
+    public static function supportsRangeStepSplitErrors(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045, #12412, #15028, #15692).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.

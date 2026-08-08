@@ -669,6 +669,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testSupportsRangeStepSplitErrorsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRangeStepSplitErrors());
+    }
+
+    public function testSupportsRangeStepSplitErrorsTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsRangeStepSplitErrors());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsLazyObjectFactoriesFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsLazyObjectFactories());
