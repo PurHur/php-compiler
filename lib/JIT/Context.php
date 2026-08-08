@@ -83,6 +83,13 @@ class Context {
      * @var array<int, Variable>
      */
     public array $lazyInitClosures = [];
+
+    /**
+     * Proxy class names parallel to {@see $lazyInitProxies} for TypeError messages (#29170).
+     *
+     * @var array<int, string>
+     */
+    public array $lazyInitProxyClassNames = [];
     /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */
     public array $externalMethodStubs = [];
     public array $functionReturnType = [];
