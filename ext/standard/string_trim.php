@@ -15,7 +15,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringTrimMask;
-use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -38,10 +37,8 @@ final class string_trim extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('trim() requires one to three arguments');
-        }
+        // php-src string.stub.php — arity ≤2; no $mode (#28230 / #28202).
+        $this->requireArgCountRange($frame, 'trim', 1, 2);
         $string = self::vmStringArg($frame, 0, 'string');
         if ('' === $string) {
             if (null === $frame->returnVar) {
@@ -67,9 +64,8 @@ final class string_trim extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('trim() requires one to three arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'trim', 1, 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
         if (
             !$context->callerStrictTypes
@@ -91,43 +87,24 @@ final class string_trim extends Internal
         $literal = $args[0]->compileTimeString ?? null;
         $optional = \array_slice($args, 1);
         $optCount = \count($optional);
-        $modeLiteral = null;
-        $maskLiteral = null;
-        if (1 === $optCount) {
-            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[0]);
-            $maskLiteral = null === $modeLiteral ? ($optional[0]->compileTimeString ?? null) : null;
-        } elseif (2 === $optCount) {
-            $maskLiteral = $optional[0]->compileTimeString ?? null;
-            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[1]);
-        }
-        if (null !== $literal && (0 === $optCount || null !== $maskLiteral || null !== $modeLiteral)) {
+        $maskLiteral = 1 === $optCount ? ($optional[0]->compileTimeString ?? null) : null;
+        if (null !== $literal && (0 === $optCount || null !== $maskLiteral)) {
             $mask = null !== $maskLiteral ? $maskLiteral : VmString::TRIM_DEFAULT;
-            $mode = null !== $modeLiteral ? $modeLiteral : VmString::TRIM_SIDE_BOTH;
 
             return $context->builder->call(
                 $context->lookupFunction('__string__separate'),
                 $context->builder->load(
-                    $context->constantStringFromString(VmString::trimInt($literal, $mask, $mode))
+                    $context->constantStringFromString(
+                        VmString::trimInt($literal, $mask, VmString::TRIM_SIDE_BOTH)
+                    )
                 )
             );
         }
         $mode = VmString::TRIM_SIDE_BOTH;
         $maskStr = null;
         if (1 === $optCount) {
-            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[0]);
-            if (null !== $modeLiteral) {
-                $mode = $modeLiteral;
-            } else {
-                StringTrimMask::ensureLinked($context);
-                $maskStr = JitStringBuiltinArg::lower($context, $optional[0], 'trim', 1, 'characters');
-            }
-        } elseif (2 === $optCount) {
             StringTrimMask::ensureLinked($context);
             $maskStr = JitStringBuiltinArg::lower($context, $optional[0], 'trim', 1, 'characters');
-            $modeLiteral = StringTrimModeJit::compileTimeModeBitmask($context, $optional[1]);
-            if (null !== $modeLiteral) {
-                $mode = $modeLiteral;
-            }
         }
         $str = self::jitStringArg($context, $args[0], 0, 'string');
         $early = self::jitReturnIfCoercedEmptyTrimInput($context, $args[0], $str);

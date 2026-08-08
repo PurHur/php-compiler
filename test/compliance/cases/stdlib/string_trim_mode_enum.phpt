@@ -1,21 +1,19 @@
 --TEST--
-stdlib StringTrimMode enum for trim()/ltrim()/rtrim() (#7283, ext/standard/string.c)
+stdlib StringTrimMode phantom absent; trim arity ≤2 (#28202 / #28230, re-#7283)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 var_export(enum_exists('StringTrimMode', false));
 echo "\n";
-var_export(StringTrimMode::Both->name);
-echo "\n";
-var_export(StringTrimMode::Left->value);
-echo "\n";
-var_export(StringTrimMode::Right->value);
-echo "\n";
 echo trim('  x  '), "\n";
-echo trim('  x  ', StringTrimMode::Both), "\n";
-echo ltrim('  x  ', StringTrimMode::Left), "\n";
-echo rtrim('  x  ', StringTrimMode::Right), "\n";
-echo ltrim('  x  ', StringTrimMode::Both), "\n";
 echo trim('xxhelloxx', 'x'), "\n";
+try {
+    trim(' x ', ' ', true);
+    echo "uncaught\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
 enum Es: string { case B = 'hi'; }
 try {
     trim('  x  ', Es::B);
@@ -24,14 +22,8 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-true
-'Both'
-1
-2
-x
-x
-x  
-  x
+false
 x
 hello
+ArgumentCountError:trim() expects at most 2 arguments, 3 given
 trim(): Argument #2 ($characters) must be of type string, Es given
