@@ -758,6 +758,64 @@ PHP;
     }
 
     /**
+     * @covers issue #28816 — issue-body (re-#28627): `final public int` isFinal=1,
+     * WRITE_OK, sibling override CompileFatal under PROFILE=8.4/8.5; PROFILE=8.2
+     * rejects final on properties (Zend wording).
+     */
+    public function testIssue28816IssueBodyIsFinalWriteOverrideAndProfile82Reject(): void
+    {
+        $isfinal = dirname(__DIR__) . '/repro/issue_28816_final_plain_isfinal_write.php';
+        $override = dirname(__DIR__) . '/repro/issue_28816_final_plain_override.php';
+        $reject82 = dirname(__DIR__) . '/repro/issue_28816_final_plain_reject_82.php';
+        self::assertFileExists($isfinal);
+        self::assertFileExists($override);
+        self::assertFileExists($reject82);
+        $isfinalCode = file_get_contents($isfinal);
+        $overrideCode = file_get_contents($override);
+        $rejectCode = file_get_contents($reject82);
+        self::assertNotFalse($isfinalCode);
+        self::assertNotFalse($overrideCode);
+        self::assertNotFalse($rejectCode);
+
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $_ENV['PHP_COMPILER_PROFILE'] = $profile;
+            self::assertTrue(
+                \PHPCompiler\CompilerVersion::supportsFinalProperties(),
+                'PROFILE='.$profile.' must support final properties'
+            );
+
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($isfinalCode, 'issue_28816_isfinal_'.$profile.'.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("isFinal=1\nWRITE_OK\n", ob_get_clean(), 'PROFILE='.$profile);
+
+            try {
+                $runtime->parseAndCompile($overrideCode, 'issue_28816_override_'.$profile.'.php');
+                $this->fail('Expected CompileFatal on sibling override (#28816) PROFILE='.$profile);
+            } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+                self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+                self::assertStringStartsWith('PHP Fatal error:', $e->zendStderrLine());
+            }
+        }
+
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.2';
+        self::assertFalse(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+        $runtime82 = new Runtime();
+        try {
+            $runtime82->parseAndCompile($rejectCode, 'issue_28816_reject_82.php');
+            $this->fail('Expected CompileFatal rejecting final on properties under PROFILE=8.2 (#28816)');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            self::assertStringContainsString(
+                'Cannot declare property A::$x final, the final modifier is allowed only for methods, classes, and class constants',
+                $e->getMessage()
+            );
+        }
+    }
+
+    /**
      * @covers issue #27818 — trait-imported final plain property: isFinal=1 + child
      * override CompileFatal (same Zend inheritance rules as class-declared finals).
      */
