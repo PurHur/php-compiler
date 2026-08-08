@@ -22,6 +22,66 @@ final class HashTableWriteLlvm
         return ++self::$seq;
     }
 
+    /**
+     * Track string-keyed constant array literals for filter_var options folds (#29046).
+     */
+    private static function trackCompileTimeAssoc(Variable $array, Variable $key, Variable $element): void
+    {
+        if (null === $array->compileTimeAssoc) {
+            return;
+        }
+        $keyStr = $key->compileTimeString;
+        if (null === $keyStr && Variable::TYPE_NATIVE_LONG === $key->type && null !== $key->compileTimeLong) {
+            $keyStr = (string) $key->compileTimeLong;
+        }
+        if (null === $keyStr) {
+            $array->compileTimeAssoc = null;
+
+            return;
+        }
+        $phpVal = self::compileTimePhpScalar($element);
+        if (false === $phpVal) {
+            $array->compileTimeAssoc = null;
+
+            return;
+        }
+        $array->compileTimeAssoc[$keyStr] = $phpVal;
+    }
+
+    /**
+     * @return mixed|false false when not foldable
+     */
+    private static function compileTimePhpScalar(Variable $element): mixed
+    {
+        if (Variable::TYPE_NULL === $element->type) {
+            return null;
+        }
+        if (null !== $element->compileTimeString
+            && (Variable::TYPE_STRING === $element->type || Variable::TYPE_VALUE === $element->type)) {
+            return $element->compileTimeString;
+        }
+        if (null !== $element->compileTimeLong
+            && (Variable::TYPE_NATIVE_LONG === $element->type
+                || Variable::TYPE_NATIVE_BOOL === $element->type
+                || Variable::TYPE_VALUE === $element->type)) {
+            if (Variable::TYPE_NATIVE_BOOL === $element->type) {
+                return 0 !== $element->compileTimeLong;
+            }
+
+            return $element->compileTimeLong;
+        }
+        if (null !== $element->compileTimeFloat
+            && (Variable::TYPE_NATIVE_DOUBLE === $element->type || Variable::TYPE_VALUE === $element->type)) {
+            return $element->compileTimeFloat;
+        }
+        if ((Variable::TYPE_HASHTABLE === $element->type || Variable::TYPE_VALUE === $element->type)
+            && \is_array($element->compileTimeAssoc)) {
+            return $element->compileTimeAssoc;
+        }
+
+        return false;
+    }
+
     private static function ownedString(Context $context, Variable $element): Value
     {
         $str = JitStringArg::stringPtrFromVariable($context, $element);
@@ -857,12 +917,14 @@ final class HashTableWriteLlvm
             } else {
                 $array->compileTimeArray = null;
             }
+            $array->compileTimeAssoc = null;
             ++$array->nextFreeElement;
 
             return;
         }
         // Keyed writes invalidate packed compile-time string tracking (#27181).
         $array->compileTimeArray = null;
+        self::trackCompileTimeAssoc($array, $key, $element);
         if (Variable::TYPE_OBJECT === $key->type
             || Variable::TYPE_HASHTABLE === $key->type) {
             // Array-literal enum/object keys: typed TypeError under PROFILE≥8.3 (#28628).
@@ -1916,6 +1978,7 @@ final class HashTableWriteLlvm
     {
         $result->nextFreeElement = 0;
         $result->compileTimeArray = [];
+        $result->compileTimeAssoc = [];
         if ($result->type & Variable::IS_NATIVE_ARRAY) {
             return;
         }
