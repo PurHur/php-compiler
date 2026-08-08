@@ -22,15 +22,14 @@ final class ArrayUniqueJitHelper
     public static function unique(HashTable $ht, int $flags): HashTable
     {
         $flags = self::normalizeFlags($flags);
-        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         $out = new HashTable();
         $seen = new HashTable();
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             self::assertUniqueElement($value, $flags);
-            if (self::isSeen($value, $seen, $sortType)) {
+            if (self::isSeen($value, $seen, $flags)) {
                 continue;
             }
-            self::markSeen($value, $seen, $sortType);
+            self::markSeen($value, $seen, $flags);
             $stored = new Variable();
             $stored->copyFrom($value);
             if (Variable::TYPE_INTEGER === $key->type) {
@@ -80,10 +79,11 @@ final class ArrayUniqueJitHelper
         );
     }
 
-    private static function isSeen(Variable $value, HashTable $seen, int $sortType): bool
+    private static function isSeen(Variable $value, HashTable $seen, int $flags): bool
     {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_STRING === $sortType) {
-            return null !== $seen->find($value->resolveIndirect()->toString());
+            return null !== $seen->find(self::stringSeenKey($value, $flags));
         }
         if (StdlibConstants::SORT_NUMERIC === $sortType) {
             return null !== $seen->find(self::numericSeenKey($value));
@@ -97,12 +97,13 @@ final class ArrayUniqueJitHelper
         return false;
     }
 
-    private static function markSeen(Variable $value, HashTable $seen, int $sortType): void
+    private static function markSeen(Variable $value, HashTable $seen, int $flags): void
     {
         $marker = new Variable();
         $marker->int(1);
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_STRING === $sortType) {
-            $seen->update($value->resolveIndirect()->toString(), $marker);
+            $seen->update(self::stringSeenKey($value, $flags), $marker);
 
             return;
         }
@@ -114,6 +115,20 @@ final class ArrayUniqueJitHelper
         $copy = new Variable();
         $copy->copyFrom($value);
         $seen->append($copy);
+    }
+
+    /**
+     * SORT_STRING|SORT_FLAG_CASE — php-src case-folds via zend_string_tolower / ASCII
+     * strtolower for the uniqueness key (#29114, re-#4253).
+     */
+    private static function stringSeenKey(Variable $value, int $flags): string
+    {
+        $s = $value->resolveIndirect()->toString();
+        if (0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)) {
+            return VmString::asciiLower($s);
+        }
+
+        return $s;
     }
 
     /**
