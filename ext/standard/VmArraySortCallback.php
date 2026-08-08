@@ -122,6 +122,8 @@ final class VmArraySortCallback
         ?Frame $scopeFrame = null,
         string $function = 'usort'
     ): void {
+        // php-src PHP_ARRAY_CMP_FUNC_BACKUP — once-per-sort bool deprecation (#29089).
+        VmClosureCall::beginUserSort($function);
         $cmp = static function (Variable $a, Variable $b) use (
             $context,
             $callback,
@@ -147,6 +149,7 @@ final class VmArraySortCallback
         ?Frame $scopeFrame = null,
         string $function = 'uksort'
     ): void {
+        VmClosureCall::beginUserSort($function);
         $cmp = static function (array $a, array $b) use (
             $context,
             $callback,
@@ -172,6 +175,7 @@ final class VmArraySortCallback
         ?Frame $scopeFrame = null,
         string $function = 'uasort'
     ): void {
+        VmClosureCall::beginUserSort($function);
         $cmp = static function (array $a, array $b) use (
             $context,
             $callback,
