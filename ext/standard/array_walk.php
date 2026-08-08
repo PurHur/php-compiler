@@ -21,6 +21,8 @@ use PHPLLVM\Value;
  *
  * JIT/AOT: compile-time string builtin callbacks (#1209) and closure callbacks with optional
  * $userdata (#4916). String callbacks with userdata remain VM-only (#3627).
+ *
+ * Excess/missing argc → ArgumentCountError (#28473).
  */
 final class array_walk extends Internal
 {
@@ -31,10 +33,9 @@ final class array_walk extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.stub.php — ArgumentCountError (#28473).
+        $this->requireArgCountRange($frame, 'array_walk', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
-        }
         $subject = $frame->calledArgs[0]->resolveIndirect();
         // Objects are accepted (php_array_walk), but Zend TypeError text is "array" only
         // (php-src ext/standard/array.c / Zend 8.2+ observable message) — #19836.
@@ -65,10 +66,11 @@ final class array_walk extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #28473.
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_walk', 2, 3)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        $argc = \count($args);
         // Objects are accepted, but Zend TypeError text for invalid subjects is "array" (#19836).
         $badSubject = self::jitKnownBadArraySubjectLabel($args[0]);
         if (null !== $badSubject) {

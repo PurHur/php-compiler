@@ -17,6 +17,7 @@ use PHPCompiler\Func\PHP;
 use PHPCompiler\JIT\Builtin\ArrayFilterRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\HashTable;
@@ -27,15 +28,16 @@ use PHPLLVM\Value;
  * array_filter() with default falsy removal or string builtin / closure callbacks.
  *
  * php-src: ext/standard/array.c — php_array_filter(), ARRAY_FILTER_USE_* modes (#4243).
+ *
+ * Excess/missing argc → ArgumentCountError (#28473).
  */
 final class array_filter extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.stub.php — ArgumentCountError (#28473).
+        $this->requireArgCountRange($frame, 'array_filter', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('array_filter() requires one to three arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -85,10 +87,11 @@ final class array_filter extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('array_filter() requires one to three arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #28473.
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_filter', 1, 3)) {
+            return HashTableHelper::alloc($context);
         }
+        $argc = \count($args);
         TypeErrorRaise::ensureLinked($context);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_filter', 1, 'array');
         // Null / omitted callback → soft falsy filter (mode ignored); php-src array.c (#24843).
