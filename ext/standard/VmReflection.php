@@ -1416,8 +1416,9 @@ final class VmReflection
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
             $object = $objectOrClass->toObject();
             // __PHP_Incomplete_Class — Zend refuses property introspection (#26366 / #19632).
+            // Warning prefix is always property_exists(): (internal execute_data), not the caller (#29025).
             if (IncompleteClassSupport::isIncomplete($object)) {
-                IncompleteClassSupport::emitAccessWarning($object, $ctx, $frame);
+                IncompleteClassSupport::emitAccessWarning($object, $ctx, $frame, 'property_exists');
 
                 return false;
             }
