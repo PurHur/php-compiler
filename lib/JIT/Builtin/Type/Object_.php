@@ -2103,9 +2103,10 @@ class Object_ extends Type {
     }
 
     /**
-     * Register an alternate name for a JIT-declared user class (class_alias, #3178).
+     * Register an alternate name for a JIT-known class (class_alias, #3178).
      *
-     * php-src: zend_register_class_alias_ex — resolves alias-of-alias to canonical class (#11639).
+     * php-src: zend_register_class_alias_ex — allows internal originals; alias-of-alias to
+     * canonical (#11639). Duplicate names warn + false (#29084 / re-#18290).
      */
     public function registerClassAlias(string $original, string $alias): bool
     {
@@ -2129,11 +2130,6 @@ class Object_ extends Type {
         }
 
         $classId = $this->classes[$canonicalOriginalLc];
-        if (isset($this->externalOnlyClassIds[$classId])) {
-            throw new \ValueError(
-                'class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given'
-            );
-        }
 
         if (isset($this->classes[$aliasLc]) || isset($this->classAliasToOriginalLc[$aliasLc])) {
             $vmContext = $this->context->runtime->vmContext ?? null;
