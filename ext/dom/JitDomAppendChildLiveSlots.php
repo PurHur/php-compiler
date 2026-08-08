@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -164,7 +165,9 @@ final class JitDomAppendChildLiveSlots
         );
         self::storeSibling($context, $child, VmDom::PROP_NEXT_SIBLING, $nullBox);
         self::storeChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, $childJit);
-        self::writeChildNodesList($context, $parent, 2, $curFirst, $child);
+        // +1 in place — absolute writeChildNodesList(..., 2) left loadXML-seeded
+        // held `$list = $parent->childNodes` stale at length 2 (#29048 / re-#28509).
+        self::incrementChildNodesLengthInPlace($context, $parent, $curFirst, $child);
         self::storeParentNode($context, $child, $parent);
         $context->builder->branch($bbDone);
 
@@ -253,6 +256,95 @@ final class JitDomAppendChildLiveSlots
             $parentJit,
             JITVariable::TYPE_VALUE
         );
+    }
+
+    /**
+     * Bump an existing childNodes list by 1 (or seed length=2) without replacing
+     * the list object — held `$list = $node->childNodes` must observe the update
+     * (#29048, php-src nodelist.c live collection).
+     */
+    private static function incrementChildNodesLengthInPlace(
+        Context $context,
+        Value $owner,
+        Value $item0,
+        Value $item1
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_acls_inc_len');
+        $objectType = $context->type->object;
+        $listClassId = $objectType->lookup('DOMNodeList');
+        $nodeClassId = $objectType->lookup('DOMNode');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
+        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($listClassId, 'length')) {
+            $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
+        }
+        if (!$objectType->hasProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER)) {
+            $objectType->defineProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        }
+        foreach (['__phpcItem0', '__phpcItem1'] as $prop) {
+            if (!$objectType->hasProperty($listClassId, $prop)) {
+                $objectType->defineProperty($listClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+
+        $existing = self::loadChildNodesListObject($context, $owner);
+        $missing = $context->builder->icmp(Builder::INT_EQ, $existing, $objPtrTy->constNull());
+        $bbSeed = BasicBlockHelper::append($context, 'dom_acls_inc_seed');
+        $bbBump = BasicBlockHelper::append($context, 'dom_acls_inc_bump');
+        $bbDone = BasicBlockHelper::append($context, 'dom_acls_inc_done');
+        $context->builder->branchIf($missing, $bbSeed, $bbBump);
+
+        $context->builder->positionAtEnd($bbSeed);
+        // No prior list (should be rare on append-tail) — seed length=2 + pins.
+        self::writeChildNodesList($context, $owner, 2, $item0, $item1);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbBump);
+        $lengthVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $existing,
+            'DOMNodeList',
+            'length',
+            $listClassId
+        );
+        $current = $context->helper->loadValue($lengthVar);
+        $next = $context->builder->add($current, $i64->constInt(1, false));
+        $nextJit = new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $next);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', 'length'),
+            $nextJit,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $ownerJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $owner);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER),
+            $ownerJit,
+            JITVariable::TYPE_VALUE
+        );
+        $i0 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item0);
+        $i1 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item1);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem0'),
+            $i0,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem1'),
+            $i1,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /** Load parent.childNodes object from a TYPE_VALUE slot (null if unset). */
+    private static function loadChildNodesListObject(Context $context, Value $owner): Value
+    {
+        return self::loadLink($context, $owner, 'DOMNode', VmDom::PROP_CHILD_NODES, 'dom_acls_cn');
     }
 
     private static function writeChildNodesList(

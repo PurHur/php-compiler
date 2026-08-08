@@ -1,5 +1,5 @@
 --TEST--
-AOT: DOMNodeList childNodes live length after appendChild on stored root (#27044, re-#19208)
+AOT: DOMNodeList childNodes live length after appendChild on stored root (#29048, re-#28509/#27044/#19208)
 --FILE--
 <?php
 $d = new DOMDocument();

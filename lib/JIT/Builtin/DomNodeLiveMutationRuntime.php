@@ -219,10 +219,9 @@ final class DomNodeLiveMutationRuntime
                 && 1 === $extraArgCount
                 && \in_array($extraArgs[0]->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)
             ) {
-                // Held `$list = $node->childNodes` (#28509 / #27044): bump the existing
-                // OBJECT list *before* LiveSlots may replace the parent pointer. After sync,
-                // syncChildNodesLengthSlot would clobber move-path absolute lengths (#27476).
-                self::bumpHeldObjectChildNodesLength($context, $receiver, $extraArgCount);
+                // LiveSlots increments the existing childNodes list in place so held
+                // `$list = $node->childNodes` observes +1 (#29048). Do not bump here —
+                // a pre-sync bumpHeld + LiveSlots +1 would double-count.
                 JitDomAppendChildLiveSlots::sync(
                     $context,
                     self::receiverObject($context, $receiver),
@@ -500,10 +499,13 @@ final class DomNodeLiveMutationRuntime
     }
 
     /**
-     * Increment in-place length on a held childNodes DOMNodeList object (#28509, #27044).
+     * Increment in-place length on a held childNodes DOMNodeList object (#28509, #27044, #29048).
      *
      * Unlike {@see bumpChildNodesLengthSlot}, never allocates / absolute-sets via
      * syncChildNodesLengthSlot — that path clobbers move-path writeChildNodesList (#27476).
+     *
+     * loadXML / LiveSlots store childNodes as TYPE_VALUE; unwrap the object so the
+     * bump reaches the same list a user held via `$list = $node->childNodes`.
      */
     private static function bumpHeldObjectChildNodesLength(
         Context $context,
@@ -530,14 +532,23 @@ final class DomNodeLiveMutationRuntime
             VmDom::PROP_CHILD_NODES,
             $nodeClassId
         );
-        if (Variable::TYPE_OBJECT !== $listVar->type) {
+        $listObj = null;
+        if (Variable::TYPE_OBJECT === $listVar->type) {
+            $listObj = $context->helper->loadValue($listVar);
+        } elseif (Variable::TYPE_VALUE === $listVar->type) {
+            // TYPE_VALUE box (loadXML / #27216) — same live object as `$list = childNodes`.
+            $listObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $listVar)
+            );
+        } else {
             return;
         }
         self::bumpExistingChildNodesLength(
             $context,
             $objectType,
             $listClassId,
-            $context->helper->loadValue($listVar),
+            $listObj,
             $delta
         );
     }
