@@ -45,6 +45,13 @@ final class DomInstanceMethodJit
     private const USER_SCRIPT_DIRECT_METHODS = [
         'domdocument::createelement' => true,
         'domdocument::createelementns' => true,
+        // Living Dom\Document createElement* — object receiver + helper (#28958).
+        'dom\\document::createelement' => true,
+        'dom\\document::createelementns' => true,
+        'dom\\htmldocument::createelement' => true,
+        'dom\\htmldocument::createelementns' => true,
+        'dom\\xmldocument::createelement' => true,
+        'dom\\xmldocument::createelementns' => true,
         'domdocument::createcomment' => true,
         'domdocument::createattributens' => true,
         'domdocument::createattribute' => true,
@@ -192,6 +199,36 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::createelementns' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateElementNS();
+
+                return;
+            }
+            if ('dom\\document::createelement' === $lc
+                || 'dom\\xmldocument::createelement' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomLivingDocumentCreateElement(
+                    'Dom\\Element',
+                    false
+                );
+
+                return;
+            }
+            if ('dom\\htmldocument::createelement' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomLivingDocumentCreateElement(
+                    'Dom\\HTMLElement',
+                    true
+                );
+
+                return;
+            }
+            if ('dom\\document::createelementns' === $lc
+                || 'dom\\xmldocument::createelementns' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomLivingDocumentCreateElementNS(false);
+
+                return;
+            }
+            if ('dom\\htmldocument::createelementns' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomLivingDocumentCreateElementNS(true);
 
                 return;
             }
@@ -626,6 +663,12 @@ final class DomInstanceMethodJit
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
             self::ensureProxy($context, 'domdocument::createelementns');
+            self::ensureProxy($context, 'dom\\document::createelement');
+            self::ensureProxy($context, 'dom\\document::createelementns');
+            self::ensureProxy($context, 'dom\\htmldocument::createelement');
+            self::ensureProxy($context, 'dom\\htmldocument::createelementns');
+            self::ensureProxy($context, 'dom\\xmldocument::createelement');
+            self::ensureProxy($context, 'dom\\xmldocument::createelementns');
             self::ensureProxy($context, 'domdocument::createcomment');
             self::ensureProxy($context, 'domdocument::load');
             self::ensureProxy($context, 'domdocument::loadhtml');

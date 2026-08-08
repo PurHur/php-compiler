@@ -22,6 +22,12 @@ final class JitDomCreateElementNS
 {
     private const CLASS_ELEMENT = 'DOMElement';
 
+    private const CLASS_LIVING_ELEMENT = 'Dom\\Element';
+
+    private const CLASS_HTML_ELEMENT = 'Dom\\HTMLElement';
+
+    private const HTML_NS = 'http://www.w3.org/1999/xhtml';
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 3) {
@@ -54,6 +60,52 @@ final class JitDomCreateElementNS
         }
 
         throw new \LogicException('DOMDocument::createElementNS() requires user-script AOT helper in this compiler build');
+    }
+
+    /**
+     * Living Dom\Document::createElementNS — main-module materialize (#28958 / #21030).
+     *
+     * @param bool $htmlDocument when true, HTML namespace → Dom\HTMLElement + uppercase names
+     */
+    public static function invokeLiving(
+        Context $context,
+        bool $htmlDocument,
+        JITVariable ...$args
+    ): Value {
+        if (\count($args) < 3) {
+            throw new \LogicException('Dom\\Document::createElementNS() expects receiver, namespace, and qualified name');
+        }
+
+        $nsResolved = self::isCompileTimeNullableString($args[1]);
+        $nameLit = self::compileTimeStringArg($args[2]);
+        if ($nsResolved && null !== $nameLit) {
+            $nsLit = self::compileTimeNullableStringArg($args[1]);
+            if (!self::needsHelperValidation($nsLit, $nameLit)) {
+                $valueLit = '';
+                if (isset($args[3])) {
+                    $vLit = self::compileTimeStringArg($args[3]);
+                    if (null === $vLit && JITVariable::TYPE_NULL !== $args[3]->type && !$args[3]->isNullConstant) {
+                        return self::invokeViaHelper($context, ...$args);
+                    }
+                    $valueLit = $vLit ?? '';
+                }
+                $isHtmlNs = $htmlDocument && self::HTML_NS === $nsLit;
+                $elementClass = $isHtmlNs ? self::CLASS_HTML_ELEMENT : self::CLASS_LIVING_ELEMENT;
+                $qName = $isHtmlNs ? strtoupper($nameLit) : $nameLit;
+                $obj = self::materializeElementNSFromLiterals(
+                    $context,
+                    $nsLit,
+                    $qName,
+                    $valueLit,
+                    $elementClass
+                );
+                self::storeOwnerAndNullParent($context, $obj, $args[0], $elementClass);
+
+                return $obj;
+            }
+        }
+
+        return self::invokeViaHelper($context, ...$args);
     }
 
     /** Namespace arg is compile-time null or string literal. */
@@ -104,7 +156,10 @@ final class JitDomCreateElementNS
         return false;
     }
 
-    private static function invokeViaHelper(Context $context, JITVariable ...$args): Value
+    /**
+     * Living Dom\Document::createElementNS — helper so HTML ns → Dom\HTMLElement (#28958 / #21030).
+     */
+    public static function invokeViaHelper(Context $context, JITVariable ...$args): Value
     {
         DomCreateElementNSRuntime::ensureLinked($context);
 
@@ -135,7 +190,7 @@ final class JitDomCreateElementNS
     }
 
     /**
-     * AOT-native DOMElement with NS property slots (no DomRegistry — same as createElement).
+     * AOT-native element with NS property slots (no DomRegistry — same as createElement).
      *
      * @param string|null $namespace null → namespaceURI NULL; "" → empty URI + xmlns=""
      */
@@ -143,22 +198,24 @@ final class JitDomCreateElementNS
         Context $context,
         ?string $namespace,
         string $qualifiedName,
-        string $value = ''
+        string $value = '',
+        string $className = self::CLASS_ELEMENT
     ): Value {
         [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        $classId = $objectType->lookup($className);
         self::ensureElementNSPropertyLayout($objectType, $classId);
 
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
 
         $nameStr = $context->builder->load($context->constantStringFromString($qualifiedName));
-        self::storeStringProperty($context, $obj, VmDom::PROP_NODE_NAME, $nameStr);
-        self::storeStringProperty($context, $obj, VmDom::PROP_TAG_NAME, $nameStr);
+        self::storeStringProperty($context, $obj, $className, VmDom::PROP_NODE_NAME, $nameStr);
+        self::storeStringProperty($context, $obj, $className, VmDom::PROP_TAG_NAME, $nameStr);
         self::storeStringProperty(
             $context,
             $obj,
+            $className,
             VmDom::PROP_LOCAL_NAME,
             $context->builder->load($context->constantStringFromString($localName))
         );
@@ -166,25 +223,27 @@ final class JitDomCreateElementNS
             self::storeBoxedStringProperty(
                 $context,
                 $obj,
+                $className,
                 VmDom::PROP_PREFIX,
                 $context->builder->load($context->constantStringFromString($prefix))
             );
         } else {
             // VM/Zend expose ""; AOT null is acceptable for unprefixed (DomRegistry sync).
-            self::storeNullProperty($context, $obj, VmDom::PROP_PREFIX);
+            self::storeNullProperty($context, $obj, $className, VmDom::PROP_PREFIX);
         }
         if (null === $namespace) {
-            self::storeNullProperty($context, $obj, VmDom::PROP_NAMESPACE_URI);
+            self::storeNullProperty($context, $obj, $className, VmDom::PROP_NAMESPACE_URI);
         } else {
             // VALUE slot (nullable) — must box via __value__writeString, not TYPE_STRING store (#24923).
             self::storeBoxedStringProperty(
                 $context,
                 $obj,
+                $className,
                 VmDom::PROP_NAMESPACE_URI,
                 $context->builder->load($context->constantStringFromString($namespace))
             );
         }
-        self::storeNullProperty($context, $obj, VmDom::PROP_ATTRIBUTES);
+        self::storeNullProperty($context, $obj, $className, VmDom::PROP_ATTRIBUTES);
         if ('' !== $value) {
             if (!$objectType->hasProperty($classId, VmDom::PROP_TEXT_CONTENT)) {
                 $objectType->defineProperty($classId, VmDom::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
@@ -192,6 +251,7 @@ final class JitDomCreateElementNS
             self::storeStringProperty(
                 $context,
                 $obj,
+                $className,
                 VmDom::PROP_TEXT_CONTENT,
                 $context->builder->load($context->constantStringFromString($value))
             );
@@ -231,10 +291,14 @@ final class JitDomCreateElementNS
         }
     }
 
-    private static function storeOwnerAndNullParent(Context $context, Value $obj, JITVariable $documentArg): void
-    {
+    private static function storeOwnerAndNullParent(
+        Context $context,
+        Value $obj,
+        JITVariable $documentArg,
+        string $className = self::CLASS_ELEMENT
+    ): void {
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        $classId = $objectType->lookup($className);
         self::ensureElementNSPropertyLayout($objectType, $classId);
 
         $nullSlot = JitValueBox::alloc($context);
@@ -246,12 +310,12 @@ final class JitDomCreateElementNS
         $docObj = self::loadObjectArg($context, $documentArg);
         $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $docObj);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_OWNER_DOCUMENT),
+            $objectType->propertySlotFor($obj, $className, VmDom::PROP_OWNER_DOCUMENT),
             $docJit,
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $objectType->propertySlotFor($obj, $className, VmDom::PROP_PARENT_NODE),
             $nullVar,
             JITVariable::TYPE_VALUE
         );
@@ -329,8 +393,13 @@ final class JitDomCreateElementNS
         return self::compileTimeStringArg($arg);
     }
 
-    private static function storeStringProperty(Context $context, Value $obj, string $prop, Value $str): void
-    {
+    private static function storeStringProperty(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $prop,
+        Value $str
+    ): void {
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $str
@@ -342,15 +411,20 @@ final class JitDomCreateElementNS
             $owned
         );
         $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($obj, self::CLASS_ELEMENT, $prop),
+            $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
             JITVariable::TYPE_STRING
         );
     }
 
     /** Store string into a TYPE_VALUE (nullable) property slot (#24923). */
-    private static function storeBoxedStringProperty(Context $context, Value $obj, string $prop, Value $str): void
-    {
+    private static function storeBoxedStringProperty(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $prop,
+        Value $str
+    ): void {
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $str
@@ -364,13 +438,13 @@ final class JitDomCreateElementNS
         );
         $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($obj, self::CLASS_ELEMENT, $prop),
+            $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
             JITVariable::TYPE_VALUE
         );
     }
 
-    private static function storeNullProperty(Context $context, Value $obj, string $prop): void
+    private static function storeNullProperty(Context $context, Value $obj, string $className, string $prop): void
     {
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
@@ -379,7 +453,7 @@ final class JitDomCreateElementNS
         );
         $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($obj, self::CLASS_ELEMENT, $prop),
+            $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
             JITVariable::TYPE_NULL
         );

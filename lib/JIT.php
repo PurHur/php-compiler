@@ -19606,6 +19606,13 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
                 }
+                // Living createElement* — peer createAttribute object-receiver path (#28958).
+                if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\xmldocument::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
+                }
                 // `__construct` on typed object: use safe new-construct candidates only —
                 // LimitIteratorConstruct et al. throw while emitting every switch arm (#27302 / #27156).
                 $runtimeCandidates = ('__construct' === $methodLc)
@@ -19677,6 +19684,17 @@ class JIT {
                 ) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy(
                         'dom\\xmldocument::'.$methodLc
+                    );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if (
+                    ('createelement' === $methodLc || 'createelementns' === $methodLc)
+                    && $this->context->functionIsRegistered('dom\\htmldocument::'.$methodLc)
+                ) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                        'dom\\htmldocument::'.$methodLc
                     );
                     $this->context->scope->args = [$receiverVar];
 
