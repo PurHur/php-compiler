@@ -338,7 +338,9 @@ final class VmFilter
         int $flags
     ): Variable {
         $out = new HashTable();
-        $childFlags = $flags & ~self::FILTER_FORCE_ARRAY;
+        // php-src php_zval_filter_recursive: REQUIRE_ARRAY / FORCE_ARRAY apply only at the
+        // current level; children are filtered as scalars (or recurse without those flags).
+        $childFlags = $flags & ~(self::FILTER_FORCE_ARRAY | self::FILTER_REQUIRE_ARRAY);
         $parsed = self::parseFilterArgs($options);
         foreach ($ht->iterateKeyed(true) as [$keyVar, $valueVar]) {
             $value = $valueVar->resolveIndirect();
@@ -358,15 +360,6 @@ final class VmFilter
                         $childFlags
                     );
                 }
-            } elseif (0 !== ($childFlags & self::FILTER_REQUIRE_ARRAY)) {
-                $filtered = self::failureResult(
-                    0 !== ($childFlags & self::FILTER_NULL_ON_FAILURE),
-                    $childFlags,
-                    sprintf(
-                        'filter validation failed: not an array (got %s)',
-                        self::zendTypeName($value)
-                    )
-                );
             } else {
                 $filtered = self::filterVarScalar($value, $filter, $childFlags, $parsed['filterOptions']);
             }
@@ -422,7 +415,8 @@ final class VmFilter
                 );
             }
             $out = new HashTable();
-            $childFlags = $flags & ~self::FILTER_FORCE_ARRAY;
+            // php-src: REQUIRE_ARRAY / FORCE_ARRAY are level-local (#29047).
+            $childFlags = $flags & ~(self::FILTER_FORCE_ARRAY | self::FILTER_REQUIRE_ARRAY);
             foreach ($value->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
                 $filtered = self::invokeCallbackFilter(
                     $ctx,
