@@ -474,21 +474,29 @@ final class VmXml
      * Also rejects undeclared general entities (XML_ERR_UNDECLARED_ENTITY) for SimpleXML /
      * load-string callers (#22775). DOMDocument::loadXML uses {@see validationErrorRecords}
      * then its own DTD-aware scan — keep entity checks out of that structural path (#22774).
+     *
+     * Reports every record from {@see validationErrorRecords} (e.g. tag mismatch 76 + premature
+     * end 77) so SimpleXML matches DOM / libxml2 under libxml_use_internal_errors (#28658 / #25064).
      */
     public static function validateAndReport(Context $ctx, string $data, ?Frame $frame = null): bool
     {
-        $error = self::validationErrorRecord($data);
-        if (null === $error) {
+        $records = self::validationErrorRecords($data);
+        if ([] === $records) {
             $element = self::stripDocumentMiscEnvelope(trim($data));
             if ('' !== $element) {
-                $error = self::detectUndeclaredEntityRef($element);
+                $entity = self::detectUndeclaredEntityRef($element);
+                if (null !== $entity) {
+                    $records = [$entity];
+                }
             }
         }
-        if (null === $error) {
+        if ([] === $records) {
             return true;
         }
 
-        \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+        foreach ($records as $error) {
+            \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+        }
 
         return false;
     }
