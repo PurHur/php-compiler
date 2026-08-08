@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * rename() for compiled JIT/AOT modules (#15533, #29090, php-in-PHP).
+ * rename() for compiled JIT/AOT modules (#15533, #29090, #29141, php-in-PHP).
  *
- * NestedJIT leaf: {@see phpc_rename_kernel} → {@see \PHPCompiler\JIT\Builtin\StringRename}
- * module-local rename(2) (LibcExtern rename row removed). Full {@see VmFs::rename()} /
- * {@code @rename} under NestedJIT is not yet a drop-in — Context only resolves whitelisted
- * kernels before registerModule (#15417); plain rename stays an ExternalMethod stub.
+ * Leaf is `@rename` → NestedJIT whitelist {@see rename_} →
+ * {@see \PHPCompiler\JIT\Builtin\StringRename::invokeNestedLeaf} (no kernel).
+ * User-stream / warning / stat-cache match pre-#29141 helper control flow without
+ * pulling {@see VmFs} into the NestedJIT TU (#579 stubs).
  * Returns int 0/1 (not bool) so NestedJIT return lowering uses __value__readLong
- * (bool boxes have no readLong arm and always yield 0; see #20603 / HashEquals i32 ABI).
+ * (#20603 / HashEquals i32 ABI).
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class RenameJitHelper
@@ -33,21 +33,19 @@ final class RenameJitHelper
 
             return $userOk ? 1 : 0;
         }
-        if (null !== VmFsPhpWrapper::renameWarningMessage($from, $to)) {
-            $ok = false;
-        } else {
-            $ok = \phpc_rename_kernel($from, $to);
+        $wrapperMessage = VmFsPhpWrapper::renameWarningMessage($from, $to);
+        if (null !== $wrapperMessage) {
+            TriggerErrorJitHelper::warning($wrapperMessage);
+
+            return 0;
         }
+        $ok = @\rename($from, $to);
         if ($ok) {
             VmStatCache::invalidatePath($from);
             VmStatCache::invalidatePath($to);
-        }
-        if (!$ok) {
-            $wrapperMessage = VmFsPhpWrapper::renameWarningMessage($from, $to);
+        } else {
             TriggerErrorJitHelper::warning(
-                null !== $wrapperMessage
-                    ? $wrapperMessage
-                    : 'rename('.$from.','.$to.'): No such file or directory'
+                'rename('.$from.','.$to.'): No such file or directory'
             );
         }
 

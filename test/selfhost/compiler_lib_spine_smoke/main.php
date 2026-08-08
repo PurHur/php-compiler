@@ -4134,7 +4134,6 @@ require_once __DIR__.'/../../../ext/standard/phpc_ob_write_stdout_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_url_rewriter_apply_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_rewrite_vars_set_tags_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_putenv_kernel.php';
-require_once __DIR__.'/../../../ext/standard/phpc_rename_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
 require_once __DIR__.'/../../../ext/standard/phpc_stat_mode_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_weakref_null_slot.php';

@@ -910,9 +910,9 @@ class Context {
             'phpc_file_put_contents_kernel',
             'phpc_readfile_kernel',
 
-            // rename(2) NestedJIT leaf (#29090) — phpc_rename_kernel → StringRename.
-            // Plain "rename" is not enough: before registerModule it stays ExternalMethod (#15417).
-            'phpc_rename_kernel',
+            // rename(2) NestedJIT leaf (#29141) — whitelist rename → rename_::call →
+            // StringRename::invokeNestedLeaf (module-local rename(2); kernel removed).
+            'rename',
             'phpc_ob_write_stdout_kernel',
             'phpc_url_rewriter_apply_kernel',
             'phpc_rewrite_vars_set_tags_kernel',

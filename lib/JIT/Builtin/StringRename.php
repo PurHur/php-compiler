@@ -11,12 +11,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for rename() (#15533, #19215, #20028, #20603, #29090).
+ * JIT/AOT link for rename() (#15533, #19215, #20028, #20603, #29090, #29141).
  *
  * User-script AOT + embed: {@see RenameJitHelper} via {@see JitVmHelperLink}
  * (Unlink #19186 shape — helper SSOT is {@see \PHPCompiler\ext\standard\VmFs::rename()}).
  * NestedJIT leaf: module-local rename(2) decl (avoids re-entering the helper
- * bridge while NestedJIT compiles RenameJitHelper / VmFsPathPure).
+ * bridge while NestedJIT compiles RenameJitHelper / VmFsPathPure `@rename`).
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class StringRename
@@ -91,7 +91,7 @@ final class StringRename
             self::INVOKE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#29090'
+            '#29141'
         );
     }
 

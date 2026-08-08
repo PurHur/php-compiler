@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\RenameJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** rename() JIT: RenameJitHelper + StringRename leaf — no JitRenameKernel / LibcExtern rename (#29090). */
+/** rename() JIT: RenameJitHelper → @rename leaf — no rename kernel (#29141). */
 final class RenameRuntimeShrinkTest extends TestCase
 {
     public function testJitRenameUsesPhpBridgeNotLibc(): void
@@ -34,19 +34,17 @@ final class RenameRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('LibcExtern::', $source);
     }
 
-    public function testPhpcRenameKernelUsesStringRenameLeaf(): void
+    public function testRenameJitHelperUsesAtRenameLeaf(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_rename_kernel.php');
-        $this->assertStringContainsString('StringRename::invokeNestedLeaf', $source);
-        $this->assertStringNotContainsString('JitRenameKernel', $source);
-        $this->assertStringNotContainsString('LibcExtern::', $source);
-    }
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RenameJitHelper.php');
+        $this->assertStringContainsString('public static function invokeArgv(string $from, string $to): int', $source);
+        $this->assertStringContainsString('@\\rename', $source);
+        $this->assertStringContainsString('VmUserStream::tryRename', $source);
+        $this->assertStringContainsString('VmStatCache::invalidatePath', $source);
+        $this->assertStringContainsString('return $ok ? 1 : 0', $source);
+        $this->assertStringNotContainsString('VmFs::rename', $source);
+        $this->assertStringNotContainsString('VmFsPathPure::rename', $source);
 
-    public function testRenameJitHelperDelegatesToKernel(): void
-    {
-        if (!\function_exists('phpc_rename_kernel')) {
-            $this->markTestSkipped('phpc_rename_kernel requires compiler runtime');
-        }
         $dir = sys_get_temp_dir().'/phpc-rename-'.bin2hex(random_bytes(4));
         $this->assertTrue(mkdir($dir, 0700));
         $from = $dir.'/from.txt';
@@ -58,32 +56,30 @@ final class RenameRuntimeShrinkTest extends TestCase
         $this->assertSame(0, RenameJitHelper::invokeArgv($from, $to));
         $this->assertSame(1, RenameJitHelper::invokeArgv($to, $from));
         $this->assertFileExists($from);
-        unlink($from);
+        @unlink($from);
         rmdir($dir);
     }
 
-    public function testRenameJitHelperReturnsIntNotBool(): void
+    public function testContextWhitelistsRenameNotKernel(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RenameJitHelper.php');
-        $this->assertStringContainsString('public static function invokeArgv(string $from, string $to): int', $source);
-        $this->assertStringContainsString('return $ok ? 1 : 0', $source);
-        $this->assertStringContainsString('phpc_rename_kernel', $source);
-        $this->assertStringNotContainsString('str_contains', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertMatchesRegularExpression("/'rename'\\s*,/", $source);
+        $this->assertStringNotContainsString("'phpc_rename_kernel'", $source);
     }
 
-    public function testSpineBundleIncludesRenameHelperNotJitRenameKernel(): void
+    public function testSpineBundleIncludesRenameHelperNotKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('RenameJitHelper.php', $spine);
         $this->assertStringContainsString('StringRename.php', $spine);
-        $this->assertStringContainsString('phpc_rename_kernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_rename_kernel.php', $spine);
         $this->assertStringNotContainsString('JitRenameKernel.php', $spine);
     }
 
-    public function testJitRenameKernelFileDeleted(): void
+    public function testPhpcRenameKernelFileDeleted(): void
     {
         $root = dirname(__DIR__, 2);
         $this->assertFileDoesNotExist($root.'/ext/standard/JitRenameKernel.php');
-        $this->assertFileExists($root.'/ext/standard/phpc_rename_kernel.php');
+        $this->assertFileDoesNotExist($root.'/ext/standard/phpc_rename_kernel.php');
     }
 }
