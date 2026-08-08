@@ -15,6 +15,9 @@ if (is_file($path)) {
 } else {
     echo 'missing', "\n";
 }
+// is_file() populated the positive stat cache — clear before timed touch asserts
+// (php-src keeps positive hits across touch until clearstatcache, #25853).
+clearstatcache(true, $path);
 $t = 1000000000;
 if (touch($path, $t)) {
     echo 'set', "\n";
@@ -27,6 +30,7 @@ if ($m === $t) {
 } else {
     echo 'badmtime', "\n";
 }
+clearstatcache(true, $path);
 $mtime = 1000000100;
 $atime = 1000000200;
 if (touch($path, $mtime, $atime)) {

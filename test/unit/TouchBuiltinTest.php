@@ -32,20 +32,24 @@ if ($m === $t) {
 } else {
     echo 'badmtime', "\n";
 }
+// Separate path — avoid prior filemtime positive cache (#25853); no clearstatcache needed.
+$path2 = $base . '/marker2.txt';
+@unlink($path2);
 $mtime = 1000000100;
 $atime = 1000000200;
-if (touch($path, $mtime, $atime)) {
+if (touch($path2, $mtime, $atime)) {
     echo 'atime_set', "\n";
 } else {
     echo 'noatime', "\n";
 }
-$s = stat($path);
+$s = stat($path2);
 if ($s['mtime'] === $mtime && $s['atime'] === $atime) {
     echo 'atime_ok', "\n";
 } else {
     echo 'badatime', "\n";
 }
 @unlink($path);
+@unlink($path2);
 PHP;
 
     private const CODE_VM = <<<'PHP'
@@ -69,14 +73,16 @@ if ($m === $t) {
 } else {
     echo 'badmtime', "\n";
 }
+$path2 = $base . '/marker2.txt';
+@unlink($path2);
 $mtime = 1000000100;
 $atime = 1000000200;
-if (touch($path, $mtime, $atime)) {
+if (touch($path2, $mtime, $atime)) {
     echo 'atime_set', "\n";
 } else {
     echo 'noatime', "\n";
 }
-$s = stat($path);
+$s = stat($path2);
 if ($s['mtime'] === $mtime && $s['atime'] === $atime) {
     echo 'atime_ok', "\n";
 } else {
@@ -88,6 +94,7 @@ if (touch('/no/such/phpc-touch-path')) {
     echo 'gone', "\n";
 }
 @unlink($path);
+@unlink($path2);
 PHP;
 
     private const EXPECT = "create\nset\nmtime\natime_set\natime_ok\n";
@@ -124,6 +131,26 @@ var_export($s['mtime'] === $mtime && $s['atime'] === $atime);
 @unlink($f);
 PHP;
         $this->assertSame('true', trim($this->runBin('bin/vm.php', $code)));
+    }
+
+    /** Issue #28995 — timed touch without a prior stat must expose mtime/atime immediately. */
+    public function testVmTimedTouchVisibleWithoutPriorStat(): void
+    {
+        $code = <<<'PHP'
+$p = tempnam(sys_get_temp_dir(), 'phpc_touch_noprior_');
+$mtime = 1600000000;
+$atime = 1599999900;
+touch($p, $mtime, $atime);
+echo filemtime($p) === $mtime && fileatime($p) === $atime ? 'ok3' : 'bad3';
+echo "\n";
+@unlink($p);
+$p = tempnam(sys_get_temp_dir(), 'phpc_touch_noprior2_');
+touch($p, $mtime);
+echo filemtime($p) === $mtime && fileatime($p) === $mtime ? 'ok2' : 'bad2';
+echo "\n";
+@unlink($p);
+PHP;
+        $this->assertSame("ok3\nok2\n", $this->runBin('bin/vm.php', $code));
     }
 
     /**
