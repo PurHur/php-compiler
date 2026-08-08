@@ -56,7 +56,44 @@ final class MbstringEncodingRegistry
             'mime' => '8bit',
             'aliases' => ['binary'],
         ],
+        // libmbfl transfer / pseudo encodings (php-src mbfilter_{base64,uuencode,qprint,htmlent}.c; #28983).
+        'BASE64' => [
+            'canonical' => 'BASE64',
+            'mime' => 'BASE64',
+            'aliases' => [],
+        ],
+        'UUENCODE' => [
+            'canonical' => 'UUENCODE',
+            'mime' => 'x-uuencode',
+            'aliases' => [],
+        ],
+        'Quoted-Printable' => [
+            'canonical' => 'Quoted-Printable',
+            'mime' => 'Quoted-Printable',
+            'aliases' => ['qprint'],
+        ],
+        'HTML-ENTITIES' => [
+            'canonical' => 'HTML-ENTITIES',
+            'mime' => 'HTML-ENTITIES',
+            'aliases' => ['HTML', 'html'],
+        ],
     ];
+
+    /**
+     * Transfer encodings whose php_mb_get_encoding() path emits E_DEPRECATED on PHP 8.2+
+     * (php-src ext/mbstring/mbstring.c; #28983).
+     *
+     * @return list<string>
+     */
+    public static function specialTransferEncodings(): array
+    {
+        return ['BASE64', 'UUENCODE', 'Quoted-Printable', 'HTML-ENTITIES'];
+    }
+
+    public static function isSpecialTransferEncoding(string $canonical): bool
+    {
+        return \in_array($canonical, self::specialTransferEncodings(), true);
+    }
 
     public static function resolve(string $name): ?string
     {

@@ -35,6 +35,12 @@ final class mb_encoding_aliases extends Internal
             'mb_encoding_aliases',
             0
         );
+        // php_mb_get_encoding() path — transfer encodings E_DEPRECATED on PROFILE≥8.2 (#28983).
+        VmMbstring::deprecateSpecialTransferEncodingViaMbstring(
+            $encoding,
+            $frame,
+            'mb_encoding_aliases'
+        );
         $frame->returnVar->array(
             MbstringState::hashTableFromStringList(
                 MbstringEncodingRegistry::aliases($encoding)
