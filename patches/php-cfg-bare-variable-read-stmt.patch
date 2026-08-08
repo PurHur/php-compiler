@@ -18,18 +18,24 @@
      }
  
      protected function parseStmt_Class(Stmt\Class_ $node)
-@@ -1417,8 +1426,16 @@
+@@ -1417,8 +1426,24 @@
          $block->addParent($this->block);
          $this->block = $block;
          $result = $this->parseExprNode($expr->expr);
 -        // Evaluate reads inside the suppress region (issue #3546; Zend ZEND_COMPILE_SILENCE).
 -        $result = $this->readVariable($result);
 +        // Bare variable reads need a real fetch op for ZEND_CHECK_UNDEFINED_VAR (#13587).
++        // Materialize into a temp under silence so `$a = @$undef` does not re-fetch the CV
++        // after END_SILENCE (#29132). UnaryPlus would coerce null→int(0); Assign preserves null.
 +        if ($expr->expr instanceof Node\Expr\Variable) {
-+            $this->block->children[] = new Op\Expr\UnaryPlus(
++            $tmp = new Temporary();
++            $assign = new Op\Expr\Assign(
++                $tmp,
 +                $this->readVariable($result),
 +                $attrs
 +            );
++            $this->block->children[] = $assign;
++            $result = $assign->result;
 +        } else {
 +            // Evaluate reads inside the suppress region (issue #3546; Zend ZEND_COMPILE_SILENCE).
 +            $result = $this->readVariable($result);

@@ -12325,7 +12325,9 @@ class Compiler {
             || $child instanceof Op\Expr\Include_
             || $child instanceof Op\Expr\ArrayDimFetch
             || $child instanceof Op\Expr\Isset_
-            || $child instanceof Op\Expr\Empty_;
+            || $child instanceof Op\Expr\Empty_
+            // `@$cv` materializes via Assign under silence (#13587 / #29132).
+            || $child instanceof Op\Expr\Assign;
     }
 
     /**
