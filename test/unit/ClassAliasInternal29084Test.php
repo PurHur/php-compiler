@@ -20,7 +20,8 @@ final class ClassAliasInternal29084Test extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/issue_29084_class_alias_internal.php';
-        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/vm.php')
+        $cmd = 'PHP_COMPILER_PROFILE=8.4 '
+            .escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/vm.php')
             .' '.escapeshellarg($src).' 2>&1';
         exec($cmd, $out, $rc);
         $this->assertSame(0, $rc, implode("\n", $out));
@@ -34,7 +35,8 @@ final class ClassAliasInternal29084Test extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/issue_29084_class_alias_internal.php';
-        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/jit.php')
+        $cmd = 'PHP_COMPILER_PROFILE=8.4 '
+            .escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/jit.php')
             .' '.escapeshellarg($src).' 2>&1';
         exec($cmd, $out, $rc);
         $this->assertSame(0, $rc, implode("\n", $out));

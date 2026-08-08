@@ -664,8 +664,9 @@ class Context {
     /**
      * Register an alternate name for a class (ext/standard class_alias, #3095).
      *
-     * php-src: zend_register_class_alias_ex — allows internal originals (stdClass, Exception);
-     * resolves alias-of-alias to canonical class (#11639). Duplicate alias names warn + false (#29084).
+     * php-src: zend_register_class_alias_ex — internal originals allowed on PHP 8.3+ (#29084);
+     * PROFILE≤8.2 throws ValueError (#29150). Alias-of-alias resolves to canonical (#11639).
+     * Duplicate alias names warn + false (#29084 / re-#18290).
      */
     public function registerClassAlias(string $original, string $alias, bool $autoload = true, ?\PHPCompiler\Frame $frame = null): bool
     {
@@ -703,6 +704,11 @@ class Context {
         }
 
         $entry = $this->classes[$canonicalOriginalLc];
+        if ($entry->isInternal && !\PHPCompiler\CompilerVersion::allowsClassAliasOfInternalClass()) {
+            throw new \ValueError(
+                'class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given'
+            );
+        }
 
         if (isset($this->classes[$aliasLc]) || isset($this->classAliases[$aliasLc]) || isset($this->enums[$aliasLc])) {
             $this->errors->triggerError(
