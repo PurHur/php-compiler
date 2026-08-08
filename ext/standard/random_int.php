@@ -25,9 +25,8 @@ final class random_int extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('random_int() requires exactly two arguments');
-        }
+        // php-src ext/random/random.c — ArgumentCountError (#28476).
+        $this->requireExactArgCount($frame, 'random_int', 2);
         $min = self::parseBound($frame, 0, 1, 'min');
         $max = self::parseBound($frame, 1, 2, 'max');
         $result = VmRandom::randomInt($min, $max);
@@ -39,8 +38,9 @@ final class random_int extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('random_int() requires exactly two arguments');
+        // Catchable ArgumentCountError (AOT/JIT) — #28476.
+        if (!$this->requireExactJitArgCount($context, $args, 'random_int', 2)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
         $min = JitRandomIntArg::lowerBound($context, $args[0], 1, 'min');

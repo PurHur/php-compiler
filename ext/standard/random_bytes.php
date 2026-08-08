@@ -17,9 +17,8 @@ final class random_bytes extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('random_bytes() requires exactly one argument');
-        }
+        // php-src ext/standard/random.c — ArgumentCountError (#28476).
+        $this->requireExactArgCount($frame, 'random_bytes', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -29,8 +28,9 @@ final class random_bytes extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('random_bytes() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #28476.
+        if (!$this->requireExactJitArgCount($context, $args, 'random_bytes', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
         $length = JitRandomBytesArg::lowerLength($context, $args[0]);
 

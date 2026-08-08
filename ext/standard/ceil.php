@@ -25,9 +25,8 @@ final class ceil extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('ceil() requires exactly one argument');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#28476).
+        $this->requireExactArgCount($frame, 'ceil', 1);
         $num = VmMath::parseNumberBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'ceil',
@@ -46,8 +45,9 @@ final class ceil extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('ceil() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #28476.
+        if (!$this->requireExactJitArgCount($context, $args, 'ceil', 1)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
         $asFloat = JitMathNumberArg::lowerToDouble($context, $args[0], 'ceil', 1, 'num');
 

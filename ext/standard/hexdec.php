@@ -30,9 +30,8 @@ final class hexdec extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('hexdec() requires exactly one argument');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#28476).
+        $this->requireExactArgCount($frame, 'hexdec', 1);
         $hexString = self::vmStringArg($frame, 0);
         VmMath::assignRadixToReturn($frame->returnVar, $hexString, 16);
     }
@@ -42,8 +41,9 @@ final class hexdec extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('hexdec() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #28476.
+        if (!$this->requireExactJitArgCount($context, $args, 'hexdec', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         if (
