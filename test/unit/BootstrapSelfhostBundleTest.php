@@ -541,8 +541,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        // Spine ratio 7249/7252 — 3 deferred (PregJitHelperThinAot #24115, NetworkServicesNameLookupThinAot #27103, TimezoneAbbreviationsData #29111).
-        $this->assertSame(7249, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550); 3 deferred PregJitHelperThinAot (#24115) + NetworkServicesNameLookupThinAot (#27103) + TimezoneAbbreviationsData (#29111)');
+        // Spine ratio 7248/7251 — 3 deferred (PregJitHelperThinAot #24115, NetworkServicesNameLookupThinAot #27103, TimezoneAbbreviationsData #29111).
+        $this->assertSame(7248, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550); 3 deferred PregJitHelperThinAot (#24115) + NetworkServicesNameLookupThinAot (#27103) + TimezoneAbbreviationsData (#29111)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
