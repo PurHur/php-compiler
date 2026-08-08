@@ -236,6 +236,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('unixtojd'));
     }
 
+    /** php-src calendar.stub.php — ?int $year = null, int $mode = 0 (#28781). */
+    public function testEasterDateDaysStubParamTypes(): void
+    {
+        foreach (['easter_date', 'easter_days'] as $f) {
+            $year = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $mode = BuiltinInternalArgInfo::paramInfoForFunction($f, 1);
+            $this->assertNotNull($year, $f);
+            $this->assertNotNull($mode, $f);
+            $this->assertSame('?int', $year['type'], $f);
+            $this->assertSame('int', $mode['type'], $f);
+            $this->assertSame('year', $year['name'], $f);
+            // easter_days InternalArgInfo still says method; Reflection uses BuiltinParamNames mode (#24362).
+            $this->assertTrue($year['isOptional'], $f);
+            $this->assertTrue($mode['isOptional'], $f);
+            $this->assertSame(['year=', 'mode='], BuiltinParamNames::forFunction($f), $f);
+        }
+    }
+
     /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
     public function testCeilFloorReflectionStubTypes(): void
     {
