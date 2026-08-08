@@ -682,18 +682,19 @@ class Parser
     {
         // Loop/switch: target must be within the same or an enclosing loop/switch scope.
         if (!$this->isPrefix($to['loopSwitch'], $from['loopSwitch'])) {
-            throw new \RuntimeException("'goto' into loop or switch statement is disallowed");
+            // CompileError (not RuntimeException): CLI catches it as exit 255 without a host stack dump (#28796).
+            throw new \CompileError("'goto' into loop or switch statement is disallowed");
         }
 
         // Finally: jumps into or out of a finally scope are disallowed.
         if ($from['finally'] !== $to['finally']) {
             if ($this->isPrefix($from['finally'], $to['finally'])) {
-                throw new \RuntimeException('jump into a finally block is disallowed');
+                throw new \CompileError('jump into a finally block is disallowed');
             }
             if ($this->isPrefix($to['finally'], $from['finally'])) {
-                throw new \RuntimeException('jump out of a finally block is disallowed');
+                throw new \CompileError('jump out of a finally block is disallowed');
             }
-            throw new \RuntimeException('jump into a finally block is disallowed');
+            throw new \CompileError('jump into a finally block is disallowed');
         }
     }
 
@@ -1882,22 +1883,29 @@ class Parser
         $defaultBlock = $endBlock;
         /** @var null|Block $block */
         $block = null;
-        foreach ($node->cases as $case) {
-            $caseBlock = new Block($this->block);
-            if ($block && ! $block->dead) {
-                // wire up!
-                $block->children[] = new Jump($caseBlock);
-                $caseBlock->addParent($block);
-            }
+        // Jumptable path must track switch scope like the desugar path (#28796 / Zend zend_compile.c).
+        $switchId = ++$this->ctx->gotoScopeId;
+        $this->ctx->gotoLoopSwitchStack[] = $switchId;
+        try {
+            foreach ($node->cases as $case) {
+                $caseBlock = new Block($this->block);
+                if ($block && ! $block->dead) {
+                    // wire up!
+                    $block->children[] = new Jump($caseBlock);
+                    $caseBlock->addParent($block);
+                }
 
-            if ($case->cond) {
-                $targets[] = $caseBlock;
-                $cases[] = $this->parseExprNode($case->cond);
-            } else {
-                $defaultBlock = $caseBlock;
-            }
+                if ($case->cond) {
+                    $targets[] = $caseBlock;
+                    $cases[] = $this->parseExprNode($case->cond);
+                } else {
+                    $defaultBlock = $caseBlock;
+                }
 
-            $block = $this->parseNodes($case->stmts, $caseBlock);
+                $block = $this->parseNodes($case->stmts, $caseBlock);
+            }
+        } finally {
+            array_pop($this->ctx->gotoLoopSwitchStack);
         }
         $this->block->children[] = new Op\Stmt\Switch_(
             $cond, $cases, $targets, $defaultBlock, $this->mapAttributes($node)
