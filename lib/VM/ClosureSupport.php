@@ -207,14 +207,12 @@ final class ClosureSupport
             return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $scope, $fromCallableApi));
         }
 
-        // Scalars / resources: Closure::fromCallable → TypeError; FCC keeps LogicException (#26457).
+        // Scalars / resources: Closure::fromCallable → TypeError; FCC `$c(...)` → catchable Error (#26457, #28937).
         if ($fromCallableApi) {
             throw new \TypeError(self::fromCallableNoArrayOrStringMessage());
         }
 
-        throw new \LogicException(
-            'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
-        );
+        throw new \Error(CallableCheck::scalarNotCallableMessage($callable));
     }
 
     /** php-src zend_closures.c — invalid scalar/object for Closure::fromCallable (#26457). */
@@ -739,9 +737,8 @@ final class ClosureSupport
                 );
             }
 
-            throw new \LogicException(
-                'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
-            );
+            // FCC `$c(...)` — catchable Error, not Closure::fromCallable LogicException (#28937).
+            throw new \Error(CallableCheck::arrayCallbackTwoElementsMessage());
         }
         $receiver = $table->findVariable($idx0, false)->resolveIndirect();
         $methodVar = $table->findVariable($idx1, false)->resolveIndirect();
@@ -750,17 +747,25 @@ final class ClosureSupport
             || Variable::TYPE_ENUM_CASE === $receiver->type
             || Variable::TYPE_STRING === $receiver->type
             || null !== $scope;
-        if ($fromCallableApi && !$receiverOk) {
-            throw new \TypeError(
-                self::fromCallableFailedMessage(
-                    'first array member is not a valid class name or object'
-                )
-            );
+        if (!$receiverOk) {
+            if ($fromCallableApi) {
+                throw new \TypeError(
+                    self::fromCallableFailedMessage(
+                        'first array member is not a valid class name or object'
+                    )
+                );
+            }
+
+            throw new \Error(CallableCheck::firstArrayMemberInvalidMessage());
         }
-        if ($fromCallableApi && Variable::TYPE_STRING !== $methodVar->type) {
-            throw new \TypeError(
-                self::fromCallableFailedMessage('second array member is not a valid method')
-            );
+        if (Variable::TYPE_STRING !== $methodVar->type) {
+            if ($fromCallableApi) {
+                throw new \TypeError(
+                    self::fromCallableFailedMessage('second array member is not a valid method')
+                );
+            }
+
+            throw new \Error(CallableCheck::secondArrayMemberInvalidMessage());
         }
         $methodName = $methodVar->toString();
         if (Variable::TYPE_OBJECT === $receiver->type) {
@@ -808,9 +813,13 @@ final class ClosureSupport
             );
         }
 
-        throw new \LogicException(
-            'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
-        );
+        if ($fromCallableApi) {
+            throw new \TypeError(
+                'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
+            );
+        }
+
+        throw new \Error(CallableCheck::firstArrayMemberInvalidMessage());
     }
 
     /** `(new C)(...)` / Closure::fromCallable($obj) when $obj defines __invoke (zend_closures.c, #9605). */

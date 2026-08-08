@@ -42,6 +42,18 @@ final class CallableCheck
         return 'Array callback must have exactly two elements';
     }
 
+    /** Zend zend_is_callable_ex — array[0] kind (#28937, FCC / invoke). */
+    public static function firstArrayMemberInvalidMessage(): string
+    {
+        return 'First array member is not a valid class name or object';
+    }
+
+    /** Zend zend_is_callable_ex — array[1] kind (#28937, FCC / invoke). */
+    public static function secondArrayMemberInvalidMessage(): string
+    {
+        return 'Second array member is not a valid method';
+    }
+
     public static function assertParameter(
         Variable $value,
         Context $context,

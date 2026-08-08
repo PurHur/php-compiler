@@ -82,6 +82,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\Cast\Void_
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
+                || $usage instanceof FirstClassCallable
                 || $usage instanceof Op\Terminal\StaticVar) {
                 continue;
             } elseif ($usage instanceof Op\Terminal\Const_) {
@@ -160,6 +161,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
                 || $usage instanceof Op\Terminal\StaticVar
+                || $usage instanceof FirstClassCallable
                 || $usage instanceof Op\Terminal\Const_) {
                 // not a dynamic packed-array append
             } else {
