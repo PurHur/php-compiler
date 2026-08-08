@@ -1739,13 +1739,14 @@ final class VmFilter
 
     /**
      * Practical URL subset for FILTER_VALIDATE_URL (php-src ext/filter/logical_filters.c).
+     * php_filter_validate_url runs php_filter_url first and fails if any byte is stripped (#28996).
      */
     public static function isValidUrlSubset(string $s, int $flags = 0): bool
     {
         if ('' === $s) {
             return false;
         }
-        if (preg_match('/[\x00-\x1f\x7f]/', $s)) {
+        if (0 === FilterUrlValidate::isUrlCharsetOk($s)) {
             return false;
         }
         $parsed = VmString::parseUrl($s);

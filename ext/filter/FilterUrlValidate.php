@@ -8,6 +8,7 @@ namespace PHPCompiler\ext\filter;
  * FILTER_VALIDATE_URL subset — NestedJIT/AOT-safe unit (#27206, peer EMAIL #27068).
  *
  * php-src: ext/filter/logical_filters.c — php_filter_validate_url
+ * (pre-check via php_filter_url / RFC 1738 §5 allow-list in sanitizing_filters.c)
  *
  * Keep free of VmFilter / `\preg_match` / by-ref / `"\0"` / bool returns.
  * Host SSOT for compile-time fold: {@see VmFilter::isValidUrlSubset()}.
@@ -18,9 +19,38 @@ final class FilterUrlValidate
 
     private const FLAG_QUERY_REQUIRED = 0x080000;
 
+    /**
+     * RFC 1738 §5 characters kept by php_filter_url (LOWALPHA…RESERVED).
+     * Validate fails when any other byte is present (length would change after sanitize).
+     */
+    private const URL_ALLOWED =
+        'abcdefghijklmnopqrstuvwxyz'
+        . 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        . '0123456789'
+        . '$-_.+'
+        . "!*'(),"
+        . '{}|\\^~[]`'
+        . '<>#%"'
+        . ';/?:@&=';
+
     public static function isValid(string $s, int $flags = 0): bool
     {
         return 1 === self::isValidInt($s, $flags);
+    }
+
+    /**
+     * 1 when every byte is in the php_filter_url allow-list (#28996 spaces / #29015 non-ASCII).
+     */
+    public static function isUrlCharsetOk(string $s): int
+    {
+        $len = \strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            if (false === \strpos(self::URL_ALLOWED, $s[$i])) {
+                return 0;
+            }
+        }
+
+        return 1;
     }
 
     public static function isValidInt(string $s, int $flags = 0): int
@@ -29,11 +59,8 @@ final class FilterUrlValidate
         if (0 === $len) {
             return 0;
         }
-        for ($i = 0; $i < $len; ++$i) {
-            $o = \ord($s[$i]);
-            if ($o < 0x20 || 0x7f === $o) {
-                return 0;
-            }
+        if (0 === self::isUrlCharsetOk($s)) {
+            return 0;
         }
 
         if (\str_starts_with($s, 'https://')) {
