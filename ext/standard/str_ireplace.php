@@ -80,16 +80,12 @@ final class str_ireplace extends Internal
         $ht = new HashTable();
         $totalCount = 0;
         foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
-            if (Variable::TYPE_STRING !== $value->type) {
-                throw new \LogicException(
-                    'str_ireplace() array subject values must be strings in this compiler build'
-                );
-            }
+            // php-src php_str_replace_array: convert_to_string per array subject (#27165).
             $elemCount = 0;
             $replaced = self::replaceWithNeedles(
                 $searchNeedles,
                 $replaceOperand,
-                $value->toString(),
+                $value->resolveIndirect()->toString(null, $frame),
                 $elemCount
             );
             $totalCount += $elemCount;
