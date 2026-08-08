@@ -47,7 +47,7 @@ final class numfmt_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('numfmt_create() is not implemented for JIT in this compiler build (issue #20754)');
+        return JitNumberFormatterCreate::invoke($context, ...$args);
     }
 }
 
