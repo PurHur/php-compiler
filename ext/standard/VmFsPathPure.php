@@ -21,9 +21,8 @@ final class VmFsPathPure
 
     public static function rename(string $from, string $to): bool
     {
-        if (str_contains($from, "\0") || str_contains($to, "\0")) {
-            return false;
-        }
+        // Embedded-NUL reject is handled by rename_() / JitStringBuiltinArg on the
+        // JIT leaf; keep this Pure path free of NestedJIT-fragile scans (#29141).
         if (null !== VmFsPhpWrapper::renameWarningMessage($from, $to)) {
             return false;
         }
@@ -33,7 +32,7 @@ final class VmFsPathPure
 
     public static function copy(string $from, string $to): bool
     {
-        if (str_contains($from, "\0") || str_contains($to, "\0")) {
+        if (self::pathHasNulByte($from) || self::pathHasNulByte($to)) {
             return false;
         }
 
@@ -42,7 +41,7 @@ final class VmFsPathPure
 
     public static function link(string $target, string $link): bool
     {
-        if (str_contains($target, "\0") || str_contains($link, "\0")) {
+        if (self::pathHasNulByte($target) || self::pathHasNulByte($link)) {
             return false;
         }
 
@@ -52,7 +51,7 @@ final class VmFsPathPure
     /** @return string|false */
     public static function readlink(string $path)
     {
-        if (str_contains($path, "\0")) {
+        if (self::pathHasNulByte($path)) {
             return false;
         }
         $result = @\readlink($path);
@@ -62,10 +61,23 @@ final class VmFsPathPure
 
     public static function symlink(string $target, string $link): bool
     {
-        if (str_contains($target, "\0") || str_contains($link, "\0")) {
+        if (self::pathHasNulByte($target) || self::pathHasNulByte($link)) {
             return false;
         }
 
         return @\symlink($target, $link);
+    }
+
+    /** NestedJIT-safe embedded-NUL check (#29141) — avoids str_contains("\0") always-true. */
+    private static function pathHasNulByte(string $path): bool
+    {
+        $n = \strlen($path);
+        for ($i = 0; $i < $n; ++$i) {
+            if ("\0" === $path[$i]) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

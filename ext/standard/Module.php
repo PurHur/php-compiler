@@ -669,7 +669,6 @@ class Module extends ModuleAbstract
             new phpc_native_ht_set_hashtable_at(),
             new phpc_native_ht_set_string_key_long(),
             new phpc_native_environ_mirror_into_ht(),
-            new phpc_rename_kernel(),
             new phpc_ob_write_stdout_kernel(),
             new phpc_url_rewriter_apply_kernel(),
             new phpc_rewrite_vars_set_tags_kernel(),
