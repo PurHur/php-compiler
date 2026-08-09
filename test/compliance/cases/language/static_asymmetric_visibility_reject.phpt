@@ -1,5 +1,7 @@
 --TEST--
-PHP 8.4 static asymmetric visibility: explicit read + set modifier compile fatal (#7013, zend_compile.c)
+PHP 8.4 static asymmetric visibility: Zend "Static property may not have asymmetric visibility" (#7013, #29389, zend_compile.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 // Key off PROFILE env — not supportsStaticAsymmetricVisibility(). PHP 8.5 accepts static aviz (#26239).
@@ -12,8 +14,10 @@ if (is_string($profile) && '' !== trim($profile)
 --FILE--
 <?php
 class C {
-    public (private(set)) static int $x = 1;
+    public private(set) static int $x = 1;
 }
 echo C::$x, "\n";
 --EXPECT_EXIT--
 255
+--EXPECTF--
+%aStatic property may not have asymmetric visibility%a
