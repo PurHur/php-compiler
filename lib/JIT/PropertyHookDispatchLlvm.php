@@ -102,9 +102,9 @@ final class PropertyHookDispatchLlvm
     }
 
     /**
-     * isset($obj->prop) on hooked properties (#9671, #23339, zend_std_has_property).
-     * Same-name backing probes storage; distinct backing skips get when UNDEF (post-unset),
-     * otherwise invokes get and tests non-null (initialized null still runs get).
+     * isset($obj->prop) on hooked properties (#9671, #29214, zend_std_has_property).
+     * When a get hook exists, always invoke it (same-name / expression-bodied set included);
+     * write-only (no get) probes the backing slot.
      */
     public static function tryEmitPropertyIsSet(
         Context $context,
@@ -119,19 +119,17 @@ final class PropertyHookDispatchLlvm
         }
         $object = $context->type->object;
         assert($object instanceof Builtin\Type\Object_);
-        $sameName = 0 === strcasecmp($backingName, $propertyName);
         $hookLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
         $getProxy = self::resolveHookProxy($context, $declaringClass, $hookLc);
         $canCallGet = null !== $getProxy
             && !self::proxyIsStatic($context, $getProxy)
             && !PropertyHookJitHelper::isRawHookWrite($context, $propertyName, $enclosingBlock);
-        if (!$sameName && $canCallGet) {
-            return self::emitDistinctBackingIssetWithGet(
+        if ($canCallGet) {
+            return self::emitIssetViaGetHook(
                 $context,
                 $receiver,
                 $declaringClass,
                 $propertyName,
-                $backingName,
                 $enclosingBlock
             );
         }
@@ -156,45 +154,16 @@ final class PropertyHookDispatchLlvm
     }
 
     /**
-     * Distinct-backing isset: UNDEF → false; else get-hook result non-null (#23339).
+     * isset via get hook — result is non-null (#29214, zend_std_has_property).
      */
-    private static function emitDistinctBackingIssetWithGet(
+    private static function emitIssetViaGetHook(
         Context $context,
         Value $receiver,
         string $declaringClass,
         string $propertyName,
-        string $backingName,
         ?Block $enclosingBlock
     ): Value {
-        $object = $context->type->object;
-        assert($object instanceof Builtin\Type\Object_);
         $i1 = $context->getTypeFromString('int1');
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $undefBb = $fn->appendBasicBlock('hook_isset_undef');
-        $getBb = $fn->appendBasicBlock('hook_isset_get');
-        $mergeBb = $fn->appendBasicBlock('hook_isset_merge');
-        $resultSlot = $context->builder->alloca($i1);
-
-        $fetched = $object->propertyFetch($receiver, $declaringClass, $backingName);
-        $isUndef = $i1->constInt(0, false);
-        if (Variable::TYPE_VALUE === $fetched->type) {
-            $valueMap = $context->structFieldMap['__value__'];
-            $typeByte = $context->builder->load(
-                $context->builder->structGep($fetched->value, $valueMap['type'])
-            );
-            $undefType = $context->getTypeFromString('int8')->constInt(
-                \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
-                false
-            );
-            $isUndef = $context->builder->icmp(Builder::INT_EQ, $typeByte, $undefType);
-        }
-        $context->builder->branchIf($isUndef, $undefBb, $getBb);
-
-        $context->builder->positionAtEnd($undefBb);
-        $context->builder->store($i1->constInt(0, false), $resultSlot);
-        $context->builder->branch($mergeBb);
-
-        $context->builder->positionAtEnd($getBb);
         $hookValue = self::tryEmitPropertyGet(
             $context,
             $receiver,
@@ -203,8 +172,9 @@ final class PropertyHookDispatchLlvm
             $enclosingBlock
         );
         if (null === $hookValue) {
-            $context->builder->store($i1->constInt(0, false), $resultSlot);
-        } elseif (Variable::TYPE_VALUE === $hookValue->type) {
+            return $i1->constInt(0, false);
+        }
+        if (Variable::TYPE_VALUE === $hookValue->type) {
             $valueMap = $context->structFieldMap['__value__'];
             $typeByte = $context->builder->load(
                 $context->builder->structGep($hookValue->value, $valueMap['type'])
@@ -213,23 +183,13 @@ final class PropertyHookDispatchLlvm
                 \PHPCompiler\VM\Variable::TYPE_NULL,
                 false
             );
-            $context->builder->store(
-                $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType),
-                $resultSlot
-            );
-        } else {
-            $loaded = $context->helper->loadValue($hookValue);
-            $nullPtr = $context->getTypeFromString('void*')->constNull();
-            $context->builder->store(
-                $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr),
-                $resultSlot
-            );
+
+            return $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
         }
-        $context->builder->branch($mergeBb);
+        $loaded = $context->helper->loadValue($hookValue);
+        $nullPtr = $context->getTypeFromString('void*')->constNull();
 
-        $context->builder->positionAtEnd($mergeBb);
-
-        return $context->builder->load($resultSlot);
+        return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
     }
 
     /**
