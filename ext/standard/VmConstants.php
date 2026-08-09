@@ -23,14 +23,17 @@ final class VmConstants
      * constant() lookup — user/core constants and Class::CONST (#5926, basic_functions.c).
      *
      * @param ?string $callerClassLc active class scope for Class::CONST visibility (#29130)
+     *                               and for self:: / parent:: (#29455)
+     * @param ?string $calledClassLc late-static called class for static:: (#29455)
      */
     public static function constantLookup(
         Context $ctx,
         string $name,
-        ?string $callerClassLc = null
+        ?string $callerClassLc = null,
+        ?string $calledClassLc = null
     ): ?Variable {
         if (str_contains($name, '::')) {
-            return self::lookupClassConstant($ctx, $name, $callerClassLc);
+            return self::lookupClassConstant($ctx, $name, $callerClassLc, $calledClassLc);
         }
 
         return self::globalConstantLookup($ctx, $name);
@@ -53,14 +56,17 @@ final class VmConstants
      * defined() lookup — existence without materializing value (#4972, basic_functions.c).
      *
      * @param ?string $callerClassLc active class scope for Class::CONST visibility (#29130)
+     *                               and for self:: / parent:: (#29455)
+     * @param ?string $calledClassLc late-static called class for static:: (#29455)
      */
     public static function constantDefined(
         Context $ctx,
         string $name,
-        ?string $callerClassLc = null
+        ?string $callerClassLc = null,
+        ?string $calledClassLc = null
     ): bool {
         if (str_contains($name, '::')) {
-            return self::isClassConstantDefined($ctx, $name, $callerClassLc);
+            return self::isClassConstantDefined($ctx, $name, $callerClassLc, $calledClassLc);
         }
 
         return self::globalConstantDefined($ctx, $name);
@@ -85,7 +91,8 @@ final class VmConstants
     private static function isClassConstantDefined(
         Context $ctx,
         string $qualifiedName,
-        ?string $callerClassLc
+        ?string $callerClassLc,
+        ?string $calledClassLc = null
     ): bool {
         $pos = strrpos($qualifiedName, '::');
         if (false === $pos) {
@@ -96,9 +103,9 @@ final class VmConstants
         if ('' === $className || '' === $constName) {
             return false;
         }
-        $classLc = strtolower(ltrim($className, '\\'));
+        $classLc = self::resolveRelativeClassLc($ctx, $className, $callerClassLc, $calledClassLc);
         if (!isset($ctx->classes[$classLc])) {
-            $ctx->autoloadClass($className);
+            $ctx->autoloadClass($classLc);
         }
         if (!isset($ctx->classes[$classLc])) {
             return false;
@@ -116,12 +123,14 @@ final class VmConstants
         $constKey = $decl['constLc'];
         $vis = $declaring->constVisibility[$constKey] ?? CfgFunc::FLAG_PUBLIC;
         $declaringLc = strtolower(ltrim($declaring->name, '\\'));
+        // Zend keeps the original Class:: name left-hand side in access errors (parent::P).
+        $displayClass = $className;
         try {
             ClassConstVisibility::assertAccessible(
                 $vis,
                 $callerClassLc,
                 $declaringLc,
-                $classEntry->name,
+                $displayClass,
                 $constName,
                 static fn (string $callerLc, string $ancestorLc): bool => isset($ctx->classes[$callerLc])
                     && self::isClassSameOrSubclassOf($ctx, $callerLc, $ancestorLc)
@@ -135,11 +144,13 @@ final class VmConstants
 
     /**
      * @see Zend zif_constant — zend_fetch_class + class constant table + visibility (#29130)
+     * Relative self:: / static:: / parent:: — zend_constants.c / #29455.
      */
     private static function lookupClassConstant(
         Context $ctx,
         string $qualifiedName,
-        ?string $callerClassLc
+        ?string $callerClassLc,
+        ?string $calledClassLc = null
     ): ?Variable {
         $pos = strrpos($qualifiedName, '::');
         if (false === $pos) {
@@ -150,9 +161,9 @@ final class VmConstants
         if ('' === $className || '' === $constName) {
             return null;
         }
-        $classLc = strtolower(ltrim($className, '\\'));
+        $classLc = self::resolveRelativeClassLc($ctx, $className, $callerClassLc, $calledClassLc);
         if (!isset($ctx->classes[$classLc])) {
-            $ctx->autoloadClass($className);
+            $ctx->autoloadClass($classLc);
         }
         if (!isset($ctx->classes[$classLc])) {
             return null;
@@ -173,12 +184,14 @@ final class VmConstants
         $constKey = $decl['constLc'];
         $vis = $declaring->constVisibility[$constKey] ?? CfgFunc::FLAG_PUBLIC;
         $declaringLc = strtolower(ltrim($declaring->name, '\\'));
+        // Zend error text uses the original left-hand name (e.g. parent::P, not A::P).
+        $displayClass = $className;
         try {
             ClassConstVisibility::assertAccessible(
                 $vis,
                 $callerClassLc,
                 $declaringLc,
-                $classEntry->name,
+                $displayClass,
                 $constName,
                 static fn (string $callerLc, string $ancestorLc): bool => isset($ctx->classes[$callerLc])
                     && self::isClassSameOrSubclassOf($ctx, $callerLc, $ancestorLc)
@@ -200,6 +213,51 @@ final class VmConstants
         );
 
         return $result;
+    }
+
+    /**
+     * Expand self / static / parent for constant() / defined() (#29455).
+     *
+     * php-src: Zend/zend_constants.c — zend_get_constant_str relative class fetch.
+     *
+     * @throws \Error when a relative keyword is used without a valid class scope
+     */
+    private static function resolveRelativeClassLc(
+        Context $ctx,
+        string $className,
+        ?string $selfClassLc,
+        ?string $calledClassLc
+    ): string {
+        $classLc = strtolower(ltrim($className, '\\'));
+        if (!\in_array($classLc, ['self', 'static', 'parent'], true)) {
+            return $classLc;
+        }
+        if (null === $selfClassLc || '' === $selfClassLc) {
+            throw new \Error('Cannot access "'.$classLc.'" when no class scope is active');
+        }
+        if ('self' === $classLc) {
+            return $selfClassLc;
+        }
+        if ('static' === $classLc) {
+            if (null !== $calledClassLc && '' !== $calledClassLc) {
+                return strtolower(ltrim($calledClassLc, '\\'));
+            }
+
+            return $selfClassLc;
+        }
+        // parent::
+        if (!isset($ctx->classes[$selfClassLc])) {
+            $ctx->autoloadClass($selfClassLc);
+        }
+        if (!isset($ctx->classes[$selfClassLc])) {
+            throw new \Error('Cannot access "parent" when no class scope is active');
+        }
+        $parentLc = $ctx->classes[$selfClassLc]->parentLc;
+        if (null === $parentLc) {
+            throw new \Error('Cannot access "parent" when current class scope has no parent');
+        }
+
+        return $parentLc;
     }
 
     private static function isClassSameOrSubclassOf(Context $ctx, string $classLc, string $ancestorLc): bool

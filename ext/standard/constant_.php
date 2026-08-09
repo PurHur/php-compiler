@@ -48,7 +48,8 @@ final class constant_ extends Internal
         $value = VmConstants::constantLookup(
             $frame->vmContext,
             $name,
-            VmReflection::callerClassLcFromFrame($frame)
+            VmReflection::callerClassLcFromFrame($frame),
+            VmReflection::calledClassLcFromFrame($frame)
         );
         if (null !== $value) {
             if (null !== $frame->returnVar) {
@@ -56,6 +57,10 @@ final class constant_ extends Internal
             }
 
             return;
+        }
+        // Zend: Class::CONST form is unquoted; bare names are quoted (zend_constants.c).
+        if (str_contains($name, '::')) {
+            throw new \Error('Undefined constant '.$name);
         }
         throw new \Error('Undefined constant "'.$name.'"');
     }

@@ -861,6 +861,19 @@ final class VmReflection
     }
 
     /**
+     * Late-static called class for constant('static::…') / defined('static::…') (#29455).
+     */
+    public static function calledClassLcFromFrame(Frame $frame): ?string
+    {
+        $scopeFrame = self::reflectionCallerFrame($frame);
+        if (null !== $scopeFrame->calledClass && '' !== $scopeFrame->calledClass) {
+            return strtolower($scopeFrame->calledClass);
+        }
+
+        return self::callerClassLcFromFrame($frame);
+    }
+
+    /**
      * is_callable() visibility probe for a resolved method (#9334).
      */
     public static function isMethodCallableFromScope(
