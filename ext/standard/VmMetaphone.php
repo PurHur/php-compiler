@@ -138,8 +138,9 @@ final class VmMetaphone
 
     public static function encode(string $word, int $maxPhonemes = 0): string
     {
+        // php-src ext/standard/string.c — PHP_FUNCTION(metaphone) max_phonemes range (#29304).
         if ($maxPhonemes < 0) {
-            throw new \LogicException('metaphone() max phonemes must be >= 0');
+            throw new \ValueError('metaphone(): Argument #2 ($max_phonemes) must be greater than or equal to 0');
         }
         $len = \strlen($word);
         $out = '';

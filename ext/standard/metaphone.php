@@ -39,9 +39,7 @@ final class metaphone extends Internal
                 throw new \LogicException('metaphone() max phonemes must be an integer in this compiler build');
             }
             $maxPhonemes = $maxVar->toInt();
-            if ($maxPhonemes < 0) {
-                throw new \LogicException('metaphone() max phonemes must be >= 0 in this compiler build');
-            }
+            // Range check is SSOT in VmMetaphone::encode() (php-src string.c / #29304).
         }
         if (null === $frame->returnVar) {
             return;

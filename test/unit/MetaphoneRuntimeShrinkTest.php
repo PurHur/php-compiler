@@ -41,6 +41,16 @@ final class MetaphoneRuntimeShrinkTest extends TestCase
         $this->assertSame('PRKRMNK', VmMetaphone::encode('programming', 0));
     }
 
+    /** php-src string.c — negative max_phonemes is ValueError, not LogicException (#29304). */
+    public function testNegativeMaxPhonemesThrowsValueError(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(
+            'metaphone(): Argument #2 ($max_phonemes) must be greater than or equal to 0'
+        );
+        VmMetaphone::encode('test', -1);
+    }
+
     /** NestedJIT compound summed index assign is a silent no-op → AOT SIGKILL (#26815). */
     public function testVmMetaphoneAvoidsCompoundSummedIndexAdvance(): void
     {
