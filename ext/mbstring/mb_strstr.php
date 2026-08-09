@@ -25,11 +25,17 @@ final class mb_strstr extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
+        // Sparse named args (encoding: without before_needle) — isset, not count (#28584).
+        if (!isset($frame->calledArgs[0]) || !isset($frame->calledArgs[1])) {
             throw new \ArgumentCountError(sprintf(
                 'mb_strstr() expects at least 2 arguments, %d given',
-                $argc
+                \count($frame->calledArgs)
+            ));
+        }
+        if (isset($frame->calledArgs[4])) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_strstr() expects at most 4 arguments, %d given',
+                max(\array_keys($frame->calledArgs)) + 1
             ));
         }
         // Z_PARAM_STR — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21313).
@@ -38,10 +44,10 @@ final class mb_strstr extends Internal
             return;
         }
         $needle = VmString::trimFamilyStringArgForFrame($frame, 1, 'mb_strstr', 1, 'needle');
-        $part = $argc >= 3
+        $part = isset($frame->calledArgs[2])
             ? VmMbstring::coercePartArg($frame->calledArgs[2], 'mb_strstr', 2)
             : false;
-        $encoding = $argc >= 4
+        $encoding = isset($frame->calledArgs[3])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_strstr', 3)
             : 'UTF-8';
         $result = VmMbstring::strstr($haystack, $needle, $part, $encoding);
