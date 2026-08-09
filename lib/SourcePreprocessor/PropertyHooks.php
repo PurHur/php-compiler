@@ -29,6 +29,13 @@ final class PropertyHooks
     /** php-src: zend_verify_hooked_property — virtual hooked property + explicit default (#16861, #12995). */
     public const VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR = 'Cannot specify default value for virtual hooked property %s::$%s';
 
+    /**
+     * php-src: Zend/zend_inheritance.c zend_verify_hooked_property — backed `&get` + `set` (#29230).
+     *
+     * Message uses {@code Class::prop} (not {@code Class::$prop}).
+     */
+    public const BACKED_GET_BYREF_WITH_SET_COMPILE_ERROR = 'Get hook of backed property %s::%s with set hook may not return by reference';
+
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -115,6 +122,11 @@ final class PropertyHooks
     public static function virtualHookedDefaultCompileError(string $className, string $propName): string
     {
         return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
+    }
+
+    public static function backedGetByRefWithSetCompileError(string $className, string $propName): string
+    {
+        return sprintf(self::BACKED_GET_BYREF_WITH_SET_COMPILE_ERROR, $className, $propName);
     }
 
     /** Zend 8.2 reference-profile parse diagnostic (#18019, zend_language_parser.y). */
@@ -1322,6 +1334,14 @@ final class PropertyHooks
                 ) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
+                $this->rejectBackedGetByRefWithSet(
+                    $lcClass,
+                    $prop,
+                    $classDisplay,
+                    $filename,
+                    $fullCode,
+                    $bodyOffsetInFile + $hookOpen
+                );
             }
             if ($isFinalProperty) {
                 if (!isset($this->registry[$lcClass][$prop])) {
@@ -1648,7 +1668,9 @@ final class PropertyHooks
         string $attributes = ''
     ): array {
         if ($this->setArrowExprUsesStatementForm($expr, $isStatic)) {
-            $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
+            // php-src: ZEND_AST_PROPERTY_HOOK_SHORT_BODY set always counts as using the property
+            // (zend_property_hook_uses_property) — even when the expr assigns a different field (#29230).
+            $usesBacking = true;
             $this->registerHookBacking($lcClass, $prop, 'set', $expr, $isStatic);
             $body = '{ '.$expr.'; }';
         } else {
@@ -2446,6 +2468,40 @@ final class PropertyHooks
             $filename,
             self::lineAtOffset($fullCode, $declOffsetInFile),
             self::ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE
+        );
+    }
+
+    /**
+     * php-src zend_verify_hooked_property — backed `&get` cannot coexist with `set` (#29230).
+     *
+     * Virtual properties may declare both (zend_inheritance.c); arrow `set =>` is never virtual.
+     */
+    private function rejectBackedGetByRefWithSet(
+        string $lcClass,
+        string $prop,
+        string $classDisplayName,
+        string $filename,
+        string $fullCode,
+        int $hookOpenOffsetInFile
+    ): void {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            return;
+        }
+        $propMeta = $this->registry[$lcClass][$prop] ?? [];
+        if (empty($propMeta['getByRef'])) {
+            return;
+        }
+        $hasSet = isset($propMeta['set']) || !empty($propMeta['requiresSet']);
+        if (!$hasSet) {
+            return;
+        }
+        if (!empty($propMeta['virtual'])) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+            self::backedGetByRefWithSetCompileError($classDisplayName, $prop)
         );
     }
 
