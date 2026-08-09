@@ -122,6 +122,35 @@ PHP;
         );
     }
 
+    /**
+     * @covers issue #29387 — readonly between get-vis and set-vis must not inject a second public
+     * @dataProvider readonlyPrivateSetOrderProvider
+     */
+    public function testRewritePublicReadonlyPrivateSetOrders(string $decl): void
+    {
+        $this->requireParenthesizedAsymmetricSetModifier();
+        $source = "<?php\nclass Demo {\n    {$decl}\n}\n";
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        $flat = preg_replace('/\s+/', ' ', $rewritten);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/', $flat);
+        self::assertStringContainsString('/*phpc-asymmetric-explicit-read*/', $flat);
+        self::assertStringContainsString('readonly', $flat);
+        self::assertMatchesRegularExpression('/\bpublic\b.*\bint\s+\$x\b/i', $flat);
+        self::assertSame(
+            1,
+            preg_match_all('/\bpublic\b/i', $flat),
+            'must emit a single public modifier (no implicit duplicate public)'
+        );
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function readonlyPrivateSetOrderProvider(): iterable
+    {
+        yield 'public readonly private(set)' => ['public readonly private(set) int $x = 1;'];
+        yield 'public private(set) readonly' => ['public private(set) readonly int $x = 1;'];
+        yield 'readonly public private(set)' => ['readonly public private(set) int $x = 1;'];
+    }
+
     public function testRewriteProtectedPrivateSet(): void
     {
         $this->requireParenthesizedAsymmetricSetModifier();
@@ -399,8 +428,9 @@ PHP;
 
             return;
         }
+        // PHP 8.4: Zend static-aviz fatal (#29389), not duplicate PPP (#7013).
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::STATIC_ASYMMETRIC_VISIBILITY_MESSAGE);
         AsymmetricVisibilityRewriter::rewrite($source);
     }
 
