@@ -12928,6 +12928,7 @@ class Compiler {
                             $this->compileStaticPropertyNameSlot($staticPropertyFetch->name, $staticPropertyFetch->class, $block)
                         );
                     }
+                    // One property write; publish used result without re-writing the slot (#29194).
                     $ops[] = new OpCode(
                         OpCode::TYPE_ASSIGN,
                         $fetchSlot,
@@ -12935,10 +12936,11 @@ class Compiler {
                         $rhsSlot
                     );
                     if ([] !== $expr->result->usages) {
+                        $resultSlot = $this->compileOperand($expr->result, $block, false);
                         $ops[] = new OpCode(
                             OpCode::TYPE_ASSIGN,
-                            $this->compileOperand($expr->result, $block, false),
-                            $fetchSlot,
+                            $resultSlot,
+                            $resultSlot,
                             $rhsSlot
                         );
                     }
@@ -12958,6 +12960,9 @@ class Compiler {
                     );
                     // Assign-lowered property writes skip compileExpr(PropertyFetch); stamp line here (#21953).
                     $this->assignSourceMetadata($fetchOp, $propertyFetch);
+                    // Write the property once. A follow-up ASSIGN must not use fetchSlot as dest —
+                    // that re-invokes __set for `$r = ($obj->prop = $v)` (#29194). Publish the
+                    // expression value into resultSlot only (dest=resultSlot).
                     $ops = [
                         $fetchOp,
                         new OpCode(
@@ -12968,10 +12973,11 @@ class Compiler {
                         ),
                     ];
                     if ([] !== $expr->result->usages) {
+                        $resultSlot = $this->compileOperand($expr->result, $block, false);
                         $ops[] = new OpCode(
                             OpCode::TYPE_ASSIGN,
-                            $this->compileOperand($expr->result, $block, false),
-                            $fetchSlot,
+                            $resultSlot,
+                            $resultSlot,
                             $rhsSlot
                         );
                     }
