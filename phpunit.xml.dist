@@ -136,6 +136,7 @@
             <file>./test/compliance/DateIntervalCreateFromDateStringEmptyVMTest.php</file>
             <file>./test/compliance/WddxPacketBuildersVMTest.php</file>
             <file>./test/compliance/XmlrpcServerDispatchVMTest.php</file>
+            <file>./test/compliance/RarProceduralApiVMTest.php</file>
             <file>./test/compliance/FilestatEmptyPathSilentFalseVMTest.php</file>
             <file>./test/compliance/MkdirEmptyRecursiveInvalidPathVMTest.php</file>
             <file>./test/compliance/ChrootEmptyPathWarningVMTest.php</file>

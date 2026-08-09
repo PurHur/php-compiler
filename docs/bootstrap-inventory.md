@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7276 |
-| Phase A inventory files (M2 ratio SSOT) | 7276 |
+| PHP files on vm.php path | 7285 |
+| Phase A inventory files (M2 ratio SSOT) | 7285 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23539 |
+| Source constructs flagged (warnings) | 23559 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1997,10 +1997,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/SecureInstance.php` | 0 | 1 |
 | `ext/random/Xoshiro256StarStarInstance.php` | 0 | 1 |
 | `ext/rar/BuiltinClasses.php` | 0 | 1 |
-| `ext/rar/Module.php` | 0 | 1 |
+| `ext/rar/Module.php` | 0 | 9 |
 | `ext/rar/RarEngine.php` | 0 | 1 |
 | `ext/rar/RarExtensionPolicy.php` | 0 | 1 |
+| `ext/rar/RarProceduralFunction.php` | 0 | 1 |
 | `ext/rar/VmRar.php` | 0 | 37 |
+| `ext/rar/rar_allow_broken_set.php` | 0 | 1 |
+| `ext/rar/rar_broken_is.php` | 0 | 1 |
+| `ext/rar/rar_close.php` | 0 | 1 |
+| `ext/rar/rar_comment_get.php` | 0 | 1 |
+| `ext/rar/rar_entry_get.php` | 0 | 1 |
+| `ext/rar/rar_list.php` | 0 | 3 |
+| `ext/rar/rar_open.php` | 0 | 2 |
+| `ext/rar/rar_solid_is.php` | 0 | 1 |
 | `ext/redis/BuiltinClasses.php` | 0 | 1 |
 | `ext/redis/Module.php` | 0 | 1 |
 | `ext/redis/RedisClassMethod.php` | 0 | 1 |
@@ -23403,7 +23412,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/rar/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new rar_open (line 41)
+- new rar_list (line 42)
+- new rar_entry_get (line 43)
+- new rar_solid_is (line 44)
+- new rar_comment_get (line 45)
+- new rar_broken_is (line 46)
+- new rar_allow_broken_set (line 47)
+- new rar_close (line 48)
+- 3 class method(s)
 
 ### `ext/rar/RarEngine.php`
 
@@ -23414,6 +23431,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/rar/RarProceduralFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/rar/VmRar.php`
 
@@ -23442,19 +23464,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RarException (line 127)
 - new RarException (line 131)
 - new ObjectEntry (line 138)
-- new RarException (line 163)
-- new RarException (line 180)
-- new RarException (line 247)
+- new RarException (line 164)
+- new RarException (line 181)
 - new RarException (line 261)
-- new RarException (line 271)
 - new RarException (line 275)
-- new ObjectEntry (line 292)
-- new ArgumentCountError (line 325)
-- new HashTable (line 367)
-- new Variable (line 369)
-- new ArgumentCountError (line 388)
-- new ArgumentCountError (line 642)
-- 35 class method(s)
+- new RarException (line 285)
+- new RarException (line 289)
+- new ObjectEntry (line 306)
+- new ArgumentCountError (line 339)
+- new HashTable (line 381)
+- new Variable (line 383)
+- new ArgumentCountError (line 402)
+- new ArgumentCountError (line 656)
+- 37 class method(s)
+
+### `ext/rar/rar_allow_broken_set.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/rar/rar_broken_is.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/rar/rar_close.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/rar/rar_comment_get.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/rar/rar_entry_get.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/rar/rar_list.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 36)
+- new Variable (line 38)
+- 1 class method(s)
+
+### `ext/rar/rar_open.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/rar/rar_solid_is.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/redis/BuiltinClasses.php`
 

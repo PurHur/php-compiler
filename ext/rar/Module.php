@@ -30,4 +30,22 @@ class Module extends ModuleAbstract
     {
         return self::RAR_VERSION;
     }
+
+    public function getFunctions(): array
+    {
+        if (!RarExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return [
+            new rar_open(),
+            new rar_list(),
+            new rar_entry_get(),
+            new rar_solid_is(),
+            new rar_comment_get(),
+            new rar_broken_is(),
+            new rar_allow_broken_set(),
+            new rar_close(),
+        ];
+    }
 }

@@ -24,7 +24,7 @@ final class VmRar
 
     public const ENTRY_LC = 'rarentry';
 
-    /** @var array<int, array{path: string, entries: list<array{name: string, data: string, crc: int, packed: int, unpacked: int, hostOs: int, method: int, isDir: bool}>, broken: bool, solid: bool, comment: string, closed: bool}> */
+    /** @var array<int, array{path: string, entries: list<array{name: string, data: string, crc: int, packed: int, unpacked: int, hostOs: int, method: int, isDir: bool}>, broken: bool, solid: bool, comment: string, closed: bool, allowBroken: bool}> */
     private static array $archives = [];
 
     /** @var array<int, array{archiveId: int, index: int}> */
@@ -144,6 +144,7 @@ final class VmRar
             'solid' => (bool) $parsed['solid'],
             'comment' => (string) $parsed['comment'],
             'closed' => false,
+            'allowBroken' => false,
         ];
 
         return $object;
@@ -231,6 +232,19 @@ final class VmRar
         self::$archives[$archive->id]['closed'] = true;
 
         return true;
+    }
+
+    /** PECL rar_allow_broken_set / RarArchive::setAllowBroken (#27878). */
+    public static function setAllowBroken(ObjectEntry $archive, bool $allowBroken): bool
+    {
+        self::$archives[$archive->id]['allowBroken'] = $allowBroken;
+
+        return true;
+    }
+
+    public static function allowBroken(ObjectEntry $archive): bool
+    {
+        return self::$archives[$archive->id]['allowBroken'] ?? false;
     }
 
     public static function archivePath(ObjectEntry $archive): string
