@@ -51,7 +51,7 @@ final class shell_exec extends Internal
             $context,
             $args[0],
             $command,
-            'shell_exec(): Argument #1 ($command) cannot be empty'
+            'shell_exec(): Argument #1 ($command) must not be empty'
         );
 
         return JitShellExec::invoke($context, $command);

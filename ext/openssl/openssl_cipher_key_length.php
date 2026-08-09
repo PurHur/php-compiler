@@ -76,7 +76,7 @@ final class openssl_cipher_key_length extends Internal
             $context->builder->positionAtEnd($err);
             JitOpensslRandomPseudoBytes::emitEmptyCipherAlgoError(
                 $context,
-                'openssl_cipher_key_length(): Argument #1 ($cipher_algo) cannot be empty'
+                'openssl_cipher_key_length(): Argument #1 ($cipher_algo) must not be empty'
             );
             $context->builder->positionAtEnd($after);
             $slot = JitValueBox::alloc($context);

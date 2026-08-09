@@ -306,7 +306,7 @@ final class JitExec
             $context,
             $arg,
             $lowered,
-            \sprintf('%s(): Argument #1 ($command) cannot be empty', $function)
+            \sprintf('%s(): Argument #1 ($command) must not be empty', $function)
         );
     }
 }

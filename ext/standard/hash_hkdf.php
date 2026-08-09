@@ -97,7 +97,7 @@ final class hash_hkdf extends Internal
             $context,
             $args[1],
             $key,
-            'hash_hkdf(): Argument #2 ($key) cannot be empty'
+            'hash_hkdf(): Argument #2 ($key) must not be empty'
         );
 
         return JitHash::hashHkdf(

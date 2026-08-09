@@ -9,7 +9,7 @@ try {
     echo "fail: no throw\n";
     $fail = 1;
 } catch (ValueError $e) {
-    if ('checkdnsrr(): Argument #1 ($hostname) cannot be empty' !== $e->getMessage()) {
+    if ('checkdnsrr(): Argument #1 ($hostname) must not be empty' !== $e->getMessage()) {
         echo 'bad message: '.$e->getMessage()."\n";
         $fail = 1;
     } else {

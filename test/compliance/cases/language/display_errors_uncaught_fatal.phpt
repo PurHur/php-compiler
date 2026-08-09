@@ -6,7 +6,7 @@ declare(strict_types=1);
 ini_set('display_errors', '1');
 explode('', 'a');
 --EXPECTF--
-Fatal error: Uncaught ValueError: explode(): Argument #1 ($separator) cannot be empty in %s:%d
+Fatal error: Uncaught ValueError: explode(): Argument #1 ($separator) must not be empty in %s:%d
 Stack trace:
 #0 %s(%d): explode()
 #1 {main}

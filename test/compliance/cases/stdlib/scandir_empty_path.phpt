@@ -9,4 +9,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-scandir(): Argument #1 ($directory) cannot be empty
+scandir(): Argument #1 ($directory) must not be empty
