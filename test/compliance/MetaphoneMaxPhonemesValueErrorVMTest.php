@@ -6,17 +6,13 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for metaphone(). */
-final class MetaphoneVMTest extends BaseTest
+/** VM: metaphone(..., -1) ValueError for $max_phonemes (#29304, php-src string.c). */
+final class MetaphoneMaxPhonemesValueErrorVMTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
 
     public static function providePHPTests(): \Generator
     {
-        yield 'metaphone.phpt' => self::parsePHPT(
-            __DIR__.'/cases/stdlib/metaphone.phpt',
-            'metaphone.phpt'
-        );
         yield 'metaphone_max_phonemes_valueerror.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/metaphone_max_phonemes_valueerror.phpt',
             'metaphone_max_phonemes_valueerror.phpt'
