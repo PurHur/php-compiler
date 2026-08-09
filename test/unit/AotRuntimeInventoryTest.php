@@ -72,6 +72,10 @@ final class AotRuntimeInventoryTest extends TestCase
         $microtime = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringMicrotime.php');
         $this->assertStringContainsString('__compiler_microtime_string', $microtime);
         $this->assertStringContainsString('__compiler_microtime_float', $microtime);
+        $this->assertStringContainsString('MicrotimeJitHelper', $microtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $microtime);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $microtime);
+        $this->assertStringNotContainsString("lookupFunction('gettimeofday')", $microtime);
 
         $gettimeofday = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringGettimeofday.php');
         $this->assertStringContainsString('__compiler_gettimeofday', $gettimeofday);

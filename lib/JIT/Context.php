@@ -947,6 +947,9 @@ class Context {
             // gethostname NestedJIT leaf (#29364) — whitelist gethostname → gethostname::call →
             // StringGethostname / JitGethostnameKernel /proc leaf (kernel Internal removed).
             'gethostname',
+            // microtime NestedJIT leaf (#29405) — whitelist microtime → microtime::call →
+            // StringMicrotime::invokeFloat/invokeString thin gettimeofday leaf.
+            'microtime',
             // putenv(3) NestedJIT leaf (#29334) — whitelist putenv → putenv_::call →
             // JitEnv::putenvNestedLeaf / StringGetenv::invokePutenvNestedLeaf (kernel removed).
             'putenv',

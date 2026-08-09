@@ -7,26 +7,28 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\MicrotimeJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** StringMicrotime emits gettimeofday LLVM (NestedJIT SEGV under thin AOT, #26930). */
+/** StringMicrotime: JitVmHelperLink + NestedJIT gettimeofday leaf (#29405). */
 final class StringMicrotimeRuntimeShrinkTest extends TestCase
 {
-    public function testStringMicrotimeUsesLibcGettimeofday(): void
+    public function testStringMicrotimeRoutesThroughJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMicrotime.php');
-        $this->assertStringContainsString("lookupFunction('gettimeofday')", $source);
-        $this->assertStringContainsString('__phpc_microtime_wall_usec', $source);
-        $this->assertStringContainsString('tryGetInsertBlock', $source);
-        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('MicrotimeJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('JitMicrotimeKernel::invokeFloat', $source);
+        $this->assertStringNotContainsString("lookupFunction('gettimeofday')", $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertLessThan(150, \substr_count($source, "\n") + 1);
     }
 
-    public function testMicrotimeJitHelperDelegatesToVmDate(): void
+    public function testMicrotimeJitHelperUsesHostMicrotime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/MicrotimeJitHelper.php');
-        $this->assertStringContainsString('VmDate::microtime', $source);
+        $this->assertStringContainsString('@\\microtime', $source);
     }
 
-    public function testMicrotimeJitHelperSemanticsMatchVmDate(): void
+    public function testMicrotimeJitHelperSemanticsMatchHost(): void
     {
         $float = MicrotimeJitHelper::microtimeFloat();
         $this->assertIsFloat($float);
