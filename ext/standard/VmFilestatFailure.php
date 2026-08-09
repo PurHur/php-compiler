@@ -125,6 +125,15 @@ final class VmFilestatFailure
         );
     }
 
+    /** php-src dir.c PHP_FUNCTION(chroot) — failure warning (#29360). */
+    public static function warnChrootFailed(Frame $frame): void
+    {
+        self::triggerWarningWithHandlerFirst(
+            $frame,
+            'chroot(): No such file or directory (errno 2)'
+        );
+    }
+
     public static function warnScandirFailed(Frame $frame, string $path): void
     {
         self::warnPathOpenDirFailed($frame, 'scandir', $path);
