@@ -15985,11 +15985,12 @@ restart:
             return null;
         }
         try {
+            // Error names the fetched class (self/static/parent/explicit), not the declarer (#29524).
             PropertyVisibility::assertAccessible(
                 $meta['visibility'],
                 $this->callerClassLc($frame),
                 $meta['declaringClassLc'],
-                $meta['declaringClassDisplay'],
+                $this->staticPropertyFetchClassDisplay($classLc),
                 $propName,
                 $this->callerClassLc($frame) ?? $meta['declaringClassLc'],
                 fn (string $classLcArg, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLcArg, $ancestorLc),
@@ -16019,7 +16020,7 @@ restart:
                 $setVis,
                 $callerLc,
                 $meta['declaringClassLc'],
-                $meta['declaringClassDisplay'],
+                $this->staticPropertyFetchClassDisplay($classLc),
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
@@ -16049,11 +16050,12 @@ restart:
         }
         $callerLc = $this->callerClassLc($frame);
         try {
+            // php-src zend_std_get_static_property: Error uses the fetch CE (self→child), not declarer (#29524).
             PropertyVisibility::assertAccessible(
                 $meta['visibility'],
                 $callerLc,
                 $meta['declaringClassLc'],
-                $meta['declaringClassDisplay'],
+                $this->staticPropertyFetchClassDisplay($classLc),
                 $propNameRaw,
                 $callerLc ?? $meta['declaringClassLc'],
                 fn (string $classLcArg, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLcArg, $ancestorLc),
@@ -16064,6 +16066,12 @@ restart:
         }
 
         return null;
+    }
+
+    /** Display name of the class used in a static property fetch (self/static/parent/Foo::). */
+    private function staticPropertyFetchClassDisplay(string $classLc): string
+    {
+        return $this->context->classes[$classLc]->name ?? $classLc;
     }
 
     /**

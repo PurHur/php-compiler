@@ -37,13 +37,15 @@ final class StaticPropertyVisibilityJitGuard
         $context = $objectType->jitContext();
         $declaringClass = $meta['declaringClassName'];
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+        // Error names the fetch CE (self/static → child), not the declaring class (#29524).
+        $fetchClassDisplay = $objectType->classNameForId($classId);
         $callerLc = self::callerClassLc($context, $block);
         try {
             PropertyVisibility::assertAccessible(
                 $meta['visibility'],
                 $callerLc,
                 $declaringLc,
-                $declaringClass,
+                $fetchClassDisplay,
                 $propName,
                 $callerLc ?? $declaringLc,
                 static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),

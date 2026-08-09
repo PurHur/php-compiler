@@ -173,13 +173,15 @@ final class AsymmetricVisibilityGuard
         }
         $declaringClass = $meta['declaringClassName'];
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+        // Fetch CE in the Error (self/static → child), matching zend_std_set_static_property (#29524).
+        $fetchClassDisplay = $objectType->classNameForId($classId);
         $callerLc = self::callerClassLc($context, $enclosingBlock);
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
                 $callerLc,
                 $declaringLc,
-                $declaringClass,
+                $fetchClassDisplay,
                 $propName,
                 static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
                 MethodVisibility::mask($effectiveRead),
