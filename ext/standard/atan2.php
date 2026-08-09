@@ -27,14 +27,15 @@ final class atan2 extends Internal
     {
         // php-src ext/standard/math.c — ArgumentCountError (#21982).
         $this->requireExactArgCount($frame, 'atan2', 2);
-        $y = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
+        $y = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'atan2',
             1,
             'y',
             $frame
         );
-        $x = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        $x = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'atan2',
             2,
@@ -63,7 +64,7 @@ final class atan2 extends Internal
             'y',
             'x',
             'float',
-            true
+            false
         );
 
         return MathAtan2::invoke($context, $y, $x);
