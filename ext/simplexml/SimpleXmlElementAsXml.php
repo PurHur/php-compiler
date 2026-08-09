@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmStreamOpenFailure;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\PathSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -73,7 +74,7 @@ final class SimpleXmlElementAsXml extends VmClassMethod
     /**
      * Optional filename operand — null / absent means return the XML string (php-src Z_PARAM_PATH_OPTIONAL).
      *
-     * Empty path → ValueError "Path cannot be empty" (php-src zend_parse_arg_path).
+     * Empty path → ValueError "Path must not be empty" (php-src zend_parse_arg_path; #29268).
      */
     private static function optionalFilename(Frame $frame, string $label): ?string
     {
@@ -94,7 +95,7 @@ final class SimpleXmlElementAsXml extends VmClassMethod
             false
         );
         if ('' === $path) {
-            throw new \ValueError('Path cannot be empty');
+            throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
         }
 
         return $path;

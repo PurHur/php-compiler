@@ -1,6 +1,6 @@
 <?php
 
-$expected = 'Path cannot be empty';
+$expected = 'Path must not be empty';
 
 foreach ([null, ''] as $path) {
     try {

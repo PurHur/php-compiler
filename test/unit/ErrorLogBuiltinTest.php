@@ -90,7 +90,7 @@ final class ErrorLogBuiltinTest extends TestCase
         $frame->calledArgs[] = $dest;
 
         $this->expectException(\ValueError::class);
-        $this->expectExceptionMessage('Path cannot be empty');
+        $this->expectExceptionMessage('Path must not be empty');
         $builtin->execute($frame);
     }
 

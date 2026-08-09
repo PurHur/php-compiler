@@ -41,7 +41,7 @@ final class XmlReaderOpen extends VmClassMethod
                 throw new \TypeError('XMLReader::open(): Argument #1 ($uri) must be of type string');
             }
             $uri = $uriVar->toString();
-            // Before VmFsReadPure/fopen — host fopen('') throws generic "Path cannot be empty" (#24810).
+            // Before VmFsReadPure/fopen — host fopen('') throws generic "Path must not be empty" (#24810).
             if ('' === $uri) {
                 throw new \ValueError('XMLReader::open(): Argument #1 ($uri) cannot be empty');
             }

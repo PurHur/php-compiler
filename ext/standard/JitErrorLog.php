@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\PathSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -70,7 +71,7 @@ final class JitErrorLog
     ): Value {
         if (null === $destination || JITVariable::TYPE_NULL === $destination->type) {
             TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitValueError($context, 'Path cannot be empty');
+            TypeErrorRaise::emitValueError($context, PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
             $context->builder->call($context->lookupFunction('abort'));
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
             $slot = JitValueBox::alloc($context);

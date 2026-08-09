@@ -37,5 +37,5 @@ exists=true
 body=ok
 save=true ok
 noarg=ok
-empty=Path cannot be empty
+empty=Path must not be empty
 nullarg=ok

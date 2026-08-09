@@ -1,6 +1,6 @@
 <?php
 /** Repro for #21877 — gzopen/gzfile/readgzfile(null) → ValueError under PROFILE=8.4. */
-$expected = 'Path cannot be empty';
+$expected = 'Path must not be empty';
 foreach (['gzopen' => static fn () => gzopen(null, 'r'), 'gzfile' => static fn () => gzfile(null), 'readgzfile' => static fn () => readgzfile(null)] as $name => $fn) {
     try {
         $fn();
