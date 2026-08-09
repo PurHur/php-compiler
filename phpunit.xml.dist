@@ -127,6 +127,8 @@
             <file>./test/compliance/ImplicitNullableDeprecatedPrefixJITTest.php</file>
             <file>./test/compliance/DateTimeModifyEmptyMessageVMTest.php</file>
             <file>./test/compliance/DateTimeModifyEmptyMessageJITTest.php</file>
+            <file>./test/compliance/DateModifyNullDepVMTest.php</file>
+            <file>./test/compliance/DateModifyNullDepJITTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetVMTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetJITTest.php</file>
             <file>./test/compliance/PropertyHookWriteOnlyVirtualCoalesceVMTest.php</file>
