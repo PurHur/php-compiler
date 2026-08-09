@@ -7,17 +7,17 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Desugar PHP 8.5+ `clone $obj with { prop: $value, ... }` /
- * `clone($obj, ['prop' => $value, ...])` / `clone $obj with ['prop', ...]`
- * before nikic/php-parser (#4513, #9743, #9995, #23877, #28182).
+ * Desugar PHP 8.5+ `clone($obj, ['prop' => $value, ...])` before nikic/php-parser
+ * (#4513, #9743, #23877, #28182, #29187).
  *
- * Named `clone($obj, with: [...])` is **not** valid on Zend 8.5.8 — rewrite to
- * `Error: Unknown named parameter $with` (#28182; reverts over-accept from #12939).
+ * Keyword forms (`clone $obj with { … }` / `with […]`) are **not** in php-src — rejected by
+ * {@see \PHPCompiler\CloneWithSyntaxRejector} (#29187). Named `clone($obj, with: [...])` is
+ * rewritten to `Error: Unknown named parameter $with` (#28182).
  *
  * Rewrites to a nested IIFE: outer binds the operand, inner receives `clone $o` as a
  * parameter so `$__phpc_r` is an ARG_RECV (not a post-assign local). Assigned locals
  * passed to call args currently mis-wire ARG_SEND (#23877); parameters do not.
- * php-src: Zend/zend_language_parser.y clone_expr / with clause; zend_vm_def.h ZEND_CLONE.
+ * php-src: Zend/zend_language_parser.y clone expression (array form only); zend_vm_def.h ZEND_CLONE.
  */
 final class CloneWithDesugar
 {
@@ -27,16 +27,41 @@ final class CloneWithDesugar
     /** Zend 8.2 profile message for `clone ($obj, with: [...])` / `clone($obj, [...])` (#12987). */
     public const REFERENCE_PROFILE_UNEXPECTED_COMMA = 'syntax error, unexpected token ","';
 
-    /** Zend 8.2 profile message for `clone $obj with { }` / `clone $obj with [...]` (#12987). */
+    /** Zend message for `clone $obj with { }` / `clone $obj with [...]` (all versions; #12987, #29187). */
     public const REFERENCE_PROFILE_UNEXPECTED_WITH = 'syntax error, unexpected identifier "with"';
 
     /** Zend 8.5.8 runtime message for `clone($obj, with: [...])` named arg (#28182). */
     public const UNKNOWN_NAMED_WITH_PARAMETER = 'Unknown named parameter $with';
 
     /**
+     * Keyword `with` after clone — ParseError on every Zend version (#29187).
+     *
      * @return array{line: int, message: string}|null
      */
-    public static function referenceProfileSyntaxError(string $code): ?array
+    public static function keywordWithSyntaxError(string $code): ?array
+    {
+        if (!preg_match('/\bclone\b/i', $code) || !preg_match('/\bwith\b/i', $code)) {
+            return null;
+        }
+
+        $tokens = token_get_all($code);
+        $withSpan = self::findCloneWithSpan($code, $tokens);
+        if (null === $withSpan) {
+            return null;
+        }
+
+        return [
+            'line' => self::byteOffsetToLine($code, $withSpan['start']),
+            'message' => self::REFERENCE_PROFILE_UNEXPECTED_WITH,
+        ];
+    }
+
+    /**
+     * Parenthesized `clone($obj, [...])` on the Zend 8.2 reference profile (#12987).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileCloneCallSyntaxError(string $code): ?array
     {
         if (!preg_match('/\bclone\b/i', $code)) {
             return null;
@@ -44,22 +69,29 @@ final class CloneWithDesugar
 
         $tokens = token_get_all($code);
         $callSpan = self::findCloneCallSpan($code, $tokens);
-        if (null !== $callSpan) {
-            return [
-                'line' => self::byteOffsetToLine($code, $callSpan['start']),
-                'message' => self::REFERENCE_PROFILE_UNEXPECTED_COMMA,
-            ];
+        if (null === $callSpan) {
+            return null;
         }
 
-        $withSpan = self::findCloneWithSpan($code, $tokens);
-        if (null !== $withSpan) {
-            return [
-                'line' => self::byteOffsetToLine($code, $withSpan['start']),
-                'message' => self::REFERENCE_PROFILE_UNEXPECTED_WITH,
-            ];
+        return [
+            'line' => self::byteOffsetToLine($code, $callSpan['start']),
+            'message' => self::REFERENCE_PROFILE_UNEXPECTED_COMMA,
+        ];
+    }
+
+    /**
+     * @return array{line: int, message: string}|null
+     *
+     * @deprecated Use {@see keywordWithSyntaxError()} + {@see referenceProfileCloneCallSyntaxError()}
+     */
+    public static function referenceProfileSyntaxError(string $code): ?array
+    {
+        $keyword = self::keywordWithSyntaxError($code);
+        if (null !== $keyword) {
+            return $keyword;
         }
 
-        return null;
+        return self::referenceProfileCloneCallSyntaxError($code);
     }
 
     public static function desugar(string $code): string
@@ -71,6 +103,7 @@ final class CloneWithDesugar
             return $code;
         }
 
+        // Only parenthesized `clone($obj, [...])` — keyword `with` forms are rejected (#29187).
         for ($guard = 0; $guard < 256; ++$guard) {
             $tokens = token_get_all($code);
             $span = self::findCloneCallSpan($code, $tokens);
@@ -79,30 +112,6 @@ final class CloneWithDesugar
             }
 
             $replacement = self::rewriteCloneCallSpan($span);
-            $code = substr($code, 0, $span['start'])
-                .$replacement
-                .substr($code, $span['end']);
-        }
-
-        if (!preg_match('/\bwith\b/i', $code)) {
-            return $code;
-        }
-
-        for ($guard = 0; $guard < 256; ++$guard) {
-            $tokens = token_get_all($code);
-            $span = self::findCloneWithSpan($code, $tokens);
-            if (null === $span) {
-                break;
-            }
-
-            $assignments = isset($span['arrayText'])
-                ? self::parseCloneWithArrayAssignments($span['arrayText'])
-                : self::parsePropertyAssignments($span['blockText']);
-            if ([] === $assignments) {
-                break;
-            }
-
-            $replacement = self::buildCloneWithIife($span['exprText'], $assignments);
             $code = substr($code, 0, $span['start'])
                 .$replacement
                 .substr($code, $span['end']);

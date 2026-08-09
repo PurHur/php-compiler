@@ -30,9 +30,7 @@ final class CloneWithSyntaxReferenceProfileTest extends TestCase
 
     public function testRejectorThrowsOnWithBlockForm(): void
     {
-        if (CompilerVersion::supportsCloneWithSyntax()) {
-            $this->markTestSkipped('clone-with syntax enabled on PHP 8.5.0+ target');
-        }
+        // Keyword `with { }` is rejected on every profile — Zend never shipped it (#29187).
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(CloneWithDesugar::REFERENCE_PROFILE_UNEXPECTED_WITH);
         CloneWithSyntaxRejector::reject(

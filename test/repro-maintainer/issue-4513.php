@@ -5,5 +5,5 @@ class C {
 }
 
 $c = new C();
-$d = clone $c with { x: 2, y: 'b' };
+$d = clone($c, ['x' => 2, 'y' => 'b']);
 var_export([$d->x, $d->y]);

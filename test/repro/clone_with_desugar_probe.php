@@ -6,10 +6,11 @@ require_once __DIR__.'/../../vendor/autoload.php';
 
 use PHPCompiler\Ast\CloneWithDesugar;
 
+// Keyword `with` forms must not desugar (#29187); only parenthesized clone($obj, [...]).
 $cases = [
-    'clone $c with ["a" => 2];' => true,
+    'clone $c with ["a" => 2];' => false,
     'clone($c, ["a" => 2]);' => true,
-    '(clone $c) with ["a" => 2];' => true,
+    '(clone $c) with ["a" => 2];' => false,
 ];
 
 $failed = 0;

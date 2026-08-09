@@ -1,5 +1,5 @@
 --TEST--
-Language: clone $obj with ['prop'] keyword array syntax (PHP 8.4, #9995)
+Language: clone $obj with ['prop'] keyword array rejected like Zend (#9995 superseded by #29187)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -16,5 +16,5 @@ class W {
 $w = new W();
 $w2 = clone $w with ['a'];
 echo $w2->a, ',', $w2->b, "\n";
---EXPECT--
-1,2
+--EXPECT_EXIT--
+255

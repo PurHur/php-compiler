@@ -29,7 +29,7 @@ class R
 }
 
 $c = new R(1);
-$d = clone $c with { x: 2 };
+$d = clone($c, ['x' => 2]);
 echo $d->x, "\n";
 
 echo function_exists('phpc_clone_with_begin') ? "VISIBLE\n" : "HIDDEN\n";

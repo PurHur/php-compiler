@@ -1,5 +1,17 @@
 --TEST--
-Language: clone with property overrides (PHP 8.3, #4513)
+Language: clone($obj, [...]) property overrides (PHP 8.5, #4513, #29187)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+putenv('PHP_COMPILER_PROFILE=8.5');
+if (!PHPCompiler\CompilerVersion::supportsCloneWithSyntax()) {
+    die('skip requires PHP_COMPILER_PROFILE=8.5 clone-with gate');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 class C {
@@ -8,7 +20,7 @@ class C {
 }
 
 $c = new C();
-$d = clone $c with { x: 2, y: 'b' };
+$d = clone($c, ['x' => 2, 'y' => 'b']);
 var_export([$d->x, $d->y]);
 --EXPECT--
 array (

@@ -1,5 +1,5 @@
 --TEST--
-Language: clone $obj with { prop: val } user-script AOT (#23046, re-#19130, PHP 8.5)
+Language: clone($obj, [...]) user-script AOT (#23046, re-#19130, #29187, PHP 8.5)
 --SKIPIF--
 <?php
 if (!getenv('PHP_COMPILER_PROFILE') || '8.5' !== getenv('PHP_COMPILER_PROFILE')) {
@@ -16,7 +16,7 @@ class C {
     }
 }
 $a = new C(1, 2);
-$b = clone $a with { x: 9 };
+$b = clone($a, ['x' => 9]);
 echo $b->x, ',', $b->y, "\n";
 $p = new C(1, 2);
 $q = clone ($p, ['x' => 9]);

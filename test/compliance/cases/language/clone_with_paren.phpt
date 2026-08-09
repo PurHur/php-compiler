@@ -1,5 +1,5 @@
 --TEST--
-Language: (clone $obj) with ['prop'] parenthesized operand (PHP 8.4, #10496)
+Language: (clone $obj) with [...] rejected like Zend (#10496 superseded by #29187)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -12,8 +12,5 @@ class C {
 $c = new C();
 $d = (clone $c) with ['x' => 2, 'y' => 'b'];
 var_export([$d->x, $d->y]);
---EXPECT--
-array (
-  0 => 2,
-  1 => 'b',
-)
+--EXPECT_EXIT--
+255
