@@ -173,4 +173,41 @@ PHP;
             @unlink($bin);
         }
     }
+
+    /**
+     * AOT user-script: xml_parser_free after create/parse (#29318).
+     *
+     * @group llvm
+     */
+    public function test_xml_parser_free_aot_noop(): void
+    {
+        $repro = __DIR__.'/../repro/issue_29318_xml_parser_free_aot.php';
+        self::assertFileExists($repro);
+        $bin = sys_get_temp_dir().'/phpc_xml_parser_29318_'.getmypid();
+        $compile = sprintf(
+            'PHP_COMPILER_HELPER_RUNTIME_O=0 %s %s -o %s %s 2>&1',
+            escapeshellarg(PHP_BINARY),
+            escapeshellarg(dirname(__DIR__, 2).'/bin/compile.php'),
+            escapeshellarg($bin),
+            escapeshellarg($repro)
+        );
+        exec($compile, $out, $rc);
+        self::assertSame(0, $rc, implode("\n", $out));
+        self::assertFileExists($bin);
+        try {
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            self::assertSame(0, $runRc, implode("\n", $runOut));
+            self::assertSame(
+                [
+                    'parse=ok',
+                    'free=true',
+                    'free2=true',
+                    'parse2=fail',
+                ],
+                $runOut
+            );
+        } finally {
+            @unlink($bin);
+        }
+    }
 }

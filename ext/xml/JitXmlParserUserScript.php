@@ -13,7 +13,8 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPLLVM\Value;
 
 /**
- * User-script standalone AOT: xml_parser_create / xml_parse / xml_get_error_code (#27293).
+ * User-script standalone AOT: xml_parser_create / xml_parse / xml_get_error_code / xml_parser_free
+ * (#27293, #29318).
  *
  * Runs the existing PHP-in-PHP parser model ({@see VmXml}, {@see XmlParserSupport}) at
  * compile time when arguments are literals, then emits constant results / an allocated
@@ -113,6 +114,22 @@ final class JitXmlParserUserScript
         return self::intValue($context, VmXml::getErrorCode($parser->id));
     }
 
+    /**
+     * xml_parser_free(XMLParser $parser): bool — no-op since PHP 8.0 (#22813, #29318).
+     */
+    public static function tryFree(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || 1 !== \count($args)) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+
+        return self::boolValue($context, VmXml::parserFree($parser->id));
+    }
+
     private static function isOptionalEncodingOk(JITVariable $arg): bool
     {
         if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
@@ -207,6 +224,15 @@ final class JitXmlParserUserScript
         $slot = JitValueBox::alloc($context);
         $i64 = $context->getTypeFromString('int64');
         JitValueBox::writeLong($context, $slot, $i64->constInt($n, true));
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function boolValue(Context $context, bool $v): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt($v ? 1 : 0, false));
 
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
