@@ -3752,7 +3752,7 @@ class InternalArgInfo
         'levenshtein' => ['int', 'str1' => 'string', 'str2' => 'string'],
         'libxml_clear_errors' => [''],
         'libxml_disable_entity_loader' => ['bool', 'disable=' => 'bool'],
-        'libxml_get_errors' => ['object'],
+        'libxml_get_errors' => ['array'],
         'libxml_get_last_error' => ['object'],
         'libxml_set_external_entity_loader' => ['', 'resolver_function' => 'callable'],
         'libxml_set_streams_context' => ['', 'streams_context' => ''],

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7251 |
-| Phase A inventory files (M2 ratio SSOT) | 7251 |
+| PHP files on vm.php path | 7254 |
+| Phase A inventory files (M2 ratio SSOT) | 7254 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23423 |
+| Source constructs flagged (warnings) | 23432 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -452,7 +452,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomLoadHTMLUserScript.php` | 0 | 4 |
 | `ext/dom/JitDomLoadUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomLoadXML.php` | 0 | 1 |
-| `ext/dom/JitDomLoadXMLUserScript.php` | 0 | 5 |
+| `ext/dom/JitDomLoadXMLUserScript.php` | 0 | 6 |
 | `ext/dom/JitDomNodeChildProperty.php` | 0 | 1 |
 | `ext/dom/JitDomNodeIsConnected.php` | 0 | 2 |
 | `ext/dom/JitDomNodeListItem.php` | 0 | 1 |
@@ -1399,17 +1399,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/ldap_result_builtins.php` | 0 | 10 |
 | `ext/ldap/ldap_search_builtins.php` | 0 | 14 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
+| `ext/libxml/JitLibxmlClearErrors.php` | 0 | 1 |
+| `ext/libxml/JitLibxmlGetErrors.php` | 0 | 1 |
+| `ext/libxml/JitLibxmlGetLastError.php` | 0 | 1 |
 | `ext/libxml/JitLibxmlUseInternalErrors.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
 | `ext/libxml/LibxmlFunction.php` | 0 | 1 |
 | `ext/libxml/LibxmlInternalErrorsJitHelper.php` | 0 | 1 |
 | `ext/libxml/Module.php` | 0 | 10 |
 | `ext/libxml/VmLibxml.php` | 0 | 20 |
-| `ext/libxml/libxml_clear_errors.php` | 0 | 1 |
+| `ext/libxml/libxml_clear_errors.php` | 0 | 2 |
 | `ext/libxml/libxml_disable_entity_loader.php` | 0 | 2 |
-| `ext/libxml/libxml_get_errors.php` | 0 | 1 |
+| `ext/libxml/libxml_get_errors.php` | 0 | 2 |
 | `ext/libxml/libxml_get_external_entity_loader.php` | 0 | 2 |
-| `ext/libxml/libxml_get_last_error.php` | 0 | 1 |
+| `ext/libxml/libxml_get_last_error.php` | 0 | 2 |
 | `ext/libxml/libxml_set_external_entity_loader.php` | 0 | 2 |
 | `ext/libxml/libxml_set_streams_context.php` | 0 | 2 |
 | `ext/libxml/libxml_use_internal_errors.php` | 0 | 2 |
@@ -5435,7 +5438,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Lcg.php` | 0 | 1 |
 | `lib/JIT/Builtin/LdapRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LibcryptRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ListSpreadTailRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleParser.php` | 0 | 1 |
@@ -10083,11 +10086,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadXMLUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 246)
-- new JITVariable (line 273)
-- new JITVariable (line 336)
-- new JITVariable (line 353)
-- 19 class method(s)
+- new DOMDocument (line 201)
+- new JITVariable (line 323)
+- new JITVariable (line 350)
+- new JITVariable (line 413)
+- new JITVariable (line 430)
+- 20 class method(s)
 
 ### `ext/dom/JitDomNodeChildProperty.php`
 
@@ -18217,6 +18221,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/libxml/JitLibxmlClearErrors.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/libxml/JitLibxmlGetErrors.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/libxml/JitLibxmlGetLastError.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/libxml/JitLibxmlUseInternalErrors.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18235,7 +18254,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/LibxmlInternalErrorsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 15 class method(s)
 
 ### `ext/libxml/Module.php`
 
@@ -18254,31 +18273,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/VmLibxml.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 46)
-- new Variable (line 47)
-- new ClassEntry (line 48)
+- new Variable (line 43)
+- new Variable (line 44)
+- new ClassEntry (line 45)
+- new ClassProperty (line 47)
+- new ClassProperty (line 48)
+- new ClassProperty (line 49)
 - new ClassProperty (line 50)
 - new ClassProperty (line 51)
 - new ClassProperty (line 52)
-- new ClassProperty (line 53)
-- new ClassProperty (line 54)
-- new ClassProperty (line 55)
-- new Variable (line 109)
-- new Variable (line 157)
-- new Variable (line 163)
-- new HashTable (line 221)
-- new Variable (line 223)
-- new Variable (line 227)
-- new HashTable (line 301)
-- new Variable (line 314)
-- new ObjectEntry (line 377)
-- new Variable (line 386)
+- new Variable (line 106)
+- new Variable (line 154)
+- new Variable (line 160)
+- new HashTable (line 218)
+- new Variable (line 220)
+- new Variable (line 224)
+- new HashTable (line 298)
+- new Variable (line 311)
+- new ObjectEntry (line 375)
+- new Variable (line 384)
 - 21 class method(s)
 
 ### `ext/libxml/libxml_clear_errors.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new ArgumentCountError (line 23)
+- 2 class method(s)
 
 ### `ext/libxml/libxml_disable_entity_loader.php`
 
@@ -18289,7 +18309,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/libxml_get_errors.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new ArgumentCountError (line 23)
+- 2 class method(s)
 
 ### `ext/libxml/libxml_get_external_entity_loader.php`
 
@@ -18300,7 +18321,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/libxml_get_last_error.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new ArgumentCountError (line 23)
+- 2 class method(s)
 
 ### `ext/libxml/libxml_set_external_entity_loader.php`
 
@@ -47615,7 +47637,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- new JITVariable (line 324)
+- new JITVariable (line 333)
+- 24 class method(s)
 
 ### `lib/JIT/Builtin/ListSpreadTailRuntime.php`
 
