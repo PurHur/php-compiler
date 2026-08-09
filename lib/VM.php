@@ -368,6 +368,10 @@ class VM {
     /**
      * Isolated __toString / coercion invoke — must not run the caller script in nested runFrames (#4284).
      *
+     * Outer try/catch is deferred via {@see VM\BuiltinCallbackCatchRedirect} so catch resumes on the
+     * caller's runFrames (echo/print/cast/concat). Nest-running the catch here used to execute the
+     * merge block (and everything after) then resume the try body — printing AFTER twice (#29521).
+     *
      * @param Variable ...$args
      */
     private function invokePhpFunctionForCoercion(Func\PHP $func, ...$args): Variable
@@ -381,11 +385,24 @@ class VM {
     private function invokePhpFunctionForCoercionWithCalledArgs(Func\PHP $func, array $args): Variable
     {
         $savedStack = $this->context->swapRunStack(null);
+        $prevDefer = $this->context->deferBuiltinCallbackCatchToOuterRunFrames;
+        $this->context->deferBuiltinCallbackCatchToOuterRunFrames = true;
         try {
             $result = $this->invokePhpFunctionOnStackWithCalledArgs($func, $args);
             $this->context->swapRunStack($savedStack);
 
             return $result;
+        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+            if (!$this->context->hasRunStack()) {
+                $this->context->swapRunStack($savedStack);
+            }
+            $this->context->magicMethodThrowHandled = false;
+            throw $redirect;
+        } catch (VM\MagicMethodInvocationAborted $aborted) {
+            if (!$this->context->hasRunStack()) {
+                $this->context->swapRunStack($savedStack);
+            }
+            throw $aborted;
         } catch (\Throwable $native) {
             $this->context->swapRunStack($savedStack);
             if (null !== $savedStack) {
@@ -394,29 +411,14 @@ class VM {
                     : $this->makeEngineError($native->getMessage(), 'Exception');
                 $catchFrame = $this->findCatchFrameForThrow($savedStack->frame, $thrown);
                 if (null !== $catchFrame) {
-                    $this->context->swapRunStack($savedStack);
-                    $catchStack = $this->context->swapRunStack(null);
-                    $this->context->push($catchFrame);
-                    $catchResult = $this->runFrames();
-                    $this->context->swapRunStack($catchStack);
-                    $this->clearTryCatchUnwindState();
-                    if (self::SUCCESS !== $catchResult) {
-                        throw new \LogicException('Coercion catch handler failed in this compiler build');
-                    }
-                    throw new VM\MagicMethodInvocationAborted();
+                    // Defer catch to outer opcode handler — do not nest-run merge (#29521).
+                    $this->context->magicMethodThrowHandled = false;
+                    throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
                 }
             }
             throw $native;
-        } catch (VM\MagicMethodInvocationAborted $aborted) {
-            if (!$this->context->hasRunStack()) {
-                $this->context->swapRunStack($savedStack);
-            }
-            throw $aborted;
-        } catch (\Throwable $e) {
-            if (!$this->context->hasRunStack()) {
-                $this->context->swapRunStack($savedStack);
-            }
-            throw $e;
+        } finally {
+            $this->context->deferBuiltinCallbackCatchToOuterRunFrames = $prevDefer;
         }
     }
 
@@ -639,7 +641,8 @@ class VM {
             $result = new Variable();
             $catchFrame = $this->invokeVmClassMethod($func, $caller, $result, $thisVar);
             if (null !== $catchFrame) {
-                throw new VM\MagicMethodInvocationAborted();
+                // Catch not run yet — resume on outer echo/print/cast (#29521 / #4284).
+                throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
             }
 
             return $result;
@@ -715,12 +718,8 @@ class VM {
                 ? $this->invokeVmClassMethod($func, $caller, $result, ...$extraArgs)
                 : $this->invokeVmClassMethod($func, $caller, $result, $thisVar, ...$extraArgs);
             if (null !== $catchFrame) {
-                // __toString coercion: catch already ran on nested stack — abort the cast (#4284).
-                // Foreach / other invokes: catch is prepared but not run — defer to outer runFrames
-                // so FilterIterator::accept() (etc.) throws stay user-catchable (#24286, #24297).
-                if ($this->context->coercingObjectToString) {
-                    throw new VM\MagicMethodInvocationAborted();
-                }
+                // Catch is prepared but not run — defer to outer runFrames so user try/catch
+                // resumes once (FilterIterator::accept #24286/#24297; __toString #29521/#4284).
                 throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
             }
 
@@ -5421,6 +5420,10 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        $frame->callSiteLine = $savedCallSiteLine;
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $frame->callSiteLine = $savedCallSiteLine;
                         $this->clearTryCatchUnwindState();
@@ -5499,6 +5502,9 @@ restart:
                     $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     try {
                         $arg1->bool($arg2->equals($arg3, $this));
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
@@ -5511,6 +5517,9 @@ restart:
                     $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     try {
                         $arg1->bool(!$arg2->equals($arg3, $this));
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
@@ -5771,6 +5780,10 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        // __toString throw during concat — resume catch on outer stack (#29521).
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
@@ -5806,6 +5819,10 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        // __toString throw during echo — do not continue try body (#29521).
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         break;
                     }
@@ -5839,6 +5856,10 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        // __toString throw during print — do not continue try body (#29521).
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         break;
                     }
@@ -5997,6 +6018,9 @@ restart:
                             $frame = $op->block1->getFrame($this->context, $frame);
                             goto restart;
                         }
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
