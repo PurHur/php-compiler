@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\GetenvLookupJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** getenv: always GetenvLookupJitHelper via JitVmHelperLink — no thin libc fork (#9092, #20156, #20644). */
+/** getenv: GetenvLookupJitHelper via JitVmHelperLink + NestedJIT @getenv leaf — no kernel (#9092, #20644, #29313). */
 final class GetenvJitRuntimeShrinkTest extends TestCase
 {
     public function testStringGetenvAlwaysUsesHelperBridge(): void
@@ -16,28 +16,28 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('GetenvLookupJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('getenv_bridge_entry', $source);
-        $this->assertStringContainsString('phpc_getenv_kernel', $source);
+        $this->assertStringContainsString('invokeNestedLeaf', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('phpc_getenv_kernel', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementKernelBody', $source);
         $this->assertStringNotContainsString('getenv_kernel_entry', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('LibcExtern::register', $source);
-        $this->assertStringNotContainsString("lookupFunction('getenv')", $source);
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitGetenvKernel.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_getenv_kernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitGetenvKernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/phpc_getenv_kernel.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/GetenvLookupJitHelper.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringGetenvLibcBridge.php');
     }
 
-    public function testGetenvLookupJitHelperDelegatesToKernel(): void
+    public function testGetenvLookupJitHelperUsesHostGetenvNotKernel(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/GetenvLookupJitHelper.php');
-        $this->assertStringContainsString('phpc_getenv_kernel', $source);
+        $this->assertStringContainsString('@\\getenv', $source);
         $this->assertStringContainsString('0 !== $localOnly', $source);
-        if (!\function_exists('phpc_getenv_kernel')) {
-            $this->markTestSkipped('phpc_getenv_kernel requires compiler runtime');
-        }
+        $this->assertStringNotContainsString('phpc_getenv_kernel', $source);
+        $this->assertStringNotContainsString('JitGetenvKernel', $source);
+
         $path = \getenv('PATH');
         if (false === $path) {
             $this->markTestSkipped('PATH not set in process environ');
@@ -45,6 +45,16 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
         $this->assertSame($path, GetenvLookupJitHelper::fromEnviron('PATH', 0));
         $this->assertNull(GetenvLookupJitHelper::fromEnviron('PATH', 1));
         $this->assertNull(GetenvLookupJitHelper::fromEnviron('__PHPC_GETENV_MISSING_'.bin2hex(random_bytes(4)), 0));
+    }
+
+    public function testJitEnvUsesNestedLeafUnderNestedJit(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/JitEnv.php');
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('getenvNestedLeaf', $source);
+        $this->assertStringContainsString('StringGetenv::invokeNestedLeaf', $source);
+        $this->assertStringNotContainsString('phpc_getenv_kernel', $source);
+        $this->assertStringNotContainsString('JitGetenvKernel', $source);
     }
 
     public function testStringGetenvAllAlwaysUsesHelperBridge(): void
@@ -68,21 +78,23 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 
-    public function testSpineBundleIncludesGetenvKernel(): void
+    public function testSpineBundleIncludesGetenvHelperNotKernel(): void
     {
         $spine = (string) \file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('GetenvJitHelper.php', $spine);
         $this->assertStringContainsString('GetenvLookupJitHelper.php', $spine);
-        $this->assertStringContainsString('JitGetenvKernel.php', $spine);
-        $this->assertStringContainsString('phpc_getenv_kernel.php', $spine);
         $this->assertStringContainsString('StringGetenv.php', $spine);
         $this->assertStringContainsString('StringGetenvAll.php', $spine);
+        $this->assertStringNotContainsString('JitGetenvKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_getenv_kernel.php', $spine);
     }
 
-    public function testNestedJitAllowlistsGetenvKernel(): void
+    public function testNestedJitAllowlistsGetenvBuiltinNotKernel(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('phpc_getenv_kernel', $source);
+        $this->assertStringContainsString("'getenv'", $source);
+        $this->assertStringContainsString('#29313', $source);
+        $this->assertStringNotContainsString('phpc_getenv_kernel', $source);
         $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
     }
 }

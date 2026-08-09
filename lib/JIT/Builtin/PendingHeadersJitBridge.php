@@ -434,7 +434,7 @@ final class PendingHeadersJitBridge
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        // PendingHeadersJitHelper uses phpc_getenv_kernel (not raw getenv) under NestedJIT (#21888).
+        // PendingHeadersJitHelper uses @getenv under NestedJIT (#21888 / #29313).
         StringGetenv::ensureNativeHtInternalProxies($context);
         JitVmHelperLink::ensureCompiled(
             $context,
