@@ -106,6 +106,7 @@
             <file>./test/compliance/StreamCopyToStreamReflectionVMTest.php</file>
             <file>./test/compliance/StreamBucketReflectionStreamBucketVMTest.php</file>
             <file>./test/compliance/StreamBucketNewReflectionObjectVMTest.php</file>
+            <file>./test/compliance/StreamFilterAppendPrependReflectionVMTest.php</file>
             <file>./test/compliance/StreamContextSetOptionReturnTrueVMTest.php</file>
             <file>./test/compliance/StreamSocketEnableCryptoReflectionVMTest.php</file>
             <file>./test/compliance/HtmlDecodeFlagsNamedReflectionVMTest.php</file>

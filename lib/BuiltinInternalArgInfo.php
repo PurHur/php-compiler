@@ -125,6 +125,8 @@ final class BuiltinInternalArgInfo
             'stream_socket_client' => '',
             // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#28857)
             'stream_socket_server' => '',
+            // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says resource (#28908)
+            'stream_filter_append', 'stream_filter_prepend' => '',
             // ext/standard/proc_open.stub.php — no return type; InternalArgInfo says resource (#27847)
             'proc_open' => '',
             // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |bool) (#27684)

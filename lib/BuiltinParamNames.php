@@ -1055,6 +1055,10 @@ final class BuiltinParamNames
                 return ['protocol', 'class', 'flags'];
             case 'stream_filter_register':
                 return ['filter_name', 'class'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo filtername/read_write/filterparams (#28908)
+            case 'stream_filter_append':
+            case 'stream_filter_prepend':
+                return ['stream', 'filter_name', 'mode=', 'params='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says context (#24584)
             case 'stream_context_get_options':
                 return ['stream_or_context'];

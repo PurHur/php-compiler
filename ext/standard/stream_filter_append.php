@@ -35,7 +35,7 @@ final class stream_filter_append extends Internal
             $frame->calledArgs[1],
             'stream_filter_append',
             1,
-            'filtername'
+            'filter_name'
         );
         $readWrite = VmStreamFilterChain::ALL;
         if ($argc >= 3) {
@@ -43,7 +43,7 @@ final class stream_filter_append extends Internal
                 $frame->calledArgs[2]->resolveIndirect(),
                 'stream_filter_append',
                 3,
-                'read_write'
+                'mode'
             );
         }
         if (null === $frame->returnVar) {

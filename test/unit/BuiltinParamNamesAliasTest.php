@@ -568,6 +568,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($filter, 'filtername', 'stream_filter_register'));
     }
 
+    /** @covers issue #28908 */
+    public function testStreamFilterAppendPrependZendStubNamedParamsAndReturn(): void
+    {
+        foreach (['stream_filter_append', 'stream_filter_prepend'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['stream', 'filter_name', 'mode=', 'params='], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'stream', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'filter_name', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', $fn));
+            self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'params', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'filtername', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'read_write', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'filterparams', $fn));
+            self::assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+    }
+
     /** @covers issue #24534 */
     public function testFtruncateNamedParameters(): void
     {
