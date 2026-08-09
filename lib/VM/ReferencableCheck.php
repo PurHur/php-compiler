@@ -296,6 +296,10 @@ final class ReferencableCheck
         Variable $arg,
         Frame $caller
     ): void {
+        // Zend SEND_REF: string offsets Error before generic non-variable by-ref (#29523 / #21910).
+        if (self::isStringOffsetRef($arg)) {
+            throw new \Error(Variable::STRING_OFFSET_REF_ERROR);
+        }
         if (self::isReferenceable($arg, $caller)) {
             return;
         }
@@ -305,6 +309,12 @@ final class ReferencableCheck
             $paramIdx + 1,
             $paramName
         ));
+    }
+
+    /** True when $arg is (or peels to) a string-offset lvalue — not referenceable (#29523). */
+    public static function isStringOffsetRef(Variable $arg): bool
+    {
+        return Variable::TYPE_STRING_OFFSET === $arg->resolveIndirect()->type;
     }
 
     /**
@@ -627,6 +637,11 @@ final class ReferencableCheck
 
     public static function isReferenceable(Variable $arg, Frame $caller): bool
     {
+        // Zend: string offsets are never referenceable (zend_execute.c SEND_REF / ASSIGN_REF).
+        // Indirect FETCH_DIM_W temps peel to TYPE_STRING_OFFSET — reject before isIndirect (#29523).
+        if (self::isStringOffsetRef($arg)) {
+            return false;
+        }
         if ($arg->isIndirect()) {
             return true;
         }
@@ -635,8 +650,7 @@ final class ReferencableCheck
             return true;
         }
         if (
-            Variable::TYPE_STRING_OFFSET === $resolved->type
-            || Variable::TYPE_ARRAYACCESS_OFFSET === $resolved->type
+            Variable::TYPE_ARRAYACCESS_OFFSET === $resolved->type
             || Variable::TYPE_PROPERTY_HOOK_REF === $resolved->type
         ) {
             return true;

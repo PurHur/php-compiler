@@ -1,5 +1,5 @@
 --TEST--
-Language: cannot create references to/from string offsets (#21910, Zend/zend_execute.c)
+Language: cannot create references to/from string offsets (#21910 / #29523, Zend/zend_execute.c)
 --FILE--
 <?php
 $s = 'abc';
@@ -28,10 +28,20 @@ try {
 } catch (Error $e) {
     echo 'list: ', $e->getMessage(), "\n";
 }
+function byref_sink(&$v) {
+    $v = 'Z';
+}
+try {
+    byref_sink($s[0]);
+    echo "call no throw s=$s\n";
+} catch (Error $e) {
+    echo 'call: ', $e->getMessage(), "\n";
+}
 echo $s, "\n";
 --EXPECT--
 rhs: Cannot create references to/from string offsets
 lhs: Cannot create references to/from string offsets
 arr: Cannot create references to/from string offsets
 list: Cannot create references to/from string offsets
+call: Cannot create references to/from string offsets
 abc

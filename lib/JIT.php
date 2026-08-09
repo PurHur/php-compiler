@@ -21878,6 +21878,14 @@ class JIT {
 
     private function ensureValueBoxLvalueForByRefPass(Operand $op, Variable $var): Variable
     {
+        // Zend: cannot create references to/from string offsets (#29523 / #21910).
+        if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($var, $this->context)) {
+            JIT\StringOffsetHelper::emitRefError($this->context);
+            $this->context->builder->call($this->context->lookupFunction('abort'));
+            $this->context->builder->clearInsertionPosition();
+
+            return $var;
+        }
         // Promote the caller's lvalue in place. Copying into a fresh box left the
         // original native/script-global binding unchanged, so AOT saw the pre-call
         // value (or null on {main}) after return (#24162, Zend ZEND_SEND_REF).
