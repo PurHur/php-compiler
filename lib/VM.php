@@ -6359,6 +6359,16 @@ restart:
                     $readBeforeAssign = $forWrite && $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
                     $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
                     if ($op->propertyHookCoalesceRead && !$mutates) {
+                        // Static ?? also rejects virtual write-only (#29240, zend_object_handlers.c).
+                        $catchFrame = $this->enforceWriteOnlyVirtualStaticPropertyRead(
+                            $lcClass,
+                            $propNameRaw,
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $dest = $frame->scope[$op->arg1];
                         $this->fetchStaticPropertyForCoalesce($lcClass, $propNameRaw, $dest);
                         break;
@@ -8342,6 +8352,12 @@ restart:
                         }
                     }
                     if ($op->propertyHookCoalesceRead && !$forWrite) {
+                        // ?? / ??= still throws on virtual write-only (zend BP_VAR_IS; #29240).
+                        $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($propertyObject, $name, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result, $frame);
                         break;
                     }
@@ -14902,9 +14918,10 @@ restart:
 
     private function raiseWriteOnlyVirtualPropertyReadError(string $className, string $propName, Frame $frame): ?Frame
     {
+        // php-src PHP 8.4: zend_object_handlers.c — "Property %s::$%s is write-only" (#29240).
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
-            sprintf('Cannot read property %s::$%s without get hook', $className, $propName)
+            sprintf('Property %s::$%s is write-only', $className, $propName)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {

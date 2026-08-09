@@ -1,5 +1,7 @@
 --TEST--
 Write-only virtual property hook rejects reads (issue #6484, #22452, zend_property_hooks.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {
@@ -16,4 +18,4 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-Error: Cannot read property C::$x without get hook
+Error: Property C::$x is write-only
