@@ -4772,6 +4772,7 @@ require_once __DIR__.'/../../../ext/xsl/XsltProcessorTransformToXml.php';
 require_once __DIR__.'/../../../ext/xsl/XsltRegistry.php';
 require_once __DIR__.'/../../../ext/yaml/Module.php';
 require_once __DIR__.'/../../../ext/yaml/VmYaml.php';
+require_once __DIR__.'/../../../ext/yaml/YamlConstants.php';
 require_once __DIR__.'/../../../ext/yaml/YamlExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/yaml/YamlFunction.php';
 require_once __DIR__.'/../../../ext/yaml/yaml_emit.php';

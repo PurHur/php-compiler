@@ -72,16 +72,35 @@ final class VmYaml
         return self::parse($raw, $frame);
     }
 
-    public static function emit(Variable $value): string
+    /**
+     * @param int $encoding libyaml YAML_*_ENCODING (UTF-8 / ANY emit UTF-8; UTF-16 deferred as UTF-8 #27873)
+     * @param int $linebreak libyaml YAML_*_BREAK
+     */
+    public static function emit(Variable $value, int $encoding = 0, int $linebreak = 0): string
     {
+        require_once __DIR__.'/YamlConstants.php';
         $body = self::emitValue($value->resolveIndirect(), 0);
+        $doc = "---\n".$body.(\str_ends_with($body, "\n") ? '' : "\n")."...\n";
+        if (YamlConstants::CR_BREAK === $linebreak) {
+            $doc = \str_replace("\n", "\r", $doc);
+        } elseif (YamlConstants::CRLN_BREAK === $linebreak) {
+            $doc = \str_replace("\n", "\r\n", $doc);
+        }
+        // Encoding: v1 keeps PHP string UTF-8 bytes for ANY/UTF8; UTF-16* accepted for arity
+        // parity but still returns UTF-8 (no BOM) until a real transcoder lands (#27873).
+        unset($encoding);
 
-        return "---\n".$body.(str_ends_with($body, "\n") ? '' : "\n")."...\n";
+        return $doc;
     }
 
-    public static function emitFile(string $filename, Variable $value, ?Frame $frame = null): bool
-    {
-        $ok = @file_put_contents($filename, self::emit($value));
+    public static function emitFile(
+        string $filename,
+        Variable $value,
+        ?Frame $frame = null,
+        int $encoding = 0,
+        int $linebreak = 0
+    ): bool {
+        $ok = @\file_put_contents($filename, self::emit($value, $encoding, $linebreak));
         if (false === $ok) {
             self::emitWarning($frame, 'yaml_emit_file(): Failed writing to '.$filename);
 
