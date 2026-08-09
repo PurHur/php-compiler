@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\apcu;
 
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
 
 /**
- * apcu extension module entry (PECL apcu / php-src ext/apcu; #6574, #24909).
+ * apcu extension module entry (PECL apcu / php-src ext/apcu; #6574, #24909, #27877).
  *
  * PHP-in-PHP in-process user cache — no runtime/*.c growth. Advertise apcu_* /
  * extension_loaded('apcu') only when {@see ApcuExtensionPolicy::advertisesExtension()}.
@@ -20,6 +21,22 @@ class Module extends ModuleAbstract
     public function getExtensionVersion(): string
     {
         return self::APCU_VERSION;
+    }
+
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        if (!ApcuExtensionPolicy::advertisesExtension()) {
+            return;
+        }
+        require_once __DIR__.'/ApcuConstants.php';
+        require_once __DIR__.'/VmApcuIterator.php';
+        foreach (ApcuConstants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
+        VmApcuIterator::registerClass($runtime->vmContext);
     }
 
     public function getFunctions(): array
