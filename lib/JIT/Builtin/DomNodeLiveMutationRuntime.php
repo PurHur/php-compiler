@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
+use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\standard\JitStringConcat;
@@ -169,11 +170,16 @@ final class DomNodeLiveMutationRuntime
         }
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             if ('replacechildren' === $kind) {
+                // Arity 0: skip NestedJIT — empty replaceChildren aborted in thin AOT (#29409).
+                // Non-empty: NestedJIT + INNER_XML overwrite (saveXML reads INNER_XML).
                 if (0 === $extraArgCount) {
-                    JitDomDocumentMethodKernel::ensureReplaceChildrenBridge($context, $extraArgCount);
-                    $abi = self::abiFor($kind, $extraArgCount);
-                    $llvmArgs = [self::receiverObject($context, $receiver)];
-                } elseif (self::canUseObjectMutationBridge($extraArgs)) {
+                    self::clearChildLinkSlots($context, $receiver);
+                    self::syncChildNodesLengthSlot($context, $receiver, 0);
+                    self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, []);
+
+                    return self::nullValuePtr($context);
+                }
+                if (self::canUseObjectMutationBridge($extraArgs)) {
                     JitDomDocumentMethodKernel::ensureReplaceChildrenObjectBridge($context, $extraArgCount);
                     $abi = self::replaceChildrenObjectAbi($extraArgCount);
                     $llvmArgs = [self::receiverObject($context, $receiver)];
@@ -196,17 +202,16 @@ final class DomNodeLiveMutationRuntime
                     }
                 }
                 $context->builder->call($context->lookupFunction($abi), ...$llvmArgs);
-                if ([] !== $extraArgs) {
-                    $firstArg = $extraArgs[0];
-                    $lastArg = $extraArgs[\count($extraArgs) - 1];
-                    $firstChildObj = self::childObjectForSlotSync($context, $firstArg);
-                    $lastChildObj = self::childObjectForSlotSync($context, $lastArg);
-                    if (null !== $firstChildObj && null !== $lastChildObj) {
-                        self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
-                    }
+                $firstArg = $extraArgs[0];
+                $lastArg = $extraArgs[\count($extraArgs) - 1];
+                $firstChildObj = self::childObjectForSlotSync($context, $firstArg);
+                $lastChildObj = self::childObjectForSlotSync($context, $lastArg);
+                if (null !== $firstChildObj && null !== $lastChildObj) {
+                    self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
                 }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
                 self::syncChildNodesLengthSlot($context, $receiver, $extraArgCount);
+                self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, $extraArgs);
 
                 return self::nullValuePtr($context);
             }
@@ -393,6 +398,77 @@ final class DomNodeLiveMutationRuntime
                 Variable::TYPE_VALUE
             );
         }
+    }
+
+    /** Null firstChild/lastChild after replaceChildren() with no args (#29409). */
+    private static function clearChildLinkSlots(Context $context, Variable $receiver): void
+    {
+        $objectType = $context->type->object;
+        $nodeClassId = $objectType->lookup('DOMNode');
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+            if (!$objectType->hasProperty($nodeClassId, $prop)) {
+                $objectType->defineProperty($nodeClassId, $prop, Variable::TYPE_VALUE);
+            }
+        }
+        $receiverObj = self::receiverObject($context, $receiver);
+        $nullSlot = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $nullVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $nullPtr)
+        );
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($receiverObj, 'DOMNode', $prop),
+                $nullVar,
+                Variable::TYPE_VALUE
+            );
+        }
+    }
+
+    /**
+     * Overwrite {@see VmDom::PROP_USER_SCRIPT_INNER_XML} for replaceChildren (#29409).
+     *
+     * Append/prepend concat onto the loadXML-seeded slot (#26765); replaceChildren must
+     * replace that markup so pure-LLVM saveXML($node) matches Zend.
+     *
+     * @param list<Variable> $extraArgs
+     */
+    private static function syncUserScriptInnerXmlReplaceFromArgs(
+        Context $context,
+        Variable $receiver,
+        array $extraArgs
+    ): void {
+        $receiverObj = self::receiverObject($context, $receiver);
+        if ([] === $extraArgs) {
+            JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, '');
+
+            return;
+        }
+        $pieces = [];
+        foreach ($extraArgs as $arg) {
+            if (Variable::TYPE_STRING === $arg->type) {
+                $lit = $arg->compileTimeString ?? null;
+                if (null === $lit) {
+                    return;
+                }
+                // Text nodes are serialized as escaped text content (simple literals only).
+                $pieces[] = htmlspecialchars($lit, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                continue;
+            }
+            if (!\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
+                return;
+            }
+            $tag = $arg->compileTimeDomTagName ?? null;
+            if (null === $tag || '' === $tag) {
+                return;
+            }
+            $pieces[] = '<'.$tag.'/>';
+        }
+        JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, implode('', $pieces));
     }
 
     /**
