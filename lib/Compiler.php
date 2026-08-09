@@ -204,6 +204,9 @@ class Compiler {
     /** Display class name while compiling a class body (#4286). */
     private ?string $compilingClassDisplayName = null;
 
+    /** True while compiling a `readonly class` body (#29186). */
+    private bool $compilingClassIsReadonly = false;
+
     /** @var array<string, true> instance property names declared in the current class body (#4286) */
     private array $compilingClassInstancePropertyNames = [];
 
@@ -7087,10 +7090,12 @@ class Compiler {
         $this->currentClassStaticPropertyCompile = $classLc;
         $prevCompilingParentLc = $this->compilingClassParentLc;
         $prevCompilingParentName = $this->compilingClassParentName;
+        $prevCompilingClassIsReadonly = $this->compilingClassIsReadonly;
         $this->compilingClassParentLc = $parentLc;
         $this->compilingClassParentName = null !== $parentLc
             ? ($parentName ?? $parentLc)
             : null;
+        $this->compilingClassIsReadonly = ClassReadonly::fromClassFlags($class->flags);
         $return->block1 = $this->compileClassBody(
             $class->stmts,
             $type,
@@ -7098,6 +7103,7 @@ class Compiler {
         );
         $this->compilingClassParentLc = $prevCompilingParentLc;
         $this->compilingClassParentName = $prevCompilingParentName;
+        $this->compilingClassIsReadonly = $prevCompilingClassIsReadonly;
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
         $this->mergeTraitStaticPropertiesIntoClass($class->stmts, $classLc);
         $this->mergeTraitCompileTimeClassConstsIntoClass($class->stmts, $classLc);
@@ -8515,6 +8521,11 @@ class Compiler {
                         $declare->propertyLazy = (property_exists($child, 'propertyLazy') && $child->propertyLazy)
                             || LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
                     }
+                    $declare->propertySetVisibility = PropertyVisibility::withImplicitReadonlyProtectedSet(
+                        $declare->propertyReadonly || $this->compilingClassIsReadonly,
+                        MethodVisibility::mask($declare->propertyVisibility),
+                        (int) $declare->propertySetVisibility
+                    );
                     // Explicit `final` (instance + static) — recover from propertyFlags when CFG
                     // visibility is VISIBILITY_MODIFIER_MASK-stripped (#23403, re-#23036/#22308).
                     // php-src Zend 8.2 rejects all finals; 8.4 allows plain + static finals.
@@ -9310,6 +9321,11 @@ class Compiler {
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
         $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
+        $declare->propertySetVisibility = PropertyVisibility::withImplicitReadonlyProtectedSet(
+            $declare->propertyReadonly || $this->compilingClassIsReadonly,
+            MethodVisibility::mask($declare->propertyVisibility),
+            (int) $declare->propertySetVisibility
+        );
         $explicitFinal = FinalPromotedPropertyRewriter::isFinalFromAttributes($param->getAttributes())
             || (property_exists($param, 'promotionFinal') && $param->promotionFinal);
         // php-src zend_API.c — private(set) promoted props are implicitly final (#23068).

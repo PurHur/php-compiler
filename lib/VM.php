@@ -15234,8 +15234,15 @@ restart:
             }
             throw new \Error($this->readonlyPropertyWriteErrorMessage($object, $propName, $declaringClass, $frame));
         }
-        if (VM\CloneWithSupport::consumeReinit($object, $propName)) {
-            return;
+        // Clone-with reinit unlocks readonly once; asymmetric set still applies (#29186).
+        if (isset($object->reinitableProperties[$propName])) {
+            $avizMsg = $this->asymmetricPropertyWriteMessageForMeta($object, $propName, $frame, true);
+            if (null !== $avizMsg) {
+                throw new \Error($avizMsg);
+            }
+            if (VM\CloneWithSupport::consumeReinit($object, $propName)) {
+                return;
+            }
         }
         // First write after construction from declaring-class scope is initialization (#23475).
         if ($this->allowReadonlyPropertyFirstInit($object, $propName, $frame)) {
@@ -15330,8 +15337,15 @@ restart:
                 $frame
             );
         }
-        if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
-            return null;
+        // Clone-with reinit unlocks readonly once; asymmetric set still applies (#29186).
+        if (isset($owner->reinitableProperties[$prop])) {
+            $avizMsg = $this->asymmetricPropertyWriteMessageForMeta($owner, $prop, $frame, true);
+            if (null !== $avizMsg) {
+                return $this->dispatchVmError($avizMsg, $frame);
+            }
+            if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
+                return null;
+            }
         }
         // First write after construction from declaring-class scope is initialization (#23475).
         if ($this->allowReadonlyPropertyFirstInit($owner, $prop, $frame)) {
@@ -16110,8 +16124,25 @@ restart:
         if ('' === $propName) {
             return null;
         }
+
+        return $this->asymmetricPropertyWriteMessageForMeta($owner, $propName, $frame, false);
+    }
+
+    /**
+     * @param bool $readonlyReinitWindow when true, enforce aviz even for readonly props (clone-with, #29186)
+     */
+    private function asymmetricPropertyWriteMessageForMeta(
+        ObjectEntry $owner,
+        string $propName,
+        Frame $frame,
+        bool $readonlyReinitWindow
+    ): ?string {
         $meta = $this->classPropertyMeta($owner, $propName);
         if (null === $meta) {
+            return null;
+        }
+        // Ordinary readonly writes use the readonly Error; aviz applies after reinit unlock (#29186).
+        if ($meta->readonly && !$readonlyReinitWindow) {
             return null;
         }
         $setVis = PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility);
@@ -16136,7 +16167,8 @@ restart:
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
                 $meta->asymmetricExplicitRead,
-                $this->callerScopeDisplay($frame, $callerLc)
+                $this->callerScopeDisplay($frame, $callerLc),
+                $meta->readonly
             );
         } catch (\LogicException $e) {
             return $e->getMessage();
@@ -19760,6 +19792,14 @@ restart:
                     if ($entry->readonly) {
                         $incoming->readonly = true;
                     }
+                    $incoming->setVisibility = PropertyVisibility::withImplicitReadonlyProtectedSet(
+                        $incoming->readonly,
+                        MethodVisibility::mask($incoming->visibility),
+                        (int) $incoming->setVisibility
+                    );
+                    if (PropertyVisibility::isImplicitlyFinalFromPrivateSet($incoming->setVisibility)) {
+                        $incoming->propertyFinal = true;
+                    }
                     foreach ($entry->properties as $idx => $existing) {
                         if (strtolower($existing->name) !== $propLc) {
                             continue;
@@ -20464,10 +20504,18 @@ restart:
         );
         $property->defaultInitBlock = $block->fragmentForOpcodes($pendingNewDefaultOps);
         $property->defaultInitResultSlot = $resultSlot;
+        if ($entry->readonly) {
+            $property->readonly = true;
+        }
+        $property->setVisibility = PropertyVisibility::withImplicitReadonlyProtectedSet(
+            $property->readonly,
+            MethodVisibility::mask($property->visibility),
+            (int) $property->setVisibility
+        );
         // php-src zend_API.c — private(set) ⇒ ZEND_ACC_FINAL (#23068).
         $property->propertyFinal = (bool) ($declareOp->propertyFinal ?? false)
             || PropertyVisibility::isImplicitlyFinalFromPrivateSet(
-                (int) ($declareOp->propertySetVisibility ?? 0)
+                (int) $property->setVisibility
             );
         $entry->properties[] = $property;
     }

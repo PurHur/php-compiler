@@ -8,6 +8,8 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\CloneWithReinitRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\MethodVisibility;
+use PHPCompiler\PropertyVisibility;
 use PHPLLVM\Builder;
 
 /**
@@ -166,7 +168,22 @@ final class ReadonlyClassGuard
             $context->builder->positionAtEnd($reinitBlock);
             CloneWithReinitRuntime::ensureLinked($context);
             $reinitOk = CloneWithReinitRuntime::emitTryConsumePropertyName($context, $obj, $propName);
-            $context->builder->branchIf($reinitOk, $storeBlock, $violateBlock);
+            $avizBlock = $fn->appendBasicBlock('readonly_reinit_aviz_'.$id);
+            $context->builder->branchIf($reinitOk, $avizBlock, $violateBlock);
+            $context->builder->positionAtEnd($avizBlock);
+            // Clone-with unlocks readonly once; protected(set)/private(set) still apply (#29186).
+            if (self::emitAsymmetricDenyOnReadonlyReinit(
+                $context,
+                $objectType,
+                $enclosingBlock,
+                $jit,
+                $id,
+                $propName
+            )) {
+                $checkBlock = $nextCheck;
+                continue;
+            }
+            $context->builder->branch($storeBlock);
             $context->builder->positionAtEnd($violateBlock);
             $declaringClass = $objectType->classNameForId($id);
             $message = sprintf(
@@ -181,6 +198,78 @@ final class ReadonlyClassGuard
         $context->builder->positionAtEnd($storeBlock);
         $context->builder->branch($exitBlock);
         $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /**
+     * After clone-with reinit consume succeeds, still enforce asymmetric set (#29186).
+     *
+     * @return bool true when a deny was emitted (caller must skip store / advance)
+     */
+    private static function emitAsymmetricDenyOnReadonlyReinit(
+        Context $context,
+        Object_ $objectType,
+        ?Block $enclosingBlock,
+        ?\PHPCompiler\JIT $jit,
+        int $classId,
+        string $propName
+    ): bool {
+        $readVis = $objectType->propertyVisibility($classId, $propName);
+        $effectiveRead = PropertyVisibility::effectiveGetVisibility(
+            $readVis,
+            $objectType->propertyGetVisibility($classId, $propName)
+        );
+        $setVis = PropertyVisibility::effectiveSetVisibility(
+            $readVis,
+            $objectType->propertySetVisibility($classId, $propName)
+        );
+        if ($setVis === MethodVisibility::mask($effectiveRead)) {
+            return false;
+        }
+        $declaringClass = $objectType->classNameForId($classId);
+        $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+        $callerLc = null;
+        $callerDisplay = null;
+        if (null !== $enclosingBlock?->func?->class) {
+            $callerDisplay = ltrim($enclosingBlock->func->class->value, '\\');
+            $callerLc = strtolower($callerDisplay);
+        } elseif ('' !== $context->scope->className) {
+            $callerDisplay = ltrim($context->scope->className, '\\');
+            $callerLc = strtolower($callerDisplay);
+        }
+        try {
+            PropertyVisibility::assertWritable(
+                $setVis,
+                $callerLc,
+                $declaringLc,
+                $declaringClass,
+                $propName,
+                static function (string $child, string $parent) use ($objectType): bool {
+                    $current = $child;
+                    for ($depth = 0; $depth < 64; ++$depth) {
+                        if ($current === $parent) {
+                            return true;
+                        }
+                        $next = $objectType->parentClassLc($current);
+                        if (null === $next) {
+                            return false;
+                        }
+                        $current = $next;
+                    }
+
+                    return false;
+                },
+                MethodVisibility::mask($effectiveRead),
+                $objectType->propertyAsymmetricExplicitRead($classId, $propName),
+                $callerDisplay,
+                true
+            );
+        } catch (\LogicException $e) {
+            self::emitViolation($context, $jit, $e->getMessage());
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

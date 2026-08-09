@@ -22,6 +22,31 @@ final class PropertyVisibility
     }
 
     /**
+     * PHP 8.4+ `public readonly` / readonly-class public props get implicit `protected(set)` (#29186).
+     *
+     * Explicit set visibility (including `public(set)`) wins. Protected/private read visibility
+     * already implies the matching set scope — no separate IS_*_SET bit.
+     * php-src: Zend/zend_compile.c / asymmetric visibility + readonly interaction.
+     */
+    public static function withImplicitReadonlyProtectedSet(
+        bool $readonly,
+        int $readVisibilityFlags,
+        int $explicitSetVisibilityFlags
+    ): int {
+        if (0 !== $explicitSetVisibilityFlags) {
+            return $explicitSetVisibilityFlags;
+        }
+        if (!$readonly || !CompilerVersion::supportsAsymmetricVisibility()) {
+            return 0;
+        }
+        if (!MethodVisibility::isPublic($readVisibilityFlags)) {
+            return 0;
+        }
+
+        return CfgFunc::FLAG_PROTECTED;
+    }
+
+    /**
      * php-src zend_API.c — `private(set)` properties are implicitly final (#23068).
      * Uses the asymmetric set-visibility flag (not effective write = private).
      */
@@ -102,7 +127,8 @@ final class PropertyVisibility
         callable $isSubclass,
         int $readVisibilityFlags = 0,
         bool $explicitReadModifier = false,
-        ?string $callerClassDisplay = null
+        ?string $callerClassDisplay = null,
+        bool $readonlyProperty = false
     ): void {
         self::assertSetVisibility(
             'modify',
@@ -114,7 +140,8 @@ final class PropertyVisibility
             $isSubclass,
             $readVisibilityFlags,
             $explicitReadModifier,
-            $callerClassDisplay
+            $callerClassDisplay,
+            $readonlyProperty
         );
     }
 
@@ -144,7 +171,8 @@ final class PropertyVisibility
             $isSubclass,
             $readVisibilityFlags,
             $explicitReadModifier,
-            $callerClassDisplay
+            $callerClassDisplay,
+            false
         );
     }
 
@@ -153,6 +181,7 @@ final class PropertyVisibility
      *
      * php-src zend_execute.c zend_asymmetric_visibility_property_modification_error —
      * class scopes use `from scope {Name}` with original casing (#26298).
+     * Clone-with reinit of readonly props uses `protected(set) readonly` wording (#29186).
      *
      * @throws \LogicException when the operation is not allowed
      */
@@ -166,7 +195,8 @@ final class PropertyVisibility
         callable $isSubclass,
         int $readVisibilityFlags = 0,
         bool $explicitReadModifier = false,
-        ?string $callerClassDisplay = null
+        ?string $callerClassDisplay = null,
+        bool $readonlyProperty = false
     ): void {
         if (MethodVisibility::isPublic($setVisibilityFlags)) {
             return;
@@ -179,7 +209,8 @@ final class PropertyVisibility
                 $propertyName,
                 'global scope',
                 $readVisibilityFlags,
-                $explicitReadModifier
+                $explicitReadModifier,
+                $readonlyProperty
             );
         }
         $scopeLabel = 'scope '.($callerClassDisplay ?? $callerClassLc);
@@ -192,7 +223,8 @@ final class PropertyVisibility
                     $propertyName,
                     $scopeLabel,
                     $readVisibilityFlags,
-                    $explicitReadModifier
+                    $explicitReadModifier,
+                    $readonlyProperty
                 );
             }
 
@@ -209,7 +241,8 @@ final class PropertyVisibility
                 $propertyName,
                 $scopeLabel,
                 $readVisibilityFlags,
-                $explicitReadModifier
+                $explicitReadModifier,
+                $readonlyProperty
             );
         }
     }
@@ -245,11 +278,17 @@ final class PropertyVisibility
         string $propertyName,
         string $scopeLabel,
         int $readVisibilityFlags = 0,
-        bool $explicitReadModifier = false
+        bool $explicitReadModifier = false,
+        bool $readonlyProperty = false
     ): void {
         $kind = 0 !== $readVisibilityFlags
             ? Ast\AsymmetricVisibilityRewriter::writeModifierLabel($readVisibilityFlags, $setVisibilityFlags, $explicitReadModifier)
             : Ast\AsymmetricVisibilityRewriter::setModifierLabel($setVisibilityFlags);
+        // php-src: only protected(set)+readonly reinit denies insert "readonly" (#29186);
+        // private(set) readonly keeps bare private(set) wording.
+        if ($readonlyProperty && ($setVisibilityFlags & CfgFunc::FLAG_PROTECTED) !== 0) {
+            $kind .= ' readonly';
+        }
         throw new \LogicException(
             sprintf(
                 'Cannot %s %s property %s::$%s from %s',
