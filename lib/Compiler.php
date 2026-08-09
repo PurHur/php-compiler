@@ -14443,18 +14443,25 @@ class Compiler {
                 ? $this->compileOperand($lastFetch->dim, $block, true)
                 : null;
             $block->addOpCode($this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, false));
+        } elseif ($useContainerIsset && null !== $propFetch) {
+            // Instance prop ?? / ??= : fetch once (hook backing / magic IS-mode), then isset on
+            // the value. Container isset alone skips __get and treats null-as-set (#29228).
+            $this->compilePropertyFetchRead($propFetch, $block, true);
+            $evaluatedLeftSlot = $this->compileOperand($propFetch->result, $block, true);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ISSET,
+                $checkSlot,
+                $evaluatedLeftSlot,
+                null
+            ));
+            $useContainerIsset = false;
         } elseif ($useContainerIsset) {
             $issetOp = $this->makeIssetOpCode(
                 $checkSlot,
                 $containerSlot,
                 $dimSlot,
-                null !== $propFetch
+                false
             );
-            if (
-                null !== $propFetch
-            ) {
-                $issetOp->issetForCoalesceAssign = true;
-            }
             if (null !== $staticPropFetch) {
                 $issetOp->issetOnStaticProperty = true;
                 $issetOp->issetForCoalesceAssign = true;
