@@ -27,6 +27,7 @@ final class GetDefinedConstantsVarsBuiltinTest extends BaseTest
             'get_defined_constants_phantom_modules.phpt',
             'get_defined_constants_user_bucket.phpt',
             'get_defined_constants_ftp_mysqli_buckets.phpt',
+            'get_defined_constants_dom_pecl_buckets.phpt',
             'get_defined_constants_snmp_bucket.phpt',
             'get_defined_vars_extract.phpt',
             'get_defined_vars_extract_jit.phpt',
