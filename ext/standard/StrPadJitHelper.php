@@ -22,7 +22,8 @@ final class StrPadJitHelper
             return $input;
         }
         if ('' === $padString) {
-            throw new \ValueError('str_pad(): Argument #3 ($pad_string) must be a non-empty string');
+            // php-src string.c — keep literal (no VmString call; NestedJIT isolation) (#29292)
+            throw new \ValueError('str_pad(): Argument #3 ($pad_string) must not be empty');
         }
         $need = $padLength - $inputLen;
         if (2 === $padType) {
