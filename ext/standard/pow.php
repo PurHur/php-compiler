@@ -29,10 +29,8 @@ final class pow extends Internal
         $this->requireExactArgCount($frame, 'pow', 2);
         $base = $frame->calledArgs[0]->resolveIndirect();
         $exp = $frame->calledArgs[1]->resolveIndirect();
-        if (VmMath::requiresForwardProfileStrictDoubleNull()) {
-            VmMath::parseDoubleBuiltinArg($base, 'pow', 1, 'num', $frame);
-            VmMath::parseDoubleBuiltinArg($exp, 'pow', 2, 'exponent', $frame);
-        }
+        // pow() uses the ** / zend_operators path — null coerces silently (no Z_PARAM_DOUBLE DEP).
+        // Contrast fpow()/sqrt() which emit soft-null E_DEPRECATED (#29322, re-#20951).
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,14 +42,7 @@ final class pow extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'pow', 2)) {
             return $context->getTypeFromString('double')->constReal(0.0);
         }
-        if (VmMath::requiresForwardProfileStrictDoubleNull()) {
-            if (JITVariable::TYPE_NULL === $args[0]->type) {
-                JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'pow', 'float');
-            }
-            if (JITVariable::TYPE_NULL === $args[1]->type) {
-                JitFdiv::lowerSingleOperand($context, $args[1], 2, 'exponent', 'pow', 'float');
-            }
-        }
+        // No float-null DEP here — match operator-path silence (#29322). fpow keeps soft-null.
 
         return JitPow::invoke($context, ...$args);
     }
