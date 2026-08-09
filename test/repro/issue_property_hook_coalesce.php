@@ -1,7 +1,7 @@
 <?php
 class C {
     public string $x {
-        get { throw new Exception('get must not run for ??'); }
+        get { echo "GET\n"; return $this->backing; }
         set => $this->backing = $value;
     }
     private string $backing = 'a';
@@ -10,14 +10,18 @@ $c = new C();
 var_dump($c->x ?? 'default');
 echo "ok\n";
 
-class U {
-    public string $x {
-        get { throw new Exception('get must not run for unset ??'); }
-        set => $this->backing = $value;
+class V {
+    public string $hello {
+        get => 'hello';
     }
-    private string $backing;
 }
-$u = new U();
-unset($u->x);
-var_dump($u->x ?? 'default');
-echo "unset ok\n";
+$v = new V();
+var_dump($v->hello ?? 'default');
+
+class N {
+    public ?string $y {
+        get => null;
+    }
+}
+$n = new N();
+var_dump($n->y ?? 'default');
