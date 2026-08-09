@@ -233,6 +233,18 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
         }
+        if (\in_array($lc, [
+            'rar_open',
+            'rar_list',
+            'rar_entry_get',
+            'rar_solid_is',
+            'rar_comment_get',
+            'rar_broken_is',
+            'rar_allow_broken_set',
+            'rar_close',
+        ], true)) {
+            return \PHPCompiler\ext\rar\RarExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['yaml_parse', 'yaml_parse_file', 'yaml_parse_url', 'yaml_emit', 'yaml_emit_file'], true)) {
             return \PHPCompiler\ext\yaml\YamlExtensionPolicy::advertisesExtension();
         }
