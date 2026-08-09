@@ -62,6 +62,32 @@ final class VmFilestatFailure
         self::triggerWarningWithHandlerFirst($frame, 'mkdir(): File exists');
     }
 
+    /** php-src filestat.c — recursive mkdir("") warns "Invalid path" (#29359). */
+    public static function warnMkdirInvalidPath(Frame $frame): void
+    {
+        self::triggerWarningWithHandlerFirst($frame, 'mkdir(): Invalid path');
+    }
+
+    /**
+     * Warning text for a failed mkdir() (php-src filestat.c; #29359).
+     *
+     * Empty + recursive → "Invalid path"; existing dir → "File exists"; else "No such file…".
+     */
+    public static function warnMkdirFailed(Frame $frame, string $path, bool $recursive, bool $alreadyDir): void
+    {
+        if ($alreadyDir) {
+            self::warnMkdirFileExists($frame);
+
+            return;
+        }
+        if ($recursive && '' === $path) {
+            self::warnMkdirInvalidPath($frame);
+
+            return;
+        }
+        self::warnNoSuchFile($frame, 'mkdir');
+    }
+
     public static function warnNoSuchFile(Frame $frame, string $function): void
     {
         self::triggerWarningWithHandlerFirst($frame, \sprintf('%s(): No such file or directory', $function));

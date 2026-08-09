@@ -61,11 +61,7 @@ final class mkdir_ extends Internal
         $alreadyDir = VmStatPath::isDir($path);
         $ok = VmFs::mkdir($path, $mode, $recursive);
         if (!$ok) {
-            if ($alreadyDir) {
-                VmFilestatFailure::warnMkdirFileExists($frame);
-            } else {
-                VmFilestatFailure::warnNoSuchFile($frame, 'mkdir');
-            }
+            VmFilestatFailure::warnMkdirFailed($frame, $path, $recursive, $alreadyDir);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);

@@ -18,8 +18,11 @@ final class MkdirJitHelper
         $alreadyDir = VmStatPath::isDir($path);
         $ok = VmFs::mkdir($path, $mode, $recursive);
         if (!$ok) {
+            // php-src filestat.c — recursive mkdir("") → "Invalid path" (#29359).
             if ($alreadyDir) {
                 TriggerErrorJitHelper::warning('mkdir(): File exists');
+            } elseif ($recursive && '' === $path) {
+                TriggerErrorJitHelper::warning('mkdir(): Invalid path');
             } else {
                 TriggerErrorJitHelper::warning('mkdir(): No such file or directory');
             }

@@ -131,6 +131,7 @@
             <file>./test/compliance/DateModifyNullDepJITTest.php</file>
             <file>./test/compliance/DateIntervalCreateFromDateStringEmptyVMTest.php</file>
             <file>./test/compliance/FilestatEmptyPathSilentFalseVMTest.php</file>
+            <file>./test/compliance/MkdirEmptyRecursiveInvalidPathVMTest.php</file>
             <file>./test/compliance/DateIntervalCreateFromDateStringEmptyJITTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetVMTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetJITTest.php</file>
