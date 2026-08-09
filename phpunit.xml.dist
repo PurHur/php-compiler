@@ -191,6 +191,8 @@
             <file>./test/compliance/MbStrstrFamilyReflectionVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullJITTest.php</file>
+            <file>./test/compliance/SubstrCountNullNeedleForward84VMTest.php</file>
+            <file>./test/compliance/SubstrCountNullNeedleForward84JITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

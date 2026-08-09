@@ -12,8 +12,6 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -69,7 +67,8 @@ final class substr_count extends Internal
         $i32 = $context->getTypeFromString('int32');
         $fn = $context->lookupFunction('phpc_substr_count');
         $hay = self::jitHaystackArg($context, $args[0]);
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'substr_count', 1, 'needle');
+        // Z_PARAM_STR $needle — soft-null DEP+coerce then empty ValueError (#29421; peer str_increment #26264).
+        $needle = self::jitNeedleArg($context, $args[1]);
         // Z_PARAM_LONG $offset — soft-null DEP+coerce on 8.4 (#21657; peer chr/mktime).
         $offset = $argc >= 3
             ? JitChr::lowerZParamLongArg($context, $args[2], 'substr_count', 3, 'offset')
@@ -182,6 +181,10 @@ final class substr_count extends Internal
         if (null === $needleLit) {
             return null;
         }
+        // Empty needle is a runtime ValueError (null emits DEP first) — do not host-fold (#29421).
+        if ('' === $needleLit) {
+            return null;
+        }
         $offset = 0;
         $offsetNull = false;
         if ($argc >= 3) {
@@ -245,20 +248,19 @@ final class substr_count extends Internal
     }
 
     /**
-     * php-src Z_PARAM_STR for needle — null coerces to "" without deprecation, then empty check (#18347).
+     * php-src Z_PARAM_STR $needle — soft-null DEP+coerce then empty ValueError (#29421; peer str_increment #26264).
+     *
+     * Older #18347 short-circuited null→"" without the null-to-string deprecation Zend emits since 8.1.
      */
     private static function vmNeedleArg(Frame $frame): string
     {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireString($frame, 1, 'substr_count', 'needle');
+        return VmString::trimFamilyStringArgForFrame($frame, 1, 'substr_count', 1, 'needle');
+    }
 
-            return $frame->calledArgs[1]->resolveIndirect()->toString();
-        }
-        $var = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_NULL === $var->type) {
-            return '';
-        }
-
-        return VmString::coerceStringBuiltinArg($var, 'substr_count', 1, 'needle');
+    private static function jitNeedleArg(Context $context, JITVariable $arg): Value
+    {
+        return $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'substr_count', 1, 'needle')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'substr_count', 1, 'needle');
     }
 }
