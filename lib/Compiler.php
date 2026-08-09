@@ -13308,12 +13308,29 @@ class Compiler {
                 if (null !== $mergeEcho && !$dimForWrite) {
                     $block->forceFreshVarSlot($expr->result, $mergeEcho);
                 }
+                $prefix = [];
                 $dimSlot = null !== $expr->dim
                     ? $this->compileOperand($expr->dim, $block, true)
                     : null;
                 $resultSlot = $this->compileOperand($expr->result, $block, false);
+                // Echo/ternary merge phi must not share a slot with dim keys (#3790 / #5506).
+                // Literals: rematerialize the constant. Non-literals (e.g. `new T()` result):
+                // copy into a fresh temp — never forceFreshVarSlot the live producer operand,
+                // which remaps TYPE_NEW's result away from the object and turns the key into
+                // null→"" (#29532, zend_hash Illegal offset type).
                 if (null !== $mergeEcho && null !== $dimSlot && $dimSlot === $mergeEcho && null !== $expr->dim) {
-                    $dimSlot = $this->freshLiteralConstantSlot($expr->dim, $block);
+                    if ($expr->dim instanceof Operand\Literal) {
+                        $dimSlot = $this->freshLiteralConstantSlot($expr->dim, $block);
+                    } else {
+                        $dimTemp = new Operand\Temporary();
+                        $srcOp = $block->getOperand($dimSlot);
+                        if (null !== $srcOp?->type) {
+                            $dimTemp->type = $srcOp->type;
+                        }
+                        $freshDim = $block->forceFreshVarSlot($dimTemp);
+                        $prefix[] = new OpCode(OpCode::TYPE_ASSIGN, $freshDim, $freshDim, $dimSlot);
+                        $dimSlot = $freshDim;
+                    }
                 }
                 if (null !== $dimSlot && $resultSlot === $dimSlot) {
                     $block->forceFreshVarSlot($expr->result);
@@ -13323,12 +13340,12 @@ class Compiler {
                     ? OpCode::TYPE_ARRAY_DIM_FETCH_WRITE
                     : OpCode::TYPE_ARRAY_DIM_FETCH;
 
-                return [new OpCode(
+                return array_merge($prefix, [new OpCode(
                     $fetchType,
                     $resultSlot,
                     $this->compileArrayDimFetchContainerSlot($expr, $block),
                     $dimSlot
-                )];
+                )]);
             case Op\Expr\ConstFetch::class:
                 $nsName = null;
                 if (!is_null($expr->nsName)) {
