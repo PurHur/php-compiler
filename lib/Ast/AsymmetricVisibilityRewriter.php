@@ -357,11 +357,17 @@ final class AsymmetricVisibilityRewriter
         $hasUnsupportedPropertyParenSet = !CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
             && null !== self::findParenthesizedAsymmetricSetModifierError($source);
 
+        // Mid-modifiers (`static` / `readonly`) may sit between get-vis and set-vis.
+        // Without consuming them, `public readonly private(set)` matches only at `private(set)`
+        // and injects a second implicit `public` — nikic then fatals (#29387).
+        // php-src: Zend/zend_language_parser.y — property_modifiers; trailing mid stays after match.
+        $midModifiers = '(?P<mid>(?:(?:static|readonly)\s+)*)';
+
         if (CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
             $source = (string) preg_replace_callback(
                 '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
                 .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
-                .'(?P<static>(?:static\s+)?)'
+                .$midModifiers
                 .'\(\s*(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*\)\s*/i',
                 static function (array $m): string {
                     $set = strtolower($m['set']);
@@ -374,7 +380,7 @@ final class AsymmetricVisibilityRewriter
                         $readPrefix = self::implicitReadPrefixForBareSetModifier($set);
                     }
 
-                    return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
+                    return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['mid'];
                 },
                 $source
             );
@@ -387,7 +393,7 @@ final class AsymmetricVisibilityRewriter
         return (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
             .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
-            .'(?P<static>(?:static\s+)?)'
+            .$midModifiers
             .'(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*'
             .'(?P<readAfter>(?:(?:public|protected|private)\s+)?)/i',
             static function (array $m): string {
@@ -405,8 +411,9 @@ final class AsymmetricVisibilityRewriter
                     $readPrefix = self::implicitReadPrefixForBareSetModifier($set);
                 }
 
-                // Preserve leading `static` (`public static private(set)`); trailing static stays after match (#26239).
-                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
+                // Preserve leading mid (`public readonly private(set)`, `public static private(set)`);
+                // trailing static/readonly after set stays after the match (#26239, #29387).
+                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['mid'];
             },
             $source
         );
@@ -447,7 +454,7 @@ final class AsymmetricVisibilityRewriter
         }
 
         if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?:static\s+)?(?:'
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?:(?:static|readonly)\s+)*(?:'
             .'\((?:public|protected|private)\s*\(\s*set\s*\)\)|'
             .'(?:public|protected|private)\s*\(\s*set\s*\)'
             .')/i',
@@ -665,8 +672,9 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineHasExplicitReadPlusSetModifier(string $line): bool
     {
+        // Allow static/readonly between get-vis and set-vis (#29387) — still duplicate PPP on ≤8.3.
         return 1 === preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?:(?:static|readonly)\s+)*(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
             $line
         );
     }
@@ -686,14 +694,18 @@ final class AsymmetricVisibilityRewriter
         $setModifier = $modifier.'\s*\(\s*set\s*\)';
         $parenthesizedSet = '\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)';
         $staticWord = '\bstatic\b';
+        // Optional readonly between get-vis / set / static (Zend property_modifiers; #29387).
+        $ro = '(?:readonly\s+)?';
         $patterns = [
-            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+(?:'.$staticWord.'\s+)?'.$setModifier.'.*'.$staticWord.'/i',
-            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'\s+'.$staticWord.'/i',
-            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$setModifier.'/i',
-            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$parenthesizedSet.'/i',
-            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'.*'.$staticWord.'/i',
-            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
-            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+(?:'.$staticWord.'\s+)?'.$ro.$setModifier.'.*'.$staticWord.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$ro.$setModifier.'\s+'.$staticWord.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$ro.$staticWord.'\s+'.$ro.$setModifier.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$ro.$staticWord.'\s+'.$ro.$parenthesizedSet.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$ro.$parenthesizedSet.'.*'.$staticWord.'/i',
+            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$ro.$setModifier.'/i',
+            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$ro.$parenthesizedSet.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+readonly\s+'.$setModifier.'\s+'.$staticWord.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+readonly\s+'.$parenthesizedSet.'.*'.$staticWord.'/i',
         ];
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $line)) {
@@ -708,8 +720,8 @@ final class AsymmetricVisibilityRewriter
     {
         $patterns = [
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?:(?:static|readonly)\s+)*(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?:(?:static|readonly)\s+)*\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
         ];
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $paramsText, $m, PREG_OFFSET_CAPTURE)) {
