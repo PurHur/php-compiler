@@ -79,6 +79,7 @@ class Module extends ModuleAbstract
         if (null !== $rfc7231Dep) {
             $runtime->vmContext->globalConstDeprecated['date_rfc7231'] = $rfc7231Dep;
         }
+        AssertDeprecation::registerConstantDeprecations($runtime->vmContext);
     }
 
     /**

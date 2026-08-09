@@ -22,6 +22,9 @@ final class JitAssertOptions
             );
         }
 
+        // #[\Deprecated(since: '8.3')] — E_DEPRECATED under PROFILE≥8.3 (#29209).
+        AssertDeprecation::emitJitAssertOptions($context);
+
         \PHPCompiler\JIT\Builtin\AssertOptionsRuntime::ensureLinked($context);
 
         $i32 = $context->getTypeFromString('int32');

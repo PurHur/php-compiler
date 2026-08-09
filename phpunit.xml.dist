@@ -114,6 +114,8 @@
             <file>./test/compliance/TriggerErrorUserErrorReflectionVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorHandledVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorHandledJITTest.php</file>
+            <file>./test/compliance/AssertOptionsDeprecatedVMTest.php</file>
+            <file>./test/compliance/AssertOptionsDeprecatedJITTest.php</file>
             <file>./test/compliance/XmlGetCurrentReflectionVMTest.php</file>
             <file>./test/compliance/XmlParserGetOptionReflectionVMTest.php</file>
             <file>./test/compliance/XmlParserFreeReflectionVMTest.php</file>
