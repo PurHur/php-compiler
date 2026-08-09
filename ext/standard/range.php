@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -20,6 +21,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -65,6 +67,9 @@ final class range extends Internal
         $startChar = self::charLetterLiteral($args[0]);
         $endChar = self::charLetterLiteral($args[1]);
         if (null !== $startChar && null !== $endChar) {
+            // php-src php_range_process_input multi-byte warn then first-byte path (#29203 / #28830).
+            self::emitMultiByteCharLiteralWarnings($context, $args[0], $args[1]);
+
             return self::callCharRange($context, $startChar, $endChar, $args);
         }
 
@@ -179,6 +184,48 @@ final class range extends Internal
         }
 
         return $lit[0];
+    }
+
+    /**
+     * Emit Zend 8.3+ single-byte warnings for multi-byte char-bound literals (#29203).
+     */
+    private static function emitMultiByteCharLiteralWarnings(
+        Context $context,
+        JITVariable $startArg,
+        JITVariable $endArg
+    ): void {
+        if (!CompilerVersion::supportsRangeSingleByteStringWarning()) {
+            return;
+        }
+        $startLit = JitStringArg::compileTimeLiteral($startArg);
+        $endLit = JitStringArg::compileTimeLiteral($endArg);
+        if (null !== $startLit && \strlen($startLit) > 1) {
+            self::emitRangeSingleByteWarning($context, 1, 'start');
+        }
+        if (null !== $endLit && \strlen($endLit) > 1) {
+            self::emitRangeSingleByteWarning($context, 2, 'end');
+        }
+    }
+
+    private static function emitRangeSingleByteWarning(Context $context, int $argIndex, string $paramName): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $message = \sprintf(
+            'range(): Argument #%d ($%s) must be a single byte, subsequent bytes are ignored',
+            $argIndex,
+            $paramName
+        );
+        $msg = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msg,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
+        );
     }
 
     private static function emitZeroStepGuard(Context $context, Value $step): void
