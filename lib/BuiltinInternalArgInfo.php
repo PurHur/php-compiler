@@ -854,6 +854,13 @@ final class BuiltinInternalArgInfo
                 1 => 'array',
                 default => null,
             },
+            // ext/sysvsem/sysvsem.stub.php — SysvSemaphore + bool $non_blocking; InternalArgInfo untyped (#28453)
+            'sem_acquire' => match ($index) {
+                0 => 'SysvSemaphore',
+                1 => 'bool',
+                default => null,
+            },
+            'sem_release', 'sem_remove' => 0 === $index ? 'SysvSemaphore' : null,
             // ext/sysvshm/sysvshm.stub.php — SysvSharedMemory + ?int $size; InternalArgInfo int/untyped (#27943, re-#24640)
             'shm_attach' => match ($index) {
                 0 => 'int',
