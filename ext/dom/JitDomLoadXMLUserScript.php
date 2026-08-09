@@ -300,6 +300,11 @@ final class JitDomLoadXMLUserScript
      *
      * Rematerializing on every {@see JitDomDocumentElement::fetch} dropped mutations and
      * left PROP_USER_SCRIPT_INNER_XML empty so saveXML($node) emitted {@code <root></root>}.
+     *
+     * Also wires {@see VmDom::PROP_PARENT_NODE} → document so thin-AOT
+     * {@code $isConnected} / getRootNode / contains parent-slot walks reach the
+     * document (re-#29375 / #29434) — children already parent to the root via
+     * {@see JitDomDocumentElement::syncChildrenFromXmlPublic}.
      */
     private static function materializeAndStoreDocumentElement(
         Context $context,
@@ -330,6 +335,22 @@ final class JitDomLoadXMLUserScript
             $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCUMENT_ELEMENT),
             $elemJit,
             JITVariable::TYPE_OBJECT
+        );
+        // Same DOMElement parentNode layout as appendChild-to-document (#21687 / #29434).
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        $docJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $document
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $docJit,
+            JITVariable::TYPE_VALUE
         );
         // So getElementsByTagName()->item(0) returns the linked firstChild (#26752).
         DomUserScriptPinnedRootLlvm::pin($context, $element);

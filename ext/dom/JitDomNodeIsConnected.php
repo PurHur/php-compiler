@@ -27,11 +27,17 @@ final class JitDomNodeIsConnected
         if (!\PHPCompiler\CompilerVersion::supportsDomNodeIsConnected()) {
             return false;
         }
-        if (!str_starts_with(strtolower($classLc), 'dom')) {
+        if ('isconnected' !== strtolower($propLc)) {
             return false;
         }
+        $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
+        if (str_starts_with($classLc, 'dom')) {
+            return true;
+        }
 
-        return 'isconnected' === strtolower($propLc);
+        // Temps after documentElement / firstChild often lose DOMElement userType (#23251 / #29434).
+        return null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
+            && \in_array($classLc, ['object', 'stdclass', ''], true);
     }
 
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
