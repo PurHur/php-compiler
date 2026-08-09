@@ -34,8 +34,9 @@ final class fgets extends Internal
         }
         $length = null;
         if (2 === $argc) {
+            // php-src file.stub.php: ?int $length = null — null ≡ omit length (#29506).
             $length = VmMath::parseNullableIntBuiltinArgForFrame($frame, 1, 'fgets', 2, 'length');
-            if ($length <= 0) {
+            if (null !== $length && $length <= 0) {
                 throw new \ValueError(self::LENGTH_ERROR);
             }
         }
@@ -60,8 +61,8 @@ final class fgets extends Internal
             $i64
         );
         if (2 === $argc) {
-            $length = JitIntdiv::lowerNullableIntBuiltinArgForCaller($context, $args[1], 'fgets', 2, 'length');
-            JitFgets::emitRuntimeLengthGuard($context, $length);
+            // Null → omit-length sentinel -1 without >0 guard (explicit 0/-1 still ValueError).
+            $length = JitFgets::lowerNullableLengthArg($context, $args[1]);
         } else {
             $length = $i64->constInt(-1, true);
         }
