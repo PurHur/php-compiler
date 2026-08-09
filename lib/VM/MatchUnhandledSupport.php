@@ -11,7 +11,8 @@ use PHPCompiler\ext\standard\VmSerializeFormat;
  * UnhandledMatchError message formatting — php-src zend_match_unhandled_error (#23664).
  *
  * php-src: Zend/zend_execute.c — zend_match_unhandled_error()
- * php-src: Zend/zend_smart_str.c — smart_str_append_scalar / smart_str_append_escaped_truncated
+ * php-src: Zend/zend_smart_str.c — smart_str_append_zval / smart_str_append_scalar
+ *   Enums: EnumName::CaseName (ZEND_ACC_ENUM), not "of type EnumName" (#29248).
  */
 final class MatchUnhandledSupport
 {
@@ -24,15 +25,20 @@ final class MatchUnhandledSupport
     }
 
     /**
-     * Suffix after "Unhandled match case " (scalar form or "of type …").
+     * Suffix after "Unhandled match case " (scalar, Enum::Case, or "of type …").
      */
     public static function formatCaseSuffix(Variable $value): string
     {
         $value = $value->resolveIndirect();
 
-        // Zend: Z_TYPE_P(value) <= IS_STRING → smart_str_append_scalar; else "of type …".
+        // Zend smart_str_append_zval: scalars + enum objects; else "of type …".
         if (ResourceSupport::isVmResource($value)) {
             return 'of type resource';
+        }
+
+        $enumEntry = EnumCaseSupport::enumCaseEntryForVariable($value);
+        if (null !== $enumEntry) {
+            return $enumEntry->enumClass->name.'::'.$enumEntry->caseName;
         }
 
         switch ($value->type) {
@@ -51,6 +57,7 @@ final class MatchUnhandledSupport
             case Variable::TYPE_OBJECT:
                 return 'of type '.$value->toObject()->class->name;
             case Variable::TYPE_ENUM_CASE:
+                // enumCaseEntryForVariable should have handled this; keep a safe label.
                 return 'of type '.$value->toEnumCase()->enumClass->name;
             default:
                 return 'of type unknown type';

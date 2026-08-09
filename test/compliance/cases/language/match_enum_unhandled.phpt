@@ -1,5 +1,5 @@
 --TEST--
-match on enum subject throws UnhandledMatchError with type name (issue #5448)
+match on enum subject throws UnhandledMatchError with Enum::Case (issue #29248, re-#5448)
 --FILE--
 <?php
 enum E: int { case A = 1; case B = 2; }
@@ -10,4 +10,4 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-UnhandledMatchError: Unhandled match case of type E
+UnhandledMatchError: Unhandled match case E::A

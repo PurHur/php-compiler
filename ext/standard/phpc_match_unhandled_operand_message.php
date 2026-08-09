@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\ReflectionBuiltinHelper;
+use PHPCompiler\JIT\MatchUnhandledJitHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\MatchUnhandledSupport;
 use PHPLLVM\Value;
@@ -44,12 +44,8 @@ final class phpc_match_unhandled_operand_message extends Internal
             throw new \LogicException('phpc_match_unhandled_operand_message() requires exactly one argument');
         }
         if (JITVariable::TYPE_OBJECT === $args[0]->type) {
-            $prefix = $context->builder->load(
-                $context->constantStringFromString('Unhandled match case of type ')
-            );
-            $name = ReflectionBuiltinHelper::getClassName($context, $args[0]);
-
-            return JitStringConcat::concat($context, $prefix, $name);
+            // Enums: Enum::Case via smart_str_append_zval; other objects: of type Class (#29248).
+            return MatchUnhandledJitHelper::formatObjectOrEnumCaseMessage($context, $args[0]);
         }
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type
             || 0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)

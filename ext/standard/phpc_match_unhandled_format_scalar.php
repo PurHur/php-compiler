@@ -198,9 +198,11 @@ final class phpc_match_unhandled_format_scalar extends Internal
             $afterObject
         );
         $context->builder->positionAtEnd($objectBlock);
-        $objPrefix = $context->builder->load($context->constantStringFromString('of type '));
-        $className = \PHPCompiler\JIT\ReflectionBuiltinHelper::getClassName($context, $arg);
-        $objectMsg = JitStringConcat::concat($context, $objPrefix, $className);
+        // Enums: Enum::Case; non-enum objects: of type Class (#29248 / smart_str_append_zval).
+        $objectMsg = \PHPCompiler\JIT\MatchUnhandledJitHelper::formatObjectOrEnumCaseSuffix(
+            $context,
+            $arg
+        );
         $objectEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
