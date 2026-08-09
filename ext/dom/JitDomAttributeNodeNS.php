@@ -622,6 +622,9 @@ final class JitDomAttributeNodeNS
             $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, $valueLit);
             if ('id' === $nameLit) {
                 DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
+                JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
+                // Keep setIdAttribute cache in sync when setAttribute runs after a prior
+                // setIdAttribute in the same script (multi-document #29257).
                 $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
                 if (null !== $parsed) {
                     $parsed['id'] = $valueLit;

@@ -2688,6 +2688,21 @@ final class VmDom
         self::applyIdAttributeRegistration($element, $name, $isId);
     }
 
+    /**
+     * NestedJIT/user-script AOT: DomRegistry ID update without PROP_ELEMENT_ID_MAP sync (#29257).
+     */
+    public static function setIdAttributeWithoutIdMapSync(ObjectEntry $element, string $name, bool $isId): void
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+        if (!\array_key_exists($name, $state->attributes)) {
+            DomExceptionConstants::raiseNotFound();
+        }
+        self::applyIdAttributeRegistration($element, $name, $isId, false);
+    }
+
     /** DOMElement::setIdAttributeNS() — namespaced ID map (php-src ext/dom/element.c; #15300). */
     public static function setIdAttributeNS(
         ObjectEntry $element,
@@ -2730,8 +2745,12 @@ final class VmDom
         self::applyIdAttributeRegistration($element, $name, $isId);
     }
 
-    private static function applyIdAttributeRegistration(ObjectEntry $element, string $qName, bool $isId): void
-    {
+    private static function applyIdAttributeRegistration(
+        ObjectEntry $element,
+        string $qName,
+        bool $isId,
+        bool $syncIdMap = true
+    ): void {
         $state = DomRegistry::state($element);
         $document = self::ownerDocumentEntry($element);
         if (null === $document) {
@@ -2744,7 +2763,9 @@ final class VmDom
         if ($isId) {
             if ($state->idAttributeName === $qName) {
                 // Already marked ID on this attr (atype == XML_ATTRIBUTE_ID) — no-op.
-                self::syncElementIdMapProperty($document);
+                if ($syncIdMap) {
+                    self::syncElementIdMapProperty($document);
+                }
 
                 return;
             }
@@ -2758,7 +2779,9 @@ final class VmDom
             self::unregisterElementId($document, $element);
             $state->idAttributeName = null;
         }
-        self::syncElementIdMapProperty($document);
+        if ($syncIdMap) {
+            self::syncElementIdMapProperty($document);
+        }
     }
 
     private static function findAttributeQNameByNsAndLocal(

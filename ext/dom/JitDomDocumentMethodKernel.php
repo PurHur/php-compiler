@@ -873,6 +873,36 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureSetIdAttributeTrueBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::ensureBridge(
+            $context,
+            \PHPCompiler\JIT\Builtin\DomSetIdAttributeRuntime::ABI_TRUE,
+            'dom_element_set_id_attribute_true_user_script',
+            [$objPtr, $strPtr],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomSetIdAttributeJitHelper::setIdTrueArgv',
+            '/ext/dom/DomSetIdAttributeJitHelper.php'
+        );
+    }
+
+    public static function ensureSetIdAttributeFalseBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::ensureBridge(
+            $context,
+            \PHPCompiler\JIT\Builtin\DomSetIdAttributeRuntime::ABI_FALSE,
+            'dom_element_set_id_attribute_false_user_script',
+            [$objPtr, $strPtr],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomSetIdAttributeJitHelper::setIdFalseArgv',
+            '/ext/dom/DomSetIdAttributeJitHelper.php'
+        );
+    }
+
     public static function ensureRemoveChildBridge(Context $context): void
     {
         $objPtr = $context->getTypeFromString('__object__*');
