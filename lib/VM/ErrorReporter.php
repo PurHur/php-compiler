@@ -38,10 +38,10 @@ final class ErrorReporter
     public const E_ALL_WITHOUT_STRICT = 30719;
 
     /**
-     * Zend ≤8.3 / default-profile startup mask: E_ALL & ~E_DEPRECATED & ~E_STRICT (#4842).
+     * Unset-profile / compliance startup mask: E_ALL & ~E_DEPRECATED & ~E_STRICT (#4842, #2055).
      *
-     * Prefer {@see defaultStartupReporting()} — PROFILE≥8.4 uses Zend 8.4's E_ALL (includes
-     * E_DEPRECATED) so file-level compile deprecations are not silent (#26083).
+     * Prefer {@see defaultStartupReporting()} — explicit {@code PHP_COMPILER_PROFILE} uses Zend
+     * {@see eAll()} (includes E_DEPRECATED) so PROFILE=8.2+ matches php.ini (#29195, #26083).
      */
     public const DEFAULT_STARTUP_REPORTING = self::E_ALL_LEGACY & ~self::E_DEPRECATED & ~self::E_STRICT;
 
@@ -63,14 +63,20 @@ final class ErrorReporter
     }
 
     /**
-     * Profile-aware guest default for error_reporting / ErrorReporter (#4842, #26083, #27824).
+     * Profile-aware guest default for error_reporting / ErrorReporter (#4842, #26083, #27824, #29195).
      *
-     * PHP 8.0+ php.ini default is E_ALL (includes E_DEPRECATED). On PROFILE≥8.4, E_ALL is 30719
-     * and equals the startup level. Unset / ≤8.3 profiles keep #4842's 22527 mask so
-     * default-profile compliance stays stable.
+     * PHP 8.0+ php.ini default is E_ALL (includes E_DEPRECATED). Explicit
+     * {@code PHP_COMPILER_PROFILE} uses {@see eAll()} so PROFILE=8.2/8.3 are not silent on
+     * dynamic-property E_DEPRECATED (zend_object_handlers.c). Unset reference harness keeps
+     * #4842's 22527 mask so compliance host {@code -d error_reporting=0} stays quiet (#2055).
      */
     public static function defaultStartupReporting(): int
     {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return self::eAll();
+        }
+        // Stable 8.4.0+ VERSION (no PROFILE): Zend E_ALL without E_STRICT (#26083).
         if (\PHPCompiler\CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
             return self::eAll();
         }

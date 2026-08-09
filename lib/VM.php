@@ -3621,14 +3621,16 @@ class VM {
             $this->raiseUncaughtException($thrown);
         }
         if (!$object->class->allowsDynamicProperties) {
-            $scriptPath = $frame->scriptPath;
-            $this->context->errors->deprecatedDynamicProperty(
-                $object->class->name,
-                $name,
-                '' !== $scriptPath && '-' !== $scriptPath ? $scriptPath : null,
-                $this->context,
-                $frame
-            );
+            if (\PHPCompiler\CompilerVersion::supportsDynamicPropertyCreationDeprecation()) {
+                $scriptPath = $frame->scriptPath;
+                $this->context->errors->deprecatedDynamicProperty(
+                    $object->class->name,
+                    $name,
+                    '' !== $scriptPath && '-' !== $scriptPath ? $scriptPath : null,
+                    $this->context,
+                    $frame
+                );
+            }
         }
 
         return $object->allocateProperty($name);

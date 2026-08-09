@@ -147,7 +147,8 @@ if (!function_exists('php_compiler_cli_sync_host_error_reporting')) {
      * Inherit host {@code php -d error_reporting=...} into the guest VM when argv has no override (#19848).
      *
      * Guest {@see \PHPCompiler\VM\ErrorReporter::defaultStartupReporting()} clears
-     * {@code E_DEPRECATED} on ≤8.3 / unset profiles (#4842); PROFILE≥8.4 matches Zend 8.4 E_ALL.
+     * {@code E_DEPRECATED} on unset profiles (#4842); explicit {@code PHP_COMPILER_PROFILE}
+     * matches Zend {@see \PHPCompiler\VM\ErrorReporter::eAll()} (#29195, #26083).
      * Compliance uses host {@code -d error_reporting=0} (#2055) and must keep that guest default —
      * only sync when the host level enables deprecations (e.g. {@code E_ALL}).
      *
