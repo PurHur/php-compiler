@@ -231,19 +231,7 @@ final class BuiltinClasses
     private static function registerEnums(Context $ctx): void
     {
         self::registerUnitEnum($ctx, 'Uri\\UriComparisonMode', 'uri\\uricomparisonmode', ['IncludeFragment', 'ExcludeFragment']);
-        self::registerUnitEnum($ctx, 'Uri\\Rfc3986\\UriType', 'uri\\rfc3986\\uritype', [
-            'AbsolutePathReference',
-            'RelativePathReference',
-            'NetworkPathReference',
-            'Uri',
-        ]);
-        self::registerUnitEnum($ctx, 'Uri\\Rfc3986\\UriHostType', 'uri\\rfc3986\\urihosttype', [
-            'IPv4',
-            'IPv6',
-            'IPvFuture',
-            'RegisteredName',
-        ]);
-        // UrlHostType is absent from php-src PHP-8.5 php_uri.stub.php (#28199); Rfc3986 UriHostType tracked in #28198.
+        // UriType / UriHostType absent from php-src PHP-8.5 php_uri.stub.php (#28198)
         self::registerUnitEnum($ctx, 'Uri\\WhatWg\\UrlValidationErrorType', VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR_TYPE, [
             'DomainToAscii',
             'DomainToUnicode',
@@ -353,8 +341,7 @@ final class BuiltinClasses
             'withquery' => new Rfc3986UriWithQuery(),
             'withfragment' => new Rfc3986UriWithFragment(),
             'withuserinfo' => new Rfc3986UriWithUserInfo(),
-            'geturitype' => new Rfc3986UriGetUriType(),
-            'gethosttype' => new Rfc3986UriGetHostType(),
+            // getUriType / getHostType absent from php-src PHP-8.5 php_uri.stub.php (#28198)
             'resolve' => new Rfc3986UriResolve(),
             'equals' => new Rfc3986UriEquals(),
             '__serialize' => new Rfc3986UriSerialize(),

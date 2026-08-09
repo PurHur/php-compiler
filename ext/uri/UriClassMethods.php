@@ -613,45 +613,6 @@ final class Rfc3986UriWithUserInfo extends Rfc3986UriGetter
     }
 }
 
-final class Rfc3986UriGetUriType extends Rfc3986UriGetter
-{
-    public function __construct()
-    {
-        parent::__construct('getUriType');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\Rfc3986\\Uri::getUriType() requires VM context');
-        $case = VmUri::rfc3986UriType($this->receiverState($frame));
-        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx, $case): void {
-            VmUri::writeEnumCase($ctx, VmUri::CLASS_RFC3986_URI_TYPE, $case, $ret);
-        });
-    }
-}
-
-final class Rfc3986UriGetHostType extends Rfc3986UriGetter
-{
-    public function __construct()
-    {
-        parent::__construct('getHostType');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\Rfc3986\\Uri::getHostType() requires VM context');
-        $host = $this->receiverState($frame)['host'] ?? null;
-        $case = VmUri::rfc3986HostType(\is_string($host) || null === $host ? $host : null);
-        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx, $case): void {
-            if (null === $case) {
-                $ret->null();
-            } else {
-                VmUri::writeEnumCase($ctx, VmUri::CLASS_RFC3986_URI_HOST_TYPE, $case, $ret);
-            }
-        });
-    }
-}
-
 final class Rfc3986UriResolve extends Rfc3986UriGetter
 {
     public function __construct()
