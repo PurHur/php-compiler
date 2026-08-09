@@ -101,9 +101,15 @@ final class JitDomRemoveChild
     {
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
+        $elementClassId = $objectType->lookup('DOMElement');
         foreach ([VmDom::PROP_PARENT_NODE, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PREVIOUS_SIBLING] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
                 $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+            // createElement / loadXML / LiveSlots store parent+siblings on DOMElement
+            // (#27476 / #28672 / #29434) — nulling only DOMNode leaves isConnected true.
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
         $nullSlot = JitValueBox::alloc($context);
@@ -118,6 +124,11 @@ final class JitDomRemoveChild
         foreach ([VmDom::PROP_PARENT_NODE, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PREVIOUS_SIBLING] as $prop) {
             $objectType->propertyStore(
                 $objectType->propertySlotFor($node, 'DOMNode', $prop),
+                $nullVar,
+                JITVariable::TYPE_VALUE
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($node, 'DOMElement', $prop),
                 $nullVar,
                 JITVariable::TYPE_VALUE
             );
