@@ -11,11 +11,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for internal modf via ModfJitHelper PHP (#15200, #22519).
+ * JIT/AOT link for internal modf via ModfJitHelper PHP (#15200, #22519, #29244).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Lcg #22495).
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Lcg #22495 / Frexp #29156).
  * Userland modf() is not registered (#25359); keep this for NestedJIT helpers.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * NestedJIT-safe peel lives in {@see \PHPCompiler\ext\standard\ModfJitHelper} (no VmMath::modf).
  */
 final class MathModf
 {
