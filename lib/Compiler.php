@@ -8568,6 +8568,22 @@ class Compiler {
                             )
                         );
                     }
+                    // php-src zend_add_member_modifier — final + private read visibility (#29425).
+                    // private(set) only sets asymmetric set-vis, not FLAG_PRIVATE on read vis.
+                    if (
+                        $explicitFinal
+                        && 0 !== (MethodVisibility::mask((int) $child->visibility) & CfgFunc::FLAG_PRIVATE)
+                    ) {
+                        $sourceFile = $child->getFile();
+                        if ('' === $sourceFile) {
+                            $sourceFile = 'unknown';
+                        }
+                        throw new CompileFatal(
+                            $sourceFile,
+                            max(1, $child->getLine()),
+                            SourcePreprocessor\PropertyHooks::FINAL_PRIVATE_PROPERTY_COMPILE_ERROR
+                        );
+                    }
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeTargetValidator::assertEntriesForTarget(
                         $declare->attributeEntries,

@@ -1356,6 +1356,59 @@ PHP;
         }
     }
 
+    /** @covers issue #29425 — php-src zend_add_member_modifier final+private hooked property */
+    public function testRejectsFinalPrivateHookedProperty(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+class C {
+    final private string $x {
+        get => 'g';
+        set {}
+    }
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::FINAL_PRIVATE_PROPERTY_COMPILE_ERROR);
+            (new PropertyHooks())->process($src, 'final_private_prop.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #29425 — final + private(set) remains legal (not private read vis) */
+    public function testAllowsFinalPublicPrivateSetHookedProperty(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+class C {
+    final public private(set) string $x {
+        get => $this->x;
+        set {}
+    }
+}
+PHP;
+            [, $registry] = (new PropertyHooks())->process($src, 'final_private_set_prop.php');
+            self::assertTrue($registry['c']['x']['finalProperty'] ?? false);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #23069 — prior plain `final` must not mark following hooked property */
     public function testFinalPlainSiblingDoesNotBleedOntoHookedProperty(): void
     {
