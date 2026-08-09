@@ -44,9 +44,15 @@ final class MagicMethodDispatch
         );
     }
 
+    public static function emitMagicGetIndirectModifyNotice(Context $context, string $className, string $propertyName): void
+    {
+        MagicMethodLlvm::emitMagicGetIndirectModifyNotice($context, $className, $propertyName);
+    }
+
+    /** @deprecated Use {@see emitMagicGetIndirectModifyNotice}. */
     public static function emitMagicGetIndirectModifyError(Context $context, string $className, string $propertyName): void
     {
-        MagicMethodLlvm::emitMagicGetIndirectModifyError($context, $className, $propertyName);
+        self::emitMagicGetIndirectModifyNotice($context, $className, $propertyName);
     }
 
     public static function tryEmitMagicGet(

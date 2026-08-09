@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
-use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PropertyVisibility;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\MagicMethodJitHelper;
 use PHPCfg\Operand;
 use PHPLLVM\Value;
@@ -124,16 +125,37 @@ final class MagicMethodLlvm
         );
     }
 
+    /**
+     * Zend E_NOTICE for []= / dim-write on a non-object __get temporary (#29231, re-#4673).
+     * php-src: Zend/zend_object_handlers.c — does not throw; write continues on the temp.
+     */
+    public static function emitMagicGetIndirectModifyNotice(Context $context, string $className, string $propertyName): void
+    {
+        StringTriggerError::ensureLinked($context);
+        $message = sprintf(
+            'Indirect modification of overloaded property %s::$%s has no effect',
+            $className,
+            $propertyName
+        );
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(ErrorReporter::E_NOTICE, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
+    /** @deprecated Use {@see emitMagicGetIndirectModifyNotice}; kept for call-site rename. */
     public static function emitMagicGetIndirectModifyError(Context $context, string $className, string $propertyName): void
     {
-        ErrorRaise::emitRaise(
-            $context,
-            sprintf(
-                'Indirect modification of overloaded property %s::$%s has no effect',
-                $className,
-                $propertyName
-            )
-        );
+        self::emitMagicGetIndirectModifyNotice($context, $className, $propertyName);
     }
 
     /**

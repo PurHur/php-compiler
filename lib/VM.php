@@ -3435,12 +3435,15 @@ class VM {
     }
 
     /**
-     * Reject []= / dim-write on a non-object value produced by __get (#4673, #20005).
+     * Notice + continue for []= / dim-write on a non-object value from __get (#29231, re-#4673).
      *
      * php-src zend_object_handlers.c: arrays returned by value from __get cannot be
-     * written back (Indirect modification … has no effect). Objects from __get —
-     * including SimpleXMLElement / ArrayAccess — keep write_dimension on the live
-     * instance, so $sxe->child["attr"] = … must reach offsetSet (#20005, sxe_prop_dim_write).
+     * written back — Zend emits E_NOTICE ("Indirect modification … has no effect") and
+     * continues (write hits the temporary only). Objects from __get — including
+     * SimpleXMLElement / ArrayAccess — keep write_dimension on the live instance, so
+     * $sxe->child["attr"] = … must reach offsetSet (#20005, sxe_prop_dim_write).
+     *
+     * Hooked-property Indirect modification Error paths are separate (#28590 / #29215).
      */
     protected function rejectMagicGetIndirectModify(Variable $containerSlot, bool $forWrite, Frame $frame): ?Frame
     {
@@ -3456,12 +3459,16 @@ class VM {
         }
         $class = $containerSlot->magicGetOverloadedTarget->class->name;
         $prop = $containerSlot->magicGetOverloadedName;
-
-        return $this->dispatchVmError(sprintf(
-            'Indirect modification of overloaded property %s::$%s has no effect',
+        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $this->context->errors->indirectModificationOfOverloadedProperty(
             $class,
-            $prop
-        ), $frame);
+            $prop,
+            $this->context,
+            $frame,
+            $scriptFile
+        );
+
+        return null;
     }
 
     /**
