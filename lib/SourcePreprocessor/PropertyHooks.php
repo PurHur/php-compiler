@@ -30,6 +30,17 @@ final class PropertyHooks
     public const ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
 
     /**
+     * php-src: Zend/zend_inheritance.c zend_verify_hooked_property — #29426 / php-src#19845.
+     *
+     * Virtual hooked property with asymmetric set-visibility must declare both get and set hooks;
+     * get-only → "Read-only …", set-only → "Write-only …".
+     */
+    public const READONLY_VIRTUAL_ASYMMETRIC_VISIBILITY_COMPILE_ERROR = 'Read-only virtual property %s::$%s must not specify asymmetric visibility';
+
+    /** @see READONLY_VIRTUAL_ASYMMETRIC_VISIBILITY_COMPILE_ERROR */
+    public const WRITEONLY_VIRTUAL_ASYMMETRIC_VISIBILITY_COMPILE_ERROR = 'Write-only virtual property %s::$%s must not specify asymmetric visibility';
+
+    /**
      * php-src: Zend/zend_compile.c zend_modifier_token_to_flag(ZEND_MODIFIER_TARGET_PROPERTY_HOOK) (#29388).
      *
      * Visibility and asymmetric-set tokens are illegal on property hooks; only {@code final} is allowed.
@@ -158,6 +169,16 @@ final class PropertyHooks
     public static function virtualHookedDefaultCompileError(string $className, string $propName): string
     {
         return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
+    }
+
+    public static function readonlyVirtualAsymmetricVisibilityCompileError(string $className, string $propName): string
+    {
+        return sprintf(self::READONLY_VIRTUAL_ASYMMETRIC_VISIBILITY_COMPILE_ERROR, $className, $propName);
+    }
+
+    public static function writeonlyVirtualAsymmetricVisibilityCompileError(string $className, string $propName): string
+    {
+        return sprintf(self::WRITEONLY_VIRTUAL_ASYMMETRIC_VISIBILITY_COMPILE_ERROR, $className, $propName);
     }
 
     public static function backedGetByRefWithSetCompileError(string $className, string $propName): string
@@ -1463,6 +1484,15 @@ final class PropertyHooks
                 ) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
+                $this->rejectAsymmetricVisibilityOnPartialVirtual(
+                    $ownDeclHead,
+                    $lcClass,
+                    $prop,
+                    $classDisplay,
+                    $filename,
+                    $fullCode,
+                    $bodyOffsetInFile + $declStart
+                );
                 $this->rejectBackedGetByRefWithSet(
                     $lcClass,
                     $prop,
@@ -2729,6 +2759,9 @@ final class PropertyHooks
      * (`set =>`, `set { }`, abstract `set;`, …) unless the block is get-only with an implemented get hook
      * (`get =>`, `get { }`) — PHP 8.4 (#13983, zend_property_hooks.c).
      *
+     * Get-only *virtual* properties with decl-site aviz are rejected separately
+     * ({@see rejectAsymmetricVisibilityOnPartialVirtual}, #29426).
+     *
      * In-block {@code private set;} / {@code private(set);} are illegal on hooks (#29388).
      */
     private function rejectAsymmetricDeclSetWithoutSetHook(
@@ -2757,6 +2790,45 @@ final class PropertyHooks
             $filename,
             self::lineAtOffset($fullCode, $declOffsetInFile),
             self::ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE
+        );
+    }
+
+    /**
+     * php-src: Zend/zend_inheritance.c zend_verify_hooked_property (#29426).
+     *
+     * {@code ZEND_ACC_VIRTUAL} + {@code ZEND_ACC_PPP_SET_MASK} requires both get and set hooks.
+     */
+    private function rejectAsymmetricVisibilityOnPartialVirtual(
+        string $declHead,
+        string $lcClass,
+        string $prop,
+        string $classDisplayName,
+        string $filename,
+        string $fullCode,
+        int $declOffsetInFile
+    ): void {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            return;
+        }
+        if (!$this->declHeadHasAsymmetricSetVisibility($declHead)) {
+            return;
+        }
+        $propMeta = $this->registry[$lcClass][$prop] ?? [];
+        if (empty($propMeta['virtual'])) {
+            return;
+        }
+        $hasGet = isset($propMeta['get']) || !empty($propMeta['requiresGet']);
+        $hasSet = isset($propMeta['set']) || !empty($propMeta['requiresSet']);
+        if ($hasGet && $hasSet) {
+            return;
+        }
+        $message = !$hasGet
+            ? sprintf(self::WRITEONLY_VIRTUAL_ASYMMETRIC_VISIBILITY_COMPILE_ERROR, $classDisplayName, $prop)
+            : sprintf(self::READONLY_VIRTUAL_ASYMMETRIC_VISIBILITY_COMPILE_ERROR, $classDisplayName, $prop);
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $declOffsetInFile),
+            $message
         );
     }
 

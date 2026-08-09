@@ -484,9 +484,35 @@ PHP;
         (new PropertyHooks())->process($src, 'private_set_semi.php');
     }
 
-    /** @covers issue #13983 — `private(set)` decl + get-only hook compiles on PHP 8.4 */
-    public function testLowersAsymmetricDeclSetWithGetOnlyHook(): void
+    /** @covers issue #29426 — get-only virtual + decl-site aviz is Zend Fatal (supersedes #13983 allow) */
+    public function testRejectsAsymmetricDeclSetOnGetOnlyVirtual(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
+        foreach (['private', 'protected'] as $setVis) {
+            $src = <<<PHP
+<?php
+class C {
+    public {$setVis}(set) string \$x {
+        get => 'g';
+    }
+}
+PHP;
+            try {
+                (new PropertyHooks())->process($src, "aviz_get_only_{$setVis}.php");
+                self::fail("Expected CompileFatal for public {$setVis}(set) get-only virtual");
+            } catch (CompileFatal $e) {
+                self::assertSame(
+                    PropertyHooks::readonlyVirtualAsymmetricVisibilityCompileError('C', 'x'),
+                    $e->getMessage()
+                );
+            }
+        }
+    }
+
+    /** @covers issue #29426 — parenthesized aviz + get-only virtual also Fatal */
+    public function testRejectsParenthesizedAsymmetricDeclSetOnGetOnlyVirtual(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -495,13 +521,31 @@ class C {
     }
 }
 PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(
+            PropertyHooks::readonlyVirtualAsymmetricVisibilityCompileError('C', 'x')
+        );
+        (new PropertyHooks())->process($src, 'aviz_paren_get_only.php');
+    }
+
+    /** @covers issue #29426 — backed get-only (uses $this->prop) keeps aviz legal */
+    public function testAllowsAsymmetricDeclSetOnBackedGetOnly(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    public private(set) string $x {
+        get => $this->x;
+    }
+}
+PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
-        self::assertStringContainsString('public (private(set)) string $x;', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertArrayHasKey('get', $registry['c']['x'] ?? []);
         self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
-        self::assertTrue($registry['c']['x']['virtual'] ?? false);
+        self::assertFalse($registry['c']['x']['virtual'] ?? false);
     }
 
     /** @covers issue #12203 — `private(set)` decl + get; obligation without set hook still rejected */
