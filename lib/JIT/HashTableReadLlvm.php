@@ -286,8 +286,26 @@ final class HashTableReadLlvm
             $falseBlock
         );
         $context->builder->positionAtEnd($objectBlock);
+        // Boxed object: resource handle warn+cast (#29550); else Illegal offset.
+        $keyObj = $context->builder->call($context->lookupFunction('__value__readObject'), $valPtr);
+        $handle = $context->builder->ptrToInt($keyObj, $context->getTypeFromString('int64'));
+        $isRes = \PHPCompiler\ext\standard\JitIsResource::invoke($context, $handle);
+        $resOk = $fn->appendBasicBlock('ht_isset_vk_obj_res');
+        $objIllegal = $fn->appendBasicBlock('ht_isset_vk_obj_illegal');
+        $context->builder->branchIf($isRes, $resOk, $objIllegal);
+        $context->builder->positionAtEnd($resOk);
+        HashTableResourceKeyLlvm::emitWarning($context, $handle);
+        $resIndex = $context->builder->truncOrBitCast($handle, $sizeT);
+        $objResResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $resIndex
+        );
+        $objResPred = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($objIllegal);
         HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
-        $objResult = $context->getTypeFromString('int1')->constInt(0, false);
+        $objIllegalResult = $i1->constInt(0, false);
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($falseBlock);
         $context->builder->branch($merge);
@@ -296,7 +314,8 @@ final class HashTableReadLlvm
         $phi->addIncoming($strResult, $stringBlock);
         $phi->addIncoming($longResult, $longBlock);
         $phi->addIncoming($floatResult, $floatPred);
-        $phi->addIncoming($objResult, $objectBlock);
+        $phi->addIncoming($objResResult, $objResPred);
+        $phi->addIncoming($objIllegalResult, $objIllegal);
         $phi->addIncoming($i1->constInt(0, false), $falseBlock);
 
         return $phi;
@@ -553,9 +572,30 @@ final class HashTableReadLlvm
             );
         }
         if (Variable::TYPE_OBJECT === $dim->type) {
-            HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
+            // Resource handles typed as object: warn+cast (#29550); other objects TypeError.
+            $i1 = $context->getTypeFromString('int1');
+            $slot = BasicBlockHelper::entryAlloca($context, $i1);
+            $context->builder->store($i1->constInt(0, false), $slot);
+            $done = BasicBlockHelper::append($context, 'ht_isset_obj_done');
+            HashTableResourceKeyLlvm::emitObjectDimOrIllegal(
+                $context,
+                $dim,
+                'Illegal offset type in isset or empty',
+                static function (Value $index) use ($context, $ht, $slot, $done): void {
+                    $exists = $context->builder->call(
+                        $context->lookupFunction('__hashtable__offsetIsSet'),
+                        $ht,
+                        $index
+                    );
+                    $context->builder->store($exists, $slot);
+                    $context->builder->branch($done);
+                }
+            );
+            // illegal path falls through here
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
 
-            return $context->getTypeFromString('int1')->constInt(0, false);
+            return $context->builder->load($slot);
         }
         if (Variable::TYPE_VALUE === $dim->type) {
             return self::offsetIsSetValueBoxKey($context, $ht, $dim);

@@ -1074,15 +1074,11 @@ final class Variable {
                 }
                 if (self::TYPE_OBJECT === $dim->type) {
                     if ($forWrite) {
-                        HashTableHelper::emitIllegalOffsetTypeForKey($this->context, $dim);
-                        $this->context->builder->call($this->context->lookupFunction('abort'));
-                        $this->context->builder->clearInsertionPosition();
-
-                        return new Variable(
+                        // Resource array offsets warn+cast (#29550); other objects TypeError.
+                        return HashTableHelper::prepareResourceOrIllegalObjectKeyWrite(
                             $this->context,
-                            self::TYPE_NULL,
-                            self::KIND_VALUE,
-                            $this->context->getTypeFromString('__value__*')->constNull()
+                            $ht,
+                            $dim
                         );
                     }
                     $keyObj = $this->context->helper->loadValue($dim);
