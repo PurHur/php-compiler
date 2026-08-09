@@ -34,6 +34,8 @@ final class VmSem
 
         $entry = new ClassEntry('SysvSemaphore');
         $entry->isInternal = true;
+        // php-src `final class SysvSemaphore` (ext/sysvsem/sysvsem.stub.php; #28422).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
