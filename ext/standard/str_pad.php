@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\PadTypeJit;
 use PHPCompiler\JIT\Builtin\StringStrPad;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -45,9 +44,10 @@ final class str_pad extends Internal
             $padString = self::vmStringArg($frame, 2, 'pad_string');
         }
         // Compiler convention: 0 = STR_PAD_LEFT, 1 = STR_PAD_RIGHT (default).
+        // Explicit null uses Z_PARAM_LONG soft-null → 0 (STR_PAD_LEFT), not the omitted default (#29353).
         $padType = 1;
         if (isset($frame->calledArgs[3])) {
-            $padType = VmString::resolveStrPadTypeArg($frame->calledArgs[3]);
+            $padType = VmString::resolveStrPadTypeArg($frame->calledArgs[3], $frame);
         }
         $result = VmString::strPad($input, $padLength, $padString, $padType);
         BuiltinExecute::writeReturn(
@@ -77,7 +77,8 @@ final class str_pad extends Internal
             if (null !== $padTypeLiteral) {
                 $padType = $context->getTypeFromString('int64')->constInt($padTypeLiteral, false);
             } else {
-                $padType = JitLongArg::lower($context, $args[3], 'str_pad() pad type');
+                // Z_PARAM_LONG soft-null DEP+coerce (peer mb_str_pad / #29353).
+                $padType = JitIntdiv::lowerIntBuiltinArg($context, $args[3], 'str_pad', 4, 'pad_type');
             }
         } else {
             $padType = $context->getTypeFromString('int64')->constInt(1, false);
