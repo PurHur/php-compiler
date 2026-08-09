@@ -380,6 +380,9 @@ final class BuiltinInternalArgInfo
             // ext/sysvshm/sysvshm.stub.php — InternalArgInfo return int / empty; Zend SysvSharedMemory|false / mixed (#27943)
             'shm_attach' => 'SysvSharedMemory|false',
             'shm_get_var' => 'mixed',
+            // ext/shmop/shmop.stub.php — InternalArgInfo return int / empty; Zend Shmop|false / void (#28451)
+            'shmop_open' => 'Shmop|false',
+            'shmop_close' => 'void',
             // ext/sockets/sockets.stub.php — InternalArgInfo resource / empty; Zend Socket|false / void (#27854)
             'socket_create', 'socket_create_listen', 'socket_accept', 'socket_import_stream' => 'Socket|false',
             'socket_close' => 'void',
@@ -827,6 +830,8 @@ final class BuiltinInternalArgInfo
                 default => null,
             },
             'curl_share_close', 'curl_share_errno' => 0 === $index ? 'CurlShareHandle' : null,
+            // ext/shmop/shmop.stub.php — Shmop $shmop; InternalArgInfo still int (legacy shmid) (#28451)
+            'shmop_read', 'shmop_write', 'shmop_size', 'shmop_delete', 'shmop_close' => 0 === $index ? 'Shmop' : null,
             // ext/sysvshm/sysvshm.stub.php — SysvSharedMemory + ?int $size; InternalArgInfo int/untyped (#27943, re-#24640)
             'shm_attach' => match ($index) {
                 0 => 'int',
