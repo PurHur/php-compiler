@@ -526,6 +526,8 @@ final class HashTable {
      * Float→int: callers emit E_DEPRECATED on precision loss for read/isset/unset (#27948)
      * and INF/NAN (#27926). Writes use {@see normalizeIndexKeyForWrite} (#19730).
      *
+     * Resources warn and cast to their list id (#29550, zend_hash.c / zend_execute.c).
+     *
      * Under PROFILE≥8.5, null→"" also emits {@see NULL_ARRAY_OFFSET_DEPRECATED_MESSAGE} unless
      * {@param $emitNullOffsetDeprecation} is false (array_key_exists uses a distinct message; #26276).
      */
@@ -537,6 +539,10 @@ final class HashTable {
     ): Variable {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
+        }
+        $resourceKey = ResourceArrayOffsetSupport::tryCoerceToIntKey($index, $frame);
+        if (null !== $resourceKey) {
+            return $resourceKey;
         }
         EnumCaseSupport::rejectIllegalArrayOffset($index, $illegalOffsetMessage);
         if (Variable::TYPE_NULL === $index->type) {

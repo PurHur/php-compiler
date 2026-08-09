@@ -463,6 +463,10 @@ final class EnumCaseSupport
     public static function rejectIllegalArrayOffset(Variable $index, string $message = 'Illegal offset type'): void
     {
         $index = $index->resolveIndirect();
+        // Resources warn+cast in HashTable::normalizeIndexKey (#29550, zend_hash.c).
+        if (ResourceArrayOffsetSupport::isResourceArrayOffset($index)) {
+            return;
+        }
         if (Variable::TYPE_ENUM_CASE === $index->type
             || Variable::TYPE_OBJECT === $index->type
             || Variable::TYPE_ARRAY === $index->type) {

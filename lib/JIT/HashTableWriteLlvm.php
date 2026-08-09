@@ -757,13 +757,31 @@ final class HashTableWriteLlvm
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($afterFloat);
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
-        );
+        $objectBlock = $fn->appendBasicBlock('ht_unset_vk_obj');
         $afterObject = $fn->appendBasicBlock('ht_unset_vk_after_obj');
-        $context->builder->branchIf($isObject, $illegalBlock, $afterObject);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_OBJECT, false)
+            ),
+            $objectBlock,
+            $afterObject
+        );
+        $context->builder->positionAtEnd($objectBlock);
+        $keyObj = $context->builder->call($context->lookupFunction('__value__readObject'), $valPtr);
+        $handle = $context->builder->ptrToInt($keyObj, $context->getTypeFromString('int64'));
+        $isRes = \PHPCompiler\ext\standard\JitIsResource::invoke($context, $handle);
+        $resOk = $fn->appendBasicBlock('ht_unset_vk_obj_res');
+        $context->builder->branchIf($isRes, $resOk, $illegalBlock);
+        $context->builder->positionAtEnd($resOk);
+        HashTableResourceKeyLlvm::emitWarning($context, $handle);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetLongAt'),
+            $ht,
+            $context->builder->truncOrBitCast($handle, $context->getTypeFromString('size_t'))
+        );
+        $context->builder->branch($done);
         $context->builder->positionAtEnd($afterObject);
         $isEnumCase = $context->builder->icmp(
             Builder::INT_EQ,
@@ -831,7 +849,22 @@ final class HashTableWriteLlvm
             return;
         }
         if (Variable::TYPE_OBJECT === $dim->type) {
-            HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in unset');
+            $done = BasicBlockHelper::append($context, 'ht_unset_obj_done');
+            HashTableResourceKeyLlvm::emitObjectDimOrIllegal(
+                $context,
+                $dim,
+                'Illegal offset type in unset',
+                static function (Value $index) use ($context, $ht, $done): void {
+                    $context->builder->call(
+                        $context->lookupFunction('__hashtable__unsetLongAt'),
+                        $ht,
+                        $index
+                    );
+                    $context->builder->branch($done);
+                }
+            );
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
 
             return;
         }
@@ -931,10 +964,26 @@ final class HashTableWriteLlvm
         // Keyed writes invalidate packed compile-time string tracking (#27181).
         $array->compileTimeArray = null;
         self::trackCompileTimeAssoc($array, $key, $element);
-        if (Variable::TYPE_OBJECT === $key->type
-            || Variable::TYPE_HASHTABLE === $key->type) {
-            // Array-literal enum/object keys: typed TypeError under PROFILE≥8.3 (#28628).
+        if (Variable::TYPE_HASHTABLE === $key->type) {
+            // Array-literal array keys: typed TypeError under PROFILE≥8.3 (#28628).
             HashTableHelper::emitIllegalOffsetTypeForKey($context, $key);
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $key->type) {
+            // Resource warn+cast (#29550); other objects TypeError (#28628).
+            $done = BasicBlockHelper::append($context, 'ht_add_obj_key_done');
+            HashTableResourceKeyLlvm::emitObjectDimOrIllegal(
+                $context,
+                $key,
+                'Illegal offset type',
+                static function (Value $index) use ($context, $ht, $element, $done): void {
+                    self::setAtIndex($context, $ht, $index, $element);
+                    $context->builder->branch($done);
+                }
+            );
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
 
             return;
         }
@@ -1119,17 +1168,33 @@ final class HashTableWriteLlvm
         self::setAtStringKey($context, $ht, $emptyKey, $element);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($afterNull);
-        $illegalBlock = $fn->appendBasicBlock('ht_set_vk_illegal');
+        $objectBlock = $fn->appendBasicBlock('ht_set_vk_obj');
         $afterObject = $fn->appendBasicBlock('ht_set_vk_after_obj');
+        $illegalBlock = $fn->appendBasicBlock('ht_set_vk_illegal');
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
                 $kind,
                 $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
             ),
-            $illegalBlock,
+            $objectBlock,
             $afterObject
         );
+        $context->builder->positionAtEnd($objectBlock);
+        // Boxed object key: resource handle warn+cast (#29550); else Illegal offset.
+        $keyObj = $context->builder->call($context->lookupFunction('__value__readObject'), $valPtr);
+        $handle = $context->builder->ptrToInt($keyObj, $context->getTypeFromString('int64'));
+        $isRes = \PHPCompiler\ext\standard\JitIsResource::invoke($context, $handle);
+        $resOk = $fn->appendBasicBlock('ht_set_vk_obj_res');
+        $context->builder->branchIf($isRes, $resOk, $illegalBlock);
+        $context->builder->positionAtEnd($resOk);
+        HashTableResourceKeyLlvm::emitWarning($context, $handle);
+        $resIndex = $context->builder->truncOrBitCast(
+            $handle,
+            $context->getTypeFromString('size_t')
+        );
+        self::setAtIndex($context, $ht, $resIndex, $element);
+        $context->builder->branch($done);
         $context->builder->positionAtEnd($afterObject);
         $isEnumCase = $context->builder->icmp(
             Builder::INT_EQ,
@@ -1878,6 +1943,48 @@ final class HashTableWriteLlvm
         );
         $var->writableHt = $ht;
         $var->writableIndex = $index;
+
+        return $var;
+    }
+
+    /**
+     * TYPE_OBJECT dim write: resource → index lvalue; else Illegal offset TypeError (#29550).
+     */
+    public static function prepareResourceOrIllegalObjectKeyWrite(
+        Context $context,
+        Value $ht,
+        Variable $dim
+    ): Variable {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $indexSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('size_t')
+        );
+        $done = BasicBlockHelper::append($context, 'ht_obj_key_write_done');
+        HashTableResourceKeyLlvm::emitObjectDimOrIllegal(
+            $context,
+            $dim,
+            'Illegal offset type',
+            static function (Value $index) use ($context, $indexSlot, $done): void {
+                $context->builder->store($index, $indexSlot);
+                $context->builder->branch($done);
+            }
+        );
+        // Illegal path: still give a dummy index so the CFG is complete after abort helpers.
+        $context->builder->store(
+            $context->getTypeFromString('size_t')->constInt(0, false),
+            $indexSlot
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $var->writableHt = $ht;
+        $var->writableIndex = $context->builder->load($indexSlot);
 
         return $var;
     }

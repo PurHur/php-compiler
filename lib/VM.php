@@ -8852,9 +8852,9 @@ restart:
                             $this->resolveOutgoingCallArgValue($frame, $op->arg2)
                         );
                         // Array-literal keys share assignment's typed TypeError (#28628 / zend_illegal_container_offset).
-                        VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
+                        // Resource keys warn+cast (#29550); float precision via normalizeIndexKeyForWrite.
+                        $key = VM\HashTable::normalizeIndexKeyForWrite($key, $this->context, $frame);
                         if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                            VM\HashTable::warnFloatKeyWriteIfNeeded($key, $this->context, $frame);
                             $ht->updateIndex(
                                 $key->is(Variable::TYPE_FLOAT)
                                     ? \PHPCompiler\ext\standard\VmMath::floatToZendLong($key->toFloat())
@@ -8863,10 +8863,6 @@ restart:
                             );
                         } elseif ($key->is(Variable::TYPE_STRING)) {
                             $ht->update($key->toString(), $value);
-                        } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
-                            $ht->updateIndex($key->toBool() ? 1 : 0, $value);
-                        } elseif ($key->is(Variable::TYPE_NULL)) {
-                            $ht->update('', $value);
                         } else {
                             throw new \TypeError(VM\EnumCaseSupport::illegalArrayOffsetMessage($key));
                         }
@@ -21296,10 +21292,10 @@ restart:
                 $key = $this->resolveOutgoingCallArgValue($frame, $op->arg3)->resolveIndirect();
                 $value = $this->resolveOutgoingCallArgValue($frame, $op->arg2);
                 // Class-body array defaults: same typed offset TypeError as runtime literals (#28628).
-                VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
+                // Resource keys warn+cast (#29550).
+                $key = VM\HashTable::normalizeIndexKeyForWrite($key, $this->context, $frame);
                 $storeIndirect = $value->isIndirect();
                 if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                    VM\HashTable::warnFloatKeyWriteIfNeeded($key, $this->context, $frame);
                     $intKey = $key->is(Variable::TYPE_FLOAT)
                         ? \PHPCompiler\ext\standard\VmMath::floatToZendLong($key->toFloat())
                         : $key->toInt();
@@ -21310,15 +21306,6 @@ restart:
                     $storeIndirect
                         ? $ht->updateIndirect($key->toString(), $value)
                         : $ht->update($key->toString(), $value);
-                } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
-                    $index = $key->toBool() ? 1 : 0;
-                    $storeIndirect
-                        ? $ht->updateIndirectIndex($index, $value)
-                        : $ht->updateIndex($index, $value);
-                } elseif ($key->is(Variable::TYPE_NULL)) {
-                    $storeIndirect
-                        ? $ht->updateIndirect('', $value)
-                        : $ht->update('', $value);
                 } else {
                     throw new \TypeError(VM\EnumCaseSupport::illegalArrayOffsetMessage($key));
                 }

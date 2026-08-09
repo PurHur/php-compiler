@@ -182,6 +182,15 @@ final class HashTableHelper
         return HashTableWriteLlvm::prepareIndexWrite($context, $ht, $index);
     }
 
+    /** TYPE_OBJECT dim write: resource warn+cast or Illegal offset (#29550). */
+    public static function prepareResourceOrIllegalObjectKeyWrite(
+        Context $context,
+        Value $ht,
+        Variable $dim
+    ): Variable {
+        return HashTableWriteLlvm::prepareResourceOrIllegalObjectKeyWrite($context, $ht, $dim);
+    }
+
     /**
      * Writable __value__ slot for a string key (creates an empty string entry if missing; issue #103).
      */
