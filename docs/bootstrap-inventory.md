@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7286 |
-| Phase A inventory files (M2 ratio SSOT) | 7286 |
+| PHP files on vm.php path | 7291 |
+| Phase A inventory files (M2 ratio SSOT) | 7291 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23581 |
+| Source constructs flagged (warnings) | 23644 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1577,11 +1577,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mongodb/ManagerConstruct.php` | 0 | 1 |
 | `ext/mongodb/ManagerExecuteBulkWrite.php` | 0 | 2 |
 | `ext/mongodb/ManagerExecuteQuery.php` | 0 | 2 |
-| `ext/mongodb/Module.php` | 0 | 1 |
+| `ext/mongodb/Module.php` | 0 | 3 |
+| `ext/mongodb/MongodbBsonMethods.php` | 0 | 5 |
 | `ext/mongodb/MongodbClassMethod.php` | 0 | 1 |
+| `ext/mongodb/MongodbDriverMethods.php` | 0 | 4 |
 | `ext/mongodb/MongodbExtensionPolicy.php` | 0 | 1 |
 | `ext/mongodb/QueryConstruct.php` | 0 | 2 |
 | `ext/mongodb/VmMongodb.php` | 0 | 12 |
+| `ext/mongodb/VmMongodbTypes.php` | 0 | 43 |
+| `ext/mongodb/ns_bson_fromJSON.php` | 0 | 6 |
+| `ext/mongodb/ns_bson_toJSON.php` | 0 | 3 |
 | `ext/msgpack/BuiltinClasses.php` | 0 | 1 |
 | `ext/msgpack/Module.php` | 0 | 6 |
 | `ext/msgpack/MsgpackConstants.php` | 0 | 1 |
@@ -19533,12 +19538,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mongodb/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new ns_bson_fromJSON (line 38)
+- new ns_bson_toJSON (line 39)
+- 3 class method(s)
+
+### `ext/mongodb/MongodbBsonMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 120)
+- new ArgumentCountError (line 186)
+- new ArgumentCountError (line 263)
+- new ArgumentCountError (line 301)
+- 18 class method(s)
 
 ### `ext/mongodb/MongodbClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mongodb/MongodbDriverMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 57)
+- new ArgumentCountError (line 130)
+- 8 class method(s)
 
 ### `ext/mongodb/MongodbExtensionPolicy.php`
 
@@ -19554,18 +19578,82 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mongodb/VmMongodb.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 49)
-- new ClassEntry (line 63)
-- new ManagerConstruct (line 66)
-- new ManagerExecuteBulkWrite (line 70)
-- new ManagerExecuteQuery (line 73)
-- new ClassEntry (line 85)
-- new BulkWriteConstruct (line 88)
-- new ClassEntry (line 101)
-- new QueryConstruct (line 104)
-- new ClassEntry (line 116)
-- new ManagerState (line 124)
+- new ClassEntry (line 51)
+- new ClassEntry (line 65)
+- new ManagerConstruct (line 68)
+- new ManagerExecuteBulkWrite (line 72)
+- new ManagerExecuteQuery (line 75)
+- new ClassEntry (line 87)
+- new BulkWriteConstruct (line 90)
+- new ClassEntry (line 103)
+- new QueryConstruct (line 106)
+- new ClassEntry (line 118)
+- new ManagerState (line 126)
 - 11 class method(s)
+
+### `ext/mongodb/VmMongodbTypes.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 85)
+- new ClassEntry (line 106)
+- new ObjectIdConstruct (line 112)
+- new ObjectIdToString (line 116)
+- new ObjectIdGetTimestamp (line 117)
+- new ClassEntry (line 128)
+- new UtcDateTimeConstruct (line 134)
+- new UtcDateTimeToString (line 138)
+- new ClassEntry (line 149)
+- new Variable (line 164)
+- new BinaryConstruct (line 169)
+- new BinaryGetData (line 173)
+- new BinaryGetType (line 174)
+- new ClassEntry (line 185)
+- new RegexConstruct (line 191)
+- new RegexGetPattern (line 195)
+- new RegexGetFlags (line 196)
+- new RegexToString (line 197)
+- new ClassEntry (line 208)
+- new Decimal128Construct (line 214)
+- new Decimal128ToString (line 218)
+- new ClassEntry (line 229)
+- new TimestampConstruct (line 235)
+- new TimestampGetIncrement (line 239)
+- new TimestampGetTimestamp (line 240)
+- new TimestampToString (line 241)
+- new ClassEntry (line 252)
+- new CommandConstruct (line 255)
+- new ClassEntry (line 269)
+- new Variable (line 279)
+- new Variable (line 291)
+- new ReadPreferenceConstruct (line 296)
+- new ReadPreferenceGetMode (line 300)
+- new ReadPreferenceGetModeString (line 301)
+- new ClassEntry (line 312)
+- new Variable (line 315)
+- new WriteConcernConstruct (line 319)
+- new WriteConcernGetW (line 323)
+- new WriteConcernGetWtimeout (line 324)
+- new WriteConcernGetJournal (line 325)
+- new UnexpectedValueException (line 563)
+- new UnexpectedValueException (line 576)
+- 38 class method(s)
+
+### `ext/mongodb/ns_bson_fromJSON.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new HashTable (line 75)
+- new Variable (line 77)
+- new HashTable (line 90)
+- new Variable (line 92)
+- 3 class method(s)
+
+### `ext/mongodb/ns_bson_toJSON.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new stdClass (line 52)
+- 4 class method(s)
 
 ### `ext/msgpack/BuiltinClasses.php`
 
@@ -54211,92 +54299,92 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 15493)
 - new Error (line 15499)
 - new Error (line 15510)
-- new ClassEntry (line 16450)
-- new Variable (line 16451)
-- new VM\ClassProperty (line 16452)
-- new ObjectEntry (line 16455)
-- new Variable (line 16458)
-- new Variable (line 16539)
-- new Error (line 16632)
-- new Variable (line 16723)
-- new VM\GeneratorUncaughtThrow (line 16725)
-- new Error (line 16794)
-- new Variable (line 16839)
-- new VM\GeneratorUncaughtThrow (line 16853)
-- new Variable (line 16963)
-- new VM\GeneratorUncaughtThrow (line 16986)
-- new Variable (line 17060)
-- new Variable (line 17190)
-- new Variable (line 17232)
-- new Variable (line 17414)
-- new Variable (line 17430)
-- new Variable (line 17475)
-- new Variable (line 17618)
-- new Variable (line 17744)
-- new Variable (line 17914)
-- new VM\PropertyIsInitializedHandler (line 17923)
-- new Error (line 18088)
-- new VM\EnumFromHandler (line 18114)
-- new Error (line 18492)
-- new CompileError (line 18937)
-- new VM\ClassProperty (line 19179)
-- new CompileError (line 19266)
-- new Variable (line 19571)
-- new CompileError (line 19600)
-- new CompileError (line 19607)
-- new Variable (line 19889)
-- new Variable (line 19891)
-- new ClassEntry (line 19941)
-- new Func\PHP (line 19948)
-- new VM\ClassProperty (line 20044)
-- new Func\PHP (line 20297)
-- new Variable (line 20373)
-- new Variable (line 20380)
-- new Variable (line 20386)
-- new Variable (line 20424)
-- new Variable (line 20454)
-- new Variable (line 20647)
-- new Variable (line 20693)
-- new VM\ClassProperty (line 20763)
-- new Error (line 20822)
-- new Error (line 20857)
-- new Error (line 20860)
-- new Error (line 20863)
-- new Error (line 20866)
-- new ObjectEntry (line 20868)
-- new Error (line 20881)
-- new Error (line 20884)
-- new Error (line 20887)
-- new Error (line 20890)
-- new Error (line 20911)
-- new ObjectEntry (line 20916)
-- new Variable (line 20918)
-- new Variable (line 20936)
-- new Variable (line 20949)
-- new Variable (line 20970)
-- new Variable (line 20983)
-- new Error (line 21125)
-- new Error (line 21130)
+- new ClassEntry (line 16458)
+- new Variable (line 16459)
+- new VM\ClassProperty (line 16460)
+- new ObjectEntry (line 16463)
+- new Variable (line 16466)
+- new Variable (line 16547)
+- new Error (line 16640)
+- new Variable (line 16731)
+- new VM\GeneratorUncaughtThrow (line 16733)
+- new Error (line 16802)
+- new Variable (line 16847)
+- new VM\GeneratorUncaughtThrow (line 16861)
+- new Variable (line 16971)
+- new VM\GeneratorUncaughtThrow (line 16994)
+- new Variable (line 17068)
+- new Variable (line 17198)
+- new Variable (line 17240)
+- new Variable (line 17422)
+- new Variable (line 17438)
+- new Variable (line 17483)
+- new Variable (line 17626)
+- new Variable (line 17752)
+- new Variable (line 17922)
+- new VM\PropertyIsInitializedHandler (line 17931)
+- new Error (line 18096)
+- new VM\EnumFromHandler (line 18122)
+- new Error (line 18500)
+- new CompileError (line 18945)
+- new VM\ClassProperty (line 19187)
+- new CompileError (line 19274)
+- new Variable (line 19579)
+- new CompileError (line 19608)
+- new CompileError (line 19615)
+- new Variable (line 19897)
+- new Variable (line 19899)
+- new ClassEntry (line 19949)
+- new Func\PHP (line 19956)
+- new VM\ClassProperty (line 20052)
+- new Func\PHP (line 20305)
+- new Variable (line 20381)
+- new Variable (line 20388)
+- new Variable (line 20394)
+- new Variable (line 20432)
+- new Variable (line 20462)
+- new Variable (line 20655)
+- new Variable (line 20701)
+- new VM\ClassProperty (line 20771)
+- new Error (line 20830)
+- new Error (line 20865)
+- new Error (line 20868)
+- new Error (line 20871)
+- new Error (line 20874)
+- new ObjectEntry (line 20876)
+- new Error (line 20889)
+- new Error (line 20892)
+- new Error (line 20895)
+- new Error (line 20898)
+- new Error (line 20919)
+- new ObjectEntry (line 20924)
+- new Variable (line 20926)
+- new Variable (line 20944)
+- new Variable (line 20957)
+- new Variable (line 20978)
+- new Variable (line 20991)
 - new Error (line 21133)
-- new Error (line 21136)
-- new Error (line 21139)
-- new VM\ObjectEntry (line 21144)
-- new Func\PHP (line 21211)
-- new ClosureState (line 21223)
-- new Variable (line 21345)
-- new Variable (line 21363)
-- new NoDiscardMetadata (line 21611)
-- new Variable (line 21822)
-- new Variable (line 21824)
-- new CompileError (line 21852)
-- new CompileError (line 21883)
-- new CompileError (line 21922)
-- new CompileError (line 22067)
-- new CompileError (line 22096)
-- new CompileError (line 22129)
-- new CompileError (line 22136)
-- new Variable (line 22374)
-- 603 class method(s)
+- new Error (line 21138)
+- new Error (line 21141)
+- new Error (line 21144)
+- new Error (line 21147)
+- new VM\ObjectEntry (line 21152)
+- new Func\PHP (line 21219)
+- new ClosureState (line 21231)
+- new Variable (line 21353)
+- new Variable (line 21371)
+- new NoDiscardMetadata (line 21619)
+- new Variable (line 21830)
+- new Variable (line 21832)
+- new CompileError (line 21860)
+- new CompileError (line 21891)
+- new CompileError (line 21930)
+- new CompileError (line 22075)
+- new CompileError (line 22104)
+- new CompileError (line 22137)
+- new CompileError (line 22144)
+- new Variable (line 22382)
+- 604 class method(s)
 - 31 closure(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`

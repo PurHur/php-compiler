@@ -11,7 +11,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmString;
 
-/** MongoDB\Driver VM classes (PECL mongodb; #6575). */
+/** MongoDB\Driver VM classes (PECL mongodb; #6575, #27875). */
 final class VmMongodb
 {
     public const MANAGER_LC = 'mongodb\\driver\\manager';
@@ -39,6 +39,8 @@ final class VmMongodb
         self::registerBulkWrite($ctx);
         self::registerQuery($ctx);
         self::registerCursor($ctx);
+        require_once __DIR__.'/VmMongodbTypes.php';
+        VmMongodbTypes::register($ctx);
     }
 
     private static function registerException(Context $ctx, string $lc, string $name, string $parentLc): void

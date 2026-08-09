@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\mongodb;
 
 use PHPCompiler\VM\Context;
 
-/** Register mongodb builtin classes (#6575). */
+/** Register mongodb builtin classes (#6575, #27875). */
 final class BuiltinClasses
 {
     public static function register(Context $ctx): void
