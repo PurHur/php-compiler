@@ -66,7 +66,8 @@ final class LibcExtern
             'mkdir' => [$i32, false, [$i8p, $i32]],
             // rename dropped (#29090): StringRename NestedJIT leaf declares rename(2)
             // module-locally; RenameJitHelper SSOT is VmFs::rename (Unlink #19186 shape).
-            'chdir' => [$i32, false, [$i8p]],
+            // chdir dropped (#29219): StringChdir NestedJIT leaf declares chdir(2)
+            // module-locally; ChdirJitHelper uses @chdir (Rename #29141 shape).
             'getenv' => [$i8p, false, [$i8p]],
             'putenv' => [$i32, false, [$i8p]],
             'setenv' => [$i32, false, [$i8p, $i8p, $i32]],

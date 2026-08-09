@@ -159,8 +159,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitChmod.php',
         'ext/standard/ChdirJitHelper.php',
         'ext/standard/JitChdir.php',
-        'ext/standard/JitChdirKernel.php',
-        'ext/standard/phpc_chdir_kernel.php',
         'ext/standard/GethostnameJitHelper.php',
         'ext/standard/JitGethostname.php',
         'ext/standard/JitGethostnameKernel.php',
