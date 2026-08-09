@@ -2570,23 +2570,42 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ stream_context_set_options() (ext/standard/streams.c, #12597, #10056).
+     * PHP 8.3+ stream_context_set_options() (ext/standard/streams.c, #12597, #10056, #29083).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#15706).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate when reported
+     * PHP_VERSION is the 8.2 reference string). Enable via stable 8.4.0+ or explicit
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (php-src / php.net since 8.3.0).
+     *
+     * Same shape as {@see supportsJsonValidate()} — do not use {@see isForwardProfileAtLeast()}
+     * here (that would re-advertise on unset PROFILE while {@see phpversion()} still reports
+     * {@see REFERENCE_PHP_VERSION}).
      */
     public static function supportsStreamContextSetOptions(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
-    }
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
 
-    /** stream_context_set_options() visible to function_exists() — stable runtime or forward 8.4+ profile (#16346, #16494). */
-    public static function advertisesStreamContextSetOptions(): bool
-    {
         if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * stream_context_set_options() visible to function_exists() — same gate as registration (#16346, #16494, #29083).
+     *
+     * Withheld on 8.4.0-dev reference harness (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
+     */
+    public static function advertisesStreamContextSetOptions(): bool
+    {
+        return self::supportsStreamContextSetOptions();
     }
 
     /**

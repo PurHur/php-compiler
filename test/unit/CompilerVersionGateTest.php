@@ -1918,6 +1918,39 @@ final class CompilerVersionGateTest extends TestCase
     public function testSupportsStreamContextSetOptionsWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsStreamContextSetOptions());
+        $this->assertFalse(CompilerVersion::advertisesStreamContextSetOptions());
+    }
+
+    public function testSupportsStreamContextSetOptionsFalseOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsStreamContextSetOptions());
+            $this->assertFalse(CompilerVersion::advertisesStreamContextSetOptions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsStreamContextSetOptionsTrueWhenProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStreamContextSetOptions());
+            $this->assertTrue(CompilerVersion::advertisesStreamContextSetOptions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsStreamContextSetOptionsTrueWhenProfile84(): void
@@ -1926,6 +1959,7 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsStreamContextSetOptions());
+            $this->assertTrue(CompilerVersion::advertisesStreamContextSetOptions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -3537,9 +3571,25 @@ final class CompilerVersionGateTest extends TestCase
     public function testSupportsStreamContextSetOptionsTrueOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.3');
         try {
             $this->assertTrue(CompilerVersion::supportsStreamContextSetOptions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersStreamContextSetOptionsOnForwardProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['stream_context_set_options']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

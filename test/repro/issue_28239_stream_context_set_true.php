@@ -1,5 +1,5 @@
 <?php
-/** Issue #28239 — stream_context_set_options/set_params Reflection return true (PROFILE≥8.4). */
+/** Issue #28239 — stream_context_set_options/set_params Reflection return true (PROFILE≥8.3). */
 foreach (['stream_context_set_options', 'stream_context_set_params'] as $f) {
     $r = new ReflectionFunction($f);
     echo $f, ' ret=', $r->hasReturnType() ? (string) $r->getReturnType() : '?', PHP_EOL;

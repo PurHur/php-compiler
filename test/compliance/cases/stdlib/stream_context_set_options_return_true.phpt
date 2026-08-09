@@ -5,7 +5,7 @@ PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 if (!\PHPCompiler\CompilerVersion::supportsStreamContextSetOptions()) {
-    die('skip stream_context_set_options needs PROFILE≥8.4');
+    die('skip stream_context_set_options needs PROFILE≥8.3');
 }
 ?>
 --FILE--
