@@ -34,6 +34,12 @@ final class JitDomAppendChildUserScript
         self::zeroOldParentChildNodesLength($context, $child);
 
         // documentElement: keep existing root; only first append installs it (#27410).
+        // loadXML/loadHTML pin documentElement as TYPE_OBJECT (raw __object__*), not a
+        // VALUE box — __value__readObject on that pointer segfaults (#29487 / re-#19212).
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
         $docElSlot = $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, self::PROP_DOCUMENT_ELEMENT);
         $docElPtr = $context->builder->load($docElSlot);
         $voidPtr = $context->getTypeFromString('void*');
@@ -46,15 +52,12 @@ final class JitDomAppendChildUserScript
         $context->builder->branchIf($slotNull, $setRoot, $checkVal);
 
         $context->builder->positionAtEnd($checkVal);
-        $existingRoot = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($docElPtr, $context->getTypeFromString('__value__*'))
-        );
+        $existingRoot = $context->builder->pointerCast($docElPtr, $objPtrTy);
         $rootNull = $context->builder->icmp(Builder::INT_EQ, $existingRoot, $objPtrTy->constNull());
         $context->builder->branchIf($rootNull, $setRoot, $linkNext);
 
         $context->builder->positionAtEnd($setRoot);
-        $objectType->propertyStore($docElSlot, $childJit, JITVariable::TYPE_VALUE);
+        $objectType->propertyStore($docElSlot, $childJit, JITVariable::TYPE_OBJECT);
         self::ensureChildLinkLayout($context);
         $objectType->propertyStore(
             $objectType->propertySlotFor($document, 'DOMNode', VmDom::PROP_FIRST_CHILD),

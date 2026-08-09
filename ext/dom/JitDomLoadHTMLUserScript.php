@@ -227,11 +227,105 @@ final class JitDomLoadHTMLUserScript
         self::storeElementInIdMap($context, $document, $parsed['id'], $element);
         $idStr = $context->builder->load($context->constantStringFromString($parsed['id']));
         DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
+        // Pin html documentElement so DOMDocument::appendChild linkNext sees a real root
+        // (TYPE_OBJECT) — setRoot after loadHTML otherwise segfaulted (#29487 / re-#19212).
+        self::materializeAndStoreHtmlDocumentElement($context, $document, $element);
         self::pinUserScriptLoadSideEffects($context);
 
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(1, false);
+    }
+
+    /**
+     * libxml htmlReadMemory wraps fragments in {@code <html><body>…</body></html>}.
+     * Pin {@code html} as documentElement and attach the id-mapped element under body
+     * so appendChild / documentElement fetch match Zend (#29487).
+     */
+    private static function materializeAndStoreHtmlDocumentElement(
+        Context $context,
+        Value $document,
+        Value $idElement
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_loadhtml_us_document_element');
+        $html = JitDomCreateElement::materializeElementFromLiteral($context, 'html');
+        $body = JitDomCreateElement::materializeElementFromLiteral($context, 'body');
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PREVIOUS_SIBLING] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+            $nodeClassId = $objectType->lookup('DOMNode');
+            if (!$objectType->hasProperty($nodeClassId, $prop)) {
+                $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+
+        $htmlJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $html);
+        $bodyJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $body);
+        $idJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $idElement);
+        $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
+
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCUMENT_ELEMENT),
+            $htmlJit,
+            JITVariable::TYPE_OBJECT
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($html, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($body, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $htmlJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($idElement, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $bodyJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($html, self::CLASS_ELEMENT, VmDom::PROP_FIRST_CHILD),
+            $bodyJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($html, self::CLASS_ELEMENT, VmDom::PROP_LAST_CHILD),
+            $bodyJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($body, self::CLASS_ELEMENT, VmDom::PROP_FIRST_CHILD),
+            $idJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($body, self::CLASS_ELEMENT, VmDom::PROP_LAST_CHILD),
+            $idJit,
+            JITVariable::TYPE_VALUE
+        );
+        // Document child edges so DOMDocument::appendChild takes linkNext (#29487).
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, 'DOMNode', VmDom::PROP_FIRST_CHILD),
+            $htmlJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, 'DOMNode', VmDom::PROP_LAST_CHILD),
+            $htmlJit,
+            JITVariable::TYPE_VALUE
+        );
+        DomUserScriptPinnedRootLlvm::pin($context, $html);
     }
 
     /** Keep id-map/cache writes when loadHTML() return is discarded (#17954). */
