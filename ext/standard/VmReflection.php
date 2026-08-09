@@ -3086,6 +3086,8 @@ final class VmReflection
      *
      * Order: abstract, final, virtual, public|protected|private, protected(set)|private(set),
      * static, readonly. Visibility uses exact PPP / PPP_SET match (mutually exclusive).
+     * PPP_SET name tokens are PROFILE≥8.5 only (php-src #19691 / GH-19697; #29188) — 8.4 keeps
+     * the bits / is*Set() accessors but omits the strings.
      *
      * @return Variable list<string>
      */
@@ -3124,13 +3126,16 @@ final class VmReflection
                 break;
         }
 
-        switch ($modifiers & self::REFLECTION_PPP_SET_MASK) {
-            case self::REFLECTION_IS_PROTECTED_SET:
-                $append('protected(set)');
-                break;
-            case self::REFLECTION_IS_PRIVATE_SET:
-                $append('private(set)');
-                break;
+        // php-src 8.5+ only — GH-19697; omit on PROFILE=8.4 / reference (#29188).
+        if (CompilerVersion::supportsAsymmetricVisibilityModifierNames()) {
+            switch ($modifiers & self::REFLECTION_PPP_SET_MASK) {
+                case self::REFLECTION_IS_PROTECTED_SET:
+                    $append('protected(set)');
+                    break;
+                case self::REFLECTION_IS_PRIVATE_SET:
+                    $append('private(set)');
+                    break;
+            }
         }
 
         if (($modifiers & self::REFLECTION_IS_STATIC) !== 0) {
