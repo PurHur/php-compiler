@@ -3,11 +3,10 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helpers for getenv() and putenv() via PutenvJitHelper / GetenvJitHelper (#9092, #8992, #20499, #21023, #23414).
+ * JIT/AOT helpers for getenv() and putenv() via PutenvJitHelper / GetenvJitHelper (#9092, #8992, #20499, #21023, #23414, #29334).
  *
  * Embed + thin standalone AOT: syntax guard + {@see PutenvJitHelper::putenv} overlay;
- * process-environ mirror lives inside the helper via {@see phpc_putenv_kernel}
- * (no caller-side libc emission).
+ * process-environ mirror via host `@putenv` (NestedJIT leaf = setenv/unsetenv; kernel deleted).
  * Bool results are bare {@see int1} so Internal::call type inference succeeds (#21023).
  * php-src: ext/standard/basic_functions.c — zif_putenv
  */
@@ -116,7 +115,12 @@ final class JitEnv
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_emit_cont');
 
-        // Always NestedJIT PutenvJitHelper (overlay + process-environ kernel) (#21023 / #23414).
+        // Nested helper compile: libc setenv leaf without re-entering PutenvJitHelper (#29334).
+        if (NestedJitCompileScope::isActive()) {
+            return self::putenvNestedLeaf($context, $assignmentStr);
+        }
+
+        // Always NestedJIT PutenvJitHelper (overlay + @putenv mirror) (#21023 / #23414 / #29334).
         self::emitPutenvSyntaxGuard($context, $assignmentStr);
         StringGetenv::ensurePutenvLinked($context);
         $result = JitNestedHelperCoerce::callHelper(
@@ -133,10 +137,21 @@ final class JitEnv
     }
 
     /**
+     * NestedJIT leaf for putenv() — libc setenv/unsetenv mirror (#29334 / getenv #29313).
+     *
+     * @return Value int1 true (mirror is best-effort; helper always returns true after overlay)
+     */
+    public static function putenvNestedLeaf(Context $context, Value $assignmentStr): Value
+    {
+        StringGetenv::invokePutenvNestedLeaf($context, $assignmentStr);
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    /**
      * putenv from a compile-time "NAME=value" literal — avoid __string__ GEPs (#5965).
      *
-     * Helper-only: {@see PutenvJitHelper::putenv} owns overlay + process-environ mirror via
-     * {@see phpc_putenv_kernel} (no inline libc emission here — #23414).
+     * Helper-only: {@see PutenvJitHelper::putenv} owns overlay + `@putenv` mirror (#23414 / #29334).
      */
     public static function putenvFromCStringLiteral(Context $context, string $assignment): Value
     {
@@ -148,6 +163,9 @@ final class JitEnv
         }
 
         $str = $context->builder->load($context->constantStringFromString($assignment));
+        if (NestedJitCompileScope::isActive()) {
+            return self::putenvNestedLeaf($context, $str);
+        }
         StringGetenv::ensurePutenvLinked($context);
         JitNestedHelperCoerce::callHelper(
             $context,

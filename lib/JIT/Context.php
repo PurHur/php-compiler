@@ -945,8 +945,9 @@ class Context {
             'phpc_argon2_hash',
             'phpc_argon2_verify',
             'phpc_gethostname_kernel',
-            // putenv setenv mirror NestedJIT leaf (#23414) — peer getenv (#20644 / #29313).
-            'phpc_putenv_kernel',
+            // putenv(3) NestedJIT leaf (#29334) — whitelist putenv → putenv_::call →
+            // JitEnv::putenvNestedLeaf / StringGetenv::invokePutenvNestedLeaf (kernel removed).
+            'putenv',
             // Stat path always-helper NestedJIT leaves (#20742) — peer rename (#20603).
             'phpc_stat_mode_kernel',
             'phpc_access_kernel',

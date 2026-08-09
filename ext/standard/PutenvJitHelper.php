@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Slim putenv() NestedJIT leaf (#23414) — peer {@see GetenvLookupJitHelper} / {@see RenameJitHelper}.
+ * Slim putenv() NestedJIT leaf (#23414, #29334) — peer {@see GetenvLookupJitHelper} / {@see RenameJitHelper}.
  *
- * Owns process-local overlay + {@see phpc_putenv_kernel} setenv mirror so user-script AOT
+ * Owns process-local overlay + `@putenv` process-environ mirror so user-script AOT
  * does not NestedJIT the full GetenvJitHelper.php TU (apacheSetenv crash on master).
+ * NestedJIT whitelist routes `putenv` → {@see JitEnv::putenvNestedLeaf} (kernel deleted).
  * php-src: ext/standard/basic_functions.c — zif_putenv
  */
 final class PutenvJitHelper
@@ -50,8 +51,8 @@ final class PutenvJitHelper
         } else {
             self::$local[$name] = $value;
         }
-        // Full assignment — kernel mirrors via malloc+setenv (#5965 / #17316).
-        \phpc_putenv_kernel($assignment);
+        // Full assignment — NestedJIT leaf mirrors via setenv/unsetenv (#29334 / #5965).
+        @\putenv($assignment);
 
         return true;
     }
