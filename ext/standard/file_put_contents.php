@@ -30,7 +30,8 @@ final class file_put_contents extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'file_put_contents');
+        // Z_PARAM_PATH non-empty — same guard as fopen/file_get_contents (#29294 / #29268).
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'file_put_contents', 'filename');
         $flags = 0;
         if (isset($frame->calledArgs[2])) {
             $flags = VmMath::parseIntBuiltinArgForFrame(
@@ -83,7 +84,7 @@ final class file_put_contents extends Internal
 
         return JitFilePutContents::invoke(
             $context,
-            JitFilestatArg::lowerFilename($context, $args[0], 'file_put_contents'),
+            JitStreamPath::lowerNonEmptyPath($context, $args[0], 'file_put_contents', 0, 'filename'),
             self::lowerDataJitArg($context, $args[1]),
             $flags
         );
