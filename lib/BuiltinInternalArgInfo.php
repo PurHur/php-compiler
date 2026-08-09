@@ -245,6 +245,8 @@ final class BuiltinInternalArgInfo
             'mb_convert_encoding' => 'array|string|false',
             // ext/mbstring/mbstring.stub.php — InternalArgInfo return int (missing |false) (#28583)
             'mb_strpos', 'mb_strrpos', 'mb_stripos', 'mb_strripos' => 'int|false',
+            // ext/mbstring/mbstring.stub.php — InternalArgInfo return string (missing |false) (#28584)
+            'mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_strrichr' => 'string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#27726)
@@ -1073,6 +1075,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/mbstring/mbstring.stub.php — ?string $encoding = null (InternalArgInfo string) (#28583)
             'mb_strpos', 'mb_strrpos', 'mb_stripos', 'mb_strripos' => 3 === $index ? '?string' : null,
+            // ext/mbstring/mbstring.stub.php — ?string $encoding = null (InternalArgInfo string) (#28584)
+            'mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_strrichr' => 3 === $index ? '?string' : null,
             // ext/mbstring/mbstring.stub.php — string, ?string characters=, ?string encoding= (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => match ($index) {
                 0 => 'string',
