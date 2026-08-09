@@ -929,12 +929,15 @@ final class ClosureSupport
         $boundThis->copyFrom($receiver);
         $state = ClosureState::fromMethodCallable($declaringClass->methods[$methodLc], $boundThis, $methodName);
         $state->boundScopeClass = $boundScopeClass;
-        if ($scoped) {
-            // Invoke the resolved Func directly — virtual dispatch would hit child overrides (#17655, #26630).
-            $state->methodReceiver = null;
-            $state->methodName = null;
-            $state->boundThis = $boundThis;
-        }
+        // Always invoke the resolved Func directly (zend_closures.c). Keeping methodReceiver
+        // would re-run initMethodCall on invoke and re-check visibility from the *caller*
+        // frame — private methods then fail when the caller is another closure (class
+        // declared inside a closure, #29208) even though fromCallable already allowed them.
+        // Scoped parent/self FCC also needs this so virtual dispatch cannot hit overrides
+        // (#17655, #26630).
+        $state->methodReceiver = null;
+        $state->methodName = null;
+        $state->boundThis = $boundThis;
 
         return $state;
     }
