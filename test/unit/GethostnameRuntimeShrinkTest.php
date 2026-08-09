@@ -7,7 +7,10 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\GethostnameJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** gethostname() JIT: VmHostPure SSOT + /proc NestedJIT leaf — no libc gethostname(2) (#21166, #28544). */
+/**
+ * gethostname() JIT: @gethostname NestedJIT leaf + /proc LLVM — no kernel Internal
+ * (#21166, #28544, #29364).
+ */
 final class GethostnameRuntimeShrinkTest extends TestCase
 {
     public function testJitGethostnameUsesPhpBridgeNotLibc(): void
@@ -32,9 +35,10 @@ final class GethostnameRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString("lookupFunction('gethostname')", $source);
         $this->assertStringNotContainsString('LibcExtern', $source);
+        $this->assertStringNotContainsString('phpc_gethostname_kernel', $source);
     }
 
-    public function testKernelUsesProcHostnameNotLibcGethostname(): void
+    public function testNestedLeafUsesProcHostnameNotLibcGethostname(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGethostnameKernel.php');
         $this->assertStringContainsString('/proc/sys/kernel/hostname', $source);
@@ -43,13 +47,7 @@ final class GethostnameRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("lookupFunction('read')", $source);
         $this->assertStringNotContainsString("lookupFunction('gethostname')", $source);
         $this->assertStringContainsString('VmHostPure', $source);
-    }
-
-    public function testKernelExecuteUsesVmHostPure(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_gethostname_kernel.php');
-        $this->assertStringContainsString('VmHostPure::gethostname', $source);
-        $this->assertDoesNotMatchRegularExpression('/@\\\\gethostname\\s*\\(/', $source);
+        $this->assertStringNotContainsString('phpc_gethostname_kernel', $source);
     }
 
     public function testLibcExternNoLongerDeclaresGethostname(): void
@@ -58,24 +56,22 @@ final class GethostnameRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("'gethostname' =>", $source);
     }
 
-    public function testGethostnameJitHelperDelegatesToKernel(): void
+    public function testGethostnameJitHelperUsesHostGethostnameNotKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GethostnameJitHelper.php');
         $this->assertStringContainsString('public static function resolveJit(): string', $source);
-        $this->assertStringContainsString('phpc_gethostname_kernel', $source);
+        $this->assertStringContainsString('@\\gethostname', $source);
+        $this->assertStringNotContainsString('phpc_gethostname_kernel', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/phpc_gethostname_kernel.php');
         $this->assertMatchesRegularExpression(
             '/return\s+\\\\is_string\s*\(\s*\$host\s*\)\s*\?\s*\$host\s*:\s*[\'"][\'"]/',
             $source
         );
-        $this->assertStringNotContainsString('@\\gethostname(', $source);
         $this->assertDoesNotMatchRegularExpression(
             '/^\s*\$host\s*=\s*VmHost::/m',
             $source
         );
 
-        if (!\function_exists('phpc_gethostname_kernel')) {
-            $this->markTestSkipped('phpc_gethostname_kernel requires compiler runtime');
-        }
         if (!\function_exists('gethostname')) {
             $this->markTestSkipped('host gethostname unavailable');
         }
@@ -84,20 +80,30 @@ final class GethostnameRuntimeShrinkTest extends TestCase
         $this->assertSame($expected, GethostnameJitHelper::resolveJit());
     }
 
-    public function testModuleNoLongerDeclaresLibcGethostname(): void
+    public function testModuleNoLongerRegistersKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
-        $this->assertStringContainsString('phpc_gethostname_kernel', $source);
+        $this->assertStringNotContainsString('phpc_gethostname_kernel', $source);
+        $this->assertStringContainsString('new gethostname()', $source);
         $this->assertStringNotContainsString("lookupFunction('gethostname')", $source);
         $this->assertStringNotContainsString("addFunction('gethostname'", $source);
     }
 
-    public function testSpineBundleIncludesGethostnameHelperAndKernel(): void
+    public function testSpineBundleIncludesGethostnameHelperNotKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('GethostnameJitHelper.php', $spine);
         $this->assertStringContainsString('StringGethostname.php', $spine);
         $this->assertStringContainsString('JitGethostnameKernel.php', $spine);
-        $this->assertStringContainsString('phpc_gethostname_kernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_gethostname_kernel.php', $spine);
+    }
+
+    public function testNestedJitAllowlistsGethostnameBuiltinNotKernel(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString("'gethostname'", $source);
+        $this->assertStringContainsString('#29364', $source);
+        $this->assertStringNotContainsString('phpc_gethostname_kernel', $source);
+        $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
     }
 }

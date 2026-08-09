@@ -2433,7 +2433,6 @@ require_once __DIR__.'/../../../ext/standard/GetParentClassJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetcwdJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostnameJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitGethostnameKernel.php';
-require_once __DIR__.'/../../../ext/standard/phpc_gethostname_kernel.php';
 require_once __DIR__.'/../../../ext/standard/GetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvLookupJitHelper.php';
