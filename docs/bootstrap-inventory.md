@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7285 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23563 |
+| Source constructs flagged (warnings) | 23564 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6475,7 +6475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Runtime.php` | 0 | 41 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
-| `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 16 |
+| `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 17 |
 | `lib/SwitchCaseSemicolonDeprecation.php` | 0 | 3 |
 | `lib/SwitchCommaCaseRewriter.php` | 0 | 1 |
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
@@ -53904,21 +53904,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/SourcePreprocessor/PropertyHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 154)
-- new self (line 164)
-- new self (line 174)
-- new CompileFatal (line 668)
-- new CompileFatal (line 1338)
-- new CompileFatal (line 1353)
-- new CompileFatal (line 1375)
-- new CompileFatal (line 1582)
+- new self (line 161)
+- new self (line 171)
+- new self (line 181)
+- new CompileFatal (line 675)
+- new CompileFatal (line 1345)
+- new CompileFatal (line 1360)
+- new CompileFatal (line 1382)
 - new CompileFatal (line 1589)
-- new CompileFatal (line 2302)
-- new CompileFatal (line 2314)
-- new CompileFatal (line 2812)
-- new CompileFatal (line 2851)
-- new CompileFatal (line 2885)
-- 83 class method(s)
+- new CompileFatal (line 1596)
+- new CompileFatal (line 2318)
+- new CompileFatal (line 2330)
+- new CompileFatal (line 2352)
+- new CompileFatal (line 2890)
+- new CompileFatal (line 2929)
+- new CompileFatal (line 2963)
+- 86 class method(s)
 - 5 closure(s)
 
 ### `lib/SwitchCaseSemicolonDeprecation.php`

@@ -68,6 +68,13 @@ final class PropertyHooks
      */
     public const SET_HOOK_VALUE_TYPE_COMPAT_ERROR = 'Type of parameter $%s of hook %s::$%s::set must be compatible with property type';
 
+    /**
+     * php-src: Zend/zend_compile.c — set-hook param must not be {@code ZEND_PARAM_REF} (#29442).
+     *
+     * Message shape: {@code Parameter $value of set hook C::$x must not be pass-by-reference}.
+     */
+    public const SET_HOOK_PARAM_BY_REF_COMPILE_ERROR = 'Parameter $%s of %s hook %s::$%s must not be pass-by-reference';
+
     /** Zend 8.2 reference profile — default initializer + hook block (#12574). */
     public const REFERENCE_PROFILE_UNEXPECTED_ARROW = 'syntax error, unexpected token "=>"';
 
@@ -2278,6 +2285,7 @@ final class PropertyHooks
      *
      * {@code (prop_type_ast != NULL) != (value_param_ast->child[0] != NULL)} then
      * {@see zend_verify_property_hook_variance} for both-typed contravariance.
+     * By-ref params are rejected first (#29442).
      */
     private function rejectIncompatibleExplicitSetHookParam(
         string $params,
@@ -2291,6 +2299,14 @@ final class PropertyHooks
         if (!CompilerVersion::supportsPropertyHooks()) {
             return;
         }
+        $this->rejectByRefExplicitSetHookParam(
+            $params,
+            $classDisplay,
+            $prop,
+            $filename,
+            $fullCode,
+            $hookOpenOffsetInFile
+        );
         $parsed = $this->parseExplicitSetHookParam($params);
         if (null === $parsed) {
             return;
@@ -2318,9 +2334,71 @@ final class PropertyHooks
         );
     }
 
+    /**
+     * php-src: Zend/zend_compile.c — {@code value_param_ast->attr & ZEND_PARAM_REF} (#29442).
+     */
+    private function rejectByRefExplicitSetHookParam(
+        string $params,
+        string $classDisplay,
+        string $prop,
+        string $filename,
+        string $fullCode,
+        int $hookOpenOffsetInFile
+    ): void {
+        $paramName = $this->explicitSetHookParamByRefName($params);
+        if (null === $paramName) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+            self::setHookParamByRefCompileError($paramName, $classDisplay, $prop)
+        );
+    }
+
     public static function setHookValueTypeCompatError(string $paramName, string $className, string $propName): string
     {
         return sprintf(self::SET_HOOK_VALUE_TYPE_COMPAT_ERROR, $paramName, $className, $propName);
+    }
+
+    public static function setHookParamByRefCompileError(
+        string $paramName,
+        string $className,
+        string $propName,
+        string $hookKind = 'set'
+    ): string {
+        return sprintf(self::SET_HOOK_PARAM_BY_REF_COMPILE_ERROR, $paramName, $hookKind, $className, $propName);
+    }
+
+    /**
+     * Param name when the set-hook parameter is pass-by-reference ({@code &$value} / {@code T &$value}).
+     *
+     * Intersection types use {@code &} between names ({@code Foo&Bar $v}); only {@code &} immediately
+     * before {@code $name} is by-ref (Zend {@code ZEND_PARAM_REF}).
+     */
+    private function explicitSetHookParamByRefName(string $params): ?string
+    {
+        $params = trim($params);
+        while (str_starts_with($params, '#[')) {
+            $end = $this->findAttributeGroupEnd($params);
+            if (null === $end) {
+                break;
+            }
+            $params = ltrim(substr($params, $end + 1));
+        }
+        if ('' === $params) {
+            return null;
+        }
+        if (preg_match('/^(.+?)(\s*=\s*.+)$/s', $params, $dm) && !str_contains($dm[1], '(')) {
+            if (preg_match('/\$\w+\s*$/', $dm[1])) {
+                $params = rtrim($dm[1]);
+            }
+        }
+        if (preg_match('/&\s*\$(\w+)\s*$/', $params, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     /**
