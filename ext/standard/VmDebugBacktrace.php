@@ -158,9 +158,17 @@ final class VmDebugBacktrace
         if (null !== $frame->vmContext) {
             $walk = $frame->vmContext->runStackFrames();
         }
+        // runStack holds suspended *callers* only — the active opcode frame is not on it (#14132).
+        // debug_backtrace(): handler frame → prepend parent (the active user frame).
+        // Exception::__construct / captureOnThrow call build($activeUserFrame) directly — prepend
+        // that frame too, or nested functions inside closures vanish from getTrace() (#29207).
         if ($frame->hasHandler() && null !== $frame->parent) {
             if ([] === $walk || $walk[0] !== $frame->parent) {
                 array_unshift($walk, $frame->parent);
+            }
+        } elseif (self::isUserCodeFrame($frame)) {
+            if ([] === $walk || $walk[0] !== $frame) {
+                array_unshift($walk, $frame);
             }
         }
         if ([] !== $walk) {
