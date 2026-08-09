@@ -162,6 +162,8 @@
             <file>./test/compliance/MbConvertEncodingQuotedPrintableVMTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsVMTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsJITTest.php</file>
+            <file>./test/compliance/MathBinaryFloatNullSoftVMTest.php</file>
+            <file>./test/compliance/MathBinaryFloatNullSoftJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

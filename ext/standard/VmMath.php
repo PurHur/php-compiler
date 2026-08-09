@@ -692,7 +692,8 @@ final class VmMath
 
     /**
      * Z_PARAM_DOUBLE null → TypeError on PHP 8.4 forward profile
-     * (fadd/fsub/fmul/fdiv/fmod/hypot/atan2/nextafter $toward; #19182, #20432, #24198).
+     * (fadd/fsub/fmul and nextafter $toward only; #19182, #20432).
+     * fdiv/fmod/hypot/atan2 use {@see parseDoubleBuiltinArg} soft-null (#29319, re-#24198).
      *
      * @throws \TypeError when operand is null on PROFILE=8.4+
      */

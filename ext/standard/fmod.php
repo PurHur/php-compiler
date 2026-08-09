@@ -27,14 +27,15 @@ final class fmod extends Internal
     {
         // php-src ext/standard/math.c — ArgumentCountError (#21982).
         $this->requireExactArgCount($frame, 'fmod', 2);
-        $num1 = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
+        $num1 = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'fmod',
             1,
             'num1',
             $frame
         );
-        $num2 = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        $num2 = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'fmod',
             2,
@@ -63,7 +64,7 @@ final class fmod extends Internal
             'num1',
             'num2',
             'float',
-            true
+            false
         );
 
         return MathFmod::invoke($context, $left, $right);

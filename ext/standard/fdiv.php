@@ -29,14 +29,15 @@ final class fdiv extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, self::FUNCTION, 2);
-        $a = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
+        $a = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             self::FUNCTION,
             1,
             'num1',
             $frame
         );
-        $b = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        $b = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             self::FUNCTION,
             2,
@@ -62,7 +63,7 @@ final class fdiv extends Internal
             'num1',
             'num2',
             'float',
-            true
+            false
         );
 
         return $context->builder->fdiv($left, $right);

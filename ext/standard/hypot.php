@@ -26,14 +26,15 @@ final class hypot extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'hypot', 2);
-        $x = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
+        $x = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'hypot',
             1,
             'x',
             $frame
         );
-        $y = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
+        $y = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'hypot',
             2,
@@ -62,7 +63,7 @@ final class hypot extends Internal
             'x',
             'y',
             'float',
-            true
+            false
         );
 
         return MathHypot::invoke($context, $x, $y);
