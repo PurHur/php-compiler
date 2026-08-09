@@ -68,4 +68,22 @@ final class VmFloatDtoaTest extends TestCase
         $this->assertSame('10', VmFloatDtoa::formatSprintfG(9.99, 2));
         $this->assertSame('0.0001', VmFloatDtoa::formatSprintfG(9.99e-5, 2));
     }
+
+    /** php-src php_ecvt / %e half-to-even mantissa rounding (#29008). */
+    public function testSprintfScientificHalfEvenMatchesZend(): void
+    {
+        $this->assertSame('1.234e+0', VmFloatDtoa::formatSprintfE(1.2345, 3));
+        $this->assertSame('1.234e+3', VmFloatDtoa::formatSprintfE(1234.5, 3));
+        $this->assertSame('1.234e+4', VmFloatDtoa::formatSprintfE(12345.0, 3));
+        $this->assertSame('1.236e+0', VmFloatDtoa::formatSprintfE(1.2355, 3));
+        $this->assertSame('1.234e-3', VmFloatDtoa::formatSprintfE(0.0012345, 3));
+        $this->assertSame('9.999e+0', VmFloatDtoa::formatSprintfE(9.9995, 3));
+        $this->assertSame('1.000e+2', VmFloatDtoa::formatSprintfE(99.995, 3));
+        $this->assertSame('-1.234E+0', VmFloatDtoa::formatSprintfE(-1.2345, 3, true));
+        $this->assertSame('2e+0', VmFloatDtoa::formatSprintfE(1.5, 0));
+        $this->assertSame('1e+1', VmFloatDtoa::formatSprintfE(9.5, 0));
+        $this->assertSame('1.234500e+3', VmFloatDtoa::formatSprintfE(1234.5, 6));
+        $this->assertSame('0.000e+0', VmFloatDtoa::formatSprintfE(0.0, 3));
+        $this->assertSame('0.000e+0', VmFloatDtoa::formatSprintfE(-0.0, 3));
+    }
 }
