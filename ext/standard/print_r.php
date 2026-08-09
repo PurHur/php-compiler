@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
@@ -27,10 +28,9 @@ final class print_r extends Internal
         if (null === $vm) {
             throw new \LogicException('print_r() requires an active VM');
         }
+        // php-src ext/standard/var.c — ArgumentCountError (#28474).
+        $this->requireArgCountRange($frame, 'print_r', 1, 2);
         $argc = count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('print_r() expects 1 or 2 arguments');
-        }
         $return = false;
         if (2 === $argc) {
             $return = $frame->calledArgs[1]->resolveIndirect()->toBool();
@@ -54,6 +54,14 @@ final class print_r extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireArgCountRangeJit($context, $args, 'print_r', 1, 2)) {
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
+        }
+
         return JitPrintR::invoke($context, ...$args);
     }
 }

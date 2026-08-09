@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Variable;
@@ -33,6 +34,8 @@ final class var_dump_ extends Internal
         if (null === $vm) {
             throw new \LogicException('var_dump() requires an active VM');
         }
+        // php-src ext/standard/var.c — ArgumentCountError (#28474).
+        $this->requireAtLeastArgCount($frame, 'var_dump', 1);
         foreach ($frame->calledArgs as $arg) {
             VmVarDump::dumpVariable($vm, $arg->resolveIndirect(), 1, false, $frame);
         }
@@ -40,6 +43,14 @@ final class var_dump_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireAtLeastJitArgCount($context, $args, 'var_dump', 1)) {
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
+        }
+
         return JitVarDump::invoke($context, ...$args);
     }
 }

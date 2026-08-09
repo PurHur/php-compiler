@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringVarExport;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -21,7 +22,16 @@ final class JitVarExport
     {
         $argc = count($args);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('var_export() requires one or two arguments in this compiler build (JIT/AOT)');
+            // php-src ext/standard/var.c — ArgumentCountError (#28474).
+            $message = $argc < 1
+                ? 'var_export() expects at least 1 argument, 0 given'
+                : \sprintf('var_export() expects at most 2 arguments, %d given', $argc);
+            ExceptionBridge::emitArgumentCountErrorAndAbort($context, $message);
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);

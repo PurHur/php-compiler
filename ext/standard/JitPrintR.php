@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringPrintR;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -19,7 +20,16 @@ final class JitPrintR
     {
         $argc = \count($args);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('print_r() expects 1 or 2 arguments');
+            // php-src ext/standard/var.c — ArgumentCountError (#28474).
+            $message = $argc < 1
+                ? 'print_r() expects at least 1 argument, 0 given'
+                : \sprintf('print_r() expects at most 2 arguments, %d given', $argc);
+            ExceptionBridge::emitArgumentCountErrorAndAbort($context, $message);
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
         }
 
         StringPrintR::ensureLinked($context);
