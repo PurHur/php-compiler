@@ -474,6 +474,26 @@ echo is_string($flat[\'display_errors\'] ?? null) ? "flat string\n" : "flat not 
         );
     }
 
+    /**
+     * Issue #29228: ??= on magic props consults __get (after __isset, or alone when __isset absent).
+     * php-src zend_object_handlers.c — coalesce IS-mode read, not isset()-only.
+     */
+    public function testMagicPropertyNullCoalesceAssignConsultsGet(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_run_20260809b/magic_coalesce_assign_skips_get.php'),
+            "ISSET\nSET\nISSET\nGET\ndone\n"
+        );
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_run_20260809b/magic_coalesce_assign_no_isset_uses_get.php'),
+            "isset=N\nGET:x\ndone\n"
+        );
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_run_20260809b/magic_coalesce_assign_null_via_get.php'),
+            "ISSET\nGET\nSET:1\ndone\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();

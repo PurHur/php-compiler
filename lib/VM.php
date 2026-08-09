@@ -1453,11 +1453,17 @@ class VM {
     }
 
     /**
-     * ?? / ??= left branch on property hooks — read backing without get hook (#6472, #8902).
+     * ?? / ??= quiet property read (zend BP_VAR_IS / coalesce) (#6472, #8902, #29228).
+     * Hooked props: backing only, never get hook. Magic: __isset then __get, or __get alone
+     * when __isset is absent (unlike isset(), which stays false without __isset).
      * ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys (spl_array.c; #22649, re-#22576).
      */
-    public function fetchObjectPropertyForCoalesce(ObjectEntry $object, string $propName, Variable $dst): void
-    {
+    public function fetchObjectPropertyForCoalesce(
+        ObjectEntry $object,
+        string $propName,
+        Variable $dst,
+        ?Frame $frame = null
+    ): void {
         $backing = $this->hookedPropertyBackingValue($object, $propName);
         if (false !== $backing) {
             $dst->copyFrom($backing);
@@ -1473,6 +1479,23 @@ class VM {
             } else {
                 $dst->null();
             }
+
+            return;
+        }
+        // Overloaded / inaccessible: coalesce consults __get (zend_std_read_property IS-mode; #29228).
+        if (
+            null !== $frame
+            && $this->propertyReadUsesMagicGet($object, $propName, $frame)
+        ) {
+            if ($this->hasInstanceMethod($object->class, '__isset')) {
+                if (!$this->objectPropertyIsSet($object, $propName, $frame)) {
+                    $dst->undefined();
+
+                    return;
+                }
+            }
+            $got = $this->invokeMagicGet($object, $propName)->resolveIndirect();
+            $dst->copyFrom($got);
 
             return;
         }
@@ -8319,7 +8342,7 @@ restart:
                         }
                     }
                     if ($op->propertyHookCoalesceRead && !$forWrite) {
-                        $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result);
+                        $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result, $frame);
                         break;
                     }
                     if ($propertyObject->hasProperty($name) && !$magicGetForRead) {
