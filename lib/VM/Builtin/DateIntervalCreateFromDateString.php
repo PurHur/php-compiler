@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmDateInterval;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\NativeDateMalformedIntervalException;
 use PHPCompiler\VM\Variable;
 
 /**
  * DateInterval::createFromDateString() — OOP alias of date_interval_create_from_date_string() (#9993).
  *
  * php-src: ext/date/php_date.c — PHP_METHOD(DateInterval, createFromDateString)
+ *
+ * PHP 8.3+ forward profile: EH_THROW DateMalformedIntervalStringException on parse failure (#29290).
+ * Procedural date_interval_create_from_date_string() stays warning+false on all profiles.
  */
 final class DateIntervalCreateFromDateString extends VmClassMethod
 {
@@ -47,6 +52,10 @@ final class DateIntervalCreateFromDateString extends VmClassMethod
         $warning = null;
         $parsed = VmDateInterval::parseFromDateString($datetime, $warning);
         if (null === $parsed) {
+            // php-src zim_DateInterval_createFromDateString — throw under 8.3+ date hierarchy (#29290).
+            if (CompilerVersion::advertisesDateExceptionHierarchy()) {
+                throw new NativeDateMalformedIntervalException((string) $warning);
+            }
             $frame->vmContext->errors->triggerError(
                 'DateInterval::createFromDateString(): '.$warning,
                 ErrorReporter::E_WARNING,

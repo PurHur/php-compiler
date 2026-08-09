@@ -251,7 +251,8 @@ final class VmDateInterval
         $spec = ltrim($input);
         $len = \strlen($spec);
         if (0 === $len) {
-            $warning = self::fromDateStringWarning($input, 0, 'The timezone could not be found in the database');
+            // php-src timelib: empty input → position char is a space + "Empty string" (#29290).
+            $warning = 'Unknown or bad format () at position 0 ( ): Empty string';
 
             return null;
         }
