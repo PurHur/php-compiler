@@ -9,13 +9,15 @@ use PHPCompiler\VM;
 use PHPCompiler\VM\ErrorReporter;
 
 /**
- * E_DEPRECATED on utf8_encode()/utf8_decode() call (php-src ext/standard/utf8.c; #18104).
+ * E_DEPRECATED on utf8_encode()/utf8_decode() call (php-src ext/standard/utf8.c; #18104, #29249).
+ *
+ * Zend since 8.2: "Function …() is deprecated since 8.2, visit the php.net documentation for various alternatives"
  */
 final class Utf8EndecDeprecation
 {
     public static function message(string $function): string
     {
-        return 'Function '.$function.'() is deprecated';
+        return 'Function '.$function.'() is deprecated since 8.2, visit the php.net documentation for various alternatives';
     }
 
     public static function emitVm(Frame $frame, string $function): void
