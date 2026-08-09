@@ -14550,10 +14550,16 @@ class JIT {
                         $name->value,
                         \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
                     );
+                    $setVis = (int) ($op->propertySetVisibility ?? 0);
+                    $setVis = \PHPCompiler\PropertyVisibility::withImplicitReadonlyProtectedSet(
+                        $op->propertyReadonly || $this->context->scope->classIsReadonly,
+                        \PHPCompiler\MethodVisibility::mask($op->propertyVisibility),
+                        $setVis
+                    );
                     $this->context->type->object->definePropertySetVisibility(
                         $classId,
                         $name->value,
-                        (int) ($op->propertySetVisibility ?? 0)
+                        $setVis
                     );
                     $this->context->type->object->definePropertyGetVisibility(
                         $classId,

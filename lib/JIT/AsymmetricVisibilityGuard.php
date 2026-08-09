@@ -77,6 +77,11 @@ final class AsymmetricVisibilityGuard
         $propName = $lvalue->objectPropertyName;
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
         $classId = $objectType->lookup($declaringClass);
+        // Readonly ordinary writes use ReadonlyClassGuard; aviz applies on clone-with reinit (#29186).
+        if ($objectType->isPropertyReadonly($classId, $propName)
+            || $objectType->isReadonlyClass($classId)) {
+            return false;
+        }
         $readVis = $objectType->propertyVisibility($classId, $propName);
         $effectiveRead = PropertyVisibility::effectiveGetVisibility(
             $readVis,
