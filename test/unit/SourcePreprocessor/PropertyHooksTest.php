@@ -316,9 +316,12 @@ PHP;
         self::assertSame('__phpc_property_set_x', $registry['box']['x']['set'] ?? null);
     }
 
-    public function testLowersGetParamBlockHook(): void
+    public function testRejectsGetHookWithParameterList(): void
     {
-        $src = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
 <?php
 class C {
     private string $_data = 'abcdef';
@@ -329,18 +332,24 @@ class C {
     }
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringNotContainsString('$chunk {', $out);
-        self::assertStringContainsString('public string $chunk;', $out);
-        self::assertStringContainsString('function __phpc_property_get_chunk($len)', $out);
-        self::assertStringContainsString('return substr($this->_data, 0, $len);', $out);
-        self::assertSame('__phpc_property_get_chunk', $registry['c']['chunk']['get'] ?? null);
-        self::assertTrue($registry['c']['chunk']['getParameterized'] ?? false);
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::getHookParameterListCompileError('C', 'chunk'));
+            (new PropertyHooks())->process($src, 'hook_get_with_param.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
-    public function testLowersGetParamArrowHook(): void
+    public function testRejectsGetHookArrowWithParameterListAndEmptyParens(): void
     {
-        $src = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $arrow = <<<'PHP'
 <?php
 class C {
     private string $_data = 'abcdef';
@@ -349,10 +358,58 @@ class C {
     }
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('function __phpc_property_get_chunk($len)', $out);
-        self::assertStringContainsString('return substr($this->_data, 0, $len);', $out);
-        self::assertTrue($registry['c']['chunk']['getParameterized'] ?? false);
+            try {
+                (new PropertyHooks())->process($arrow, 'hook_get_arrow_param.php');
+                self::fail('Expected CompileFatal for get ($len) =>');
+            } catch (CompileFatal $e) {
+                self::assertSame(PropertyHooks::getHookParameterListCompileError('C', 'chunk'), $e->getMessage());
+            }
+
+            $empty = <<<'PHP'
+<?php
+class C {
+    public $x {
+        get() {
+            return 1;
+        }
+    }
+}
+PHP;
+            try {
+                (new PropertyHooks())->process($empty, 'hook_get_empty_parens.php');
+                self::fail('Expected CompileFatal for get()');
+            } catch (CompileFatal $e) {
+                self::assertSame(PropertyHooks::getHookParameterListCompileError('C', 'x'), $e->getMessage());
+            }
+
+            $legal = <<<'PHP'
+<?php
+class C {
+    public $x = 1 {
+        get => $this->x;
+    }
+    public $y {
+        get { return 2; }
+    }
+    public $z = 3 {
+        &get { return $this->z; }
+    }
+}
+PHP;
+            [$out, $registry] = (new PropertyHooks())->process($legal, 'hook_get_legal.php');
+            self::assertStringContainsString('function __phpc_property_get_x', $out);
+            self::assertStringContainsString('function __phpc_property_get_y', $out);
+            self::assertStringContainsString('function &__phpc_property_get_z', $out);
+            self::assertArrayNotHasKey('getParameterized', $registry['c']['x'] ?? []);
+            self::assertArrayNotHasKey('getParameterized', $registry['c']['y'] ?? []);
+            self::assertArrayNotHasKey('getParameterized', $registry['c']['z'] ?? []);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testRejectsStaticPropertyHooksOnForwardProfile(): void

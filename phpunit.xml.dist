@@ -144,6 +144,7 @@
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetVMTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetJITTest.php</file>
             <file>./test/compliance/PropertyHookSetUntypedValueRejectVMTest.php</file>
+            <file>./test/compliance/PropertyHookGetParamRejectVMTest.php</file>
             <file>./test/compliance/PropertyHookSetTypedValueOkVMTest.php</file>
             <file>./test/compliance/FinalAbstractHookedPropertyRejectVMTest.php</file>
             <file>./test/compliance/AvizVirtualGetOnlyRejectVMTest.php</file>

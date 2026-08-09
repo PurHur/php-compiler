@@ -75,6 +75,14 @@ final class PropertyHooks
      */
     public const SET_HOOK_PARAM_BY_REF_COMPILE_ERROR = 'Parameter $%s of %s hook %s::$%s must not be pass-by-reference';
 
+    /**
+     * php-src: Zend/zend_property_hooks.c / zend_compile.c — get hook must not declare a parameter list (#29444).
+     *
+     * {@code get($unused)}, empty {@code get()}, and {@code get ($len) => …} are all compile-fatal;
+     * legal forms are {@code get =>}, {@code get \{ … \}}, and {@code &get} without parentheses.
+     */
+    public const GET_HOOK_PARAMETER_LIST_COMPILE_ERROR = 'get hook of property %s::$%s must not have a parameter list';
+
     /** Zend 8.2 reference profile — default initializer + hook block (#12574). */
     public const REFERENCE_PROFILE_UNEXPECTED_ARROW = 'syntax error, unexpected token "=>"';
 
@@ -1669,42 +1677,16 @@ final class PropertyHooks
                 continue;
             }
             if (preg_match('/^get\s*\(/s', $rest)) {
-                $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
-                if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
-                    $params = trim($pm[1]);
-                    $rest = substr($rest, strlen($pm[0])) ?? $rest;
-                    [$expr, $rest] = $this->takeUntilSemicolon($rest);
-                    $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
-                    $this->registerHookBacking($lcClass, $prop, 'get', $expr, $isStatic);
-                    $body = '{ return '.$expr.'; }';
-                    $method = self::GET_METHOD_PREFIX.$prop;
-                    $methods[] = $this->hookMethodDecl($isStatic, $method, $params, $body, $propertyType, $byRef, false, $hookAttrs);
-                    $this->registerHook($lcClass, $prop, 'get', $method, $isStatic, $hookFinal, $byRef);
-                    $this->registerHookParameterizedGet($lcClass, $prop);
-                    continue;
-                }
-                if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
-                    break;
-                }
-                $params = trim($pm[1]);
-                $rest = substr($rest, strlen($pm[0]) - 1);
-                [$body, $rest] = $this->takeBraceBody($rest);
-                $methods = array_merge(
-                    $methods,
-                    $this->lowerGetBlockHook(
-                        $lcClass,
-                        $prop,
-                        $isStatic,
-                        $params,
-                        $body,
-                        $usesBacking,
-                        $propertyType,
-                        $hookFinal,
-                        $byRef,
-                        $hookAttrs
-                    )
+                // php-src: get hook must not have a parameter list — including empty get() (#29444).
+                $this->rejectGetHookParameterList(
+                    $classNameForError,
+                    $prop,
+                    $filename,
+                    $lineCode,
+                    $lineOffset
                 );
-                continue;
+                // Unreachable when property hooks are enabled (throws). On reference profile, stop.
+                break;
             }
             if (preg_match('/^get\s*\{/s', $rest)) {
                 $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
@@ -2278,6 +2260,31 @@ final class PropertyHooks
         }
 
         return $params;
+    }
+
+    /**
+     * php-src: Zend/zend_property_hooks.c — get hook with {@code (…)} is compile-fatal (#29444).
+     */
+    private function rejectGetHookParameterList(
+        string $classDisplay,
+        string $prop,
+        string $filename,
+        string $fullCode,
+        int $hookOpenOffsetInFile
+    ): void {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+            self::getHookParameterListCompileError($classDisplay, $prop)
+        );
+    }
+
+    public static function getHookParameterListCompileError(string $className, string $propName): string
+    {
+        return sprintf(self::GET_HOOK_PARAMETER_LIST_COMPILE_ERROR, $className, $propName);
     }
 
     /**
