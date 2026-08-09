@@ -10,7 +10,11 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
-/** Dom\HTMLDocument::querySelector() — VM (php-src ext/dom/parentnode.c; #19580). */
+/**
+ * Dom\Document::querySelector() — VM (php-src ext/dom/parentnode.c; #19580, #29453).
+ *
+ * Declared on abstract Dom\Document; inherited by HTMLDocument + XMLDocument.
+ */
 final class HtmlDocumentQuerySelector extends VmClassMethod
 {
     public function __construct()
@@ -20,11 +24,11 @@ final class HtmlDocumentQuerySelector extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $receiver = $this->htmlDocumentReceiver($frame, 'Dom\\HTMLDocument::querySelector()');
+        $receiver = $this->documentReceiver($frame, 'Dom\\Document::querySelector()');
         if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('Dom\\HTMLDocument::querySelector() expects exactly 1 argument, 0 given');
+            throw new \ArgumentCountError('Dom\\Document::querySelector() expects exactly 1 argument, 0 given');
         }
-        $selectors = $this->stringArg($frame->calledArgs[1], 'Dom\\HTMLDocument::querySelector()', 0, 'selectors');
+        $selectors = $this->stringArg($frame->calledArgs[1], 'Dom\\Document::querySelector()', 0, 'selectors');
         $found = VmDomLiving::querySelector($receiver, $selectors);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($found): void {
             if (null === $found) {
@@ -35,7 +39,7 @@ final class HtmlDocumentQuerySelector extends VmClassMethod
         });
     }
 
-    private function htmlDocumentReceiver(Frame $frame, string $label): ObjectEntry
+    private function documentReceiver(Frame $frame, string $label): ObjectEntry
     {
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException($label.' called without $this');
@@ -49,8 +53,8 @@ final class HtmlDocumentQuerySelector extends VmClassMethod
             ));
         }
         $object = $var->toObject();
-        if (VmDomLiving::CLASS_HTML_DOCUMENT !== strtolower($object->class->name)) {
-            throw new \TypeError($label.' must be called on a Dom\\HTMLDocument instance');
+        if (!VmDomLiving::isLivingDocument($object)) {
+            throw new \TypeError($label.' must be called on a Dom\\Document instance');
         }
 
         return $object;
@@ -61,7 +65,7 @@ final class HtmlDocumentQuerySelector extends VmClassMethod
         $var = $var->resolveIndirect();
         if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
             throw new \TypeError(sprintf(
-                '%s expects argument #%d ($%s) to be of type string, %s given',
+                '%s: Argument #%d ($%s) must be of type string, %s given',
                 $label,
                 $index + 1,
                 $paramName,

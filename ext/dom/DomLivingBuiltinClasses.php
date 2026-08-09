@@ -478,6 +478,21 @@ final class DomLivingBuiltinClasses
         $document->methods['importlegacynode'] = new DocumentImportLegacyNode();
         $document->methodVisibility['importlegacynode'] = $pub;
         $document->methodNames['importlegacynode'] = 'importLegacyNode';
+        // ParentNode selectors on Dom\Document — inherited by HTMLDocument + XMLDocument
+        // (php-src php_dom.stub.php / parentnode.c; #29453).
+        $document->methods['queryselector'] = new HtmlDocumentQuerySelector();
+        $document->methodVisibility['queryselector'] = $pub;
+        $document->methodNames['queryselector'] = 'querySelector';
+        $document->methods['queryselectorall'] = new HtmlDocumentQuerySelectorAll();
+        $document->methodVisibility['queryselectorall'] = $pub;
+        $document->methodNames['queryselectorall'] = 'querySelectorAll';
+        if (null !== $elementRet) {
+            $document->methodReturnDeclaredTypes['queryselector'] = $elementRet;
+        }
+        $nodeListRet = ReflectionTypeSupport::cfgTypeFromLabel('Dom\\NodeList');
+        if (null !== $nodeListRet) {
+            $document->methodReturnDeclaredTypes['queryselectorall'] = $nodeListRet;
+        }
         $ctx->classes[VmDomLiving::CLASS_DOCUMENT] = $document;
 
         $htmlDocument = new ClassEntry('Dom\\HTMLDocument');
@@ -505,17 +520,18 @@ final class DomLivingBuiltinClasses
         $htmlDocument->methods['getelementbyid'] = new HtmlDocumentGetElementById();
         $htmlDocument->methodVisibility['getelementbyid'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['getelementbyid'] = 'getElementById';
-        $htmlDocument->methods['queryselector'] = new HtmlDocumentQuerySelector();
+        // Also bind on concrete class for AOT method tables; declaring scope remains Dom\Document (#29453).
+        $htmlDocument->methods['queryselector'] = $document->methods['queryselector'];
         $htmlDocument->methodVisibility['queryselector'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['queryselector'] = 'querySelector';
-        $htmlDocument->methods['queryselectorall'] = new HtmlDocumentQuerySelectorAll();
+        $htmlDocument->methodDeclaringClassLc['queryselector'] = VmDomLiving::CLASS_DOCUMENT;
+        $htmlDocument->methods['queryselectorall'] = $document->methods['queryselectorall'];
         $htmlDocument->methodVisibility['queryselectorall'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['queryselectorall'] = 'querySelectorAll';
-        // ParentNode selector returns (php-src php_dom.stub.php; #28741).
+        $htmlDocument->methodDeclaringClassLc['queryselectorall'] = VmDomLiving::CLASS_DOCUMENT;
         if (null !== $elementRet) {
             $htmlDocument->methodReturnDeclaredTypes['queryselector'] = $elementRet;
         }
-        $nodeListRet = ReflectionTypeSupport::cfgTypeFromLabel('Dom\\NodeList');
         if (null !== $nodeListRet) {
             $htmlDocument->methodReturnDeclaredTypes['queryselectorall'] = $nodeListRet;
         }
@@ -572,13 +588,26 @@ final class DomLivingBuiltinClasses
             $xmlDocument->methodReturnDeclaredTypes['createfromfile'] = $xmlDocRet;
             $xmlDocument->methodReturnDeclaredTypes['createempty'] = $xmlDocRet;
         }
-        // Inherited getElementById / saveXml Reflection when looked up on XMLDocument (#28740).
+        // Inherited getElementById / saveXml / querySelector* Reflection on XMLDocument (#28740, #29453).
         if (null !== $elementRet) {
             $xmlDocument->methodReturnDeclaredTypes['getelementbyid'] = $elementRet;
+            $xmlDocument->methodReturnDeclaredTypes['queryselector'] = $elementRet;
         }
         if (null !== $saveXmlRet) {
             $xmlDocument->methodReturnDeclaredTypes['savexml'] = $saveXmlRet;
         }
+        if (null !== $nodeListRet) {
+            $xmlDocument->methodReturnDeclaredTypes['queryselectorall'] = $nodeListRet;
+        }
+        // Concrete-class bind for AOT method_exists / invoke; declaring scope Dom\Document (#29453).
+        $xmlDocument->methods['queryselector'] = $document->methods['queryselector'];
+        $xmlDocument->methodVisibility['queryselector'] = CfgFunc::FLAG_PUBLIC;
+        $xmlDocument->methodNames['queryselector'] = 'querySelector';
+        $xmlDocument->methodDeclaringClassLc['queryselector'] = VmDomLiving::CLASS_DOCUMENT;
+        $xmlDocument->methods['queryselectorall'] = $document->methods['queryselectorall'];
+        $xmlDocument->methodVisibility['queryselectorall'] = CfgFunc::FLAG_PUBLIC;
+        $xmlDocument->methodNames['queryselectorall'] = 'querySelectorAll';
+        $xmlDocument->methodDeclaringClassLc['queryselectorall'] = VmDomLiving::CLASS_DOCUMENT;
         self::copySelectedMethods(
             $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
             $xmlDocument,

@@ -146,7 +146,7 @@ final class VmDomJitDispatch
     }
 
     /**
-     * Dom\HTMLDocument::querySelector() — php-src parentnode.c (#19580).
+     * Dom\Document::querySelector() — php-src parentnode.c (#19580, #29453).
      *
      * @param list<Variable> $extra
      */
@@ -165,7 +165,7 @@ final class VmDomJitDispatch
     }
 
     /**
-     * Dom\HTMLDocument::querySelectorAll() — php-src parentnode.c (#19580).
+     * Dom\Document::querySelectorAll() — php-src parentnode.c (#19580, #29453).
      *
      * @param list<Variable> $extra
      */

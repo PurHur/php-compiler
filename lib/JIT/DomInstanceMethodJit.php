@@ -161,6 +161,10 @@ final class DomInstanceMethodJit
         'dom\\tokenlist::getiterator' => true,
         'dom\\htmldocument::queryselector' => true,
         'dom\\htmldocument::queryselectorall' => true,
+        'dom\\document::queryselector' => true,
+        'dom\\document::queryselectorall' => true,
+        'dom\\xmldocument::queryselector' => true,
+        'dom\\xmldocument::queryselectorall' => true,
         'dom\\htmldocument::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
         'domimplementation::createdocumenttype' => true,
@@ -625,6 +629,10 @@ final class DomInstanceMethodJit
             }
             if ('dom\\htmldocument::queryselector' === $lc
                 || 'dom\\htmldocument::queryselectorall' === $lc
+                || 'dom\\document::queryselector' === $lc
+                || 'dom\\document::queryselectorall' === $lc
+                || 'dom\\xmldocument::queryselector' === $lc
+                || 'dom\\xmldocument::queryselectorall' === $lc
                 || 'dom\\htmldocument::getelementbyid' === $lc
                 || 'dom\\htmldocument::savehtml' === $lc
                 || 'dom\\element::rename' === $lc
@@ -802,6 +810,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domimplementation::createdocumenttype');
             self::ensureProxy($context, 'dom\\htmldocument::queryselector');
             self::ensureProxy($context, 'dom\\htmldocument::queryselectorall');
+            self::ensureProxy($context, 'dom\\document::queryselector');
+            self::ensureProxy($context, 'dom\\document::queryselectorall');
+            self::ensureProxy($context, 'dom\\xmldocument::queryselector');
+            self::ensureProxy($context, 'dom\\xmldocument::queryselectorall');
             self::ensureProxy($context, 'dom\\htmldocument::getelementbyid');
             self::ensureProxy($context, 'dom\\htmldocument::savehtml');
             self::ensureProxy($context, 'dom\\attr::rename');
