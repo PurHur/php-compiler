@@ -147,6 +147,7 @@
             <file>./test/compliance/PropertyHookSetTypedValueOkVMTest.php</file>
             <file>./test/compliance/FinalAbstractHookedPropertyRejectVMTest.php</file>
             <file>./test/compliance/AvizVirtualGetOnlyRejectVMTest.php</file>
+            <file>./test/compliance/FinalPrivateHookedPropertyRejectVMTest.php</file>
             <file>./test/compliance/PropertyHookWriteOnlyVirtualCoalesceVMTest.php</file>
             <file>./test/compliance/PropertyHookWriteOnlyVirtualCoalesceJITTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnVMTest.php</file>

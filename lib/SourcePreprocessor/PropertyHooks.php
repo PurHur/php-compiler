@@ -26,6 +26,14 @@ final class PropertyHooks
      */
     public const FINAL_ABSTRACT_PROPERTY_COMPILE_ERROR = 'Cannot use the final modifier on an abstract property';
 
+    /**
+     * php-src: Zend/zend_compile.c zend_add_member_modifier — #29425.
+     *
+     * {@code final} + {@code private} (read visibility) is illegal; {@code private(set)} is not
+     * the same as private read visibility and remains allowed with {@code final}.
+     */
+    public const FINAL_PRIVATE_PROPERTY_COMPILE_ERROR = 'Property cannot be both final and private';
+
     /** php-src: Zend/zend_compile.c — `private(set)` decl + hook block requires set hook (#12203). */
     public const ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
 
@@ -1331,6 +1339,21 @@ final class PropertyHooks
                     $filename,
                     self::lineAtOffset($fullCode, $bodyOffsetInFile + $declStart),
                     self::FINAL_ABSTRACT_PROPERTY_COMPILE_ERROR
+                );
+            }
+            // php-src zend_add_member_modifier — final+private read visibility (#29425).
+            // Strip asymmetric `*(set)` first so `final public private(set)` stays legal.
+            $headSansAsymSet = preg_replace(
+                '/\b(?:public|protected|private)\s*\(\s*set\s*\)/i',
+                '',
+                $ownDeclHead
+            ) ?? $ownDeclHead;
+            $isPrivateProperty = (bool) preg_match('/\bprivate\b/', $headSansAsymSet);
+            if ($isFinalProperty && $isPrivateProperty) {
+                throw new CompileFatal(
+                    $filename,
+                    self::lineAtOffset($fullCode, $bodyOffsetInFile + $declStart),
+                    self::FINAL_PRIVATE_PROPERTY_COMPILE_ERROR
                 );
             }
             if ($isAbstractHook) {
