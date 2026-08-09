@@ -184,8 +184,12 @@ final class JitMcjitEmbed
     private static function findBraceBalancedClassDeclarations(string $mask): array
     {
         $matches = [];
+        // Named: `class Foo … {` / `readonly class Foo … {`
+        // Anonymous: `new class {` / `new readonly class {` / `class extends X {` (#29250)
+        // Require a name OR extends/implements/`{` after `class` so `::class` / `get_class`
+        // cannot span into a later brace (#27156 / #29030).
         if (!preg_match_all(
-            '/\b((?:(?:abstract\s+|final\s+|readonly\s+)*)class\s+(?:[\w\\\\]+)\b[^{]*)\{/',
+            '/\b((?:(?:abstract\s+|final\s+|readonly\s+)*)class\s+(?:[\w\\\\]+\b|(?=extends\b|implements\b|\{))[^{]*)\{/',
             $mask,
             $headers,
             PREG_OFFSET_CAPTURE

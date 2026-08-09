@@ -278,6 +278,36 @@ PHP;
         $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
     }
 
+    /** @covers issue #29250 — anonymous readonly + promoted-only needs MCJIT bootstrap */
+    public function testPrependsBootstrapForAnonymousReadonlyPromotedOnlyClass(): void
+    {
+        $in = <<<'PHP'
+<?php
+$o = new readonly class {
+    public function __construct(public int $x = 1) {}
+};
+$o->x = 2;
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+    }
+
+    /** @covers issue #29250 — anonymous promoted-only (non-readonly) gets class pad */
+    public function testPadsAnonymousPromotedOnlyClass(): void
+    {
+        $in = <<<'PHP'
+<?php
+$o = new class {
+    public function __construct(public int $x = 1) {}
+};
+echo $o->x;
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringNotContainsString('__phpc_mcjit_embed_bootstrap', $out);
+    }
+
     /** @covers issue #8967 */
     public function testPadsEmptyReadonlyClassWithoutPropertyDefault(): void
     {

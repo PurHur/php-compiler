@@ -15377,6 +15377,7 @@ restart:
         }
         $uninitialized = !$owner->hasProperty($prop)
             || VM\TypedPropertyCheck::isUninitialized($owner->getProperty($prop));
+        $declaringClass = MethodVisibility::formatAnonymousScopeForMessage($declaringClass);
         $message = $uninitialized
             ? sprintf('Cannot indirectly modify readonly property %s::$%s', $declaringClass, $prop)
             : sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop);
@@ -15494,6 +15495,8 @@ restart:
         string $declaringClass,
         Frame $frame
     ): string {
+        // Strip @anonymous\0file:line$id provenance for Error messages (#29250 / #26031).
+        $declaringClass = MethodVisibility::formatAnonymousScopeForMessage($declaringClass);
         if ($owner->hasProperty($prop)) {
             $slot = $owner->getProperty($prop);
             if (VM\TypedPropertyCheck::isUninitialized($slot)) {

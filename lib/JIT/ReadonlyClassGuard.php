@@ -109,7 +109,9 @@ final class ReadonlyClassGuard
             if ('unset' === $violation) {
                 $isUninit = self::emitPropertySlotIsUninitialized($context, $lvalue);
                 $violatePlain = $fn->appendBasicBlock('readonly_unset_plain_'.$id);
-                $declaringClass = $objectType->classNameForId($id);
+                $declaringClass = \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
+                    $objectType->classNameForId($id)
+                );
                 if ($mayFirstInit && null !== $isUninit) {
                     $context->builder->branchIf($isUninit, $storeBlock, $violatePlain);
                 } elseif (null !== $isUninit) {
@@ -185,7 +187,9 @@ final class ReadonlyClassGuard
             }
             $context->builder->branch($storeBlock);
             $context->builder->positionAtEnd($violateBlock);
-            $declaringClass = $objectType->classNameForId($id);
+            $declaringClass = \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
+                $objectType->classNameForId($id)
+            );
             $message = sprintf(
                 'Cannot modify readonly property %s::$%s',
                 $declaringClass,
@@ -382,8 +386,10 @@ final class ReadonlyClassGuard
         if (null === $callerClassId || $callerClassId === $meta['declaringClassId']) {
             return false;
         }
-        $declaringClass = $meta['declaringClassName'];
-        $callerClass = $objectType->classNameForId($callerClassId);
+        $declaringClass = MethodVisibility::formatAnonymousScopeForMessage($meta['declaringClassName']);
+        $callerClass = MethodVisibility::formatAnonymousScopeForMessage(
+            $objectType->classNameForId($callerClassId)
+        );
         $message = sprintf(
             'Cannot initialize readonly property %s::$%s from scope %s',
             $declaringClass,
@@ -546,7 +552,9 @@ final class ReadonlyClassGuard
                 $propName
             );
         }
-        $callerClass = $objectType->classNameForId($callerClassId);
+        $callerClass = MethodVisibility::formatAnonymousScopeForMessage(
+            $objectType->classNameForId($callerClassId)
+        );
 
         return sprintf(
             'Cannot unset readonly property %s::$%s from scope %s',
