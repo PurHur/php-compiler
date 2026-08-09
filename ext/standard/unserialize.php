@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -29,10 +30,9 @@ final class unserialize extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/var.c — ArgumentCountError (#28474).
+        $this->requireArgCountRange($frame, 'unserialize', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \LogicException('unserialize() requires at least one argument');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -77,8 +77,12 @@ final class unserialize extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('unserialize() requires at least one argument');
+        if (!$this->requireArgCountRangeJit($context, $args, 'unserialize', 1, 2)) {
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
         }
         $options = null;
         if (\count($args) > 1) {

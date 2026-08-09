@@ -12,6 +12,7 @@ use PHPCompiler\Handler;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitBoolArg;
@@ -155,8 +156,8 @@ abstract class Internal extends Func implements Handler, Call
     /**
      * Arity guard for JIT/AOT builtin lowering (#4145).
      *
-     * Emits a pending ArgumentCountError in LLVM IR (AOT-safe) instead of throwing
-     * during compile-time lowering. Returns false when argc is wrong.
+     * Emits a catchable ArgumentCountError (AndAbort) so standalone AOT throws (#27763 / #28474).
+     * Returns false when argc is wrong (caller should return a dummy value for IR validity).
      *
      * @param JITVariable[] $args
      */
@@ -164,10 +165,13 @@ abstract class Internal extends Func implements Handler, Call
     {
         $argc = \count($args);
         if ($argc !== $expected) {
-            ExceptionBridge::emitArgumentCountError(
+            // AndAbort so standalone AOT throws / is catchable (#27763 / #28474); pending-only is silent.
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
                 self::exactArgCountMessage($function, $expected, $argc)
             );
+            // Catchable path terminates the insert BB; open a fresh one for the caller's dummy return.
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
 
             return false;
         }
@@ -182,10 +186,11 @@ abstract class Internal extends Func implements Handler, Call
     {
         $argc = \count($args);
         if ($argc < $minimum) {
-            ExceptionBridge::emitArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
                 self::atLeastArgCountMessage($function, $minimum, $argc)
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
 
             return false;
         }
@@ -200,10 +205,11 @@ abstract class Internal extends Func implements Handler, Call
     {
         $argc = \count($args);
         if ($argc > $maximum) {
-            ExceptionBridge::emitArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
                 self::atMostArgCountMessage($function, $maximum, $argc)
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
 
             return false;
         }
@@ -218,18 +224,20 @@ abstract class Internal extends Func implements Handler, Call
     {
         $argc = \count($args);
         if ($argc < $minimum) {
-            ExceptionBridge::emitArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
                 self::atLeastArgCountMessage($function, $minimum, $argc)
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
 
             return false;
         }
         if ($argc > $maximum) {
-            ExceptionBridge::emitArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
                 self::atMostArgCountMessage($function, $maximum, $argc)
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
 
             return false;
         }

@@ -23,10 +23,8 @@ final class serialize extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \LogicException('serialize() requires at least one argument');
-        }
+        // php-src ext/standard/var.c — ArgumentCountError (#28474).
+        $this->requireExactArgCount($frame, 'serialize', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -40,8 +38,8 @@ final class serialize extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('serialize() requires at least one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'serialize', 1)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
 
         $compileTime = self::compileTimeSerialize($context, $args[0]);

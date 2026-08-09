@@ -30,17 +30,8 @@ final class json_decode extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0])) {
-            throw new \LogicException('json_decode() requires at least one argument');
-        }
-        foreach (\array_keys($frame->calledArgs) as $idx) {
-            if ($idx < 0 || $idx > 3) {
-                throw new \ArgumentCountError(\sprintf(
-                    'json_decode() expects at most 4 arguments, %d given',
-                    $idx + 1
-                ));
-            }
-        }
+        // php-src ext/json/php_json.c — ArgumentCountError (#28474).
+        $this->requireArgCountRange($frame, 'json_decode', 1, 4);
         $json = JsonStringOperandArg::vmJson($frame, 'json_decode');
         $depth = 512;
         if (isset($frame->calledArgs[2])) {
@@ -79,12 +70,8 @@ final class json_decode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1) {
-            throw new \LogicException('json_decode() requires at least one argument');
-        }
-        if ($argc > 4) {
-            throw new \LogicException('json_decode() expects at most 4 arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'json_decode', 1, 4)) {
+            return JitJsonDecode::materializeNull($context);
         }
         $depth = self::resolveDepthJit($context, $args);
         $flags = self::resolveFlagsJit($context, $args);

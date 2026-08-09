@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -20,10 +21,8 @@ final class var_export extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('var_export() requires one or two arguments in this compiler build');
-        }
+        // php-src ext/standard/var.c — ArgumentCountError (#28474).
+        $this->requireArgCountRange($frame, 'var_export', 1, 2);
         $v = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($v);
         $return = false;
@@ -47,6 +46,14 @@ final class var_export extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireArgCountRangeJit($context, $args, 'var_export', 1, 2)) {
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
+        }
+
         return JitVarExport::invoke($context, ...$args);
     }
 }
