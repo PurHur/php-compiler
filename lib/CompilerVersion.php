@@ -1699,6 +1699,32 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ E_DEPRECATED for {@code assert_options()} and {@code ASSERT_*} constants.
+     *
+     * php-src: ext/standard/basic_functions.stub.php — `#[\Deprecated(since: '8.3')]` on
+     * assert_options; `@deprecated` on ASSERT_* (#29209). Withheld on 8.4.0-dev reference /
+     * unset PROFILE (matches Zend 8.2 silence). Enable via stable 8.4.0+ or explicit
+     * {@code PHP_COMPILER_PROFILE=8.3} / {@code 8.4} / {@code 8.5}.
+     */
+    public static function supportsAssertOptionsDeprecation(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ E_DEPRECATED for {@code trigger_error(..., E_USER_ERROR)} / {@code user_error(..., E_USER_ERROR)}.
      *
      * php-src: Zend/zend_builtin_functions.c — "Passing E_USER_ERROR to trigger_error() is

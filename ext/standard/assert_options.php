@@ -28,6 +28,8 @@ final class assert_options extends Internal
                 'assert_options() expects at least 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
+        // #[\Deprecated(since: '8.3')] — E_DEPRECATED under PROFILE≥8.3 (#29209).
+        AssertDeprecation::emitAssertOptions($frame);
         $what = $frame->calledArgs[0]->resolveIndirect()->toInt();
         if (1 === $argc) {
             $result = VmAssertState::getOption($what);
