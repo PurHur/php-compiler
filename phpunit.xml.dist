@@ -111,6 +111,7 @@
             <file>./test/compliance/StreamIsattyReflectionVMTest.php</file>
             <file>./test/compliance/StreamSelectReflectionVMTest.php</file>
             <file>./test/compliance/StreamSocketClientReflectionVMTest.php</file>
+            <file>./test/compliance/StreamSocketServerReflectionVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorReflectionVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorHandledVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorHandledJITTest.php</file>
