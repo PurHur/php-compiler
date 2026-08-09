@@ -66,6 +66,73 @@ PHP;
         $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
     }
 
+    /** Three-arg null $from/$to — DEP+coerce under PROFILE=8.4 (#29308). */
+    public function testVmThreeArgNullSoftMatchesZend84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $code = (string) file_get_contents(
+                dirname(__DIR__, 2).'/test/repro/issue_29308_strtr_three_arg_null.php'
+            );
+            $expect = "== from_null ==\n"
+                ."OK:'a'\n"
+                ."DEP:strtr(): Passing null to parameter #2 (\$from) of type array|string is deprecated\n"
+                ."== to_null ==\n"
+                ."OK:'a'\n"
+                ."DEP:strtr(): Passing null to parameter #3 (\$to) of type ?string is deprecated\n"
+                ."== both_null ==\n"
+                ."OK:'a'\n"
+                ."DEP:strtr(): Passing null to parameter #2 (\$from) of type array|string is deprecated\n"
+                ."DEP:strtr(): Passing null to parameter #3 (\$to) of type ?string is deprecated\n"
+                ."== two_arg_null ==\n"
+                ."TypeError:strtr(): Argument #2 (\$from) must be of type array, string given\n";
+            $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotThreeArgNullSoftMatchesZend84(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            // DEP labels covered by VM test; AOT asserts soft-null return values (#29308).
+            $code = <<<'PHP'
+error_reporting(0);
+echo 'from_null:'.var_export(strtr('a', null, 'x'), true)."\n";
+echo 'to_null:'.var_export(strtr('a', 'a', null), true)."\n";
+echo 'both_null:'.var_export(strtr('a', null, null), true)."\n";
+PHP;
+            $expect = "from_null:'a'\nto_null:'a'\nboth_null:'a'\n";
+            $this->assertSame($expect, $this->runAotBinary($code));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
     /**
      * @group llvm
      * @group jit

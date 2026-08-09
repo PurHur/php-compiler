@@ -26,9 +26,9 @@ final class JitStrtr
         ?JITVariable $toArg = null
     ): Value {
         if (null !== $subjectArg && null !== $fromArg && null !== $toArg) {
-            $sLit = JitStringArg::compileTimeLiteral($subjectArg);
-            $fLit = JitStringArg::compileTimeLiteral($fromArg);
-            $tLit = JitStringArg::compileTimeLiteral($toArg);
+            $sLit = self::compileTimeStringOrNullCoerced($subjectArg);
+            $fLit = self::compileTimeStringOrNullCoerced($fromArg);
+            $tLit = self::compileTimeStringOrNullCoerced($toArg);
             if (null !== $sLit && null !== $fLit && null !== $tLit) {
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::strtr($sLit, $fLit, $tLit))
@@ -43,6 +43,21 @@ final class JitStrtr
             $from,
             $to
         );
+    }
+
+    /**
+     * Compile-time string literal, or '' for null constants (Z_PARAM_STR soft-null, #29308).
+     *
+     * Soft-null lowers emit E_DEPRECATED then an empty string Value; folding here keeps
+     * constant null args off the NestedJIT empty-$from hang path in __compiler_strtr.
+     */
+    private static function compileTimeStringOrNullCoerced(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return '';
+        }
+
+        return JitStringArg::compileTimeLiteral($arg);
     }
 
     public static function translateArray(

@@ -36,18 +36,10 @@ final class strtr extends Internal
         }
         if (3 === $argc) {
             $string = self::vmStringArg($frame, 0, 'string');
-            $from = VmString::coerceZparamStrBuiltinArg(
-                $frame->calledArgs[1],
-                'strtr',
-                1,
-                'from'
-            );
-            $to = VmString::coerceZparamStrBuiltinArg(
-                $frame->calledArgs[2],
-                'strtr',
-                2,
-                'to'
-            );
+            // php-src string.c PHP_FUNCTION(strtr) 3-arg: Z_PARAM_STR($from) / Z_PARAM_STRING($to)
+            // — null DEP+coerce on 8.4 (not TypeError). Labels: array|string / ?string (#29308).
+            $from = self::vmThreeArgSpanString($frame, 1, 'from', 'array|string');
+            $to = self::vmThreeArgSpanString($frame, 2, 'to', '?string');
             $result = VmString::strtr($string, $from, $to);
             BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->string($result));
 
@@ -64,11 +56,35 @@ final class strtr extends Internal
             return JitStrtr::translateArray($context, $args[0], $args[1]);
         }
         if (3 === \count($args)) {
+            // Soft-null outside strict_types; strict TypeError uses "string" like Zend (#29308).
+            $fromExpected = $context->callerStrictTypes ? 'string' : 'array|string';
+            $toExpected = $context->callerStrictTypes ? 'string' : '?string';
+
             return JitStrtr::translate(
                 $context,
                 JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strtr', 0, 'string'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strtr', 1, 'from'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'strtr', 2, 'to'),
+                JitStringBuiltinArg::lower(
+                    $context,
+                    $args[1],
+                    'strtr',
+                    1,
+                    'from',
+                    $fromExpected,
+                    null,
+                    false,
+                    false
+                ),
+                JitStringBuiltinArg::lower(
+                    $context,
+                    $args[2],
+                    'strtr',
+                    2,
+                    'to',
+                    $toExpected,
+                    null,
+                    false,
+                    false
+                ),
                 $args[0],
                 $args[1],
                 $args[2]
@@ -114,6 +130,31 @@ final class strtr extends Internal
             'strtr',
             $argIndex,
             $paramName
+        );
+    }
+
+    /**
+     * Three-arg $from / $to — soft-null with Zend DEP labels; strict_types → TypeError (#29308).
+     *
+     * php-src: ext/standard/string.c PHP_FUNCTION(strtr); stub array|string $from, ?string $to.
+     */
+    private static function vmThreeArgSpanString(
+        Frame $frame,
+        int $argIndex,
+        string $paramName,
+        string $softExpectedType
+    ): string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strtr', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strtr',
+            $argIndex,
+            $paramName,
+            $softExpectedType,
+            false
         );
     }
 
