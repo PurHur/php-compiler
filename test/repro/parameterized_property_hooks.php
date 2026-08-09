@@ -1,4 +1,5 @@
 <?php
+// #29444 — Zend rejects get($param); previously accepted as #18172 extension.
 declare(strict_types=1);
 
 class C {
