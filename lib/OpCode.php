@@ -439,6 +439,15 @@ class OpCode {
     }
 
     /**
+     * True when {@see $destSlot} is the value of TYPE_RETURN (`return $obj->prop`, #29456).
+     * By-ref functions need a live property alias, not a copy — do not mark assign-lvalue.
+     */
+    public static function destSlotUsedAsReturnValue(self $op, int $destSlot): bool
+    {
+        return self::TYPE_RETURN === $op->type && $op->arg1 === $destSlot;
+    }
+
+    /**
      * True when this opcode uses {@see $destSlot} as the container for dim mutation
      * ($prop[]= / $prop[k]= write, or unset($prop[k]) — #6775, #24250).
      *
