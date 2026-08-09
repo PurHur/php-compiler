@@ -169,8 +169,6 @@ final class JitDate
 
     public static function microtime(Context $context, Value $asFloat): Value
     {
-        StringMicrotime::ensureLinked($context);
-
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
         $isFloat = $context->builder->icmp(
@@ -187,7 +185,7 @@ final class JitDate
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $slotPtr,
-            $context->builder->call($context->lookupFunction('__compiler_microtime_float'))
+            StringMicrotime::invokeFloat($context)
         );
         $context->builder->branch($mergeBb);
 
@@ -195,7 +193,7 @@ final class JitDate
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $slotPtr,
-            $context->builder->call($context->lookupFunction('__compiler_microtime_string'))
+            StringMicrotime::invokeString($context)
         );
         $context->builder->branch($mergeBb);
 

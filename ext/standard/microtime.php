@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** microtime() — sub-second clock (VM VmDate; JIT/AOT StringMicrotime LLVM, #6110/#5045/#2186). */
+/** microtime() — sub-second clock (VM VmDate; JIT/AOT MicrotimeJitHelper via StringMicrotime, #29405/#2186). */
 final class microtime extends Internal
 {
     public function __construct()

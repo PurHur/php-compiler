@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * microtime() semantics reference for VM (#9181, php-in-PHP).
+ * microtime() for compiled JIT/AOT modules (#29405, php-in-PHP).
  *
- * Thin AOT/JIT emit uses libc gettimeofday via {@see \PHPCompiler\JIT\Builtin\StringMicrotime}
- * (NestedJIT of this helper orphans insert blocks / segfaults — #26930).
- * SSOT: {@see VmDate::microtime()}
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(microtime)
+ * Leaf is `@microtime` → NestedJIT whitelist {@see microtime} →
+ * {@see \PHPCompiler\JIT\Builtin\StringMicrotime} thin gettimeofday leaf
+ * (gethostname #29364 / getenv #29313 shape).
+ * php-src: ext/standard/microtime.c — PHP_FUNCTION(microtime)
  */
 final class MicrotimeJitHelper
 {
     public static function microtimeFloat(): float
     {
-        return VmDate::microtime(true);
+        return (float) @\microtime(true);
     }
 
     public static function microtimeString(): string
     {
-        return VmDate::microtime(false);
+        return (string) @\microtime(false);
     }
 }

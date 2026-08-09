@@ -9,27 +9,38 @@ use PHPCompiler\ext\standard\VmDate;
 use PHPUnit\Framework\TestCase;
 
 /**
- * microtime() AOT via libc gettimeofday (#6110, #26930).
+ * microtime() AOT via MicrotimeJitHelper PHP + NestedJIT gettimeofday leaf (#29405).
  */
 final class MicrotimeRuntimeShrinkTest extends TestCase
 {
-    public function testMicrotimeUsesLibcGettimeofdayNotNestedJit(): void
+    public function testMicrotimeRoutesThroughJitVmHelperLink(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMicrotime.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringContainsString('MicrotimeJitHelper', $bridge);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
+        $this->assertStringContainsString('JitMicrotimeKernel::invokeFloat', $bridge);
+        $this->assertStringContainsString('JitMicrotimeKernel::invokeString', $bridge);
         $this->assertStringContainsString('__compiler_microtime_float', $bridge);
         $this->assertStringContainsString('__compiler_microtime_string', $bridge);
-        $this->assertStringContainsString("lookupFunction('gettimeofday')", $bridge);
-        $this->assertStringContainsString('tryGetInsertBlock', $bridge);
-        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $bridge);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
-        $this->assertStringNotContainsString('parseAndCompile', $bridge);
+        $this->assertStringNotContainsString("lookupFunction('gettimeofday')", $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertLessThan(150, \substr_count($bridge, "\n") + 1);
     }
 
-    public function testMicrotimeJitHelperDelegatesToVmDate(): void
+    public function testNestedLeafUsesLibcGettimeofday(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitMicrotimeKernel.php');
+        $this->assertStringContainsString("lookupFunction('gettimeofday')", $source);
+        $this->assertStringContainsString('__phpc_microtime_wall_usec', $source);
+        $this->assertStringContainsString('tryGetInsertBlock', $source);
+    }
+
+    public function testMicrotimeJitHelperUsesHostMicrotimeNotVmDate(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/MicrotimeJitHelper.php');
-        $this->assertStringContainsString('VmDate::microtime', $source);
-        $this->assertStringContainsString('StringMicrotime', $source);
+        $this->assertStringContainsString('@\\microtime', $source);
+        $this->assertStringNotContainsString('VmDate::microtime', $source);
 
         $float = MicrotimeJitHelper::microtimeFloat();
         $this->assertIsFloat($float);
@@ -43,10 +54,19 @@ final class MicrotimeRuntimeShrinkTest extends TestCase
         $this->assertTrue(is_numeric($parts[1]));
     }
 
-    public function testSpineBundleIncludesMicrotimeJitHelper(): void
+    public function testNestedJitAllowlistsMicrotimeBuiltin(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString("'microtime'", $source);
+        $this->assertStringContainsString('#29405', $source);
+        $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
+    }
+
+    public function testSpineBundleIncludesMicrotimeArtifacts(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('MicrotimeJitHelper.php', $spine);
         $this->assertStringContainsString('StringMicrotime.php', $spine);
+        $this->assertStringContainsString('JitMicrotimeKernel.php', $spine);
     }
 }
