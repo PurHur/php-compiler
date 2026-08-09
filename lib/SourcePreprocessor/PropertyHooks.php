@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\Compiler\InheritanceVariance;
 use PHPCompiler\CompilerVersion;
 
 /**
@@ -29,6 +30,16 @@ final class PropertyHooks
 
     /** @see HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR */
     public const HOOK_ASYMMETRIC_SET_MODIFIER_COMPILE_ERROR = 'Cannot use the %s(set) modifier on a property hook';
+
+    /**
+     * php-src: Zend/zend_compile.c + zend_hooked_property_variance_error_ex (#29419).
+     *
+     * Explicit {@code set($value)} / {@code set(T $value)} must match property typing:
+     * typed property XOR typed set-param is illegal; both typed requires contravariance
+     * (set-param same or wider than the property type). Short {@code set \{ \}} / {@code set =>}
+     * omit the param list and synthesize a typed {@code $value} (not rejected here).
+     */
+    public const SET_HOOK_VALUE_TYPE_COMPAT_ERROR = 'Type of parameter $%s of hook %s::$%s::set must be compatible with property type';
 
     /** Zend 8.2 reference profile — default initializer + hook block (#12574). */
     public const REFERENCE_PROFILE_UNEXPECTED_ARROW = 'syntax error, unexpected token "=>"';
@@ -317,8 +328,33 @@ final class PropertyHooks
                 $hookSource = substr($body, $open + 1, $close - $open - 1);
                 if ($defaultInitializerOnly && CompilerVersion::supportsPropertyHooks()) {
                     $declPrefix = substr($body, max(0, $varStart - 200), $varStart - max(0, $varStart - 200));
-                    $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix);
-                    [, $usesBacking] = $this->lowerHooks($hookSource, $prop, 'c', $isStatic, true);
+                    $propDeclHead = rtrim(substr($body, $varStart, $hookOpen - $varStart));
+                    [, $ownDeclPrefix] = $this->splitPropertyDeclPrefix($declPrefix);
+                    $ownDeclHead = $ownDeclPrefix.$propDeclHead;
+                    $propertyType = $this->propertyTypeFromDeclHead($ownDeclHead);
+                    $isStatic = (bool) preg_match('/\bstatic\b/', $ownDeclHead);
+                    $classDisplay = '' !== $declName ? $declName : 'c';
+                    try {
+                        [, $usesBacking] = $this->lowerHooks(
+                            $hookSource,
+                            $prop,
+                            strtolower($classDisplay),
+                            $isStatic,
+                            true,
+                            $propertyType,
+                            'unknown',
+                            $fullCode,
+                            $absHookOpen,
+                            $classDisplay
+                        );
+                    } catch (CompileFatal $e) {
+                        // Surface set-hook type / other hook CompileFatals via the rejector so
+                        // the real filename is attached (PropertyHookSyntaxRejector).
+                        return [
+                            'line' => $e->sourceLine,
+                            'message' => $e->getMessage(),
+                        ];
+                    }
                     if ($usesBacking) {
                         $offset = $close + 1;
                         continue;
@@ -1315,7 +1351,8 @@ final class PropertyHooks
                 $propertyType,
                 $filename,
                 $fullCode,
-                $bodyOffsetInFile + $hookOpen
+                $bodyOffsetInFile + $hookOpen,
+                $classDisplay
             );
             $this->rejectAsymmetricDeclSetWithoutSetHook(
                 $ownDeclHead,
@@ -1497,7 +1534,8 @@ final class PropertyHooks
         ?string $propertyType = null,
         string $filename = 'unknown',
         string $fullCode = '',
-        int $hookOpenOffsetInFile = 0
+        int $hookOpenOffsetInFile = 0,
+        string $classDisplay = ''
     ): array {
         $methods = [];
         $usesBacking = false;
@@ -1505,6 +1543,7 @@ final class PropertyHooks
         $rest = trim($hookSource);
         $lineCode = '' !== $fullCode ? $fullCode : $hookSource;
         $lineOffset = '' !== $fullCode ? $hookOpenOffsetInFile : 0;
+        $classNameForError = '' !== $classDisplay ? $classDisplay : $lcClass;
         while ('' !== $rest) {
             $rest = ltrim($rest);
             // php-src: attributes precede property_hook (zend_language_parser.y, #26328).
@@ -1628,6 +1667,15 @@ final class PropertyHooks
                     break;
                 }
                 $params = trim($pm[1]);
+                $this->rejectIncompatibleExplicitSetHookParam(
+                    $params,
+                    $propertyType,
+                    $classNameForError,
+                    $prop,
+                    $filename,
+                    $lineCode,
+                    $lineOffset
+                );
                 $rest = substr($rest, strlen($pm[0]) - 1);
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
@@ -1651,6 +1699,15 @@ final class PropertyHooks
                 // php-src: Zend/zend_compile.c — `set($param) => expr` fat-arrow (#17329, PHP 8.4).
                 if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
                     $params = trim($pm[1]);
+                    $this->rejectIncompatibleExplicitSetHookParam(
+                        $params,
+                        $propertyType,
+                        $classNameForError,
+                        $prop,
+                        $filename,
+                        $lineCode,
+                        $lineOffset
+                    );
                     $rest = substr($rest, strlen($pm[0])) ?? $rest;
                     [$expr, $rest] = $this->takeUntilSemicolon($rest);
                     $methods = array_merge(
@@ -1663,6 +1720,15 @@ final class PropertyHooks
                     break;
                 }
                 $params = trim($pm[1]);
+                $this->rejectIncompatibleExplicitSetHookParam(
+                    $params,
+                    $propertyType,
+                    $classNameForError,
+                    $prop,
+                    $filename,
+                    $lineCode,
+                    $lineOffset
+                );
                 $rest = substr($rest, strlen($pm[0]) - 1);
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
@@ -2136,6 +2202,157 @@ final class PropertyHooks
         }
 
         return $params;
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — explicit set-hook param typing vs property type (#29419).
+     *
+     * {@code (prop_type_ast != NULL) != (value_param_ast->child[0] != NULL)} then
+     * {@see zend_verify_property_hook_variance} for both-typed contravariance.
+     */
+    private function rejectIncompatibleExplicitSetHookParam(
+        string $params,
+        ?string $propertyType,
+        string $classDisplay,
+        string $prop,
+        string $filename,
+        string $fullCode,
+        int $hookOpenOffsetInFile
+    ): void {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            return;
+        }
+        $parsed = $this->parseExplicitSetHookParam($params);
+        if (null === $parsed) {
+            return;
+        }
+        [$paramName, $paramType] = $parsed;
+        $propTyped = null !== $propertyType && '' !== trim($propertyType);
+        $paramTyped = null !== $paramType && '' !== trim($paramType);
+        if ($propTyped !== $paramTyped) {
+            throw new CompileFatal(
+                $filename,
+                self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+                self::setHookValueTypeCompatError($paramName, $classDisplay, $prop)
+            );
+        }
+        if (!$propTyped || !$paramTyped) {
+            return;
+        }
+        if ($this->setHookParamTypeCompatibleWithProperty(trim($propertyType), trim($paramType), $classDisplay)) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+            self::setHookValueTypeCompatError($paramName, $classDisplay, $prop)
+        );
+    }
+
+    public static function setHookValueTypeCompatError(string $paramName, string $className, string $propName): string
+    {
+        return sprintf(self::SET_HOOK_VALUE_TYPE_COMPAT_ERROR, $paramName, $className, $propName);
+    }
+
+    /**
+     * @return array{0: string, 1: ?string}|null [paramNameWithoutDollar, type or null]
+     */
+    private function parseExplicitSetHookParam(string $params): ?array
+    {
+        $params = trim($params);
+        while (str_starts_with($params, '#[')) {
+            $end = $this->findAttributeGroupEnd($params);
+            if (null === $end) {
+                break;
+            }
+            $params = ltrim(substr($params, $end + 1));
+        }
+        if ('' === $params) {
+            return null;
+        }
+        // Drop default (`$v = …`) — Zend rejects defaults separately; still parse the name/type.
+        if (preg_match('/^(.+?)(\s*=\s*.+)$/s', $params, $dm) && !str_contains($dm[1], '(')) {
+            // Only strip default when the `=` is not inside a type (DNF unlikely in hook params).
+            if (preg_match('/\$\w+\s*$/', $dm[1])) {
+                $params = rtrim($dm[1]);
+            }
+        }
+        if (preg_match('/^&?\s*(\$\w+)\s*$/', $params, $m)) {
+            return [substr($m[1], 1), null];
+        }
+        if (preg_match('/^(.+?)\s+(&\s*)?(\$\w+)\s*$/s', $params, $m)) {
+            $type = trim($m[1]);
+            if ('' === $type || str_starts_with($type, '$')) {
+                return [substr($m[3], 1), null];
+            }
+
+            return [substr($m[3], 1), $type];
+        }
+
+        return null;
+    }
+
+    /**
+     * Set-param must be the same type or contravariant (wider) than the property type.
+     *
+     * php-src: zend_verify_property_hook_variance → zend_perform_covariant_type_check(prop, set).
+     */
+    private function setHookParamTypeCompatibleWithProperty(
+        string $propertyType,
+        string $setParamType,
+        string $classDisplay
+    ): bool {
+        $norm = static function (string $t): string {
+            $t = preg_replace('/\s+/', '', $t) ?? $t;
+
+            return strtolower($t);
+        };
+        $propN = $norm($propertyType);
+        $setN = $norm($setParamType);
+        if ($propN === $setN) {
+            return true;
+        }
+        if ('mixed' === $setN) {
+            return true;
+        }
+        // Union / DNF on the set side: property type (or its non-null core) must be accepted.
+        if (str_contains($setN, '|') && !str_contains($setN, '(')) {
+            $members = explode('|', $setN);
+            $propCore = str_starts_with($propN, '?') ? substr($propN, 1) : $propN;
+            if (in_array($propN, $members, true) || in_array($propCore, $members, true)) {
+                return true;
+            }
+            if (str_starts_with($propN, '?') && in_array('null', $members, true) && in_array($propCore, $members, true)) {
+                return true;
+            }
+        }
+        $ownerLc = strtolower($classDisplay);
+        // TypeSig lives in InheritanceVariance.php (not a separate autoload file).
+        class_exists(InheritanceVariance::class);
+        $propSig = \PHPCompiler\Compiler\TypeSig::fromDumpTypeString($propertyType);
+        $setSig = \PHPCompiler\Compiler\TypeSig::fromDumpTypeString($setParamType);
+        if (null === $propSig || null === $setSig) {
+            // Unresolved / union dump forms we could not prove — only reject clear builtin mismatches below.
+            $builtins = InheritanceVariance::BUILTIN_SCALARS;
+            $propKey = str_starts_with($propN, '?') ? substr($propN, 1) : $propN;
+            $setKey = str_starts_with($setN, '?') ? substr($setN, 1) : $setN;
+            if (isset($builtins[$propKey]) && isset($builtins[$setKey]) && $propKey !== $setKey) {
+                // int↔float widening is not allowed for property-hook variance (unlike arg passing).
+                return false;
+            }
+
+            // Class / unresolved — defer (Zend may delay); identical-after-norm already handled.
+            return !isset($builtins[$propKey]) || !isset($builtins[$setKey]);
+        }
+        // prop type must be a subtype of set-param type (set is wider / contravariant).
+        return InheritanceVariance::isCovariantTypeCompatible(
+            $setSig,
+            $propSig,
+            $ownerLc,
+            $ownerLc,
+            static fn (string $a, string $b): bool => $a === $b,
+            static fn (string $a, string $b): bool => false
+        );
     }
 
     /**

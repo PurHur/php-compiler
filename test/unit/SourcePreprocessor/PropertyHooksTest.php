@@ -304,14 +304,14 @@ class Box {
     private string $stored = 'init';
     public string $x {
         get => $this->stored;
-        set($v) => $this->stored = strtoupper($v);
+        set(string $v) => $this->stored = strtoupper($v);
     }
 }
 PHP;
         [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$x {', $out);
         self::assertStringContainsString('public string $x;', $out);
-        self::assertStringContainsString('function __phpc_property_set_x($v)', $out);
+        self::assertStringContainsString('function __phpc_property_set_x(string $v)', $out);
         self::assertStringContainsString('$this->stored = strtoupper($v);', $out);
         self::assertSame('__phpc_property_set_x', $registry['box']['x']['set'] ?? null);
     }
@@ -1374,6 +1374,120 @@ PHP;
             '/#\[HookAttr\]\s+public function &__phpc_property_get_x/s',
             $out
         );
+    }
+
+    /** @covers issue #29419 — untyped set($value) on typed hooked property is compile-fatal */
+    public function testRejectsUntypedSetValueOnTypedHookedProperty(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+class C {
+    public string $x = 'a' {
+        set($value) { $this->x = $value . '!'; }
+    }
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::setHookValueTypeCompatError('value', 'C', 'x'));
+            PropertyHookSyntaxRejector::reject($src, 'hook_set_untyped.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #29419 — typed set(string $value) and short set { } remain legal */
+    public function testAllowsTypedAndShortSetOnTypedHookedProperty(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $typed = <<<'PHP'
+<?php
+class C {
+    public string $x = 'a' {
+        set(string $value) { $this->x = $value . '!'; }
+    }
+}
+PHP;
+            [$out] = (new PropertyHooks())->process($typed, 'hook_set_typed.php');
+            self::assertStringContainsString('function __phpc_property_set_x(string $value)', $out);
+
+            $short = <<<'PHP'
+<?php
+class C {
+    public string $x = 'a' {
+        set { $this->x = $value . '!'; }
+    }
+}
+PHP;
+            [$outShort] = (new PropertyHooks())->process($short, 'hook_set_short.php');
+            self::assertStringContainsString('function __phpc_property_set_x($value)', $outShort);
+
+            $wide = <<<'PHP'
+<?php
+class C {
+    public string $x = 'a' {
+        set(string|Stringable $value) { $this->x = (string) $value; }
+    }
+}
+PHP;
+            [$outWide] = (new PropertyHooks())->process($wide, 'hook_set_wide.php');
+            self::assertStringContainsString('function __phpc_property_set_x(string|Stringable $value)', $outWide);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #29419 — typed set on untyped property / incompatible set type */
+    public function testRejectsTypedSetOnUntypedPropertyAndIncompatibleSetType(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $typedOnUntyped = <<<'PHP'
+<?php
+class C {
+    public $x = 'a' {
+        set(string $value) { $this->x = $value; }
+    }
+}
+PHP;
+            try {
+                (new PropertyHooks())->process($typedOnUntyped, 'hook_set_typed_on_untyped.php');
+                self::fail('Expected CompileFatal for typed set on untyped property');
+            } catch (CompileFatal $e) {
+                self::assertSame(PropertyHooks::setHookValueTypeCompatError('value', 'C', 'x'), $e->getMessage());
+            }
+
+            $incompat = <<<'PHP'
+<?php
+class C {
+    public string $x = 'a' {
+        set(int $value) { $this->x = (string) $value; }
+    }
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::setHookValueTypeCompatError('value', 'C', 'x'));
+            (new PropertyHooks())->process($incompat, 'hook_set_incompat.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
 }
