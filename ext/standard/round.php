@@ -54,7 +54,10 @@ final class round extends Internal
         if (isset($frame->calledArgs[2])) {
             $mode = VmRoundMode::resolveRoundModeArg(
                 $frame->calledArgs[2]->resolveIndirect(),
-                'round'
+                'round',
+                'mode',
+                3,
+                $frame
             );
         }
 

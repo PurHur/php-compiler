@@ -47,6 +47,21 @@ final class JitRoundModeArg
             return $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
         }
 
+        // Soft-null RoundingMode|int — DEP then ValueError for coerced mode 0 (#29384).
+        if (Variable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $fn, 'null', $paramName, $argNum);
+
+                return $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
+            }
+            JitIntdiv::emitNullIntDeprecation($context, $fn, $argNum, $paramName, 'RoundingMode|int');
+            if (CompilerVersion::supportsRoundingModeEnum()) {
+                self::emitInvalidModeAndAbort($context, $fn, $argNum, $paramName);
+            }
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
         $lowered = JitIntdiv::lowerIntBuiltinArg($context, $arg, $fn, $argNum, $paramName);
         if (CompilerVersion::supportsRoundingModeEnum()) {
             return self::lowerRuntimeModeWithValidation($context, $lowered, $fn, $argNum, $paramName);

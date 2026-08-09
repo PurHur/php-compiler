@@ -69,4 +69,26 @@ final class VmRoundModeInvalidModeTest extends TestCase
             }
         }
     }
+
+    /** Soft-null $mode → coerce 0 → ValueError on PHP 8.4 (#29384). */
+    public function testNullModeDepThenValueErrorOnPhp84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $var = new Variable();
+            $var->null();
+            $this->expectException(\ValueError::class);
+            $this->expectExceptionMessage(
+                'round(): Argument #3 ($mode) must be a valid rounding mode (RoundingMode::*)'
+            );
+            VmRoundMode::resolveRoundModeArg($var, 'round');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
