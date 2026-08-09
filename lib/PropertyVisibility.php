@@ -56,14 +56,19 @@ final class PropertyVisibility
     }
 
     /**
-     * Parent private slots are not visible by plain name from a child method scope (zend_fetch_property).
+     * Parent private slots are not visible by plain name on a *child* receiver (zend_fetch_property).
+     *
+     * On `$this` / another child instance, Zend treats `->parentPrivate` as undefined (#19005).
+     * On another instance of the *declaring* class, the property exists but the child scope
+     * cannot access it → Error (zend_std_read_property; #29494).
      */
     public static function isParentPrivatePropertyInvisibleFromChildScope(
         int $visibilityFlags,
         ?string $callerClassLc,
         string $declaringClassLc,
         callable $isSubclassOf,
-        int $storedGetVisibility = 0
+        int $storedGetVisibility = 0,
+        ?string $receiverClassLc = null
     ): bool {
         $readVis = self::effectiveGetVisibility($visibilityFlags, $storedGetVisibility);
         if (($readVis & CfgFunc::FLAG_PRIVATE) === 0) {
@@ -72,8 +77,15 @@ final class PropertyVisibility
         if (null === $callerClassLc || $callerClassLc === $declaringClassLc) {
             return false;
         }
+        if (!$isSubclassOf($callerClassLc, $declaringClassLc)) {
+            return false;
+        }
+        // Declaring-class receiver: visible slot, inaccessible from child → assertAccessible/Error.
+        if (null !== $receiverClassLc && $receiverClassLc === $declaringClassLc) {
+            return false;
+        }
 
-        return $isSubclassOf($callerClassLc, $declaringClassLc);
+        return true;
     }
 
     /**
