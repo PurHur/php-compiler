@@ -80,11 +80,6 @@ final class substr_replace extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
         }
-        if (JitStrReplaceSubject::isKnownArray($args[1])) {
-            throw new \LogicException(
-                'substr_replace() array $replace with array $string is not supported in this compiler build'
-            );
-        }
 
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
@@ -113,7 +108,8 @@ final class substr_replace extends Internal
                 && !JitStrReplaceSubject::isKnownArray($args[0])
             );
         $offset = $this->jitLong($context, $args[2], 'substr_replace() offset');
-        $replace = JitStringBuiltinArg::lower($context, $args[1], 'substr_replace', 1, 'replace');
+        // php-src string.c: scalar $string + array $replace → first element via convert_to_string (#29309).
+        $replace = self::jitScalarReplaceArg($context, $args[1]);
         if ($stringIsStringish) {
             return JitSubstrReplace::replace(
                 $context,
@@ -125,6 +121,12 @@ final class substr_replace extends Internal
             );
         }
 
+        if (JitStrReplaceSubject::isKnownArray($args[1])) {
+            throw new \LogicException(
+                'substr_replace() array $replace with array $string is not supported in this compiler build'
+            );
+        }
+
         return JitSubstrReplaceArray::invoke(
             $context,
             $args[0],
@@ -133,6 +135,37 @@ final class substr_replace extends Internal
             $lengthVal,
             $hasLength
         );
+    }
+
+    /**
+     * Scalar-string path $replace — string or first compile-time array element (#29309).
+     */
+    private static function jitScalarReplaceArg(Context $context, JITVariable $arg): Value
+    {
+        // Compile-time array literal (native or value-box hashtable) — first element (#29309).
+        if (\is_array($arg->compileTimeArray) && JitStrReplaceSubject::isKnownArray($arg)) {
+            if ([] === $arg->compileTimeArray) {
+                return $context->builder->load($context->constantStringFromString(''));
+            }
+            $first = $arg->compileTimeArray[\array_key_first($arg->compileTimeArray)];
+            if (null === $first) {
+                // convert_to_string on null → "" without parameter DEP.
+                return $context->builder->load($context->constantStringFromString(''));
+            }
+            if (\is_string($first) || \is_int($first) || \is_float($first) || \is_bool($first)) {
+                return $context->builder->load($context->constantStringFromString((string) $first));
+            }
+            throw new \LogicException(
+                'substr_replace() array $replace element must be string-coercible at compile time in this compiler build'
+            );
+        }
+        if (JitStrReplaceSubject::isKnownArray($arg)) {
+            throw new \LogicException(
+                'substr_replace() runtime array $replace is not supported in this compiler build'
+            );
+        }
+
+        return JitStringBuiltinArg::lower($context, $arg, 'substr_replace', 1, 'replace', 'array|string');
     }
 
     private static function jitStringArg(
@@ -213,7 +246,8 @@ final class substr_replace extends Internal
         }
 
         foreach ($replaceVar->toArray()->iterateKeyed(true) as [, $value]) {
-            return VmString::coerceStringBuiltinArg($value, 'substr_replace', 1, 'replace', 'array|string');
+            // Element convert_to_string — not Z_PARAM_STR (#29309).
+            return VmString::coerceStrReplaceArrayElement($value);
         }
 
         return '';
@@ -370,6 +404,7 @@ final class substr_replace extends Internal
             return $defaultWhenExhausted;
         }
 
-        return VmString::coerceStringBuiltinArg($values[$index++], $function, $argIndex, $paramName);
+        // Array element — convert_to_string, not Z_PARAM_STR (#29309).
+        return VmString::coerceStrReplaceArrayElement($values[$index++]);
     }
 }

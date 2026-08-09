@@ -189,6 +189,18 @@ final class VmString
     }
 
     /**
+     * str_replace / str_ireplace / substr_replace array *element* conversion (#29309).
+     *
+     * php-src uses convert_to_string / zval_get_string on elements — null becomes "" with no
+     * parameter-level E_DEPRECATED. Do not route through {@see coerceStringBuiltinArg} (Z_PARAM_STR).
+     * php-src: ext/standard/string.c php_str_replace_common / php_str_to_str_ex.
+     */
+    public static function coerceStrReplaceArrayElement(Variable $var): string
+    {
+        return self::coerceOperand($var);
+    }
+
+    /**
      * php_strtr_array() replace_pairs key/value — zend convert_to_string, not Z_PARAM_STR (#28978).
      *
      * Nested arrays warn "Array to string conversion" and become "Array"; objects without
