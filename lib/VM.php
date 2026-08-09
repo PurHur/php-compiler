@@ -8559,6 +8559,26 @@ restart:
                                     $frame = $catchFrame;
                                     goto restart;
                                 }
+                            } elseif ($this->propertyFetchDestUsedAsByRefForeachIterable($frame, $op)) {
+                                // foreach ($obj->hooked as &$v) — FE_RESET_RW / #29215.
+                                if ($this->deliverByRefGetHookedPropertyDimWriteContainer(
+                                    $result,
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                )) {
+                                    break;
+                                }
+                                $catchFrame = $this->enforceHookedPropertyDimWriteRequiresByRefGet(
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $result->copyFrom($hookValue);
                             } else {
                                 $result->copyFrom($hookValue);
                             }
@@ -8633,6 +8653,26 @@ restart:
                             // look like a property write (readonly / DOM read-only / skipped `__get`) (#23986, #24250).
                             if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
                                 $result->indirect($propSlot);
+                            } elseif ($this->propertyFetchDestUsedAsByRefForeachIterable($frame, $op)) {
+                                // Hooked array without &get must Error before FE_RESET_RW (#29215).
+                                if ($this->deliverByRefGetHookedPropertyDimWriteContainer(
+                                    $result,
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                )) {
+                                    break;
+                                }
+                                $catchFrame = $this->enforceHookedPropertyDimWriteRequiresByRefGet(
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $result->copyFrom($propSlot);
                             } else {
                                 $result->copyFrom($propSlot);
                             }
@@ -10985,6 +11025,56 @@ restart:
         }
 
         return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot);
+    }
+
+    /**
+     * True when fetch dest is the container for `foreach (… as &$v)` (FE_RESET_RW, #29215).
+     *
+     * PROPERTY_FETCH is immediately followed by ITER_RESET on the same slot; the by-ref flag
+     * lives on ITER_VALUE in a successor block (arg3), so scan reachable CFG edges.
+     */
+    private function propertyFetchDestUsedAsByRefForeachIterable(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        $next = $frame->block->opCodes[$frame->pos] ?? null;
+        if (
+            null === $next
+            || OpCode::TYPE_ITER_RESET !== $next->type
+            || (int) $next->arg1 !== $destSlot
+        ) {
+            return false;
+        }
+
+        return $this->foreachContainerSlotHasByRefValueFetch($frame->block, $destSlot);
+    }
+
+    /**
+     * Walk successor blocks from {@see $start} for ITER_VALUE with by-ref on {@see $containerSlot}.
+     */
+    private function foreachContainerSlotHasByRefValueFetch(\PHPCompiler\Block $start, int $containerSlot): bool
+    {
+        $seen = [];
+        $queue = [$start];
+        while ([] !== $queue) {
+            $block = array_shift($queue);
+            $id = spl_object_id($block);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($block->opCodes as $candidate) {
+                if (OpCode::destSlotUsedAsByRefForeachValueContainer($candidate, $containerSlot)) {
+                    return true;
+                }
+                foreach ([$candidate->block1, $candidate->block2, $candidate->block3] as $edge) {
+                    if ($edge instanceof \PHPCompiler\Block) {
+                        $queue[] = $edge;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

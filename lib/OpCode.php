@@ -457,6 +457,17 @@ class OpCode {
             && !$op->unsetOnProperty;
     }
 
+    /**
+     * True when {@see $destSlot} is the foreach container for a by-ref value fetch
+     * (`foreach ($obj->prop as &$v)` — FE_RESET_RW / #29215).
+     */
+    public static function destSlotUsedAsByRefForeachValueContainer(self $op, int $destSlot): bool
+    {
+        return self::TYPE_ITER_VALUE === $op->type
+            && (int) $op->arg2 === $destSlot
+            && (bool) $op->arg3;
+    }
+
     /** True when this opcode reads {@see $destSlot} as lhs in fetch-op-assign compound lowering (#6438). */
     public static function destSlotUsedAsCompoundAssignRead(self $op, int $destSlot): bool
     {
