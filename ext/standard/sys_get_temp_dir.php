@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** sys_get_temp_dir() — VM via VmSysGetTempDirNative; JIT/AOT via SysGetTempDirRuntime PHP (#9585). */
+/** sys_get_temp_dir() — VM via VmSysGetTempDirNative; JIT/AOT via SysGetTempDirJitHelper (#29433, #9585). */
 final class sys_get_temp_dir extends Internal
 {
     public function __construct()
