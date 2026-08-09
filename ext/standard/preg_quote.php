@@ -38,8 +38,10 @@ final class preg_quote extends Internal
         );
         $delimiter = null;
         if (2 === $argc) {
-            $delimiter = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[1],
+            // Z_PARAM_STR_OR_NULL $delimiter — null is silent (php-src stub ?string; #29347).
+            $delimiter = VmString::typedNullableStringBuiltinArgForFrame(
+                $frame,
+                1,
                 'preg_quote',
                 1,
                 'delimiter'
@@ -72,10 +74,30 @@ final class preg_quote extends Internal
             );
         }
 
+        // Z_PARAM_STR_OR_NULL — compile-time null → empty delimiter sentinel (#29347).
+        // NestedJIT ABI is non-nullable __string__*; empty means "no delimiter".
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return $context->builder->call(
+                $context->lookupFunction('__string__preg_quote'),
+                $subject,
+                $noDelimiter
+            );
+        }
+
         return $context->builder->call(
             $context->lookupFunction('__string__preg_quote'),
             $subject,
-            JitStringBuiltinArg::lower($context, $args[1], 'preg_quote', 1, 'delimiter')
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[1],
+                'preg_quote',
+                1,
+                'delimiter',
+                '?string',
+                '?string',
+                false,
+                false
+            )
         );
     }
 }
