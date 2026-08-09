@@ -24,6 +24,8 @@ final class VmFtpConnection
 
         $entry = new ClassEntry('FTP\\Connection');
         $entry->isInternal = true;
+        // php-src `final class Connection` (ext/ftp/ftp.stub.php; #28403).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 }
