@@ -4,25 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\JitFileGetContentsLibc;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_file_get_contents (#15309, #19339, #26756).
+ * JIT/AOT link for __compiler_file_get_contents via FileGetContentsJitHelper PHP (#29510).
  *
- * Emits thin libc open/read via {@see JitFileGetContentsLibc} — NestedJIT of
- * FileGetContentsJitHelper→fopen/fread returns empty under AOT and blocks gen-0
- * argv-driver refresh (#26756 / re-#23468).
- * VM SSOT remains {@see \PHPCompiler\ext\standard\VmFs::fileGetContents()}.
+ * Always {@see JitVmHelperLink} → helper → {@see phpc_file_get_contents_kernel} (Internal::call libc).
+ * Pre-registerModule NestedJIT resolves kernels via Runtime modules (#15417 / #20290).
+ * Thin libc open/read stays only behind the kernel (#26756) — not inlined into this ABI bridge.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmFs::fileGetContents()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_mem
  */
 final class StringFileGetContents
 {
     private const ABI = '__compiler_file_get_contents';
+
+    private const HELPER_PATH = '/ext/standard/FileGetContentsJitHelper.php';
+
+    private const READ_HELPER = 'PHPCompiler\\ext\\standard\\FileGetContentsJitHelper::readPathArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::READ_HELPER,
+    ];
 
     private const BRIDGE_ENTRY = 'fgc_bridge_entry';
 
@@ -38,7 +46,7 @@ final class StringFileGetContents
 
     public static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
@@ -55,14 +63,12 @@ final class StringFileGetContents
         } catch (\Throwable) {
         }
 
-        LibcExtern::register($context);
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#29510');
+
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($strPtr, false, $strPtr)
-            );
+            : $context->lookupFunction(self::ABI);
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
         $failBb = $fn->appendBasicBlock('fgc_bridge_fail');
@@ -73,11 +79,15 @@ final class StringFileGetContents
         $isNullPath = $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull());
         $context->builder->branchIf($isNullPath, $failBb, $okBb);
 
+        $context->builder->positionAtEnd($okBb);
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::READ_HELPER, '#29510');
+        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path]);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
+        );
+
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($strPtr->constNull());
-
-        $context->builder->positionAtEnd($okBb);
-        JitFileGetContentsLibc::emitBody($context, $fn);
 
         $context->registerFunction(self::ABI, $fn);
         if (null !== $savedBlock) {

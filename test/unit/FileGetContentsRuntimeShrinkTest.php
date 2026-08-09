@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\FileGetContentsJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_file_get_contents: always PHP helper bridge, no libc kernel (#15309, #19339). */
+/** __compiler_file_get_contents: always PHP helper bridge (#15309, #19339, #29510). */
 final class FileGetContentsRuntimeShrinkTest extends TestCase
 {
     public function testStringFileGetContentsUsesPhpBridgeNotDeferKernel(): void
@@ -15,15 +15,51 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContents.php');
         $this->assertStringContainsString('FileGetContentsJitHelper', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('extractStringPtrFromHelperResult', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('JitFileGetContentsKernel', $bridge);
+        $this->assertStringNotContainsString('JitFileGetContentsLibc::emitBody', $bridge);
+        $this->assertStringNotContainsString('use PHPCompiler\\ext\\standard\\JitFileGetContentsLibc', $bridge);
         $this->assertStringNotContainsString('StringFileGetContentsLibc', $bridge);
+        $this->assertStringNotContainsString('LibcExtern', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitFileGetContentsKernel.php');
     }
 
+    /** Thin libc remains only behind phpc_file_get_contents_kernel (#26756 / #29510). */
+    public function testLibcEmitLivesOnlyInKernelNotBridge(): void
+    {
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_file_get_contents_kernel.php');
+        $this->assertStringContainsString('JitFileGetContentsLibc::emitBody', $kernel);
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/FileGetContentsJitHelper.php');
+        $this->assertStringContainsString('phpc_file_get_contents_kernel', $helper);
+    }
+
+    /** NestedJIT must resolve the kernel Internal — else helper returns null (#26756 / #29510). */
+    public function testNestedJitWhitelistIncludesFileGetContentsKernel(): void
+    {
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertMatchesRegularExpression(
+            "/'phpc_file_get_contents_kernel'/",
+            $context
+        );
+        $this->assertStringContainsString("'phpc_readfile_kernel'", $context);
+        $this->assertStringContainsString("'phpc_file_put_contents_kernel'", $context);
+    }
+
+    public function testFileGetContentsJitHelperUsesPhpcKernel(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FileGetContentsJitHelper.php');
+        $this->assertMatchesRegularExpression('/return\s+\\\\phpc_file_get_contents_kernel\s*\(/', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_file_get_contents_kernel.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitFileGetContentsLibc.php');
+    }
+
     public function testFileGetContentsJitHelperDelegatesToVmFs(): void
     {
+        if (!\function_exists('phpc_file_get_contents_kernel')) {
+            $this->markTestSkipped('phpc_file_get_contents_kernel requires compiler runtime');
+        }
         $path = tempnam(sys_get_temp_dir(), 'phpc-fgc-');
         $this->assertNotFalse($path);
         file_put_contents($path, 'jit-helper-ok');

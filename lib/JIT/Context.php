@@ -925,6 +925,10 @@ class Context {
         return match ($lc) {
             'phpc_file_put_contents_kernel',
             'phpc_readfile_kernel',
+            // file_get_contents NestedJIT leaf (#29510) — whitelist kernel so
+            // FileGetContentsJitHelper→phpc_file_get_contents_kernel is not stubbed null
+            // (peer readfile/file_put_contents; former always-on libc bridge #26756).
+            'phpc_file_get_contents_kernel',
 
             // rename(2) NestedJIT leaf (#29141) — whitelist rename → rename_::call →
             // StringRename::invokeNestedLeaf (module-local rename(2); kernel removed).
