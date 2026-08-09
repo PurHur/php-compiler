@@ -1254,6 +1254,64 @@ PHP;
         self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
     }
 
+    /** @covers issue #29424 — php-src GH-17916 final+abstract hooked property */
+    public function testRejectsFinalAbstractHookedProperty(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+abstract class A {
+    final abstract public string $x { get; }
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::FINAL_ABSTRACT_PROPERTY_COMPILE_ERROR);
+            (new PropertyHooks())->process($src, 'final_abstract_prop.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #29424 — abstract-only / final-only hooked properties remain legal */
+    public function testAllowsAbstractOnlyAndFinalOnlyHookedProperty(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $abstractOnly = <<<'PHP'
+<?php
+abstract class A {
+    abstract public string $x { get; }
+}
+PHP;
+            [, $registry] = (new PropertyHooks())->process($abstractOnly, 'abstract_only_prop.php');
+            self::assertTrue($registry['a']['x']['abstract'] ?? false);
+            self::assertFalse($registry['a']['x']['finalProperty'] ?? false);
+
+            $finalOnly = <<<'PHP'
+<?php
+class C {
+    public final string $x { get => 'ok'; }
+}
+PHP;
+            [, $finalReg] = (new PropertyHooks())->process($finalOnly, 'final_only_prop.php');
+            self::assertTrue($finalReg['c']['x']['finalProperty'] ?? false);
+            self::assertFalse($finalReg['c']['x']['abstract'] ?? false);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #23069 — prior plain `final` must not mark following hooked property */
     public function testFinalPlainSiblingDoesNotBleedOntoHookedProperty(): void
     {
