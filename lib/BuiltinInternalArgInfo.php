@@ -192,6 +192,8 @@ final class BuiltinInternalArgInfo
             // ext/zlib/zlib.stub.php — InternalArgInfo return resource; Zend DeflateContext|false / InflateContext|false (#27627)
             'deflate_init' => 'DeflateContext|false',
             'inflate_init' => 'InflateContext|false',
+            // ext/zlib/zlib.stub.php — InternalArgInfo return string; Zend string|false (#28755)
+            'deflate_add', 'inflate_add' => 'string|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
             'base64_decode', 'hex2bin' => 'string|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471, #28569)
@@ -753,6 +755,9 @@ final class BuiltinInternalArgInfo
             },
             // ext/zlib/zlib.stub.php — array|object $options (InternalArgInfo array / omitted) (#27627, #28592)
             'deflate_init', 'inflate_init' => 1 === $index ? 'object|array' : null,
+            // ext/zlib/zlib.stub.php — DeflateContext/InflateContext $context; InternalArgInfo untyped (#28755)
+            'deflate_add' => 0 === $index ? 'DeflateContext' : null,
+            'inflate_add' => 0 === $index ? 'InflateContext' : null,
             // ext/hash/hash.stub.php — HashContext $context; InternalArgInfo untyped / resource (#27745, #27737)
             'hash_copy', 'hash_update', 'hash_final' => 0 === $index ? 'HashContext' : null,
             'hash_update_file' => 0 === $index ? 'HashContext' : null,

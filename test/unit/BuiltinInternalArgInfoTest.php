@@ -1368,6 +1368,22 @@ final class BuiltinInternalArgInfoTest extends TestCase
         // Optionality for deflate_init $options is from BuiltinParamNames `options=` (#24568), not InternalArgInfo.
     }
 
+    /** php-src ext/zlib/zlib.stub.php — DeflateContext/InflateContext $context → string|false (#28755). */
+    public function testDeflateInflateAddReflectionStubTypes(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('deflate_add'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('inflate_add'));
+        $this->assertSame('DeflateContext', BuiltinInternalArgInfo::stubParamTypeOverride('deflate_add', 0));
+        $this->assertSame('InflateContext', BuiltinInternalArgInfo::stubParamTypeOverride('inflate_add', 0));
+        $deflateCtx = BuiltinInternalArgInfo::paramInfoForFunction('deflate_add', 0);
+        $this->assertNotNull($deflateCtx);
+        $this->assertSame('DeflateContext', $deflateCtx['type']);
+        $this->assertSame('context', $deflateCtx['name']);
+        $inflateCtx = BuiltinInternalArgInfo::paramInfoForFunction('inflate_add', 0);
+        $this->assertNotNull($inflateCtx);
+        $this->assertSame('InflateContext', $inflateCtx['type']);
+    }
+
     /**
      * ext/standard/basic_functions.stub.php — StreamBucket Reflection under PROFILE≥8.4 (#27797).
      *
