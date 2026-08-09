@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** Empty-string builtin ValueError wording must match Zend (#29275 / #29276). */
+/** Empty-string builtin ValueError wording must match Zend (#29275 / #29276 / #29291). */
 final class EmptyStringArgValueErrorMessageTest extends TestCase
 {
     public function test_shared_formatter_matches_zend(): void
@@ -21,6 +21,10 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             'substr_count(): Argument #2 ($needle) must not be empty',
             VmString::emptyStringArgValueErrorMessage('substr_count', 1, 'needle')
         );
+        self::assertSame(
+            'wordwrap(): Argument #3 ($break) must not be empty',
+            VmString::emptyStringArgValueErrorMessage('wordwrap', 2, 'break')
+        );
     }
 
     public function test_vm_explode_and_substr_count_empty_messages(): void
@@ -30,6 +34,7 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
         foreach ([
             'issue29275_explode_empty_separator_message.php',
             'issue29276_substr_count_empty_needle_message.php',
+            'issue29291_wordwrap_empty_break_message.php',
         ] as $name) {
             $repro = realpath(__DIR__.'/../repro/'.$name);
             self::assertNotFalse($repro, $name);

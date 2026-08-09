@@ -562,7 +562,7 @@ final class VmString
     /**
      * Zend empty-string ValueError wording (php-src zend_argument_error / string.c; #29275/#29276).
      *
-     * Prefer this over ad-hoc "cannot be empty" so explode / substr_count / Z_PARAM non-empty
+     * Prefer this over ad-hoc "cannot be empty" so explode / substr_count / wordwrap / Z_PARAM non-empty
      * guards cannot drift from php-src.
      */
     public const EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT = 'must not be empty';
@@ -1135,7 +1135,8 @@ final class VmString
         }
         $breakLen = self::byteLength($break);
         if (0 === $breakLen) {
-            throw new \ValueError('wordwrap(): Argument #3 ($break) must be a non-empty string');
+            // php-src string.c PHP_FUNCTION(wordwrap) — Zend "must not be empty" (#29291)
+            throw new \ValueError(self::emptyStringArgValueErrorMessage('wordwrap', 2, 'break'));
         }
         if (0 === $width && $cut) {
             throw new \ValueError('wordwrap(): Argument #4 ($cut_long_words) cannot be true when argument #2 ($width) is 0');

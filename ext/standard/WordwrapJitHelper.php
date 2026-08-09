@@ -29,7 +29,8 @@ final class WordwrapJitHelper
         }
         $breakLen = self::byteLength($break);
         if (0 === $breakLen) {
-            throw new \ValueError('wordwrap(): Argument #3 ($break) must be a non-empty string');
+            // php-src string.c — keep literal (no VmString call; NestedJIT isolation) (#29291)
+            throw new \ValueError('wordwrap(): Argument #3 ($break) must not be empty');
         }
         if (0 === $width && $cutBool) {
             throw new \ValueError('wordwrap(): Argument #4 ($cut_long_words) cannot be true when argument #2 ($width) is 0');
