@@ -54,7 +54,7 @@ final class VmMath
 
     /**
      * Z_PARAM_DOUBLE null rejection on PHP 8.4 forward profile (fadd/fsub/fmul only; #19182).
-     * fpow uses Z_PARAM_DOUBLE soft-null like pow/sqrt (#24177).
+     * fpow/sqrt use Z_PARAM_DOUBLE soft-null (#24177); pow() uses operator path — silent null (#29322).
      */
     public static function requiresForwardProfileStrictDoubleNull(): bool
     {
