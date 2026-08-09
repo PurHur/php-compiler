@@ -1515,6 +1515,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ `Reflection::getModifierNames()` includes `private(set)` / `protected(set)`.
+     *
+     * Zend 8.4 keeps IS_*_SET bits and `isPrivateSet()` / `isProtectedSet()`, but omits the
+     * set-visibility name tokens (php-src #19691 / GH-19697 landed in 8.5 only). PROFILE=8.4
+     * and the 8.4.0-dev reference profile must match that omission (#29188).
+     * php-src: ext/reflection/php_reflection.c zim_Reflection_getModifierNames.
+     */
+    public static function supportsAsymmetricVisibilityModifierNames(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2

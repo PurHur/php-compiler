@@ -1,5 +1,5 @@
 --TEST--
-Reflection::getModifierNames() maps modifier bits like Zend (#22127)
+Reflection::getModifierNames() maps modifier bits like Zend (#22127; *(set) names PROFILE≥8.5 only #29188)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -27,5 +27,5 @@ method=1
 65536=["readonly"]
 7=[]
 512=["virtual"]
-2048=["protected(set)"]
-4096=["private(set)"]
+2048=[]
+4096=[]
