@@ -127,8 +127,10 @@ final class DomInstanceMethodJit
         'domelement::getattributenodens' => true,
         'domelement::setattributenodens' => true,
         'domelement::setattributenode' => true,
-        // setIdAttribute — dedicated true/false ABI (NestedJIT bool unsafe; #29257).
+        // setIdAttribute* — dedicated true/false ABI (NestedJIT bool unsafe; #29257, #29284).
         'domelement::setidattribute' => true,
+        'domelement::setidattributens' => true,
+        'domelement::setidattributenode' => true,
         'domelement::toggleattribute' => true,
         'domnode::contains' => true,
         'domnode::comparedocumentposition' => true,
@@ -375,6 +377,16 @@ final class DomInstanceMethodJit
             }
             if ('domelement::setidattribute' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttribute();
+
+                return;
+            }
+            if ('domelement::setidattributens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementSetIdAttributeNS();
+
+                return;
+            }
+            if ('domelement::setidattributenode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementSetIdAttributeNode();
 
                 return;
             }
@@ -779,6 +791,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::setattributenodens');
             self::ensureProxy($context, 'domelement::setattributenode');
             self::ensureProxy($context, 'domelement::setidattribute');
+            self::ensureProxy($context, 'domelement::setidattributens');
+            self::ensureProxy($context, 'domelement::setidattributenode');
             self::ensureProxy($context, 'domdocument::createattributens');
             self::ensureProxy($context, 'domdocument::createattribute');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
@@ -820,7 +834,7 @@ final class DomInstanceMethodJit
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild'],
-        'domelement' => ['setattribute', 'removeattribute', 'setidattribute'],
+        'domelement' => ['setattribute', 'removeattribute', 'setidattribute', 'setidattributens', 'setidattributenode'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],
         'domnamednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],

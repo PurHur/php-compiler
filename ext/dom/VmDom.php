@@ -2710,6 +2710,28 @@ final class VmDom
         string $localName,
         bool $isId
     ): void {
+        self::setIdAttributeNSInternal($element, $namespace, $localName, $isId, true);
+    }
+
+    /**
+     * NestedJIT/user-script AOT: DomRegistry ID update without PROP_ELEMENT_ID_MAP sync (#29284).
+     */
+    public static function setIdAttributeNSWithoutIdMapSync(
+        ObjectEntry $element,
+        ?string $namespace,
+        string $localName,
+        bool $isId
+    ): void {
+        self::setIdAttributeNSInternal($element, $namespace, $localName, $isId, false);
+    }
+
+    private static function setIdAttributeNSInternal(
+        ObjectEntry $element,
+        ?string $namespace,
+        string $localName,
+        bool $isId,
+        bool $syncIdMap
+    ): void {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
         }
@@ -2717,7 +2739,7 @@ final class VmDom
         if (null === $qName) {
             DomExceptionConstants::raiseNotFound();
         }
-        self::applyIdAttributeRegistration($element, $qName, $isId);
+        self::applyIdAttributeRegistration($element, $qName, $isId, $syncIdMap);
     }
 
     /**
@@ -2726,6 +2748,26 @@ final class VmDom
      */
     public static function setIdAttributeNode(ObjectEntry $element, ObjectEntry $attr, bool $isId): void
     {
+        self::setIdAttributeNodeInternal($element, $attr, $isId, true);
+    }
+
+    /**
+     * NestedJIT/user-script AOT: DomRegistry ID update without PROP_ELEMENT_ID_MAP sync (#29284).
+     */
+    public static function setIdAttributeNodeWithoutIdMapSync(
+        ObjectEntry $element,
+        ObjectEntry $attr,
+        bool $isId
+    ): void {
+        self::setIdAttributeNodeInternal($element, $attr, $isId, false);
+    }
+
+    private static function setIdAttributeNodeInternal(
+        ObjectEntry $element,
+        ObjectEntry $attr,
+        bool $isId,
+        bool $syncIdMap
+    ): void {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
         }
@@ -2742,7 +2784,7 @@ final class VmDom
         ) {
             DomExceptionConstants::raiseNotFound();
         }
-        self::applyIdAttributeRegistration($element, $name, $isId);
+        self::applyIdAttributeRegistration($element, $name, $isId, $syncIdMap);
     }
 
     private static function applyIdAttributeRegistration(

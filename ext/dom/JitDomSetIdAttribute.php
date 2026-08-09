@@ -15,7 +15,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMElement::setIdAttribute() (#29257).
+ * LLVM lowering for DOMElement::setIdAttribute{,NS,Node}() (#29257, #29284).
  *
  * NestedJIT helper updates DomRegistry without PROP_ELEMENT_ID_MAP sync. Thin AOT
  * stores {@see DomUserScriptElementCacheLlvm} using a compile-time id value (from
@@ -46,24 +46,13 @@ final class JitDomSetIdAttribute
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_cont');
         $nameLlvm = JitStringArg::lower($context, $args[1], 'DOMElement::setIdAttribute() name');
         $element = self::loadObjectArg($context, $args[0]);
-        $abi = DomSetIdAttributeRuntime::ABI_TRUE;
-        $isIdTrue = true;
-        if (JITVariable::TYPE_NATIVE_BOOL === $args[2]->type) {
-            $raw = $context->helper->loadValue($args[2]);
-            if (
-                method_exists($raw, 'isConstant')
-                && $raw->isConstant()
-                && method_exists($raw, 'getConstantValue')
-                && (int) $raw->getConstantValue() === 0
-            ) {
-                $abi = DomSetIdAttributeRuntime::ABI_FALSE;
-                $isIdTrue = false;
-            }
-        }
+        $isIdTrue = self::resolveIsIdTrue($context, $args[2]);
         if ($isIdTrue) {
             DomSetIdAttributeRuntime::ensureTrueLinked($context);
+            $abi = DomSetIdAttributeRuntime::ABI_TRUE;
         } else {
             DomSetIdAttributeRuntime::ensureFalseLinked($context);
+            $abi = DomSetIdAttributeRuntime::ABI_FALSE;
         }
         $context->builder->call(
             $context->lookupFunction($abi),
@@ -80,6 +69,95 @@ final class JitDomSetIdAttribute
         }
 
         return self::boxNull($context);
+    }
+
+    public static function invokeNs(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 4) {
+            throw new \LogicException('DOMElement::setIdAttributeNS() expects receiver, namespace, localName, isId');
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_ns_cont');
+        $nsLlvm = self::loadNamespaceArg($context, $args[1]);
+        $localLlvm = JitStringArg::lower($context, $args[2], 'DOMElement::setIdAttributeNS() localName');
+        $element = self::loadObjectArg($context, $args[0]);
+        $isIdTrue = self::resolveIsIdTrue($context, $args[3]);
+        if ($isIdTrue) {
+            DomSetIdAttributeRuntime::ensureNsTrueLinked($context);
+            $abi = DomSetIdAttributeRuntime::ABI_NS_TRUE;
+        } else {
+            DomSetIdAttributeRuntime::ensureNsFalseLinked($context);
+            $abi = DomSetIdAttributeRuntime::ABI_NS_FALSE;
+        }
+        $context->builder->call(
+            $context->lookupFunction($abi),
+            $element,
+            $nsLlvm,
+            $localLlvm
+        );
+        if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_ns_post');
+            $fromSetAttribute = false;
+            $idLit = self::resolveCompileTimeIdValue($args[2], $fromSetAttribute);
+            if (null !== $idLit && '' !== $idLit) {
+                self::storeCacheFirstWins($context, $element, $idLit, $fromSetAttribute);
+            }
+        }
+
+        return self::boxNull($context);
+    }
+
+    public static function invokeNode(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 3) {
+            throw new \LogicException('DOMElement::setIdAttributeNode() expects receiver, attr, and isId');
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_node_cont');
+        $element = self::loadObjectArg($context, $args[0]);
+        $attr = self::loadObjectArg($context, $args[1]);
+        $isIdTrue = self::resolveIsIdTrue($context, $args[2]);
+        if ($isIdTrue) {
+            DomSetIdAttributeRuntime::ensureNodeTrueLinked($context);
+            $abi = DomSetIdAttributeRuntime::ABI_NODE_TRUE;
+        } else {
+            DomSetIdAttributeRuntime::ensureNodeFalseLinked($context);
+            $abi = DomSetIdAttributeRuntime::ABI_NODE_FALSE;
+        }
+        $context->builder->call(
+            $context->lookupFunction($abi),
+            $element,
+            $attr
+        );
+        if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_node_post');
+            $fromSetAttribute = false;
+            $idLit = self::resolveCompileTimeNodeIdValue($fromSetAttribute);
+            if (null !== $idLit && '' !== $idLit) {
+                self::storeCacheFirstWins($context, $element, $idLit, $fromSetAttribute);
+            }
+        }
+
+        return self::boxNull($context);
+    }
+
+    /** NestedJIT bool load is unsafe — only constant false selects the false ABI (#29257). */
+    private static function resolveIsIdTrue(Context $context, JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_NATIVE_BOOL !== $arg->type) {
+            return true;
+        }
+        $raw = $context->helper->loadValue($arg);
+        if (
+            method_exists($raw, 'isConstant')
+            && $raw->isConstant()
+            && method_exists($raw, 'getConstantValue')
+            && (int) $raw->getConstantValue() === 0
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function resolveCompileTimeIdValue(JITVariable $nameArg, bool &$fromSetAttribute): ?string
@@ -99,12 +177,31 @@ final class JitDomSetIdAttribute
         if (null === $xml || '' === $xml) {
             return null;
         }
-        // First id="…" / id='…' in the loadXML literal (first-wins matches DomRegistry).
+        // First id="…" / id='…' or localName="…" in the loadXML literal (first-wins).
         if (1 === preg_match(
             '/\b'.preg_quote($nameLit, '/').'\s*=\s*(["\'])([^"\']*)\1/',
             $xml,
             $m
         )) {
+            return $m[2];
+        }
+
+        return null;
+    }
+
+    private static function resolveCompileTimeNodeIdValue(bool &$fromSetAttribute): ?string
+    {
+        $fromSetAttribute = false;
+        if ([] !== self::$setAttributeIdValues) {
+            $fromSetAttribute = true;
+
+            return self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1];
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === $xml) {
+            return null;
+        }
+        if (1 === preg_match('/\bid\s*=\s*(["\'])([^"\']*)\1/', $xml, $m)) {
             return $m[2];
         }
 
@@ -138,6 +235,15 @@ final class JitDomSetIdAttribute
         $context->builder->positionAtEnd($cont);
     }
 
+    private static function loadNamespaceArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
+        return JitStringArg::lower($context, $arg, 'DOMElement::setIdAttributeNS() namespace');
+    }
+
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
@@ -150,7 +256,7 @@ final class JitDomSetIdAttribute
             );
         }
 
-        throw new \LogicException('DOMElement::setIdAttribute() expects an object receiver');
+        throw new \LogicException('DOMElement::setIdAttribute*() expects an object receiver/attr');
     }
 
     private static function boxNull(Context $context): Value
