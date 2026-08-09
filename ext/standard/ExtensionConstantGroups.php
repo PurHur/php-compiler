@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\apcu\ApcuConstants;
+use PHPCompiler\ext\apcu\ApcuExtensionPolicy;
+use PHPCompiler\ext\brotli\BrotliConstants;
+use PHPCompiler\ext\brotli\BrotliExtensionPolicy;
 use PHPCompiler\ext\calendar\CalendarConstants;
 use PHPCompiler\ext\curl\CurlConstants;
 use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\DomExceptionConstants;
+use PHPCompiler\ext\dom\DomLivingConstants;
+use PHPCompiler\ext\eio\EioConstants;
+use PHPCompiler\ext\eio\EioExtensionPolicy;
 use PHPCompiler\ext\exif\ExifConstants;
 use PHPCompiler\ext\fileinfo\FileinfoConstants;
 use PHPCompiler\ext\filter\FilterConstants;
@@ -18,12 +25,16 @@ use PHPCompiler\ext\gmp\GmpConstants;
 use PHPCompiler\ext\hash\MhashRegistry;
 use PHPCompiler\ext\hash\VmHashContext;
 use PHPCompiler\ext\iconv\IconvConstants;
+use PHPCompiler\ext\imap\ImapConstants;
+use PHPCompiler\ext\imap\ImapExtensionPolicy;
 use PHPCompiler\ext\inotify\InotifyConstants;
 use PHPCompiler\ext\intl\IntlConstants;
 use PHPCompiler\ext\ldap\LdapConstants;
 use PHPCompiler\ext\ldap\LdapExtensionPolicy;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\mbstring\MbstringConstants;
+use PHPCompiler\ext\msgpack\MsgpackConstants;
+use PHPCompiler\ext\msgpack\MsgpackExtensionPolicy;
 use PHPCompiler\ext\mysqli\MysqliConstants;
 use PHPCompiler\ext\odbc\OdbcConstants;
 use PHPCompiler\ext\openssl\OpensslConstants;
@@ -39,11 +50,15 @@ use PHPCompiler\ext\sqlite3\Sqlite3Constants;
 use PHPCompiler\ext\soap\SoapConstants;
 use PHPCompiler\ext\sockets\SocketConstants;
 use PHPCompiler\ext\sodium\SodiumConstants;
+use PHPCompiler\ext\ssh2\Ssh2Constants;
+use PHPCompiler\ext\ssh2\Ssh2ExtensionPolicy;
 use PHPCompiler\ext\sysvmsg\SysvmsgConstants;
 use PHPCompiler\ext\tidy\TidyConstants;
 use PHPCompiler\ext\tokenizer\TokenConstants;
 use PHPCompiler\ext\uuid\UuidConstants;
 use PHPCompiler\ext\xml\XmlConstants;
+use PHPCompiler\ext\yaml\YamlConstants;
+use PHPCompiler\ext\yaml\YamlExtensionPolicy;
 
 /**
  * Extension constant groups for get_defined_constants(true) (Zend/zend_builtin_functions.c; #17416, #17799).
@@ -73,7 +88,9 @@ final class ExtensionConstantGroups
         $groups['tokenizer'] = TokenConstants::registeredConstants();
         $groups['dom'] = array_merge(
             DomExceptionConstants::globalConstants(),
-            DomConstants::globalConstants()
+            DomConstants::globalConstants(),
+            // Dom\HTML_NO_DEFAULT_NS — living stub const; Zend 8.4+ dom bucket (#29485 / #26008).
+            DomLivingConstants::registeredConstants()
         );
         $groups['libxml'] = LibxmlConstants::registeredConstants();
         $groups['openssl'] = OpensslConstants::registeredConstants();
@@ -139,6 +156,29 @@ final class ExtensionConstantGroups
         }
         $groups['odbc'] = OdbcConstants::registeredConstants();
         $groups['sysvmsg'] = SysvmsgConstants::registeredConstants();
+        // PECL / optional modules that register into Context::$constants (#29485 / re-#23732).
+        // Without a group here their MINIT names land in 'user', which Zend omits when empty.
+        if (ApcuExtensionPolicy::advertisesExtension()) {
+            $groups['apcu'] = ApcuConstants::registeredConstants();
+        }
+        if (YamlExtensionPolicy::advertisesExtension()) {
+            $groups['yaml'] = YamlConstants::registeredConstants();
+        }
+        if (MsgpackExtensionPolicy::advertisesExtension()) {
+            $groups['msgpack'] = MsgpackConstants::registeredConstants();
+        }
+        if (BrotliExtensionPolicy::advertisesExtension()) {
+            $groups['brotli'] = BrotliConstants::registeredConstants();
+        }
+        if (Ssh2ExtensionPolicy::advertisesExtension()) {
+            $groups['ssh2'] = Ssh2Constants::registeredConstants();
+        }
+        if (EioExtensionPolicy::advertisesExtension()) {
+            $groups['eio'] = EioConstants::registeredConstants();
+        }
+        if (ImapExtensionPolicy::advertisesExtension()) {
+            $groups['imap'] = ImapConstants::registeredConstants();
+        }
 
         return $groups;
     }

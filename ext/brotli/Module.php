@@ -24,28 +24,17 @@ class Module extends ModuleAbstract
         // PECL brotli.c — php_register_url_stream_wrapper("compress.brotli", …) (#28115).
         \PHPCompiler\ext\standard\VmStreamWrapperRegistry::registerExtensionBuiltin(VmBrotliStream::PROTOCOL);
         VmBrotliContext::registerClasses($runtime->vmContext);
-        foreach ([
-            'BROTLI_GENERIC' => VmBrotliNative::MODE_GENERIC,
-            'BROTLI_TEXT' => VmBrotliNative::MODE_TEXT,
-            'BROTLI_FONT' => VmBrotliNative::MODE_FONT,
-            'BROTLI_COMPRESS_LEVEL_MIN' => VmBrotliNative::MIN_QUALITY,
-            'BROTLI_COMPRESS_LEVEL_MAX' => VmBrotliNative::MAX_QUALITY,
-            'BROTLI_COMPRESS_LEVEL_DEFAULT' => VmBrotliNative::DEFAULT_QUALITY,
-            'BROTLI_PROCESS' => VmBrotliContext::OP_PROCESS,
-            'BROTLI_FLUSH' => VmBrotliContext::OP_FLUSH,
-            'BROTLI_FINISH' => VmBrotliContext::OP_FINISH,
-            'BROTLI_VERSION_NUMBER' => VmBrotliNative::versionNumber(),
-        ] as $name => $value) {
+        foreach (BrotliConstants::registeredConstants() as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
-            $var->int($value);
+            if (\is_bool($value)) {
+                $var->bool($value);
+            } elseif (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int($value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
-        $versionText = new \PHPCompiler\VM\Variable();
-        $versionText->string(VmBrotliNative::versionText());
-        $runtime->vmContext->defineConstant('BROTLI_VERSION_TEXT', $versionText);
-        $dict = new \PHPCompiler\VM\Variable();
-        $dict->bool(VmBrotliNative::dictionarySupport());
-        $runtime->vmContext->defineConstant('BROTLI_DICTIONARY_SUPPORT', $dict);
     }
 
     public function getFunctions(): array
