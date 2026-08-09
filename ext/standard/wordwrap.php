@@ -8,12 +8,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringWordwrap;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -52,11 +52,8 @@ final class wordwrap extends Internal
         }
         $cut = false;
         if (isset($frame->calledArgs[3])) {
-            $c = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $c->type) {
-                throw new \LogicException('wordwrap() cut must be a boolean in this compiler build');
-            }
-            $cut = $c->toBool();
+            // Z_PARAM_BOOL — null→false + E_DEPRECATED (php-src string.c; #29354).
+            $cut = VmMath::parseBoolBuiltinArgForFrame($frame, 3, 'wordwrap', 4, 'cut_long_words');
         }
         $frame->returnVar->string(
             VmString::wordwrap($text, $width, $break, $cut)
@@ -73,7 +70,7 @@ final class wordwrap extends Internal
             $width = self::compileTimeWidth($args);
             $break = self::compileTimeBreak($args);
             $cut = self::compileTimeCut($context, $args);
-            if (null !== $width && null !== $break) {
+            if (null !== $width && null !== $break && null !== $cut) {
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::wordwrap($literal, $width, $break, $cut))
                 );
@@ -93,10 +90,11 @@ final class wordwrap extends Internal
         $i8 = $context->getTypeFromString('int8');
         $cutI8 = $i8->constInt(0, false);
         if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[3]->type) {
-                throw new \LogicException('wordwrap() cut must be a boolean in this compiler build');
-            }
-            $cutI8 = $context->builder->zExt($context->helper->loadValue($args[3]), $i8);
+            // Z_PARAM_BOOL — null→false + E_DEPRECATED (php-src string.c; #29354).
+            $cutI8 = $context->builder->zExt(
+                JitBoolArg::lowerCoerceZParamBool($context, $args[3], 'wordwrap', 'cut_long_words', 4),
+                $i8
+            );
         }
 
         $text = self::jitStringArg($context, $args[0], 0, 'string');
@@ -169,17 +167,24 @@ final class wordwrap extends Internal
         return JitStringArg::compileTimeLiteral($args[2]);
     }
 
-    private static function compileTimeCut(Context $context, array $args): bool
+    /**
+     * Compile-time cut_long_words when a native bool constant; otherwise null so
+     * {@see JitBoolArg::lowerCoerceZParamBool} handles soft-null DEP (#29354).
+     */
+    private static function compileTimeCut(Context $context, array $args): ?bool
     {
         if (!isset($args[3]) || NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             return false;
         }
+        if (JITVariable::TYPE_NULL === $args[3]->type || $args[3]->isNullConstant) {
+            return null;
+        }
         if (JITVariable::TYPE_NATIVE_BOOL !== $args[3]->type || JITVariable::KIND_VALUE !== $args[3]->kind) {
-            return false;
+            return null;
         }
         $raw = $args[3]->value->value ?? null;
         if (null === $raw) {
-            return false;
+            return null;
         }
 
         return 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($raw);
