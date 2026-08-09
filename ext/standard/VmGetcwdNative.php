@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * getcwd for VM — /proc/self/cwd on Linux, else {@see VmGetcwdPure}; no libc FFI (#8955, #12154).
  *
  * php-src: ext/standard/dir.c — getcwd(2) / realpath fallback.
- * JIT/AOT: {@see JitChdir} via realpath(3) on ".".
+ * JIT/AOT: {@see GetcwdJitHelper} via {@see \PHPCompiler\JIT\Builtin\GetcwdJit} (#29429).
  */
 final class VmGetcwdNative
 {

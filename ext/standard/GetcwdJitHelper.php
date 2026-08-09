@@ -5,19 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * JIT/AOT runtime helper for getcwd() — VM/algorithm reference (#10451).
+ * getcwd() for compiled JIT/AOT modules (#29429, #25541, php-in-PHP).
  *
- * Thin AOT/JIT emit uses libc realpath(".") via {@see \PHPCompiler\JIT\Builtin\GetcwdJit}
- * (NestedJIT of this helper segfaults under user-script AOT — #26928).
- * SSOT: {@see VmGetcwdNative}
- * php-src: ext/standard/dir.c — php_get_current_dir()
+ * Leaf is `@getcwd` → NestedJIT whitelist {@see getcwd_} →
+ * {@see \PHPCompiler\JIT\Builtin\GetcwdJit::invokeNestedLeaf} (getcwd(2); no VmGetcwdNative
+ * pull in this TU — #26928 NestedJIT segfault root cause).
+ * Empty string on failure so {@see JitGetcwd::boxed} can lower to false (#10451).
+ * php-src: ext/standard/dir.c — PHP_FUNCTION(getcwd)
  */
 final class GetcwdJitHelper
 {
     public static function resolveJit(): string
     {
-        $cwd = VmGetcwdNative::resolve();
+        $cwd = @\getcwd();
 
-        return false === $cwd ? '' : $cwd;
+        return \is_string($cwd) ? $cwd : '';
     }
 }

@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for getcwd() via realpath(3) on "." (JIT/AOT). */
+/** LLVM lowering for getcwd() via GetcwdJitHelper PHP (#29429). */
 final class JitGetcwd
 {
     private static int $blockSerial = 0;
