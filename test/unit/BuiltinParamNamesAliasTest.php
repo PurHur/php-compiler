@@ -5404,6 +5404,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('stream_socket_server', 3));
     }
 
+    /** @covers issue #28568 */
+    public function testSocketConnectReadWriteStubTypes(): void
+    {
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('socket_read'));
+        self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('socket_write'));
+        self::assertSame('Socket', BuiltinInternalArgInfo::stubParamTypeOverride('socket_connect', 0));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('socket_connect', 2));
+        self::assertSame('Socket', BuiltinInternalArgInfo::stubParamTypeOverride('socket_bind', 0));
+        self::assertSame('Socket', BuiltinInternalArgInfo::stubParamTypeOverride('socket_listen', 0));
+        self::assertSame('Socket', BuiltinInternalArgInfo::stubParamTypeOverride('socket_read', 0));
+        self::assertSame('Socket', BuiltinInternalArgInfo::stubParamTypeOverride('socket_write', 0));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('socket_write', 2));
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {

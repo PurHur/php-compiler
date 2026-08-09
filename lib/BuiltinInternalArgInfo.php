@@ -381,6 +381,9 @@ final class BuiltinInternalArgInfo
             // ext/sockets/sockets.stub.php — InternalArgInfo resource / empty; Zend Socket|false / void (#27854)
             'socket_create', 'socket_create_listen', 'socket_accept', 'socket_import_stream' => 'Socket|false',
             'socket_close' => 'void',
+            // ext/sockets/sockets.stub.php — InternalArgInfo omits |false (#28568)
+            'socket_read' => 'string|false',
+            'socket_write' => 'int|false',
             default => null,
         };
     }
@@ -843,6 +846,18 @@ final class BuiltinInternalArgInfo
             },
             // ext/sockets/sockets.stub.php — Socket $socket; InternalArgInfo untyped / absent (#27854)
             'socket_export_stream', 'socket_close', 'socket_accept' => 0 === $index ? 'Socket' : null,
+            // ext/sockets/sockets.stub.php — Socket $socket + nullable port/length (#28568)
+            'socket_connect' => match ($index) {
+                0 => 'Socket',
+                2 => '?int',
+                default => null,
+            },
+            'socket_bind', 'socket_listen', 'socket_read' => 0 === $index ? 'Socket' : null,
+            'socket_write' => match ($index) {
+                0 => 'Socket',
+                2 => '?int',
+                default => null,
+            },
             // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
             'filter_var' => match ($index) {
                 0 => 'mixed',
