@@ -81,10 +81,7 @@ final class range extends Internal
         $start = JitLongArg::lower($context, $args[0], 'range() start');
         $end = JitLongArg::lower($context, $args[1], 'range() end');
         if (3 === \count($args)) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-                throw new \LogicException('range() step must be an integer in this compiler build');
-            }
-            $step = JitLongArg::lower($context, $args[2], 'range() step');
+            $step = self::lowerIntStepArg($context, $args[2]);
         } else {
             $cmp = $context->builder->icmp(Builder::INT_SGT, $start, $end);
             $one = $i64->constInt(1, false);
@@ -105,7 +102,12 @@ final class range extends Internal
      */
     private static function callFloatRange(Context $context, array $args): Value
     {
-        foreach ($args as $arg) {
+        foreach ($args as $i => $arg) {
+            // Soft-null $step is handled below (#29352); start/end stay numeric-only.
+            if (2 === $i
+                && (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false))) {
+                continue;
+            }
             if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
                 && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type) {
                 throw new \LogicException('range() float path requires native numeric operands in this compiler build');
@@ -115,7 +117,11 @@ final class range extends Internal
         $start = self::toJitDouble($context, $args[0], $double);
         $end = self::toJitDouble($context, $args[1], $double);
         if (3 === \count($args)) {
-            $step = self::toJitDouble($context, $args[2], $double);
+            if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+                $step = self::lowerFloatStepNull($context);
+            } else {
+                $step = self::toJitDouble($context, $args[2], $double);
+            }
         } else {
             $cmp = $context->builder->fcmp(Builder::REAL_OGT, $start, $end);
             $one = $double->constReal(1.0);
@@ -158,10 +164,7 @@ final class range extends Internal
         $start = $i64->constInt(\ord($startChar), false);
         $end = $i64->constInt(\ord($endChar), false);
         if (3 === \count($args)) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-                throw new \LogicException('range() step must be an integer in this compiler build');
-            }
-            $step = JitLongArg::lower($context, $args[2], 'range() step');
+            $step = self::lowerIntStepArg($context, $args[2]);
         } else {
             $cmp = $context->builder->icmp(Builder::INT_SGT, $start, $end);
             $one = $i64->constInt(1, false);
@@ -173,6 +176,53 @@ final class range extends Internal
         self::emitOversizedStepGuard($context, $start, $end, $step);
 
         return RangeIntRuntime::charRange($context, $start, $end, $step);
+    }
+
+    /**
+     * Z_PARAM_NUMBER soft-null on $step — DEP (int|float) then 0; zero-step guard follows (#29352).
+     * Caller strict_types → TypeError (Zend).
+     */
+    private static function lowerIntStepArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'range(): Argument #3 ($step) must be of type int|float, null given'
+                );
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+            // Skip DEP IR on user-script AOT (thin standalone trigger_error mid-fold — peer #21593).
+            if (!$context->isUserScriptAot()) {
+                JitIntdiv::emitNullIntDeprecation($context, 'range', 3, 'step', 'int|float');
+            }
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type) {
+            throw new \LogicException('range() step must be an integer in this compiler build');
+        }
+
+        return JitLongArg::lower($context, $arg, 'range() step');
+    }
+
+    /** Soft-null float $step → 0.0 with int|float DEP (#29352). */
+    private static function lowerFloatStepNull(Context $context): Value
+    {
+        if ($context->callerStrictTypes) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'range(): Argument #3 ($step) must be of type int|float, null given'
+            );
+
+            return $context->getTypeFromString('double')->constReal(0.0);
+        }
+        if (!$context->isUserScriptAot()) {
+            JitIntdiv::emitNullIntDeprecation($context, 'range', 3, 'step', 'int|float');
+        }
+
+        return $context->getTypeFromString('double')->constReal(0.0);
     }
 
     /**
