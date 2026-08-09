@@ -192,6 +192,8 @@ final class BuiltinInternalArgInfo
             // ext/zlib/zlib.stub.php — InternalArgInfo return resource; Zend DeflateContext|false / InflateContext|false (#27627)
             'deflate_init' => 'DeflateContext|false',
             'inflate_init' => 'InflateContext|false',
+            // ext/zlib/zlib.stub.php — InternalArgInfo return string; Zend string|false (#28755)
+            'deflate_add', 'inflate_add' => 'string|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
             'base64_decode', 'hex2bin' => 'string|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471, #28569)
@@ -383,6 +385,10 @@ final class BuiltinInternalArgInfo
             // ext/shmop/shmop.stub.php — InternalArgInfo return int / empty; Zend Shmop|false / void (#28451)
             'shmop_open' => 'Shmop|false',
             'shmop_close' => 'void',
+            // ext/sysvmsg/sysvmsg.stub.php — InternalArgInfo resource / empty / array; Zend SysvMessageQueue|false / bool / array|false (#28452)
+            'msg_get_queue' => 'SysvMessageQueue|false',
+            'msg_receive' => 'bool',
+            'msg_stat_queue' => 'array|false',
             // ext/sockets/sockets.stub.php — InternalArgInfo resource / empty; Zend Socket|false / void (#27854)
             'socket_create', 'socket_create_listen', 'socket_accept', 'socket_import_stream' => 'Socket|false',
             'socket_close' => 'void',
@@ -749,6 +755,9 @@ final class BuiltinInternalArgInfo
             },
             // ext/zlib/zlib.stub.php — array|object $options (InternalArgInfo array / omitted) (#27627, #28592)
             'deflate_init', 'inflate_init' => 1 === $index ? 'object|array' : null,
+            // ext/zlib/zlib.stub.php — DeflateContext/InflateContext $context; InternalArgInfo untyped (#28755)
+            'deflate_add' => 0 === $index ? 'DeflateContext' : null,
+            'inflate_add' => 0 === $index ? 'InflateContext' : null,
             // ext/hash/hash.stub.php — HashContext $context; InternalArgInfo untyped / resource (#27745, #27737)
             'hash_copy', 'hash_update', 'hash_final' => 0 === $index ? 'HashContext' : null,
             'hash_update_file' => 0 === $index ? 'HashContext' : null,
@@ -832,6 +841,31 @@ final class BuiltinInternalArgInfo
             'curl_share_close', 'curl_share_errno' => 0 === $index ? 'CurlShareHandle' : null,
             // ext/shmop/shmop.stub.php — Shmop $shmop; InternalArgInfo still int (legacy shmid) (#28451)
             'shmop_read', 'shmop_write', 'shmop_size', 'shmop_delete', 'shmop_close' => 0 === $index ? 'Shmop' : null,
+            // ext/sysvmsg/sysvmsg.stub.php — SysvMessageQueue + mixed/untyped outs; InternalArgInfo resource/untyped/int (#28452)
+            'msg_send' => match ($index) {
+                0 => 'SysvMessageQueue',
+                5 => '',
+                default => null,
+            },
+            'msg_receive' => match ($index) {
+                0 => 'SysvMessageQueue',
+                2, 7 => '',
+                4 => 'mixed',
+                default => null,
+            },
+            'msg_remove_queue', 'msg_stat_queue' => 0 === $index ? 'SysvMessageQueue' : null,
+            'msg_set_queue' => match ($index) {
+                0 => 'SysvMessageQueue',
+                1 => 'array',
+                default => null,
+            },
+            // ext/sysvsem/sysvsem.stub.php — SysvSemaphore + bool $non_blocking; InternalArgInfo untyped (#28453)
+            'sem_acquire' => match ($index) {
+                0 => 'SysvSemaphore',
+                1 => 'bool',
+                default => null,
+            },
+            'sem_release', 'sem_remove' => 0 === $index ? 'SysvSemaphore' : null,
             // ext/sysvshm/sysvshm.stub.php — SysvSharedMemory + ?int $size; InternalArgInfo int/untyped (#27943, re-#24640)
             'shm_attach' => match ($index) {
                 0 => 'int',

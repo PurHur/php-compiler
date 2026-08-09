@@ -694,6 +694,37 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('SysvSharedMemory', $shm['type']);
     }
 
+    /** php-src ext/sysvmsg/sysvmsg.stub.php — SysvMessageQueue stubs; InternalArgInfo resource/untyped (#28452). */
+    public function testMsgReflectionStubTypes(): void
+    {
+        $this->assertSame('SysvMessageQueue|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('msg_get_queue'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('msg_receive'));
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('msg_stat_queue'));
+        $this->assertSame('SysvMessageQueue', BuiltinInternalArgInfo::stubParamTypeOverride('msg_send', 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('msg_send', 5));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('msg_receive', 4));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('msg_receive', 2));
+        $queue = BuiltinInternalArgInfo::paramInfoForFunction('msg_remove_queue', 0);
+        $this->assertNotNull($queue);
+        $this->assertSame('SysvMessageQueue', $queue['type']);
+    }
+
+    /** php-src ext/sysvsem/sysvsem.stub.php — SysvSemaphore stubs; InternalArgInfo untyped (#28453). */
+    public function testSemReflectionStubTypes(): void
+    {
+        $this->assertSame('SysvSemaphore', BuiltinInternalArgInfo::stubParamTypeOverride('sem_acquire', 0));
+        $this->assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('sem_acquire', 1));
+        $this->assertSame('SysvSemaphore', BuiltinInternalArgInfo::stubParamTypeOverride('sem_release', 0));
+        $this->assertSame('SysvSemaphore', BuiltinInternalArgInfo::stubParamTypeOverride('sem_remove', 0));
+        $sem = BuiltinInternalArgInfo::paramInfoForFunction('sem_acquire', 0);
+        $this->assertNotNull($sem);
+        $this->assertSame('SysvSemaphore', $sem['type']);
+        $nonBlocking = BuiltinInternalArgInfo::paramInfoForFunction('sem_acquire', 1);
+        $this->assertNotNull($nonBlocking);
+        $this->assertSame('bool', $nonBlocking['type']);
+        $this->assertTrue($nonBlocking['isOptional']);
+    }
+
     /** php-src ext/sockets/sockets.stub.php — Socket stubs; InternalArgInfo resource/untyped (#27854). */
     public function testSocketExportImportReflectionStubTypes(): void
     {
@@ -1335,6 +1366,22 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNotNull($deflateOpts);
         $this->assertSame('object|array', $deflateOpts['type']);
         // Optionality for deflate_init $options is from BuiltinParamNames `options=` (#24568), not InternalArgInfo.
+    }
+
+    /** php-src ext/zlib/zlib.stub.php — DeflateContext/InflateContext $context → string|false (#28755). */
+    public function testDeflateInflateAddReflectionStubTypes(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('deflate_add'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('inflate_add'));
+        $this->assertSame('DeflateContext', BuiltinInternalArgInfo::stubParamTypeOverride('deflate_add', 0));
+        $this->assertSame('InflateContext', BuiltinInternalArgInfo::stubParamTypeOverride('inflate_add', 0));
+        $deflateCtx = BuiltinInternalArgInfo::paramInfoForFunction('deflate_add', 0);
+        $this->assertNotNull($deflateCtx);
+        $this->assertSame('DeflateContext', $deflateCtx['type']);
+        $this->assertSame('context', $deflateCtx['name']);
+        $inflateCtx = BuiltinInternalArgInfo::paramInfoForFunction('inflate_add', 0);
+        $this->assertNotNull($inflateCtx);
+        $this->assertSame('InflateContext', $inflateCtx['type']);
     }
 
     /**

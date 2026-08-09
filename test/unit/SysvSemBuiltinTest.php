@@ -30,5 +30,8 @@ final class SysvSemBuiltinTest extends BaseTest
 
         $path = __DIR__.'/../compliance/cases/sysvsem/sem_acquire_reflection_names_24610.phpt';
         yield 'sem_acquire_reflection_names_24610.phpt' => self::parsePHPT($path, 'sem_acquire_reflection_names_24610.phpt');
+
+        $typesPath = __DIR__.'/../compliance/cases/sysvsem/sem_reflection_types_28453.phpt';
+        yield 'sem_reflection_types_28453.phpt' => self::parsePHPT($typesPath, 'sem_reflection_types_28453.phpt');
     }
 }
