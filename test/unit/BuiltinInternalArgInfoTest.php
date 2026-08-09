@@ -1192,6 +1192,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ob_gzhandler'));
     }
 
+    /** php-src zlib.stub.php — InternalArgInfo omits |false (#28788). */
+    public function testGzfileReadgzfileReflectionReturnUnions(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzfile'));
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('readgzfile'));
+    }
+
     /** php-src base64.c / string.stub.php — InternalArgInfo omits |false (#25477). */
     public function testBase64DecodeHex2binReflectionReturnUnions(): void
     {

@@ -187,6 +187,9 @@ final class BuiltinInternalArgInfo
             'zlib_encode', 'zlib_decode' => 'string|false',
             // ext/zlib/zlib.stub.php — InternalArgInfo return string; Zend string|false (#28855)
             'ob_gzhandler' => 'string|false',
+            // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#28788)
+            'gzfile' => 'array|false',
+            'readgzfile' => 'int|false',
             // ext/readline/readline.stub.php — InternalArgInfo return string (missing |false) (#28342)
             'readline' => 'string|false',
             // pecl-file_formats-lzf lzf.stub.php — InternalArgInfo return int (missing |false) (#28063)
