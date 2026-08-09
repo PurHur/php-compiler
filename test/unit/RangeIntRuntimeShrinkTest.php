@@ -38,6 +38,8 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('RangeIntRuntime::floatRange', $builtin);
         $this->assertStringContainsString('charLetterLiteral', $builtin);
         $this->assertStringContainsString('callFloatRange', $builtin);
+        $this->assertStringContainsString('emitIncreasingNegativeStepGuard', $builtin);
+        $this->assertStringContainsString('emitIncreasingNegativeFloatStepGuard', $builtin);
         $this->assertStringNotContainsString('HashTableHelper::buildIntegerRange', $builtin);
     }
 
@@ -59,6 +61,12 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $this->assertSame(4, $stepped->getNumElements());
         $this->assertSame(0, $stepped->findIndex(0)?->resolveIndirect()->toInt());
         $this->assertSame(6, $stepped->findIndex(3)?->resolveIndirect()->toInt());
+
+        // Default profile: increasing + negative step still flips (Zend 8.2).
+        $legacyFlip = RangeIntJitHelper::intRangeCopy(1, 5, -1);
+        $this->assertSame(5, $legacyFlip->getNumElements());
+        $this->assertSame(1, $legacyFlip->findIndex(0)?->resolveIndirect()->toInt());
+        $this->assertSame(5, $legacyFlip->findIndex(4)?->resolveIndirect()->toInt());
 
         // php-src: |step| > span → ValueError; |step| == span OK (#26657).
         $equalSpan = RangeIntJitHelper::intRangeCopy(0, 2, 2);
@@ -87,6 +95,10 @@ final class RangeIntRuntimeShrinkTest extends TestCase
                 'range(): Argument #3 ($step) must be less than the range spanned by argument #1 ($start) and argument #2 ($end)',
                 RangeIntJitHelper::stepOversizedErrorMessage()
             );
+            $this->assertSame(
+                'range(): Argument #3 ($step) must be greater than 0 for increasing ranges',
+                RangeIntJitHelper::stepIncreasingNegativeErrorMessage()
+            );
             try {
                 RangeIntJitHelper::intRangeCopy(1, 2, 0);
                 $this->fail('expected ValueError for zero step');
@@ -102,6 +114,19 @@ final class RangeIntRuntimeShrinkTest extends TestCase
                     $e->getMessage()
                 );
             }
+            try {
+                RangeIntJitHelper::intRangeCopy(1, 5, -1);
+                $this->fail('expected ValueError for increasing negative step');
+            } catch (\ValueError $e) {
+                $this->assertSame(
+                    'range(): Argument #3 ($step) must be greater than 0 for increasing ranges',
+                    $e->getMessage()
+                );
+            }
+            // Equal endpoints + negative step remain a singleton (#29351 / php-src).
+            $eq = RangeIntJitHelper::intRangeCopy(5, 5, -1);
+            $this->assertSame(1, $eq->getNumElements());
+            $this->assertSame(5, $eq->findIndex(0)?->resolveIndirect()->toInt());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

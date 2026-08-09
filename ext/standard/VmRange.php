@@ -299,7 +299,12 @@ final class VmRange
 
     private static function normalizeIntStepSign(int $start, int $end, int $step): int
     {
-        if ($start <= $end && $step < 0) {
+        // php-src negative_step_error: strictly increasing only (#29351).
+        if ($start < $end && $step < 0) {
+            if (CompilerVersion::supportsRangeIncreasingNegativeStepError()) {
+                throw new \ValueError(RangeIntJitHelper::stepIncreasingNegativeErrorMessage());
+            }
+
             return abs($step);
         }
         if ($start > $end && $step > 0) {
@@ -346,7 +351,12 @@ final class VmRange
 
     private static function normalizeFloatStepSign(float $start, float $end, float $step): float
     {
-        if ($start <= $end && $step < 0.0) {
+        // php-src negative_step_error: strictly increasing only (#29351).
+        if ($start < $end && $step < 0.0) {
+            if (CompilerVersion::supportsRangeIncreasingNegativeStepError()) {
+                throw new \ValueError(RangeIntJitHelper::stepIncreasingNegativeErrorMessage());
+            }
+
             return abs($step);
         }
         if ($start > $end && $step > 0.0) {

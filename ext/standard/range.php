@@ -92,6 +92,7 @@ final class range extends Internal
             $step = $context->builder->select($cmp, $negOne, $one);
         }
         self::emitZeroStepGuard($context, $step);
+        self::emitIncreasingNegativeStepGuard($context, $start, $end, $step);
         self::emitOversizedStepGuard($context, $start, $end, $step);
 
         return RangeIntRuntime::intRange($context, $start, $end, $step);
@@ -122,6 +123,7 @@ final class range extends Internal
             $step = $context->builder->select($cmp, $negOne, $one);
         }
         self::emitZeroFloatStepGuard($context, $step);
+        self::emitIncreasingNegativeFloatStepGuard($context, $start, $end, $step);
         self::emitOversizedFloatStepGuard($context, $start, $end, $step);
 
         return RangeIntRuntime::floatRange($context, $start, $end, $step);
@@ -167,6 +169,7 @@ final class range extends Internal
             $step = $context->builder->select($cmp, $negOne, $one);
         }
         self::emitZeroStepGuard($context, $step);
+        self::emitIncreasingNegativeStepGuard($context, $start, $end, $step);
         self::emitOversizedStepGuard($context, $start, $end, $step);
 
         return RangeIntRuntime::charRange($context, $start, $end, $step);
@@ -255,6 +258,67 @@ final class range extends Internal
         $context->builder->positionAtEnd($err);
         ExceptionBridge::emitValueErrorAndAbort($context, RangeIntJitHelper::stepZeroErrorMessage());
         BasicBlockHelper::ensureOpenInsertBlock($context, 'range_fstep_err_dead_'.$tag);
+        $context->builder->positionAtEnd($ok);
+    }
+
+    /**
+     * php-src negative_step_error: strictly increasing range + negative step (#29351).
+     * PROFILE≥8.3 only — legacy silently flips the sign.
+     */
+    private static function emitIncreasingNegativeStepGuard(
+        Context $context,
+        Value $start,
+        Value $end,
+        Value $step
+    ): void {
+        if (!CompilerVersion::supportsRangeIncreasingNegativeStepError()) {
+            return;
+        }
+        $tag = 'rin'.(string) ++self::$jitGuardSeq;
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $increasing = $context->builder->icmp(Builder::INT_SLT, $start, $end);
+        $stepNeg = $context->builder->icmp(Builder::INT_SLT, $step, $zero);
+        $bad = $context->builder->and($increasing, $stepNeg);
+        $ok = BasicBlockHelper::append($context, 'range_inc_neg_ok_'.$tag);
+        $err = BasicBlockHelper::append($context, 'range_inc_neg_err_'.$tag);
+        $context->builder->branchIf($bad, $err, $ok);
+        $context->builder->positionAtEnd($err);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            RangeIntJitHelper::stepIncreasingNegativeErrorMessage()
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'range_inc_neg_err_dead_'.$tag);
+        $context->builder->positionAtEnd($ok);
+    }
+
+    /**
+     * Float twin of {@see emitIncreasingNegativeStepGuard} (#29351).
+     */
+    private static function emitIncreasingNegativeFloatStepGuard(
+        Context $context,
+        Value $start,
+        Value $end,
+        Value $step
+    ): void {
+        if (!CompilerVersion::supportsRangeIncreasingNegativeStepError()) {
+            return;
+        }
+        $tag = 'rif'.(string) ++self::$jitGuardSeq;
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+        $increasing = $context->builder->fcmp(Builder::REAL_OLT, $start, $end);
+        $stepNeg = $context->builder->fcmp(Builder::REAL_OLT, $step, $zero);
+        $bad = $context->builder->and($increasing, $stepNeg);
+        $ok = BasicBlockHelper::append($context, 'range_finc_neg_ok_'.$tag);
+        $err = BasicBlockHelper::append($context, 'range_finc_neg_err_'.$tag);
+        $context->builder->branchIf($bad, $err, $ok);
+        $context->builder->positionAtEnd($err);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            RangeIntJitHelper::stepIncreasingNegativeErrorMessage()
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'range_finc_neg_err_dead_'.$tag);
         $context->builder->positionAtEnd($ok);
     }
 

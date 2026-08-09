@@ -27,6 +27,9 @@ final class RangeIntJitHelper
     /** php-src 8.3+ boundary_error. */
     private const STEP_OVERSIZED_ERROR_83 = 'range(): Argument #3 ($step) must be less than the range spanned by argument #1 ($start) and argument #2 ($end)';
 
+    /** php-src 8.3+ negative_step_error (strictly increasing only; #29351). */
+    private const STEP_INCREASING_NEGATIVE_ERROR_83 = 'range(): Argument #3 ($step) must be greater than 0 for increasing ranges';
+
     /** Zero-step ValueError text (PROFILE≥8.3 split; #28537). */
     public static function stepZeroErrorMessage(): string
     {
@@ -47,12 +50,22 @@ final class RangeIntJitHelper
         return self::STEP_RANGE_ERROR_LEGACY;
     }
 
+    /** Increasing-range negative-step ValueError text (PROFILE≥8.3; #29351). */
+    public static function stepIncreasingNegativeErrorMessage(): string
+    {
+        return self::STEP_INCREASING_NEGATIVE_ERROR_83;
+    }
+
     public static function intRangeCopy(int $start, int $end, int $step): HashTable
     {
         if (0 === $step) {
             throw new \ValueError(self::stepZeroErrorMessage());
         }
-        if ($start <= $end && $step < 0) {
+        // php-src: only end > start rejects a negative step; equal endpoints stay a singleton.
+        if ($start < $end && $step < 0) {
+            if (CompilerVersion::supportsRangeIncreasingNegativeStepError()) {
+                throw new \ValueError(self::stepIncreasingNegativeErrorMessage());
+            }
             $step = -$step;
         } elseif ($start > $end && $step > 0) {
             $step = -$step;

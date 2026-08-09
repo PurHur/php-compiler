@@ -738,6 +738,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsRangeIncreasingNegativeStepErrorFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRangeIncreasingNegativeStepError());
+    }
+
+    public function testSupportsRangeIncreasingNegativeStepErrorTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsRangeIncreasingNegativeStepError());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsLazyObjectFactoriesFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsLazyObjectFactories());
