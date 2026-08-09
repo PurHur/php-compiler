@@ -42782,6 +42782,9 @@ class Compiler {
             $this->compileOperand($expr->class, $block, true),
             $this->compileOperand($expr->name, $block, true)
         );
+        // Use-site line for #[\Deprecated] class-const / enum-case notices (Zend zend_attributes.c / #29381).
+        // Without this, FatalSite walks back to DECLARE_CLASS and cites the declaration line.
+        $this->assignSourceMetadata($op, $expr);
         if (null !== $constName
             && 'class' === strtolower($constName)
             && ($expr->class instanceof Operand\Variable || $expr->class instanceof Operand\Temporary)) {
@@ -54960,15 +54963,15 @@ class Compiler {
             return [];
         }
         $valueSlot = $this->compileOperand($valueOperand, $block, true);
+        $op = new OpCode(
+            OpCode::TYPE_CLASS_CONST_FETCH,
+            $valueSlot,
+            $this->compileOperand($fetch->class, $block, true),
+            $this->compileOperand($fetch->name, $block, true)
+        );
+        $this->assignSourceMetadata($op, $fetch);
 
-        return [
-            new OpCode(
-                OpCode::TYPE_CLASS_CONST_FETCH,
-                $valueSlot,
-                $this->compileOperand($fetch->class, $block, true),
-                $this->compileOperand($fetch->name, $block, true)
-            ),
-        ];
+        return [$op];
     }
 
     private function findEnumCaseClassConstFetchForArrayElement(
@@ -55267,12 +55270,14 @@ class Compiler {
             if (null !== $keyFetch) {
                 $keyTemp = new Operand\Temporary();
                 $keySlot = $block->getVarSlot($keyTemp, false);
-                $return[] = new OpCode(
+                $keyOp = new OpCode(
                     OpCode::TYPE_CLASS_CONST_FETCH,
                     $keySlot,
                     $this->compileOperand($keyFetch->class, $block, true),
                     $this->compileOperand($keyFetch->name, $block, true)
                 );
+                $this->assignSourceMetadata($keyOp, $keyFetch);
+                $return[] = $keyOp;
             } else {
                 $keySlot = $this->compileOperand($keyOperand, $block, true);
             }
