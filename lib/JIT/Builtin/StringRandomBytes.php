@@ -10,10 +10,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_random_bytes via RandomBytesJitHelper PHP (#9149, #21186).
+ * JIT/AOT link for __compiler_random_bytes via RandomBytesJitHelper PHP (#9149, #21186, #29531).
  *
  * Embed + thin standalone AOT: {@see RandomBytesJitHelper} via {@see JitVmHelperLink}
  * (HashEquals #20469 / Rename #19215 shape — no user-script null stub).
+ * Nested helper compile: `@random_bytes` → libc CSPRNG leaf ({@see JitRandomBytesKernel})
+ * without re-entering RandomBytesJitHelper — kernel Internal deleted (#29531).
  * SSOT: {@see \PHPCompiler\ext\standard\VmRandomPure}.
  * php-src: ext/standard/random.c — php_random_bytes()
  */

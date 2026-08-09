@@ -3104,7 +3104,6 @@ require_once __DIR__.'/../../../ext/standard/Rad2degJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RandJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RandomBytesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitRandomBytesKernel.php';
-require_once __DIR__.'/../../../ext/standard/phpc_random_bytes_kernel.php';
 require_once __DIR__.'/../../../ext/standard/RangeBuiltin.php';
 require_once __DIR__.'/../../../ext/standard/RangeIntJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReadfileJitHelper.php';
