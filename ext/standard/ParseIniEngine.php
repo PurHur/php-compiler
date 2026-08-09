@@ -15,6 +15,13 @@ final class ParseIniEngine
     public const SCANNER_RAW = 1;
     public const SCANNER_TYPED = 2;
 
+    /** php-src zend_ini_scanner.l — unterminated double-quoted value (#29358). */
+    private const UNTERMINATED_DOUBLE_QUOTE =
+        'unexpected end of file, expecting TC_DOLLAR_CURLY or TC_QUOTED_STRING or \'"\'';
+
+    /** php-src zend_ini_scanner.l — unterminated single-quoted value. */
+    private const UNTERMINATED_SINGLE_QUOTE = 'unexpected end of file';
+
     private static ?string $lastSyntaxError = null;
     private static ?int $lastSyntaxLine = null;
 
@@ -97,6 +104,8 @@ final class ParseIniEngine
             if (false === $parsedValue) {
                 if (null === self::$lastSyntaxError) {
                     self::setSyntaxError($lineNo + 1, "unexpected '='");
+                } elseif (null === self::$lastSyntaxLine) {
+                    self::$lastSyntaxLine = $lineNo + 1;
                 }
 
                 return false;
@@ -218,9 +227,16 @@ final class ParseIniEngine
         if ('"' === $raw[0] && !self::doubleQuotedIsComplete($raw)) {
             $combined = $raw;
             $lineCount = \count($lines);
+            $startLine = $lineNo + 1;
             while (!self::doubleQuotedIsComplete($combined)) {
                 ++$lineNo;
                 if ($lineNo >= $lineCount) {
+                    // Zend reports the last line scanned (EOF), not the opening line (#29358).
+                    self::setSyntaxError(
+                        \max($startLine, $lineCount),
+                        self::UNTERMINATED_DOUBLE_QUOTE
+                    );
+
                     return false;
                 }
                 $combined .= "\n".$lines[$lineNo];
@@ -318,6 +334,11 @@ final class ParseIniEngine
     private static function parseDoubleQuoted(string $raw, int $scannerMode): string|false
     {
         if (!str_ends_with($raw, '"') || 1 === strlen($raw)) {
+            // Multiline EOF path sets line+detail; this is a same-line fallback (#29358).
+            if (null === self::$lastSyntaxError) {
+                self::$lastSyntaxError = self::UNTERMINATED_DOUBLE_QUOTE;
+            }
+
             return false;
         }
         $inner = substr($raw, 1, -1);
@@ -389,6 +410,10 @@ final class ParseIniEngine
     private static function parseSingleQuoted(string $raw): string|false
     {
         if (!str_ends_with($raw, "'") || 1 === strlen($raw)) {
+            if (null === self::$lastSyntaxError) {
+                self::$lastSyntaxError = self::UNTERMINATED_SINGLE_QUOTE;
+            }
+
             return false;
         }
 
