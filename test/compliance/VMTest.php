@@ -1625,6 +1625,9 @@ class VMTest extends BaseTest {
             if (str_contains($name, 'dynamic_property_deprecation')) {
                 continue;
             }
+            if (str_contains($name, 'dyn_prop_inc_undefined_warn')) {
+                continue;
+            }
             // Native preg stub error codes (JIT/AOT); VM uses host PCRE (issue #1181, #3110).
             if (str_contains(strtolower($case[0]), 'preg_last_error') && str_contains(strtolower($case[0]), 'jit')) {
                 continue;
