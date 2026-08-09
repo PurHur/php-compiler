@@ -1,5 +1,17 @@
 --TEST--
-Property hook ??= — null-check backing, assign via set hook, read via get hook (#6472, zend_property_hooks.c)
+Property hook ??= — Zend null-checks get-hook return, then set (#29266 / #6472, zend_object_handlers.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+putenv('PHP_COMPILER_PROFILE=8.4');
+if (!PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+    die('skip requires PHP_COMPILER_PROFILE=8.4 property hooks gate');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {
@@ -23,6 +35,19 @@ class D {
 $d = new D();
 $d->y ??= 'ignored';
 echo $d->y, "\n";
+
+class E {
+    public ?string $y {
+        get => null;
+        set { $this->store = $value; }
+    }
+    private ?string $store = null;
+}
+$e = new E();
+$e->y ??= 'via-null-get';
+var_export($e->y);
+echo "\n";
 --EXPECT--
-assigned
+default
 kept
+NULL

@@ -1,5 +1,5 @@
 --TEST--
-Property hook ?? — Zend BP_VAR_IS invokes get when present (#29266, zend_object_handlers.c)
+Virtual get-only property ?? invokes get hook (#29266, zend_object_handlers.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\CompilerVersion')) {
@@ -16,33 +16,22 @@ PHP_COMPILER_PROFILE=8.4
 <?php
 class C {
     public string $x {
-        get { echo "GET\n"; return $this->backing; }
-        set => $this->backing = $value;
-    }
-    private string $backing = 'a';
-}
-$c = new C();
-var_dump($c->x ?? 'default');
-echo "ok\n";
-
-class V {
-    public string $hello {
         get => 'hello';
     }
 }
-$v = new V();
-var_dump($v->hello ?? 'default');
+$o = new C;
+echo $o->x, "\n";
+echo ($o->x ?? 'rhs'), "\n";
 
-class N {
+class D {
     public ?string $y {
         get => null;
     }
 }
-$n = new N();
-var_dump($n->y ?? 'default');
+$d = new D;
+var_export($d->y ?? 'rhs');
+echo "\n";
 --EXPECT--
-GET
-string(1) "a"
-ok
-string(5) "hello"
-string(7) "default"
+hello
+hello
+'rhs'

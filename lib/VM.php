@@ -1142,8 +1142,8 @@ class VM {
     }
 
     /**
-     * ?? / ??= on property hooks — Zend checks backing null/uninit, not get-hook return (#6472, #8902).
-     * Incomplete objects: E_WARNING + false before write Error (#19632).
+     * ?? / ??= on property hooks — Zend BP_VAR_IS invokes get when present (#29266, zend_object_handlers.c).
+     * Write-only (no get): probe backing (#6472). Incomplete: E_WARNING + false (#19632).
      */
     public function objectPropertyIsSetForCoalesceAssign(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
@@ -1152,7 +1152,7 @@ class VM {
 
             return false;
         }
-        $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        $hookedIsset = $this->issetHookedPropertyForIssetEmpty($object, $propName, $frame);
         if (null !== $hookedIsset) {
             return $hookedIsset;
         }
@@ -1161,10 +1161,22 @@ class VM {
     }
 
     /**
-     * ?? / ??= on static property hooks — read backing without get hook (#9683, zend_property_hooks.c).
+     * ?? / ??= on static property hooks — invoke get when present (#29266); else backing (#9683).
      */
-    public function fetchStaticPropertyForCoalesce(string $classLc, string $propNameRaw, Variable $dst): void
-    {
+    public function fetchStaticPropertyForCoalesce(
+        string $classLc,
+        string $propNameRaw,
+        Variable $dst,
+        ?Frame $frame = null
+    ): void {
+        $propLc = strtolower($propNameRaw);
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
+        if (null !== $hooks && isset($hooks['get']) && null !== $frame) {
+            $hookValue = $this->fetchStaticPropertyWithHooks($classLc, $propNameRaw, $hooks['get'], $frame);
+            $dst->copyFromForClone($hookValue->resolveIndirect());
+
+            return;
+        }
         $backing = $this->hookedStaticPropertyBackingValue($classLc, $propNameRaw);
         if (false !== $backing) {
             $dst->copyFromForClone($backing);
@@ -1404,7 +1416,8 @@ class VM {
     }
 
     /**
-     * ?? / ??= isset probe on hooked properties — backing only, never get hook (#8902, #6472).
+     * ?? / ??= isset probe on hooked properties when no get hook — backing only (#8902, #6472).
+     * Prefer {@see issetHookedPropertyForIssetEmpty} when a get hook may exist (#29266).
      *
      * @return bool|null null when the property is not hook-backed
      */
@@ -1453,22 +1466,37 @@ class VM {
     }
 
     /**
-     * ?? / ??= quiet property read (zend BP_VAR_IS / coalesce) (#6472, #8902, #29228).
-     * Hooked props: backing only, never get hook. Magic: __isset then __get, or __get alone
+     * ?? / ??= quiet property read (zend BP_VAR_IS / coalesce) (#6472, #8902, #29228, #29266).
+     * Hooked props with get: invoke get (zend_std_read_property; virtual get-only included).
+     * Write-only hooked: backing probe only. Magic: __isset then __get, or __get alone
      * when __isset is absent (unlike isset(), which stays false without __isset).
      * ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys (spl_array.c; #22649, re-#22576).
+     *
+     * @return Frame|null catch frame when a hook/type guard throws into userland
      */
     public function fetchObjectPropertyForCoalesce(
         ObjectEntry $object,
         string $propName,
         Variable $dst,
         ?Frame $frame = null
-    ): void {
+    ): ?Frame {
+        if (null !== $frame && $this->instancePropertyHasGetHook($object, $propName)) {
+            try {
+                $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
+            } catch (VM\PropertyHookRefWriteSignal $signal) {
+                return $signal->catchFrame;
+            }
+            if (null !== $hookValue) {
+                $dst->copyFrom($hookValue->resolveIndirect());
+
+                return null;
+            }
+        }
         $backing = $this->hookedPropertyBackingValue($object, $propName);
         if (false !== $backing) {
             $dst->copyFrom($backing);
 
-            return;
+            return null;
         }
         // ARRAY_AS_PROPS storage is not declarative object properties — mirror PROPERTY_FETCH read.
         if (SplArrayStorage::hasArrayAsProps($object)) {
@@ -1480,7 +1508,7 @@ class VM {
                 $dst->null();
             }
 
-            return;
+            return null;
         }
         // Overloaded / inaccessible: coalesce consults __get (zend_std_read_property IS-mode; #29228).
         if (
@@ -1491,19 +1519,21 @@ class VM {
                 if (!$this->objectPropertyIsSet($object, $propName, $frame)) {
                     $dst->undefined();
 
-                    return;
+                    return null;
                 }
             }
             $got = $this->invokeMagicGet($object, $propName)->resolveIndirect();
             $dst->copyFrom($got);
 
-            return;
+            return null;
         }
         if ($object->hasProperty($propName)) {
             $dst->copyFrom($object->getProperty($propName));
         } else {
             $dst->undefined();
         }
+
+        return null;
     }
 
     /**
@@ -6370,7 +6400,12 @@ restart:
                             goto restart;
                         }
                         $dest = $frame->scope[$op->arg1];
-                        $this->fetchStaticPropertyForCoalesce($lcClass, $propNameRaw, $dest);
+                        try {
+                            $this->fetchStaticPropertyForCoalesce($lcClass, $propNameRaw, $dest, $frame);
+                        } catch (VM\PropertyHookRefWriteSignal $signal) {
+                            $frame = $signal->catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     if (
@@ -8358,7 +8393,11 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result, $frame);
+                        $catchFrame = $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     if ($propertyObject->hasProperty($name) && !$magicGetForRead) {

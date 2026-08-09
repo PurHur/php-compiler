@@ -334,9 +334,9 @@ class OpCode {
     public bool $unsetOnProperty = false;
     /** ?? / ??= on static hooked properties: probe backing storage, not get hook (#9683). */
     public bool $issetOnStaticProperty = false;
-    /** ?? / ??= on hooked properties: null-check backing storage, not get-hook value (#6472, #8902). */
+    /** ?? / ??= on hooked properties: invoke get when present (#29266); else backing (#6472, #8902). */
     public bool $issetForCoalesceAssign = false;
-    /** ?? / ??= left branch: read backing storage, not get-hook value (#6472, #8902). */
+    /** ?? / ??= left branch: quiet property read (get hook when present; #29266, #6472, #8902). */
     public bool $propertyHookCoalesceRead = false;
     /** TYPE_PROPERTY_FETCH in a ?-> fetch arm must read typed slots (#5361, zend_object_handlers.c). */
     public bool $nullsafeFetchPropertyRead = false;
