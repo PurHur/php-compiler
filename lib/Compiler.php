@@ -11354,10 +11354,11 @@ class Compiler {
     }
 
     /**
-     * Zend 8.4 compile-time deprecation for implicit nullable typed parameters (#21390, #22987).
+     * Zend 8.4 compile-time deprecation for implicit nullable typed parameters (#21390, #22987, #29274).
      *
      * Emits during CFG compile for both eval (VM running) and file-level parseAndCompile
-     * (VM not running yet — use {@see $vmContext} from Runtime).
+     * (VM not running yet — use {@see $vmContext} from Runtime). Message is prefixed with the
+     * Zend zend_error callable label ({@see displayCallableNameForCompileDeprecation()}).
      */
     protected function maybeEmitImplicitNullableParamDeprecation(
         Op\Expr\Param $param,
@@ -11378,6 +11379,7 @@ class Compiler {
         }
 
         $paramName = $this->displayParamName($param);
+        $callableName = $this->displayCallableNameForCompileDeprecation($block);
         $line = max(0, $param->getLine());
         $file = $block->scriptPath();
         if ('' === $file) {
@@ -11402,9 +11404,11 @@ class Compiler {
             }
         }
 
+        // Zend zend_compile.c / zend_error: "{func}(): Implicitly marking parameter $x …" (#29274).
         $context->errors->internalDeprecated(
             sprintf(
-                'Implicitly marking parameter %s as nullable is deprecated, the explicit nullable type must be used instead',
+                '%s(): Implicitly marking parameter %s as nullable is deprecated, the explicit nullable type must be used instead',
+                $callableName,
                 $paramName
             ),
             $context,
@@ -11412,6 +11416,46 @@ class Compiler {
             $file,
             $line
         );
+    }
+
+    /**
+     * Zend zend_error-style callable label for compile-time deprecations (#29274).
+     *
+     * Named function → {@code f}; method → {@code C::m}; closure/arrow on PROFILE≥8.4 →
+     * {@code {closure:file:line}} (same shape as Closure::__debugInfo); else {@code {closure}}.
+     */
+    protected function displayCallableNameForCompileDeprecation(Block $block): string
+    {
+        $func = $block->func;
+        if (null === $func || !\is_string($func->name) || '' === $func->name || '{main}' === $func->name) {
+            return '{closure}';
+        }
+        $name = $func->name;
+        if (str_starts_with($name, '{anonymous}') || str_starts_with($name, '{closure}')) {
+            if (CompilerVersion::supportsClosureRichDebugInfo()) {
+                $callable = $func->callableOp ?? null;
+                if ($callable instanceof Op) {
+                    $file = $callable->getFile();
+                    $line = max(0, (int) $callable->getLine());
+                    if (\is_string($file) && '' !== $file && $line > 0) {
+                        return '{closure:'.$file.':'.$line.'}';
+                    }
+                }
+            }
+
+            return '{closure}';
+        }
+        if (null !== $func->class) {
+            $class = $this->staticNameFromOperand($func->class);
+            if ((null === $class || '' === $class) && null !== $this->compilingClassDisplayName) {
+                $class = $this->compilingClassDisplayName;
+            }
+            if (null !== $class && '' !== $class) {
+                return ltrim($class, '\\').'::'.$name;
+            }
+        }
+
+        return $name;
     }
 
     private function displayParamName(Op\Expr\Param $param): string
