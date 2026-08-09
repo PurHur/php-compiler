@@ -19423,10 +19423,13 @@ class JIT {
             } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
                 $className = 'DOMElement';
                 $declaringClassLc = 'domelement';
-            } elseif ('setidattribute' === $methodLc) {
-                // firstChild / item() temps → :object; bind before ExternalMethod (#29257).
-                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::setidattribute');
-                if ($this->context->functionIsRegistered('domelement::setidattribute')) {
+            } elseif ('setidattribute' === $methodLc
+                || 'setidattributens' === $methodLc
+                || 'setidattributenode' === $methodLc
+            ) {
+                // firstChild / item() temps → :object; bind before ExternalMethod (#29257, #29284).
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::'.$methodLc);
+                if ($this->context->functionIsRegistered('domelement::'.$methodLc)) {
                     $className = 'DOMElement';
                     $declaringClassLc = 'domelement';
                 }
@@ -19686,9 +19689,13 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
                 }
-                // setIdAttribute on child-property temps (:object) (#29257).
-                if ('setidattribute' === $methodLc) {
-                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::setidattribute');
+                // setIdAttribute* on child-property temps (:object) (#29257, #29284).
+                if (
+                    'setidattribute' === $methodLc
+                    || 'setidattributens' === $methodLc
+                    || 'setidattributenode' === $methodLc
+                ) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::'.$methodLc);
                 }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
@@ -19785,11 +19792,15 @@ class JIT {
                     return;
                 }
                 if (
-                    'setidattribute' === $methodLc
-                    && $this->context->functionIsRegistered('domelement::setidattribute')
+                    (
+                        'setidattribute' === $methodLc
+                        || 'setidattributens' === $methodLc
+                        || 'setidattributenode' === $methodLc
+                    )
+                    && $this->context->functionIsRegistered('domelement::'.$methodLc)
                 ) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy(
-                        'domelement::setidattribute'
+                        'domelement::'.$methodLc
                     );
                     $this->context->scope->args = [$receiverVar];
 
