@@ -52,15 +52,17 @@ final class str_getcsv extends Internal
             self::rejectNullOptionalString($frame, $frame->calledArgs[2], 2, 'enclosure');
             $enclosure = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'str_getcsv', 2, 'enclosure');
         }
-        if (isset($frame->calledArgs[3])) {
+        $escapeOmitted = !isset($frame->calledArgs[3]);
+        if (!$escapeOmitted) {
             self::rejectNullOptionalString($frame, $frame->calledArgs[3], 3, 'escape');
             $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
-        } else {
+        }
+        // php-src: validate separator/enclosure before omitted-$escape DEP (#29383, file.c).
+        VmCsvArg::validateStrGetcsvOptions($separator, $enclosure, $escape);
+        if ($escapeOmitted) {
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
             VmCsvArg::emitOmittedEscapeDeprecation($frame, 'str_getcsv');
         }
-        // php-src 8.4+: multi-byte separator/enclosure/escape → ValueError (#24148, UPGRADING).
-        VmCsvArg::validateStrGetcsvOptions($separator, $enclosure, $escape);
         if (null === $frame->returnVar) {
             return;
         }
@@ -89,20 +91,22 @@ final class str_getcsv extends Internal
             self::rejectNullOptionalStringJit($context, $args[2], 2, 'enclosure');
             $enclosure = JitStringBuiltinArg::lower($context, $args[2], 'str_getcsv', 2, 'enclosure');
         }
-        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
+        $escapeOmitted = !isset($args[3]) || NamedOptionalCallArgs::isOmittedOptional($args[3]);
+        if (!$escapeOmitted) {
             self::rejectNullOptionalStringJit($context, $args[3], 3, 'escape');
             $escape = JitStringBuiltinArg::lower($context, $args[3], 'str_getcsv', 3, 'escape');
-        } else {
-            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
-            VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'str_getcsv');
         }
-        // php-src 8.4+: multi-byte separator/enclosure/escape → ValueError (#24148, UPGRADING).
+        // php-src: validate before omitted-$escape DEP (#29383 / #24148).
         if (!JitCsvArg::validateStrGetcsvCall($context, ...$args)) {
             // Compile-time ValueError already emitted; return a dummy __value__* (fputcsv pattern).
             return $context->builder->pointerCast(
                 $context->constantFromInteger(0, 'int64'),
                 $context->getTypeFromString('__value__*')
             );
+        }
+        if ($escapeOmitted) {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
+            VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'str_getcsv');
         }
 
         return JitStrGetcsv::invoke($context, $input, $separator, $enclosure, $escape);
