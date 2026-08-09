@@ -34,6 +34,8 @@ final class VmSysvShm
 
         $entry = new ClassEntry('SysvSharedMemory');
         $entry->isInternal = true;
+        // php-src `final class SysvSharedMemory` (ext/sysvshm/sysvshm.stub.php; #28422).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
