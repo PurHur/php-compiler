@@ -30,6 +30,13 @@ final class PropertyHooks
     public const VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR = 'Cannot specify default value for virtual hooked property %s::$%s';
 
     /**
+     * php-src: Zend/zend_language_parser.y — promoted param hooks then `=` is a ParseError (#29242, re-#7313).
+     *
+     * Default *before* the hook block remains valid (`public int $x = 1 { get … }`).
+     */
+    public const PROMOTED_HOOK_DEFAULT_AFTER_PARSE_ERROR = 'syntax error, unexpected token "=", expecting ")"';
+
+    /**
      * php-src: Zend/zend_inheritance.c zend_verify_hooked_property — backed `&get` + `set` (#29230).
      *
      * Message uses {@code Class::prop} (not {@code Class::$prop}).
@@ -533,6 +540,53 @@ final class PropertyHooks
         }
 
         return $depth > 0;
+    }
+
+    /**
+     * Zend rejects `} = <expr>` after a promoted-parameter hook block (zend_language_parser.y, #29242).
+     *
+     * Skips whitespace and block comments between `}` and `=` so comment-padded forms still fail.
+     */
+    private function rejectPromotedCtorHookDefaultAfter(
+        string $body,
+        int $hookClose,
+        string $filename,
+        string $fullCode,
+        int $bodyOffsetInFile
+    ): void {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            return;
+        }
+        $len = strlen($body);
+        $i = $hookClose + 1;
+        while ($i < $len) {
+            $ch = $body[$i];
+            if (ctype_space($ch)) {
+                ++$i;
+                continue;
+            }
+            if ('/' === $ch && $i + 1 < $len && '*' === $body[$i + 1]) {
+                $end = strpos($body, '*/', $i + 2);
+                if (false === $end) {
+                    return;
+                }
+                $i = $end + 2;
+                continue;
+            }
+            break;
+        }
+        if ($i >= $len || '=' !== $body[$i]) {
+            return;
+        }
+        // Distinguishes `=>` (illegal here but not this diagnostic) from default `=`.
+        if ($i + 1 < $len && '>' === $body[$i + 1]) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $bodyOffsetInFile + $i),
+            self::PROMOTED_HOOK_DEFAULT_AFTER_PARSE_ERROR
+        );
     }
 
     /**
@@ -1225,6 +1279,15 @@ final class PropertyHooks
                 $declPrefix,
                 $propDeclHead
             );
+            if ($isPromotedCtorParam) {
+                $this->rejectPromotedCtorHookDefaultAfter(
+                    $body,
+                    $close,
+                    $filename,
+                    $fullCode,
+                    $bodyOffsetInFile
+                );
+            }
             $propDecl = preg_replace('/\s+$/', '', $propDeclHead) ?? $propDeclHead;
             if (!$isPromotedCtorParam && !str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';

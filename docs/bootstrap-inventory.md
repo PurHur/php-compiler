@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7255 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23434 |
+| Source constructs flagged (warnings) | 23436 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6446,7 +6446,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Runtime.php` | 0 | 41 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
-| `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 7 |
+| `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 9 |
 | `lib/SwitchCaseSemicolonDeprecation.php` | 0 | 3 |
 | `lib/SwitchCommaCaseRewriter.php` | 0 | 1 |
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
@@ -44933,7 +44933,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1493)
+- new InternalArgInfo (line 1495)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -53640,12 +53640,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/SourcePreprocessor/PropertyHooks.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 92)
-- new self (line 102)
-- new self (line 112)
-- new CompileFatal (line 1203)
-- new CompileFatal (line 2445)
-- 72 class method(s)
+- new self (line 106)
+- new self (line 116)
+- new self (line 126)
+- new CompileFatal (line 585)
+- new CompileFatal (line 1269)
+- new CompileFatal (line 2530)
+- new CompileFatal (line 2564)
+- 75 class method(s)
 - 2 closure(s)
 
 ### `lib/SwitchCaseSemicolonDeprecation.php`
