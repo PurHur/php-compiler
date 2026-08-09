@@ -9373,7 +9373,8 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
         AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
         AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
-        AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'property', $declare->attributeEntries);
+        // php-src zend_attributes.c — promotion is a parameter for #[\Deprecated] target checks (#29420).
+        AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'parameter', $declare->attributeEntries);
         $result->addOpCode($declare);
     }
 

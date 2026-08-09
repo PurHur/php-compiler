@@ -323,6 +323,39 @@ PHP;
         }
     }
 
+    /** php-src zend_attributes.c — promotion reported as parameter, not property (#29420). */
+    public function testDeprecatedOnPromotedCtorParamCitesParameterUnderProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!\PHPCompiler\CompilerVersion::advertisesDeprecatedAttributeClass()) {
+                $this->markTestSkipped('Deprecated not advertised');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        #[\Deprecated('old')]
+        public $x = 1,
+    ) {}
+}
+PHP;
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Attribute "Deprecated" cannot target parameter (allowed targets: function, method, class constant)'
+            );
+            $runtime->parseAndCompile($code, 'deprecated_promoted_ctor.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /**
      * php-src validate_deprecated: TARGET_CLASS is traits-only (#26307 / #28892).
      *
