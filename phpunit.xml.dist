@@ -126,6 +126,8 @@
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetJITTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnVMTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnJITTest.php</file>
+            <file>./test/compliance/DynPropIncUndefinedWarnVMTest.php</file>
+            <file>./test/compliance/DynPropIncUndefinedWarnJITTest.php</file>
             <file>./test/compliance/XmlGetCurrentReflectionVMTest.php</file>
             <file>./test/compliance/XmlParserGetOptionReflectionVMTest.php</file>
             <file>./test/compliance/XmlParserFreeReflectionVMTest.php</file>
