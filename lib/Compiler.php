@@ -13300,7 +13300,12 @@ class Compiler {
             case Op\Expr\ArrayDimFetch::class:
                 $this->rejectArrayEmptyOffsetRead($expr, $block);
                 $mergeEcho = $this->mergeEchoSlotForBranch($block);
-                if (null !== $mergeEcho && !$this->isArrayDimFetchForWrite($expr, $block)) {
+                $dimForWrite = $this->isArrayDimFetchForWrite($expr, $block);
+                // By-ref call args also use FETCH_DIM_W — reject temporary bases (#29522 / #29247).
+                if ($dimForWrite) {
+                    $this->rejectTemporaryExpressionInWriteContext($expr->result, $block);
+                }
+                if (null !== $mergeEcho && !$dimForWrite) {
                     $block->forceFreshVarSlot($expr->result, $mergeEcho);
                 }
                 $dimSlot = null !== $expr->dim
@@ -13314,7 +13319,7 @@ class Compiler {
                     $block->forceFreshVarSlot($expr->result);
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                 }
-                $fetchType = $this->isArrayDimFetchForWrite($expr, $block)
+                $fetchType = $dimForWrite
                     ? OpCode::TYPE_ARRAY_DIM_FETCH_WRITE
                     : OpCode::TYPE_ARRAY_DIM_FETCH;
 
@@ -13503,7 +13508,12 @@ class Compiler {
                     )
                 );
             case Op\Expr\PropertyFetch::class:
-                $fetchType = $this->isPropertyFetchForWrite($expr, $block)
+                $propForWrite = $this->isPropertyFetchForWrite($expr, $block);
+                // By-ref call args use FETCH_OBJ_W — reject (new …)->prop temps (#29522 / #29247).
+                if ($propForWrite) {
+                    $this->rejectTemporaryExpressionInWriteContext($expr->result, $block);
+                }
+                $fetchType = $propForWrite
                     ? OpCode::TYPE_PROPERTY_FETCH_WRITE
                     : OpCode::TYPE_PROPERTY_FETCH;
 
@@ -15157,6 +15167,7 @@ class Compiler {
      */
     private function compilePropertyFetchWrite(Op\Expr\PropertyFetch $fetch, Block $block): void
     {
+        $this->rejectTemporaryExpressionInWriteContext($fetch->result, $block);
         $block->addOpCode(new OpCode(
             OpCode::TYPE_PROPERTY_FETCH_WRITE,
             $this->compileOperand($fetch->result, $block, false),
@@ -15194,6 +15205,7 @@ class Compiler {
      */
     private function compileArrayDimFetchWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): void
     {
+        $this->rejectTemporaryExpressionInWriteContext($fetch->result, $block);
         $block->addOpCode(new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH_WRITE,
             $this->compileOperand($fetch->result, $block, false),
@@ -18086,10 +18098,19 @@ class Compiler {
      */
     protected function findArrayDimFetchForResult(Operand $result, Block $block): ?Op\Expr\ArrayDimFetch
     {
+        if (null === $block->orig) {
+            return null;
+        }
         foreach ($block->orig->children as $child) {
             if ($child instanceof Op\Expr\ArrayDimFetch && $child->result === $result) {
                 return $child;
             }
+        }
+        // php-cfg may allocate a distinct FuncCall arg temp whose sole writer is the dim
+        // fetch (`f([1,2][0])` — arg !== ArrayDimFetch->result) (#29522).
+        $writer = $result->ops[0] ?? null;
+        if ($writer instanceof Op\Expr\ArrayDimFetch) {
+            return $writer;
         }
 
         return null;
@@ -41059,10 +41080,19 @@ class Compiler {
 
     protected function findPropertyFetchForResult(Operand $result, Block $block): ?Op\Expr\PropertyFetch
     {
+        if (null === $block->orig) {
+            return null;
+        }
         foreach ($block->orig->children as $child) {
             if ($child instanceof Op\Expr\PropertyFetch && $child->result === $result) {
                 return $child;
             }
+        }
+        // php-cfg may allocate a distinct FuncCall arg temp whose sole writer is the prop
+        // fetch (`f((new stdClass)->x)` — arg !== PropertyFetch->result) (#29522).
+        $writer = $result->ops[0] ?? null;
+        if ($writer instanceof Op\Expr\PropertyFetch) {
+            return $writer;
         }
 
         return null;
@@ -47320,6 +47350,23 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $argIndex => $arg) {
+            // Zend zend_compile.c: by-ref call args cannot bind temporary lit-dim / new-prop (#29522).
+            $cfgArg = null;
+            if (
+                null !== $cfgCallOp
+                && \is_array($cfgCallOp->args ?? null)
+                && \array_key_exists((int) $argIndex, $cfgCallOp->args)
+            ) {
+                $cfgArg = $cfgCallOp->args[(int) $argIndex];
+            }
+            $byRefProbe = $cfgArg instanceof Operand ? $cfgArg : $arg;
+            if (
+                null !== $calleeName
+                && $byRefProbe instanceof Operand
+                && $this->callArgRequiresByRef($calleeName, (int) $argIndex, $byRefProbe, $block)
+            ) {
+                $this->rejectTemporaryByRefCallArg($byRefProbe, $block);
+            }
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
             // new C(..., Class::CONST) — fold ClassConstFetch onto a fresh constant slot before
@@ -59440,6 +59487,32 @@ class Compiler {
             return;
         }
         $this->throwCompileError('Cannot use temporary expression in write context');
+    }
+
+    /**
+     * Shared write-context guards for Assign / unset / FETCH_*_W (incl. by-ref call args) (#29522).
+     *
+     * Function-return dims remain writable (f(g()[0]) when g returns by value) — only temporary
+     * array literals / new / const / bare call returns are rejected.
+     */
+    protected function rejectTemporaryExpressionInWriteContext(?Operand $var, ?Block $block = null): void
+    {
+        $this->rejectNewExprInWriteContext($var, $block);
+        $this->rejectArrayLiteralInWriteContext($var, $block);
+        $this->rejectGlobalConstInWriteContext($var, $block);
+        $this->rejectCallReturnInWriteContext($var, $block);
+    }
+
+    /**
+     * Zend zend_compile.c: SEND_REF of temporary lit-dim / new-prop / const is illegal (#29522).
+     *
+     * Function-return dims remain allowed (f(g()[0])); do not call rejectCallReturnInWriteContext.
+     */
+    protected function rejectTemporaryByRefCallArg(?Operand $arg, ?Block $block = null): void
+    {
+        $this->rejectNewExprInWriteContext($arg, $block);
+        $this->rejectArrayLiteralInWriteContext($arg, $block);
+        $this->rejectGlobalConstInWriteContext($arg, $block);
     }
 
     /**

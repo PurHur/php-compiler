@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/../BaseTest.php';
 
 /**
- * #29247 — temporary array/new write contexts are compile fatals (zend_compile.c).
+ * #29247 / #29522 — temporary array/new write contexts are compile fatals (zend_compile.c).
  */
 class TemporaryWriteContextTest extends TestCase
 {
@@ -61,6 +61,26 @@ class TemporaryWriteContextTest extends TestCase
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('Cannot use temporary expression in write context');
         $this->compileSnippet('unset((new stdClass)->x);');
+    }
+
+    public function testByRefArgLiteralArrayDimIsCompileFatal(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot use temporary expression in write context');
+        $this->compileSnippet('function f(&$x) { $x = 5; } f([1, 2][0]);');
+    }
+
+    public function testByRefArgNewPropIsCompileFatal(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot use temporary expression in write context');
+        $this->compileSnippet('function f(&$x) { $x = 5; } f((new stdClass)->x);');
+    }
+
+    public function testByRefArgFunctionReturnDimStillCompiles(): void
+    {
+        $this->compileSnippet('function f(&$x) { $x = 5; } function g() { return [1]; } f(g()[0]);');
+        $this->assertTrue(true);
     }
 
     public function testVariableArrayDimAssignStillCompiles(): void
