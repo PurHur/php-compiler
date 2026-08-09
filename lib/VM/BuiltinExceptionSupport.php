@@ -31,6 +31,8 @@ final class BuiltinExceptionSupport
     public const CLASS_REDIS_CLUSTER_EXCEPTION = 'redisclusterexception';
     public const CLASS_RAR_EXCEPTION = 'rarexception';
     public const CLASS_SIMDJSON_EXCEPTION = 'simdjsonexception';
+
+    public const CLASS_SIMDJSON_VALUE_ERROR = 'simdjsonvalueerror';
     public const CLASS_PDO_EXCEPTION = 'pdoexception';
     public const CLASS_SQLITE3_EXCEPTION = 'sqlite3exception';
     public const CLASS_PHAR_EXCEPTION = 'pharexception';
@@ -394,6 +396,19 @@ final class BuiltinExceptionSupport
         $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
 
         return $var;
+    }
+
+    public static function materializeSimdJsonValueError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_SIMDJSON_VALUE_ERROR])) {
+            return self::materializeValueError($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_SIMDJSON_VALUE_ERROR, $message, $file, $line);
     }
 
     public static function materializeDateInvalidTimeZoneException(

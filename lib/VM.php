@@ -11513,6 +11513,8 @@ restart:
             return $this->dispatchVmArgumentCountError($e, $callerFrame);
         } catch (\TypeError $e) {
             return $this->dispatchVmTypeError($e, $callerFrame);
+        } catch (\PHPCompiler\ext\simdjson\SimdJsonValueError $e) {
+            return $this->dispatchVmSimdJsonValueError($e, $callerFrame);
         } catch (\ValueError $e) {
             return $this->dispatchVmValueError($e, $callerFrame);
         } catch (\AssertionError $e) {
@@ -12464,6 +12466,21 @@ restart:
             $file,
             $line,
             $error->getCode()
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    private function dispatchVmSimdJsonValueError(
+        \PHPCompiler\ext\simdjson\SimdJsonValueError $error,
+        Frame $frame
+    ): ?Frame {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeSimdJsonValueError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
