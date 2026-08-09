@@ -1012,6 +1012,27 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ range() ValueError when $step < 0 for a strictly increasing range
+     * (ext/standard/array.c negative_step_error; #29351).
+     *
+     * Equal endpoints still accept a negative step (singleton). Decreasing ranges still
+     * accept a positive step (abs + subtract). Withheld on the 8.4.0-dev reference profile
+     * (Zend 8.2 silently flips). Enable via explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` / `8.5`.
+     */
+    public static function supportsRangeIncreasingNegativeStepError(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ range() E_WARNING when non-numeric string bounds are not a single byte
      * (ext/standard/array.c php_range_process_input; #29203).
      *
