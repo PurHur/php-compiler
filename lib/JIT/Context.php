@@ -935,6 +935,9 @@ class Context {
             // getcwd(2) NestedJIT leaf (#29429) — whitelist getcwd → getcwd_::call →
             // GetcwdJit::invokeNestedLeaf (module-local getcwd(2); always-on realpath LLVM removed).
             'getcwd',
+            // sys_get_temp_dir NestedJIT leaf (#29433) — whitelist sys_get_temp_dir →
+            // SysGetTempDirRuntime::invokeNestedLeaf (thin getenv/realpath; always-on LLVM removed).
+            'sys_get_temp_dir',
 
             // getenv(3) NestedJIT leaf (#29313) — whitelist getenv → getenv_::call →
             // JitEnv::getenvNestedLeaf / StringGetenv::invokeNestedLeaf (kernel removed).
