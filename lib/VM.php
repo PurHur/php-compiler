@@ -1527,6 +1527,24 @@ class VM {
 
             return null;
         }
+        // No __get: inaccessible declared slots are unset for ?? (zend_std_has_property; #29503).
+        if (null !== $frame) {
+            $meta = $this->classPropertyMeta($object, $propName, $frame);
+            if (
+                null !== $meta
+                && $this->declaredPropertyInaccessibleFromCaller(
+                    $object,
+                    $meta,
+                    $propName,
+                    $frame,
+                    $meta->getVisibility
+                )
+            ) {
+                $dst->undefined();
+
+                return null;
+            }
+        }
         if ($object->hasProperty($propName)) {
             $dst->copyFrom($object->getProperty($propName));
         } else {
@@ -8380,14 +8398,15 @@ restart:
                     $magicGetForRead = !$forWrite
                         && !$op->propertyHookCoalesceRead
                         && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
-                    if (!$magicGetForRead && !$forWrite) {
+                    // ?? / ??= use BP_VAR_IS: skip Error / Undefined from read visibility — isset-like (#29503).
+                    if (!$magicGetForRead && !$forWrite && !$op->propertyHookCoalesceRead) {
                         $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
                     }
-                    if (!$magicGetForRead && !$forWrite) {
+                    if (!$magicGetForRead && !$forWrite && !$op->propertyHookCoalesceRead) {
                         $invisibleParentPrivateMeta = $this->classPropertyMeta($propertyObject, $name, $frame);
                         if (
                             null !== $invisibleParentPrivateMeta

@@ -91,6 +91,65 @@ final class InstancePropertyVisibilityJitGuard
         );
     }
 
+    /**
+     * ?? / ??= BP_VAR_IS: inaccessible declared props are silent-null (zend_std_has_property; #29503).
+     * Returns true when the dest was written and the normal fetch must be skipped.
+     */
+    public static function trySilentNullForIsModeFetch(
+        Object_ $objectType,
+        \PHPCompiler\JIT $jit,
+        Block $block,
+        int $classId,
+        string $propName,
+        string $receiverClassName,
+        \PHPCfg\Operand $destOp
+    ): bool {
+        $meta = $objectType->instancePropertyVisibilityMeta($classId, $propName);
+        if (null === $meta) {
+            return false;
+        }
+        $getVisibility = $meta['getVisibility'] ?? 0;
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], $getVisibility);
+        if (MethodVisibility::isPublic($readVis)) {
+            return false;
+        }
+
+        $declaringClass = $meta['declaringClassName'];
+        $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+        $callerLc = self::callerClassLc($objectType->jitContext(), $block);
+        $receiverLc = strtolower(ltrim($receiverClassName, '\\'));
+        if (PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
+            $meta['visibility'],
+            $callerLc,
+            $declaringLc,
+            static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+            $getVisibility,
+            $receiverLc
+        )) {
+            NonObjectPropertyFetchHelper::lowerNullPropertyDest($objectType->jitContext(), $destOp);
+
+            return true;
+        }
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta['visibility'],
+                $callerLc,
+                $declaringLc,
+                $declaringClass,
+                $propName,
+                $receiverLc,
+                static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+                $getVisibility
+            );
+        } catch (\LogicException $e) {
+            NonObjectPropertyFetchHelper::lowerNullPropertyDest($objectType->jitContext(), $destOp);
+
+            return true;
+        }
+
+        return false;
+    }
+
     private static function classIdToLc(Object_ $objectType, int $classId): ?string
     {
         try {

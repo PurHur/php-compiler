@@ -12713,7 +12713,20 @@ class JIT {
                         )) {
                             break;
                         }
-                        if (!$forWrite) {
+                        if (!$forWrite && $op->propertyHookCoalesceRead) {
+                            // ?? / ??= BP_VAR_IS: inaccessible → silent null, not Error/Undefined (#29503).
+                            if (JIT\InstancePropertyVisibilityJitGuard::trySilentNullForIsModeFetch(
+                                $this->context->type->object,
+                                $this,
+                                $block,
+                                $classId,
+                                $name->value,
+                                $declaringClass,
+                                $result
+                            )) {
+                                break;
+                            }
+                        } elseif (!$forWrite) {
                             JIT\InstancePropertyVisibilityJitGuard::emitBeforeFetch(
                                 $this->context->type->object,
                                 $this,
@@ -12725,6 +12738,7 @@ class JIT {
                         }
                         if (
                             !$forWrite
+                            && !$op->propertyHookCoalesceRead
                             && JIT\InstancePropertyVisibilityJitGuard::isInvisibleParentPrivateFetch(
                                 $this->context->type->object,
                                 $classId,
