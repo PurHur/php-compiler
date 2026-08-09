@@ -3243,6 +3243,7 @@ require_once __DIR__.'/../../../ext/standard/VmArrayValueCallback.php';
 require_once __DIR__.'/../../../ext/standard/VmArrayWalk.php';
 require_once __DIR__.'/../../../ext/standard/VmArrayWalkCallback.php';
 require_once __DIR__.'/../../../ext/standard/VmAssert.php';
+require_once __DIR__.'/../../../ext/standard/AssertDeprecation.php';
 require_once __DIR__.'/../../../ext/standard/VmAssertState.php';
 require_once __DIR__.'/../../../ext/standard/VmBrowser.php';
 require_once __DIR__.'/../../../ext/standard/VmCallable.php';
