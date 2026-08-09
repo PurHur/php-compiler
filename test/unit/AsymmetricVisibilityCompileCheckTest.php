@@ -163,7 +163,7 @@ PHP, 'static_asymmetric_reject.php');
             $this->fail('Expected compile failure');
         } catch (\Throwable $e) {
             $this->assertStringContainsString(
-                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
+                AsymmetricVisibilityRewriter::STATIC_ASYMMETRIC_VISIBILITY_MESSAGE,
                 $e->getMessage()
             );
         }

@@ -28,6 +28,14 @@ final class AsymmetricVisibilityRewriter
     /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
     public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
 
+    /**
+     * php-src: Zend/zend_compile.c — static property + asymmetric set on PHP 8.4 (#29389).
+     *
+     * Zend 8.4 fatals with this string (not {@see MULTIPLE_MODIFIERS_MESSAGE}); PHP 8.5 accepts
+     * static aviz ({@see CompilerVersion::supportsStaticAsymmetricVisibility()}).
+     */
+    public const STATIC_ASYMMETRIC_VISIBILITY_MESSAGE = 'Static property may not have asymmetric visibility';
+
     /** Actionable DX when asymmetric visibility syntax is rejected on the reference profile (#17695). */
     public const REFERENCE_PROFILE_ASYMMETRIC_VISIBILITY_HINT = 'Asymmetric visibility requires PHP_COMPILER_PROFILE=8.4 (PHP 8.4 forward profile)';
 
@@ -83,7 +91,7 @@ final class AsymmetricVisibilityRewriter
             if (self::lineViolatesMultipleSetModifierRulesForReferenceProfile($line)) {
                 return $lineNum;
             }
-            // Static aviz is PHP 8.5+ (#26239); ≤8.4 still treat read+set on static as fatal (#7013).
+            // Static aviz is PHP 8.5+ (#26239); ≤8.4 still treat read+set on static as fatal (#7013 / #29389).
             if (!CompilerVersion::supportsStaticAsymmetricVisibility()
                 && self::lineViolatesStaticAsymmetricSetRules($line)) {
                 return $lineNum;
@@ -337,11 +345,13 @@ final class AsymmetricVisibilityRewriter
             return $source;
         }
 
+        // Static aviz reject before generic multiple-modifier checks so PROFILE=8.4
+        // emits Zend's "Static property may not have asymmetric visibility" (#29389).
+        self::rejectAsymmetricSetOnStaticProperty($source);
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectPromotedParamParenthesizedAsymmetricSet($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
-        self::rejectAsymmetricSetOnStaticProperty($source);
         self::rejectBareSetModifierWithoutRead($source);
 
         $hasUnsupportedPropertyParenSet = !CompilerVersion::supportsParenthesizedAsymmetricSetModifier()
@@ -714,8 +724,8 @@ final class AsymmetricVisibilityRewriter
      * Static properties reject asymmetric visibility with an explicit read modifier before PHP 8.5 (#7013).
      *
      * php-src: Zend/zend_compile.c — zend_add_member_modifier(); on ≤8.4 public read with private set on
-     * static is fatal (Multiple access type modifiers are not allowed). PHP 8.5 adds static aviz
-     * (RFC static-aviz, #26239) — skip this reject when {@see CompilerVersion::supportsStaticAsymmetricVisibility()}.
+     * static is fatal ("Static property may not have asymmetric visibility", #29389). PHP 8.5 adds
+     * static aviz (RFC static-aviz, #26239) — skip when {@see CompilerVersion::supportsStaticAsymmetricVisibility()}.
      */
     private static function rejectAsymmetricSetOnStaticProperty(string $source): void
     {
@@ -728,7 +738,7 @@ final class AsymmetricVisibilityRewriter
 
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
             if (self::lineViolatesStaticAsymmetricSetRules($line)) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+                throw new \CompileError(self::STATIC_ASYMMETRIC_VISIBILITY_MESSAGE);
             }
         });
     }

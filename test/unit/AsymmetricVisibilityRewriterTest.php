@@ -424,7 +424,27 @@ PHP;
             return;
         }
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::STATIC_ASYMMETRIC_VISIBILITY_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    /** @covers issue #29389 — unparenthesized static aviz uses Zend 8.4 message on ≤8.4 */
+    public function testStaticUnparenthesizedPublicPrivateSetCompileErrors(): void
+    {
+        if (CompilerVersion::supportsStaticAsymmetricVisibility()) {
+            $this->markTestSkipped('static asymmetric visibility accepted on PHP 8.5+ (#26239)');
+        }
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
+        $source = <<<'PHP'
+<?php
+class C {
+    public private(set) static int $x = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::STATIC_ASYMMETRIC_VISIBILITY_MESSAGE);
         AsymmetricVisibilityRewriter::rewrite($source);
     }
 
