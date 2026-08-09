@@ -929,6 +929,9 @@ class Context {
             // rename(2) NestedJIT leaf (#29141) — whitelist rename → rename_::call →
             // StringRename::invokeNestedLeaf (module-local rename(2); kernel removed).
             'rename',
+            // chdir(2) NestedJIT leaf (#29219) — whitelist chdir → chdir_::call →
+            // StringChdir::invokeNestedLeaf (module-local chdir(2); kernel removed).
+            'chdir',
             'phpc_ob_write_stdout_kernel',
             'phpc_url_rewriter_apply_kernel',
             'phpc_rewrite_vars_set_tags_kernel',
@@ -938,7 +941,6 @@ class Context {
             'phpc_libcrypt_verify',
             'phpc_argon2_hash',
             'phpc_argon2_verify',
-            'phpc_chdir_kernel',
             'phpc_gethostname_kernel',
             'phpc_getenv_kernel',
             // putenv setenv mirror NestedJIT leaf (#23414) — peer getenv (#20644).

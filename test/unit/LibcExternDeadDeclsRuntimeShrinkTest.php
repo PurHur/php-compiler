@@ -38,6 +38,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'sscanf',
             'strtok_r',
             'rename',
+            'chdir',
         ];
     }
 
@@ -58,7 +59,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
-        foreach (['chdir', 'chmod', 'syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
+        foreach (['chmod', 'syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
             $this->assertStringContainsString(
                 "'{$sym}' =>",
                 $source,
@@ -71,6 +72,12 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'LibcExtern must not declare libc rename (#29090)'
         );
         $this->assertStringContainsString('#29090', $source);
+        $this->assertStringNotContainsString(
+            "'chdir' =>",
+            $source,
+            'LibcExtern must not declare libc chdir (#29219)'
+        );
+        $this->assertStringContainsString('#29219', $source);
     }
 
     public function testChownRuntimeDoesNotLookupLibcChown(): void

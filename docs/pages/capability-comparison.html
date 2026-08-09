@@ -52,7 +52,7 @@
           This is <em>not</em> a full php-src inventory — only items we measure in
           <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities-syntax.md"><code>capabilities-syntax.md</code></a>
           and <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md"><code>capabilities.md</code></a>.
-          Generated 2026-08-08 (matrix mtime).
+          Generated 2026-08-09 (matrix mtime).
         </p>
       </header>
 
@@ -64,7 +64,7 @@
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>1073</strong> / 1172 full (VM+JIT+AOT)
+          <strong>1072</strong> / 1171 full (VM+JIT+AOT)
           <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">64 partial · 35 gaps</p>
         </article>
         <article>
@@ -96,7 +96,7 @@
 <tr data-support="full"><td><code>Static methods on user classes (`Expr_StaticCall`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2209">#2209</a></td></tr>
 <tr data-support="full"><td><code>Constructors (`__construct`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/145">#145</a></td></tr>
 <tr data-support="full"><td><code>`clone` + `__clone()` magic method</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3170">#3170</a></td></tr>
-<tr data-support="full"><td><code>PHP 8.3+ `clone $obj with { prop: $value }`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/4513">#4513</a></td></tr>
+<tr data-support="full"><td><code>PHP 8.5+ `clone($obj, [&#039;prop&#039; =&gt; $value])`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/4513">#4513</a></td></tr>
 <tr data-support="full"><td><code>Magic methods `__get` / `__set` / `__call` / `__toString`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/146">#146</a></td></tr>
 <tr data-support="full"><td><code>Private methods</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/145">#145</a></td></tr>
 <tr data-support="full"><td><code>Property fetch `$this-&gt;x`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/58">#58</a></td></tr>
@@ -863,7 +863,6 @@
 <tr data-support="full"><td><code>`phpc_access_kernel`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`phpc_argon2_hash`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`phpc_argon2_verify`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`phpc_chdir_kernel`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`phpc_clone_with_begin`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`phpc_clone_with_end`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`phpc_clone_with_reinit`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
