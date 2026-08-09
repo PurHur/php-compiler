@@ -36018,10 +36018,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1873)
-- new Error (line 1884)
-- new ArgumentCountError (line 3870)
-- 219 class method(s)
+- new Error (line 1885)
+- new Error (line 1896)
+- new ArgumentCountError (line 3882)
+- 220 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -40859,9 +40859,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 277)
-- new Variable (line 321)
-- 11 class method(s)
+- new HashTable (line 311)
+- new Variable (line 355)
+- 12 class method(s)
 
 ### `ext/standard/symlink_.php`
 
@@ -42489,8 +42489,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/JitXmlParserUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 163)
-- 10 class method(s)
+- new JITVariable (line 180)
+- 12 class method(s)
 
 ### `ext/xml/Module.php`
 
@@ -52506,20 +52506,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 868)
-- new Variable (line 1488)
-- new Variable (line 1531)
-- new Variable (line 1768)
-- new Variable (line 1775)
-- new Variable (line 1835)
-- new Variable (line 1851)
-- new Variable (line 1867)
-- new Variable (line 1909)
-- new Variable (line 1952)
-- new Variable (line 1954)
-- new Variable (line 2076)
-- new Variable (line 2100)
-- new Variable (line 2213)
-- new Variable (line 2231)
+- new Variable (line 1494)
+- new Variable (line 1537)
+- new Variable (line 1774)
+- new Variable (line 1781)
+- new Variable (line 1841)
+- new Variable (line 1857)
+- new Variable (line 1873)
+- new Variable (line 1915)
+- new Variable (line 1958)
+- new Variable (line 1960)
+- new Variable (line 2082)
+- new Variable (line 2106)
+- new Variable (line 2219)
+- new Variable (line 2237)
 - 46 class method(s)
 
 ### `lib/JIT/HeaderCallbackPolicy.php`

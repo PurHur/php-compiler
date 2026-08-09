@@ -40,6 +40,15 @@ final class xml_parser_free extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryFree($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_parser_free() user-script AOT requires a tracked XMLParser (#29318)'
+            );
+        }
         throw new \LogicException('xml_parser_free() is not JIT-lowered in this compiler build');
     }
 }
