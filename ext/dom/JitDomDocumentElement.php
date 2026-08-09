@@ -43,8 +43,10 @@ final class JitDomDocumentElement
             );
         }
 
-        // Prefer the documentElement pinned at loadXML / createFromString (#26757, #27108).
+        // Prefer the documentElement pinned at loadXML / loadHTML / createFromString
+        // (#26757, #27108, #29487). Pure user-script loadHTML also pins html root.
         if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
+            || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
             || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
         ) {
             $docClass = JitDomLoadXMLUserScript::lastDocumentClass() ?? self::CLASS_DOCUMENT;
