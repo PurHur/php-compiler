@@ -269,6 +269,49 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset.php'));
     }
 
+    /**
+     * PHP 8.4 implicit protected(set) on readonly must not steal the unset Error wording (#29273).
+     *
+     * @covers issue #29273
+     */
+    public function testReadonlyUnsetMessageNotAsymmetricProtectedSet(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('PHP 8.4+ implicit protected(set) on readonly');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(public readonly int $x) {}
+}
+class E {
+    public function __construct(public private(set) readonly int $z) {}
+}
+foreach (
+    [
+        'promoted' => [new C(1), 'x', 'C'],
+        'priv_set_ro' => [new E(1), 'z', 'E'],
+    ] as $label => [$o, $prop, $class]
+) {
+    try {
+        unset($o->$prop);
+        echo "$label: UNEXPECTED_OK\n";
+    } catch (\Error $e) {
+        echo "$label: ", $e->getMessage(), "\n";
+    }
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_unset_message_not_aviz.php'));
+        $out = ob_get_clean();
+        $this->assertSame(
+            "promoted: Cannot unset readonly property C::\$x\n"
+            ."priv_set_ro: Cannot unset readonly property E::\$z\n",
+            $out
+        );
+    }
+
     /** @covers issue #29131 — unset uninitialized readonly in ctor then reinit */
     public function testReadonlyPropertyAllowsUnsetThenReinitInConstruct(): void
     {

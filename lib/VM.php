@@ -6682,13 +6682,15 @@ restart:
                             }
                             break;
                         }
-                        // unset() follows set-visibility (zend_object_handlers.c, #23338).
-                        $catchFrame = $this->enforceAsymmetricPropertyUnset($object, $propName, $frame);
+                        // Readonly beats asymmetric set-visibility on unset (zend_object_handlers.c, #29273).
+                        // PHP 8.4 implicit protected(set) on readonly must not win the Error wording.
+                        $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
+                        // unset() follows set-visibility (zend_object_handlers.c, #23338).
+                        $catchFrame = $this->enforceAsymmetricPropertyUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
@@ -14739,6 +14741,10 @@ restart:
     {
         $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta) {
+            return null;
+        }
+        // Implicit PHP 8.4 protected(set) on readonly — wording is readonly, not aviz (#29273).
+        if ($meta->readonly || $object->class->readonly) {
             return null;
         }
         $setVis = PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility);

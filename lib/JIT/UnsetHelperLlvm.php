@@ -323,17 +323,7 @@ final class UnsetHelperLlvm
             }
             $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
-                if (
-                    null !== $jit
-                    && AsymmetricVisibilityGuard::emitBeforePropertyUnset(
-                        $context,
-                        $jit,
-                        $prop,
-                        $context->jitEnclosingBlock
-                    )
-                ) {
-                    return;
-                }
+                // Match assign order: readonly before asymmetric (#29273 / zend_object_handlers.c).
                 DynamicObjectReadonlyGuard::emitBeforePropertyStore(
                     $context,
                     $prop,
@@ -347,6 +337,17 @@ final class UnsetHelperLlvm
                     'unset',
                     $jit
                 );
+                if (
+                    null !== $jit
+                    && AsymmetricVisibilityGuard::emitBeforePropertyUnset(
+                        $context,
+                        $jit,
+                        $prop,
+                        $context->jitEnclosingBlock
+                    )
+                ) {
+                    return;
+                }
                 ReadonlyClassGuard::emitStoreUnlessPending(
                     $context,
                     static function () use ($context, $prop, $null): void {
@@ -364,17 +365,7 @@ final class UnsetHelperLlvm
         $nameVar = $context->getVariableFromOp($dimOp);
         $prop = $context->type->object->propertyFetchDynamic($receiver, $declaringClass, $nameVar);
         if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
-            if (
-                null !== $jit
-                && AsymmetricVisibilityGuard::emitBeforePropertyUnset(
-                    $context,
-                    $jit,
-                    $prop,
-                    $context->jitEnclosingBlock
-                )
-            ) {
-                return;
-            }
+            // Match assign order: readonly before asymmetric (#29273 / zend_object_handlers.c).
             DynamicObjectReadonlyGuard::emitBeforePropertyStore(
                 $context,
                 $prop,
@@ -388,6 +379,17 @@ final class UnsetHelperLlvm
                 'unset',
                 $jit
             );
+            if (
+                null !== $jit
+                && AsymmetricVisibilityGuard::emitBeforePropertyUnset(
+                    $context,
+                    $jit,
+                    $prop,
+                    $context->jitEnclosingBlock
+                )
+            ) {
+                return;
+            }
             ReadonlyClassGuard::emitStoreUnlessPending(
                 $context,
                 static function () use ($context, $prop, $null): void {
