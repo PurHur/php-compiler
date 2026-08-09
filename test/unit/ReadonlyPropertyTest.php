@@ -270,6 +270,41 @@ PHP;
     }
 
     /**
+     * Readonly anonymous property Error must use Zend display name (no NUL/path) (#29267).
+     *
+     * @covers issue #29267
+     */
+    public function testReadonlyAnonymousPropertyErrorMessageStripsInternalName(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsReadonlyAnonymousClass()) {
+            $this->markTestSkipped('new readonly class requires PHP 8.3+ forward profile');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new readonly class {
+    public function __construct(public string $a = "x") {}
+};
+try {
+    $o->a = "y";
+    echo "UNEXPECTED_OK\n";
+} catch (\Error $e) {
+    $msg = $e->getMessage();
+    echo $msg, "\n";
+    echo "has_nul=", (strpos($msg, "\0") !== false ? "yes" : "no"), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_anon_error_message.php'));
+        $out = ob_get_clean();
+        $this->assertSame(
+            "Cannot modify readonly property class@anonymous::\$a\n"
+            ."has_nul=no\n",
+            $out
+        );
+    }
+
+    /**
      * PHP 8.4 implicit protected(set) on readonly must not steal the unset Error wording (#29273).
      *
      * @covers issue #29273
