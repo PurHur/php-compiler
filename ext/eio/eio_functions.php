@@ -282,3 +282,159 @@ final class eio_write extends EioFunction
         ]));
     }
 }
+
+final class eio_stat extends EioFunction
+{
+    public function __construct()
+    {
+        parent::__construct('eio_stat');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError('eio_stat() expects between 3 and 4 arguments, '.$argc.' given');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('eio_stat() requires a VM context');
+        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'eio_stat', 0, 'path');
+        $pri = VmEioCore::resolvePri($frame->calledArgs[1]);
+        $cb = $this->optionalCallback($frame, 2);
+        $data = $this->optionalData($frame, 3);
+        $frame->returnVar->copyFrom(VmEioCore::enqueue($ctx, 'stat', $cb, $data, $pri, [
+            'path' => $path,
+        ]));
+    }
+}
+
+final class eio_mkdir extends EioFunction
+{
+    public function __construct()
+    {
+        parent::__construct('eio_mkdir');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 5) {
+            throw new \ArgumentCountError('eio_mkdir() expects between 2 and 5 arguments, '.$argc.' given');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('eio_mkdir() requires a VM context');
+        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'eio_mkdir', 0, 'path');
+        $mode = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'eio_mkdir', 2, 'mode');
+        $pri = $argc >= 3 ? VmEioCore::resolvePri($frame->calledArgs[2]) : EioConstants::EIO_PRI_DEFAULT;
+        $cb = $this->optionalCallback($frame, 3);
+        $data = $this->optionalData($frame, 4);
+        $frame->returnVar->copyFrom(VmEioCore::enqueue($ctx, 'mkdir', $cb, $data, $pri, [
+            'path' => $path,
+            'mode' => $mode,
+        ]));
+    }
+}
+
+final class eio_unlink extends EioFunction
+{
+    public function __construct()
+    {
+        parent::__construct('eio_unlink');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 4) {
+            throw new \ArgumentCountError('eio_unlink() expects between 1 and 4 arguments, '.$argc.' given');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('eio_unlink() requires a VM context');
+        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'eio_unlink', 0, 'path');
+        $pri = $argc >= 2 ? VmEioCore::resolvePri($frame->calledArgs[1]) : EioConstants::EIO_PRI_DEFAULT;
+        $cb = $this->optionalCallback($frame, 2);
+        $data = $this->optionalData($frame, 3);
+        $frame->returnVar->copyFrom(VmEioCore::enqueue($ctx, 'unlink', $cb, $data, $pri, [
+            'path' => $path,
+        ]));
+    }
+}
+
+final class eio_chmod extends EioFunction
+{
+    public function __construct()
+    {
+        parent::__construct('eio_chmod');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 5) {
+            throw new \ArgumentCountError('eio_chmod() expects between 2 and 5 arguments, '.$argc.' given');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('eio_chmod() requires a VM context');
+        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'eio_chmod', 0, 'path');
+        $mode = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'eio_chmod', 2, 'mode');
+        $pri = $argc >= 3 ? VmEioCore::resolvePri($frame->calledArgs[2]) : EioConstants::EIO_PRI_DEFAULT;
+        $cb = $this->optionalCallback($frame, 3);
+        $data = $this->optionalData($frame, 4);
+        $frame->returnVar->copyFrom(VmEioCore::enqueue($ctx, 'chmod', $cb, $data, $pri, [
+            'path' => $path,
+            'mode' => $mode,
+        ]));
+    }
+}
+
+final class eio_readdir extends EioFunction
+{
+    public function __construct()
+    {
+        parent::__construct('eio_readdir');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 4 || $argc > 5) {
+            throw new \ArgumentCountError('eio_readdir() expects between 4 and 5 arguments, '.$argc.' given');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('eio_readdir() requires a VM context');
+        }
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'eio_readdir', 0, 'path');
+        $flags = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'eio_readdir', 2, 'flags');
+        $pri = VmEioCore::resolvePri($frame->calledArgs[2]);
+        $cb = $this->optionalCallback($frame, 3);
+        $data = $this->optionalData($frame, 4);
+        $frame->returnVar->copyFrom(VmEioCore::enqueue($ctx, 'readdir', $cb, $data, $pri, [
+            'path' => $path,
+            'flags' => $flags,
+        ]));
+    }
+}
