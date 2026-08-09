@@ -134,6 +134,13 @@ class Object_ extends Type {
      */
     private array $classConstDeprecated = [];
 
+    /**
+     * Declaring class/interface lc for class-const #[\Deprecated] messages (#29380).
+     *
+     * @var array<int, array<string, string>>
+     */
+    private array $classConstDeclaringLc = [];
+
     /** @var array<int, array<string, string>> class id => const key lc => canonical display name */
     private array $classConstDisplayNames = [];
 
@@ -5509,6 +5516,7 @@ class Object_ extends Type {
     {
         $key = \PHPCompiler\ClassConstName::key($name);
         $this->classConstDisplayNames[$classId][$key] = $name;
+        $this->classConstDeclaringLc[$classId][$key] = strtolower(ltrim($this->classNameForId($classId), '\\'));
         unset($this->classConstMapGlobals[$classId]);
         if (VMVariable::TYPE_ARRAY === $value->type) {
             $table = $value->toArray();
@@ -5791,6 +5799,11 @@ class Object_ extends Type {
                     if (isset($this->classConstDeprecated[$ifaceId][$name])) {
                         $this->classConstDeprecated[$classId][$name] = $this->classConstDeprecated[$ifaceId][$name];
                     }
+                    $this->classConstDeclaringLc[$classId][$name] = $this->classConstDeclaringLc[$ifaceId][$name]
+                        ?? $ifaceLc;
+                    if (isset($this->classConstDisplayNames[$ifaceId][$name])) {
+                        $this->classConstDisplayNames[$classId][$name] = $this->classConstDisplayNames[$ifaceId][$name];
+                    }
                 }
             }
         }
@@ -5913,6 +5926,8 @@ class Object_ extends Type {
             if (isset($this->classConstDeprecated[$traitId][$name])) {
                 $this->classConstDeprecated[$classId][$name] = $this->classConstDeprecated[$traitId][$name];
             }
+            $this->classConstDeclaringLc[$classId][$name] = $this->classConstDeclaringLc[$traitId][$name]
+                ?? strtolower(ltrim($traitName, '\\'));
         }
     }
 
@@ -6195,7 +6210,7 @@ class Object_ extends Type {
 
         $dep = $this->classConstDeprecated[$resolvedId][$key] ?? null;
         if (null !== $dep) {
-            $displayClass = $this->classNameForId($resolvedId);
+            $displayClass = $this->classConstDeprecatedOwnerDisplay($resolvedId, $key);
             $displayConst = $this->classConstDisplayNames[$resolvedId][$key] ?? $constName;
             \PHPCompiler\JIT\DeprecatedCallGuard::emitClassConstFetch(
                 $this->context,
@@ -6206,6 +6221,17 @@ class Object_ extends Type {
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$resolvedId][$key]);
+    }
+
+    /** Declaring class/interface name for class-const #[\Deprecated] notices (#29380). */
+    private function classConstDeprecatedOwnerDisplay(int $resolvedId, string $key): string
+    {
+        $declLc = $this->classConstDeclaringLc[$resolvedId][$key] ?? null;
+        if (null !== $declLc && isset($this->classes[$declLc])) {
+            return $this->classNameForId($this->classes[$declLc]);
+        }
+
+        return $this->classNameForId($resolvedId);
     }
 
     /**

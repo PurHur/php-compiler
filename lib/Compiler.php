@@ -7227,6 +7227,9 @@ class Compiler {
         if (!isset($this->compileTimeClassConstVisibility[$classLc])) {
             $this->compileTimeClassConstVisibility[$classLc] = [];
         }
+        if (!isset($this->compileTimeClassConstDeprecated[$classLc])) {
+            $this->compileTimeClassConstDeprecated[$classLc] = [];
+        }
         if (!isset($this->compileTimeClassConstNames[$classLc])) {
             $this->compileTimeClassConstNames[$classLc] = [];
         }
@@ -7240,6 +7243,11 @@ class Compiler {
             if (isset($this->compileTimeClassConstVisibility[$ifaceLc][$constLc])) {
                 $this->compileTimeClassConstVisibility[$classLc][$constLc]
                     = $this->compileTimeClassConstVisibility[$ifaceLc][$constLc];
+            }
+            // Keep #[\Deprecated] so implementor fetches are not constant-folded (#29380).
+            if (isset($this->compileTimeClassConstDeprecated[$ifaceLc][$constLc])) {
+                $this->compileTimeClassConstDeprecated[$classLc][$constLc]
+                    = $this->compileTimeClassConstDeprecated[$ifaceLc][$constLc];
             }
             if (isset($this->compileTimeClassConstNames[$ifaceLc][$constLc])) {
                 $this->compileTimeClassConstNames[$classLc][$constLc]

@@ -19167,6 +19167,10 @@ restart:
                 if (isset($iface->constVisibility[$name])) {
                     $entry->constVisibility[$name] = $iface->constVisibility[$name];
                 }
+                // Propagate #[\Deprecated] so C::X (implements I) emits like Zend (#29380).
+                if (isset($iface->constDeprecated[$name])) {
+                    $entry->constDeprecated[$name] = $iface->constDeprecated[$name];
+                }
                 if (isset($iface->constFinal[$name])) {
                     $entry->constFinal[$name] = true;
                 }
@@ -21594,12 +21598,27 @@ restart:
         if (isset($classEntry->constDeprecated[$memberLc])) {
             $meta = $classEntry->constDeprecated[$memberLc];
             if ($meta->emitsRuntimeNotice()) {
+                // Zend cites the declaring class/interface (A::X / I::X), not the fetch class (#29380).
                 $this->emitDeprecatedNotice(
-                    $meta->formatConstant($classEntry->name, $memberNameRaw),
+                    $meta->formatConstant(
+                        $this->classConstDeprecatedOwnerDisplay($classEntry, $memberLc),
+                        $memberNameRaw
+                    ),
                     $frame
                 );
             }
         }
+    }
+
+    /** Declaring class/interface display name for class-const #[\Deprecated] notices (#29380). */
+    private function classConstDeprecatedOwnerDisplay(ClassEntry $classEntry, string $memberLc): string
+    {
+        $declLc = $classEntry->constDeclaringClassLc[$memberLc] ?? null;
+        if (null !== $declLc && isset($this->context->classes[$declLc])) {
+            return $this->context->classes[$declLc]->name;
+        }
+
+        return $classEntry->name;
     }
 
     private function emitInstancePropertyAccessDeprecation(
