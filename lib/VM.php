@@ -8435,7 +8435,13 @@ restart:
                                 $frame = $catchFrame;
                                 goto restart;
                             }
+                            // Declared-but-UNDEF (e.g. after unset): BP_VAR_RW ++/-- warns like a read (#29241).
+                            $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op)
+                                && $this->objectPropertySlotIsUndefinedForRwWarn($propertyObject, $name, $frame);
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                            if ($warnUndefAfterRw) {
+                                $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
+                            }
                             if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
                                 $result->propertyAssignLvalue = true;
                             }
@@ -8619,7 +8625,12 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                        // Missing dynamic prop: create then Undefined property for ++/-- (BP_VAR_RW, #29241).
+                        $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op);
                         $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                        if ($warnUndefAfterRw) {
+                            $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
+                        }
                         if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
                             $result->propertyAssignLvalue = true;
                         }
@@ -10897,6 +10908,50 @@ restart:
             OpCode::TYPE_PRE_DEC,
             OpCode::TYPE_POST_DEC,
         ], true) && $next->arg3 === $destSlot;
+    }
+
+    /**
+     * True when an existing instance slot is UNDEF for get_property_ptr_ptr BP_VAR_RW (#29241).
+     *
+     * Typed uninitialized props stay Error-on-read; untyped/explicitly-unset warn like a plain read.
+     */
+    private function objectPropertySlotIsUndefinedForRwWarn(
+        ObjectEntry $object,
+        string $name,
+        Frame $frame
+    ): bool {
+        if ($object->isPropertyExplicitlyUnset($name)) {
+            return true;
+        }
+        $propMeta = $this->classPropertyMeta($object, $name, $frame);
+        $propSlot = null !== $propMeta && $object->hasPropertyForMeta($propMeta)
+            ? $object->getPropertyForMeta($propMeta)
+            : ($object->hasProperty($name) ? $object->getProperty($name) : null);
+        if (null === $propSlot) {
+            return false;
+        }
+
+        return $propSlot->resolveIndirect()->isUndefined()
+            && !VM\TypedPropertyCheck::isUninitialized($propSlot);
+    }
+
+    /**
+     * After creating/binding a property for ++/-- (BP_VAR_RW), emit Undefined property
+     * (zend_std_get_property_ptr_ptr — after allocation, #29241).
+     */
+    private function warnUndefinedPropertyAfterIncDecRwFetch(
+        ObjectEntry $object,
+        string $name,
+        Frame $frame
+    ): void {
+        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $this->context->errors->undefinedPropertyRead(
+            $object->class->name,
+            $name,
+            $this->context,
+            $frame,
+            $scriptFile
+        );
     }
 
     /** True when a following opcode assigns through this PROPERTY_FETCH destination slot (#5370). */

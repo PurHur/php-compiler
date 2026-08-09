@@ -12637,6 +12637,14 @@ class JIT {
                             if (null === JIT\BasicBlockHelper::tryGetInsertBlock($this->context)) {
                                 break;
                             }
+                            // BP_VAR_RW (++/--): Undefined property after create (zend_object_handlers.c, #29241).
+                            if ($this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)) {
+                                JIT\Builtin\UndefinedPropertyFetchRuntime::emitWarning(
+                                    $this->context,
+                                    $declaringClass,
+                                    $name->value
+                                );
+                            }
                         }
                         if (!$forWrite) {
                             // User-script AOT: SimpleXMLElement child views via host tree (#26863).
