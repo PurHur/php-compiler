@@ -4356,15 +4356,19 @@ restart:
                         // ?: merge assigns omit arg3; legacy lowering reads slot 0 (#9159, re-#14134).
                         $arg3 = $this->readScopeOperandForRuntimeRead($frame, 0);
                     }
-                    $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    $catchFrame = $this->enforceStaticPropertyVisibilityWrite($arg2, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
+                    // Direct `$obj->prop =` (propertyAssignLvalue) checks visibility. Writes through
+                    // an already-acquired reference (`$r =& …; $r =`) must not — Zend (#29456).
+                    if ($arg2->propertyAssignLvalue) {
+                        $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $catchFrame = $this->enforceStaticPropertyVisibilityWrite($arg2, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                     }
                     $catchFrame = $this->enforceReadonlyPropertyWrite($arg2, $frame);
                     if (null !== $catchFrame) {
@@ -4555,22 +4559,26 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    // Reference acquisition follows set visibility (php.net asymmetric visibility, #7070).
-                    $catchFrame = $this->enforcePropertyVisibilityWrite($rhsSlot, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    $catchFrame = $this->enforceStaticPropertyVisibilityWrite($rhsSlot, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    if (null !== ($msg = $this->asymmetricPropertyWriteMessage($rhsSlot, $frame))) {
-                        $catchFrame = $this->dispatchVmError($msg, $frame);
+                    // Reference acquisition via `$r = &$obj->prop` follows set visibility (#7070).
+                    // Already-acquired by-ref call returns (`$r = &$obj->getPriv()`) must not
+                    // re-check — Zend aliases the returned reference (#29456).
+                    if ($rhsSlot->propertyRefAcquisition) {
+                        $catchFrame = $this->enforcePropertyVisibilityWrite($rhsSlot, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
+                        }
+                        $catchFrame = $this->enforceStaticPropertyVisibilityWrite($rhsSlot, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        if (null !== ($msg = $this->asymmetricPropertyWriteMessage($rhsSlot, $frame))) {
+                            $catchFrame = $this->dispatchVmError($msg, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                         }
                     }
                     $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
@@ -6463,7 +6471,9 @@ restart:
                         }
                         $dest = $frame->scope[$op->arg1];
                         $dest->indirect($storage);
-                        if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                            $dest->propertyRefAcquisition = true;
+                        } else {
                             $dest->propertyAssignLvalue = true;
                         }
                         $dest->staticPropertyClassLc = $lcClass;
@@ -6502,8 +6512,12 @@ restart:
                         VM\TypedPropertyCheck::assertReadable($storage);
                     }
                     $dest->indirect($storage);
-                    if ($forWrite && !$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
-                        $dest->propertyAssignLvalue = true;
+                    if ($forWrite) {
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                            $dest->propertyRefAcquisition = true;
+                        } else {
+                            $dest->propertyAssignLvalue = true;
+                        }
                     }
                     $dest->staticPropertyClassLc = $lcClass;
                     $dest->objectPropertyName = $propNameRaw;
@@ -8421,10 +8435,11 @@ restart:
                             $this->emitInstancePropertyAccessDeprecation($propertyObject, $name, $frame);
                         }
                         if ($forWrite) {
-                            // `$r = &$obj->inaccessible` — get_property_ptr_ptr fails; BP_VAR_W
-                            // read_property invokes __get (zend_object_handlers.c, #25688).
+                            // `$r = &$obj->inaccessible` / `return $obj->inaccessible` from `&fn`
+                            // — get_property_ptr_ptr fails; BP_VAR_W read_property invokes __get
+                            // (zend_object_handlers.c, #25688 / #29456).
                             if (
-                                $this->propertyFetchDestUsedAsAssignRefSource($frame, $op)
+                                $this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)
                                 && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame)
                             ) {
                                 $this->deliverInaccessiblePropertyFetchByRef(
@@ -8438,18 +8453,18 @@ restart:
                             $writeProxy = new Variable();
                             $writeProxy->objectPropertyOwner = $propertyObject;
                             $writeProxy->objectPropertyName = $name;
-                            // `$r = &$obj->readonlyProp` — zend_readonly.c get_property_ptr_ptr (#25620).
+                            // `$r = &$obj->readonlyProp` / by-ref return — zend_readonly.c (#25620 / #29456).
                             // Must Error before binding; write-through checks alone leave REF_OK.
-                            if ($this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                            if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                                 $catchFrame = $this->enforceReadonlyPropertyFetchByRef($writeProxy, $frame);
                                 if (null !== $catchFrame) {
                                     $frame = $catchFrame;
                                     goto restart;
                                 }
                             }
-                            // `$r = &$obj->hooked` — PROPERTY_FETCH_WRITE feeds ASSIGN_REF; Zend rejects
-                            // without `&get` at get_ptr time, not as write-only (#22475).
-                            if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                            // `$r = &$obj->hooked` / by-ref return — PROPERTY_FETCH_WRITE; Zend rejects
+                            // without `&get` at get_ptr time, not as write-only (#22475 / #29456).
+                            if (!$this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                                 $catchFrame = $this->enforceVirtualPropertyHookWrite($writeProxy, $frame);
                                 if (null !== $catchFrame) {
                                     $frame = $catchFrame;
@@ -8529,7 +8544,9 @@ restart:
                             if ($warnUndefAfterRw) {
                                 $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
                             }
-                            if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                            if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                                $result->propertyRefAcquisition = true;
+                            } else {
                                 $result->propertyAssignLvalue = true;
                             }
                             break;
@@ -8662,7 +8679,12 @@ restart:
                             // `$obj->arr[]=` / unset($obj->arr[$k]) need a live alias into property storage.
                             // Plain R-mode fetches must copy: an indirect alias makes ternary/`&&` phi self-ASSIGN
                             // look like a property write (readonly / DOM read-only / skipped `__get`) (#23986, #24250).
-                            if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                            // By-ref `return $this->prop` also needs the live cell (#29456) — compiler prefers
+                            // PROPERTY_FETCH_WRITE, but keep R-mode resilient when usages are empty.
+                            if (
+                                $this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)
+                                || $this->propertyFetchDestUsedAsReturnByRef($frame, $op)
+                            ) {
                                 $result->indirect($propSlot);
                             } elseif ($this->propertyFetchDestUsedAsByRefForeachIterable($frame, $op)) {
                                 // Hooked array without &get must Error before FE_RESET_RW (#29215).
@@ -8692,7 +8714,7 @@ restart:
                     }
                     if ($forWrite) {
                         // Missing / uninitialized declared prop still trips by-ref readonly (#25620).
-                        if ($this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                             $missingRefProxy = new Variable();
                             $missingRefProxy->objectPropertyOwner = $propertyObject;
                             $missingRefProxy->objectPropertyName = $name;
@@ -8718,7 +8740,9 @@ restart:
                         if ($warnUndefAfterRw) {
                             $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
                         }
-                        if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                            $result->propertyRefAcquisition = true;
+                        } else {
                             $result->propertyAssignLvalue = true;
                         }
                         break;
@@ -11073,6 +11097,36 @@ restart:
         }
 
         return false;
+    }
+
+    /**
+     * True when fetch dest is returned from a by-ref function (`return $this->prop`, #29456).
+     *
+     * PROPERTY_FETCH is immediately followed by RETURN on the same slot in the typical
+     * `function &get(){ return $this->x; }` lowering.
+     */
+    private function propertyFetchDestUsedAsReturnByRef(Frame $frame, OpCode $op): bool
+    {
+        if (!$this->functionReturnsByRef($frame)) {
+            return false;
+        }
+        $destSlot = (int) $op->arg1;
+        $next = $frame->block->opCodes[$frame->pos] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return OpCode::destSlotUsedAsReturnValue($next, $destSlot);
+    }
+
+    /**
+     * Live property alias without treating the fetch as a direct assign lvalue
+     * (ASSIGN_REF RHS or by-ref return — #22475 / #29456).
+     */
+    private function propertyFetchDestUsedAsLiveRefBinding(Frame $frame, OpCode $op): bool
+    {
+        return $this->propertyFetchDestUsedAsAssignRefSource($frame, $op)
+            || $this->propertyFetchDestUsedAsReturnByRef($frame, $op);
     }
 
     /** True when fetch dest is read by a compound op before a later assign (#6438, zend_property_hooks.c). */

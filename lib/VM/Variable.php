@@ -122,6 +122,13 @@ final class Variable {
     public bool $propertyAssignLvalue = false;
 
     /**
+     * True when this INDIRECT was produced by PROPERTY_FETCH_WRITE (or static fetch) used as a
+     * reference-acquisition temp (`$r = &$obj->prop` / by-ref return fetch). ASSIGN_REF re-checks
+     * visibility only for these temps — not for already-acquired by-ref call returns (#29456).
+     */
+    public bool $propertyRefAcquisition = false;
+
+    /**
      * Zend ZSTR_IS_INTERNED — compile-time string literals / interned table entries (#22716).
      * Used by debug_zval_dump(); cleared on fresh {@see string()} allocations.
      */
@@ -1003,6 +1010,7 @@ final class Variable {
         $this->reset();
         $this->typedPropertyByRef = false;
         $this->propertyAssignLvalue = false;
+        $this->propertyRefAcquisition = false;
         $this->type = self::TYPE_INDIRECT;
         $this->indirect = $value;
     }

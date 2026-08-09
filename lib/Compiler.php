@@ -17699,16 +17699,58 @@ class Compiler {
             return false;
         }
 
-        return $this->cfgFunctionYieldsByReference($block);
+        return $this->cfgFunctionReturnsByReference($block);
+    }
+
+    /**
+     * `return $this->prop` from `function &name()` needs FETCH_OBJ_W (#29456, zend_execute.c).
+     */
+    private function propertyFetchUsedAsByRefReturnValue(
+        Op\Expr\PropertyFetch $fetch,
+        Op $usage,
+        Block $block
+    ): bool {
+        if (!$usage instanceof Op\Terminal\Return_) {
+            return false;
+        }
+        if ($usage->expr !== $fetch->result) {
+            return false;
+        }
+
+        return $this->cfgFunctionReturnsByReference($block);
+    }
+
+    /**
+     * `yield $this->prop` from `function &gen()` needs the live property cell (#29456).
+     */
+    private function propertyFetchUsedAsByRefYieldValue(
+        Op\Expr\PropertyFetch $fetch,
+        Op $usage,
+        Block $block
+    ): bool {
+        if (!$usage instanceof Op\Expr\Yield_) {
+            return false;
+        }
+        if ($usage->value !== $fetch->result) {
+            return false;
+        }
+
+        return $this->cfgFunctionReturnsByReference($block);
     }
 
     /** True when the enclosing CFG func is declared `function &name()` (FLAG_RETURNS_REF). */
-    private function cfgFunctionYieldsByReference(Block $block): bool
+    private function cfgFunctionReturnsByReference(Block $block): bool
     {
         $decl = $block->func ?? null;
 
         return null !== $decl
             && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
+    /** @deprecated alias — FLAG_RETURNS_REF covers yield-by-ref and return-by-ref */
+    private function cfgFunctionYieldsByReference(Block $block): bool
+    {
+        return $this->cfgFunctionReturnsByReference($block);
     }
 
     /**
@@ -17912,6 +17954,13 @@ class Compiler {
             if ($this->propertyFetchUsedAsByRefCallArg($fetch, $usage, $block)) {
                 continue;
             }
+            // `return $this->prop` / `yield $this->prop` from `&method` (#29456).
+            if ($this->propertyFetchUsedAsByRefReturnValue($fetch, $usage, $block)) {
+                continue;
+            }
+            if ($this->propertyFetchUsedAsByRefYieldValue($fetch, $usage, $block)) {
+                continue;
+            }
             // $obj->prop[] = must read through get hook first; dim write uses FETCH not FETCH_W (#6775, #19171).
             if (
                 $usage instanceof Op\Expr\ArrayDimFetch
@@ -17956,6 +18005,12 @@ class Compiler {
                 return true;
             }
             if ($this->propertyFetchPrecedesByRefCall($fetch, $next, $block, $i, $children)) {
+                return true;
+            }
+            if ($this->propertyFetchUsedAsByRefReturnValue($fetch, $next, $block)) {
+                return true;
+            }
+            if ($this->propertyFetchUsedAsByRefYieldValue($fetch, $next, $block)) {
                 return true;
             }
             // $obj->prop[] = — read fetch + dim write container (#6775, #19171).
