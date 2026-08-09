@@ -121,6 +121,8 @@ final class BuiltinInternalArgInfo
             'stream_context_create' => '',
             // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#27848)
             'stream_socket_client' => '',
+            // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#28857)
+            'stream_socket_server' => '',
             // ext/standard/proc_open.stub.php — no return type; InternalArgInfo says resource (#27847)
             'proc_open' => '',
             // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |bool) (#27684)
@@ -983,6 +985,11 @@ final class BuiltinInternalArgInfo
             'stream_socket_client' => match ($index) {
                 1, 2 => '',
                 3 => '?float',
+                default => null,
+            },
+            // ext/standard/streamsfuncs.stub.php — untyped &$error_* outs (#28857)
+            'stream_socket_server' => match ($index) {
+                1, 2 => '',
                 default => null,
             },
             // ext/standard/file.stub.php — ?int $length = null (#24826)
