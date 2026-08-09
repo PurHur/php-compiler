@@ -2217,7 +2217,7 @@ class VM {
     }
 
     /**
-     * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259, #6604).
+     * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259, #29379).
      *
      * Integer HashTable keys stay ints so var_dump prints `[0]=>` not `["0"]=>`
      * (php-src zend_array / php_var_dump; SplFixedArray #19783).
@@ -2399,10 +2399,10 @@ class VM {
     }
 
     /**
-     * get_mangled_object_vars() — mangled keys, dynamic props, get hooks (#3497, #10491, #22445).
+     * get_mangled_object_vars() — mangled keys, dynamic props, raw backing (#3497, #10491, #22445, #29379).
      *
      * php-src: Zend/zend_builtin_functions.c — ZEND_FUNCTION(get_mangled_object_vars)
-     * uses zend_get_properties_no_lazy_init (raw property table), not DEBUG purpose.
+     * uses zend_get_properties_no_lazy_init (raw property table), not get-hook reads.
      * DateTime / DateTimeImmutable / DateTimeZone store state in C on Zend — filter
      * compiler __dt_* storage keys (#22445).
      *
@@ -2482,22 +2482,17 @@ class VM {
     }
 
     /**
-     * var_dump()/print_r() property list — mangled keys, get hooks invoked (#6604).
+     * var_dump()/print_r()/debug_zval_dump() property list — mangled keys, no get hooks (#29379).
      *
-     * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_DEBUG) + zend_read_property_ex
+     * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_DEBUG) walks the property table
+     * without zend_read_property_ex — virtual hooked props are omitted; backed hooks dump the
+     * backing slot (re-#6604 wrongly invoked get). var_export / get_object_vars still use get.
      *
      * @return array<string, Variable>
      */
     private function collectDebugPropertiesForBuiltin(ObjectEntry $object, Frame $frame): array
     {
         $ctx = $this->context;
-        $scopeFrame = $frame;
-        while (null !== $scopeFrame && null !== $scopeFrame->handler) {
-            $scopeFrame = $scopeFrame->parent;
-        }
-        if (null === $scopeFrame) {
-            $scopeFrame = $frame;
-        }
         $hookBackingLc = $this->separatePropertyHookBackingNameSet($object);
         /** @var array<string, Variable> $result */
         $result = [];
@@ -2527,15 +2522,16 @@ class VM {
                 if ($meta->phpInvisible) {
                     continue;
                 }
-                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                // Virtual hooked properties: no DEBUG slot — omit entirely (#29379, zend_property_hooks.c).
+                if ($meta->propertyHookVirtual) {
                     continue;
                 }
-                if (null !== $meta->getHookMethodLc) {
-                    $hookValue = $this->fetchPropertyWithHooks($object, $meta->name, $scopeFrame);
-                    if (null === $hookValue) {
+                // Backed hooked property: dump raw backing, never invoke get (#29379).
+                if (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc) {
+                    if (!$object->hasPropertyForMeta($meta)) {
                         continue;
                     }
-                    $value = $hookValue->resolveIndirect();
+                    $value = $object->getPropertyForMeta($meta)->resolveIndirect();
                     if (VM\TypedPropertyCheck::isUninitialized($value)) {
                         continue;
                     }
