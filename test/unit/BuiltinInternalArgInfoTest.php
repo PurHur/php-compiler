@@ -1186,6 +1186,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src zlib.stub.php — InternalArgInfo return string; Zend string|false (#28855). */
+    public function testObGzhandlerReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ob_gzhandler'));
+    }
+
     /** php-src base64.c / string.stub.php — InternalArgInfo omits |false (#25477). */
     public function testBase64DecodeHex2binReflectionReturnUnions(): void
     {
