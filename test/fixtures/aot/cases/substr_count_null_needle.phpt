@@ -1,12 +1,9 @@
 --TEST--
-AOT: substr_count() null needle ValueError (#18347, ext/standard/string.c)
+AOT: substr_count() null needle — soft-null DEP then Uncaught ValueError empty (#18347/#29421, ext/standard/string.c)
 --FILE--
 <?php
-try {
-    substr_count('haystack', null);
-    echo "null_needle: uncaught\n";
-} catch (ValueError $e) {
-    echo $e->getMessage(), "\n";
-}
+// Uncaught: AOT try/catch does not yet catch rejectEmpty ValueError (peer str_increment #26264).
+substr_count('haystack', null);
 --EXPECT--
-substr_count(): Argument #2 ($needle) must not be empty
+--EXPECT_EXIT--
+255

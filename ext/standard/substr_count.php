@@ -69,6 +69,12 @@ final class substr_count extends Internal
         $hay = self::jitHaystackArg($context, $args[0]);
         // Z_PARAM_STR $needle — soft-null DEP+coerce then empty ValueError (#29421; peer str_increment #26264).
         $needle = self::jitNeedleArg($context, $args[1]);
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[1],
+            $needle,
+            VmString::emptyStringArgValueErrorMessage('substr_count', 1, 'needle')
+        );
         // Z_PARAM_LONG $offset — soft-null DEP+coerce on 8.4 (#21657; peer chr/mktime).
         $offset = $argc >= 3
             ? JitChr::lowerZParamLongArg($context, $args[2], 'substr_count', 3, 'offset')
