@@ -71,6 +71,68 @@ final class VmFloatDtoa
     }
 
     /**
+     * php-src main/snprintf.c php_ecvt + php_conv_fp format 'E'/'e' (%e / %E).
+     *
+     * Precision is digits after the decimal in the mantissa (default 6). Rounding is
+     * zend_dtoa half-to-even (#29008) — not number_format()'s half-up.
+     */
+    public static function formatSprintfE(float $value, int $precision, bool $upper = false): string
+    {
+        if (\is_nan($value)) {
+            return 'NaN';
+        }
+        if (\is_infinite($value)) {
+            return $value > 0.0 ? 'INF' : '-INF';
+        }
+
+        $precision = \max(0, $precision);
+        $negative = $value < 0.0;
+        $abs = \abs($value);
+        $expChar = $upper ? 'E' : 'e';
+
+        if (0.0 === $abs) {
+            // php-src: -0.0 prints without a leading '-' for %e/%E.
+            if ($precision > 0) {
+                return '0.'.\str_repeat('0', $precision).$expChar.'+0';
+            }
+
+            return '0'.$expChar.'+0';
+        }
+
+        $ndigit = $precision + 1;
+        [$digits, $decpt] = self::dtoaDigitsFromFloat($abs, $ndigit + 8);
+        [$digits, $decpt] = self::roundDigitsHalfEven($digits, $ndigit, $decpt);
+
+        if ('0' === $digits || '' === $digits) {
+            if ($precision > 0) {
+                return '0.'.\str_repeat('0', $precision).$expChar.'+0';
+            }
+
+            return '0'.$expChar.'+0';
+        }
+
+        // Carry from 999… → 1000… can leave an extra digit; keep $ndigit significant digits.
+        if (\strlen($digits) > $ndigit) {
+            $digits = \substr($digits, 0, $ndigit);
+        }
+        while (\strlen($digits) < $ndigit) {
+            $digits .= '0';
+        }
+
+        $exp = $decpt - 1;
+        if ($precision > 0) {
+            $body = $digits[0].'.'.\substr($digits, 1);
+        } else {
+            $body = $digits[0];
+        }
+        $expSign = $exp >= 0 ? '+' : '-';
+
+        $formatted = $body.$expChar.$expSign.\abs($exp);
+
+        return $negative ? '-'.$formatted : $formatted;
+    }
+
+    /**
      * php-src Zend/zend_strtod.c zend_gcvt + ext/standard/formatted_print.c %g/%G/%h/%H (#24016).
      *
      * Precision is significant digits (0 means 1). Scientific when decpt > ndigit or decpt < -3.

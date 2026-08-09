@@ -656,7 +656,7 @@ final class VmSprintf
         return self::applyFloatSignPrefix($value, VmFloatDtoa::formatSprintfF($value, $precision), $showSign);
     }
 
-    /** php-src sprintf.c — %e / %E (default precision 6). */
+    /** php-src sprintf.c — %e / %E (default precision 6; half-even via VmFloatDtoa, #29008). */
     private static function formatScientific(float $value, bool $upper, int $precision = 6, ?string $showSign = null): string
     {
         if (\is_nan($value)) {
@@ -665,20 +665,14 @@ final class VmSprintf
         if (\is_infinite($value)) {
             return self::formatInfinity(true);
         }
-        $sign = $value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign);
-        $abs = \abs($value);
-        if (0.0 === $abs) {
-            $zeros = \str_repeat('0', $precision);
 
-            return $sign.'0.'.$zeros.($upper ? 'E' : 'e').'+0';
+        // Sign for finite values: dtoa body is unsigned; apply +/- / space like %f.
+        $body = VmFloatDtoa::formatSprintfE($value, $precision, $upper);
+        if ('' !== $body && '-' === $body[0]) {
+            return $body;
         }
-        $exp = (int) \floor(\log10($abs));
-        $mantissa = $abs / (10 ** $exp);
-        $mant = VmNumberFormat::format($mantissa, $precision, '.', '');
-        $expChar = $upper ? 'E' : 'e';
-        $expSign = $exp >= 0 ? '+' : '-';
 
-        return $sign.$mant.$expChar.$expSign.\abs($exp);
+        return self::positiveFloatSignPrefix($value, $showSign).$body;
     }
 
     /**
