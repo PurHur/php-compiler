@@ -1950,7 +1950,7 @@ class VM {
             // Dynamic property on the object — readable.
             return true;
         }
-        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame)) {
+        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame, $object)) {
             return false;
         }
         $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);
@@ -3352,7 +3352,7 @@ class VM {
         Frame $frame,
         int $getOrSetVisibility
     ): bool {
-        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame)) {
+        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame, $object)) {
             return true;
         }
         $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
@@ -3407,7 +3407,7 @@ class VM {
         if (null === $meta) {
             return false;
         }
-        $invisibleParent = $this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame);
+        $invisibleParent = $this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame, $object);
         $inaccessible = $invisibleParent
             || $this->declaredPropertyInaccessibleFromCaller($object, $meta, $propName, $frame, 0);
         if (!$inaccessible) {
@@ -8393,7 +8393,11 @@ restart:
                             null !== $invisibleParentPrivateMeta
                             && (
                                 $invisibleParentPrivateMeta->phpInvisible
-                                || $this->isParentPrivatePropertyInvisibleFromCaller($invisibleParentPrivateMeta, $frame)
+                                || $this->isParentPrivatePropertyInvisibleFromCaller(
+                                    $invisibleParentPrivateMeta,
+                                    $frame,
+                                    $propertyObject
+                                )
                             )
                         ) {
                             // Non-null receiver: nullsafe still warns like plain -> (#23705).
@@ -15692,14 +15696,18 @@ restart:
         return $this->enforcePropertyReadVisibility($object, $propName, $frame);
     }
 
-    private function isParentPrivatePropertyInvisibleFromCaller(VM\ClassProperty $meta, Frame $frame): bool
-    {
+    private function isParentPrivatePropertyInvisibleFromCaller(
+        VM\ClassProperty $meta,
+        Frame $frame,
+        ObjectEntry $object
+    ): bool {
         return PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
             $meta->visibility,
             $this->callerClassLc($frame),
             $meta->declaringClassLc,
             fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
-            $meta->getVisibility
+            $meta->getVisibility,
+            strtolower($object->class->name)
         );
     }
 
@@ -15709,7 +15717,7 @@ restart:
         if (null === $meta) {
             return null;
         }
-        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame)) {
+        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame, $object)) {
             return null;
         }
         $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);

@@ -39,12 +39,14 @@ final class InstancePropertyVisibilityJitGuard
         $declaringClass = $meta['declaringClassName'];
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
         $callerLc = self::callerClassLc($context, $block);
+        $receiverLc = strtolower(ltrim($receiverClassName, '\\'));
         if (PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
             $meta['visibility'],
             $callerLc,
             $declaringLc,
             static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
-            $getVisibility
+            $getVisibility,
+            $receiverLc
         )) {
             return;
         }
@@ -55,7 +57,7 @@ final class InstancePropertyVisibilityJitGuard
                 $declaringLc,
                 $declaringClass,
                 $propName,
-                strtolower(ltrim($receiverClassName, '\\')),
+                $receiverLc,
                 static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
                 $getVisibility
             );
@@ -77,14 +79,30 @@ final class InstancePropertyVisibilityJitGuard
         $getVisibility = $meta['getVisibility'] ?? 0;
         $declaringLc = strtolower(ltrim($meta['declaringClassName'], '\\'));
         $callerLc = self::callerClassLc($objectType->jitContext(), $enclosingBlock);
+        $receiverLc = self::classIdToLc($objectType, $classId);
 
         return PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
             $meta['visibility'],
             $callerLc,
             $declaringLc,
             static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
-            $getVisibility
+            $getVisibility,
+            $receiverLc
         );
+    }
+
+    private static function classIdToLc(Object_ $objectType, int $classId): ?string
+    {
+        try {
+            $name = $objectType->classNameForId($classId);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if ('' === $name) {
+            return null;
+        }
+
+        return strtolower(ltrim($name, '\\'));
     }
 
     private static function callerClassLc(Context $context, ?Block $enclosingBlock): ?string
