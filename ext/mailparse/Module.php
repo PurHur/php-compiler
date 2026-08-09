@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mailparse;
 
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM\Variable;
 
 /**
- * mailparse extension module entry (PECL mailparse / mailparse.c; #6383, #22230, #24908).
+ * mailparse extension module entry (PECL mailparse / mailparse.c; #6383, #22230, #24908, #28064).
  *
  * Advertise mailparse_* / extension_loaded('mailparse') only when
  * {@see MailparseExtensionPolicy::advertisesExtension()}.
@@ -22,6 +24,20 @@ class Module extends ModuleAbstract
     public function getExtensionVersion(): string
     {
         return self::MAILPARSE_VERSION;
+    }
+
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        if (!MailparseExtensionPolicy::advertisesExtension()) {
+            return;
+        }
+        require_once __DIR__.'/MailparseConstants.php';
+        foreach (MailparseConstants::registeredConstants() as $name => $value) {
+            $var = new Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public function getFunctions(): array
