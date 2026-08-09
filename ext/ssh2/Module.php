@@ -31,7 +31,11 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/Ssh2Constants.php';
         foreach (Ssh2Constants::registeredConstants() as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int($value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
         VmSsh2Session::registerClass($runtime->vmContext);
