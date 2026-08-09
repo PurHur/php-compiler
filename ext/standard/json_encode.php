@@ -158,17 +158,15 @@ final class json_encode extends Internal
         if (!isset($frame->calledArgs[2])) {
             return 512;
         }
-        $depth = VmMath::parseIntBuiltinArg(
+        // php-src ext/json/json.c PHP_FUNCTION(json_encode): no ValueError on depth≤0 —
+        // encoder.max_depth is set and arrays/objects hit PHP_JSON_ERROR_DEPTH (#29345).
+        // Contrast json_decode()/json_validate() which do reject depth≤0.
+        return VmMath::parseIntBuiltinArg(
             $frame->calledArgs[2]->resolveIndirect(),
             'json_encode',
             3,
             'depth'
         );
-        if ($depth < 1) {
-            throw new \ValueError('json_encode(): Argument #3 ($depth) must be greater than 0');
-        }
-
-        return $depth;
     }
 
     /**
