@@ -41,17 +41,22 @@ final class date_modify extends Internal
         $modifier = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'date_modify',
-            2,
+            1,
             'modifier'
         );
         if (!DateTimeSupport::tryModify($dt, $modifier)) {
-            $pos = '' !== $modifier ? $modifier[0] : 'n';
-            $frame->vmContext->errors->triggerError(
-                \sprintf(
+            // php-src php_date_modify / timelib: empty → "( ): Empty string"; else timezone-db (#29302).
+            if ('' === $modifier) {
+                $warning = 'date_modify(): Failed to parse time string () at position 0 ( ): Empty string';
+            } else {
+                $warning = \sprintf(
                     'date_modify(): Failed to parse time string (%s) at position 0 (%s): The timezone could not be found in the database',
                     $modifier,
-                    $pos
-                ),
+                    $modifier[0]
+                );
+            }
+            $frame->vmContext->errors->triggerError(
+                $warning,
                 ErrorReporter::E_WARNING,
                 '' !== $frame->scriptPath ? $frame->scriptPath : null,
                 $frame->vmContext,
