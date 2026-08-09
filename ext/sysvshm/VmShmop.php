@@ -43,6 +43,8 @@ final class VmShmop
 
         $entry = new ClassEntry('Shmop');
         $entry->isInternal = true;
+        // php-src `final class Shmop` (ext/shmop/shmop.stub.php; #28423).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
