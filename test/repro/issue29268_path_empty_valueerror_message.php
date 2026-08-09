@@ -14,6 +14,7 @@ $checks = [
     'fopen' => static fn () => fopen('', 'r'),
     'file_get_contents' => static fn () => file_get_contents(''),
     'hash_file' => static fn () => hash_file('sha256', ''),
+    'file_put_contents' => static fn () => file_put_contents('', 'x'),
 ];
 
 foreach ($checks as $fn => $call) {
