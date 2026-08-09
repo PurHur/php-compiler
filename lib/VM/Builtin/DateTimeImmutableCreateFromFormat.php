@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
@@ -27,8 +27,20 @@ final class DateTimeImmutableCreateFromFormat extends VmClassMethod
         if ($argc < 2) {
             throw new \LogicException('DateTimeImmutable::createFromFormat() expects at least 2 arguments');
         }
-        $format = VmReflection::stringArg($frame->calledArgs[0], 'DateTimeImmutable::createFromFormat() format', 0);
-        $time = VmReflection::stringArg($frame->calledArgs[1], 'DateTimeImmutable::createFromFormat() datetime', 1);
+        // Static factory: calledArgs has no $this — Zend stub indices (php-src php_date.stub.php, #29269).
+        // Do not use VmReflection::stringArg() here: its `::` path subtracts 1 as if $this were present.
+        $format = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'DateTimeImmutable::createFromFormat',
+            0,
+            'format'
+        );
+        $time = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'DateTimeImmutable::createFromFormat',
+            1,
+            'datetime'
+        );
         $timezone = null;
         if ($argc >= 3) {
             $tzVar = $frame->calledArgs[2]->resolveIndirect();
