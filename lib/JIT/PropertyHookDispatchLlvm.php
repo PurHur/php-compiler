@@ -598,11 +598,20 @@ final class PropertyHookDispatchLlvm
             return false;
         }
 
-        $message = sprintf('Cannot read property %s::$%s without get hook', $className, $propertyName);
-        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
-            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+        // php-src PHP 8.4: zend_object_handlers.c — "Property %s::$%s is write-only" (#29240).
+        $message = sprintf('Property %s::$%s is write-only', $className, $propertyName);
+        if ([] !== $context->tryCatch->handlerStack) {
+            // Object_::isset passes $jit=null; emitCatchableClassError accepts that (#29240).
+            if (null !== $jit) {
+                TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+            } else {
+                TryCatchHelper::emitCatchableClassError($context, 'Error', $message, null);
+            }
         } else {
             ErrorRaise::emitRaise($context, $message);
+            // Pending Error alone is swallowed by ?? ISSET/COALESCE — hard-stop (#29240).
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->clearInsertionPosition();
         }
 
         return true;

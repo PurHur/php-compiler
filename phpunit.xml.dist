@@ -124,6 +124,8 @@
             <file>./test/compliance/EStrictConstantDeprecatedJITTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetVMTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetJITTest.php</file>
+            <file>./test/compliance/PropertyHookWriteOnlyVirtualCoalesceVMTest.php</file>
+            <file>./test/compliance/PropertyHookWriteOnlyVirtualCoalesceJITTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnVMTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnJITTest.php</file>
             <file>./test/compliance/DynPropIncUndefinedWarnVMTest.php</file>
