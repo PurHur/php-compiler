@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** getcwd() — VM via VmGetcwdNative (libc); JIT/AOT via realpath(3) on "." (#5044). */
+/** getcwd() — VM via VmFs; JIT/AOT via GetcwdJitHelper (#29429, #5044). */
 final class getcwd_ extends Internal
 {
     public function __construct()
