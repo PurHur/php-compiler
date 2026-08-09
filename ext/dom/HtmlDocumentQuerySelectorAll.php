@@ -10,7 +10,11 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
-/** Dom\HTMLDocument::querySelectorAll() — VM (php-src ext/dom/parentnode.c; #19580). */
+/**
+ * Dom\Document::querySelectorAll() — VM (php-src ext/dom/parentnode.c; #19580, #29453).
+ *
+ * Declared on abstract Dom\Document; inherited by HTMLDocument + XMLDocument.
+ */
 final class HtmlDocumentQuerySelectorAll extends VmClassMethod
 {
     public function __construct()
@@ -20,19 +24,19 @@ final class HtmlDocumentQuerySelectorAll extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $ctx = $frame->vmContext ?? throw new \LogicException('Dom\\HTMLDocument::querySelectorAll() requires VM context');
-        $receiver = $this->htmlDocumentReceiver($frame, 'Dom\\HTMLDocument::querySelectorAll()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('Dom\\Document::querySelectorAll() requires VM context');
+        $receiver = $this->documentReceiver($frame, 'Dom\\Document::querySelectorAll()');
         if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('Dom\\HTMLDocument::querySelectorAll() expects exactly 1 argument, 0 given');
+            throw new \ArgumentCountError('Dom\\Document::querySelectorAll() expects exactly 1 argument, 0 given');
         }
-        $selectors = $this->stringArg($frame->calledArgs[1], 'Dom\\HTMLDocument::querySelectorAll()', 0, 'selectors');
+        $selectors = $this->stringArg($frame->calledArgs[1], 'Dom\\Document::querySelectorAll()', 0, 'selectors');
         $list = VmDomLiving::querySelectorAll($ctx, $receiver, $selectors);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($list): void {
             $ret->copyFrom($list);
         });
     }
 
-    private function htmlDocumentReceiver(Frame $frame, string $label): ObjectEntry
+    private function documentReceiver(Frame $frame, string $label): ObjectEntry
     {
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException($label.' called without $this');
@@ -46,8 +50,8 @@ final class HtmlDocumentQuerySelectorAll extends VmClassMethod
             ));
         }
         $object = $var->toObject();
-        if (VmDomLiving::CLASS_HTML_DOCUMENT !== strtolower($object->class->name)) {
-            throw new \TypeError($label.' must be called on a Dom\\HTMLDocument instance');
+        if (!VmDomLiving::isLivingDocument($object)) {
+            throw new \TypeError($label.' must be called on a Dom\\Document instance');
         }
 
         return $object;
@@ -58,7 +62,7 @@ final class HtmlDocumentQuerySelectorAll extends VmClassMethod
         $var = $var->resolveIndirect();
         if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
             throw new \TypeError(sprintf(
-                '%s expects argument #%d ($%s) to be of type string, %s given',
+                '%s: Argument #%d ($%s) must be of type string, %s given',
                 $label,
                 $index + 1,
                 $paramName,

@@ -19440,8 +19440,31 @@ class JIT {
                     $declaringClassLc = 'domattr';
                 }
             } elseif (\in_array($methodLc, ['queryselector', 'queryselectorall', 'savehtml', 'getelementbyid'], true)) {
-                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
-                if ($this->context->functionIsRegistered('dom\\htmldocument::'.$methodLc)) {
+                // Prefer concrete Dom\*Document receiver; fall back to HTMLDocument (#19580, #29453).
+                $livingDocProxies = [
+                    'dom\\xmldocument::'.$methodLc,
+                    'dom\\htmldocument::'.$methodLc,
+                    'dom\\document::'.$methodLc,
+                ];
+                if ('savehtml' === $methodLc || 'getelementbyid' === $methodLc) {
+                    $livingDocProxies = ['dom\\htmldocument::'.$methodLc];
+                }
+                foreach ($livingDocProxies as $livingProxy) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, $livingProxy);
+                }
+                $preferLc = strtolower($className);
+                if (str_contains($preferLc, 'xmldocument')
+                    && $this->context->functionIsRegistered('dom\\xmldocument::'.$methodLc)
+                ) {
+                    $className = 'Dom\\XMLDocument';
+                    $declaringClassLc = 'dom\\xmldocument';
+                } elseif (str_contains($preferLc, 'document')
+                    && !str_contains($preferLc, 'html')
+                    && $this->context->functionIsRegistered('dom\\document::'.$methodLc)
+                ) {
+                    $className = 'Dom\\Document';
+                    $declaringClassLc = 'dom\\document';
+                } elseif ($this->context->functionIsRegistered('dom\\htmldocument::'.$methodLc)) {
                     $className = 'Dom\\HTMLDocument';
                     $declaringClassLc = 'dom\\htmldocument';
                 }
