@@ -26,8 +26,6 @@ final class VmUri
     public const CLASS_WHATWG_URL_VALIDATION_ERROR = 'uri\\whatwg\\urlvalidationerror';
     public const CLASS_WHATWG_URL_VALIDATION_ERROR_TYPE = 'uri\\whatwg\\urlvalidationerrortype';
     public const CLASS_RFC3986_URI_BUILDER = 'uri\\rfc3986\\uribuilder';
-    public const CLASS_RFC3986_URI_TYPE = 'uri\\rfc3986\\uritype';
-    public const CLASS_RFC3986_URI_HOST_TYPE = 'uri\\rfc3986\\urihosttype';
 
     /** WHATWG special schemes (url.spec.whatwg.org/#is-special). */
     public const SPECIAL_SCHEMES = ['ftp', 'file', 'http', 'https', 'ws', 'wss'];
@@ -399,23 +397,6 @@ final class VmUri
     }
 
     /** Copy a registered unit-enum case into $dest (or null when missing). */
-    public static function writeEnumCase(Context $ctx, string $enumLc, string $caseName, Variable $dest): void
-    {
-        $enum = $ctx->classes[$enumLc] ?? null;
-        if (!$enum instanceof ClassEntry) {
-            $dest->null();
-
-            return;
-        }
-        $lc = \PHPCompiler\ClassConstName::key($caseName);
-        if (!isset($enum->constants[$lc])) {
-            $dest->null();
-
-            return;
-        }
-        $dest->copyFrom($enum->constants[$lc]);
-    }
-
     public static function newWhatWgUrlVariable(Context $ctx, array $state): Variable
     {
         $class = self::requireClass($ctx, self::CLASS_WHATWG_URL, 'Uri\\WhatWg\\Url');
@@ -445,56 +426,6 @@ final class VmUri
     public static function whatWgState(ObjectEntry $object): array
     {
         return self::$whatWgState[$object->id] ?? throw new \LogicException('Url state missing');
-    }
-
-    /**
-     * Classify RFC 3986 UriType for getUriType() (#20950).
-     *
-     * @param array<string, mixed> $state
-     *
-     * @return 'Uri'|'NetworkPathReference'|'AbsolutePathReference'|'RelativePathReference'
-     */
-    public static function rfc3986UriType(array $state): string
-    {
-        $scheme = $state['scheme'] ?? null;
-        if (\is_string($scheme) && '' !== $scheme) {
-            return 'Uri';
-        }
-        $host = $state['host'] ?? null;
-        if (null !== $host) {
-            return 'NetworkPathReference';
-        }
-        $path = (string) ($state['path'] ?? '');
-        if (str_starts_with($path, '/')) {
-            return 'AbsolutePathReference';
-        }
-
-        return 'RelativePathReference';
-    }
-
-    /**
-     * Classify RFC 3986 host type for getHostType() (#20950).
-     *
-     * @return 'IPv4'|'IPv6'|'IPvFuture'|'RegisteredName'|null
-     */
-    public static function rfc3986HostType(?string $host): ?string
-    {
-        if (null === $host) {
-            return null;
-        }
-        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
-            $inner = substr($host, 1, -1);
-            if (str_starts_with(strtolower($inner), 'v')) {
-                return 'IPvFuture';
-            }
-
-            return 'IPv6';
-        }
-        if ('' !== $host && false !== filter_var($host, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4)) {
-            return 'IPv4';
-        }
-
-        return 'RegisteredName';
     }
 
     public static function rfc3986Resolve(Context $ctx, ObjectEntry $base, string $ref): Variable
