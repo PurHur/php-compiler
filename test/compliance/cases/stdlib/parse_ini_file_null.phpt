@@ -9,4 +9,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-parse_ini_file(): Argument #1 ($filename) cannot be empty
+parse_ini_file(): Argument #1 ($filename) must not be empty

@@ -548,6 +548,31 @@ final class VmString
     }
 
     /**
+     * Zend empty-string ValueError wording (php-src zend_argument_error / string.c; #29275/#29276).
+     *
+     * Prefer this over ad-hoc "cannot be empty" so explode / substr_count / Z_PARAM non-empty
+     * guards cannot drift from php-src.
+     */
+    public const EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT = 'must not be empty';
+
+    /**
+     * Format `fn(): Argument #N ($name) must not be empty` (1-based $argIndex).
+     */
+    public static function emptyStringArgValueErrorMessage(
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): string {
+        return \sprintf(
+            '%s(): Argument #%d ($%s) %s',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            self::EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT
+        );
+    }
+
+    /**
      * Reject empty string builtin operands (php-src Z_PARAM_STR non-empty path guards; #11031).
      *
      * @throws \ValueError when the coerced string is empty
@@ -559,12 +584,7 @@ final class VmString
         string $paramName
     ): void {
         if ('' === $str) {
-            throw new \ValueError(\sprintf(
-                '%s(): Argument #%d ($%s) cannot be empty',
-                $function,
-                $argIndex + 1,
-                $paramName
-            ));
+            throw new \ValueError(self::emptyStringArgValueErrorMessage($function, $argIndex, $paramName));
         }
     }
 
@@ -3685,7 +3705,7 @@ final class VmString
     public static function explode(string $delimiter, string $string, int $limit = \PHP_INT_MAX): array
     {
         if ('' === $delimiter) {
-            throw new \ValueError('explode(): Argument #1 ($separator) cannot be empty');
+            self::rejectEmptyBuiltinStringArg($delimiter, 'explode', 0, 'separator');
         }
         if ('' === $string) {
             if ($limit >= 0) {
@@ -5174,7 +5194,7 @@ final class VmString
         ?int $length = null
     ): int {
         if ('' === $needle) {
-            throw new \ValueError('substr_count(): Argument #2 ($needle) cannot be empty');
+            self::rejectEmptyBuiltinStringArg($needle, 'substr_count', 1, 'needle');
         }
         $hayLen = self::byteLength($haystack);
         $needleLen = self::byteLength($needle);

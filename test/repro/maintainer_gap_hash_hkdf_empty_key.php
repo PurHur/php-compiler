@@ -9,7 +9,7 @@ try {
     echo 'result_len='.\strlen($result)."\n";
     $fail = 1;
 } catch (ValueError $e) {
-    if ('hash_hkdf(): Argument #2 ($key) cannot be empty' !== $e->getMessage()) {
+    if ('hash_hkdf(): Argument #2 ($key) must not be empty' !== $e->getMessage()) {
         echo 'bad message: '.$e->getMessage()."\n";
         $fail = 1;
     }

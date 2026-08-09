@@ -65,7 +65,7 @@ final class checkdnsrr extends Internal
             $context,
             $args[0],
             $hostname,
-            $fn.'(): Argument #1 ($hostname) cannot be empty'
+            $fn.'(): Argument #1 ($hostname) must not be empty'
         );
         if ($argc >= 2) {
             if (JITVariable::TYPE_HASHTABLE === $args[1]->type) {

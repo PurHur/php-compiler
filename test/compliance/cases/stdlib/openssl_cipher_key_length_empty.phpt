@@ -8,4 +8,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-openssl_cipher_key_length(): Argument #1 ($cipher_algo) cannot be empty
+openssl_cipher_key_length(): Argument #1 ($cipher_algo) must not be empty

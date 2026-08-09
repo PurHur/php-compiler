@@ -118,7 +118,7 @@ final class explode extends Internal
             $after = BasicBlockHelper::append($context, 'explode_empty_sep_after');
             $context->builder->branch($err);
             $context->builder->positionAtEnd($err);
-            TypeErrorRaise::emitValueError($context, 'explode(): Argument #1 ($separator) cannot be empty');
+            TypeErrorRaise::emitValueError($context, 'explode(): Argument #1 ($separator) must not be empty');
             $context->builder->call($context->lookupFunction('abort'));
             $context->builder->positionAtEnd($after);
 

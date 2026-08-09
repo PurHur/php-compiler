@@ -67,7 +67,7 @@ final class scandir extends Internal
             $context,
             $args[0],
             $path,
-            'scandir(): Argument #1 ($directory) cannot be empty'
+            'scandir(): Argument #1 ($directory) must not be empty'
         );
         StringFsGlob::ensureLinked($context);
 

@@ -24,6 +24,6 @@ try {
 }
 ?>
 --EXPECT--
-ValueError: setcookie(): Argument #1 ($name) cannot be empty
-ValueError: setrawcookie(): Argument #1 ($name) cannot be empty
-empty: setcookie(): Argument #1 ($name) cannot be empty
+ValueError: setcookie(): Argument #1 ($name) must not be empty
+ValueError: setrawcookie(): Argument #1 ($name) must not be empty
+empty: setcookie(): Argument #1 ($name) must not be empty
