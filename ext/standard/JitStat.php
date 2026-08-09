@@ -332,6 +332,16 @@ final class JitStat
         string $function,
         bool $lstat
     ): void {
+        // php-src filestat.c — empty path returns false without E_WARNING (#29343; peer disk_* silent fail).
+        $i64 = $context->getTypeFromString('int64');
+        $pathLen = $context->builder->call($context->lookupFunction('__string__strlen'), $pathStr);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $pathLen, $i64->constInt(0, false));
+        $id = (string) (++self::$blockSerial);
+        $warnBlock = BasicBlockHelper::append($context, 'stat_fail_warn_'.$id);
+        $contBlock = BasicBlockHelper::append($context, 'stat_fail_cont_'.$id);
+        $context->builder->branchIf($isEmpty, $contBlock, $warnBlock);
+
+        $context->builder->positionAtEnd($warnBlock);
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($pathStr, $map['value']);
         $op = $lstat ? 'Lstat' : 'stat';
@@ -365,5 +375,8 @@ final class JitStat
             $i32->constInt(0, false)
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+        $context->builder->branch($contBlock);
+
+        $context->builder->positionAtEnd($contBlock);
     }
 }
