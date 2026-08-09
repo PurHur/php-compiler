@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
@@ -33,7 +34,7 @@ final class VmRange
         if ($useFloat) {
             $start = self::parseFloatEndpoint($startVar, $frame, 1, 'start');
             $end = self::parseFloatEndpoint($endVar, $frame, 2, 'end');
-            $step = self::resolveFloatStep($stepVar, $start, $end);
+            $step = self::resolveFloatStep($stepVar, $start, $end, $frame);
 
             return self::buildFloatRange($start, $end, $step);
         }
@@ -44,14 +45,14 @@ final class VmRange
             // php-src php_range_process_input — multi-byte non-numeric strings warn then use byte 0 (#29203).
             self::warnMultiByteCharEndpoint($frame, $startVar, 1, 'start');
             self::warnMultiByteCharEndpoint($frame, $endVar, 2, 'end');
-            $step = self::resolveCharStep($stepVar, $startChar, $endChar);
+            $step = self::resolveCharStep($stepVar, $startChar, $endChar, $frame);
 
             return self::buildCharRange($startChar, $endChar, $step);
         }
 
         $start = self::parseIntEndpoint($startVar, $frame, 1, 'start');
         $end = self::parseIntEndpoint($endVar, $frame, 2, 'end');
-        $step = self::resolveIntStep($stepVar, $start, $end);
+        $step = self::resolveIntStep($stepVar, $start, $end, $frame);
 
         return self::buildIntRange($start, $end, $step);
     }
@@ -253,10 +254,33 @@ final class VmRange
         );
     }
 
-    private static function resolveIntStep(?Variable $stepVar, int $start, int $end): int
+    /**
+     * Z_PARAM_NUMBER $step null: strict_types → TypeError; else DEP then zero-step ValueError (#29352).
+     *
+     * @throws \TypeError|\ValueError
+     */
+    private static function rejectOrCoerceNullStep(?Frame $frame): never
     {
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+            throw new \TypeError(
+                'range(): Argument #3 ($step) must be of type int|float, null given'
+            );
+        }
+        VmNullNumberParamDeprecation::emit($frame, 'range', 3, 'step', 'int|float');
+        throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
+    }
+
+    private static function resolveIntStep(
+        ?Variable $stepVar,
+        int $start,
+        int $end,
+        ?Frame $frame = null
+    ): int {
         if (null === $stepVar) {
             return $start > $end ? -1 : 1;
+        }
+        if (Variable::TYPE_NULL === $stepVar->type) {
+            self::rejectOrCoerceNullStep($frame);
         }
         if (Variable::TYPE_INTEGER !== $stepVar->type) {
             if (Variable::TYPE_FLOAT === $stepVar->type) {
@@ -314,10 +338,17 @@ final class VmRange
         return $step;
     }
 
-    private static function resolveFloatStep(?Variable $stepVar, float $start, float $end): float
-    {
+    private static function resolveFloatStep(
+        ?Variable $stepVar,
+        float $start,
+        float $end,
+        ?Frame $frame = null
+    ): float {
         if (null === $stepVar) {
             return $start <= $end ? 1.0 : -1.0;
+        }
+        if (Variable::TYPE_NULL === $stepVar->type) {
+            self::rejectOrCoerceNullStep($frame);
         }
         if (Variable::TYPE_INTEGER === $stepVar->type) {
             $step = (float) $stepVar->toInt();
@@ -366,10 +397,17 @@ final class VmRange
         return $step;
     }
 
-    private static function resolveCharStep(?Variable $stepVar, string $startChar, string $endChar): int
-    {
+    private static function resolveCharStep(
+        ?Variable $stepVar,
+        string $startChar,
+        string $endChar,
+        ?Frame $frame = null
+    ): int {
         if (null === $stepVar) {
             return ord($startChar) > ord($endChar) ? -1 : 1;
+        }
+        if (Variable::TYPE_NULL === $stepVar->type) {
+            self::rejectOrCoerceNullStep($frame);
         }
         if (Variable::TYPE_INTEGER !== $stepVar->type) {
             if (Variable::TYPE_FLOAT === $stepVar->type) {
