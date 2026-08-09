@@ -18824,7 +18824,7 @@ restart:
                 $data['method'],
                 $entry->name,
                 $data['traitName'],
-                $methodLc
+                $data['methodNames']
             );
             $entry->traitMethodSources[$methodLc] = $data['traitName'];
             $entry->methodVisibility[$methodLc] = $data['vis'];

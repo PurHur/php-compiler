@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+require_once __DIR__.'/../BaseTest.php';
+
+/**
+ * VM: #[\Deprecated] trait method cites using class, not trait (#29392).
+ *
+ * Slash-free data-set name so --filter works (path-style VMTest names break the regex).
+ */
+final class DeprecatedTraitMethodUsingClassVMTest extends BaseTest
+{
+    protected static string $DIR = __DIR__;
+
+    public static function providePHPTests(): \Generator
+    {
+        foreach ([
+            'deprecated_trait_method_using_class_84.phpt',
+            'deprecated_trait_method_inherited_using_class_84.phpt',
+        ] as $file) {
+            yield $file => self::parsePHPT(
+                __DIR__.'/cases/language/'.$file,
+                $file
+            );
+        }
+    }
+
+    public function setUp(): void
+    {
+        $this->BIN = realpath(__DIR__.'/../../bin/vm.php');
+    }
+}
