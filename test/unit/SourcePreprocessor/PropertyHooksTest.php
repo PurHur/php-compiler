@@ -1645,4 +1645,84 @@ PHP;
         }
     }
 
+    /** @covers issue #29442 — set(&$value) is compile-fatal */
+    public function testRejectsByRefSetHookParam(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $byRef = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set(&$value) {
+            $this->x = $value;
+        }
+    }
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::setHookParamByRefCompileError('value', 'C', 'x'));
+            (new PropertyHooks())->process($byRef, 'hook_set_by_ref.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #29442 — typed by-ref rejected; legal set($value) / set => unchanged */
+    public function testRejectsTypedByRefSetHookParamAndAllowsLegalSet(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $typedByRef = <<<'PHP'
+<?php
+class C {
+    public string $x = 'a' {
+        set(string &$v) { $this->x = $v; }
+    }
+}
+PHP;
+            try {
+                (new PropertyHooks())->process($typedByRef, 'hook_set_typed_by_ref.php');
+                self::fail('Expected CompileFatal for typed by-ref set param');
+            } catch (CompileFatal $e) {
+                self::assertSame(PropertyHooks::setHookParamByRefCompileError('v', 'C', 'x'), $e->getMessage());
+            }
+
+            $block = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set($value) { $this->x = $value; }
+    }
+}
+PHP;
+            [$out] = (new PropertyHooks())->process($block, 'hook_set_legal.php');
+            self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
+            self::assertStringNotContainsString('&$value', $out);
+
+            $arrow = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set => $value;
+    }
+}
+PHP;
+            [$outArrow] = (new PropertyHooks())->process($arrow, 'hook_set_arrow_legal.php');
+            self::assertStringContainsString('function __phpc_property_set_x($value)', $outArrow);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
 }
