@@ -3545,16 +3545,23 @@ class VM {
             return $object->getProperty($name);
         }
         if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
+            // Stamp user site before raise (same class as #25556 / #29457).
+            [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
             $thrown = VM\BuiltinExceptionSupport::materializeError(
                 $this->context,
-                VM\ObjectReadonlySupport::modifyObjectMessage($object)
+                VM\ObjectReadonlySupport::modifyObjectMessage($object),
+                $file,
+                $line
             );
             $this->raiseUncaughtException($thrown);
         }
         if ($object->class->readonly && !$this->hasInstanceMethod($object->class, '__set')) {
+            [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
             $thrown = VM\BuiltinExceptionSupport::materializeError(
                 $this->context,
-                sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+                sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name),
+                $file,
+                $line
             );
             $this->raiseUncaughtException($thrown);
         }
@@ -3581,9 +3588,13 @@ class VM {
         }
         // Defense in depth — primary gate is enforceInternalDynamicPropertyCreate (#26055, #26371).
         if ($object->class->noDynamicProperties) {
+            // Stamp assignment site so uncaught Error does not cite ExceptionSupport (#29457).
+            [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
             $thrown = VM\BuiltinExceptionSupport::materializeError(
                 $this->context,
-                sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+                sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name),
+                $file,
+                $line
             );
             $this->raiseUncaughtException($thrown);
         }
@@ -15294,22 +15305,18 @@ restart:
      * Reject dynamic property creation on readonly classes (Zend zend_objects.c).
      * Returns catch frame or raises uncaught Error (#4799).
      *
+     * Route through {@see dispatchVmError} so file/line stamp the user assignment site
+     * (php-src zend_object_handlers.c / #25556, #29457).
+     *
      * @return ?Frame catch frame when handled; null when no violation or after uncaught raise
      */
     private function enforceReadonlyDynamicPropertyCreate(ObjectEntry $object, string $name, Frame $frame): ?Frame
     {
         if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
-            $thrown = VM\BuiltinExceptionSupport::materializeError(
-                $this->context,
-                VM\ObjectReadonlySupport::modifyObjectMessage($object)
+            return $this->dispatchVmError(
+                VM\ObjectReadonlySupport::modifyObjectMessage($object),
+                $frame
             );
-            $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-            if (null !== $catchFrame) {
-                return $catchFrame;
-            }
-            $this->raiseUncaughtException($thrown);
-
-            return null;
         }
 
         if (!$object->class->readonly || $this->hasInstanceMethod($object->class, '__set')) {
@@ -15319,22 +15326,18 @@ restart:
             return null;
         }
 
-        $thrown = VM\BuiltinExceptionSupport::materializeError(
-            $this->context,
-            sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+        return $this->dispatchVmError(
+            sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name),
+            $frame
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
-
-        return null;
     }
 
     /**
      * ZEND_ACC_NO_DYNAMIC_PROPERTIES → catchable Error (zend_object_handlers.c; #26371).
      * Closure/Fiber/Generator/WeakMap reject; Dom\* and other internals allow with E_DEPRECATED (#26566).
+     *
+     * Route through {@see dispatchVmError} so getFile()/getLine() and uncaught fatals cite the
+     * user assignment, not ExceptionSupport.php (#29457, re-#25556).
      *
      * @return ?Frame catch frame when handled; null when allowed or after uncaught raise
      */
@@ -15357,17 +15360,10 @@ restart:
             return null;
         }
 
-        $thrown = VM\BuiltinExceptionSupport::materializeError(
-            $this->context,
-            sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+        return $this->dispatchVmError(
+            sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name),
+            $frame
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
-
-        return null;
     }
 
     /**
