@@ -199,6 +199,35 @@ final class VmApcu
     }
 
     /**
+     * Active user-cache keys after TTL expiry (APCUIterator; #27877).
+     *
+     * @return list<string>
+     */
+    public static function listKeys(): array
+    {
+        self::expireStale();
+
+        return \array_keys(self::$store);
+    }
+
+    /**
+     * Snapshot of one active entry for APCUIterator::current() formatting (#27877).
+     *
+     * @return array{value: Variable, expires: int}|null
+     */
+    public static function entrySnapshot(string $key): ?array
+    {
+        if (!self::exists($key)) {
+            return null;
+        }
+        $entry = self::$store[$key];
+        $value = new Variable();
+        $value->duplicateFrom($entry['value']);
+
+        return ['value' => $value, 'expires' => $entry['expires']];
+    }
+
+    /**
      * Minimal apcu_cache_info() shape (user cache only).
      *
      * @return array<string, mixed>

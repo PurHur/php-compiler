@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7256 |
-| Phase A inventory files (M2 ratio SSOT) | 7256 |
+| PHP files on vm.php path | 7258 |
+| Phase A inventory files (M2 ratio SSOT) | 7258 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23438 |
+| Source constructs flagged (warnings) | 23460 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -26,10 +26,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | File | Blockers | Warnings |
 |------|----------|----------|
 | `bin/vm.php` | 0 | 1 |
+| `ext/apcu/ApcuConstants.php` | 0 | 1 |
 | `ext/apcu/ApcuExtensionPolicy.php` | 0 | 1 |
 | `ext/apcu/ApcuFunction.php` | 0 | 8 |
 | `ext/apcu/Module.php` | 0 | 15 |
-| `ext/apcu/VmApcu.php` | 0 | 6 |
+| `ext/apcu/VmApcu.php` | 0 | 7 |
+| `ext/apcu/VmApcuIterator.php` | 0 | 20 |
 | `ext/apcu/apcu_add.php` | 0 | 5 |
 | `ext/apcu/apcu_cache_info.php` | 0 | 2 |
 | `ext/apcu/apcu_cas.php` | 0 | 2 |
@@ -7165,6 +7167,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Runtime (line 17)
 
+### `ext/apcu/ApcuConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/apcu/ApcuExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7185,21 +7192,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/apcu/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new apcu_store (line 32)
-- new apcu_fetch (line 33)
-- new apcu_add (line 34)
-- new apcu_inc (line 35)
-- new apcu_dec (line 36)
-- new apcu_cas (line 37)
-- new apcu_entry (line 38)
-- new apcu_delete (line 39)
-- new apcu_clear_cache (line 40)
-- new apcu_exists (line 41)
-- new apcu_cache_info (line 42)
-- new apcu_sma_info (line 43)
-- new apcu_key_info (line 44)
-- new apcu_enabled (line 45)
-- 2 class method(s)
+- new apcu_store (line 49)
+- new apcu_fetch (line 50)
+- new apcu_add (line 51)
+- new apcu_inc (line 52)
+- new apcu_dec (line 53)
+- new apcu_cas (line 54)
+- new apcu_entry (line 55)
+- new apcu_delete (line 56)
+- new apcu_clear_cache (line 57)
+- new apcu_exists (line 58)
+- new apcu_cache_info (line 59)
+- new apcu_sma_info (line 60)
+- new apcu_key_info (line 61)
+- new apcu_enabled (line 62)
+- 3 class method(s)
 
 ### `ext/apcu/VmApcu.php`
 
@@ -7209,7 +7216,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 79)
 - new Variable (line 104)
 - new Variable (line 177)
-- 15 class method(s)
+- new Variable (line 224)
+- 17 class method(s)
+
+### `ext/apcu/VmApcuIterator.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 50)
+- new ApcuIteratorConstruct (line 56)
+- new Error (line 158)
+- new Error (line 168)
+- new HashTable (line 172)
+- new Variable (line 176)
+- new Variable (line 181)
+- new Variable (line 186)
+- new Variable (line 195)
+- new Variable (line 200)
+- new Variable (line 205)
+- new Variable (line 210)
+- new Variable (line 215)
+- new Variable (line 220)
+- new Variable (line 225)
+- new Variable (line 234)
+- new Variable (line 239)
+- new Error (line 283)
+- new ArgumentCountError (line 368)
+- 25 class method(s)
 
 ### `ext/apcu/apcu_add.php`
 
