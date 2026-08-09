@@ -50,13 +50,15 @@ final class VmDate
     }
 
     /**
-     * timezone_version_get() — Olson/tzdata version sentinel (ext/date/php_date.c, #6832, #8032).
+     * timezone_version_get() — Olson/tzdata version (ext/date/php_date.c, #6832, #8032, #29386).
      *
-     * PHP-owned: return php-src `0.system` when no bundled timelib DB is linked (self-host/AOT).
+     * PHP-owned: read the IANA version from system zoneinfo (`tzdata.zi` / `+VERSION`).
+     * Falls back to php-src `0.system` only when no zoneinfo database is present — never
+     * delegates to host Zend ext/date for the version string (self-host/AOT shrink, #8032).
      */
     public static function timezone_version_get(): string
     {
-        return '0.system';
+        return VmDateTimeNative::timezoneDbVersion();
     }
 
     /**

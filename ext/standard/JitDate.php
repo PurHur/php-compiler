@@ -97,7 +97,7 @@ final class JitDate
         return $ptr;
     }
 
-    /** timezone_version_get() — tzdata version baked at JIT link from VmDate (#6832, #8032). */
+    /** timezone_version_get() — tzdata version baked at JIT link from VmDate (#6832, #8032, #29386). */
     public static function timezone_version_get(Context $context): Value
     {
         $version = VmDate::timezone_version_get();

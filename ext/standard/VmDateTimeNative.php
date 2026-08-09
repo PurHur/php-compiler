@@ -20,6 +20,9 @@ final class VmDateTimeNative
 {
     private const ZONEINFO_ROOT = '/usr/share/zoneinfo';
 
+    /** Cached Olson/tzdata version from zoneinfo (timezone_version_get, #29386). */
+    private static ?string $timezoneDbVersion = null;
+
     /** Day-scan fallback only for narrow windows; full-range uses TZif (#11069). */
     private const TRANSITION_SCAN_MAX_SPAN = 86400 * 366 * 10;
 
@@ -42,6 +45,58 @@ final class VmDateTimeNative
 
     /** Set when createFromFormat format is satisfied but time has trailing junk (#14173, #16196). */
     private static bool $createFromFormatTrailingData = false;
+
+    /**
+     * timezone_version_get() — IANA tzdata version for the zoneinfo tree we actually use (#29386).
+     *
+     * php-src returns `DATE_TIMEZONEDB->version` (bundled timezonedb) or `0.system` under
+     * `USE_SYSTEM_TZDATA`. This runtime validates zones via `/usr/share/zoneinfo`, so prefer
+     * the `# version …` line from `tzdata.zi` (or `+VERSION`) over the opaque sentinel.
+     */
+    public static function timezoneDbVersion(): string
+    {
+        if (null !== self::$timezoneDbVersion) {
+            return self::$timezoneDbVersion;
+        }
+        $parsed = self::readTimezoneDbVersionFromZoneinfo();
+        self::$timezoneDbVersion = null !== $parsed && '' !== $parsed ? $parsed : '0.system';
+
+        return self::$timezoneDbVersion;
+    }
+
+    /**
+     * @return non-empty-string|null
+     */
+    private static function readTimezoneDbVersionFromZoneinfo(): ?string
+    {
+        $ziPath = self::ZONEINFO_ROOT.'/tzdata.zi';
+        if (\is_file($ziPath)) {
+            // Header only — full tzdata.zi is ~100KiB+; version is on line 1 (#29386).
+            $head = VmFs::fileGetContents($ziPath, false, null, 0, 512);
+            if (\is_string($head) && 1 === \preg_match('/^#\s*version\s+(\S+)/m', $head, $match)) {
+                $version = $match[1];
+                if ('' !== $version) {
+                    return $version;
+                }
+            }
+        }
+
+        $plusPath = self::ZONEINFO_ROOT.'/+VERSION';
+        if (\is_file($plusPath)) {
+            $raw = VmFs::fileGetContents($plusPath);
+            if (\is_string($raw) && '' !== $raw) {
+                $line = \trim(\explode("\n", $raw, 2)[0]);
+                if ('' !== $line && !\str_starts_with($line, '#')) {
+                    return $line;
+                }
+                if (1 === \preg_match('/version\s+(\S+)/i', $line, $match) && '' !== $match[1]) {
+                    return $match[1];
+                }
+            }
+        }
+
+        return null;
+    }
 
     /**
      * timezone_identifiers_list() — Olson identifiers from zone.tab (ext/date/php_date.c, #3504).
