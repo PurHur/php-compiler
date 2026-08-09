@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ssh2;
 
 /**
- * PECL ssh2 fingerprint / stream constants (php_ssh2.h; #26575).
+ * PECL ssh2 fingerprint / stream / default-terminal constants (php_ssh2.h; #26575, #28093).
  */
 final class Ssh2Constants
 {
@@ -22,6 +22,24 @@ final class Ssh2Constants
 
     /** PHP_SSH2_TERM_UNIT_PIXELS (php_ssh2.h; #26663). */
     public const TERM_UNIT_PIXELS = 1;
+
+    /** SSH2_STREAM_STDIO (ssh2.c MINIT). */
+    public const STREAM_STDIO = 0;
+
+    /** SSH2_STREAM_STDERR = SSH_EXTENDED_DATA_STDERR (libssh2.h). */
+    public const STREAM_STDERR = 1;
+
+    /** PHP_SSH2_DEFAULT_TERMINAL. */
+    public const DEFAULT_TERMINAL = 'vanilla';
+
+    /** PHP_SSH2_DEFAULT_TERM_WIDTH. */
+    public const DEFAULT_TERM_WIDTH = 80;
+
+    /** PHP_SSH2_DEFAULT_TERM_HEIGHT. */
+    public const DEFAULT_TERM_HEIGHT = 25;
+
+    /** PHP_SSH2_DEFAULT_TERM_UNIT (= TERM_UNIT_CHARS). */
+    public const DEFAULT_TERM_UNIT = self::TERM_UNIT_CHARS;
 
     /** LIBSSH2_POLLFD_* / PECL SSH2_POLL* (#26735). */
     public const POLLIN = 0x0001;
@@ -45,7 +63,7 @@ final class Ssh2Constants
     /** PHP_SSH2_DEFAULT_POLL_TIMEOUT (seconds). */
     public const DEFAULT_POLL_TIMEOUT = 30;
 
-    /** @return array<string, int> */
+    /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
         return [
@@ -55,6 +73,12 @@ final class Ssh2Constants
             'SSH2_FINGERPRINT_RAW' => self::FINGERPRINT_RAW,
             'SSH2_TERM_UNIT_CHARS' => self::TERM_UNIT_CHARS,
             'SSH2_TERM_UNIT_PIXELS' => self::TERM_UNIT_PIXELS,
+            'SSH2_STREAM_STDIO' => self::STREAM_STDIO,
+            'SSH2_STREAM_STDERR' => self::STREAM_STDERR,
+            'SSH2_DEFAULT_TERMINAL' => self::DEFAULT_TERMINAL,
+            'SSH2_DEFAULT_TERM_WIDTH' => self::DEFAULT_TERM_WIDTH,
+            'SSH2_DEFAULT_TERM_HEIGHT' => self::DEFAULT_TERM_HEIGHT,
+            'SSH2_DEFAULT_TERM_UNIT' => self::DEFAULT_TERM_UNIT,
             'SSH2_POLLIN' => self::POLLIN,
             'SSH2_POLLEXT' => self::POLLEXT,
             'SSH2_POLLOUT' => self::POLLOUT,
