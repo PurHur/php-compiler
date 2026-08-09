@@ -272,6 +272,38 @@ if (!function_exists('php_compiler_cli_sync_host_exception_string_param_max_len'
     }
 }
 
+if (!function_exists('php_compiler_cli_sync_host_zend_assertions')) {
+    /**
+     * Inherit host {@code php -d zend.assertions=...} into the guest VM (#29551).
+     *
+     * Guest argv {@code bin/vm.php -d zend.assertions=-1} wins via
+     * {@see php_compiler_cli_apply_ini_overrides} (startup stage). Host php.ini alone is ignored
+     * so the guest keeps php-src's compiled default {@code 1} (#28823; distro ini is often {@code -1}).
+     *
+     * @param array<string, mixed> $options
+     */
+    function php_compiler_cli_sync_host_zend_assertions(\PHPCompiler\VM\Context $ctx, array $options): void
+    {
+        $overrides = $options['-d'] ?? null;
+        if (is_array($overrides)) {
+            foreach ($overrides as $key => $_) {
+                if (is_string($key) && 0 === strcasecmp($key, 'zend.assertions')) {
+                    return;
+                }
+            }
+        }
+        if (!php_compiler_cli_host_cmdline_has_dash_d('zend.assertions')) {
+            return;
+        }
+        $raw = @\ini_get('zend.assertions');
+        if (false === $raw) {
+            return;
+        }
+        // Startup stage only — OnUpdateAssertions allows crossing -1 here (#24396).
+        \PHPCompiler\ext\standard\VmIni::applyStartupIniOverride('zend.assertions', (string) $raw);
+    }
+}
+
 if (!function_exists('php_compiler_cli_resolve_user_path')) {
     /**
      * Resolve a user-supplied relative path against the pre-chdir invocation cwd.
