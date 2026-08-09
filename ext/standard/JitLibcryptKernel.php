@@ -12,10 +12,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for phpc_libcrypt_kernel() — thin libc crypt(3) (#9275, #26773).
+ * LLVM lowering for NestedJIT `@crypt` — thin libc crypt(3) (#9275, #26773, #29545).
  *
- * Nested leaf inside {@see LibcryptJitHelper} only. Avoids NestedJIT lowering of
- * PHP {@see \crypt()} into {@see PasswordJitHelper} (AOT recursion / null hash).
+ * Nested leaf via {@see crypt::call} when {@see NestedJitCompileScope} is active.
+ * Avoids re-entering {@see PasswordJitHelper} through `__compiler_crypt` (AOT recursion / null hash).
  * php-src: ext/standard/crypt.c — PHP_FN(crypt)
  */
 final class JitLibcryptKernel
@@ -177,15 +177,19 @@ final class JitLibcryptKernel
 
     private static function libcryptDecl(Context $context): LlvmFunction
     {
+        // Compiler-prefixed lookup — never registerFunction('crypt'): NestedJIT @crypt
+        // must not interpose libxcrypt crypt(3) (#26861 / #29545).
         try {
-            return $context->lookupFunction('crypt');
+            return $context->lookupFunction('__compiler_libc_crypt');
         } catch (\Throwable) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('crypt', $ft);
-            $context->registerFunction('crypt', $fn);
-
-            return $fn;
         }
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
+        // IR/linker symbol stays "crypt" so -lcrypt resolves crypt(3); lookup alias only.
+        $probe = $context->module->getNamedFunction('crypt');
+        $fn = null !== $probe ? $probe : $context->module->addFunction('crypt', $ft);
+        $context->registerFunction('__compiler_libc_crypt', $fn);
+
+        return $fn;
     }
 }

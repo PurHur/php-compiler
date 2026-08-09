@@ -673,7 +673,6 @@ class Module extends ModuleAbstract
             new phpc_ob_write_stdout_kernel(),
             new phpc_url_rewriter_apply_kernel(),
             new phpc_rewrite_vars_set_tags_kernel(),
-            new phpc_libcrypt_kernel(),
             new phpc_libcrypt_verify(),
             new phpc_argon2_hash(),
             new phpc_argon2_verify(),
