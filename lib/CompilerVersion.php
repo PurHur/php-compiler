@@ -1699,6 +1699,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ E_DEPRECATED for {@code trigger_error(..., E_USER_ERROR)} / {@code user_error(..., E_USER_ERROR)}.
+     *
+     * php-src: Zend/zend_builtin_functions.c — "Passing E_USER_ERROR to trigger_error() is
+     * deprecated since 8.4, throw an exception or call exit with a string message instead" (#29216).
+     * Withheld on 8.4.0-dev reference / PROFILE≤8.3 (matches Zend 8.2/8.3 silence). Enable via
+     * stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4} / {@code 8.5}.
+     */
+    public static function supportsTriggerErrorUserErrorDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.2+ E_DEPRECATED when creating an undeclared instance property without
      * {@code #[\AllowDynamicProperties]} (zend_object_handlers.c; #29195 / re-#21953).
      *

@@ -532,10 +532,8 @@ final class ErrorReporter
         if (0 !== ($this->errorReporting & $level)
             || [] !== $this->handlerStack) {
             if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
-                if (self::E_USER_ERROR === $level) {
-                    $this->abortUserFatal($level, $message, $file, $line);
-                }
-
+                // php-src: handler return true swallows the error — including E_USER_ERROR —
+                // and continues at the trigger_error() call site (#29216; RFC deprecations_php_8_4).
                 return;
             }
         }
