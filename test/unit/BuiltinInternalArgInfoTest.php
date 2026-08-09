@@ -694,6 +694,21 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('SysvSharedMemory', $shm['type']);
     }
 
+    /** php-src ext/sysvmsg/sysvmsg.stub.php — SysvMessageQueue stubs; InternalArgInfo resource/untyped (#28452). */
+    public function testMsgReflectionStubTypes(): void
+    {
+        $this->assertSame('SysvMessageQueue|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('msg_get_queue'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('msg_receive'));
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('msg_stat_queue'));
+        $this->assertSame('SysvMessageQueue', BuiltinInternalArgInfo::stubParamTypeOverride('msg_send', 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('msg_send', 5));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('msg_receive', 4));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('msg_receive', 2));
+        $queue = BuiltinInternalArgInfo::paramInfoForFunction('msg_remove_queue', 0);
+        $this->assertNotNull($queue);
+        $this->assertSame('SysvMessageQueue', $queue['type']);
+    }
+
     /** php-src ext/sockets/sockets.stub.php — Socket stubs; InternalArgInfo resource/untyped (#27854). */
     public function testSocketExportImportReflectionStubTypes(): void
     {
