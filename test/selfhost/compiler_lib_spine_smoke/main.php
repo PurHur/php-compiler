@@ -6729,6 +6729,7 @@ require_once __DIR__.'/../../../lib/VM/EnumCasesJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/EnumFromHandler.php';
 require_once __DIR__.'/../../../lib/VM/EnumFromJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/EnumSupport.php';
+require_once __DIR__.'/../../../lib/VM/EngineConstantDeprecation.php';
 require_once __DIR__.'/../../../lib/VM/ErrorReporter.php';
 require_once __DIR__.'/../../../lib/VM/ExceptionHandlerStack.php';
 require_once __DIR__.'/../../../lib/VM/ExceptionSupport.php';

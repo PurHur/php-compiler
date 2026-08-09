@@ -79,6 +79,30 @@ final class DeprecatedCallGuard
         );
     }
 
+    /**
+     * Global constant fetch use-site notice (Zend zend_constants.c CONST_DEPRECATED, #29229).
+     *
+     * Mirrors VM {@see \PHPCompiler\VM::emitGlobalConstFetchDeprecation} for MCJIT/AOT.
+     */
+    public static function emitGlobalConstFetch(
+        Context $context,
+        DeprecatedMetadata $meta,
+        string $constName,
+        int $line = 0
+    ): void {
+        if (!CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()) {
+            return;
+        }
+        if (!$meta->emitsRuntimeNotice()) {
+            return;
+        }
+        self::emitUserDeprecated(
+            $context,
+            $meta->formatGlobalConstant($constName),
+            $line > 0 ? $line : $context->callSiteLine
+        );
+    }
+
     public static function emitUserDeprecated(Context $context, string $message, int $line): void
     {
         StringTriggerError::ensureLinked($context);

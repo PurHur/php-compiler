@@ -298,6 +298,7 @@ class Context {
         $this->scriptStack = new ScriptStack();
         $this->executionLimits = new \PHPCompiler\ext\standard\VmExecutionLimits();
         BuiltinClasses::register($this);
+        EngineConstantDeprecation::register($this);
     }
 
     public function constantFetch(string $name): ?Variable {

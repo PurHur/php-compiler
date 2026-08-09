@@ -19,7 +19,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
-**M2 spine:** **7250** / **7252** (2 deferred: #24115, #27103) (`php script/bootstrap-spine-count.php`) — full Phase A inventory in `compiler_lib_spine_smoke`; coverage sync ✅ (`check-selfhost-spine-coverage-sync.php`). Native spine **link** + **lint** ✅ ([#2134](https://github.com/PurHur/php-compiler/issues/2134), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). **M5 daily gate:** `make north-star5-verify-fast` + VM probe ~20ms ([#2201](https://github.com/PurHur/php-compiler/issues/2201)); `--strict` pre-merge only. M4 gen-2→gen-3 recompile ✅. Target doc: [self-host-target.md](self-host-target.md)
+**M2 spine:** **7253** / **7255** (2 deferred: #24115, #27103) (`php script/bootstrap-spine-count.php`) — full Phase A inventory in `compiler_lib_spine_smoke`; coverage sync ✅ (`check-selfhost-spine-coverage-sync.php`). Native spine **link** + **lint** ✅ ([#2134](https://github.com/PurHur/php-compiler/issues/2134), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). **M5 daily gate:** `make north-star5-verify-fast` + VM probe ~20ms ([#2201](https://github.com/PurHur/php-compiler/issues/2201)); `--strict` pre-merge only. M4 gen-2→gen-3 recompile ✅. Target doc: [self-host-target.md](self-host-target.md)
 
 ## Language (#1354–#1366)
 

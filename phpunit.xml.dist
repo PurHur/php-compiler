@@ -116,6 +116,8 @@
             <file>./test/compliance/TriggerErrorUserErrorHandledJITTest.php</file>
             <file>./test/compliance/AssertOptionsDeprecatedVMTest.php</file>
             <file>./test/compliance/AssertOptionsDeprecatedJITTest.php</file>
+            <file>./test/compliance/EStrictConstantDeprecatedVMTest.php</file>
+            <file>./test/compliance/EStrictConstantDeprecatedJITTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnVMTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnJITTest.php</file>
             <file>./test/compliance/XmlGetCurrentReflectionVMTest.php</file>
