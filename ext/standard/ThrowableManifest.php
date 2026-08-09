@@ -156,6 +156,7 @@ final class ThrowableManifest
         'RedisClusterException' => 'RuntimeException',
         'RarException' => 'Exception',
         'SimdJsonException' => 'RuntimeException',
+        'SimdJsonValueError' => 'ValueError',
         'SoapFault' => 'Exception',
         'mysqli_sql_exception' => 'RuntimeException',
     ];
@@ -202,6 +203,7 @@ final class ThrowableManifest
         'RedisClusterException' => 'RedisClusterException',
         'RarException' => 'RarException',
         'SimdJsonException' => \PHPCompiler\ext\simdjson\SimdJsonException::class,
+        'SimdJsonValueError' => \PHPCompiler\ext\simdjson\SimdJsonValueError::class,
         'SoapFault' => 'SoapFault',
         'mysqli_sql_exception' => 'mysqli_sql_exception',
     ];
@@ -240,6 +242,7 @@ final class ThrowableManifest
             'RedisClusterException' => \PHPCompiler\ext\redis\RedisExtensionPolicy::advertisesExtension(),
             'RarException' => \PHPCompiler\ext\rar\RarExtensionPolicy::advertisesExtension(),
             'SimdJsonException' => \PHPCompiler\ext\simdjson\SimdjsonExtensionPolicy::advertisesExtension(),
+            'SimdJsonValueError' => \PHPCompiler\ext\simdjson\SimdjsonExtensionPolicy::advertisesExtension(),
             'SoapFault' => \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExceptionClass(),
             'mysqli_sql_exception' => \PHPCompiler\ext\mysqli\MysqliExtensionPolicy::advertisesExtension(),
             default => true,
