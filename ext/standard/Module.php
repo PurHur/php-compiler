@@ -678,7 +678,6 @@ class Module extends ModuleAbstract
             new phpc_libcrypt_verify(),
             new phpc_argon2_hash(),
             new phpc_argon2_verify(),
-            new phpc_gethostname_kernel(),
             new phpc_readfile_kernel(),
             new phpc_file_get_contents_kernel(),
             new phpc_file_put_contents_kernel(),

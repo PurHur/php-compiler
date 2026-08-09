@@ -10,10 +10,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for phpc_gethostname_kernel() — /proc+/etc open/read (#28544).
+ * LLVM NestedJIT leaf for gethostname() — /proc+/etc open/read (#28544, #29364).
  *
- * Nested leaf inside GethostnameJitHelper only (user-script AOT always goes through
- * {@see GethostnameJitHelper} via {@see \PHPCompiler\JIT\Builtin\StringGethostname}).
+ * Used while NestedJIT compiles {@see GethostnameJitHelper} `@gethostname` (and any
+ * NestedJIT call site) via {@see \PHPCompiler\JIT\Builtin\StringGethostname} —
+ * kernel Internal removed (getenv #29313 shape).
  * Mirrors {@see VmHostPure} (no libc gethostname(2) — peer {@see JitRandomBytesKernel}).
  * Returns `__string__*` — empty string when unavailable (box to false at call site).
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(gethostname)

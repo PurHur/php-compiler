@@ -11,12 +11,13 @@ use PHPCompiler\ext\standard\JitGethostnameKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for gethostname() via GethostnameJitHelper PHP (#21166).
+ * JIT/AOT link for gethostname() via GethostnameJitHelper PHP (#21166, #29364).
  *
  * Embed + thin standalone AOT: {@see GethostnameJitHelper} via {@see JitVmHelperLink}
  * (chdir #21147 / getenv #20644 shape — no thin libc ABI fork).
- * Nested helper compile: /proc+/etc leaf ({@see JitGethostnameKernel}) without re-entering
- * GethostnameJitHelper — no libc gethostname(2) (#28544).
+ * Nested helper compile: `@gethostname` → /proc+/etc leaf ({@see JitGethostnameKernel})
+ * without re-entering GethostnameJitHelper — no libc gethostname(2) (#28544); kernel
+ * Internal deleted (#29364, peer getenv #29313 / putenv #29334).
  * SSOT for VM: {@see \PHPCompiler\ext\standard\VmHost::gethostname()} / {@see VmHostPure}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(gethostname)
  */

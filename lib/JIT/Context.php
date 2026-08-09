@@ -944,7 +944,9 @@ class Context {
             'phpc_libcrypt_verify',
             'phpc_argon2_hash',
             'phpc_argon2_verify',
-            'phpc_gethostname_kernel',
+            // gethostname NestedJIT leaf (#29364) — whitelist gethostname → gethostname::call →
+            // StringGethostname / JitGethostnameKernel /proc leaf (kernel Internal removed).
+            'gethostname',
             // putenv(3) NestedJIT leaf (#29334) — whitelist putenv → putenv_::call →
             // JitEnv::putenvNestedLeaf / StringGetenv::invokePutenvNestedLeaf (kernel removed).
             'putenv',
