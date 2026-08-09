@@ -8,21 +8,40 @@ use PHPCompiler\VM\Variable;
 
 /**
  * Per-class function-static keys for trait-composed methods (#6660, zend_traits_copy_statics).
+ *
+ * Always rebinds the composed Func name to {@code $className::$methodName} (zend_traits.c
+ * copies scope to the using class). Without that, #[\Deprecated] use-site notices keep the
+ * trait name ({@code Tr::m}) instead of Zend's using-class form ({@code C::m}) (#29392).
  */
 final class TraitMethodFunctionStatic
 {
-    public static function bindMethod(Func $method, string $className, string $traitName, string $methodLc): Func
+    public static function bindMethod(Func $method, string $className, string $traitName, string $methodName): Func
     {
         if (!$method instanceof Func\PHP) {
             return $method;
         }
         $fromPrefix = $traitName.'::';
+        $newName = $className.'::'.$methodName;
         if (!self::blockUsesTraitFunctionStaticKeys($method->block, $fromPrefix)) {
-            return $method;
+            if ($method->getName() === $newName) {
+                return $method;
+            }
+
+            return self::cloneFuncWithName($method, $newName, $method->block);
         }
         $newBlock = self::cloneBlockRebindingKeys($method->block, $fromPrefix, $className.'::');
-        $bound = new Func\PHP($className.'::'.$methodLc, $newBlock);
+
+        return self::cloneFuncWithName($method, $newName, $newBlock);
+    }
+
+    private static function cloneFuncWithName(Func\PHP $method, string $newName, Block $block): Func\PHP
+    {
+        $bound = new Func\PHP($newName, $block);
         $bound->deprecated = $method->deprecated;
+        $bound->sourceLocation = $method->sourceLocation;
+        $bound->parameterMetadata = $method->parameterMetadata;
+        $bound->attributeNames = $method->attributeNames;
+        $bound->attributeEntries = $method->attributeEntries;
 
         return $bound;
     }
