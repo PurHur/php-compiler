@@ -27,6 +27,9 @@ final class DynamicPropertyDeprecationGuard
         if ($objectType->allowsDynamicProperties($classId)) {
             return;
         }
+        if (!\PHPCompiler\CompilerVersion::supportsDynamicPropertyCreationDeprecation()) {
+            return;
+        }
         if (MagicMethodDispatch::hasInstanceMethod($objectType, $classId, '__set')) {
             return;
         }

@@ -75,6 +75,92 @@ final class DynamicPropertyDeprecationCliTest extends TestCase
     }
 
     /**
+     * Explicit PROFILE=8.2 guest default is Zend E_ALL — dynamic prop E_DEPRECATED without -d (#29195).
+     */
+    public function testProfile82DefaultStartupEmitsDynamicPropertyDeprecation(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        if (false === $vm) {
+            $this->markTestSkipped('bin/vm.php missing');
+        }
+
+        $script = tempnam(sys_get_temp_dir(), 'dynprop82');
+        $this->assertNotFalse($script);
+        file_put_contents($script, "<?php\nclass C {}\n\$c = new C;\n\$c->x = 1;\necho \$c->x, \"\\n\";\n");
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $cmd = [
+                PHP_BINARY,
+                '-d',
+                'error_reporting=0',
+                '-d',
+                'display_errors=0',
+                $vm,
+                $script,
+            ];
+            $result = $this->runCommand($cmd, $repoRoot);
+            $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+            $this->assertStringContainsString(
+                'Creation of dynamic property C::$x is deprecated',
+                $result['stderr']
+            );
+            $this->assertStringContainsString("1\n", $result['stdout']);
+        } finally {
+            @unlink($script);
+            if (false === $prev || '' === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /**
+     * PROFILE=8.1 must not emit dynamic-property E_DEPRECATED (Zend 8.1; #29195).
+     */
+    public function testProfile81SilentOnDynamicPropertyEvenWithEall(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        if (false === $vm) {
+            $this->markTestSkipped('bin/vm.php missing');
+        }
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.1');
+        try {
+            $cmd = [
+                PHP_BINARY,
+                '-d',
+                'error_reporting=0',
+                '-d',
+                'display_errors=0',
+                $vm,
+                '-d',
+                'error_reporting=E_ALL',
+                '-r',
+                'class C{}; $c=new C; $c->x=1; echo $c->x, "\n";',
+            ];
+            $result = $this->runCommand($cmd, $repoRoot);
+            $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+            $this->assertStringNotContainsString(
+                'Creation of dynamic property C::$x is deprecated',
+                $result['stderr']
+            );
+            $this->assertStringContainsString("1\n", $result['stdout']);
+        } finally {
+            if (false === $prev || '' === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /**
      * Compliance host {@code -d error_reporting=0} must not clear guest DEFAULT startup mask (#2055).
      */
     public function testHostErrorReportingZeroKeepsGuestDefaultWithoutDeprecationNoise(): void

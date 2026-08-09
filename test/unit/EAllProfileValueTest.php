@@ -45,9 +45,26 @@ final class EAllProfileValueTest extends TestCase
             self::assertSame(32767, ErrorReporter::eAll());
             self::assertSame(32767, Context::errorReportingConstant('E_ALL'));
             self::assertSame(32767, Context::errorReportingConstantExact('E_ALL'));
-            self::assertSame(22527, ErrorReporter::defaultStartupReporting());
+            // Explicit PROFILE matches Zend php.ini E_ALL (includes E_DEPRECATED) (#29195).
+            self::assertSame(32767, ErrorReporter::defaultStartupReporting());
             self::assertSame(ErrorReporter::E_STRICT, ErrorReporter::eAll() & ErrorReporter::E_STRICT);
         });
+    }
+
+    public function testUnsetProfileKeepsComplianceStartupMask(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            self::assertSame(ErrorReporter::DEFAULT_STARTUP_REPORTING, ErrorReporter::defaultStartupReporting());
+            self::assertSame(0, ErrorReporter::defaultStartupReporting() & ErrorReporter::E_DEPRECATED);
+        } finally {
+            if (false === $prev || '' === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testEAllConstantUnderProfile85Matches84(): void

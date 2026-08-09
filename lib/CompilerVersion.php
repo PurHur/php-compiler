@@ -1679,6 +1679,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.2+ E_DEPRECATED when creating an undeclared instance property without
+     * {@code #[\AllowDynamicProperties]} (zend_object_handlers.c; #29195 / re-#21953).
+     *
+     * PROFILE&lt;8.2 stays silent like Zend 8.1. Unset 8.4.0-dev language profile is ≥8.2 so
+     * emission is allowed; display still follows {@see \PHPCompiler\VM\ErrorReporter::defaultStartupReporting()}.
+     */
+    public static function supportsDynamicPropertyCreationDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.2.0', '>=');
+    }
+
+    /**
      * PHP 8.2+ deprecates `"${var}"` dollar-brace string interpolation (prefer `"{$var}"`).
      *
      * php-src: Zend/zend_compile.c / T_DOLLAR_OPEN_CURLY_BRACES (#22001).
