@@ -18,6 +18,14 @@ final class PropertyHooks
     /** php-src: Zend/zend_compile.c — hooks apply to object properties only (#24281, re-#9725). */
     public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
 
+    /**
+     * php-src: Zend/zend_compile.c zend_add_member_modifier — GH-17916 / #29424.
+     *
+     * {@code final} + {@code abstract} on a hooked property is a contradiction (subclasses
+     * must implement, but final forbids override).
+     */
+    public const FINAL_ABSTRACT_PROPERTY_COMPILE_ERROR = 'Cannot use the final modifier on an abstract property';
+
     /** php-src: Zend/zend_compile.c — `private(set)` decl + hook block requires set hook (#12203). */
     public const ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
 
@@ -1296,6 +1304,14 @@ final class PropertyHooks
             // PHP 8.4 explicit `virtual` modifier — strip before nikic/php-parser (#18170, zend_language_parser.y).
             $isExplicitVirtual = (bool) preg_match('/\bvirtual\b/', $ownDeclHead);
             $isInterfaceHook = 'interface' === $declKind;
+            // php-src zend_add_member_modifier — final+abstract on property (#29424, GH-17916).
+            if ($isAbstractHook && $isFinalProperty) {
+                throw new CompileFatal(
+                    $filename,
+                    self::lineAtOffset($fullCode, $bodyOffsetInFile + $declStart),
+                    self::FINAL_ABSTRACT_PROPERTY_COMPILE_ERROR
+                );
+            }
             if ($isAbstractHook) {
                 $ownDeclPrefix = preg_replace('/\babstract\s+/', '', $ownDeclPrefix) ?? $ownDeclPrefix;
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
