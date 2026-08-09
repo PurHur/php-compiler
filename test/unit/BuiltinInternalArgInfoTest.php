@@ -709,6 +709,22 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('SysvMessageQueue', $queue['type']);
     }
 
+    /** php-src ext/sysvsem/sysvsem.stub.php — SysvSemaphore stubs; InternalArgInfo untyped (#28453). */
+    public function testSemReflectionStubTypes(): void
+    {
+        $this->assertSame('SysvSemaphore', BuiltinInternalArgInfo::stubParamTypeOverride('sem_acquire', 0));
+        $this->assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('sem_acquire', 1));
+        $this->assertSame('SysvSemaphore', BuiltinInternalArgInfo::stubParamTypeOverride('sem_release', 0));
+        $this->assertSame('SysvSemaphore', BuiltinInternalArgInfo::stubParamTypeOverride('sem_remove', 0));
+        $sem = BuiltinInternalArgInfo::paramInfoForFunction('sem_acquire', 0);
+        $this->assertNotNull($sem);
+        $this->assertSame('SysvSemaphore', $sem['type']);
+        $nonBlocking = BuiltinInternalArgInfo::paramInfoForFunction('sem_acquire', 1);
+        $this->assertNotNull($nonBlocking);
+        $this->assertSame('bool', $nonBlocking['type']);
+        $this->assertTrue($nonBlocking['isOptional']);
+    }
+
     /** php-src ext/sockets/sockets.stub.php — Socket stubs; InternalArgInfo resource/untyped (#27854). */
     public function testSocketExportImportReflectionStubTypes(): void
     {
