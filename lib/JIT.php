@@ -8520,20 +8520,18 @@ class JIT {
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
                     $fetchIs = !$forWrite && $op->arrayDimFetchIs;
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    // Zend: E_NOTICE + continue on non-object __get temp (#29231, re-#4673).
                     if (
                         $forWrite
                         && null !== $value->magicGetOverloadedClass
                         && null !== $value->magicGetOverloadedName
                         && Variable::TYPE_OBJECT !== $value->type
                     ) {
-                        JIT\MagicMethodDispatch::emitMagicGetIndirectModifyError(
+                        JIT\MagicMethodDispatch::emitMagicGetIndirectModifyNotice(
                             $this->context,
                             $value->magicGetOverloadedClass,
                             $value->magicGetOverloadedName
                         );
-                        $this->context->builder->call($this->context->lookupFunction('abort'));
-                        $this->context->builder->clearInsertionPosition();
-                        break;
                     }
                     $resultOp = $block->getOperand($op->arg1);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($resultOp);
