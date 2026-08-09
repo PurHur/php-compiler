@@ -16249,7 +16249,8 @@ restart:
     }
 
     /**
-     * Hook-block `private(set);` is not get-only read-only — defer to asymmetric write guard (#9872).
+     * Hook-block asymmetric markers use {@code set (private);} (php-compiler) or decl-site
+     * {@code private(set)}; bare {@code private(set);} on a hook is a compile fatal (#29388).
      */
     private function propertyHasDistinctAsymmetricSetVisibility(
         ?string $staticClassLc,

@@ -20,6 +20,16 @@ final class PropertyHooks
     /** php-src: Zend/zend_compile.c — `private(set)` decl + hook block requires set hook (#12203). */
     public const ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
 
+    /**
+     * php-src: Zend/zend_compile.c zend_modifier_token_to_flag(ZEND_MODIFIER_TARGET_PROPERTY_HOOK) (#29388).
+     *
+     * Visibility and asymmetric-set tokens are illegal on property hooks; only {@code final} is allowed.
+     */
+    public const HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR = 'Cannot use the %s modifier on a property hook';
+
+    /** @see HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR */
+    public const HOOK_ASYMMETRIC_SET_MODIFIER_COMPILE_ERROR = 'Cannot use the %s(set) modifier on a property hook';
+
     /** Zend 8.2 reference profile — default initializer + hook block (#12574). */
     public const REFERENCE_PROFILE_UNEXPECTED_ARROW = 'syntax error, unexpected token "=>"';
 
@@ -1302,7 +1312,10 @@ final class PropertyHooks
                 $lcClass,
                 $isStatic,
                 $skipSemicolonRequiredHooks,
-                $propertyType
+                $propertyType,
+                $filename,
+                $fullCode,
+                $bodyOffsetInFile + $hookOpen
             );
             $this->rejectAsymmetricDeclSetWithoutSetHook(
                 $ownDeclHead,
@@ -1427,7 +1440,10 @@ final class PropertyHooks
      * @return array{0: list<string>, 1: bool, 2: string, 3: ?string} method source chunks, backing use, trailing decls, asymmetric set visibility
      */
     /**
-     * Concrete `{ get; private set; }` uses implicit backing field — not abstract obligations (#7148).
+     * Concrete `{ get; set (private); }` uses implicit backing field — not abstract obligations.
+     *
+     * Zend rejects visibility / {@code *(set)} on hooks (#29388); only the alternate
+     * {@code set (vis)} marker (php-compiler) remains as an in-block asymmetric shorthand.
      */
     private function isImplicitAsymmetricBackingHookSource(string $hookSource): bool
     {
@@ -1441,9 +1457,35 @@ final class PropertyHooks
         }
 
         return (bool) preg_match(
-            '/^(?:(public|protected|private)\s+set\s*;|set\s*\(\s*(public|protected|private)\s*\)\s*;|(?:public|protected|private)\s*\(\s*set\s*\)\s*;)\s*$/s',
+            '/^set\s*\(\s*(public|protected|private)\s*\)\s*;\s*$/s',
             $rest
         );
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c zend_modifier_token_to_flag — only {@code final} is legal on hooks (#29388).
+     */
+    private function rejectIllegalHookMemberModifiers(
+        string $rest,
+        string $filename,
+        string $fullCode,
+        int $hookOpenOffsetInFile
+    ): void {
+        // No trailing \b after ")" — ";" is non-word, so \b would miss `private(set);` (#29388).
+        if (preg_match('/^(public|protected|private)\s*\(\s*set\s*\)/i', $rest, $m)) {
+            throw new CompileFatal(
+                $filename,
+                self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+                sprintf(self::HOOK_ASYMMETRIC_SET_MODIFIER_COMPILE_ERROR, strtolower($m[1]))
+            );
+        }
+        if (preg_match('/^(public|protected|private)\s+(get|set|unset)\b/i', $rest, $m)) {
+            throw new CompileFatal(
+                $filename,
+                self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+                sprintf(self::HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR, strtolower($m[1]))
+            );
+        }
     }
 
     private function lowerHooks(
@@ -1452,12 +1494,17 @@ final class PropertyHooks
         string $lcClass,
         bool $isStatic = false,
         bool $skipSemicolonRequiredHooks = false,
-        ?string $propertyType = null
+        ?string $propertyType = null,
+        string $filename = 'unknown',
+        string $fullCode = '',
+        int $hookOpenOffsetInFile = 0
     ): array {
         $methods = [];
         $usesBacking = false;
         $asymmetricSetVisibility = null;
         $rest = trim($hookSource);
+        $lineCode = '' !== $fullCode ? $fullCode : $hookSource;
+        $lineOffset = '' !== $fullCode ? $hookOpenOffsetInFile : 0;
         while ('' !== $rest) {
             $rest = ltrim($rest);
             // php-src: attributes precede property_hook (zend_language_parser.y, #26328).
@@ -1465,6 +1512,7 @@ final class PropertyHooks
             $hookFinal = $this->consumeHookFinalPrefix($rest);
             // php-src: `&get` / `&set` — by-ref property hooks (zend_language_parser.y, #21098).
             $byRef = $this->consumeHookByRefPrefix($rest);
+            $this->rejectIllegalHookMemberModifiers($rest, $filename, $lineCode, $lineOffset);
             if (preg_match('/^get\s*;/s', $rest)) {
                 if (!$skipSemicolonRequiredHooks) {
                     $this->registerRequiredHook($lcClass, $prop, 'requiresGet', $hookFinal);
@@ -1473,18 +1521,6 @@ final class PropertyHooks
                     $this->registerGetByRefFlag($lcClass, $prop);
                 }
                 $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
-                continue;
-            }
-            // php-src: asymmetric set visibility only — not an abstract set hook obligation (#9872, #17337).
-            if (preg_match('/^(public|protected|private)\s+set\s*;/s', $rest, $asymM)) {
-                $asymmetricSetVisibility = strtolower($asymM[1]);
-                $rest = preg_replace('/^(public|protected|private)\s+set\s*;/i', '', $rest, 1) ?? $rest;
-                continue;
-            }
-            // php-src: Zend/zend_compile.c — `private(set);` in hook block (#9872, PHP 8.4 asymmetric visibility).
-            if (preg_match('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/s', $rest, $asymM)) {
-                $asymmetricSetVisibility = strtolower($asymM[1]);
-                $rest = preg_replace('/^(public|protected|private)\s*\(\s*set\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^set\s*;/s', $rest)) {
@@ -1575,16 +1611,6 @@ final class PropertyHooks
                 );
                 continue;
             }
-            if (preg_match('/^(public|protected|private)\s+set\s*=>\s*/s', $rest, $asymM)) {
-                $asymmetricSetVisibility = strtolower($asymM[1]);
-                $rest = preg_replace('/^(public|protected|private)\s+set\s*=>\s*/i', '', $rest, 1) ?? $rest;
-                [$expr, $rest] = $this->takeUntilSemicolon($rest);
-                $methods = array_merge(
-                    $methods,
-                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal, '$value', $byRef, $hookAttrs)
-                );
-                continue;
-            }
             if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*=>\s*/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
                 $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*=>\s*/i', '', $rest, 1) ?? $rest;
@@ -1613,41 +1639,6 @@ final class PropertyHooks
             if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*\{/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
                 $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*/i', '', $rest, 1) ?? $rest;
-                [$body, $rest] = $this->takeBraceBody($rest);
-                $methods = array_merge(
-                    $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking, $propertyType, $hookFinal, $byRef, $hookAttrs)
-                );
-                continue;
-            }
-            if (preg_match('/^(public|protected|private)\s+set\s*\(/s', $rest, $asymM)) {
-                $asymmetricSetVisibility = strtolower($asymM[1]);
-                $rest = preg_replace('/^(public|protected|private)\s+set\s*/i', '', $rest, 1) ?? $rest;
-                if (preg_match('/^\(([^)]*)\)\s*=>\s*/s', $rest, $pm)) {
-                    $params = trim($pm[1]);
-                    $rest = substr($rest, strlen($pm[0])) ?? $rest;
-                    [$expr, $rest] = $this->takeUntilSemicolon($rest);
-                    $methods = array_merge(
-                        $methods,
-                        $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking, $propertyType, $hookFinal, $params, $byRef, $hookAttrs)
-                    );
-                    continue;
-                }
-                if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
-                    break;
-                }
-                $params = trim($pm[1]);
-                $rest = substr($rest, strlen($pm[0]) - 1);
-                [$body, $rest] = $this->takeBraceBody($rest);
-                $methods = array_merge(
-                    $methods,
-                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking, $propertyType, $hookFinal, $byRef, $hookAttrs)
-                );
-                continue;
-            }
-            if (preg_match('/^(public|protected|private)\s+set\s*\{/s', $rest, $asymM)) {
-                $asymmetricSetVisibility = strtolower($asymM[1]);
-                $rest = preg_replace('/^(public|protected|private)\s+set\s*/i', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
@@ -2502,8 +2493,10 @@ final class PropertyHooks
 
     /**
      * php-src: Zend/zend_compile.c — asymmetric `(set)` on the property decl requires a set hook
-     * (`get; private set;`, `set =>`, …) unless the block is get-only with an implemented get hook
+     * (`set =>`, `set { }`, abstract `set;`, …) unless the block is get-only with an implemented get hook
      * (`get =>`, `get { }`) — PHP 8.4 (#13983, zend_property_hooks.c).
+     *
+     * In-block {@code private set;} / {@code private(set);} are illegal on hooks (#29388).
      */
     private function rejectAsymmetricDeclSetWithoutSetHook(
         string $declHead,

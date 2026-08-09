@@ -1,5 +1,7 @@
 --TEST--
-Language: property hook block public (private(set)) asymmetric visibility (#9872, Zend/zend_compile.c)
+Language: property hook block private(set); is compile-fatal (#29388, Zend/zend_compile.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {
@@ -8,14 +10,7 @@ class C {
         private(set);
     }
 }
-$c = new C();
-echo $c->x, "\n";
-try {
-    $c->x = 'bad';
-    echo "no-error\n";
-} catch (Error $e) {
-    echo $e->getMessage(), "\n";
-}
---EXPECT--
-g
-Cannot modify private(set) property C::$x from global scope
+--EXPECT_EXIT--
+255
+--EXPECTF--
+PHP Fatal error:  Cannot use the private(set) modifier on a property hook in %s on line %d
