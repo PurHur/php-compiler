@@ -9,7 +9,7 @@ namespace PHPCompiler\ext\standard;
  *
  * Overlay mutations in PHP; inherited environ via {@see GetenvLookupJitHelper}
  * (`@getenv` NestedJIT leaf — #29313). Process-environ setenv mirror
- * via {@see phpc_putenv_kernel} (no caller-side LibcExtern in JitEnv).
+ * via `@putenv` NestedJIT leaf (#29334). No caller-side LibcExtern in JitEnv.
  * php-src: ext/standard/basic_functions.c — zif_getenv, zif_putenv
  */
 final class GetenvJitHelper

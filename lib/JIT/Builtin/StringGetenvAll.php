@@ -15,7 +15,7 @@ use PHPLLVM\Builder;
  *
  * Embed + thin standalone AOT: process environ via {@see EnvironMirrorRuntime}
  * (`__superglobals__mirror_process_environ` — shared with $_SERVER refresh #18984).
- * putenv() mirrors into the process environ via {@see phpc_putenv_kernel}/setenv, so the
+ * putenv() mirrors into the process environ via `@putenv`/setenv NestedJIT leaf (#29334), so the
  * environ walk already includes overlay entries. A NestedJIT overlay-merge helper
  * segfaults under thin AOT when getenv() is the only env builtin (#24855 / re-#20758).
  * No inline environ-kernel walk in this bridge (Rename #19215 shape).
