@@ -111,6 +111,9 @@ final class is_resource_ extends Internal
         if (\PHPCompiler\VM\ResourceSupport::isWddxPacketResource($v)) {
             return true;
         }
+        if (\PHPCompiler\VM\ResourceSupport::isXmlrpcServerResource($v)) {
+            return true;
+        }
 
         return false;
     }

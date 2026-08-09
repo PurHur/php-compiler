@@ -181,6 +181,25 @@ final class ResourceSupport
             && $state->handle <= 0;
     }
 
+    /** php-src xmlrpc server resource (xmlrpc_server_create; #27879) — open when handle > 0. */
+    public static function isXmlrpcServerResource(Variable $var): bool
+    {
+        $state = self::stateFromVariable($var);
+
+        return null !== $state
+            && ResourceState::KIND_XMLRPC_SERVER === $state->kind
+            && $state->handle > 0;
+    }
+
+    public static function isClosedXmlrpcServerResource(Variable $var): bool
+    {
+        $state = self::stateFromVariable($var);
+
+        return null !== $state
+            && ResourceState::KIND_XMLRPC_SERVER === $state->kind
+            && $state->handle <= 0;
+    }
+
     /** VM stream-context array handles (ext/standard/streams.c, #6367, #8743). */
     public static function isStreamContextResource(Variable $var): bool
     {
@@ -197,6 +216,8 @@ final class ResourceSupport
             || self::isProcessResource($var)
             || self::isWddxPacketResource($var)
             || self::isClosedWddxPacketResource($var)
+            || self::isXmlrpcServerResource($var)
+            || self::isClosedXmlrpcServerResource($var)
             || self::isStreamContextResource($var);
     }
 
@@ -240,6 +261,9 @@ final class ResourceSupport
             return null === $handle || !VmProcess::isValidHandle($handle);
         }
         if (self::isClosedWddxPacketResource($var)) {
+            return true;
+        }
+        if (self::isClosedXmlrpcServerResource($var)) {
             return true;
         }
 
@@ -313,6 +337,12 @@ final class ResourceSupport
         if (self::isWddxPacketResource($var)) {
             return 'resource (WDDX packet ID)';
         }
+        if (self::isClosedXmlrpcServerResource($var)) {
+            return 'resource (closed)';
+        }
+        if (self::isXmlrpcServerResource($var)) {
+            return 'resource (xmlrpc server)';
+        }
 
         return null;
     }
@@ -354,6 +384,9 @@ final class ResourceSupport
                 break;
             case ResourceState::KIND_WDDX_PACKET:
                 // No legacy int-tagged path — WDDX packets require Resource object wrap (#27858).
+                $var->int($handle);
+                break;
+            case ResourceState::KIND_XMLRPC_SERVER:
                 $var->int($handle);
                 break;
             default:

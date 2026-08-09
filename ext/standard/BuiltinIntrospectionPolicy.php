@@ -205,7 +205,22 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return CurlExtensionPolicy::advertisesIntrospectionFunctions();
         }
-        if (\in_array($lc, ['xmlrpc_encode', 'xmlrpc_decode'], true)) {
+        if (\in_array($lc, [
+            'xmlrpc_encode',
+            'xmlrpc_decode',
+            'xmlrpc_encode_request',
+            'xmlrpc_decode_request',
+            'xmlrpc_is_fault',
+            'xmlrpc_get_type',
+            'xmlrpc_set_type',
+            'xmlrpc_server_create',
+            'xmlrpc_server_destroy',
+            'xmlrpc_server_register_method',
+            'xmlrpc_server_call_method',
+            'xmlrpc_parse_method_descriptions',
+            'xmlrpc_server_add_introspection_data',
+            'xmlrpc_server_register_introspection_callback',
+        ], true)) {
             return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
         }
         if (\in_array($lc, [

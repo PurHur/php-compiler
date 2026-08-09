@@ -799,9 +799,12 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'extension_loaded_simdjson'))) {
                 continue;
             }
+            // xmlrpc_server_* / *_forward* set PROFILE via --ENV--; always include (#27879).
             if (!CompilerVersion::supportsXmlrpc()
                 && str_contains($name, 'xmlrpc')
-                && !str_contains($name, 'extension_loaded_xmlrpc')) {
+                && !str_contains($name, 'extension_loaded_xmlrpc')
+                && !str_contains($name, 'xmlrpc_server')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             // wddx_packet_builders / *_forward* set PROFILE via --ENV--; always include (#27858).

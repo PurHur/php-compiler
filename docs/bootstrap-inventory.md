@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7268 |
-| Phase A inventory files (M2 ratio SSOT) | 7268 |
+| PHP files on vm.php path | 7276 |
+| Phase A inventory files (M2 ratio SSOT) | 7276 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23519 |
+| Source constructs flagged (warnings) | 23539 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4834,8 +4834,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlreader/XmlReaderXML.php` | 0 | 4 |
 | `ext/xmlrpc/JitXmlrpc.php` | 0 | 1 |
 | `ext/xmlrpc/JitXmlrpcCompileTime.php` | 0 | 5 |
-| `ext/xmlrpc/Module.php` | 0 | 8 |
+| `ext/xmlrpc/Module.php` | 0 | 15 |
 | `ext/xmlrpc/VmXmlrpc.php` | 0 | 7 |
+| `ext/xmlrpc/VmXmlrpcServer.php` | 0 | 5 |
 | `ext/xmlrpc/XmlrpcDecodeJitHelper.php` | 0 | 1 |
 | `ext/xmlrpc/XmlrpcEncodeJitHelper.php` | 0 | 1 |
 | `ext/xmlrpc/XmlrpcEncodeScalarJitHelper.php` | 0 | 2 |
@@ -4848,6 +4849,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlrpc/xmlrpc_encode_request.php` | 0 | 2 |
 | `ext/xmlrpc/xmlrpc_get_type.php` | 0 | 1 |
 | `ext/xmlrpc/xmlrpc_is_fault.php` | 0 | 1 |
+| `ext/xmlrpc/xmlrpc_parse_method_descriptions.php` | 0 | 1 |
+| `ext/xmlrpc/xmlrpc_server_add_introspection_data.php` | 0 | 1 |
+| `ext/xmlrpc/xmlrpc_server_call_method.php` | 0 | 2 |
+| `ext/xmlrpc/xmlrpc_server_create.php` | 0 | 1 |
+| `ext/xmlrpc/xmlrpc_server_destroy.php` | 0 | 1 |
+| `ext/xmlrpc/xmlrpc_server_register_introspection_callback.php` | 0 | 1 |
+| `ext/xmlrpc/xmlrpc_server_register_method.php` | 0 | 1 |
 | `ext/xmlrpc/xmlrpc_set_type.php` | 0 | 1 |
 | `ext/xmlwriter/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlwriter/JitXmlWriterMethod.php` | 0 | 1 |
@@ -43139,6 +43147,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new xmlrpc_is_fault (line 38)
 - new xmlrpc_get_type (line 39)
 - new xmlrpc_set_type (line 40)
+- new xmlrpc_server_create (line 41)
+- new xmlrpc_server_destroy (line 42)
+- new xmlrpc_server_register_method (line 43)
+- new xmlrpc_server_call_method (line 44)
+- new xmlrpc_parse_method_descriptions (line 45)
+- new xmlrpc_server_add_introspection_data (line 46)
+- new xmlrpc_server_register_introspection_callback (line 47)
 - 2 class method(s)
 
 ### `ext/xmlrpc/VmXmlrpc.php`
@@ -43151,6 +43166,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 280)
 - new Exception (line 303)
 - 27 class method(s)
+
+### `ext/xmlrpc/VmXmlrpcServer.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 73)
+- new Variable (line 85)
+- new Variable (line 134)
+- new Variable (line 151)
+- 10 class method(s)
 
 ### `ext/xmlrpc/XmlrpcDecodeJitHelper.php`
 
@@ -43213,6 +43237,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/xmlrpc/xmlrpc_is_fault.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlrpc/xmlrpc_parse_method_descriptions.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlrpc/xmlrpc_server_add_introspection_data.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlrpc/xmlrpc_server_call_method.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/xmlrpc/xmlrpc_server_create.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlrpc/xmlrpc_server_destroy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlrpc/xmlrpc_server_register_introspection_callback.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlrpc/xmlrpc_server_register_method.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -58515,9 +58575,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ResourceSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 328)
-- new ResourceState (line 330)
-- 25 class method(s)
+- new ObjectEntry (line 358)
+- new ResourceState (line 360)
+- 27 class method(s)
 
 ### `lib/VM/SapiOutput.php`
 

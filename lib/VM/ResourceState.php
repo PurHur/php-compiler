@@ -26,6 +26,9 @@ final class ResourceState
     /** pecl-text-wddx le_wddx — "WDDX packet ID" (#27858). */
     public const KIND_WDDX_PACKET = 'WDDX packet ID';
 
+    /** php-src ext/xmlrpc le_xmlrpc_server — "xmlrpc server" (#27879). */
+    public const KIND_XMLRPC_SERVER = 'xmlrpc server';
+
     public function __construct(
         public int $handle,
         public string $kind,
