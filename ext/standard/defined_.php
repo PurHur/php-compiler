@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\DefineRuntime;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\GlobalIntrospectionNameRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -34,7 +35,8 @@ final class defined_ extends Internal
         $defined = VmConstants::constantDefined(
             $frame->vmContext,
             $name,
-            VmReflection::callerClassLcFromFrame($frame)
+            VmReflection::callerClassLcFromFrame($frame),
+            VmReflection::calledClassLcFromFrame($frame)
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($defined);
@@ -62,9 +64,26 @@ final class defined_ extends Internal
         if (null !== $literal) {
             $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
             $callerLc = self::jitCallerClassLc($context);
-            if (null !== $context->runtime->vmContext
-                && VmConstants::constantDefined($context->runtime->vmContext, $literal, $callerLc)) {
-                return $i1->constInt(1, false);
+            $calledLc = self::jitCalledClassLc($context);
+            if (null !== $context->runtime->vmContext) {
+                try {
+                    if (VmConstants::constantDefined(
+                        $context->runtime->vmContext,
+                        $literal,
+                        $callerLc,
+                        $calledLc
+                    )) {
+                        return $i1->constInt(1, false);
+                    }
+                } catch (\Error $e) {
+                    // defined('self::…') outside class — Zend Error (#29455).
+                    ErrorRaise::registerDeclarations($context);
+                    ErrorRaise::ensureLinked($context);
+                    ErrorRaise::emitRaise($context, $e->getMessage());
+                    $context->builder->call($context->lookupFunction('abort'));
+
+                    return $i1->constInt(0, false);
+                }
             }
             $nameStr = $context->builder->load($context->constantStringFromString($literal));
 
@@ -95,5 +114,15 @@ final class defined_ extends Internal
         }
 
         return strtolower(ltrim($context->scope->className, '\\'));
+    }
+
+    /** Late-static called class for defined('static::CONST') fold (#29455). */
+    private static function jitCalledClassLc(Context $context): ?string
+    {
+        if ('' !== ($context->scope->calledClassName ?? '')) {
+            return strtolower(ltrim($context->scope->calledClassName, '\\'));
+        }
+
+        return self::jitCallerClassLc($context);
     }
 }

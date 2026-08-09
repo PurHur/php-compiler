@@ -8,10 +8,13 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DefineRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\GlobalIntrospectionNameRuntime;
+use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
+use PHPCfg\Operand\Literal;
+use PHPCfg\Type;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -39,12 +42,27 @@ final class JitConstant
         $callerLc = '' !== ($context->scope->className ?? '')
             ? strtolower(ltrim($context->scope->className, '\\'))
             : null;
+        $calledLc = '' !== ($context->scope->calledClassName ?? '')
+            ? strtolower(ltrim($context->scope->calledClassName, '\\'))
+            : $callerLc;
+
+        // constant('static::X') — mirror CLASS_CONST_FETCH for literal static:: (#29455 / #19614).
+        $staticPtr = self::tryInvokeLiteralStaticClassConst($context, $name);
+        if (null !== $staticPtr) {
+            return $staticPtr;
+        }
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         try {
-            $phpVar = VmConstants::constantLookup($context->runtime->vmContext, $name, $callerLc);
+            $phpVar = VmConstants::constantLookup(
+                $context->runtime->vmContext,
+                $name,
+                $callerLc,
+                $calledLc
+            );
         } catch (\Error $e) {
-            // Visibility Error must be runtime so try/catch around constant() works (#29130).
+            // Visibility / relative-scope Error must be runtime so try/catch around constant() works (#29130).
             ErrorRaise::registerDeclarations($context);
             ErrorRaise::ensureLinked($context);
             ErrorRaise::emitRaise($context, $e->getMessage());
@@ -57,7 +75,44 @@ final class JitConstant
 
             return $ptr;
         }
+        if (str_contains($name, '::')) {
+            throw new \LogicException('Undefined constant '.$name);
+        }
         throw new \LogicException('Undefined constant "'.$name.'"');
+    }
+
+    /**
+     * Lower constant('static::CONST') like opcode static::CONST (LSB) (#29455).
+     */
+    private static function tryInvokeLiteralStaticClassConst(Context $context, string $name): ?Value
+    {
+        $pos = strrpos($name, '::');
+        if (false === $pos) {
+            return null;
+        }
+        $classPart = substr($name, 0, $pos);
+        $constPart = substr($name, $pos + 2);
+        if ('' === $constPart || 'static' !== strtolower(ltrim($classPart, '\\'))) {
+            return null;
+        }
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        $objectType = $context->type->object ?? null;
+        if (null === $block || null === $objectType) {
+            return null;
+        }
+        $classOp = new Literal('static');
+        $classOp->type = Type::string();
+        $classVar = JITVariable::fromLiteral($context, $classOp);
+        $fetched = ClassConstFetchHelper::fetchLiteralConstWithRuntimeClass(
+            $objectType,
+            $block,
+            $classVar,
+            $classOp,
+            $constPart,
+            null
+        );
+
+        return JitValueBox::pointer($context, $fetched->value);
     }
 
     private static function invokeRuntime(Context $context, Value $nameStr): Value
