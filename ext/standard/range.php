@@ -103,9 +103,11 @@ final class range extends Internal
     private static function callFloatRange(Context $context, array $args): Value
     {
         foreach ($args as $i => $arg) {
-            // Soft-null $step is handled below (#29352); start/end stay numeric-only.
+            // Soft-null $step is handled below (#29352); bool $step coerces (#29505).
             if (2 === $i
-                && (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false))) {
+                && (JITVariable::TYPE_NULL === $arg->type
+                    || ($arg->isNullConstant ?? false)
+                    || JITVariable::TYPE_NATIVE_BOOL === $arg->type)) {
                 continue;
             }
             if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
@@ -119,6 +121,9 @@ final class range extends Internal
         if (3 === \count($args)) {
             if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
                 $step = self::lowerFloatStepNull($context);
+            } elseif (JITVariable::TYPE_NATIVE_BOOL === $args[2]->type) {
+                // Z_PARAM_NUMBER bool → 0.0/1.0 (#29505).
+                $step = $context->builder->uiToFp($context->helper->loadValue($args[2]), $double);
             } else {
                 $step = self::toJitDouble($context, $args[2], $double);
             }
@@ -200,7 +205,10 @@ final class range extends Internal
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type) {
+        // Z_PARAM_NUMBER: bool → 0/1 via JitLongArg zext (#29505); long/double as before.
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
+            && JITVariable::TYPE_NATIVE_BOOL !== $arg->type
+            && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type) {
             throw new \LogicException('range() step must be an integer in this compiler build');
         }
 

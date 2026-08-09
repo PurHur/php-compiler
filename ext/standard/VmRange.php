@@ -282,6 +282,15 @@ final class VmRange
         if (Variable::TYPE_NULL === $stepVar->type) {
             self::rejectOrCoerceNullStep($frame);
         }
+        // php-src Z_PARAM_NUMBER: bool coerces to 0/1 before zero-step check (#29505).
+        if (Variable::TYPE_BOOLEAN === $stepVar->type) {
+            $step = $stepVar->toBool() ? 1 : 0;
+            if (0 === $step) {
+                throw new \ValueError(RangeIntJitHelper::stepZeroErrorMessage());
+            }
+
+            return self::normalizeIntStepSign($start, $end, $step);
+        }
         if (Variable::TYPE_INTEGER !== $stepVar->type) {
             if (Variable::TYPE_FLOAT === $stepVar->type) {
                 $step = VmMath::floatToZendLong($stepVar->toFloat());
@@ -350,7 +359,10 @@ final class VmRange
         if (Variable::TYPE_NULL === $stepVar->type) {
             self::rejectOrCoerceNullStep($frame);
         }
-        if (Variable::TYPE_INTEGER === $stepVar->type) {
+        // php-src Z_PARAM_NUMBER: bool coerces to 0.0/1.0 (#29505).
+        if (Variable::TYPE_BOOLEAN === $stepVar->type) {
+            $step = $stepVar->toBool() ? 1.0 : 0.0;
+        } elseif (Variable::TYPE_INTEGER === $stepVar->type) {
             $step = (float) $stepVar->toInt();
         } elseif (Variable::TYPE_FLOAT === $stepVar->type) {
             $step = $stepVar->toFloat();
@@ -409,7 +421,10 @@ final class VmRange
         if (Variable::TYPE_NULL === $stepVar->type) {
             self::rejectOrCoerceNullStep($frame);
         }
-        if (Variable::TYPE_INTEGER !== $stepVar->type) {
+        // php-src Z_PARAM_NUMBER: bool coerces to 0/1 (#29505).
+        if (Variable::TYPE_BOOLEAN === $stepVar->type) {
+            $step = $stepVar->toBool() ? 1 : 0;
+        } elseif (Variable::TYPE_INTEGER !== $stepVar->type) {
             if (Variable::TYPE_FLOAT === $stepVar->type) {
                 $step = VmMath::floatToZendLong($stepVar->toFloat());
             } elseif (Variable::TYPE_STRING === $stepVar->type) {
