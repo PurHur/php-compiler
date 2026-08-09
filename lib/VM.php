@@ -5422,7 +5422,7 @@ restart:
                         break;
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
                         $frame->callSiteLine = $savedCallSiteLine;
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $frame->callSiteLine = $savedCallSiteLine;
@@ -5503,7 +5503,7 @@ restart:
                     try {
                         $arg1->bool($arg2->equals($arg3, $this));
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
@@ -5518,7 +5518,7 @@ restart:
                     try {
                         $arg1->bool(!$arg2->equals($arg3, $this));
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
@@ -5548,6 +5548,10 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        // __toString throw during relational compare (#29534).
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
+                        goto restart;
                     }
                     break;
                 case OpCode::TYPE_SPACESHIP:
@@ -5563,6 +5567,10 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        // __toString throw during <=> (#29534).
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
+                        goto restart;
                     }
                     break;
                 case OpCode::TYPE_POST_INC:
@@ -5782,7 +5790,7 @@ restart:
                         break;
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
                         // __toString throw during concat — resume catch on outer stack (#29521).
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
@@ -5821,7 +5829,7 @@ restart:
                         break;
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
                         // __toString throw during echo — do not continue try body (#29521).
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         break;
@@ -5858,7 +5866,7 @@ restart:
                         break;
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
                         // __toString throw during print — do not continue try body (#29521).
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         break;
@@ -5878,7 +5886,7 @@ restart:
                         );
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
                         // Outer try matched from nested eval runFrames — resume catch here (#25816).
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (\ParseError $e) {
                         $catchFrame = $this->dispatchVmParseError($e, $frame);
@@ -6019,7 +6027,7 @@ restart:
                             goto restart;
                         }
                     } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                        $frame = $redirect->catchFrame;
+                        $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                         goto restart;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
@@ -9603,7 +9611,7 @@ restart:
                             break;
                         } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
                             // Iterator protocol throw (FilterIterator::accept, …) — do not re-wrap (#24286).
-                            $frame = $redirect->catchFrame;
+                            $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                             goto restart;
                         } catch (\Exception $e) {
                             // zend_interfaces.c — bad getIterator() return is Exception, not TypeError (#19729).
@@ -9998,7 +10006,7 @@ restart:
                 ) {
                     throw $redirect;
                 }
-                $frame = $redirect->catchFrame;
+                $frame = $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
                 goto restart;
             } catch (VM\CloneMagicCatchRedirect $redirect) {
                 // Isolated __clone stack: abort nested runFrames; clone opcode resumes outer catch (#23527).
@@ -11738,7 +11746,7 @@ restart:
 
             return null;
         } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-            return $redirect->catchFrame;
+            return $this->resumeAfterBuiltinCallbackCatchRedirect($redirect);
         } catch (\Exception $e) {
             return $this->dispatchVmEngineException($e->getMessage(), $callerFrame);
         } finally {
@@ -12871,10 +12879,22 @@ restart:
     }
 
     /**
-     * Enter catch or finally for a try handler. Abandoned callee CVs are released before the
-     * handler runs (Zend CV undef on exception leave) so __destruct runs before catch / before
-     * finally when leaving nested calls (#22541).
+     * Resume a deferred user catch on the outer runFrames stack (#29521, #29534).
+     *
+     * {@see Context::truncateRunStackForCatch()} during __toString coercion runs on the
+     * isolated empty stack from {@see invokePhpFunctionForCoercion()}; re-truncate here so
+     * suspended try-body call sites (compare inside a callee) cannot resume AFTER catch.
      */
+    private function resumeAfterBuiltinCallbackCatchRedirect(VM\BuiltinCallbackCatchRedirect $redirect): Frame
+    {
+        $handler = $this->context->activeCatchHandlerFrame;
+        if (null !== $handler) {
+            $this->context->truncateRunStackForCatch($handler);
+        }
+
+        return $redirect->catchFrame;
+    }
+
     /**
      * When __clone() throws into a try/catch outside the isolated clone stack, defer the
      * catch to the clone opcode caller — do not goto restart on the nested stack (#23527).
