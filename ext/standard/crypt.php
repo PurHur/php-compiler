@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -16,6 +17,8 @@ use PHPLLVM\Value;
  * crypt() — POSIX DES/BCRYPT via libcrypt (issue #3771; php-src: ext/standard/crypt.c).
  *
  * Soft-null $string/$salt on forward profile — Zend 8.4 deprecate+coerce (#21280).
+ * NestedJIT leaf: {@see JitLibcryptKernel} so `@crypt` does not re-enter
+ * {@see PasswordJitHelper} via `__compiler_crypt` (#29545 / #29531 shape).
  */
 final class crypt extends Internal
 {
@@ -46,11 +49,13 @@ final class crypt extends Internal
             return JitValueBox::pointer($context, $slot);
         }
 
-        return JitPassword::crypt(
-            $context,
-            self::jitStringArg($context, $args[0], 0, 'string'),
-            self::jitStringArg($context, $args[1], 1, 'salt')
-        );
+        $password = self::jitStringArg($context, $args[0], 0, 'string');
+        $salt = self::jitStringArg($context, $args[1], 1, 'salt');
+        if (NestedJitCompileScope::isActive()) {
+            return JitLibcryptKernel::invoke($context, $password, $salt);
+        }
+
+        return JitPassword::crypt($context, $password, $salt);
     }
 
     private static function jitStringArg(

@@ -952,8 +952,10 @@ class Context {
             // random_bytes NestedJIT leaf (#29531) — whitelist random_bytes → random_bytes::call →
             // JitRandomBytes::generate / JitRandomBytesKernel /dev/urandom leaf (kernel Internal removed).
             'random_bytes',
+            // crypt NestedJIT leaf (#29545) — whitelist crypt → crypt::call →
+            // JitLibcryptKernel libc crypt(3) (kernel Internal removed; peer random_bytes #29531).
+            'crypt',
             // Password NestedJIT leaves (#26773) — peer random_bytes (#21186 / #29531) / hash crypto (#21026).
-            'phpc_libcrypt_kernel',
             'phpc_libcrypt_verify',
             'phpc_argon2_hash',
             'phpc_argon2_verify',

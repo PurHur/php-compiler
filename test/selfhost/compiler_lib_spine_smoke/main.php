@@ -2749,7 +2749,6 @@ require_once __DIR__.'/../../../ext/standard/JitJsonLastErrorMsg.php';
 require_once __DIR__.'/../../../ext/standard/JitJsonValidate.php';
 require_once __DIR__.'/../../../ext/standard/JitLibcrypt.php';
 require_once __DIR__.'/../../../ext/standard/JitLibcryptKernel.php';
-require_once __DIR__.'/../../../ext/standard/phpc_libcrypt_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_libcrypt_verify.php';
 require_once __DIR__.'/../../../ext/standard/JitArgon2Kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_argon2_hash.php';

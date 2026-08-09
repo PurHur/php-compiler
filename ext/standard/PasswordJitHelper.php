@@ -8,10 +8,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\VM\HashTable;
 
 /**
- * password_* / crypt() for compiled JIT/AOT modules (#9908, php-in-PHP).
+ * password_* / crypt() for compiled JIT/AOT modules (#9908, #29545, php-in-PHP).
  *
  * SSOT host/VM: {@see VmPassword}, {@see VmPasswordNative}
- * NestedJIT/AOT: thin {@see phpc_libcrypt_kernel} / {@see phpc_argon2_hash} (#26773) —
+ * NestedJIT/AOT: `@crypt` → {@see JitLibcryptKernel} / {@see phpc_argon2_hash} (#26773, #29545) —
  * VmPasswordNative cannot NestedJIT (FFI); unbound stubs returned false under AOT.
  * php-src: ext/standard/password.c, ext/standard/crypt.c
  */
@@ -49,7 +49,7 @@ final class PasswordJitHelper
     public static function cryptArgv(string $password, string $salt): string
     {
         if (NestedJitCompileScope::isActive()) {
-            $result = \phpc_libcrypt_kernel($password, $salt);
+            $result = \crypt($password, $salt);
             if (!\is_string($result)) {
                 return '*0';
             }
@@ -128,7 +128,7 @@ final class PasswordJitHelper
         }
         $costTwo = ($bcryptCost < 10 ? '0' : '').(string) $bcryptCost;
         $setting = '$2y$'.$costTwo.'$'.self::bcryptEncodeSalt22($rnd);
-        $result = \phpc_libcrypt_kernel($password, $setting);
+        $result = \crypt($password, $setting);
         if (!\is_string($result)) {
             return '';
         }
