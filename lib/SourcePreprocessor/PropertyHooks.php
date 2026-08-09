@@ -69,6 +69,16 @@ final class PropertyHooks
     public const SET_HOOK_VALUE_TYPE_COMPAT_ERROR = 'Type of parameter $%s of hook %s::$%s::set must be compatible with property type';
 
     /**
+     * php-src: Zend/zend_compile.c — set-hook param list must have exactly one child (#29443).
+     *
+     * Zend wording keeps the plural {@code parameters} even for "one".
+     * Message shape: {@code set hook of property C::$x must accept exactly one parameters}.
+     * Applies only when an explicit {@code (…)} list is present — shorthand {@code set \{ \}} /
+     * {@code set =>} synthesize {@code $value} and are not rejected here.
+     */
+    public const SET_HOOK_ARITY_COMPILE_ERROR = '%s hook of property %s::$%s must accept exactly one parameters';
+
+    /**
      * php-src: Zend/zend_compile.c — set-hook param must not be {@code ZEND_PARAM_REF} (#29442).
      *
      * Message shape: {@code Parameter $value of set hook C::$x must not be pass-by-reference}.
@@ -2285,7 +2295,7 @@ final class PropertyHooks
      *
      * {@code (prop_type_ast != NULL) != (value_param_ast->child[0] != NULL)} then
      * {@see zend_verify_property_hook_variance} for both-typed contravariance.
-     * By-ref params are rejected first (#29442).
+     * Order matches Zend: arity (#29443) → by-ref (#29442) → type variance.
      */
     private function rejectIncompatibleExplicitSetHookParam(
         string $params,
@@ -2299,6 +2309,14 @@ final class PropertyHooks
         if (!CompilerVersion::supportsPropertyHooks()) {
             return;
         }
+        $this->rejectWrongArityExplicitSetHookParam(
+            $params,
+            $classDisplay,
+            $prop,
+            $filename,
+            $fullCode,
+            $hookOpenOffsetInFile
+        );
         $this->rejectByRefExplicitSetHookParam(
             $params,
             $classDisplay,
@@ -2335,6 +2353,27 @@ final class PropertyHooks
     }
 
     /**
+     * php-src: Zend/zend_compile.c — {@code param_list->children != 1} when list is present (#29443).
+     */
+    private function rejectWrongArityExplicitSetHookParam(
+        string $params,
+        string $classDisplay,
+        string $prop,
+        string $filename,
+        string $fullCode,
+        int $hookOpenOffsetInFile
+    ): void {
+        if (1 === $this->countExplicitSetHookParams($params)) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $hookOpenOffsetInFile),
+            self::setHookArityCompileError($classDisplay, $prop)
+        );
+    }
+
+    /**
      * php-src: Zend/zend_compile.c — {@code value_param_ast->attr & ZEND_PARAM_REF} (#29442).
      */
     private function rejectByRefExplicitSetHookParam(
@@ -2361,6 +2400,14 @@ final class PropertyHooks
         return sprintf(self::SET_HOOK_VALUE_TYPE_COMPAT_ERROR, $paramName, $className, $propName);
     }
 
+    public static function setHookArityCompileError(
+        string $className,
+        string $propName,
+        string $hookKind = 'set'
+    ): string {
+        return sprintf(self::SET_HOOK_ARITY_COMPILE_ERROR, $hookKind, $className, $propName);
+    }
+
     public static function setHookParamByRefCompileError(
         string $paramName,
         string $className,
@@ -2368,6 +2415,78 @@ final class PropertyHooks
         string $hookKind = 'set'
     ): string {
         return sprintf(self::SET_HOOK_PARAM_BY_REF_COMPILE_ERROR, $paramName, $hookKind, $className, $propName);
+    }
+
+    /**
+     * Count top-level parameters in an explicit set-hook {@code (…)} list.
+     *
+     * Empty {@code set()} → 0; trailing commas do not add a parameter ({@code set($v,)} → 1).
+     */
+    private function countExplicitSetHookParams(string $params): int
+    {
+        $params = trim($params);
+        if ('' === $params) {
+            return 0;
+        }
+        $count = 0;
+        $depthParen = 0;
+        $depthBracket = 0;
+        $depthBrace = 0;
+        $len = strlen($params);
+        $segStart = 0;
+        $quote = null;
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $params[$i];
+            if (null !== $quote) {
+                if ('\\' === $ch && $i + 1 < $len) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depthParen;
+                continue;
+            }
+            if (')' === $ch && $depthParen > 0) {
+                --$depthParen;
+                continue;
+            }
+            if ('[' === $ch) {
+                ++$depthBracket;
+                continue;
+            }
+            if (']' === $ch && $depthBracket > 0) {
+                --$depthBracket;
+                continue;
+            }
+            if ('{' === $ch) {
+                ++$depthBrace;
+                continue;
+            }
+            if ('}' === $ch && $depthBrace > 0) {
+                --$depthBrace;
+                continue;
+            }
+            if (',' === $ch && 0 === $depthParen && 0 === $depthBracket && 0 === $depthBrace) {
+                if ('' !== trim(substr($params, $segStart, $i - $segStart))) {
+                    ++$count;
+                }
+                $segStart = $i + 1;
+            }
+        }
+        if ('' !== trim(substr($params, $segStart))) {
+            ++$count;
+        }
+
+        return $count;
     }
 
     /**

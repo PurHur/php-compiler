@@ -1725,4 +1725,115 @@ PHP;
         }
     }
 
+    /** @covers issue #29443 — set($value, $extra) is compile-fatal (Zend "exactly one parameters") */
+    public function testRejectsExtraSetHookParam(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $extra = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set($value, $extra) {
+            $this->x = $value;
+        }
+    }
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::setHookArityCompileError('C', 'x'));
+            (new PropertyHooks())->process($extra, 'hook_set_extra_param.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #29443 — set() zero-param list fatal; shorthand / single-param / trailing comma OK */
+    public function testRejectsEmptySetHookParamListAndAllowsLegalArity(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $empty = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set() {
+            $this->x = 1;
+        }
+    }
+}
+PHP;
+            try {
+                (new PropertyHooks())->process($empty, 'hook_set_empty_params.php');
+                self::fail('Expected CompileFatal for empty set() param list');
+            } catch (CompileFatal $e) {
+                self::assertSame(PropertyHooks::setHookArityCompileError('C', 'x'), $e->getMessage());
+            }
+
+            $trailing = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set($value,) {
+            $this->x = $value;
+        }
+    }
+}
+PHP;
+            [$outTrail] = (new PropertyHooks())->process($trailing, 'hook_set_trailing_comma.php');
+            self::assertStringContainsString('function __phpc_property_set_x($value,)', $outTrail);
+
+            $shorthand = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set {
+            $this->x = $value;
+        }
+    }
+}
+PHP;
+            [$outShort] = (new PropertyHooks())->process($shorthand, 'hook_set_shorthand.php');
+            self::assertStringContainsString('function __phpc_property_set_x($value)', $outShort);
+
+            $arrow = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set => $value;
+    }
+}
+PHP;
+            [$outArrow] = (new PropertyHooks())->process($arrow, 'hook_set_arrow_arity.php');
+            self::assertStringContainsString('function __phpc_property_set_x($value)', $outArrow);
+
+            $arrowExtra = <<<'PHP'
+<?php
+class C {
+    public $x {
+        set($a, $b) => $a;
+    }
+}
+PHP;
+            try {
+                (new PropertyHooks())->process($arrowExtra, 'hook_set_arrow_extra.php');
+                self::fail('Expected CompileFatal for set($a, $b) =>');
+            } catch (CompileFatal $e) {
+                self::assertSame(PropertyHooks::setHookArityCompileError('C', 'x'), $e->getMessage());
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
 }
