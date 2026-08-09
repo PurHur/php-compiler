@@ -237,7 +237,8 @@ final class str_ireplace extends Internal
 
         $needles = [];
         foreach ($var->toArray()->iterateKeyed(true) as [, $value]) {
-            $needles[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName, 'array|string');
+            // Element convert_to_string — not Z_PARAM_STR (#29309).
+            $needles[] = VmString::coerceStrReplaceArrayElement($value);
         }
 
         return $needles;
@@ -262,7 +263,8 @@ final class str_ireplace extends Internal
 
         $values = [];
         foreach ($var->toArray()->iterateKeyed(true) as [, $value]) {
-            $values[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName, 'array|string');
+            // Element convert_to_string — not Z_PARAM_STR (#29309).
+            $values[] = VmString::coerceStrReplaceArrayElement($value);
         }
 
         return $values;

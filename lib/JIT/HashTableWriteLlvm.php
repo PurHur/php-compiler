@@ -907,13 +907,19 @@ final class HashTableWriteLlvm
             self::emitAppendOccupiedIfNextFreeOverflowed($context, $index);
             self::setAtIndex($context, $ht, $index, $element);
             $array->nextFreeElementFromRuntime = true;
-            // Track string literals for compile-time folds (preg_filter #27181 / str_replace peers).
+            // Track compile-time scalars for folds (preg_filter #27181 / str_replace peers).
+            // Null elements must stay foldable — convert_to_string → "" without Z_PARAM DEP (#29309).
             $cts = $element->compileTimeString;
             if (null !== $cts) {
                 if (!\is_array($array->compileTimeArray)) {
                     $array->compileTimeArray = [];
                 }
                 $array->compileTimeArray[$array->nextFreeElement] = $cts;
+            } elseif (Variable::TYPE_NULL === $element->type || $element->isNullConstant) {
+                if (!\is_array($array->compileTimeArray)) {
+                    $array->compileTimeArray = [];
+                }
+                $array->compileTimeArray[$array->nextFreeElement] = null;
             } else {
                 $array->compileTimeArray = null;
             }

@@ -55,13 +55,18 @@ final class JitStrIreplaceMulti
      */
     private static function compileTimeNeedleList(JITVariable $arg): ?array
     {
-        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY) && \is_array($arg->compileTimeArray)) {
+        // Native packed arrays and value-box hashtable literals both carry compileTimeArray (#29309).
+        if (\is_array($arg->compileTimeArray)) {
             $needles = [];
             foreach ($arg->compileTimeArray as $value) {
-                if (!\is_string($value)) {
+                if (\is_string($value)) {
+                    $needles[] = $value;
+                } elseif (null === $value) {
+                    // convert_to_string on null → "" without parameter DEP (#29309).
+                    $needles[] = '';
+                } else {
                     return null;
                 }
-                $needles[] = $value;
             }
 
             return $needles;
@@ -79,13 +84,17 @@ final class JitStrIreplaceMulti
      */
     private static function compileTimeReplaceOperand(JITVariable $arg): array|string|null
     {
-        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY) && \is_array($arg->compileTimeArray)) {
+        if (\is_array($arg->compileTimeArray)) {
             $values = [];
             foreach ($arg->compileTimeArray as $value) {
-                if (!\is_string($value)) {
+                if (\is_string($value)) {
+                    $values[] = $value;
+                } elseif (null === $value) {
+                    // convert_to_string on null → "" without parameter DEP (#29309).
+                    $values[] = '';
+                } else {
                     return null;
                 }
-                $values[] = $value;
             }
 
             return $values;
