@@ -19423,6 +19423,13 @@ class JIT {
             } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
                 $className = 'DOMElement';
                 $declaringClassLc = 'domelement';
+            } elseif ('setidattribute' === $methodLc) {
+                // firstChild / item() temps → :object; bind before ExternalMethod (#29257).
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::setidattribute');
+                if ($this->context->functionIsRegistered('domelement::setidattribute')) {
+                    $className = 'DOMElement';
+                    $declaringClassLc = 'domelement';
+                }
             } elseif ('isid' === $methodLc) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domattr::isid');
                 if ($this->context->functionIsRegistered('domattr::isid')) {
@@ -19679,6 +19686,10 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
                 }
+                // setIdAttribute on child-property temps (:object) (#29257).
+                if ('setidattribute' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::setidattribute');
+                }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
@@ -19768,6 +19779,17 @@ class JIT {
                 ) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy(
                         'dom\\htmldocument::'.$methodLc
+                    );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if (
+                    'setidattribute' === $methodLc
+                    && $this->context->functionIsRegistered('domelement::setidattribute')
+                ) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                        'domelement::setidattribute'
                     );
                     $this->context->scope->args = [$receiverVar];
 

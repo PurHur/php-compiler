@@ -68,6 +68,64 @@ final class JitDomGetElementById
         $document = self::loadObjectArg($context, $args[0]);
         $idStr = self::loadStringArg($context, $args[1]);
 
+        // Thin AOT: consult DomUserScriptElementCache before PROP_ELEMENT_ID_MAP.
+        // loadXML leaves the map uninitialized; reading it segfaults. setIdAttribute
+        // (#29257) and loadHTML populate the cache so lookups stay safe.
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            $cacheActive = DomUserScriptElementCacheLlvm::isActive($context);
+            $cacheBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_first');
+            $mapBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_map_after_cache');
+            $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_first_done');
+            $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+                $context,
+                $context->getTypeFromString('__value__*')
+            );
+            $context->builder->branchIf($cacheActive, $cacheBlock, $mapBlock);
+
+            $context->builder->positionAtEnd($cacheBlock);
+            $cached = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr);
+            $objPtr = $context->getTypeFromString('__object__*');
+            $isNullObj = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $cached,
+                $objPtr->constNull()
+            );
+            $cacheHit = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_first_hit');
+            $cacheMiss = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_first_miss');
+            $context->builder->branchIf($isNullObj, $cacheMiss, $cacheHit);
+
+            $context->builder->positionAtEnd($cacheHit);
+            $hitBoxed = self::boxObjectResult($context, $cached);
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $hitBoxed), $resultSlot);
+            $context->builder->branch($doneBlock);
+
+            // Cache active but id miss — null (map may be uninitialized after loadXML).
+            $context->builder->positionAtEnd($cacheMiss);
+            $nullBoxed = self::boxNullResult($context);
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullBoxed), $resultSlot);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($mapBlock);
+            $objectType = $context->type->object;
+            $classId = $objectType->lookup(self::CLASS_DOCUMENT);
+            $mapVar = ObjectInstancePropertyLlvm::propertyFetchOrdinary(
+                $objectType,
+                $document,
+                self::CLASS_DOCUMENT,
+                VmDom::PROP_ELEMENT_ID_MAP,
+                $classId
+            );
+            $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
+            $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
+            $mapOrCache = self::lookupUserScriptWithCacheFallback($context, $foundVar, $idStr);
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $mapOrCache), $resultSlot);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
+
+            return $context->builder->load($resultSlot);
+        }
+
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_DOCUMENT);
         $mapVar = ObjectInstancePropertyLlvm::propertyFetchOrdinary(
@@ -79,10 +137,6 @@ final class JitDomGetElementById
         );
         $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
         $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
-
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            return self::lookupUserScriptWithCacheFallback($context, $foundVar, $idStr);
-        }
 
         return JitValueBox::valuePtrFromVariable($context, $foundVar);
     }
