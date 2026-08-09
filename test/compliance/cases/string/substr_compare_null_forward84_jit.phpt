@@ -10,3 +10,5 @@ DEP
 haystack OK
 DEP
 needle OK
+DEP
+offset OK

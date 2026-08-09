@@ -12,6 +12,8 @@ set_error_handler(static function (int $no, string $msg): bool {
 $cases = [
     'haystack' => [static fn () => substr_compare(null, 'a', 0), -1],
     'needle' => [static fn () => substr_compare('abc', null, 0), 1],
+    // #29504 — Z_PARAM_LONG $offset soft-null (peer substr_count #21657).
+    'offset' => [static fn () => substr_compare('abc', 'b', null), -1],
 ];
 foreach ($cases as $label => [$factory, $expect]) {
     try {
