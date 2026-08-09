@@ -1699,6 +1699,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ unserialize() parse-failure diagnostic is E_WARNING (was E_NOTICE through 8.2).
+     *
+     * php-src: ext/standard/var.c / UPGRADING — "Error at offset" (#29204). Withheld on 8.4.0-dev
+     * reference / unset PROFILE (matches Zend 8.2 E_NOTICE). Enable via stable 8.4.0+ or explicit
+     * {@code PHP_COMPILER_PROFILE=8.3} / {@code 8.4} / {@code 8.5}.
+     */
+    public static function supportsUnserializeErrorAtOffsetWarning(): bool
+    {
+        return self::supportsAssertOptionsDeprecation();
+    }
+
+    /**
      * PHP 8.3+ E_DEPRECATED for {@code assert_options()} and {@code ASSERT_*} constants.
      *
      * php-src: ext/standard/basic_functions.stub.php — `#[\Deprecated(since: '8.3')]` on
