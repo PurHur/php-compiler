@@ -204,6 +204,17 @@ final class VmUnserializeFormat
         return self::$lastMaxDepthExceeded;
     }
 
+    /**
+     * Record parse failure when a non-VmUnserializeFormat path returns false (#29204).
+     *
+     * Truncated O:/C: wire often fails at EOF — Zend reports offset==length.
+     */
+    public static function recordFailure(int $offset, int $length): void
+    {
+        self::$lastErrorOffset = $offset;
+        self::$lastPayloadLength = $length;
+    }
+
     /** @return false */
     private function fail(?int $errorOffset = null): bool
     {

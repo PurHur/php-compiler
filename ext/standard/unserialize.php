@@ -279,7 +279,7 @@ final class unserialize extends Internal
         return 'mixed';
     }
 
-    /** php-src var_unserializer.c — E_WARNING on max_depth, then E_NOTICE + error_get_last (#13715, #9206). */
+    /** php-src var_unserializer — E_NOTICE through 8.2; E_WARNING from 8.3 (#13715, #9206, #29204). */
     private static function emitParseFailureNotice(Frame $frame, string $payload, ?array $options = null): void
     {
         if (null === $frame->vmContext) {
@@ -301,11 +301,16 @@ final class unserialize extends Internal
         $offset = VmUnserializeFormat::lastErrorOffset();
         $length = VmUnserializeFormat::lastPayloadLength();
         if (null === $offset || null === $length) {
-            return;
+            // Paths that return false without parser state — treat as EOF failure (#29204).
+            $length = \strlen($payload);
+            $offset = $length;
         }
+        $level = \PHPCompiler\CompilerVersion::supportsUnserializeErrorAtOffsetWarning()
+            ? ErrorReporter::E_WARNING
+            : ErrorReporter::E_NOTICE;
         $frame->vmContext->errors->triggerError(
             \sprintf('unserialize(): Error at offset %d of %d bytes', $offset, $length),
-            ErrorReporter::E_NOTICE,
+            $level,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
             $frame

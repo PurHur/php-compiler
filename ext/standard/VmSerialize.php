@@ -166,6 +166,10 @@ final class VmSerialize
         if (str_starts_with($payload, 'O:')) {
             $header = self::parseObjectWireHeader($payload);
             if (null === $header) {
+                // Truncated / malformed O: — Zend Error at offset len of len (#29204).
+                $len = \strlen($payload);
+                VmUnserializeFormat::recordFailure($len, $len);
+
                 return false;
             }
             [$className] = $header;

@@ -245,6 +245,7 @@ final class StringUnserialize
         $context->builder->branchIf($isObject, $bbObj, $bbFail);
 
         $context->builder->positionAtEnd($bbFail);
+        self::emitParseFailureWarning($context, $payloadString);
         $failSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
         $failPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $failSlot);
         $context->builder->call(
@@ -347,6 +348,66 @@ final class StringUnserialize
         $context->builder->positionAtEnd($bbDone);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * php-src var_unserializer — "Error at offset N of M bytes" on O: decode failure (#29204).
+     *
+     * Truncated object wire typically fails at EOF (offset == length).
+     */
+    private static function emitParseFailureWarning(Context $context, Value $payloadString): void
+    {
+        StringTriggerError::ensureLinked($context);
+        TypeErrorRaise::ensureDeclInScope($context, 'snprintf', $context->context->functionType(
+            $context->getTypeFromString('int32'),
+            true,
+            $context->getTypeFromString('char*'),
+            $context->getTypeFromString('size_t'),
+            $context->getTypeFromString('char*')
+        ));
+        try {
+            $context->lookupFunction('__mm__malloc');
+        } catch (\Throwable) {
+            $context->type->memorymanager->register();
+        }
+        $strMap = $context->structFieldMap['__string__'];
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $lenI64 = $context->builder->load(
+            $context->builder->structGep($payloadString, $strMap['length'])
+        );
+        $lenI32 = $context->builder->trunc($lenI64, $i32);
+        $bufSize = $sizeT->constInt(128, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('unserialize(): Error at offset %d of %d bytes'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $lenI32,
+            $lenI32
+        );
+        $level = \PHPCompiler\CompilerVersion::supportsUnserializeErrorAtOffsetWarning()
+            ? \PHPCompiler\VM\ErrorReporter::E_WARNING
+            : \PHPCompiler\VM\ErrorReporter::E_NOTICE;
+        $msgPtr = $context->builder->pointerCast($bufChar, $i8p);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $context->builder->zExt($written, $sizeT),
+            $i32->constInt($level, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
     }
 
     /**
