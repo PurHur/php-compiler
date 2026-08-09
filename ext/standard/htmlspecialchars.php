@@ -55,11 +55,14 @@ final class htmlspecialchars extends Internal
             $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
         }
         if (isset($frame->calledArgs[3])) {
-            $deVar = $frame->calledArgs[3]->resolveIndirect();
-            if (VMVariable::TYPE_BOOLEAN !== $deVar->type) {
-                throw new \LogicException('htmlspecialchars() double_encode must be a boolean in this compiler build');
-            }
-            $doubleEncode = $deVar->toBool();
+            // Z_PARAM_BOOL — null→false + E_DEPRECATED (php-src html.c / zend_API.h; #29445).
+            $doubleEncode = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                3,
+                'htmlspecialchars',
+                4,
+                'double_encode'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -226,11 +229,21 @@ final class htmlspecialchars extends Internal
 
     private static function jitDoubleEncodeArg(Context $context, JITVariable $arg): Value
     {
-        $folded = self::compileTimeBool($context, $arg);
-        if (null !== $folded) {
-            return $context->getTypeFromString('int64')->constInt($folded ? 1 : 0, false);
+        // Soft-null needs runtime DEP — do not fold TYPE_NULL (#29445 / peer wordwrap #29354).
+        if (JITVariable::TYPE_NULL !== $arg->type && !$arg->isNullConstant) {
+            $folded = self::compileTimeBool($context, $arg);
+            if (null !== $folded) {
+                return $context->getTypeFromString('int64')->constInt($folded ? 1 : 0, false);
+            }
         }
-        $bool = JitBoolArg::lower($context, $arg, 'htmlspecialchars() double_encode');
+        // Z_PARAM_BOOL — null→false + E_DEPRECATED (php-src html.c; #29445).
+        $bool = JitBoolArg::lowerCoerceZParamBool(
+            $context,
+            $arg,
+            'htmlspecialchars',
+            'double_encode',
+            4
+        );
 
         return $context->builder->zExt($bool, $context->getTypeFromString('int64'));
     }
@@ -303,6 +316,10 @@ final class htmlspecialchars extends Internal
 
         $doubleEncode = true;
         if ($argc >= 4) {
+            // Soft-null needs runtime DEP — refuse compile-time fold (#29445).
+            if (JITVariable::TYPE_NULL === $args[3]->type || $args[3]->isNullConstant) {
+                return null;
+            }
             $doubleEncodeVal = self::compileTimeBool($context, $args[3]);
             if (null === $doubleEncodeVal) {
                 return null;

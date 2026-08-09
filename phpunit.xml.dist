@@ -181,6 +181,8 @@
             <file>./test/compliance/PowNullSilentJITTest.php</file>
             <file>./test/compliance/WordwrapEmptyBreakMessageVMTest.php</file>
             <file>./test/compliance/WordwrapEmptyBreakMessageJITTest.php</file>
+            <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullVMTest.php</file>
+            <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

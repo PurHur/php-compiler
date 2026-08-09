@@ -46,11 +46,14 @@ final class htmlentities extends Internal
             $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
         }
         if (isset($frame->calledArgs[3])) {
-            $deVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $deVar->type) {
-                throw new \LogicException('htmlentities() double_encode must be a boolean in this compiler build');
-            }
-            $doubleEncode = $deVar->toBool();
+            // Z_PARAM_BOOL — null→false + E_DEPRECATED (php-src html.c / zend_API.h; peer #29445).
+            $doubleEncode = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                3,
+                'htmlentities',
+                4,
+                'double_encode'
+            );
         }
         if (null === $frame->returnVar) {
             return;
