@@ -108,6 +108,9 @@ final class is_resource_ extends Internal
         if (\PHPCompiler\VM\ResourceSupport::isStreamContextResource($v)) {
             return true;
         }
+        if (\PHPCompiler\VM\ResourceSupport::isWddxPacketResource($v)) {
+            return true;
+        }
 
         return false;
     }

@@ -6,17 +6,31 @@ namespace PHPCompiler\ext\wddx;
 
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceState;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * WDDX serialize/deserialize (php-src ext/wddx/wddx.c; #6327).
+ * WDDX serialize/deserialize (php-src ext/wddx/wddx.c; #6327 / #27858 packet builders).
  *
  * PHP-in-PHP XML packet generation — host DOM only on VM execute path.
  */
 final class VmWddx
 {
+    /** Zend le_wddx resource type name (php/pecl-text-wddx wddx.c). */
+    public const PACKET_RESOURCE_KIND = 'WDDX packet ID';
+
     /** @var array<int, true> */
     private static array $serializeSeen = [];
+
+    private static int $nextPacketId = 0;
+
+    /**
+     * Open incremental packets keyed by resource handle (wddx_packet_start / add_vars / packet_end).
+     *
+     * @var array<int, array{comment: ?string, body: string, closed: bool}>
+     */
+    private static array $packets = [];
 
     public static function serializeValue(Variable $value, ?string $comment = null): string
     {
@@ -36,6 +50,65 @@ final class VmWddx
         $body .= '</struct>';
 
         return self::packet($body, $comment);
+    }
+
+    /**
+     * wddx_packet_start() — open struct packet + return handle (pecl-text-wddx wddx.c; #27858).
+     */
+    public static function packetStart(?string $comment = null): int
+    {
+        $id = ++self::$nextPacketId;
+        self::$packets[$id] = [
+            'comment' => $comment,
+            'body' => '',
+            'closed' => false,
+        ];
+
+        return $id;
+    }
+
+    public static function isValidPacketHandle(int $handle): bool
+    {
+        return isset(self::$packets[$handle]) && !self::$packets[$handle]['closed'];
+    }
+
+    /**
+     * @param list<array{0: string, 1: Variable}> $namedVars
+     */
+    public static function packetAddNamedVars(int $handle, array $namedVars): bool
+    {
+        if (!self::isValidPacketHandle($handle)) {
+            return false;
+        }
+        foreach ($namedVars as [$name, $value]) {
+            // Per-var circular tracking (php_wddx_serialize_var walk; #27858).
+            self::$serializeSeen = [];
+            self::$packets[$handle]['body'] .= self::serializeVar($value->resolveIndirect(), $name);
+        }
+
+        return true;
+    }
+
+    /**
+     * wddx_packet_end() — close struct + return XML; invalidates the resource (pecl-text-wddx).
+     *
+     * Mutates {@see ResourceState::$handle} to 0 so is_resource() goes false (zend_list_close).
+     */
+    public static function packetEnd(int $handle, ?Variable $packetVar = null): string|false
+    {
+        if (!self::isValidPacketHandle($handle)) {
+            return false;
+        }
+        $state = self::$packets[$handle];
+        unset(self::$packets[$handle]);
+        if (null !== $packetVar) {
+            $res = ResourceSupport::stateFromVariable($packetVar);
+            if (null !== $res && ResourceState::KIND_WDDX_PACKET === $res->kind) {
+                $res->handle = 0;
+            }
+        }
+
+        return self::packet('<struct>'.$state['body'].'</struct>', $state['comment']);
     }
 
     /**

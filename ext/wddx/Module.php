@@ -33,6 +33,9 @@ class Module extends ModuleAbstract
             new wddx_serialize_value(),
             new wddx_serialize_vars(),
             new wddx_deserialize(),
+            new wddx_packet_start(),
+            new wddx_add_vars(),
+            new wddx_packet_end(),
         ];
     }
 }
