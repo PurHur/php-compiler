@@ -1947,14 +1947,15 @@ final class VmMbstring
         if ($padLength < 0 || $padLength <= $inputLength) {
             return $input;
         }
+        // php-src mbstring.c PHP_FUNCTION(mb_str_pad) — Zend "must not be empty" (#29422)
         if ('' === $padString) {
-            throw new \ValueError('mb_str_pad(): Argument #3 ($pad_string) must be a non-empty string');
+            throw new \ValueError(VmString::emptyStringArgValueErrorMessage('mb_str_pad', 2, 'pad_string'));
         }
         $padUnitLength = 'UTF-8' === $encoding
             ? VmString::utf8CharLength($padString)
             : VmString::byteLength($padString);
         if (0 === $padUnitLength) {
-            throw new \ValueError('mb_str_pad(): Argument #3 ($pad_string) must be a non-empty string');
+            throw new \ValueError(VmString::emptyStringArgValueErrorMessage('mb_str_pad', 2, 'pad_string'));
         }
         if ($padType < 0 || $padType > 2) {
             throw new \ValueError(

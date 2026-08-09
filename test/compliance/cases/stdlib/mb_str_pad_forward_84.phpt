@@ -26,4 +26,4 @@ long
 日  
 日本本本
 hi   
-mb_str_pad(): Argument #3 ($pad_string) must be a non-empty string
+mb_str_pad(): Argument #3 ($pad_string) must not be empty
