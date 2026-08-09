@@ -143,6 +143,8 @@ final class BuiltinInternalArgInfo
             // ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324, #25580)
             'preg_grep' => 'array|false',
             'preg_match', 'preg_match_all' => 'int|false',
+            // ext/pcre/php_pcre.stub.php — InternalArgInfo omits return (#27813, #28897; re-#23587)
+            'preg_replace', 'preg_filter', 'preg_replace_callback' => 'array|string|null',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#26104)
             'memory_reset_peak_usage' => 'void',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)

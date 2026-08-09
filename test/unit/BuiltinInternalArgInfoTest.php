@@ -1251,6 +1251,14 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_match_all'));
     }
 
+    /** php-src ext/pcre/php_pcre.stub.php — InternalArgInfo omits return (#27813, #28897). */
+    public function testPregReplaceFamilyReflectionReturnUnions(): void
+    {
+        foreach (['preg_replace', 'preg_filter', 'preg_replace_callback'] as $fn) {
+            $this->assertSame('array|string|null', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+    }
+
     /** php-src ext/libxml/libxml.stub.php — reflection return/default parity (#25844, #28021, #27744). */
     public function testLibxmlErrorControlReflectionStubs(): void
     {
