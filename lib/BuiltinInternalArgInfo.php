@@ -61,7 +61,7 @@ final class BuiltinInternalArgInfo
     public static function stubReturnTypeLabelForFunction(string $callableLc): ?string
     {
         // ext/standard/basic_functions.stub.php — StreamBucket shapes on PROFILE≥8.4 (#27797)
-        // ≤8.3 keeps InternalArgInfo resource/object/empty (pre-StreamBucket stubs).
+        // ≤8.3: stream_bucket_new returns object (not InternalArgInfo resource) (#28824).
         if (CompilerVersion::supportsStreamBucketClass()) {
             $bucketReturn = match ($callableLc) {
                 'stream_bucket_new' => 'StreamBucket',
@@ -72,6 +72,8 @@ final class BuiltinInternalArgInfo
             if (null !== $bucketReturn) {
                 return $bucketReturn;
             }
+        } elseif ('stream_bucket_new' === $callableLc) {
+            return 'object';
         }
 
         // ext/standard/streamsfuncs.stub.php — true return on PROFILE≥8.4; ≤8.3 keeps bool (#28344)

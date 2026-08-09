@@ -105,6 +105,7 @@
             <file>./test/compliance/MbCaseInvalidUtf8SubstVMTest.php</file>
             <file>./test/compliance/StreamCopyToStreamReflectionVMTest.php</file>
             <file>./test/compliance/StreamBucketReflectionStreamBucketVMTest.php</file>
+            <file>./test/compliance/StreamBucketNewReflectionObjectVMTest.php</file>
             <file>./test/compliance/StreamContextSetOptionReturnTrueVMTest.php</file>
             <file>./test/compliance/StreamSocketEnableCryptoReflectionVMTest.php</file>
             <file>./test/compliance/HtmlDecodeFlagsNamedReflectionVMTest.php</file>

@@ -1344,6 +1344,19 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('StreamBucket', $bucket['type']);
     }
 
+    /**
+     * Default / ≤8.3 profile: stream_bucket_new Reflection return is object (#28824).
+     *
+     * @runInSeparateProcess
+     */
+    public function testStreamBucketNewReflectionObjectOnDefaultProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        $this->assertFalse(CompilerVersion::supportsStreamBucketClass());
+        $this->assertSame('object', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_bucket_new'));
+    }
+
     /** php-src ext/xmlreader/php_xmlreader.stub.php — open/XML encoding ?string (#28712). */
     public function testXmlReaderOpenXmlEncodingReflectionStubTypes(): void
     {
