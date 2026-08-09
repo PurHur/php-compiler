@@ -22,6 +22,7 @@ function run(string $filename, string $code, array $options): void
     php_compiler_cli_sync_host_error_reporting($runtime->vmContext, $options);
     php_compiler_cli_sync_host_exception_ignore_args($runtime->vmContext, $options);
     php_compiler_cli_sync_host_exception_string_param_max_len($runtime->vmContext, $options);
+    php_compiler_cli_sync_host_zend_assertions($runtime->vmContext, $options);
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
     $scriptFilename = null;
