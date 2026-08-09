@@ -383,6 +383,10 @@ final class BuiltinInternalArgInfo
             // ext/shmop/shmop.stub.php — InternalArgInfo return int / empty; Zend Shmop|false / void (#28451)
             'shmop_open' => 'Shmop|false',
             'shmop_close' => 'void',
+            // ext/sysvmsg/sysvmsg.stub.php — InternalArgInfo resource / empty / array; Zend SysvMessageQueue|false / bool / array|false (#28452)
+            'msg_get_queue' => 'SysvMessageQueue|false',
+            'msg_receive' => 'bool',
+            'msg_stat_queue' => 'array|false',
             // ext/sockets/sockets.stub.php — InternalArgInfo resource / empty; Zend Socket|false / void (#27854)
             'socket_create', 'socket_create_listen', 'socket_accept', 'socket_import_stream' => 'Socket|false',
             'socket_close' => 'void',
@@ -832,6 +836,24 @@ final class BuiltinInternalArgInfo
             'curl_share_close', 'curl_share_errno' => 0 === $index ? 'CurlShareHandle' : null,
             // ext/shmop/shmop.stub.php — Shmop $shmop; InternalArgInfo still int (legacy shmid) (#28451)
             'shmop_read', 'shmop_write', 'shmop_size', 'shmop_delete', 'shmop_close' => 0 === $index ? 'Shmop' : null,
+            // ext/sysvmsg/sysvmsg.stub.php — SysvMessageQueue + mixed/untyped outs; InternalArgInfo resource/untyped/int (#28452)
+            'msg_send' => match ($index) {
+                0 => 'SysvMessageQueue',
+                5 => '',
+                default => null,
+            },
+            'msg_receive' => match ($index) {
+                0 => 'SysvMessageQueue',
+                2, 7 => '',
+                4 => 'mixed',
+                default => null,
+            },
+            'msg_remove_queue', 'msg_stat_queue' => 0 === $index ? 'SysvMessageQueue' : null,
+            'msg_set_queue' => match ($index) {
+                0 => 'SysvMessageQueue',
+                1 => 'array',
+                default => null,
+            },
             // ext/sysvshm/sysvshm.stub.php — SysvSharedMemory + ?int $size; InternalArgInfo int/untyped (#27943, re-#24640)
             'shm_attach' => match ($index) {
                 0 => 'int',
