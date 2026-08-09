@@ -836,6 +836,20 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ E_DEPRECATED when reading the {@code E_STRICT} constant.
+     *
+     * php-src: Zend/zend_constants.stub.php (`@deprecated` on {@code E_STRICT}) /
+     * Zend/zend_constants.c {@code zend_get_constant_ex} — {@code CONST_DEPRECATED}
+     * emits {@code Constant E_STRICT is deprecated} while the value stays 2048 (#29229).
+     * Same ≥8.4.0 gate as {@see supportsImplicitNullableParameterDeprecation()} (E_ALL
+     * drops E_STRICT in 8.4).
+     */
+    public static function supportsEStrictConstantDeprecation(): bool
+    {
+        return self::supportsImplicitNullableParameterDeprecation();
+    }
+
+    /**
      * PHP 8.5+ deprecates null as an array offset / array_key_exists() key (coerce to "").
      *
      * php-src: Zend/zend_execute.c / zend_vm_def.h; ext/standard/array.c (#26276).

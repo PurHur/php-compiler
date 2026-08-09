@@ -9608,6 +9608,21 @@ class JIT {
                         }
                         throw new \RuntimeException('Undefined constant "'.$label.'"');
                     }
+                    // CONST_DEPRECATED globals (E_STRICT, ASSERT_*, …) — Zend zend_constants.c (#29229).
+                    $fetchNameOp = null !== $op->arg3
+                        ? $block->getOperand($op->arg3)
+                        : $block->getOperand($op->arg2);
+                    if ($fetchNameOp instanceof Operand\Literal && \is_string($fetchNameOp->value)) {
+                        $constFetchName = $fetchNameOp->value;
+                        $depMeta = $this->context->runtime->vmContext->globalConstDeprecated[strtolower($constFetchName)] ?? null;
+                        if (null !== $depMeta) {
+                            JIT\DeprecatedCallGuard::emitGlobalConstFetch(
+                                $this->context,
+                                $depMeta,
+                                $constFetchName
+                            );
+                        }
+                    }
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
