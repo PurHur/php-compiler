@@ -38,6 +38,13 @@ class Module extends ModuleAbstract
             new xmlrpc_is_fault(),
             new xmlrpc_get_type(),
             new xmlrpc_set_type(),
+            new xmlrpc_server_create(),
+            new xmlrpc_server_destroy(),
+            new xmlrpc_server_register_method(),
+            new xmlrpc_server_call_method(),
+            new xmlrpc_parse_method_descriptions(),
+            new xmlrpc_server_add_introspection_data(),
+            new xmlrpc_server_register_introspection_callback(),
         ];
     }
 }
