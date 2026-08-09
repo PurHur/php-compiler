@@ -470,8 +470,8 @@ PHP;
         self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
     }
 
-    /** @covers issue #7148 — brace hook `private set;` modifier before set keyword */
-    public function testLowersBraceHookPrivateSetModifierOnConcreteClass(): void
+    /** @covers issue #7148 / #29388 — brace hook `private set;` is illegal on Zend (visibility on hook) */
+    public function testRejectsBraceHookPrivateSetModifierOnConcreteClass(): void
     {
         $src = <<<'PHP'
 <?php
@@ -479,11 +479,9 @@ class User {
     public string $email { get; private set; }
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringNotContainsString('$email {', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $email;', $out);
-        self::assertArrayNotHasKey('requiresGet', $registry['user']['email'] ?? []);
-        self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(sprintf(PropertyHooks::HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR, 'private'));
+        (new PropertyHooks())->process($src, 'private_set_semi.php');
     }
 
     /** @covers issue #13983 — `private(set)` decl + get-only hook compiles on PHP 8.4 */
@@ -523,8 +521,8 @@ PHP;
         (new PropertyHooks())->process($src, 'asymmetric_get_semicolon.php');
     }
 
-    /** @covers issue #12203 — implicit `get; private set;` backing still allowed */
-    public function testAllowsAsymmetricDeclSetWithImplicitBackingHooks(): void
+    /** @covers issue #12203 / #29388 — in-block `private set;` is rejected; use decl-site aviz + `set;` */
+    public function testRejectsAsymmetricDeclSetWithIllegalPrivateSetSemicolon(): void
     {
         $src = <<<'PHP'
 <?php
@@ -535,13 +533,13 @@ class C {
     }
 }
 PHP;
-        [$out] = (new PropertyHooks())->process($src);
-        self::assertStringNotContainsString('$x {', $out);
-        self::assertStringContainsString('public (private(set)) string $x;', $out);
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(sprintf(PropertyHooks::HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR, 'private'));
+        (new PropertyHooks())->process($src, 'asymmetric_private_set_semi.php');
     }
 
-    /** @covers issue #9872 — PHP 8.4 `private(set);` inside property hook block */
-    public function testLowersHookBlockPrivateSetParenModifier(): void
+    /** @covers issue #29388 — PHP 8.4 rejects `private(set);` inside property hook block */
+    public function testRejectsHookBlockPrivateSetParenModifier(): void
     {
         $src = <<<'PHP'
 <?php
@@ -552,17 +550,13 @@ class C {
     }
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringNotContainsString('$x {', $out);
-        self::assertStringNotContainsString('private(set)', $out);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
-        self::assertStringContainsString('function __phpc_property_get_x', $out);
-        self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
-        self::assertArrayNotHasKey('requiresSet', $registry['c']['x'] ?? []);
-        self::assertTrue($registry['c']['x']['virtual'] ?? false);
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(sprintf(PropertyHooks::HOOK_ASYMMETRIC_SET_MODIFIER_COMPILE_ERROR, 'private'));
+        (new PropertyHooks())->process($src, 'hook_private_set_paren.php');
     }
 
-    public function testLowersBraceHookPrivateSetArrowHook(): void
+    /** @covers issue #29388 — `private set =>` visibility on hook */
+    public function testRejectsBraceHookPrivateSetArrowHook(): void
     {
         $src = <<<'PHP'
 <?php
@@ -573,9 +567,71 @@ class C {
     }
 }
 PHP;
-        [$out] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $x;', $out);
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(sprintf(PropertyHooks::HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR, 'private'));
+        (new PropertyHooks())->process($src, 'private_set_arrow.php');
+    }
+
+    /** @covers issue #29388 — `private set(string $v) {}` */
+    public function testRejectsPrivateSetBlockHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $name {
+        get => 'g';
+        private set(string $v) {}
+    }
+}
+PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(sprintf(PropertyHooks::HOOK_VISIBILITY_MODIFIER_COMPILE_ERROR, 'private'));
+        (new PropertyHooks())->process($src, 'private_set_block.php');
+    }
+
+    /** @covers issue #29388 — `protected(set);` / `public(set);` inside hooks */
+    public function testRejectsProtectedAndPublicSetParenModifiersInHook(): void
+    {
+        foreach (['protected', 'public'] as $vis) {
+            $src = <<<PHP
+<?php
+class C {
+    public string \$x {
+        get => 'g';
+        {$vis}(set);
+    }
+}
+PHP;
+            try {
+                (new PropertyHooks())->process($src, "hook_{$vis}_set_paren.php");
+                self::fail("Expected CompileFatal for {$vis}(set);");
+            } catch (CompileFatal $e) {
+                self::assertSame(
+                    sprintf(PropertyHooks::HOOK_ASYMMETRIC_SET_MODIFIER_COMPILE_ERROR, $vis),
+                    $e->getMessage()
+                );
+            }
+        }
+    }
+
+    /** @covers issue #29388 — legal decl-site asymmetric visibility with hooks unchanged */
+    public function testLowersLegalDeclSitePrivateSetWithHooks(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public private(set) string $x {
+        get => $this->x;
+        set => $this->x = $value;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
         self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertArrayHasKey('get', $registry['c']['x'] ?? []);
+        self::assertArrayHasKey('set', $registry['c']['x'] ?? []);
     }
 
     /** @covers issue #23881 — same-name / short-set backing is not ZEND_ACC_VIRTUAL (Zend isVirtual=false) */

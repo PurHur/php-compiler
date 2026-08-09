@@ -1,11 +1,14 @@
 --TEST--
-PHP 8.4: brace hook private set; is compile-fatal (#29388, zend_compile.c)
+Language: private set(string) on property hook is compile-fatal (#29388)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-class User {
-    public string $email { get; private set; }
+class C {
+    public string $name {
+        get => 'g';
+        private set(string $v) {}
+    }
 }
 --EXPECT_EXIT--
 255
