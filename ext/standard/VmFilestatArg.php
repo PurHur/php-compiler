@@ -78,7 +78,9 @@ final class VmFilestatArg
     }
 
     /**
-     * Emit stat/lstat failure warning unless null was coerced to "" (#14641, php-src deprecation path).
+     * Emit stat/lstat failure warning unless null was coerced to "" (#14641) or path is empty (#29343).
+     *
+     * php-src filestat.c — empty path returns false without E_WARNING (same as touch/opendir).
      */
     public static function warnPathStatFailedForFilenameArg(
         Frame $frame,
@@ -87,9 +89,10 @@ final class VmFilestatArg
         string $path,
         bool $lstat
     ): void {
-        if (!self::wasNullFilenameArg($filenameArg)) {
-            VmFilestatFailure::warnPathStatFailed($frame, $function, $path, $lstat);
+        if ('' === $path || self::wasNullFilenameArg($filenameArg)) {
+            return;
         }
+        VmFilestatFailure::warnPathStatFailed($frame, $function, $path, $lstat);
     }
 
     /**
