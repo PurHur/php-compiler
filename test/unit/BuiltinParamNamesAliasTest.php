@@ -3021,6 +3021,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(-1, $dest->toInt());
     }
 
+    /** @covers issue #24857 — php-src basic_functions.stub.php component=-1 / flags=PATHINFO_ALL */
+    public function testParseUrlPathinfoReflectionDefaults(): void
+    {
+        self::assertSame(['url', 'component'], BuiltinParamNames::forFunction('parse_url'));
+        self::assertSame(['path', 'flags'], BuiltinParamNames::forFunction('pathinfo'));
+        self::assertSame(
+            'array|string|int|false|null',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('parse_url')
+        );
+        self::assertSame('array|string', BuiltinInternalArgInfo::returnTypeLabelForFunction('pathinfo'));
+
+        $component = ['name' => 'component', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('parse_url', 1, $component, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'parse_url', 1, $component));
+        self::assertSame(-1, $dest->toInt());
+
+        $flags = ['name' => 'flags', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('pathinfo', 1, $flags, false));
+        $dest2 = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest2, 'pathinfo', 1, $flags));
+        self::assertSame(15, $dest2->toInt());
+    }
+
     /** @covers issue #25171 */
     public function testStrtokReflectionNullTokenDefaultNamedParams(): void
     {

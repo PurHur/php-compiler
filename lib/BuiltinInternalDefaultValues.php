@@ -828,6 +828,14 @@ final class BuiltinInternalDefaultValues
         'imap_rfc822_parse_headers' => [
             1 => ['kind' => 'string', 'value' => 'UNKNOWN'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — int $component = -1; int $flags = PATHINFO_ALL (15)
+        // InternalArgInfo optional int infer → 0 (#24857)
+        'parse_url' => [
+            1 => ['kind' => 'int', 'value' => -1],
+        ],
+        'pathinfo' => [
+            1 => ['kind' => 'int', 'value' => 15],
+        ],
     ];
 
     public static function isAvailable(
