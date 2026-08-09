@@ -15,7 +15,7 @@ use PHPLLVM\Value;
  * @internal libc setenv mirror kernel for PutenvJitHelper (#23414).
  *
  * Single "NAME=value" (or "NAME" unset) assignment arg — NestedJIT leaf only
- * inside PutenvJitHelper::putenv (peer {@see phpc_getenv_kernel} / StringRename #29090).
+ * inside PutenvJitHelper::putenv (peer {@see GetenvLookupJitHelper} / StringRename #29090).
  * php-src: ext/standard/basic_functions.c — zif_putenv
  */
 final class phpc_putenv_kernel extends Internal

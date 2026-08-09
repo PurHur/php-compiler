@@ -8,14 +8,18 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getenv (#9092, #8992, #20156, #20644).
+ * JIT/AOT link for __compiler_getenv (#9092, #8992, #20156, #20644, #29313).
  *
  * Embed + thin standalone AOT: {@see GetenvLookupJitHelper} via {@see JitVmHelperLink}
- * (Rename #20603 shape — no thin libc ABI fork). NestedJIT leaf: {@see phpc_getenv_kernel}.
+ * (Rename #20603 shape — no thin libc ABI fork). NestedJIT leaf: libc getenv(3)
+ * via {@see invokeNestedLeaf} (chdir #29219 shape — kernel deleted).
  * Putenv overlay helpers remain on {@see GetenvJitHelper} (ensurePutenvLinked).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
@@ -162,7 +166,6 @@ final class StringGetenv
     {
         $internals = [
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
-            new \PHPCompiler\ext\standard\phpc_getenv_kernel(),
             new \PHPCompiler\ext\standard\phpc_putenv_kernel(),
             new \PHPCompiler\ext\standard\phpc_native_environ_mirror_into_ht(),
         ];
@@ -173,6 +176,57 @@ final class StringGetenv
                 $context->functionProxies[$lc] = $internal;
             }
         }
+    }
+
+    /**
+     * NestedJIT libc getenv(3) leaf — returns owned {@see __string__*} or null (#29313).
+     *
+     * Used while NestedJIT compiles {@see GetenvLookupJitHelper} / PendingHeaders `@getenv`
+     * so the helper bridge is not re-entered (chdir #29219 shape).
+     */
+    public static function invokeNestedLeaf(Context $context, Value $nameStr): Value
+    {
+        LibcExtern::register($context);
+
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $strMap = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        $hitBb = $fn->appendBasicBlock('getenv_nested_libc_hit');
+        $missBb = $fn->appendBasicBlock('getenv_nested_libc_miss');
+        $doneBb = $fn->appendBasicBlock('getenv_nested_libc_done');
+
+        $nameBytes = $context->builder->structGep($nameStr, $strMap['value']);
+        $envRaw = $context->builder->call($context->lookupFunction('getenv'), $nameBytes);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $envRaw, $i8p->constNull());
+        $context->builder->branchIf($isNull, $missBb, $hitBb);
+
+        $context->builder->positionAtEnd($hitBb);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $envRaw);
+        $lenI64 = $len->typeOf() === $i64
+            ? $len
+            : $context->builder->zExt($len, $i64);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenI64,
+            $envRaw
+        );
+        $hitEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $nullStr = $strPtrTy->constNull();
+        $missEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($strPtrTy, 'getenv_nested_libc_result');
+        $phi->addIncoming($owned, $hitEnd);
+        $phi->addIncoming($nullStr, $missEnd);
+
+        return $phi;
     }
 
     private static function implementGetenvBridge(Context $context): void

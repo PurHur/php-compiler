@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 /**
  * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, #8992, #20644, #23414 php-in-PHP).
  *
- * Overlay mutations in PHP; inherited environ via {@see GetenvLookupJitHelper} /
- * {@see phpc_getenv_kernel} under thin AOT NestedJIT. Process-environ setenv mirror
+ * Overlay mutations in PHP; inherited environ via {@see GetenvLookupJitHelper}
+ * (`@getenv` NestedJIT leaf — #29313). Process-environ setenv mirror
  * via {@see phpc_putenv_kernel} (no caller-side LibcExtern in JitEnv).
  * php-src: ext/standard/basic_functions.c — zif_getenv, zif_putenv
  */

@@ -21,6 +21,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -46,6 +47,11 @@ final class JitEnv
      */
     public static function getenv(Context $context, Value $nameStr, Value $localOnlyI8): Value
     {
+        // Nested helper compile: libc leaf without re-entering GetenvLookupJitHelper (#29313).
+        if (NestedJitCompileScope::isActive()) {
+            return self::getenvNestedLeaf($context, $nameStr, $localOnlyI8);
+        }
+
         StringGetenv::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -55,6 +61,53 @@ final class JitEnv
             $localOnlyI8,
             $ptr
         );
+
+        return $ptr;
+    }
+
+    /**
+     * NestedJIT leaf for getenv() — libc environ into a value box (#29313 / chdir #29219).
+     *
+     * @return Value __value__*
+     */
+    private static function getenvNestedLeaf(Context $context, Value $nameStr, Value $localOnlyI8): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $fn = $context->builder->getInsertBlock()->getParent();
+
+        $isLocal = $context->builder->icmp(Builder::INT_NE, $localOnlyI8, $i8->constInt(0, false));
+        $lookupBb = $fn->appendBasicBlock('getenv_nested_lookup');
+        $missingBb = $fn->appendBasicBlock('getenv_nested_missing');
+        $hitBb = $fn->appendBasicBlock('getenv_nested_hit');
+        $doneBb = $fn->appendBasicBlock('getenv_nested_done');
+        $context->builder->branchIf($isLocal, $missingBb, $lookupBb);
+
+        $context->builder->positionAtEnd($lookupBb);
+        $owned = StringGetenv::invokeNestedLeaf($context, $nameStr);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $owned, $strPtrTy->constNull());
+        $context->builder->branchIf($isNull, $missingBb, $hitBb);
+
+        $context->builder->positionAtEnd($hitBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($missingBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $ptr,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
 
         return $ptr;
     }

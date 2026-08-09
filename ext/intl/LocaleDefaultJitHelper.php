@@ -10,7 +10,7 @@ use PHPCompiler\ext\standard\GetenvLookupJitHelper;
  * locale_get_default() / Locale::getDefault() for compiled JIT/AOT modules (#27369).
  *
  * Slim NestedJIT leaf — avoids compiling all of {@see VmLocale} (ICU FFI static init SEGVs
- * under user-script AOT; peer {@see LocaleParserJitHelper} / {@see phpc_getenv_kernel}).
+ * under user-script AOT; peer {@see LocaleParserJitHelper} / {@see GetenvLookupJitHelper}).
  * SSOT semantics: {@see VmLocale::getDefault()} / php-src ext/intl/locale/locale_methods.c.
  */
 final class LocaleDefaultJitHelper

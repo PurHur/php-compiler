@@ -932,6 +932,9 @@ class Context {
             // chdir(2) NestedJIT leaf (#29219) — whitelist chdir → chdir_::call →
             // StringChdir::invokeNestedLeaf (module-local chdir(2); kernel removed).
             'chdir',
+            // getenv(3) NestedJIT leaf (#29313) — whitelist getenv → getenv_::call →
+            // JitEnv::getenvNestedLeaf / StringGetenv::invokeNestedLeaf (kernel removed).
+            'getenv',
             'phpc_ob_write_stdout_kernel',
             'phpc_url_rewriter_apply_kernel',
             'phpc_rewrite_vars_set_tags_kernel',
@@ -942,8 +945,7 @@ class Context {
             'phpc_argon2_hash',
             'phpc_argon2_verify',
             'phpc_gethostname_kernel',
-            'phpc_getenv_kernel',
-            // putenv setenv mirror NestedJIT leaf (#23414) — peer getenv (#20644).
+            // putenv setenv mirror NestedJIT leaf (#23414) — peer getenv (#20644 / #29313).
             'phpc_putenv_kernel',
             // Stat path always-helper NestedJIT leaves (#20742) — peer rename (#20603).
             'phpc_stat_mode_kernel',
