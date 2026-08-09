@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\LlvmToolchain;
 use PHPUnit\Framework\TestCase;
 
-/** str_pad() ValueError parity (issue #3762). */
+/** str_pad() ValueError parity (#3762 / #29292 — Zend "must not be empty"). */
 final class StrPadBuiltinTest extends TestCase
 {
     public function testExecuteEmptyPadStringThrowsValueError(): void
@@ -24,7 +24,7 @@ final class StrPadBuiltinTest extends TestCase
         $frame->calledArgs = [$input, $padLength, $padString];
         $frame->returnVar = new VM\Variable();
         $this->expectException(\ValueError::class);
-        $this->expectExceptionMessage('str_pad(): Argument #3 ($pad_string) must be a non-empty string');
+        $this->expectExceptionMessage('str_pad(): Argument #3 ($pad_string) must not be empty');
         $fn->execute($frame);
     }
 
@@ -42,7 +42,7 @@ final class StrPadBuiltinTest extends TestCase
         $frame->calledArgs = [$input, $padLength, $padString];
         $frame->returnVar = null;
         $this->expectException(\ValueError::class);
-        $this->expectExceptionMessage('str_pad(): Argument #3 ($pad_string) must be a non-empty string');
+        $this->expectExceptionMessage('str_pad(): Argument #3 ($pad_string) must not be empty');
         $fn->execute($frame);
     }
 
@@ -67,9 +67,16 @@ PHP,
         } catch (VM\ScriptExit $e) {
         }
         $this->assertSame(
-            "ValueError\nstr_pad(): Argument #3 (\$pad_string) must be a non-empty string\n",
+            "ValueError\nstr_pad(): Argument #3 (\$pad_string) must not be empty\n",
             ob_get_clean()
         );
+    }
+
+    public function testJitHelperEmptyPadStringThrowsZendMessage(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('str_pad(): Argument #3 ($pad_string) must not be empty');
+        \PHPCompiler\ext\standard\StrPadJitHelper::padArgv('a', 5, '', 1);
     }
 
     /**

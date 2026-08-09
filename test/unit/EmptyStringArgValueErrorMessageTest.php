@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** Empty-string builtin ValueError wording must match Zend (#29275 / #29276 / #29291 / #29422). */
+/** Empty-string builtin ValueError wording must match Zend (#29275 / #29276 / #29291 / #29292 / #29422). */
 final class EmptyStringArgValueErrorMessageTest extends TestCase
 {
     public function test_shared_formatter_matches_zend(): void
@@ -26,6 +26,10 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             VmString::emptyStringArgValueErrorMessage('wordwrap', 2, 'break')
         );
         self::assertSame(
+            'str_pad(): Argument #3 ($pad_string) must not be empty',
+            VmString::emptyStringArgValueErrorMessage('str_pad', 2, 'pad_string')
+        );
+        self::assertSame(
             'mb_str_pad(): Argument #3 ($pad_string) must not be empty',
             VmString::emptyStringArgValueErrorMessage('mb_str_pad', 2, 'pad_string')
         );
@@ -39,6 +43,7 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             'issue29275_explode_empty_separator_message.php',
             'issue29276_substr_count_empty_needle_message.php',
             'issue29291_wordwrap_empty_break_message.php',
+            'issue29292_str_pad_empty_pad_message.php',
             'issue29422_mb_str_pad_empty_pad_message.php',
         ] as $name) {
             $repro = realpath(__DIR__.'/../repro/'.$name);
