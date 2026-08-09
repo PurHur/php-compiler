@@ -13,7 +13,7 @@ try {
     echo $e->getMessage(), "\n";
 }
 try {
-    substr_compare('abc', 'ab', '0', 2);
+    substr_compare('abc', 'ab', 'x', 2);
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }

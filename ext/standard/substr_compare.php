@@ -39,7 +39,8 @@ final class substr_compare extends Internal
         $argc = \count($frame->calledArgs);
         $haystack = self::vmStringArg($frame, 0, 'haystack');
         $needle = self::vmStringArg($frame, 1, 'needle');
-        $offsetInt = self::requireIntArg($frame->calledArgs[2], 'substr_compare', 3, 'offset');
+        // Z_PARAM_LONG $offset — soft-null DEP+coerce (php-src string.c; #29504; peer substr_count #21657).
+        $offsetInt = VmMath::parseChrCodepointForFrame($frame, 2, 'substr_compare', 3, 'offset');
         $length = null;
         if ($argc >= 4) {
             $lengthArg = $frame->calledArgs[3]->resolveIndirect();
@@ -117,7 +118,8 @@ final class substr_compare extends Internal
         // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21515, reverts #20164 TypeError).
         $p0 = $this->stringDataPtr($context, self::jitStringArg($context, $args[0], 0, 'haystack'));
         $p1 = $this->stringDataPtr($context, self::jitStringArg($context, $args[1], 1, 'needle'));
-        $offset = self::lowerStrictIntArg($context, $args[2], 'substr_compare', 3, 'offset');
+        // Z_PARAM_LONG $offset — soft-null DEP+coerce (#29504; peer substr_count #21657).
+        $offset = JitChr::lowerZParamLongArg($context, $args[2], 'substr_compare', 3, 'offset');
         $fn = $context->lookupFunction('substr_compare');
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);
 
@@ -125,7 +127,7 @@ final class substr_compare extends Internal
     }
 
     /**
-     * Compile-time soft-null fold — emit DEP then host-evaluate when all operands are literals (#21515).
+     * Compile-time soft-null fold — emit DEP then host-evaluate when all operands are literals (#21515 / #29504).
      */
     private static function tryFoldCompileTimeSoftNull(Context $context, array $args): ?Value
     {
@@ -134,7 +136,8 @@ final class substr_compare extends Internal
         }
         $hayNull = self::isCompileTimeNull($args[0]);
         $needleNull = self::isCompileTimeNull($args[1]);
-        if (!$hayNull && !$needleNull) {
+        $offsetNull = self::isCompileTimeNull($args[2]);
+        if (!$hayNull && !$needleNull && !$offsetNull) {
             return null;
         }
         $hayLit = $hayNull ? '' : JitStringArg::compileTimeLiteral($args[0]);
@@ -142,10 +145,13 @@ final class substr_compare extends Internal
         if (null === $hayLit || null === $needleLit) {
             return null;
         }
-        if (null === $args[2]->compileTimeLong) {
+        if ($offsetNull) {
+            $offset = 0;
+        } elseif (null === $args[2]->compileTimeLong) {
             return null;
+        } else {
+            $offset = $args[2]->compileTimeLong;
         }
-        $offset = $args[2]->compileTimeLong;
         $argc = \count($args);
         $length = null;
         if ($argc >= 4) {
@@ -169,6 +175,9 @@ final class substr_compare extends Internal
         }
         if ($needleNull) {
             JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'substr_compare', 1, 'needle');
+        }
+        if ($offsetNull) {
+            JitIntdiv::emitNullIntDeprecation($context, 'substr_compare', 3, 'offset');
         }
 
         return $context->getTypeFromString('int64')->constInt(
