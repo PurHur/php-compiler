@@ -13094,9 +13094,19 @@ class Compiler {
                         }
                     }
                 }
+                // Named CV assigns keep their own slots across try/catch merge (#29482).
+                // Catch lowers before try (#6411); without this guard, catch's CV is recorded
+                // as ternary echo-phi and the try-body assign is forced onto that sibling
+                // slot — same class as #26490 (branchMergeAssignSlot) but this override path
+                // previously bypassed the named-CV check.
+                $assignIsNamedCv = null !== Block::resolveVariableName($expr->var);
                 if (null !== $block->orig && $this->isMergeBranchAssign($block, $expr)) {
                     $mergeCfg = $this->branchJumpMergeTarget($block->orig);
-                    if (null !== $mergeCfg && $this->mergeCfgBlockUsesTernaryPhi($mergeCfg)) {
+                    if (
+                        null !== $mergeCfg
+                        && $this->mergeCfgBlockUsesTernaryPhi($mergeCfg)
+                        && !$assignIsNamedCv
+                    ) {
                         $recordedPhi = $this->ternaryMergePhiRhsSlot($mergeCfg);
                         if (null !== $recordedPhi) {
                             $mergeAssignSlot = $recordedPhi;
@@ -13116,7 +13126,11 @@ class Compiler {
                     : $this->compileOperand($expr->var, $block, false);
                 if (null !== $block->orig && $this->isMergeBranchAssign($block, $expr)) {
                     $mergeCfg = $this->branchJumpMergeTarget($block->orig);
-                    if (null !== $mergeCfg && $this->mergeCfgBlockUsesTernaryPhi($mergeCfg)) {
+                    if (
+                        null !== $mergeCfg
+                        && $this->mergeCfgBlockUsesTernaryPhi($mergeCfg)
+                        && !$assignIsNamedCv
+                    ) {
                         if (!$this->ternaryMergePhiRhsSlots->contains($mergeCfg)) {
                             $this->ternaryMergePhiRhsSlots[$mergeCfg] = (int) $destSlot;
                         }
