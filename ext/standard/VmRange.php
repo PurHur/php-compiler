@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
@@ -40,6 +41,9 @@ final class VmRange
         $startChar = self::charRangeLetter($startVar);
         $endChar = self::charRangeLetter($endVar);
         if (null !== $startChar && null !== $endChar) {
+            // php-src php_range_process_input — multi-byte non-numeric strings warn then use byte 0 (#29203).
+            self::warnMultiByteCharEndpoint($frame, $startVar, 1, 'start');
+            self::warnMultiByteCharEndpoint($frame, $endVar, 2, 'end');
             $step = self::resolveCharStep($stepVar, $startChar, $endChar);
 
             return self::buildCharRange($startChar, $endChar, $step);
@@ -68,6 +72,48 @@ final class VmRange
         }
 
         return $s[0];
+    }
+
+    /**
+     * php-src php_range_process_input — E_WARNING when Z_STRLEN != 1 under PHP 8.3+ (#29203).
+     */
+    private static function warnMultiByteCharEndpoint(
+        Frame $frame,
+        Variable $var,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (!CompilerVersion::supportsRangeSingleByteStringWarning()) {
+            return;
+        }
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $var->type) {
+            return;
+        }
+        $s = $var->toString();
+        if (\strlen($s) <= 1) {
+            return;
+        }
+        $message = \sprintf(
+            'range(): Argument #%d ($%s) must be a single byte, subsequent bytes are ignored',
+            $argIndex,
+            $paramName
+        );
+        if (null !== $frame->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                $message,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame,
+                $frame->callSiteLine
+            );
+
+            return;
+        }
+        if (\function_exists('compiler_language_warning')) {
+            compiler_language_warning($message);
+        }
     }
 
     private static function endpointPrefersFloat(Variable $var): bool
