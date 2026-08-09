@@ -608,6 +608,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($from['isOptional']);
     }
 
+    /** php-src mbstring.stub.php — InternalArgInfo return int / string encoding (#28583). */
+    public function testMbStrposFamilyReflectionStubTypes(): void
+    {
+        foreach (['mb_strpos', 'mb_strrpos', 'mb_stripos', 'mb_strripos'] as $f) {
+            $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride($f, 3), $f);
+            $enc = BuiltinInternalArgInfo::paramInfoForFunction($f, 3);
+            $this->assertNotNull($enc, $f);
+            $this->assertSame('encoding', $enc['name'], $f);
+            $this->assertSame('?string', $enc['type'], $f);
+            $this->assertTrue($enc['isOptional'], $f);
+        }
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — PHP 8.3+ get_object_id; absent from InternalArgInfo (#26210). */
     public function testGetObjectIdReflectionStubTypes(): void
     {
