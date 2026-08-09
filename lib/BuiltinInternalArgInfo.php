@@ -315,6 +315,8 @@ final class BuiltinInternalArgInfo
             'ceil', 'floor' => 'float',
             // ext/standard/basic_functions.stub.php / head.c — InternalArgInfo omits |false / void (#25780)
             'get_headers' => 'array|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo empty return (#24857)
+            'parse_url' => 'array|string|int|false|null',
             'http_response_code' => 'int|bool',
             'stream_socket_pair' => 'array|false',
             'flush' => 'void',
