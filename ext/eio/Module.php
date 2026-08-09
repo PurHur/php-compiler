@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM\Variable;
 
 /**
- * eio extension module entry (PECL eio / libeio; #6442).
+ * eio extension module entry (PECL eio / libeio; #6442, #27837).
  *
  * Pure-PHP request queue completed on eio_poll() — no runtime/*.c / libeio required.
  * Advertise when {@see EioExtensionPolicy::advertisesExtension()}. JIT/AOT: VM-only v1.
@@ -52,6 +52,11 @@ class Module extends ModuleAbstract
             new eio_close(),
             new eio_read(),
             new eio_write(),
+            new eio_stat(),
+            new eio_mkdir(),
+            new eio_unlink(),
+            new eio_readdir(),
+            new eio_chmod(),
             new eio_poll(),
             new eio_nreqs(),
         ];

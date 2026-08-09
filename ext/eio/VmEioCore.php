@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\eio;
 
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmCallable;
+use PHPCompiler\ext\standard\VmStatCache;
 
 /**
- * Pure-PHP eio request queue — sync completion on {@see poll()} (#6442).
+ * Pure-PHP eio request queue — sync completion on {@see poll()} (#6442, #27837).
  *
  * No libeio / runtime/*.c. Matches PECL callback shape {@code ($data, $result[, $req])}.
  * {@see eio_read} result is the bytes string (php.net stores read bytes in $result).
+ * {@see eio_stat} result is a named-key stat array (php_eio.c EIO_STAT case).
  */
 final class VmEioCore
 {
@@ -172,9 +175,149 @@ final class VmEioCore
             return $result;
         }
 
+        if ('stat' === $type) {
+            $path = (string) $p['path'];
+            $raw = VmStatCache::stat($path);
+            if (false === $raw) {
+                $result->int(-1);
+
+                return $result;
+            }
+            $result->array(self::statArrayToHashTable($raw));
+
+            return $result;
+        }
+
+        if ('mkdir' === $type) {
+            $path = (string) $p['path'];
+            $mode = (int) $p['mode'];
+            $ok = @mkdir($path, $mode);
+            $result->int($ok ? 0 : -1);
+
+            return $result;
+        }
+
+        if ('unlink' === $type) {
+            $path = (string) $p['path'];
+            $ok = @unlink($path);
+            $result->int($ok ? 0 : -1);
+
+            return $result;
+        }
+
+        if ('chmod' === $type) {
+            $path = (string) $p['path'];
+            $mode = (int) $p['mode'];
+            $ok = @chmod($path, $mode);
+            $result->int($ok ? 0 : -1);
+
+            return $result;
+        }
+
+        if ('readdir' === $type) {
+            $path = (string) $p['path'];
+            $flags = (int) $p['flags'];
+            $entries = @scandir($path);
+            if (false === $entries) {
+                $result->int(-1);
+
+                return $result;
+            }
+            $names = [];
+            foreach ($entries as $name) {
+                if ('.' === $name || '..' === $name) {
+                    continue;
+                }
+                $names[] = $name;
+            }
+            if ($flags & EioConstants::EIO_READDIR_DIRS_FIRST) {
+                usort($names, static function (string $a, string $b) use ($path): int {
+                    $da = is_dir($path.\DIRECTORY_SEPARATOR.$a) ? 0 : 1;
+                    $db = is_dir($path.\DIRECTORY_SEPARATOR.$b) ? 0 : 1;
+
+                    return $da <=> $db ?: strcmp($a, $b);
+                });
+            } elseif ($flags & EioConstants::EIO_READDIR_STAT_ORDER) {
+                sort($names, \SORT_STRING);
+            }
+            $wantDents = (bool) ($flags & (EioConstants::EIO_READDIR_DENTS | EioConstants::EIO_READDIR_DIRS_FIRST));
+            $result->array(self::readdirResultHashTable($path, $names, $wantDents));
+
+            return $result;
+        }
+
         $result->int(-1);
 
         return $result;
+    }
+
+    /**
+     * @param array<int|string, int|string> $stat PHP {@see \stat()} shape
+     */
+    private static function statArrayToHashTable(array $stat): HashTable
+    {
+        $keys = ['dev', 'ino', 'mode', 'nlink', 'uid', 'gid', 'rdev', 'size', 'atime', 'mtime', 'ctime', 'blksize', 'blocks'];
+        $ht = new HashTable();
+        foreach ($keys as $key) {
+            $v = new Variable();
+            if (isset($stat[$key])) {
+                $v->int((int) $stat[$key]);
+            } else {
+                $v->int(-1);
+            }
+            $ht->add($key, $v);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private static function readdirResultHashTable(string $path, array $names, bool $wantDents): HashTable
+    {
+        $ht = new HashTable();
+        $namesHt = new HashTable();
+        foreach ($names as $i => $name) {
+            $nv = new Variable();
+            $nv->string($name);
+            $namesHt->updateIndex($i, $nv);
+        }
+        $namesVar = new Variable();
+        $namesVar->array($namesHt);
+        $ht->add('names', $namesVar);
+        if ($wantDents) {
+            $dentsHt = new HashTable();
+            foreach ($names as $i => $name) {
+                $full = $path.\DIRECTORY_SEPARATOR.$name;
+                $type = EioConstants::EIO_DT_UNKNOWN;
+                if (is_link($full)) {
+                    $type = EioConstants::EIO_DT_LNK;
+                } elseif (is_dir($full)) {
+                    $type = EioConstants::EIO_DT_DIR;
+                } elseif (is_file($full)) {
+                    $type = EioConstants::EIO_DT_REG;
+                }
+                $ent = new HashTable();
+                $nameV = new Variable();
+                $nameV->string($name);
+                $ent->add('name', $nameV);
+                $typeV = new Variable();
+                $typeV->int($type);
+                $ent->add('type', $typeV);
+                $inodeV = new Variable();
+                $inodeV->int(0);
+                $ent->add('inode', $inodeV);
+                $entVar = new Variable();
+                $entVar->array($ent);
+                $dentsHt->updateIndex($i, $entVar);
+            }
+            $dentsVar = new Variable();
+            $dentsVar->array($dentsHt);
+            $ht->add('dents', $dentsVar);
+        }
+
+        return $ht;
     }
 
     /**
