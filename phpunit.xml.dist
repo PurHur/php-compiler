@@ -125,6 +125,8 @@
             <file>./test/compliance/UriRfc3986PhantomsVMTest.php</file>
             <file>./test/compliance/ImplicitNullableDeprecatedPrefixVMTest.php</file>
             <file>./test/compliance/ImplicitNullableDeprecatedPrefixJITTest.php</file>
+            <file>./test/compliance/DateTimeModifyEmptyMessageVMTest.php</file>
+            <file>./test/compliance/DateTimeModifyEmptyMessageJITTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetVMTest.php</file>
             <file>./test/compliance/PropertyHookBackedGetByRefWithSetJITTest.php</file>
             <file>./test/compliance/PropertyHookWriteOnlyVirtualCoalesceVMTest.php</file>
