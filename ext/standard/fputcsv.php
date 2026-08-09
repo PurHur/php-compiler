@@ -45,16 +45,19 @@ final class fputcsv extends Internal
         if (isset($frame->calledArgs[3])) {
             $enclosure = VmReflection::stringArg($frame->calledArgs[3], 'fputcsv() enclosure', 3);
         }
-        if (isset($frame->calledArgs[4])) {
+        $escapeOmitted = !isset($frame->calledArgs[4]);
+        if (!$escapeOmitted) {
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
-        } else {
-            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
-            VmCsvArg::emitOmittedEscapeDeprecation($frame, 'fputcsv');
         }
         if (isset($frame->calledArgs[5])) {
             $eol = VmReflection::stringArg($frame->calledArgs[5], 'fputcsv() eol', 5);
         }
+        // php-src: validate separator/enclosure before omitted-$escape DEP (#29383, file.c).
         VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
+        if ($escapeOmitted) {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
+            VmCsvArg::emitOmittedEscapeDeprecation($frame, 'fputcsv');
+        }
         $fields = VmFputcsv::coerceFieldList($fieldsHt->iterate(true));
         $written = VmFs::fputcsv(
             $handle,
@@ -108,9 +111,12 @@ final class fputcsv extends Internal
         if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $enclosure = JitStringArg::lower($context, $args[3], 'fputcsv() enclosure');
         }
-        if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
+        $escapeOmitted = !isset($args[4]) || NamedOptionalCallArgs::isOmittedOptional($args[4]);
+        if (!$escapeOmitted) {
             $escape = JitStringArg::lower($context, $args[4], 'fputcsv() escape');
-        } else {
+        }
+        // Deprecation after compile-time/runtime CSV validation (#29383) — validate* already ran above.
+        if ($escapeOmitted) {
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
             VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'fputcsv');
         }

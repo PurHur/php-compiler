@@ -42,16 +42,19 @@ final class fgetcsv extends Internal
         if (isset($frame->calledArgs[3])) {
             $enclosure = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'fgetcsv', 3, 'enclosure');
         }
-        if (isset($frame->calledArgs[4])) {
+        $escapeOmitted = !isset($frame->calledArgs[4]);
+        if (!$escapeOmitted) {
             $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'fgetcsv', 4, 'escape');
-        } else {
+        }
+        // php-src: validate separator/enclosure before omitted-$escape DEP (#29383, file.c).
+        VmCsvArg::validateFgetcsvOptions($separator, $enclosure, $escape);
+        if ($escapeOmitted) {
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
             VmCsvArg::emitOmittedEscapeDeprecation($frame, 'fgetcsv');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        VmCsvArg::validateFgetcsvOptions($separator, $enclosure, $escape);
         $row = VmFs::fgetcsv($handle, $length, $separator, $enclosure, $escape);
         if (false === $row) {
             $frame->returnVar->bool(false);
@@ -93,17 +96,20 @@ final class fgetcsv extends Internal
         if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $enclosure = JitStringBuiltinArg::lower($context, $args[3], 'fgetcsv', 3, 'enclosure');
         }
-        if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
+        $escapeOmitted = !isset($args[4]) || NamedOptionalCallArgs::isOmittedOptional($args[4]);
+        if (!$escapeOmitted) {
             $escape = JitStringBuiltinArg::lower($context, $args[4], 'fgetcsv', 4, 'escape');
-        } else {
-            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
-            VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'fgetcsv');
         }
+        // php-src: validate before omitted-$escape DEP (#29383).
         if (!JitCsvArg::validateFgetcsvCall($context, ...$args)) {
             return $context->builder->pointerCast(
                 $context->constantFromInteger(0, 'int64'),
                 $context->getTypeFromString('__value__*')
             );
+        }
+        if ($escapeOmitted) {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
+            VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'fgetcsv');
         }
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
