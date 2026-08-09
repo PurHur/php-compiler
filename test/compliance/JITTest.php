@@ -1406,10 +1406,14 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'clone_with_reference_profile')) {
                 continue;
             }
+            // Keyword `with` rejection cases run on every profile (#29187); paren form needs 8.5+.
             if (!CompilerVersion::supportsCloneWithSyntax()
                 && str_contains($name, 'clone_with')
                 && !str_contains($name, 'clone_with_reference_profile')
-                && !str_contains($name, 'clone_with_forward_profile')) {
+                && !str_contains($name, 'clone_with_forward_profile')
+                && !str_contains($name, 'clone_with_brace_rejected')
+                && !str_contains($name, 'clone_with_keyword_array')
+                && !str_contains($name, 'clone_with_paren')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when try/catch/else enabled (#15817, #19128).

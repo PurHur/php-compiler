@@ -108,18 +108,18 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'clone_with',
-            'construct' => 'PHP 8.3+ `clone $obj with { prop: $value }`',
+            'construct' => 'PHP 8.5+ `clone($obj, [\'prop\' => $value])`',
             'opcodes' => ['TYPE_CLONE', 'TYPE_METHODCALL_INIT'],
             'issue' => 4513,
             'jit' => true,
             'aot' => true,
-            'profile' => '8.4',
+            'profile' => '8.5',
             'notes' => [
                 'Ast\\CloneWithDesugar before php-parser (#4513); lowers to IIFE clone + property writes',
-                'Zend/zend_language_parser.y clone_expr with clause; zend_clones.c property overrides',
+                'Zend/zend_language_parser.y clone expression (array form only); keyword `with { }` rejected (#29187)',
                 'AOT user-script: ignore leftover scope className on FLAG_CLOSURE (#23046, re-#19130)',
             ],
-            'probe' => 'class C { public int $x = 1; public string $y = "a"; } $c = new C(); $d = clone $c with { x: 2, y: "b" }; echo $d->x, $d->y;',
+            'probe' => 'class C { public int $x = 1; public string $y = "a"; } $c = new C(); $d = clone($c, ["x" => 2, "y" => "b"]); echo $d->x, $d->y;',
         ],
         [
             'id' => 'magic_methods',

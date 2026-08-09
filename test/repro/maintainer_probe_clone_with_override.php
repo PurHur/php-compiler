@@ -10,6 +10,6 @@ class C {
 }
 
 $c = new C();
-$d = clone $c with ['x' => 2];
+$d = clone($c, ['x' => 2]);
 var_export([$c->x, $d->x]);
 echo "\n";

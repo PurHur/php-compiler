@@ -1,5 +1,5 @@
 --TEST--
-Language: clone-with forward profile gate (#23877, #16676, PHP_COMPILER_PROFILE=8.5)
+Language: clone($obj, [...]) forward profile gate (#23877, #16676, #29187, PHP_COMPILER_PROFILE=8.5)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -20,7 +20,7 @@ class Src {
 }
 
 $src = new Src();
-$copy = clone $src with { x: 2 };
+$copy = clone($src, ['x' => 2]);
 $copy2 = clone ($src, ['x' => 3]);
 echo $copy->x, ',', $copy2->x, "\n";
 --EXPECT--

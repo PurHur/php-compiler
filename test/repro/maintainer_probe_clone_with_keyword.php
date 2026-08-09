@@ -11,5 +11,5 @@ class W {
 }
 
 $w = new W();
-$w2 = clone $w with ['a'];
+$w2 = clone($w, ['a']);
 echo $w2->a, ',', $w2->b, "\n";

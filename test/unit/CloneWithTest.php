@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Ast\CloneWithDesugar;
+use PHPCompiler\CloneWithSyntaxRejector;
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** PHP 8.3+ clone with { } desugar (#4513). */
+/** PHP 8.5+ parenthesized clone($obj, [...]) desugar (#4513, #29187). */
 final class CloneWithTest extends TestCase
 {
     private function skipUnlessCloneWithEnabled(): void
@@ -19,12 +21,58 @@ final class CloneWithTest extends TestCase
         }
     }
 
-    public function testDesugarRewritesCloneWith(): void
+    /** Issue #29187 — keyword `with { }` is not in Zend; desugar must not rewrite it. */
+    public function testDesugarDoesNotRewriteKeywordWithBrace(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with { x: 2, y: "b" };';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\', \'y\');$__phpc_r->x = 2;$__phpc_r->y = "b";phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
-        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+        $this->assertSame($input, CloneWithDesugar::desugar($input));
+    }
+
+    /** Issue #29187 — reject brace form under PROFILE=8.5 like Zend ParseError. */
+    public function testRejectorThrowsOnKeywordWithBraceWhenCloneWithEnabled(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsCloneWithSyntax());
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(CloneWithDesugar::REFERENCE_PROFILE_UNEXPECTED_WITH);
+            CloneWithSyntaxRejector::reject('<?php $d = clone $c with { x: 2 };', 'clone_with_brace.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #29187 — parenthesized form still compiles under PROFILE=8.5. */
+    public function testVmParenCloneWithUnderProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $code = <<<'PHP'
+<?php
+class C { public function __construct(public int $x, public int $y = 0) {} }
+$o = new C(1, 2);
+$n = clone($o, ['x' => 9]);
+echo $n->x, '|', $n->y, "\n";
+PHP;
+            $rt = new Runtime();
+            $block = $rt->parseAndCompile($code, 'clone_with_paren_ok.php');
+            ob_start();
+            $rt->run($block);
+            $this->assertSame("9|2\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     /** Issue #9743 — PHP 8.4+ clone($obj, ['prop']) functional syntax. */
@@ -153,109 +201,59 @@ PHP;
         $this->assertSame([], $phpcR, 'clone-with must not warn on $__phpc_r (#23877)');
     }
 
-    /** Issue #9995 — PHP 8.4+ `clone $obj with ['prop']` keyword array syntax. */
-    public function testDesugarRewritesCloneWithKeywordArray(): void
+    /** Issue #29187 — keyword `with […]` is not in Zend; desugar must not rewrite it. */
+    public function testDesugarDoesNotRewriteCloneWithKeywordArray(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with [\'a\'];';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
-        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+        $this->assertSame($input, CloneWithDesugar::desugar($input));
     }
 
-    public function testDesugarRewritesCloneWithKeywordAssociativeArray(): void
+    public function testDesugarDoesNotRewriteCloneWithKeywordAssociativeArray(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with [\'x\' => 2];';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
-        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+        $this->assertSame($input, CloneWithDesugar::desugar($input));
     }
 
-    /** Issue #10496 — PHP 8.4+ `(clone $obj) with [...]` parenthesized operand. */
-    public function testDesugarRewritesParenCloneWithKeywordArray(): void
+    /** Issue #29187 — `(clone $obj) with […]` is not in Zend. */
+    public function testDesugarDoesNotRewriteParenCloneWithKeywordArray(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with [\'a\'];';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
-        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+        $this->assertSame($input, CloneWithDesugar::desugar($input));
     }
 
-    public function testDesugarRewritesParenCloneWithAssociativeArray(): void
+    public function testDesugarDoesNotRewriteParenCloneWithAssociativeArray(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with [\'x\' => 2];';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
-        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+        $this->assertSame($input, CloneWithDesugar::desugar($input));
     }
 
-    public function testDesugarRewritesParenCloneWithBlock(): void
+    public function testDesugarDoesNotRewriteParenCloneWithBlock(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with { x: 2 };';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
-        $this->assertSame($expected, CloneWithDesugar::desugar($input));
+        $this->assertSame($input, CloneWithDesugar::desugar($input));
     }
 
-    public function testVmParenCloneWithKeywordArrayValueOverrides(): void
+    public function testRejectorThrowsOnKeywordWithArrayWhenCloneWithEnabled(): void
     {
-        $this->skipUnlessCloneWithEnabled();
-        $code = <<<'PHP'
-<?php
-class C {
-    public int $x = 1;
-    public readonly int $y;
-    public function __construct() { $this->y = 9; }
-}
-$c = new C();
-$d = (clone $c) with ['x' => 2, 'y' => 3];
-echo $d->x, ',', $d->y, "\n";
-PHP;
-        $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'test.php');
-        ob_start();
-        $rt->run($block);
-        $this->assertSame("2,3\n", ob_get_clean());
-    }
-
-    public function testVmCloneWithKeywordArrayReadonlyReinit(): void
-    {
-        $this->skipUnlessCloneWithEnabled();
-        $code = <<<'PHP'
-<?php
-class W {
-    public int $a = 1;
-    public readonly int $b;
-    public function __construct() { $this->b = 2; }
-}
-$w = new W();
-$w2 = clone $w with ['a'];
-echo $w2->a, ',', $w2->b, "\n";
-PHP;
-        $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'test.php');
-        ob_start();
-        $rt->run($block);
-        $this->assertSame("1,2\n", ob_get_clean());
-    }
-
-    public function testVmCloneWithKeywordArrayValueOverrides(): void
-    {
-        $this->skipUnlessCloneWithEnabled();
-        $code = <<<'PHP'
-<?php
-class C {
-    public int $x = 1;
-    public readonly int $y;
-    public function __construct() { $this->y = 9; }
-}
-$c = new C();
-$d = clone $c with ['x' => 2, 'y' => 3];
-echo $d->x, ',', $d->y, "\n";
-PHP;
-        $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'test.php');
-        ob_start();
-        $rt->run($block);
-        $this->assertSame("2,3\n", ob_get_clean());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsCloneWithSyntax());
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(CloneWithDesugar::REFERENCE_PROFILE_UNEXPECTED_WITH);
+            CloneWithSyntaxRejector::reject('<?php $d = clone $c with [\'x\' => 2];', 'clone_with_kw.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmCloneCallSyntaxReadonlyReinit(): void
@@ -310,7 +308,7 @@ class C {
     public function __construct(int $x) { $this->x = $x; }
 }
 $c = new C(1);
-$d = clone $c with { x: 2 };
+$d = clone($c, ['x' => 2]);
 echo $d->x, "\n";
 PHP;
         $rt = new Runtime();
@@ -332,7 +330,7 @@ class C {
     public function __construct(int $x) { $this->x = $x; }
 }
 $c = new C(1);
-$d = clone $c with { x: 2 };
+$d = clone($c, ['x' => 2]);
 echo $d->x, "\n";
 PHP;
         $jitBin = __DIR__.'/../../bin/jit.php';
@@ -340,7 +338,8 @@ PHP;
             ['php', $jitBin, '-r', $code],
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
-            __DIR__.'/../..'
+            __DIR__.'/../..',
+            ['PHP_COMPILER_PROFILE' => '8.5']
         );
         $this->assertIsResource($proc);
         $stdout = (string) stream_get_contents($pipes[1]);
@@ -363,7 +362,7 @@ class C {
     public string $y = 'a';
 }
 $c = new C();
-$d = clone $c with { x: 2, y: 'b' };
+$d = clone($c, ['x' => 2, 'y' => 'b']);
 var_export([$d->x, $d->y]);
 PHP;
         $rt = new Runtime();
@@ -419,7 +418,7 @@ class C {
 }
 
 $c = new C();
-$d = clone $c with ['x' => 2];
+$d = clone($c, ['x' => 2]);
 var_export([$c->x, $d->x]);
 PHP;
         $rt = new Runtime();

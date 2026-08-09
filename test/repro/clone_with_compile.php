@@ -7,5 +7,5 @@ class C {
 }
 
 $c = new C();
-$d = (clone $c) with ['a' => 2];
+$d = clone($c, ['a' => 2]);
 echo $d->a, ':x', "\n";

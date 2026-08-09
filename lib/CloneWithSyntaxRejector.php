@@ -8,10 +8,14 @@ use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject PHP 8.5+ clone-with syntax on the Zend 8.2 reference profile (#12987, #23877).
+ * Reject non-php-src clone-with surface (#12987, #23877, #29187).
  *
- * Must run before {@see Ast\CloneWithDesugar} so clone-with is not lowered into valid PHP.
- * php-src: Zend/zend_language_parser.y clone_expr with clause; zend_vm_def.h ZEND_CLONE.
+ * Zend ships only parenthesized `clone($obj, array $withProperties)` on 8.5+.
+ * Keyword forms (`clone $obj with { … }`, `clone $obj with […]`, `(clone $obj) with …`)
+ * are a ParseError on every Zend version — reject them on all profiles.
+ *
+ * Must run before {@see Ast\CloneWithDesugar} so rejected forms are not lowered.
+ * php-src: Zend/zend_language_parser.y clone expression (array form only).
  */
 final class CloneWithSyntaxRejector
 {
@@ -20,10 +24,18 @@ final class CloneWithSyntaxRejector
         if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
             return $code;
         }
+
+        // Always reject keyword `with` forms — Zend never shipped them (#29187).
+        $keywordError = CloneWithDesugar::keywordWithSyntaxError($code);
+        if (null !== $keywordError) {
+            throw new CompileFatal($filename, $keywordError['line'], $keywordError['message']);
+        }
+
         if (CompilerVersion::supportsCloneWithSyntax()) {
             return $code;
         }
-        $error = CloneWithDesugar::referenceProfileSyntaxError($code);
+
+        $error = CloneWithDesugar::referenceProfileCloneCallSyntaxError($code);
         if (null === $error) {
             return $code;
         }
