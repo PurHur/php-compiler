@@ -23,6 +23,9 @@ final class ResourceState
 
     public const KIND_PROCESS = 'process';
 
+    /** pecl-text-wddx le_wddx — "WDDX packet ID" (#27858). */
+    public const KIND_WDDX_PACKET = 'WDDX packet ID';
+
     public function __construct(
         public int $handle,
         public string $kind,

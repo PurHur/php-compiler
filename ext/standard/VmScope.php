@@ -262,10 +262,21 @@ final class VmScope
 
     public static function compact(Frame $frame): HashTable
     {
+        return self::compactArgsFrom($frame, 0);
+    }
+
+    /**
+     * compact()-style name resolution over {@see Frame::$calledArgs} starting at $fromIndex
+     * (wddx_add_vars skips the packet resource at arg 0; #27858).
+     */
+    public static function compactArgsFrom(Frame $frame, int $fromIndex): HashTable
+    {
         $caller = self::requireCaller($frame);
         $result = new HashTable();
-        foreach ($frame->calledArgs as $argIndex => $arg) {
-            foreach (self::collectCompactNames($frame, (int) $argIndex + 1, $arg->resolveIndirect()) as $name) {
+        $args = $frame->calledArgs;
+        $argc = \count($args);
+        for ($i = $fromIndex; $i < $argc; ++$i) {
+            foreach (self::collectCompactNames($frame, $i + 1, $args[$i]->resolveIndirect()) as $name) {
                 $value = self::resolveCompactVariable($frame, $caller, $name);
                 if (null === $value || $value->resolveIndirect()->isUndefined()) {
                     self::compactUndefinedVariableWarning($frame, $name);

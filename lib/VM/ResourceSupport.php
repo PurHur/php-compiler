@@ -161,6 +161,26 @@ final class ResourceSupport
         return null !== $handle && VmProcess::isValidHandle($handle);
     }
 
+    /** pecl-text-wddx packet resource zval (wddx_packet_start; #27858) — open when handle > 0. */
+    public static function isWddxPacketResource(Variable $var): bool
+    {
+        $state = self::stateFromVariable($var);
+
+        return null !== $state
+            && ResourceState::KIND_WDDX_PACKET === $state->kind
+            && $state->handle > 0;
+    }
+
+    /** Closed WDDX packet resource after wddx_packet_end (zend_list_close shape). */
+    public static function isClosedWddxPacketResource(Variable $var): bool
+    {
+        $state = self::stateFromVariable($var);
+
+        return null !== $state
+            && ResourceState::KIND_WDDX_PACKET === $state->kind
+            && $state->handle <= 0;
+    }
+
     /** VM stream-context array handles (ext/standard/streams.c, #6367, #8743). */
     public static function isStreamContextResource(Variable $var): bool
     {
@@ -175,6 +195,8 @@ final class ResourceSupport
             || self::isBucketResource($var)
             || self::isStreamFilterResource($var)
             || self::isProcessResource($var)
+            || self::isWddxPacketResource($var)
+            || self::isClosedWddxPacketResource($var)
             || self::isStreamContextResource($var);
     }
 
@@ -216,6 +238,9 @@ final class ResourceSupport
             $handle = self::resolveHandle($var);
 
             return null === $handle || !VmProcess::isValidHandle($handle);
+        }
+        if (self::isClosedWddxPacketResource($var)) {
+            return true;
         }
 
         return false;
@@ -282,6 +307,12 @@ final class ResourceSupport
         if (self::isStreamContextResource($var)) {
             return 'resource (stream-context)';
         }
+        if (self::isClosedWddxPacketResource($var)) {
+            return 'resource (closed)';
+        }
+        if (self::isWddxPacketResource($var)) {
+            return 'resource (WDDX packet ID)';
+        }
 
         return null;
     }
@@ -320,6 +351,10 @@ final class ResourceSupport
                 break;
             case ResourceState::KIND_PROCESS:
                 $var->legacyProcessHandle($handle);
+                break;
+            case ResourceState::KIND_WDDX_PACKET:
+                // No legacy int-tagged path — WDDX packets require Resource object wrap (#27858).
+                $var->int($handle);
                 break;
             default:
                 throw new \LogicException('Unknown VM resource kind: '.$kind);

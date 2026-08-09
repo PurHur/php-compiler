@@ -804,9 +804,12 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'extension_loaded_xmlrpc')) {
                 continue;
             }
+            // wddx_packet_builders / *_forward* set PROFILE via --ENV--; always include (#27858).
             if (!CompilerVersion::supportsWddx()
                 && str_contains($name, 'wddx')
-                && !str_contains($name, 'extension_loaded_wddx')) {
+                && !str_contains($name, 'extension_loaded_wddx')
+                && !str_contains($name, 'wddx_packet_builders')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             // yaml_parse_url_forward_84 sets PROFILE via --ENV--; always include (#22252).
