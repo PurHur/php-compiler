@@ -122,6 +122,10 @@
             <file>./test/compliance/AssertOptionsDeprecatedJITTest.php</file>
             <file>./test/compliance/EStrictConstantDeprecatedVMTest.php</file>
             <file>./test/compliance/EStrictConstantDeprecatedJITTest.php</file>
+            <file>./test/compliance/DeprecatedInheritedConstFetchVMTest.php</file>
+            <file>./test/compliance/DeprecatedInheritedConstFetchJITTest.php</file>
+            <file>./test/compliance/DeprecatedIfaceConstFetchVMTest.php</file>
+            <file>./test/compliance/DeprecatedIfaceConstFetchJITTest.php</file>
             <file>./test/compliance/UriRfc3986PhantomsVMTest.php</file>
             <file>./test/compliance/ImplicitNullableDeprecatedPrefixVMTest.php</file>
             <file>./test/compliance/ImplicitNullableDeprecatedPrefixJITTest.php</file>

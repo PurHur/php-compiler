@@ -224,6 +224,42 @@ PHP;
         }
     }
 
+    /** @covers issue #29382 */
+    public function testDeprecatedInheritedClassConstCitesDeclaringClassUnderProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+ini_set('error_reporting', '32767');
+ini_set('display_errors', '0');
+class A {
+    #[\Deprecated(message: 'gone')]
+    public const X = 1;
+}
+class B extends A {}
+echo B::X, "\n";
+$last = error_get_last();
+echo ($last['message'] ?? 'none'), "\n";
+echo (($last['type'] ?? 0) === 16384) ? 'dep' : 'no';
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'deprecated_inherited_const.php'));
+            $this->assertSame(
+                "1\nConstant A::X is deprecated, gone\ndep",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #27825 */
     public function testBareDeprecatedFunctionCallEmitsUnderProfile84(): void
     {
