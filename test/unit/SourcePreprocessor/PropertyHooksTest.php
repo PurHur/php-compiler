@@ -631,6 +631,53 @@ PHP;
         self::assertSame('__phpc_property_set_name', $registry['c']['name']['set'] ?? null);
     }
 
+    /** @covers issue #29242 — default after promoted ctor hook block is Zend ParseError */
+    public function testPromotedConstructorParamHookDefaultAfterThrowsParseError(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public int $x {
+            get => $this->x * 2;
+            set {
+                $this->x = $value + 1;
+            }
+        } = 1
+    ) {}
+}
+PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(PropertyHooks::PROMOTED_HOOK_DEFAULT_AFTER_PARSE_ERROR);
+        (new PropertyHooks())->process($src, 'promoted_hook_default.php');
+    }
+
+    /** @covers issue #29242 — default before promoted ctor hook block remains valid */
+    public function testPromotedConstructorParamHookDefaultBeforeStillLowers(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public int $x = 1 {
+            get => $this->x * 2;
+            set {
+                $this->x = $value + 1;
+            }
+        }
+    ) {}
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('public int $x = 1', $out);
+        self::assertStringNotContainsString('$x = 1;', $out);
+        self::assertSame('__phpc_property_get_x', $registry['c']['x']['get'] ?? null);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+    }
+
     /** @covers issue #7313 — promoted hooked param end-to-end via Runtime preprocess */
     public function testPromotedConstructorParamPropertyHooksSurviveRuntimePreprocess(): void
     {
