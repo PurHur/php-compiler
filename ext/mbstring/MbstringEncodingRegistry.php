@@ -117,6 +117,13 @@ final class MbstringEncodingRegistry
                     return $key;
                 }
             }
+            // php_mb_get_encoding also matches preferred MIME names (UUENCODE → x-uuencode; #28981).
+            if (
+                '' !== $meta['mime']
+                && $upper === strtoupper(str_replace(['-', '_', ' '], '', $meta['mime']))
+            ) {
+                return $key;
+            }
         }
 
         return null;

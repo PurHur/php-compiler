@@ -408,15 +408,25 @@ final class VmMbstring
     }
 
     /**
-     * Pseudo-encodings accepted by mb_convert_encoding() beyond CharsetEngine charsets.
+     * php-src / libmbfl UUENCODE transfer encoding (deprecated in 8.2+; #28981).
      *
-     * UUENCODE remains sibling #28981 — listed for aliases/lists (#28983) but not converted yet.
+     * MIME name x-uuencode resolves via registry; encode wraps convert_uuencode with the
+     * libmbfl "begin 0644 filename" header (no trailing "`\\n" terminator line).
+     */
+    public static function isUuencodeEncoding(string $encoding): bool
+    {
+        return 'UUENCODE' === (MbstringEncodingRegistry::resolve($encoding) ?? '');
+    }
+
+    /**
+     * Pseudo-encodings accepted by mb_convert_encoding() beyond CharsetEngine charsets.
      */
     public static function isMbConvertPseudoEncoding(string $encoding): bool
     {
         return self::isHtmlEntitiesEncoding($encoding)
             || self::isBase64Encoding($encoding)
-            || self::isQuotedPrintableEncoding($encoding);
+            || self::isQuotedPrintableEncoding($encoding)
+            || self::isUuencodeEncoding($encoding);
     }
 
     /**
@@ -561,8 +571,8 @@ final class VmMbstring
     }
 
     /**
-     * mb_convert_encoding() core — charset + HTML-ENTITIES / BASE64 / Quoted-Printable
-     * (#11212, #22631, #28980, #28982).
+     * mb_convert_encoding() core — charset + HTML-ENTITIES / BASE64 / Quoted-Printable / UUENCODE
+     * (#11212, #22631, #28980, #28982, #28981).
      *
      * php-src / libmbfl HTML-ENTITIES is not htmlentities(): ASCII (incl. <>&) stays literal;
      * named HTML entities for mapped non-ASCII; numeric &#N; for everything else (e.g. あ → &#12354;).
@@ -575,6 +585,10 @@ final class VmMbstring
      * Quoted-Printable (#28982): to-QP is libmbfl mb_wchar_to_qprint of raw input bytes
      * (from-charset not re-encoded); from-QP is quoted_printable_decode → raw bytes. Soft wrap
      * at 72 (not quot_print.c's 75). PHP 8.2+ deprecates resolving QP as $to_encoding.
+     *
+     * UUENCODE (#28981): to-UUENCODE is libmbfl mb_wchar_to_uuencode (begin header + body without
+     * convert_uuencode's trailing "`\\n"); from-UUENCODE skips to the begin line then
+     * convert_uudecode. PHP 8.2+ deprecates resolving UUENCODE as $to_encoding.
      *
      * Illegal bytes honor MBSTRG(filter_illegal_*) even when $from === $to (#25207).
      */
@@ -600,6 +614,24 @@ final class VmMbstring
             self::deprecateBase64ViaMbstring($frame, $function);
 
             return \base64_encode($source);
+        }
+
+        $toUu = self::isUuencodeEncoding($to);
+        $fromUu = self::isUuencodeEncoding($from);
+        if ($fromUu) {
+            if ($toUu) {
+                // Identity UUENCODE→UUENCODE: Zend returns decoded bytes (not re-encoded).
+                self::deprecateUuencodeViaMbstring($frame, $function);
+
+                return self::decodeUuencodePseudo($source);
+            }
+
+            return self::decodeUuencodePseudo($source);
+        }
+        if ($toUu) {
+            self::deprecateUuencodeViaMbstring($frame, $function);
+
+            return self::encodeUuencodePseudo($source);
         }
 
         $toQp = self::isQuotedPrintableEncoding($to);
@@ -714,6 +746,12 @@ final class VmMbstring
     public static function deprecateQuotedPrintableViaMbstring(?Frame $frame, string $function = 'mb_convert_encoding'): void
     {
         self::deprecateSpecialTransferEncodingViaMbstring('Quoted-Printable', $frame, $function);
+    }
+
+    /** PHP 8.2+ E_DEPRECATED for UUENCODE / x-uuencode via php_mb_get_encoding (#28981). */
+    public static function deprecateUuencodeViaMbstring(?Frame $frame, string $function = 'mb_convert_encoding'): void
+    {
+        self::deprecateSpecialTransferEncodingViaMbstring('UUENCODE', $frame, $function);
     }
 
     /**
@@ -836,6 +874,54 @@ final class VmMbstring
     public static function decodeQuotedPrintablePseudo(string $source): string
     {
         return VmString::quoted_printable_decode($source);
+    }
+
+    /**
+     * libmbfl UUENCODE output — mb_wchar_to_uuencode (php-src mbfilter_uuencode.c; #28981).
+     *
+     * Empty input yields "" (no header). Non-empty: "begin 0644 filename\\n" + convert_uuencode
+     * body without the trailing "`\\n" length-0 terminator that convert_uuencode always appends.
+     */
+    public static function encodeUuencodePseudo(string $source): string
+    {
+        if ('' === $source) {
+            return '';
+        }
+        $body = VmString::convert_uuencode($source);
+        if (str_ends_with($body, "`\n")) {
+            $body = \substr($body, 0, -2);
+        }
+
+        return "begin 0644 filename\n".$body;
+    }
+
+    /**
+     * libmbfl UUENCODE input — seek "begin " line then convert_uudecode (mbfilter_uuencode.c; #28981).
+     *
+     * Missing begin header → "" (not false). Invalid body after begin → "".
+     */
+    public static function decodeUuencodePseudo(string $source): string
+    {
+        $len = \strlen($source);
+        $pos = 0;
+        while ($pos < $len) {
+            if ('b' === $source[$pos] && 0 === \substr_compare($source, 'begin ', $pos, 6)) {
+                $nl = \strpos($source, "\n", $pos);
+                if (false === $nl) {
+                    return '';
+                }
+                $decoded = VmString::convert_uudecode(\substr($source, $nl + 1));
+
+                return false === $decoded ? '' : $decoded;
+            }
+            $nl = \strpos($source, "\n", $pos);
+            if (false === $nl) {
+                break;
+            }
+            $pos = $nl + 1;
+        }
+
+        return '';
     }
 
     /**
@@ -1230,7 +1316,9 @@ final class VmMbstring
         if (self::isQuotedPrintableEncoding($name)) {
             return 'Quoted-Printable';
         }
-        // UUENCODE is valid for lists/aliases (#28983); convert from-list still rejects until #28981.
+        if (self::isUuencodeEncoding($name)) {
+            return 'UUENCODE';
+        }
         $canonical = MbstringEncodingRegistry::resolve($name);
         if (null !== $canonical && null !== CharsetEngine::parseEncodingSpec($canonical)) {
             return $canonical;
