@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * random_bytes() CSPRNG for compiled JIT/AOT modules (#9149, #21186, php-in-PHP).
+ * random_bytes() for compiled JIT/AOT modules (#9149, #21186, #29531, php-in-PHP).
  *
- * Kernel path: {@see phpc_random_bytes_kernel}; VM SSOT remains {@see VmRandomPure}.
+ * Leaf is `@random_bytes` → NestedJIT whitelist {@see random_bytes} →
+ * {@see JitRandomBytes::generate} → {@see JitRandomBytesKernel} /dev/urandom open/read
+ * (no kernel Internal; gethostname #29364 / putenv #29334 shape).
+ * VM SSOT remains {@see VmRandomPure} / {@see VmString::randomBytes}.
  * php-src: ext/standard/random.c — php_random_bytes()
  */
 final class RandomBytesJitHelper
 {
     public static function randomBytes(int $length): string
     {
-        return \phpc_random_bytes_kernel($length);
+        return \random_bytes($length);
     }
 }

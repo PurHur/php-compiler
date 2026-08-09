@@ -11,10 +11,12 @@ use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for phpc_random_bytes_kernel() — thin libc open/read /dev/urandom (#21186).
+ * LLVM NestedJIT leaf for random_bytes() — thin libc open/read /dev/urandom (#21186, #29531).
  *
- * Nested leaf inside RandomBytesJitHelper only (user-script AOT always goes through
- * {@see RandomBytesJitHelper} via {@see \PHPCompiler\JIT\Builtin\StringRandomBytes}).
+ * Used while NestedJIT compiles {@see RandomBytesJitHelper} `@random_bytes` so the helper
+ * does not re-enter `__compiler_random_bytes` (gethostname #29364 / putenv #29334 shape).
+ * User-script AOT always goes through {@see RandomBytesJitHelper} via
+ * {@see \PHPCompiler\JIT\Builtin\StringRandomBytes}. Kernel Internal deleted (#29531).
  * Mirrors {@see VmRandomPure} (open/read, not getrandom(3)).
  * php-src: ext/standard/random.c — php_random_bytes()
  */
@@ -132,7 +134,7 @@ final class JitRandomBytesKernel
     {
         $b = $context->builder;
         if (!$b instanceof LLVMBuilderImpl) {
-            throw new \LogicException('LLVM builder required for phpc_random_bytes_kernel');
+            throw new \LogicException('LLVM builder required for JitRandomBytesKernel');
         }
         $b->llvm->lib->LLVMBuildUnreachable($b->builder);
     }
