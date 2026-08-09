@@ -6,9 +6,10 @@ namespace PHPCompiler\ext\gnupg;
 
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\Variable;
 
 /**
- * gnupg extension module entry (PECL gnupg; #6668, #25360).
+ * gnupg extension module entry (PECL gnupg; #6668, #25360, #28064).
  *
  * Advertise gnupg_* / class gnupg / extension_loaded('gnupg') only when
  * {@see GnupgExtensionPolicy::advertisesExtension()}. Requires libgpgme via FFI
@@ -24,6 +25,15 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        if (!GnupgExtensionPolicy::advertisesExtension()) {
+            return;
+        }
+        require_once __DIR__.'/GnupgConstants.php';
+        foreach (GnupgConstants::registeredConstants() as $name => $value) {
+            $var = new Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
         if (!GnupgExtensionPolicy::advertisesClasses()) {
             return;
         }
