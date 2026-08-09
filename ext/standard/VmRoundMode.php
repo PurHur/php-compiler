@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -62,7 +64,8 @@ final class VmRoundMode
         Variable $var,
         string $fn,
         string $paramName = 'mode',
-        int $argNum = 3
+        int $argNum = 3,
+        ?Frame $frame = null
     ): int {
         $var = $var->resolveIndirect();
         $fromEnum = self::tryRoundModeInt($var);
@@ -77,6 +80,29 @@ final class VmRoundMode
                 $paramName,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
+        }
+        // php-src Z_PARAM_LONG soft-null for RoundingMode|int — non-strict DEP+coerce to 0,
+        // then ValueError (mode 0 invalid); strict_types keeps TypeError (#29384).
+        if (Variable::TYPE_NULL === $var->type) {
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($%s) must be of type RoundingMode|int, null given',
+                    $fn,
+                    $argNum,
+                    $paramName
+                ));
+            }
+            VmNullNumberParamDeprecation::emit(
+                $frame,
+                $fn,
+                $argNum,
+                $paramName,
+                'RoundingMode|int'
+            );
+            $mode = 0;
+            self::assertValidLegacyIntMode($mode, $fn, $argNum, $paramName);
+
+            return $mode;
         }
         if (Variable::TYPE_INTEGER !== $var->type) {
             throw new \TypeError(sprintf(
