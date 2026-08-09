@@ -133,6 +133,29 @@ final class JitDomSaveXMLUserScript
         $lt = $context->builder->load($context->constantStringFromString('<'));
         $gt = $context->builder->load($context->constantStringFromString('>'));
         $ltSlash = $context->builder->load($context->constantStringFromString('</'));
+        $slashGt = $context->builder->load($context->constantStringFromString('/>'));
+        // Empty body → self-closing `<tag/>` (libxml xmlNodeDump; #29409).
+        $bodyLen = $context->builder->load(
+            $context->builder->structGep($bodyStr, $context->structFieldMap['__string__']['length'])
+        );
+        $bodyEmpty = $context->builder->icmp(Builder::INT_EQ, $bodyLen, $zero);
+        $bbSelfClose = BasicBlockHelper::append($context, 'dom_savexml_self_close');
+        $bbPaired = BasicBlockHelper::append($context, 'dom_savexml_paired');
+        $bbXmlMerge = BasicBlockHelper::append($context, 'dom_savexml_xml_merge');
+        $xmlSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__string__*')
+        );
+        $context->builder->branchIf($bodyEmpty, $bbSelfClose, $bbPaired);
+        $context->builder->positionAtEnd($bbSelfClose);
+        $selfClose = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $lt, $tagStr),
+            $slashGt
+        );
+        $context->builder->store($selfClose, $xmlSlot);
+        $context->builder->branch($bbXmlMerge);
+        $context->builder->positionAtEnd($bbPaired);
         $open = JitStringConcat::concat(
             $context,
             JitStringConcat::concat($context, $lt, $tagStr),
@@ -144,7 +167,11 @@ final class JitDomSaveXMLUserScript
             $gt
         );
         $withBody = JitStringConcat::concat($context, $open, $bodyStr);
-        $xml = JitStringConcat::concat($context, $withBody, $close);
+        $paired = JitStringConcat::concat($context, $withBody, $close);
+        $context->builder->store($paired, $xmlSlot);
+        $context->builder->branch($bbXmlMerge);
+        $context->builder->positionAtEnd($bbXmlMerge);
+        $xml = $context->builder->load($xmlSlot);
 
         return self::boxStringValue($context, $xml);
     }

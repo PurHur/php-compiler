@@ -1,5 +1,5 @@
 --TEST--
-AOT: DOMNode::replaceChildren() living API under PHP 8.4 forward profile (#19507, ext/dom/parentnode.c)
+AOT: DOMNode::replaceChildren() living API under PHP 8.4 forward profile (#19507, #29409, ext/dom/parentnode.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
