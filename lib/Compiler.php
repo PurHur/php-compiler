@@ -4356,7 +4356,12 @@ class Compiler {
         ?Operand $resultOverride = null
     ): Block {
         if (null !== $resultOverride) {
+            // ??= skips compileExpr(Assign); enforce the same write-context guards (#29247).
             $this->rejectNullsafeInWriteContext($resultOverride, $block);
+            $this->rejectNewExprInWriteContext($resultOverride, $block);
+            $this->rejectArrayLiteralInWriteContext($resultOverride, $block);
+            $this->rejectGlobalConstInWriteContext($resultOverride, $block);
+            $this->rejectCallReturnInWriteContext($resultOverride, $block);
         }
         if (null === $resultOverride) {
             $dimFetch = $this->findCoalesceArrayDimFetch($coalesce->left, $block);
@@ -12776,6 +12781,7 @@ class Compiler {
         $this->rejectThisReassignment($write);
         $this->rejectNullsafeInWriteContext($write, $block);
         $this->rejectNewExprInWriteContext($write, $block);
+        $this->rejectArrayLiteralInWriteContext($write, $block);
         $this->rejectGlobalConstInWriteContext($write, $block);
         $this->rejectCallReturnInWriteContext($write, $block);
 
@@ -12910,6 +12916,7 @@ class Compiler {
                     $this->rejectThisReassignment($expr->var);
                     $this->rejectNullsafeInWriteContext($expr->var, $block);
                     $this->rejectNewExprInWriteContext($expr->var, $block, $expr->expr, $expr);
+                    $this->rejectArrayLiteralInWriteContext($expr->var, $block);
                     $this->rejectGlobalConstInWriteContext($expr->var, $block);
                     $this->rejectCallReturnInWriteContext($expr->var, $block);
                 }
@@ -13495,6 +13502,7 @@ class Compiler {
                 $this->rejectThisReassignment($expr->var);
                 $this->rejectNullsafeInWriteContext($expr->var, $block);
                 $this->rejectNewExprInWriteContext($expr->var, $block);
+                $this->rejectArrayLiteralInWriteContext($expr->var, $block);
                 $this->rejectGlobalConstInWriteContext($expr->var, $block);
                 $this->rejectCallReturnInWriteContext($expr->var, $block);
                 // Zend zend_compile.c: cannot acquire a reference to $GLOBALS (#15627).
@@ -42341,6 +42349,8 @@ class Compiler {
                 foreach ($terminal->exprs as $unsetExpr) {
                     $this->rejectThisUnset($unsetExpr);
                     if ($unsetExpr instanceof Operand) {
+                        $this->rejectNewExprInWriteContext($unsetExpr, $block);
+                        $this->rejectArrayLiteralInWriteContext($unsetExpr, $block);
                         $this->rejectGlobalConstInWriteContext($unsetExpr, $block);
                         $this->rejectCallReturnInWriteContext($unsetExpr, $block);
                     }
@@ -59203,6 +59213,87 @@ class Compiler {
     protected function rejectGlobalConstInWriteContext(?Operand $var, ?Block $block = null): void
     {
         if (!$this->lvalueContainsGlobalConstFetch($var, $block)) {
+            return;
+        }
+        $this->throwCompileError('Cannot use temporary expression in write context');
+    }
+
+    /**
+     * True when $operand is an inline Op\Expr\Array_ result (php-cfg may omit ->original).
+     */
+    protected function operandIsArrayLiteral(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        if (null !== $this->unwrapArrayLiteralExpr($operand)) {
+            return true;
+        }
+        if (null === $block) {
+            return false;
+        }
+
+        return null !== $this->findArrayExprForResult($operand, $block);
+    }
+
+    /**
+     * Zend zend_compile.c: dim/append/unset on an array literal is a temporary write (#29247).
+     *
+     * Function-return dims remain writable (f()[0] = …); only inline Expr_Array bases are rejected.
+     */
+    protected function lvalueContainsArrayLiteral(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand || null === $block) {
+            return false;
+        }
+        if ($operand instanceof Operand\Temporary && null !== $operand->original) {
+            if ($operand->original instanceof Op\Expr\PropertyFetch) {
+                $propFetch = $operand->original;
+                if ($this->operandIsArrayLiteral($propFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsArrayLiteral($propFetch->var, $block);
+            }
+            if ($operand->original instanceof Op\Expr\ArrayDimFetch) {
+                $dimFetch = $operand->original;
+                if ($this->operandIsArrayLiteral($dimFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsArrayLiteral($dimFetch->var, $block);
+            }
+
+            return $this->lvalueContainsArrayLiteral($operand->original, $block);
+        }
+        if (null !== $block->orig) {
+            $propFetch = $this->findPropertyFetchForResult($operand, $block);
+            if (null !== $propFetch) {
+                if ($this->operandIsArrayLiteral($propFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsArrayLiteral($propFetch->var, $block);
+            }
+            $dimFetch = $this->findArrayDimFetchForResult($operand, $block);
+            if (null !== $dimFetch) {
+                if ($this->operandIsArrayLiteral($dimFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsArrayLiteral($dimFetch->var, $block);
+            }
+        }
+
+        return $this->operandIsArrayLiteral($operand, $block);
+    }
+
+    /**
+     * @return never
+     */
+    protected function rejectArrayLiteralInWriteContext(?Operand $var, ?Block $block = null): void
+    {
+        if (!$this->lvalueContainsArrayLiteral($var, $block)) {
             return;
         }
         $this->throwCompileError('Cannot use temporary expression in write context');
