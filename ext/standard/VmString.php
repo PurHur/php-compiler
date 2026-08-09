@@ -2793,8 +2793,19 @@ final class VmString
         return self::byteSlice($padding, 0, $length);
     }
 
-    public static function resolveStrPadTypeArg(Variable $var): int
-    {
+    /**
+     * str_pad() / mb_str_pad() $pad_type — Z_PARAM_LONG soft-null DEP+coerce (#29353).
+     *
+     * php-src: ext/standard/string.c PHP_FUNCTION(str_pad); null → 0 (STR_PAD_LEFT).
+     * Caller strict_types → TypeError via {@see VmMath::parseZParamLongBuiltinArgForFrame}.
+     */
+    public static function resolveStrPadTypeArg(
+        Variable $var,
+        ?Frame $frame = null,
+        string $function = 'str_pad',
+        int $argIndex = 3,
+        int $userArgIndex = 4
+    ): int {
         $var = $var->resolveIndirect();
         $padFromEnum = self::tryPadTypeInt($var);
         if (null !== $padFromEnum) {
@@ -2802,22 +2813,40 @@ final class VmString
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                'str_pad(): Argument #4 ($pad_type) must be of type PadType|int, %s given',
+                '%s(): Argument #%d ($pad_type) must be of type PadType|int, %s given',
+                $function,
+                $userArgIndex,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \LogicException('str_pad() pad type must be an integer in this compiler build');
+        // Z_PARAM_LONG: E_DEPRECATED then coerce null→0; other types TypeError/coerce (#29353).
+        if (null !== $frame) {
+            $padType = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                $argIndex,
+                $function,
+                $userArgIndex,
+                'pad_type'
+            );
+        } else {
+            $padType = VmMath::parseZParamLongBuiltinArg(
+                $var,
+                $function,
+                $userArgIndex,
+                'pad_type',
+                null
+            );
         }
-        $padType = $var->toInt();
         if (!\in_array($padType, [
             StdlibConstants::STR_PAD_LEFT,
             StdlibConstants::STR_PAD_RIGHT,
             StdlibConstants::STR_PAD_BOTH,
         ], true)) {
-            throw new \ValueError(
-                'str_pad(): Argument #4 ($pad_type) must be STR_PAD_LEFT, STR_PAD_RIGHT, or STR_PAD_BOTH'
-            );
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($pad_type) must be STR_PAD_LEFT, STR_PAD_RIGHT, or STR_PAD_BOTH',
+                $function,
+                $userArgIndex
+            ));
         }
 
         return $padType;

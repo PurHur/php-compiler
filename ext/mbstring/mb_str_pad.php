@@ -55,7 +55,11 @@ final class mb_str_pad extends Internal
         }
         $padType = 1;
         if ($argc >= 4) {
-            $padType = VmString::resolveStrPadTypeArg($frame->calledArgs[3]);
+            $padType = VmString::resolveStrPadTypeArg(
+                $frame->calledArgs[3],
+                $frame,
+                'mb_str_pad'
+            );
         }
         $encoding = $argc >= 5
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[4], 'mb_str_pad', 4)
