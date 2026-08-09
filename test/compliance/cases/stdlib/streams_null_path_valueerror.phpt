@@ -1,5 +1,5 @@
 --TEST--
-stdlib streams null path — ValueError Path cannot be empty (#11016, ext/standard/streamsfuncs.c)
+stdlib streams null path — ValueError Path must not be empty (#11016, ext/standard/streamsfuncs.c)
 --FILE--
 <?php
 foreach (['fopen', 'file_get_contents', 'copy', 'readfile', 'file'] as $f) {
@@ -18,8 +18,8 @@ foreach (['fopen', 'file_get_contents', 'copy', 'readfile', 'file'] as $f) {
 }
 ?>
 --EXPECT--
-fopen:Path cannot be empty
-file_get_contents:Path cannot be empty
-copy:Path cannot be empty
-readfile:Path cannot be empty
-file:Path cannot be empty
+fopen:Path must not be empty
+file_get_contents:Path must not be empty
+copy:Path must not be empty
+readfile:Path must not be empty
+file:Path must not be empty

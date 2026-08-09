@@ -1,5 +1,5 @@
 --TEST--
-stdlib hash file builtins empty path — ValueError Path cannot be empty (#14074, ext/standard/md5.c)
+stdlib hash file builtins empty path — ValueError Path must not be empty (#14074, ext/standard/md5.c)
 --FILE--
 <?php
 foreach ([
@@ -17,7 +17,7 @@ foreach ([
 }
 ?>
 --EXPECT--
-md5_file:Path cannot be empty
-sha1_file:Path cannot be empty
-hash_file:Path cannot be empty
-hash_hmac_file:Path cannot be empty
+md5_file:Path must not be empty
+sha1_file:Path must not be empty
+hash_file:Path must not be empty
+hash_hmac_file:Path must not be empty

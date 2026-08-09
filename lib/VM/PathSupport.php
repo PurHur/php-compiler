@@ -9,7 +9,8 @@ namespace PHPCompiler\VM;
  */
 final class PathSupport
 {
-    public const EMPTY_PATH_VALUE_ERROR_MESSAGE = 'Path cannot be empty';
+    /** Zend main/fopen_wrappers.c / zend_parse_arg_path — #29268 */
+    public const EMPTY_PATH_VALUE_ERROR_MESSAGE = 'Path must not be empty';
 
     public static function isEmptyPath(string $path): bool
     {

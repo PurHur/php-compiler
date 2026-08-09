@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\PathSupport;
 
 /**
  * error_log() dispatch (php-src ext/standard/basic_functions.c::_php_error_log).
@@ -32,7 +33,7 @@ final class VmErrorLog
 
             case 3:
                 if (null === $destination || '' === $destination) {
-                    throw new \ValueError('Path cannot be empty');
+                    throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
                 }
                 $written = VmFs::filePutContents(
                     $destination,
