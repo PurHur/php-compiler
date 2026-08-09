@@ -327,17 +327,9 @@ final class JitTriggerErrorKernel
         $afterHandlerBb = $fn->appendBasicBlock('trigger_error_after_handler');
         $context->builder->branchIf($handled, $handledBb, $afterHandlerBb);
 
+        // Handler return true swallows E_USER_ERROR and continues (php-src; #29216).
         $context->builder->positionAtEnd($handledBb);
-        $isFatal = $context->builder->icmp(
-            Builder::INT_EQ,
-            $level,
-            $i32->constInt(self::E_USER_ERROR, false)
-        );
-        $abortBb = $fn->appendBasicBlock('trigger_error_abort_handled');
-        $context->builder->branchIf($isFatal, $abortBb, $retBb);
-        $context->builder->positionAtEnd($abortBb);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->returnVoid();
+        $context->builder->branch($retBb);
 
         $context->builder->positionAtEnd($afterHandlerBb);
         $context->builder->call(

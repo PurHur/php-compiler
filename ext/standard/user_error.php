@@ -66,6 +66,8 @@ final class user_error extends Internal
         } elseif ('' !== $frame->scriptPath) {
             $file = $frame->scriptPath;
         }
+        // Alias of trigger_error — same E_USER_ERROR deprecation text (#29216).
+        trigger_error_::maybeDeprecateUserError($frame, $level, $file, $line);
         $frame->vmContext->errors->triggerError(
             $message,
             $level,
@@ -92,6 +94,7 @@ final class user_error extends Internal
         $levelVal = 2 === $argc
             ? self::jitLowerUserErrorLevel($context, $args[1])
             : $context->getTypeFromString('int32')->constInt(ErrorReporter::E_USER_NOTICE, false);
+        trigger_error_::jitMaybeDeprecateUserError($context, $levelVal);
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');

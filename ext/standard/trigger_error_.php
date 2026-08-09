@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -20,6 +21,10 @@ use PHPLLVM\Value;
 /** trigger_error() — user-level error/warning/notice (issue #1221); Z_PARAM_STR null on 8.4 (#21035). */
 final class trigger_error_ extends Internal
 {
+    /** php-src Zend/zend_builtin_functions.c (#29216). */
+    private const USER_ERROR_DEPRECATION =
+        'Passing E_USER_ERROR to trigger_error() is deprecated since 8.4, throw an exception or call exit with a string message instead';
+
     public function __construct()
     {
         parent::__construct('trigger_error');
@@ -53,6 +58,7 @@ final class trigger_error_ extends Internal
         } elseif ('' !== $frame->scriptPath) {
             $file = $frame->scriptPath;
         }
+        self::maybeDeprecateUserError($frame, $level, $file, $line);
         $frame->vmContext->errors->triggerError(
             $message,
             $level,
@@ -78,6 +84,7 @@ final class trigger_error_ extends Internal
         $levelVal = 2 === $argc
             ? $this->jitLowerUserErrorLevel($context, $args[1])
             : $context->getTypeFromString('int32')->constInt(ErrorReporter::E_USER_NOTICE, false);
+        self::jitMaybeDeprecateUserError($context, $levelVal);
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
@@ -106,6 +113,48 @@ final class trigger_error_ extends Internal
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(1, false);
+    }
+
+    /** @internal Shared with {@see user_error}. */
+    public static function userErrorDeprecationMessage(): string
+    {
+        return self::USER_ERROR_DEPRECATION;
+    }
+
+    public static function maybeDeprecateUserError(Frame $frame, int $level, ?string $file, int $line): void
+    {
+        if (ErrorReporter::E_USER_ERROR !== $level
+            || !CompilerVersion::supportsTriggerErrorUserErrorDeprecation()
+            || null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->internalDeprecated(
+            self::USER_ERROR_DEPRECATION,
+            $frame->vmContext,
+            $frame,
+            $file,
+            $line
+        );
+    }
+
+    public static function jitMaybeDeprecateUserError(Context $context, Value $levelI32): void
+    {
+        if (!CompilerVersion::supportsTriggerErrorUserErrorDeprecation()) {
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $isUserError = $context->builder->icmp(
+            Builder::INT_EQ,
+            $levelI32,
+            $i32->constInt(ErrorReporter::E_USER_ERROR, false)
+        );
+        $dep = BasicBlockHelper::append($context, 'trigger_error_user_error_dep');
+        $cont = BasicBlockHelper::append($context, 'trigger_error_user_error_cont');
+        $context->builder->branchIf($isUserError, $dep, $cont);
+        $context->builder->positionAtEnd($dep);
+        JitBuiltinWarning::emitDeprecated($context, self::USER_ERROR_DEPRECATION);
+        $context->builder->branch($cont);
+        $context->builder->positionAtEnd($cont);
     }
 
     private function jitLowerUserErrorLevel(Context $context, JITVariable $arg): Value
