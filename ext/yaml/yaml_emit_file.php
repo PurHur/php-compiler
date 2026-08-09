@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\yaml;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 
-/** yaml_emit_file() — encode value to YAML file (PECL yaml / yaml.c; #6275). */
+/** yaml_emit_file() — encode value to YAML file (PECL yaml / yaml.c; #6275, #27873). */
 final class yaml_emit_file extends YamlFunction
 {
     public function __construct()
@@ -28,6 +29,20 @@ final class yaml_emit_file extends YamlFunction
             0,
             'filename'
         );
-        $frame->returnVar->bool(VmYaml::emitFile($filename, $frame->calledArgs[1], $frame));
+        $encoding = 0;
+        $linebreak = 0;
+        if (\count($frame->calledArgs) >= 3) {
+            $encoding = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'yaml_emit_file', 3, 'encoding');
+        }
+        if (\count($frame->calledArgs) >= 4) {
+            $linebreak = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'yaml_emit_file', 4, 'linebreak');
+        }
+        $frame->returnVar->bool(VmYaml::emitFile(
+            $filename,
+            $frame->calledArgs[1],
+            $frame,
+            $encoding,
+            $linebreak
+        ));
     }
 }
