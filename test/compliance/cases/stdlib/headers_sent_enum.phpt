@@ -4,9 +4,9 @@ stdlib headers_sent() — enum case by-ref operands reject non-referenceable exp
 headers_sent_enum.inc.php
 --EXPECT--
 file literal: Error
-headers_sent(): Argument #1 ($filename) cannot be passed by reference
+headers_sent(): Argument #1 ($filename) could not be passed by reference
 line literal: Error
-headers_sent(): Argument #2 ($line) cannot be passed by reference
+headers_sent(): Argument #2 ($line) could not be passed by reference
 not-sent
 string
 0

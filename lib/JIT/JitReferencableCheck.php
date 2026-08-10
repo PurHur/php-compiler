@@ -50,7 +50,7 @@ final class JitReferencableCheck
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, \sprintf(
-            '%s(): Argument #%d ($%s) cannot be passed by reference',
+            '%s(): Argument #%d ($%s) could not be passed by reference',
             $fn,
             $paramIdx + 1,
             $paramName

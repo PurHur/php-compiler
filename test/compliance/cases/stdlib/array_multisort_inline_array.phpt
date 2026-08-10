@@ -19,4 +19,4 @@ try {
 flags
 two
 2,1
-sort: sort(): Argument #1 ($array) cannot be passed by reference
+sort: sort(): Argument #1 ($array) could not be passed by reference

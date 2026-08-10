@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-$expected = 'cannot be passed by reference';
+$expected = 'could not be passed by reference';
 
 foreach (
     [

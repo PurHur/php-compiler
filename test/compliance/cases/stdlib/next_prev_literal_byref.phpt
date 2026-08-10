@@ -21,8 +21,8 @@ try {
 $a = [1, 2, 3];
 echo 'var next: ', next($a), ' key: ', key($a), "\n";
 --EXPECT--
-next: Error: next(): Argument #1 ($array) cannot be passed by reference
-prev: Error: prev(): Argument #1 ($array) cannot be passed by reference
+next: Error: next(): Argument #1 ($array) could not be passed by reference
+prev: Error: prev(): Argument #1 ($array) could not be passed by reference
 var next: 2 key: 1
 --CREDITS--
 PurHur/php-compiler issue #10557

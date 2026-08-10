@@ -34,7 +34,7 @@ PHP Notice:  Only variables should be passed by reference in %s on line %d
 PHP Notice:  Only variables should be passed by reference in %s on line %d
 10
 30
-literal: Error: reset(): Argument #1 ($array) cannot be passed by reference
+literal: Error: reset(): Argument #1 ($array) could not be passed by reference
 var: 10 key=0
 --CREDITS--
 PurHur/php-compiler issue #25815

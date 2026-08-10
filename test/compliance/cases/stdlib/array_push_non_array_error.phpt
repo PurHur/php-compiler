@@ -9,4 +9,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-array_push(): Argument #1 ($array) cannot be passed by reference
+array_push(): Argument #1 ($array) could not be passed by reference

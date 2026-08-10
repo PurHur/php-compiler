@@ -24,7 +24,7 @@ current_empty=false
 key_empty=NULL
 current_lit=1
 key_lit=0
-reset: Error: reset(): Argument #1 ($array) cannot be passed by reference
+reset: Error: reset(): Argument #1 ($array) could not be passed by reference
 var_current=1 key=0
 --CREDITS--
 PurHur/php-compiler issue #10654

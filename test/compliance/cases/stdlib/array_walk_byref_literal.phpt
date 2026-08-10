@@ -13,5 +13,5 @@ try {
     echo 'rec: ', $e->getMessage(), "\n";
 }
 --EXPECT--
-walk: array_walk(): Argument #1 ($array) cannot be passed by reference
-rec: array_walk_recursive(): Argument #1 ($array) cannot be passed by reference
+walk: array_walk(): Argument #1 ($array) could not be passed by reference
+rec: array_walk_recursive(): Argument #1 ($array) could not be passed by reference

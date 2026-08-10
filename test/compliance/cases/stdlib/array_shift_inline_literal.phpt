@@ -20,9 +20,9 @@ foreach (['array_shift', 'array_pop', 'array_unshift'] as $fn) {
 $a = [1, 2];
 echo 'var shift: ', array_shift($a), ' remain: ', count($a), "\n";
 --EXPECT--
-array_shift: Error: array_shift(): Argument #1 ($array) cannot be passed by reference
-array_pop: Error: array_pop(): Argument #1 ($array) cannot be passed by reference
-array_unshift: Error: array_unshift(): Argument #1 ($array) cannot be passed by reference
+array_shift: Error: array_shift(): Argument #1 ($array) could not be passed by reference
+array_pop: Error: array_pop(): Argument #1 ($array) could not be passed by reference
+array_unshift: Error: array_unshift(): Argument #1 ($array) could not be passed by reference
 var shift: 1 remain: 1
 --CREDITS--
 PurHur/php-compiler issue #9745
