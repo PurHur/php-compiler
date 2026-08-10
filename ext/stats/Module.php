@@ -73,6 +73,10 @@ class Module extends ModuleAbstract
             new stats_rand_gen_beta(),
             new stats_rand_gen_exponential(),
             new stats_rand_gen_gamma(),
+            new stats_rand_gen_chisquare(),
+            new stats_rand_gen_f(),
+            new stats_rand_gen_funiform(),
+            new stats_rand_ibinomial(),
             new stats_rand_phrase_to_seeds(),
         ];
     }

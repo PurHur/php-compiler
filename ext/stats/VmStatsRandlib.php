@@ -37,13 +37,210 @@ final class VmStatsRandlib
     private static float $sgSi = 0.0;
     private static float $sgC = 0.0;
 
-    /** Reset Cheng/sgamma caches when setall() reseeds (#29622). */
+    /** Reset Cheng/sgamma/ignbin caches when setall() reseeds (#29622, #29649). */
     public static function resetCaches(): void
     {
         self::$betOldA = -1.0E37;
         self::$betOldB = -1.0E37;
         self::$sgAa = 0.0;
         self::$sgAaa = 0.0;
+        self::$binPsave = -1.0E37;
+        self::$binNsave = -214748365;
+    }
+
+    /** RANLIB genchi(df) = 2*sgamma(df/2) (#29649). */
+    public static function genchi(float $df): float
+    {
+        return 2.0 * self::sgamma($df / 2.0);
+    }
+
+    /** RANLIB genf(dfn,dfd) — ratio of chisquare variates (#29649). */
+    public static function genf(float $dfn, float $dfd): float
+    {
+        $xnum = 2.0 * self::sgamma($dfn / 2.0) / $dfn;
+        $xden = 2.0 * self::sgamma($dfd / 2.0) / $dfd;
+        if ($xden <= 1.0E-37 * $xnum) {
+            return 1.0E37;
+        }
+
+        return $xnum / $xden;
+    }
+
+    /** RANLIB genunf(low,high) (#29649). */
+    public static function genunf(float $low, float $high): float
+    {
+        return $low + ($high - $low) * VmStatsRand::ranf();
+    }
+
+    private static float $binPsave = -1.0E37;
+    private static int $binNsave = -214748365;
+    private static float $binP = 0.0;
+    private static float $binQ = 0.0;
+    private static float $binXnp = 0.0;
+    private static float $binFfM = 0.0;
+    private static int $binM = 0;
+    private static float $binFm = 0.0;
+    private static float $binXnpq = 0.0;
+    private static float $binP1 = 0.0;
+    private static float $binXm = 0.0;
+    private static float $binXl = 0.0;
+    private static float $binXr = 0.0;
+    private static float $binC = 0.0;
+    private static float $binXll = 0.0;
+    private static float $binXlr = 0.0;
+    private static float $binP2 = 0.0;
+    private static float $binP3 = 0.0;
+    private static float $binP4 = 0.0;
+    private static float $binQn = 0.0;
+    private static float $binR = 0.0;
+    private static float $binG = 0.0;
+
+    /**
+     * RANLIB ignbin(n,pp) — BTPE / inverse-CDF binomial (#29649).
+     *
+     * Preconditions: n ≥ 0, 0 ≤ pp ≤ 1 (checked by caller).
+     */
+    public static function ignbin(int $n, float $pp): int
+    {
+        if ($pp !== self::$binPsave) {
+            self::$binPsave = $pp;
+            self::$binP = \min($pp, 1.0 - $pp);
+            self::$binQ = 1.0 - self::$binP;
+            self::$binNsave = -214748365; // force n setup
+        }
+        if ($n !== self::$binNsave) {
+            self::$binXnp = $n * self::$binP;
+            self::$binNsave = $n;
+            if (self::$binXnp >= 30.0) {
+                self::$binFfM = self::$binXnp + self::$binP;
+                self::$binM = (int) self::$binFfM;
+                self::$binFm = (float) self::$binM;
+                self::$binXnpq = self::$binXnp * self::$binQ;
+                self::$binP1 = (float) ((int) (2.195 * \sqrt(self::$binXnpq) - 4.6 * self::$binQ)) + 0.5;
+                self::$binXm = self::$binFm + 0.5;
+                self::$binXl = self::$binXm - self::$binP1;
+                self::$binXr = self::$binXm + self::$binP1;
+                self::$binC = 0.134 + 20.5 / (15.3 + self::$binFm);
+                $al = (self::$binFfM - self::$binXl) / (self::$binFfM - self::$binXl * self::$binP);
+                self::$binXll = $al * (1.0 + 0.5 * $al);
+                $al = (self::$binXr - self::$binFfM) / (self::$binXr * self::$binQ);
+                self::$binXlr = $al * (1.0 + 0.5 * $al);
+                self::$binP2 = self::$binP1 * (1.0 + self::$binC + self::$binC);
+                self::$binP3 = self::$binP2 + self::$binC / self::$binXll;
+                self::$binP4 = self::$binP3 + self::$binC / self::$binXlr;
+            } else {
+                self::$binQn = self::$binQ ** $n;
+                self::$binR = self::$binP / self::$binQ;
+                self::$binG = self::$binR * ($n + 1);
+            }
+        }
+
+        if (self::$binXnp < 30.0) {
+            while (true) {
+                $ix = 0;
+                $f = self::$binQn;
+                $u = VmStatsRand::ranf();
+                while (true) {
+                    if ($u < $f) {
+                        break 2;
+                    }
+                    if ($ix > 110) {
+                        break;
+                    }
+                    $u -= $f;
+                    ++$ix;
+                    $f *= (self::$binG / $ix - self::$binR);
+                }
+            }
+        } else {
+            while (true) {
+                $u = VmStatsRand::ranf() * self::$binP4;
+                $v = VmStatsRand::ranf();
+                if ($u <= self::$binP1) {
+                    $ix = (int) (self::$binXm - self::$binP1 * $v + $u);
+                    break;
+                }
+                if ($u <= self::$binP2) {
+                    $x = self::$binXl + ($u - self::$binP1) / self::$binC;
+                    $v = $v * self::$binC + 1.0 - \abs(self::$binXm - $x) / self::$binP1;
+                    if ($v > 1.0 || $v <= 0.0) {
+                        continue;
+                    }
+                    $ix = (int) $x;
+                } elseif ($u <= self::$binP3) {
+                    $ix = (int) (self::$binXl + \log($v) / self::$binXll);
+                    if ($ix < 0) {
+                        continue;
+                    }
+                    $v *= (($u - self::$binP2) * self::$binXll);
+                } else {
+                    $ix = (int) (self::$binXr - \log($v) / self::$binXlr);
+                    if ($ix > $n) {
+                        continue;
+                    }
+                    $v *= (($u - self::$binP3) * self::$binXlr);
+                }
+                $k = \abs($ix - self::$binM);
+                if ($k > 20 && $k < self::$binXnpq / 2.0 - 1.0) {
+                    $amaxp = $k / self::$binXnpq * (($k * ($k / 3.0 + 0.625) + 0.1666666666666)
+                        / self::$binXnpq + 0.5);
+                    $ynorm = -($k * $k / (2.0 * self::$binXnpq));
+                    $alv = \log($v);
+                    if ($alv < $ynorm - $amaxp) {
+                        break;
+                    }
+                    if ($alv > $ynorm + $amaxp) {
+                        continue;
+                    }
+                    $x1 = $ix + 1.0;
+                    $f1 = self::$binFm + 1.0;
+                    $z = $n + 1.0 - self::$binFm;
+                    $w = $n - $ix + 1.0;
+                    $z2 = $z * $z;
+                    $x2 = $x1 * $x1;
+                    $f2 = $f1 * $f1;
+                    $w2 = $w * $w;
+                    if ($alv <= self::$binXm * \log($f1 / $x1)
+                        + ($n - self::$binM + 0.5) * \log($z / $w)
+                        + ($ix - self::$binM) * \log($w * self::$binP / ($x1 * self::$binQ))
+                        + (13860.0 - (462.0 - (132.0 - (99.0 - 140.0 / $f2) / $f2) / $f2) / $f2)
+                            / $f1 / 166320.0
+                        + (13860.0 - (462.0 - (132.0 - (99.0 - 140.0 / $z2) / $z2) / $z2) / $z2)
+                            / $z / 166320.0
+                        + (13860.0 - (462.0 - (132.0 - (99.0 - 140.0 / $x2) / $x2) / $x2) / $x2)
+                            / $x1 / 166320.0
+                        + (13860.0 - (462.0 - (132.0 - (99.0 - 140.0 / $w2) / $w2) / $w2) / $w2)
+                            / $w / 166320.0) {
+                        break;
+                    }
+                    continue;
+                }
+                $f = 1.0;
+                $r = self::$binP / self::$binQ;
+                $g = ($n + 1) * $r;
+                $t1 = self::$binM - $ix;
+                if ($t1 < 0) {
+                    $mp = self::$binM + 1;
+                    for ($i = $mp; $i <= $ix; ++$i) {
+                        $f *= ($g / $i - $r);
+                    }
+                } elseif ($t1 > 0) {
+                    $ix1 = $ix + 1;
+                    for ($i = $ix1; $i <= self::$binM; ++$i) {
+                        $f /= ($g / $i - $r);
+                    }
+                }
+                if ($v <= $f) {
+                    break;
+                }
+            }
+        }
+
+        if (self::$binPsave > 0.5) {
+            $ix = $n - $ix;
+        }
+
+        return $ix;
     }
 
     /** RANLIB sexpo() — Ahrens–Dieter SA. */

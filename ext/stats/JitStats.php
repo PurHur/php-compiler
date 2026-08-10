@@ -450,6 +450,24 @@ final class JitStats
     }
 
     /** @param array<int, JITVariable> $args */
+    public static function randIbinomial(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 2, 2, 'stats_rand_ibinomial');
+        Stats::ensureLinked($context);
+        $n = JitLongArg::lower($context, $args[0], 'stats_rand_ibinomial n');
+        $pp = self::loadDouble($context, $args[1], 'stats_rand_ibinomial', 'pp');
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_rand_ibinomial'),
+                $n,
+                $pp
+            )
+        );
+    }
+
+    /** @param array<int, JITVariable> $args */
     public static function randPhraseToSeeds(Context $context, JITVariable ...$args): Value
     {
         self::requireArgc($args, 1, 1, 'stats_rand_phrase_to_seeds');

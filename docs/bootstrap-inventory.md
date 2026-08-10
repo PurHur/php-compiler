@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7346 |
-| Phase A inventory files (M2 ratio SSOT) | 7346 |
+| PHP files on vm.php path | 7350 |
+| Phase A inventory files (M2 ratio SSOT) | 7350 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23813 |
+| Source constructs flagged (warnings) | 23825 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4618,7 +4618,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zlib_encode.php` | 0 | 1 |
 | `ext/standard/zlib_get_coding_type.php` | 0 | 2 |
 | `ext/stats/JitStats.php` | 0 | 2 |
-| `ext/stats/Module.php` | 0 | 53 |
+| `ext/stats/Module.php` | 0 | 57 |
 | `ext/stats/StatsExtensionPolicy.php` | 0 | 1 |
 | `ext/stats/StatsFunction.php` | 0 | 2 |
 | `ext/stats/StatsJitHelper.php` | 0 | 1 |
@@ -4662,11 +4662,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_harmonic_mean.php` | 0 | 2 |
 | `ext/stats/stats_kurtosis.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_beta.php` | 0 | 2 |
+| `ext/stats/stats_rand_gen_chisquare.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_exponential.php` | 0 | 2 |
+| `ext/stats/stats_rand_gen_f.php` | 0 | 2 |
+| `ext/stats/stats_rand_gen_funiform.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_gamma.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_iuniform.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_normal.php` | 0 | 2 |
 | `ext/stats/stats_rand_getsd.php` | 0 | 2 |
+| `ext/stats/stats_rand_ibinomial.php` | 0 | 2 |
 | `ext/stats/stats_rand_phrase_to_seeds.php` | 0 | 2 |
 | `ext/stats/stats_rand_ranf.php` | 0 | 2 |
 | `ext/stats/stats_rand_setall.php` | 0 | 2 |
@@ -41484,8 +41488,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/JitStats.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 475)
-- 28 class method(s)
+- new ArgumentCountError (line 493)
+- 29 class method(s)
 
 ### `ext/stats/Module.php`
 
@@ -41541,7 +41545,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new stats_rand_gen_beta (line 73)
 - new stats_rand_gen_exponential (line 74)
 - new stats_rand_gen_gamma (line 75)
-- new stats_rand_phrase_to_seeds (line 76)
+- new stats_rand_gen_chisquare (line 76)
+- new stats_rand_gen_f (line 77)
+- new stats_rand_gen_funiform (line 78)
+- new stats_rand_ibinomial (line 79)
+- new stats_rand_phrase_to_seeds (line 80)
 - 1 class method(s)
 
 ### `ext/stats/StatsExtensionPolicy.php`
@@ -41558,7 +41566,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/StatsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 21 class method(s)
+- 22 class method(s)
 
 ### `ext/stats/VmStats.php`
 
@@ -41578,14 +41586,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/VmStatsRand.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 225)
-- new HashTable (line 239)
-- 14 class method(s)
+- new HashTable (line 289)
+- new HashTable (line 303)
+- 18 class method(s)
 
 ### `ext/stats/VmStatsRandlib.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 12 class method(s)
 
 ### `ext/stats/stats_absolute_deviation.php`
 
@@ -41797,7 +41805,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/stats/stats_rand_gen_chisquare.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/stats/stats_rand_gen_exponential.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_rand_gen_f.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_rand_gen_funiform.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -41826,6 +41852,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
 - 2 class method(s)
+
+### `ext/stats/stats_rand_ibinomial.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
 
 ### `ext/stats/stats_rand_phrase_to_seeds.php`
 
@@ -54733,95 +54765,95 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 14830)
 - new VM\PropertyHookRefWriteSignal (line 14835)
 - new VM\PropertyHookFiberSuspendSignal (line 14838)
-- new Error (line 15530)
-- new Error (line 15542)
+- new Error (line 15536)
 - new Error (line 15548)
-- new Error (line 15559)
-- new ClassEntry (line 16507)
-- new Variable (line 16508)
-- new VM\ClassProperty (line 16509)
-- new ObjectEntry (line 16512)
-- new Variable (line 16515)
-- new Variable (line 16596)
-- new Error (line 16689)
-- new Variable (line 16780)
-- new VM\GeneratorUncaughtThrow (line 16782)
-- new Error (line 16851)
-- new Variable (line 16896)
-- new VM\GeneratorUncaughtThrow (line 16910)
-- new Variable (line 17020)
-- new VM\GeneratorUncaughtThrow (line 17043)
-- new Variable (line 17117)
-- new Variable (line 17247)
-- new Variable (line 17289)
-- new Variable (line 17471)
-- new Variable (line 17487)
-- new Variable (line 17532)
-- new Variable (line 17675)
-- new Variable (line 17801)
-- new Variable (line 17971)
-- new VM\PropertyIsInitializedHandler (line 17980)
-- new Error (line 18145)
-- new VM\EnumFromHandler (line 18171)
-- new Error (line 18549)
-- new CompileError (line 18994)
-- new VM\ClassProperty (line 19236)
-- new CompileError (line 19323)
-- new Variable (line 19628)
-- new CompileError (line 19657)
-- new CompileError (line 19664)
-- new Variable (line 19946)
-- new Variable (line 19948)
-- new ClassEntry (line 19998)
-- new Func\PHP (line 20005)
-- new VM\ClassProperty (line 20101)
-- new Func\PHP (line 20354)
-- new Variable (line 20430)
-- new Variable (line 20437)
+- new Error (line 15554)
+- new Error (line 15565)
+- new ClassEntry (line 16513)
+- new Variable (line 16514)
+- new VM\ClassProperty (line 16515)
+- new ObjectEntry (line 16518)
+- new Variable (line 16521)
+- new Variable (line 16602)
+- new Error (line 16695)
+- new Variable (line 16786)
+- new VM\GeneratorUncaughtThrow (line 16788)
+- new Error (line 16857)
+- new Variable (line 16902)
+- new VM\GeneratorUncaughtThrow (line 16916)
+- new Variable (line 17026)
+- new VM\GeneratorUncaughtThrow (line 17049)
+- new Variable (line 17123)
+- new Variable (line 17253)
+- new Variable (line 17295)
+- new Variable (line 17477)
+- new Variable (line 17493)
+- new Variable (line 17538)
+- new Variable (line 17681)
+- new Variable (line 17807)
+- new Variable (line 17977)
+- new VM\PropertyIsInitializedHandler (line 17986)
+- new Error (line 18151)
+- new VM\EnumFromHandler (line 18177)
+- new Error (line 18555)
+- new CompileError (line 19000)
+- new VM\ClassProperty (line 19242)
+- new CompileError (line 19329)
+- new Variable (line 19634)
+- new CompileError (line 19663)
+- new CompileError (line 19670)
+- new Variable (line 19952)
+- new Variable (line 19954)
+- new ClassEntry (line 20004)
+- new Func\PHP (line 20011)
+- new VM\ClassProperty (line 20107)
+- new Func\PHP (line 20360)
+- new Variable (line 20436)
 - new Variable (line 20443)
-- new Variable (line 20481)
-- new Variable (line 20511)
-- new Variable (line 20704)
-- new Variable (line 20750)
-- new VM\ClassProperty (line 20820)
-- new Error (line 20879)
-- new Error (line 20914)
-- new Error (line 20917)
+- new Variable (line 20449)
+- new Variable (line 20487)
+- new Variable (line 20517)
+- new Variable (line 20710)
+- new Variable (line 20756)
+- new VM\ClassProperty (line 20826)
+- new Error (line 20885)
 - new Error (line 20920)
 - new Error (line 20923)
-- new ObjectEntry (line 20925)
-- new Error (line 20938)
-- new Error (line 20941)
+- new Error (line 20926)
+- new Error (line 20929)
+- new ObjectEntry (line 20931)
 - new Error (line 20944)
 - new Error (line 20947)
-- new Error (line 20968)
-- new ObjectEntry (line 20973)
-- new Variable (line 20975)
-- new Variable (line 20993)
-- new Variable (line 21006)
-- new Variable (line 21027)
-- new Variable (line 21040)
-- new Error (line 21182)
-- new Error (line 21187)
-- new Error (line 21190)
+- new Error (line 20950)
+- new Error (line 20953)
+- new Error (line 20974)
+- new ObjectEntry (line 20979)
+- new Variable (line 20981)
+- new Variable (line 20999)
+- new Variable (line 21012)
+- new Variable (line 21033)
+- new Variable (line 21046)
+- new Error (line 21188)
 - new Error (line 21193)
 - new Error (line 21196)
-- new VM\ObjectEntry (line 21201)
-- new Func\PHP (line 21268)
-- new ClosureState (line 21280)
-- new Variable (line 21393)
-- new Variable (line 21411)
-- new NoDiscardMetadata (line 21663)
-- new Variable (line 21874)
-- new Variable (line 21876)
-- new CompileError (line 21904)
-- new CompileError (line 21935)
-- new CompileError (line 21974)
-- new CompileError (line 22119)
-- new CompileError (line 22148)
-- new CompileError (line 22181)
-- new CompileError (line 22188)
-- new Variable (line 22426)
+- new Error (line 21199)
+- new Error (line 21202)
+- new VM\ObjectEntry (line 21207)
+- new Func\PHP (line 21274)
+- new ClosureState (line 21286)
+- new Variable (line 21399)
+- new Variable (line 21417)
+- new NoDiscardMetadata (line 21669)
+- new Variable (line 21880)
+- new Variable (line 21882)
+- new CompileError (line 21910)
+- new CompileError (line 21941)
+- new CompileError (line 21980)
+- new CompileError (line 22125)
+- new CompileError (line 22154)
+- new CompileError (line 22187)
+- new CompileError (line 22194)
+- new Variable (line 22432)
 - 605 class method(s)
 - 31 closure(s)
 

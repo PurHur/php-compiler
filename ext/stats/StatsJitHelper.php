@@ -172,10 +172,21 @@ final class StatsJitHelper
             VmStatsRand::OP_GEN_BETA => VmStatsRand::genBeta($a, $b, null),
             VmStatsRand::OP_GEN_EXPONENTIAL => VmStatsRand::genExponential($a, null),
             VmStatsRand::OP_GEN_GAMMA => VmStatsRand::genGamma($a, $b, null),
+            VmStatsRand::OP_GEN_CHISQUARE => VmStatsRand::genChisquare($a, null),
+            VmStatsRand::OP_GEN_F => VmStatsRand::genF($a, $b, null),
+            VmStatsRand::OP_GEN_FUNIFORM => VmStatsRand::genFuniform($a, $b, null),
             default => false,
         };
 
         return false === $result ? \NAN : $result;
+    }
+
+    /** Returns float or NAN on failure — JIT boxes like iuniform. */
+    public static function randIbinomial(int $n, float $pp): float
+    {
+        $result = VmStatsRand::ibinomial($n, $pp, null);
+
+        return false === $result ? \NAN : (float) $result;
     }
 
     public static function randPhraseToSeeds(string $phrase): HashTable
