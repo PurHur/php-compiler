@@ -19316,8 +19316,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_split.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- 2 class method(s)
+- new ArgumentCountError (line 32)
+- 3 class method(s)
 - 2 closure(s)
 
 ### `ext/mbstring/mb_str_pad.php`
@@ -29309,21 +29309,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateIntervalConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- new JITVariable (line 42)
-- new JITVariable (line 59)
-- new JITVariable (line 70)
+- new ArgumentCountError (line 27)
+- new JITVariable (line 49)
+- new JITVariable (line 66)
+- new JITVariable (line 77)
 - 2 class method(s)
 
 ### `ext/standard/JitDateIntervalCreateFromDateString.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 107)
-- new JITVariable (line 118)
-- new JITVariable (line 128)
-- new JITVariable (line 138)
-- new JITVariable (line 146)
-- 5 class method(s)
+- new JITVariable (line 120)
+- new JITVariable (line 131)
+- new JITVariable (line 141)
+- new JITVariable (line 151)
+- new JITVariable (line 159)
+- 6 class method(s)
 
 ### `ext/standard/JitDateIntervalFormat.php`
 
@@ -29341,13 +29341,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 50)
-- new ArgumentCountError (line 262)
-- new ArgumentCountError (line 277)
-- new ArgumentCountError (line 401)
-- new JITVariable (line 511)
-- new JITVariable (line 522)
-- new JITVariable (line 539)
-- new JITVariable (line 736)
+- new ArgumentCountError (line 286)
+- new ArgumentCountError (line 301)
+- new ArgumentCountError (line 425)
+- new JITVariable (line 535)
+- new JITVariable (line 546)
+- new JITVariable (line 563)
+- new JITVariable (line 760)
 - 26 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
@@ -30919,7 +30919,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitRandomIntArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/JitReaddir.php`
 
@@ -31657,7 +31657,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTimezoneIdentifiersList.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitTimezoneLocationGet.php`
 
@@ -36333,9 +36333,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1886)
-- new Error (line 1897)
-- new ArgumentCountError (line 3913)
+- new Error (line 1898)
+- new Error (line 1909)
+- new ArgumentCountError (line 3925)
 - 220 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -40030,7 +40030,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/random_int.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/range.php`
 
@@ -51957,9 +51957,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 903)
-- new Variable (line 911)
-- new Variable (line 920)
+- new Variable (line 917)
+- new Variable (line 925)
+- new Variable (line 934)
 - 16 class method(s)
 
 ### `lib/JIT/Call/NestedClosureInvoke.php`
@@ -52916,34 +52916,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DnfParamCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 134)
-- new Variable (line 147)
-- new Variable (line 151)
-- new Variable (line 162)
-- new Variable (line 216)
-- new Variable (line 227)
-- new Variable (line 242)
-- new Variable (line 251)
-- new Variable (line 262)
-- new Variable (line 276)
-- new Variable (line 308)
-- new Variable (line 317)
-- new Variable (line 325)
-- new Variable (line 334)
-- new Variable (line 348)
-- new Variable (line 364)
-- new Variable (line 367)
-- new Variable (line 380)
-- new Variable (line 390)
-- new Variable (line 393)
-- new Variable (line 417)
-- new Variable (line 427)
-- new Variable (line 456)
-- new Variable (line 460)
-- new Variable (line 468)
-- new Variable (line 501)
-- new Variable (line 561)
-- 26 class method(s)
+- new Variable (line 156)
+- new Variable (line 169)
+- new Variable (line 173)
+- new Variable (line 184)
+- new Variable (line 238)
+- new Variable (line 249)
+- new Variable (line 264)
+- new Variable (line 273)
+- new Variable (line 284)
+- new Variable (line 298)
+- new Variable (line 330)
+- new Variable (line 339)
+- new Variable (line 347)
+- new Variable (line 356)
+- new Variable (line 370)
+- new Variable (line 386)
+- new Variable (line 389)
+- new Variable (line 402)
+- new Variable (line 412)
+- new Variable (line 415)
+- new Variable (line 439)
+- new Variable (line 449)
+- new Variable (line 478)
+- new Variable (line 482)
+- new Variable (line 490)
+- new Variable (line 523)
+- new Variable (line 583)
+- 27 class method(s)
 
 ### `lib/JIT/DomInstanceMethodJit.php`
 
@@ -55055,7 +55055,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 39)
-- new NativeDateMalformedIntervalException (line 57)
+- new NativeDateMalformedIntervalException (line 59)
 - 1 class method(s)
 - 2 closure(s)
 
