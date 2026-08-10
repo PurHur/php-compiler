@@ -39,6 +39,8 @@ final class CompileFatalDiagnosticShapeTest extends TestCase
         $this->assertStringContainsString('PHP Fatal error:', $output);
         $this->assertStringNotContainsString('parseAndCompile failure:', $output);
         $this->assertStringContainsString('Class B contains 1 abstract method', $output);
+        $this->assertStringContainsString('(A::f)', $output);
+        $this->assertStringNotContainsString('(B::f)', $output);
     }
 
     public function testTemporaryArrayAppendEmitsZendShapedFatal(): void

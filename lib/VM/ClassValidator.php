@@ -28,7 +28,7 @@ final class ClassValidator
         self::rebuildAbstractMethods($entry, $context);
         self::validateInterfaceImplementation($entry, $context);
         self::validateInterfaceProperties($entry, $context);
-        self::validateAbstractMethodsResolved($entry);
+        self::validateAbstractMethodsResolved($entry, $context);
         self::validateAbstractPropertyHooksResolved($entry, $context);
     }
 
@@ -280,21 +280,71 @@ final class ClassValidator
         return end($parts) ?: $trim;
     }
 
-    private static function validateAbstractMethodsResolved(ClassEntry $entry): void
+    private static function validateAbstractMethodsResolved(ClassEntry $entry, Context $context): void
     {
         if ($entry->isAbstract || [] === $entry->abstractMethods) {
             return;
         }
 
         $count = count($entry->abstractMethods);
-        $first = array_key_first($entry->abstractMethods);
+        $list = [];
+        foreach ($entry->abstractMethods as $methodLc => $_) {
+            $origin = self::abstractMethodOriginDisplay($entry, (string) $methodLc, $context);
+            $methodDisplay = $entry->methodNames[$methodLc]
+                ?? self::ancestorMethodDisplayName($entry, (string) $methodLc, $context)
+                ?? (string) $methodLc;
+            $list[] = $origin.'::'.$methodDisplay;
+        }
 
-        // php-src: zend_verify_abstract_class — E_COMPILE_ERROR at DECLARE (#25912).
+        // php-src: zend_verify_abstract_class — cite declaring class::method (#30022, #25912).
         throw new \CompileError(
             "Class {$entry->name} contains {$count} abstract method"
             .(1 === $count ? '' : 's')
-            ." and must therefore be declared abstract or implement the remaining methods ({$entry->name}::{$first})"
+            .' and must therefore be declared abstract or implement the remaining methods ('
+            .implode(', ', $list).')'
         );
+    }
+
+    /**
+     * Zend cites the abstract method's declaring class, not the incomplete concrete child (#30022).
+     *
+     * Own / trait abstracts stay on the child (C::f); inherited abstracts walk to the furthest
+     * ancestor that still lists the method as abstract (A::f through intermediate abstract parents).
+     */
+    private static function abstractMethodOriginDisplay(
+        ClassEntry $entry,
+        string $methodLc,
+        Context $context
+    ): string {
+        $origin = $entry;
+        $parentLc = $entry->parentLc;
+        while (null !== $parentLc && isset($context->classes[$parentLc])) {
+            $parent = $context->classes[$parentLc];
+            if (!isset($parent->abstractMethods[$methodLc])) {
+                break;
+            }
+            $origin = $parent;
+            $parentLc = $parent->parentLc;
+        }
+
+        return self::shortClassDisplayName($origin->name);
+    }
+
+    private static function ancestorMethodDisplayName(
+        ClassEntry $entry,
+        string $methodLc,
+        Context $context
+    ): ?string {
+        $parentLc = $entry->parentLc;
+        while (null !== $parentLc && isset($context->classes[$parentLc])) {
+            $parent = $context->classes[$parentLc];
+            if (isset($parent->methodNames[$methodLc])) {
+                return $parent->methodNames[$methodLc];
+            }
+            $parentLc = $parent->parentLc;
+        }
+
+        return null;
     }
 
     private static function validateAbstractPropertyHooksResolved(ClassEntry $entry, Context $context): void

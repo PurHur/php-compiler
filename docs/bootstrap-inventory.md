@@ -58249,9 +58249,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 89)
 - new CompileError (line 142)
 - new CompileError (line 186)
-- new CompileError (line 293)
-- new CompileError (line 314)
-- 14 class method(s)
+- new CompileError (line 300)
+- new CompileError (line 364)
+- 16 class method(s)
 - 2 closure(s)
 
 ### `lib/VM/CloneSupport.php`
