@@ -10,13 +10,16 @@ use PHPCompiler\JIT\Builtin\StringClassExists;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * is_a() — extends-chain instance check (php-src ext/standard/class.c, issue #3478).
+ * is_a() — extends-chain instance check (php-src Zend/zend_builtin_functions.c, issue #3478).
+ *
+ * Z_PARAM_STR $class: declare(strict_types=1) → TypeError on null; else soft-null DEP+coerce (#29817).
  */
 final class is_a_ extends Internal
 {
@@ -41,7 +44,8 @@ final class is_a_ extends Internal
             ));
         }
         $ctx = VmReflection::requireContext($frame);
-        $className = VmReflection::stringArg($frame->calledArgs[1], 'is_a() class name', 1);
+        // php-src zend_builtin_functions.stub.php — string $class (Z_PARAM_STR, #29817).
+        $className = VmString::trimFamilyStringArgForFrame($frame, 1, 'is_a', 1, 'class');
         $allowString = false;
         if (3 === \count($frame->calledArgs)) {
             $allowString = $frame->calledArgs[2]->resolveIndirect()->toBool();
@@ -74,6 +78,13 @@ final class is_a_ extends Internal
                 'is_a() expects at most 3 arguments, %d given',
                 $argc
             ));
+        }
+        // Z_PARAM_STR $class — strict TypeError / soft-null DEP (#29817).
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            self::jitClassArg($context, $args[1]);
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
         }
         $allowString = $context->constantFromBool(false);
         $allowStringKnownFalse = true;
@@ -125,6 +136,16 @@ final class is_a_ extends Internal
         }
 
         return false;
+    }
+
+    /** Z_PARAM_STR $class — caller strict_types vs soft-null (#29817). */
+    private static function jitClassArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'is_a', 1, 'class');
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'is_a', 1, 'class');
     }
 
 }
