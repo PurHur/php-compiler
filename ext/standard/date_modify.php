@@ -38,8 +38,9 @@ final class date_modify extends Internal
             'object',
             $frame->vmContext
         );
-        $modifier = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        $modifier = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
             'date_modify',
             1,
             'modifier'

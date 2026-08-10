@@ -75,12 +75,36 @@ final class JitDateMutation
             throw new \LogicException($function.'() requires $this and a modifier argument');
         }
 
-        $modifierLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $modifierLit) {
-            JitStringBuiltinArg::lower($context, $args[1], $function, $immutable ? 0 : 2, 'modifier');
-            throw new \LogicException(
-                $function.'() requires a compile-time string modifier in this compiler build (#26789)'
+        // Method: Argument #1 ($modifier); procedural date_modify: Argument #2 (#29818).
+        $modifierUserIndex = \str_contains($function, '::') ? 0 : 1;
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            // Z_PARAM_STR — strict TypeError IR; weak soft-null → "" (#29818).
+            JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[1],
+                $function,
+                $modifierUserIndex,
+                'modifier'
             );
+            if ($context->callerStrictTypes) {
+                // TypeError+abort already emitted; return unreachable object box.
+                $ret = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $ret)
+                );
+
+                return $ret;
+            }
+            $modifierLit = '';
+        } else {
+            $modifierLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $modifierLit) {
+                JitStringBuiltinArg::lower($context, $args[1], $function, $modifierUserIndex, 'modifier');
+                throw new \LogicException(
+                    $function.'() requires a compile-time string modifier in this compiler build (#26789)'
+                );
+            }
         }
 
         $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';

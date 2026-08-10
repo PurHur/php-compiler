@@ -11,11 +11,12 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\ErrorReporter;
 
 /**
- * DateTime::modify() / DateTimeImmutable::modify() — VM (#6132, #10733, #22663, #28524).
+ * DateTime::modify() / DateTimeImmutable::modify() — VM (#6132, #10733, #22663, #28524, #29818).
  *
  * php-src ext/date/php_date.c — zim_DateTime_modify / zim_DateTimeImmutable_modify:
  * PHP 8.2 warning+false; PHP 8.3+ EH_THROW DateMalformedStringException for both
  * object methods. Procedural date_modify() stays warning+false on all profiles.
+ * Caller strict_types → TypeError on null $modifier (Z_PARAM_STR; #29818).
  */
 final class DateTimeModify extends VmClassMethod
 {
@@ -34,8 +35,11 @@ final class DateTimeModify extends VmClassMethod
             'DateTime::modify()'
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
-        $modifier = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29818).
+        // Frame arg 1 includes $this; user-visible Argument #1 ($modifier).
+        $modifier = VmString::internalMethodStringArgForFrame(
+            $frame,
+            1,
             "{$label}::modify",
             0,
             'modifier'
