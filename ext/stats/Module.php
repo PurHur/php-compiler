@@ -51,6 +51,10 @@ class Module extends ModuleAbstract
             new stats_dens_pmf_poisson(),
             new stats_dens_pmf_negative_binomial(),
             new stats_dens_pmf_hypergeometric(),
+            new stats_cdf_normal(),
+            new stats_cdf_t(),
+            new stats_cdf_chisquare(),
+            new stats_cdf_gamma(),
         ];
     }
 }

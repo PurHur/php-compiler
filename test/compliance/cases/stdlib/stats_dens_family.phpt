@@ -7,7 +7,7 @@ PHP_COMPILER_ENABLE_STATS=1
 echo function_exists('stats_dens_normal') ? 'Y' : 'N';
 echo "\n";
 $funcs = get_extension_funcs('stats') ?: [];
-echo count($funcs) >= 29 ? 'funcs_ok' : 'funcs_bad='.count($funcs);
+echo count($funcs) >= 33 ? 'funcs_ok' : 'funcs_bad='.count($funcs);
 echo "\n";
 echo round(stats_dens_normal(0.0, 0.0, 1.0), 8), "\n";
 echo round(stats_dens_exponential(1.0, 1.0), 8), "\n";

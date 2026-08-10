@@ -41,6 +41,8 @@ final class StatsJit
 
     private const ABI_DENS = '__compiler_stats_dens';
 
+    private const ABI_CDF = '__compiler_stats_cdf';
+
     private const HELPER_PATH = '/ext/stats/StatsJitHelper.php';
 
     private const VARIANCE_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::variance';
@@ -69,6 +71,8 @@ final class StatsJit
 
     private const DENS_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::dens';
 
+    private const CDF_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::cdf';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::VARIANCE_HELPER,
@@ -84,6 +88,7 @@ final class StatsJit
         self::FACT_HELPER,
         self::BINOM_HELPER,
         self::DENS_HELPER,
+        self::CDF_HELPER,
     ];
 
     /** @var list<string> */
@@ -101,6 +106,7 @@ final class StatsJit
         self::ABI_FACT,
         self::ABI_BINOM,
         self::ABI_DENS,
+        self::ABI_CDF,
     ];
 
     public static function implement(Context $context): void
@@ -258,6 +264,17 @@ final class StatsJit
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#29587'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_CDF,
+            'stats_cdf_bridge_entry',
+            [$i64, $i64, $double, $double, $double],
+            $double,
+            self::CDF_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29588'
         );
         self::ensureLibcSqrt($context);
         self::registerLinkedRuntime($context);
