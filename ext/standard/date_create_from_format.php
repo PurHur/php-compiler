@@ -45,8 +45,9 @@ final class date_create_from_format extends Internal
             0,
             'format'
         );
-        $time = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        $time = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
             'date_create_from_format',
             1,
             'datetime'

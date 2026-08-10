@@ -38,14 +38,17 @@ final class date_create_immutable_from_format extends Internal
             return;
         }
 
-        $format = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — caller strict_types → TypeError on null (#29830).
+        $format = VmString::stringBuiltinArgForFrame(
+            $frame,
+            0,
             'date_create_immutable_from_format',
             0,
             'format'
         );
-        $time = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        $time = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
             'date_create_immutable_from_format',
             1,
             'datetime'

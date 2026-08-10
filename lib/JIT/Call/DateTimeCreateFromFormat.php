@@ -34,6 +34,11 @@ final class DateTimeCreateFromFormat implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitDateCreateFromFormat::invoke($context, $this->immutable, ...$args);
+        return JitDateCreateFromFormat::invokeNamed(
+            $context,
+            $this->immutable,
+            $this->name,
+            ...$args
+        );
     }
 }

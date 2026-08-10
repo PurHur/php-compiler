@@ -13,16 +13,36 @@ use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for date_create_from_format() / date_create_immutable_from_format() (#6172).
+ * LLVM lowering for date_create_from_format() / DateTime(Immutable)::createFromFormat() (#6172, #29830).
  *
- * php-src: ext/date/php_date.c — PHP_FUNCTION(date_create_from_format)
+ * php-src: ext/date/php_date.c — PHP_FUNCTION(date_create_from_format) / zim_*_createFromFormat
  */
 final class JitDateCreateFromFormat
 {
-    public static function invoke(Context $context, bool $immutable, JITVariable ...$args): Value
-    {
+    /** Sentinel: TypeError IR already emitted; caller must return unreachable box. */
+    private const TYPE_ERROR_ABORT = "\0__cff_type_error__";
+
+    public static function invoke(
+        Context $context,
+        bool $immutable,
+        JITVariable ...$args
+    ): Value {
+        return self::invokeNamed(
+            $context,
+            $immutable,
+            $immutable ? 'date_create_immutable_from_format' : 'date_create_from_format',
+            ...$args
+        );
+    }
+
+    /** Method Call path — Zend cites DateTime::createFromFormat (#29830). */
+    public static function invokeNamed(
+        Context $context,
+        bool $immutable,
+        string $function,
+        JITVariable ...$args
+    ): Value {
         $argc = \count($args);
-        $function = $immutable ? 'date_create_immutable_from_format' : 'date_create_from_format';
         if ($argc < 2 || $argc > 3) {
             throw new \ArgumentCountError(\sprintf(
                 '%s() expects at least 2 arguments, %d given',
@@ -31,10 +51,22 @@ final class JitDateCreateFromFormat
             ));
         }
 
-        $formatLit = self::compileTimeStringArg($args[0]);
-        $timeLit = self::compileTimeStringArg($args[1]);
+        $formatLit = self::resolveZparamStrLit($context, $args[0], $function, 0, 'format');
+        if (self::TYPE_ERROR_ABORT === $formatLit) {
+            return self::unreachableFalseBox($context);
+        }
+        $timeLit = self::resolveZparamStrLit($context, $args[1], $function, 1, 'datetime');
+        if (self::TYPE_ERROR_ABORT === $timeLit) {
+            return self::unreachableFalseBox($context);
+        }
+        if (null === $formatLit || null === $timeLit) {
+            throw new \LogicException(
+                $function.'() requires compile-time string operands in this compiler build (issue #6172)'
+            );
+        }
+
         $tzLit = $argc >= 3 ? self::compileTimeTimezoneName($context, $args[2], $function) : null;
-        if (null === $formatLit || null === $timeLit || (3 === $argc && null === $tzLit && JITVariable::TYPE_NULL !== $args[2]->type)) {
+        if (3 === $argc && null === $tzLit && JITVariable::TYPE_NULL !== $args[2]->type) {
             throw new \LogicException(
                 $function.'() requires compile-time string operands in this compiler build (issue #6172)'
             );
@@ -52,6 +84,65 @@ final class JitDateCreateFromFormat
             $parsed['microsecond'],
             $parsed['timezone']
         );
+    }
+
+    /**
+     * @return string|null compile-time literal, soft-null "", or TYPE_ERROR_ABORT sentinel
+     */
+    private static function resolveZparamStrLit(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ?string {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            // Z_PARAM_STR — strict / forward-profile TypeError IR; weak soft-null → "" (#29830).
+            JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                $function,
+                $userArgIndex,
+                $paramName
+            );
+            if (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()
+            ) {
+                return self::TYPE_ERROR_ABORT;
+            }
+
+            return '';
+        }
+
+        $lit = self::compileTimeStringArg($arg);
+        if (null !== $lit) {
+            return $lit;
+        }
+        if ($context->callerStrictTypes && JITVariable::TYPE_STRING !== $arg->type) {
+            JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                $function,
+                $userArgIndex,
+                $paramName
+            );
+
+            return self::TYPE_ERROR_ABORT;
+        }
+
+        return null;
+    }
+
+    private static function unreachableFalseBox(Context $context): Value
+    {
+        $ret = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $ret)
+        );
+
+        return $ret;
     }
 
     private static function compileTimeStringArg(JITVariable $arg): ?string
