@@ -220,6 +220,26 @@ final class JitDomCreateElement
         return $obj;
     }
 
+    /**
+     * Raw `%__object__*` for id-map / {@see DomUserScriptElementCacheLlvm} stores (#25119, #29736).
+     *
+     * {@see invoke()} boxes via {@see boxObjectResult()} for the call ABI (#29638); loadHTML /
+     * loadXML / compile-time getElementById must keep the unboxed pointer for hashtable +
+     * global-elem stores.
+     */
+    public static function materializeForUserScriptDocument(
+        Context $context,
+        JITVariable $document,
+        string $tag,
+        string $textContent = '',
+        string $className = self::CLASS_ELEMENT
+    ): Value {
+        $obj = self::materializeElementWithTextContent($context, $tag, $textContent, $className);
+        self::storeOwnerAndNullParent($context, $obj, $document, $className);
+
+        return $obj;
+    }
+
     /** Store textContent + nodeValue string slots (empty string is a real store; #25475). */
     public static function storeTextContentSlots(
         Context $context,

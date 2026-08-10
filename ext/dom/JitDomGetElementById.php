@@ -312,8 +312,8 @@ final class JitDomGetElementById
     /**
      * Materialize a DOMElement for a compile-time loadHTML parse record.
      *
-     * Tag lit must set {@see JITVariable::$compileTimeString} so createElement returns
-     * `__object__*` (not invokeViaHelper's boxed value) for propertyStore / id-map (#25119).
+     * Returns raw `__object__*` for propertyStore / id-map; caller boxes for the call ABI
+     * (#25119 / #29736 — do not use boxed {@see JitDomCreateElement::invoke()} here).
      *
      * @param array{tag: string, id: string, text: string} $parsed
      */
@@ -322,32 +322,12 @@ final class JitDomGetElementById
         JITVariable $receiver,
         array $parsed
     ): Value {
-        $tagVar = new JITVariable(
+        return JitDomCreateElement::materializeForUserScriptDocument(
             $context,
-            JITVariable::TYPE_STRING,
-            JITVariable::KIND_VALUE,
-            $context->builder->load($context->constantStringFromString($parsed['tag']))
+            $receiver,
+            $parsed['tag'],
+            $parsed['text']
         );
-        $tagVar->compileTimeString = $parsed['tag'];
-        $element = JitDomCreateElement::invoke($context, $receiver, $tagVar);
-        $textStr = $context->builder->load($context->constantStringFromString($parsed['text']));
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $textStr
-        );
-        $objectType = $context->type->object;
-        $classId = $objectType->lookup('DOMElement');
-        if (!$objectType->hasProperty($classId, 'textContent')) {
-            $objectType->defineProperty($classId, 'textContent', JITVariable::TYPE_STRING);
-        }
-        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($element, 'DOMElement', 'textContent'),
-            $propVar,
-            JITVariable::TYPE_STRING
-        );
-
-        return $element;
     }
 
     private static function boxObjectResult(Context $context, Value $element): Value
