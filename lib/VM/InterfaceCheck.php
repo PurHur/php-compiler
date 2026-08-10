@@ -33,7 +33,8 @@ final class InterfaceCheck
         $entry = $target->toObject()->class;
         foreach ($interfaceLcs as $memberLc) {
             if (!self::entrySatisfiesIntersectionMember($entry, $memberLc, $context)) {
-                $given = $entry->name;
+                // Fallback message path (no UserParamErrorContext): strip anon NUL (#29569).
+                $given = \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($entry->name);
 
                 self::throwKindTypeError($kind, $expected, $given, $value);
             }

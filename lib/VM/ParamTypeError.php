@@ -69,11 +69,7 @@ final class ParamTypeError
 
     private static function givenTypeName(Variable $argument): string
     {
-        $resolved = $argument->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $resolved->type) {
-            return $resolved->toObject()->class->name;
-        }
-
+        // Always via typeNameForTypeErrorActual so anon classes strip NUL+path (#29569).
         return EnumCaseSupport::typeNameForTypeErrorActual($argument);
     }
 }
