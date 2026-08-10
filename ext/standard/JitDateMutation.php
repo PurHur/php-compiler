@@ -32,7 +32,7 @@ final class JitDateMutation
         '%s(): Argument #2 ($interval) must be of type DateInterval, %s given';
 
     private const TARGET_TYPE_ERROR =
-        'date_diff(): Argument #2 ($target) must be of type DateTime, %s given';
+        'date_diff(): Argument #2 ($targetObject) must be of type DateTimeInterface, %s given';
 
     public static function invokeAdd(Context $context, JITVariable ...$args): Value
     {

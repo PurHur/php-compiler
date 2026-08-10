@@ -33,19 +33,20 @@ final class date_diff extends Internal
         if (null === $frame->returnVar || null === $frame->vmContext) {
             return;
         }
-        $base = DateTimeSupport::requireDateTime(
+        $vmCtx = $frame->vmContext;
+        $base = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[0],
             'date_diff()',
+            $vmCtx,
             1,
-            'object',
-            $frame->vmContext
+            'baseObject'
         );
-        $target = DateTimeSupport::requireDateTime(
+        $target = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[1],
             'date_diff()',
+            $vmCtx,
             2,
-            'object',
-            $frame->vmContext
+            'targetObject'
         );
         $absolute = false;
         if ($argc >= 3) {
@@ -56,7 +57,7 @@ final class date_diff extends Internal
                 'absolute'
             );
         }
-        $interval = DateTimeSupport::diffDateTimes($base, $target, $absolute, $frame->vmContext);
+        $interval = DateTimeSupport::diffDateTimes($base, $target, $absolute, $vmCtx);
         $frame->returnVar->object($interval);
     }
 
