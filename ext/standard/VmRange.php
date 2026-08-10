@@ -148,6 +148,9 @@ final class VmRange
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_STR_OR_LONG soft-null — DEP then coerce to 0 (#29348; peer $step #29352).
+            self::rejectOrCoerceNullEndpoint($frame, $argIndex, $paramName);
+
             return 0;
         }
         if (Variable::TYPE_STRING === $var->type) {
@@ -203,6 +206,9 @@ final class VmRange
             return $var->toBool() ? 1.0 : 0.0;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_STR_OR_LONG soft-null — DEP then coerce to 0.0 (#29348).
+            self::rejectOrCoerceNullEndpoint($frame, $argIndex, $paramName);
+
             return 0.0;
         }
         if (Variable::TYPE_STRING === $var->type) {
@@ -246,12 +252,30 @@ final class VmRange
     {
         return new \TypeError(
             sprintf(
-                'range(): Argument #%d ($%s) must be of type int|float|string, %s given',
+                'range(): Argument #%d ($%s) must be of type string|int|float, %s given',
                 $argIndex,
                 $paramName,
                 VmStreamArg::debugTypeName($var)
             )
         );
+    }
+
+    /**
+     * php-src Z_PARAM_STR_OR_LONG $start/$end null: strict_types → TypeError; else DEP then 0 (#29348).
+     * Type label is string|int|float (array.stub.php), not int|float|string.
+     */
+    private static function rejectOrCoerceNullEndpoint(?Frame $frame, int $argIndex, string $paramName): void
+    {
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+            throw new \TypeError(
+                sprintf(
+                    'range(): Argument #%d ($%s) must be of type string|int|float, null given',
+                    $argIndex,
+                    $paramName
+                )
+            );
+        }
+        VmNullNumberParamDeprecation::emit($frame, 'range', $argIndex, $paramName, 'string|int|float');
     }
 
     /**

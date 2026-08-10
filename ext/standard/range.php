@@ -73,13 +73,12 @@ final class range extends Internal
             return self::callCharRange($context, $startChar, $endChar, $args);
         }
 
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type
-            || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+        if (!self::jitIntEndpointOk($args[0]) || !self::jitIntEndpointOk($args[1])) {
             throw new \LogicException('range() start and end must be integers in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
-        $start = JitLongArg::lower($context, $args[0], 'range() start');
-        $end = JitLongArg::lower($context, $args[1], 'range() end');
+        $start = self::lowerIntEndpointArg($context, $args[0], 1, 'start');
+        $end = self::lowerIntEndpointArg($context, $args[1], 2, 'end');
         if (3 === \count($args)) {
             $step = self::lowerIntStepArg($context, $args[2]);
         } else {
@@ -103,11 +102,9 @@ final class range extends Internal
     private static function callFloatRange(Context $context, array $args): Value
     {
         foreach ($args as $i => $arg) {
-            // Soft-null $step is handled below (#29352); bool $step coerces (#29505).
-            if (2 === $i
-                && (JITVariable::TYPE_NULL === $arg->type
-                    || ($arg->isNullConstant ?? false)
-                    || JITVariable::TYPE_NATIVE_BOOL === $arg->type)) {
+            // Soft-null $start/$end (#29348); soft-null $step (#29352); bool $step coerces (#29505).
+            if (self::jitIsNullArg($arg)
+                || (2 === $i && JITVariable::TYPE_NATIVE_BOOL === $arg->type)) {
                 continue;
             }
             if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
@@ -116,8 +113,12 @@ final class range extends Internal
             }
         }
         $double = $context->getTypeFromString('double');
-        $start = self::toJitDouble($context, $args[0], $double);
-        $end = self::toJitDouble($context, $args[1], $double);
+        $start = self::jitIsNullArg($args[0])
+            ? self::lowerFloatEndpointNull($context, 1, 'start')
+            : self::toJitDouble($context, $args[0], $double);
+        $end = self::jitIsNullArg($args[1])
+            ? self::lowerFloatEndpointNull($context, 2, 'end')
+            : self::toJitDouble($context, $args[1], $double);
         if (3 === \count($args)) {
             if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
                 $step = self::lowerFloatStepNull($context);
@@ -181,6 +182,87 @@ final class range extends Internal
         self::emitOversizedStepGuard($context, $start, $end, $step);
 
         return RangeIntRuntime::charRange($context, $start, $end, $step);
+    }
+
+    private static function jitIsNullArg(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
+    }
+
+    private static function jitIntEndpointOk(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NATIVE_LONG === $arg->type || self::jitIsNullArg($arg);
+    }
+
+    /**
+     * Z_PARAM_STR_OR_LONG soft-null on $start/$end — DEP (string|int|float) then 0 (#29348).
+     * Caller strict_types → TypeError (Zend).
+     */
+    private static function lowerIntEndpointArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if (self::jitIsNullArg($arg)) {
+            if ($context->callerStrictTypes) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    sprintf(
+                        'range(): Argument #%d ($%s) must be of type string|int|float, null given',
+                        $argIndex,
+                        $paramName
+                    )
+                );
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+            // Skip DEP IR on user-script AOT (thin standalone trigger_error mid-fold — peer #21593 / #29352).
+            if (!$context->isUserScriptAot()) {
+                JitIntdiv::emitNullIntDeprecation(
+                    $context,
+                    'range',
+                    $argIndex,
+                    $paramName,
+                    'string|int|float'
+                );
+            }
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return JitLongArg::lower($context, $arg, 'range() '.$paramName);
+    }
+
+    /** Soft-null float $start/$end → 0.0 with string|int|float DEP (#29348). */
+    private static function lowerFloatEndpointNull(
+        Context $context,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                sprintf(
+                    'range(): Argument #%d ($%s) must be of type string|int|float, null given',
+                    $argIndex,
+                    $paramName
+                )
+            );
+
+            return $context->getTypeFromString('double')->constReal(0.0);
+        }
+        if (!$context->isUserScriptAot()) {
+            JitIntdiv::emitNullIntDeprecation(
+                $context,
+                'range',
+                $argIndex,
+                $paramName,
+                'string|int|float'
+            );
+        }
+
+        return $context->getTypeFromString('double')->constReal(0.0);
     }
 
     /**
