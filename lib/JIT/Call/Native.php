@@ -152,12 +152,27 @@ class Native implements Call {
                 && isset($this->paramTypeConstraintsByArg[$index])
                 && !$this->skipImplicitNullableTypeCheck($index, $arg)
             ) {
-                \PHPCompiler\JIT\TypeCheck::enforceParameter(
-                    $context,
-                    $arg,
-                    $this->paramTypeConstraintsByArg[$index],
-                    $context->callerStrictTypes
-                );
+                $constraint = $this->paramTypeConstraintsByArg[$index];
+                if ($context->callerStrictTypes) {
+                    \PHPCompiler\JIT\TypeCheck::enforceParameter(
+                        $context,
+                        $arg,
+                        $constraint,
+                        true
+                    );
+                } else {
+                    $prefix = $this->receiverPrefix();
+                    $userIdx = $index - $prefix;
+                    $paramName = $this->paramNames[$userIdx] ?? ('param'.$userIdx);
+                    $arg = \PHPCompiler\JIT\TypedParamCoerce::weakAtCallSite(
+                        $context,
+                        $arg,
+                        $constraint,
+                        $this->name,
+                        $userIdx,
+                        $paramName
+                    );
+                }
             }
             if (!$skipVariadicPackedTypeCheck && isset($this->paramIntersectionConstraintsByArg[$index])) {
                 \PHPCompiler\JIT\IntersectionParamCheck::enforce(
