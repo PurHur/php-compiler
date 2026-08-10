@@ -25,9 +25,18 @@ final class JitDomGetElementsByTagNameUserScript
         if (\count($args) < 2) {
             return null;
         }
-        $tagLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $tagLit) {
-            return null;
+        // Soft-null under non-strict is '' (Z_PARAM_STR); keep UserScript path so thin-AOT
+        // does not call the empty-tag ABI bridge that segfaults (#29959).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                return null;
+            }
+            $tagLit = '';
+        } else {
+            $tagLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $tagLit) {
+                return null;
+            }
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml) {
