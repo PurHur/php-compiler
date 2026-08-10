@@ -191,6 +191,8 @@
             <file>./test/compliance/MbConvertEncodingNullStrictJITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictJITTest.php</file>
+            <file>./test/compliance/TimezoneListIdentifiersNullStrictVMTest.php</file>
+            <file>./test/compliance/TimezoneListIdentifiersNullStrictJITTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsVMTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsJITTest.php</file>
             <file>./test/compliance/AsymmetricVisibilityReadonlyPrivateSetOrderVMTest.php</file>

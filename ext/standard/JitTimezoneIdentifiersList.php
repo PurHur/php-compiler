@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -23,12 +24,20 @@ final class JitTimezoneIdentifiersList
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        return self::invokeNamed($context, 'timezone_identifiers_list', ...$args);
+    }
+
+    /**
+     * Shared bake path for procedural + DateTimeZone::listIdentifiers (#29735, #29844).
+     */
+    public static function invokeNamed(Context $context, string $function, JITVariable ...$args): Value
+    {
         $argc = \count($args);
         if ($argc > 2) {
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
                 $context,
-                \sprintf('timezone_identifiers_list() expects at most 2 arguments, %d given', $argc)
+                \sprintf('%s() expects at most 2 arguments, %d given', $function, $argc)
             );
             $slot = JitValueBox::alloc($context);
 
@@ -38,19 +47,25 @@ final class JitTimezoneIdentifiersList
         $timezoneGroup = DateTimeZoneSupport::GROUP_ALL;
         $countryCode = null;
         if ($argc >= 1) {
-            $group = self::tryCompileTimeInt($context, $args[0], 'timezoneGroup');
-            if (null === $group) {
-                throw new \LogicException(
-                    'timezone_identifiers_list() requires compile-time timezoneGroup in this compiler build (issue #3504)'
-                );
+            // int $timezoneGroup — null TypeError under caller strict_types (#29844).
+            if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+                JitInternalStrictArg::requireInt($context, $args[0], $function, 'timezoneGroup', 1);
+                $timezoneGroup = 0;
+            } else {
+                $group = self::tryCompileTimeInt($context, $args[0], 'timezoneGroup');
+                if (null === $group) {
+                    throw new \LogicException(
+                        $function.'() requires compile-time timezoneGroup in this compiler build (issue #3504)'
+                    );
+                }
+                $timezoneGroup = $group;
             }
-            $timezoneGroup = $group;
         }
         if ($argc >= 2) {
             $countryCode = self::tryCompileTimeNullableString($context, $args[1], 'countryCode');
             if (false === $countryCode) {
                 throw new \LogicException(
-                    'timezone_identifiers_list() requires compile-time countryCode in this compiler build (issue #3504)'
+                    $function.'() requires compile-time countryCode in this compiler build (issue #3504)'
                 );
             }
         }

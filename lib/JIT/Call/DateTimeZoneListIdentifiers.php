@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * DateTimeZone::listIdentifiers(?int $timezoneGroup, ?string $countryCode) — JIT/AOT (#29735).
+ * DateTimeZone::listIdentifiers(int $timezoneGroup, ?string $countryCode) — JIT/AOT (#29735, #29844).
  *
  * php-src: ext/date/php_date.c — PHP_METHOD(DateTimeZone, listIdentifiers)
  * Static — no implicit $this (peer NumberFormatter::create). Shares baking with
@@ -30,6 +30,6 @@ final class DateTimeZoneListIdentifiers implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitTimezoneIdentifiersList::invoke($context, ...$args);
+        return JitTimezoneIdentifiersList::invokeNamed($context, 'DateTimeZone::listIdentifiers', ...$args);
     }
 }

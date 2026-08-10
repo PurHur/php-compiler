@@ -38,8 +38,10 @@ final class DateTimeZoneListIdentifiers extends VmClassMethod
         $timezoneGroup = DateTimeZoneSupport::GROUP_ALL;
         $countryCode = null;
         if ($argc >= 1) {
-            $timezoneGroup = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[0],
+            // php-src php_date.stub.php int $timezoneGroup — null TypeError under strict_types (#29844).
+            $timezoneGroup = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                0,
                 'DateTimeZone::listIdentifiers',
                 1,
                 'timezoneGroup'
