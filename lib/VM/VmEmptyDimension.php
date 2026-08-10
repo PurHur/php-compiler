@@ -38,7 +38,14 @@ final class VmEmptyDimension
             }
             $table = $container->toArray();
             try {
-                if (!$table->keyExists($dim, false, $frame)) {
+                // Same illegal-offset wording as isset() / ZEND_ISSET_ISEMPTY_DIM_OBJ (#29549).
+                if (!$table->keyExists(
+                    $dim,
+                    false,
+                    $frame,
+                    true,
+                    'Illegal offset type in isset or empty'
+                )) {
                     $dst->bool(true);
 
                     return null;
