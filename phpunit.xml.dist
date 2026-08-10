@@ -208,6 +208,8 @@
             <file>./test/compliance/FilePutContentsEmptyPathValueErrorJITTest.php</file>
             <file>./test/compliance/IssetEmptyStringOffsetFloatVMTest.php</file>
             <file>./test/compliance/IssetEmptyStringOffsetFloatJITTest.php</file>
+            <file>./test/compliance/IssetEmptyStringOffsetBoolNullVMTest.php</file>
+            <file>./test/compliance/IssetEmptyStringOffsetBoolNullJITTest.php</file>
             <file>./test/compliance/EmptyArrFloatDimDepVMTest.php</file>
             <file>./test/compliance/EmptyArrFloatDimDepJITTest.php</file>
         </testsuite>

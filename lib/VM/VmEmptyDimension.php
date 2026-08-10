@@ -136,7 +136,7 @@ final class VmEmptyDimension
                 return null;
             }
             try {
-                // Index already warned via isset path (#29557) — silent coerce for the char fetch.
+                // Index already coerced via isset path (#29557/#29558) — silent coerce for the char fetch.
                 $rawIndex = Variable::stringOffsetIndexFromDim(
                     $dim,
                     null,
