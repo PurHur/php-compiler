@@ -8,14 +8,17 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 
 /**
- * PECL stats_rand_* — L'Ecuyer combined MRG (randlib com.c / ignlgi) (#29589).
+ * PECL stats_rand_* — L'Ecuyer combined MRG (randlib com.c / ignlgi) (#29589, #29622).
  *
- * php-src: pecl-math-stats com.c + randlib.c (setall/getsd/ignlgi/ranf/ignuin).
- * gen_normal uses Box–Muller on ranf() — deterministic under setall, but the
- * deviate stream differs from PECL's snorm() (documented parity limit).
+ * php-src: pecl-math-stats com.c + randlib.c (setall/getsd/ignlgi/ranf/ignuin/
+ * genbet/sexpo/snorm/sgamma/phrtsd). gen_normal uses RANLIB snorm() (#29622).
  */
 final class VmStatsRand
 {
+    public const OP_GEN_BETA = 1;
+    public const OP_GEN_EXPONENTIAL = 2;
+    public const OP_GEN_GAMMA = 3;
+
     private const NUMG = 32;
 
     private static bool $commonInit = false;
@@ -67,6 +70,7 @@ final class VmStatsRand
         }
         self::$currentG = $ocgn;
         self::$hasSpare = false;
+        VmStatsRandlib::resetCaches();
 
         return true;
     }
@@ -167,27 +171,71 @@ final class VmStatsRand
 
             return false;
         }
-        // Box–Muller on ranf(); PECL uses snorm() — different stream consumption.
-        if (self::$hasSpare) {
-            self::$hasSpare = false;
 
-            return $av + $sd * self::$spare;
+        return $av + $sd * VmStatsRandlib::snorm();
+    }
+
+    /** @return float|false */
+    public static function genBeta(float $a, float $b, ?Frame $frame)
+    {
+        if ($a < 1.0E-37 || $b < 1.0E-37) {
+            VmStats::triggerWarning($frame, \sprintf(
+                "'a' or 'b' lower than 1.0E-37. 'a' value : %16.6E 'b' value : %16.6E",
+                $a,
+                $b
+            ));
+
+            return false;
         }
-        do {
-            $u = 2.0 * self::ranf() - 1.0;
-            $v = 2.0 * self::ranf() - 1.0;
-            $s = $u * $u + $v * $v;
-        } while ($s >= 1.0 || 0.0 == $s);
-        $mul = \sqrt(-2.0 * \log($s) / $s);
-        self::$spare = $v * $mul;
-        self::$hasSpare = true;
 
-        return $av + $sd * ($u * $mul);
+        return VmStatsRandlib::genbet($a, $b);
+    }
+
+    /** @return float|false */
+    public static function genExponential(float $av, ?Frame $frame)
+    {
+        if ($av < 0.0) {
+            VmStats::triggerWarning($frame, 'av < 0.0');
+
+            return false;
+        }
+
+        return VmStatsRandlib::sexpo() * $av;
+    }
+
+    /** @return float|false */
+    public static function genGamma(float $a, float $r, ?Frame $frame)
+    {
+        if (!($a > 0.0 && $r > 0.0)) {
+            VmStats::triggerWarning($frame, \sprintf(
+                'A or R nonpositive. A value : %16.6E , R value : %16.6E',
+                $a,
+                $r
+            ));
+
+            return false;
+        }
+
+        return VmStatsRandlib::sgamma($r) / $a;
     }
 
     public static function getsdHashTable(): HashTable
     {
         $seeds = self::getsd();
+        $ht = new HashTable();
+        $a = new \PHPCompiler\VM\Variable();
+        $a->int($seeds[0]);
+        $ht->append($a);
+        $b = new \PHPCompiler\VM\Variable();
+        $b->int($seeds[1]);
+        $ht->append($b);
+
+        return $ht;
+    }
+
+    public static function phraseToSeedsHashTable(string $phrase): HashTable
+    {
+        $seeds = VmStatsRandlib::phrtsd($phrase);
         $ht = new HashTable();
         $a = new \PHPCompiler\VM\Variable();
         $a->int($seeds[0]);

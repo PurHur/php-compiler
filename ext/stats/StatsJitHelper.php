@@ -154,11 +154,32 @@ final class StatsJitHelper
         return false === $result ? \NAN : $result;
     }
 
-    /** Returns float (integral) or NAN on failure — JIT boxes like other stats results. */
+    /** Returns float or NAN on failure — JIT boxes like other stats results. */
     public static function randGenIuniform(int $low, int $high): float
     {
         $result = VmStatsRand::genIuniform($low, $high, null);
 
         return false === $result ? \NAN : (float) $result;
+    }
+
+    /**
+     * Remaining rand_gen_* via op codes (#29622).
+     * Returns NAN on failure.
+     */
+    public static function randGen(int $op, float $a, float $b): float
+    {
+        $result = match ($op) {
+            VmStatsRand::OP_GEN_BETA => VmStatsRand::genBeta($a, $b, null),
+            VmStatsRand::OP_GEN_EXPONENTIAL => VmStatsRand::genExponential($a, null),
+            VmStatsRand::OP_GEN_GAMMA => VmStatsRand::genGamma($a, $b, null),
+            default => false,
+        };
+
+        return false === $result ? \NAN : $result;
+    }
+
+    public static function randPhraseToSeeds(string $phrase): HashTable
+    {
+        return VmStatsRand::phraseToSeedsHashTable($phrase);
     }
 }

@@ -53,6 +53,10 @@ final class StatsJit
 
     private const ABI_RAND_GEN_IUNIFORM = '__compiler_stats_rand_gen_iuniform';
 
+    private const ABI_RAND_GEN = '__compiler_stats_rand_gen';
+
+    private const ABI_RAND_PHRASE = '__compiler_stats_rand_phrase_to_seeds';
+
     private const HELPER_PATH = '/ext/stats/StatsJitHelper.php';
 
     private const VARIANCE_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::variance';
@@ -93,6 +97,10 @@ final class StatsJit
 
     private const RAND_GEN_IUNIFORM_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randGenIuniform';
 
+    private const RAND_GEN_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randGen';
+
+    private const RAND_PHRASE_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randPhraseToSeeds';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::VARIANCE_HELPER,
@@ -114,6 +122,8 @@ final class StatsJit
         self::RAND_RANF_HELPER,
         self::RAND_GEN_NORMAL_HELPER,
         self::RAND_GEN_IUNIFORM_HELPER,
+        self::RAND_GEN_HELPER,
+        self::RAND_PHRASE_HELPER,
     ];
 
     /** @var list<string> */
@@ -137,6 +147,8 @@ final class StatsJit
         self::ABI_RAND_RANF,
         self::ABI_RAND_GEN_NORMAL,
         self::ABI_RAND_GEN_IUNIFORM,
+        self::ABI_RAND_GEN,
+        self::ABI_RAND_PHRASE,
     ];
 
     public static function implement(Context $context): void
@@ -360,6 +372,29 @@ final class StatsJit
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#29589'
+        );
+        $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_GEN,
+            'stats_rand_gen_bridge_entry',
+            [$i64, $double, $double],
+            $double,
+            self::RAND_GEN_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29622'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_PHRASE,
+            'stats_rand_phrase_bridge_entry',
+            [$strPtr],
+            $htPtr,
+            self::RAND_PHRASE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29622'
         );
         self::ensureLibcSqrt($context);
         self::registerLinkedRuntime($context);
