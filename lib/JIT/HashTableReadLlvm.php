@@ -597,6 +597,16 @@ final class HashTableReadLlvm
 
             return $context->builder->load($slot);
         }
+        if (Variable::TYPE_HASHTABLE === $dim->type) {
+            // Array used as offset — Zend TypeError with isset/empty wording (#29567).
+            HashTableHelper::emitIllegalOffsetTypeForKey(
+                $context,
+                $dim,
+                'Illegal offset type in isset or empty'
+            );
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
         if (Variable::TYPE_VALUE === $dim->type) {
             return self::offsetIsSetValueBoxKey($context, $ht, $dim);
         }
