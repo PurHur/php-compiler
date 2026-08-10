@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
 
-/** DateTime::setTime() / DateTimeImmutable::setTime() — VM (#12469). */
+/** DateTime::setTime() / DateTimeImmutable::setTime() — VM (#12469, #29829). */
 final class DateTimeSetTime extends VmClassMethod
 {
     public function __construct()
@@ -27,13 +27,15 @@ final class DateTimeSetTime extends VmClassMethod
             'DateTime::setTime()'
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
-        $hour = VmMath::parseIntBuiltinArg($frame->calledArgs[1], "{$label}::setTime", 0, 'hour');
-        $minute = VmMath::parseIntBuiltinArg($frame->calledArgs[2], "{$label}::setTime", 1, 'minute');
+        // Z_PARAM_LONG — caller strict_types → TypeError on null (#29829).
+        // VmMath userArgIndex is 1-based (Argument #N).
+        $hour = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, "{$label}::setTime", 1, 'hour');
+        $minute = VmMath::parseZParamLongBuiltinArgForFrame($frame, 2, "{$label}::setTime", 2, 'minute');
         $second = ($argc >= 4)
-            ? VmMath::parseIntBuiltinArg($frame->calledArgs[3], "{$label}::setTime", 2, 'second')
+            ? VmMath::parseZParamLongBuiltinArgForFrame($frame, 3, "{$label}::setTime", 3, 'second')
             : 0;
         $microsecond = (5 === $argc)
-            ? VmMath::parseIntBuiltinArg($frame->calledArgs[4], "{$label}::setTime", 3, 'microsecond')
+            ? VmMath::parseZParamLongBuiltinArgForFrame($frame, 4, "{$label}::setTime", 4, 'microsecond')
             : 0;
         if (null === $frame->returnVar) {
             return;

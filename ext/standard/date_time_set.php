@@ -39,15 +39,15 @@ final class date_time_set extends Internal
             'object',
             $frame->vmContext
         );
-        $hour = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'date_time_set', 2, 'hour');
-        $minute = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'date_time_set', 3, 'minute');
+        $hour = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, 'date_time_set', 1, 'hour');
+        $minute = VmMath::parseZParamLongBuiltinArgForFrame($frame, 2, 'date_time_set', 2, 'minute');
         $second = 0;
         $microsecond = 0;
         if ($argc >= 4) {
-            $second = VmMath::parseIntBuiltinArg($frame->calledArgs[3], 'date_time_set', 4, 'second');
+            $second = VmMath::parseZParamLongBuiltinArgForFrame($frame, 3, 'date_time_set', 3, 'second');
         }
         if ($argc >= 5) {
-            $microsecond = VmMath::parseIntBuiltinArg($frame->calledArgs[4], 'date_time_set', 5, 'microsecond');
+            $microsecond = VmMath::parseZParamLongBuiltinArgForFrame($frame, 4, 'date_time_set', 4, 'microsecond');
         }
         DateTimeSupport::setTime($datetime, $hour, $minute, $second, $microsecond);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($frame): void {
