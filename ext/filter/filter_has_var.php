@@ -10,6 +10,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitFilterInputTypeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\SuperglobalInit;
@@ -33,8 +34,10 @@ final class filter_has_var extends Internal
             throw new \LogicException('filter_has_var() requires VM context in this compiler build');
         }
         $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_has_var');
-        $keyStr = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
+        $keyStr = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
             'filter_has_var',
             1,
             'var_name'
@@ -48,7 +51,27 @@ final class filter_has_var extends Internal
             throw new \LogicException('filter_has_var() requires exactly two arguments in this compiler build');
         }
         $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);
-        $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_has_var', 1, 'var_name');
+        // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
+        // Early return after TypeError so AOT try/catch does not keep lowering into a terminated block.
+        if (
+            (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant)
+            && $context->callerStrictTypes
+        ) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'filter_has_var(): Argument #2 ($var_name) must be of type string, null given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'filter_has_var_null_strict_dead');
+
+            return JitFilter::boxedFalse($context);
+        }
+        $keyStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'filter_has_var',
+            1,
+            'var_name'
+        );
         $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
 
         $i64 = $context->getTypeFromString('int64');

@@ -11,6 +11,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitFilterInputTypeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\SuperglobalInit;
@@ -29,8 +30,10 @@ final class filter_input extends Internal
             throw new \LogicException('filter_input() requires two to four arguments in this compiler build');
         }
         $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input');
-        $keyStr = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
+        $keyStr = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
             'filter_input',
             1,
             'var_name'
@@ -94,7 +97,26 @@ final class filter_input extends Internal
             );
         }
         // Fourth $options arg accepted; full options parsing deferred (#4404).
-        $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_input', 1, 'var_name');
+        // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
+        if (
+            (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant)
+            && $context->callerStrictTypes
+        ) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'filter_input(): Argument #2 ($var_name) must be of type string, null given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'filter_input_null_strict_dead');
+
+            return JitFilter::boxedNull($context);
+        }
+        $keyStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'filter_input',
+            1,
+            'var_name'
+        );
         $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
 
         // php-src: null filter coerces to 0 → unknown filter → false before var lookup (#25926).
