@@ -2707,6 +2707,11 @@ class Context {
         Block $block,
         Operand $op
     ) {
+        // Prefer the current block's folded constant even when a parent TYPE_TRY hoist
+        // already allocated an empty placeholder for the same Temporary (#29751).
+        if ($this->bindBlockConstantIfPresent($block, $op)) {
+            return;
+        }
         if ($this->scope->variables->contains($op)) {
             return;
         }
@@ -2734,22 +2739,35 @@ class Context {
                 return;
             }
         }
-        $slot = $block->slotForOperand($op);
-        if (null !== $slot && isset($block->constants[$slot])) {
-            $constVm = $block->constants[$slot];
-            // #28038 stopped treating named CVs as embedded name-string literals. Call-arg
-            // lowering can still leave TYPE_STRING placeholders on the CV's real slot while
-            // the Operand's CFG type is int/float/bool — NestedJIT then binds NATIVE_LONG
-            // formals into STRING slots (MbNumericEntity encode4 $m0…$m3, #28053). Prefer
-            // the declared CFG type when it disagrees with the compile-time constant.
-            if ($this->slotConstantAgreesWithOperandType($constVm, $op)) {
-                $this->scope->variables[$op] = VmConstantJit::toVariable($this, $constVm);
-
-                return;
-            }
-        }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
+    }
+
+    /**
+     * Bind {@see Block::$constants} for $op when the slot is a folded literal (#29751).
+     *
+     * TYPE_TRY handler blocks hoist try-body Temporaries into scope before the try-body
+     * block is lowered; those placeholders have no parent-block constant. Re-bind when the
+     * body block's constant table has the UnaryMinus/Plus fold (e.g. {@code -1} for {@code <<}).
+     */
+    private function bindBlockConstantIfPresent(Block $block, Operand $op): bool
+    {
+        $slot = $block->slotForOperand($op);
+        if (null === $slot || !isset($block->constants[$slot])) {
+            return false;
+        }
+        $constVm = $block->constants[$slot];
+        // #28038 stopped treating named CVs as embedded name-string literals. Call-arg
+        // lowering can still leave TYPE_STRING placeholders on the CV's real slot while
+        // the Operand's CFG type is int/float/bool — NestedJIT then binds NATIVE_LONG
+        // formals into STRING slots (MbNumericEntity encode4 $m0…$m3, #28053). Prefer
+        // the declared CFG type when it disagrees with the compile-time constant.
+        if (!$this->slotConstantAgreesWithOperandType($constVm, $op)) {
+            return false;
+        }
+        $this->scope->variables[$op] = VmConstantJit::toVariable($this, $constVm);
+
+        return true;
     }
 
     /**
@@ -3011,6 +3029,12 @@ class Context {
                 return $this->namedVariableBindings[$resolved];
             }
         }
+        // Try-body folded constants (e.g. UnaryMinus → -1) must win over empty parent-hoist
+        // placeholders already in scope (#29751 AOT `$a << -1` inside try).
+        if ($op instanceof Operand\Temporary && null !== $this->jitCurrentBlock
+            && $this->bindBlockConstantIfPresent($this->jitCurrentBlock, $op)) {
+            return $this->scope->variables[$op];
+        }
         if (!$this->scope->variables->contains($op)) {
             if ($op instanceof Operand\Literal) {
                 $this->scope->variables[$op] = Variable::fromLiteral($this, $op);
@@ -3049,15 +3073,6 @@ class Context {
             } elseif ($op instanceof Operand\Temporary) {
                 $block = $this->jitCurrentBlock;
                 if (null !== $block) {
-                    $slot = $block->slotForOperand($op);
-                    if (null !== $slot && isset($block->constants[$slot])) {
-                        $this->scope->variables[$op] = VmConstantJit::toVariable(
-                            $this,
-                            $block->constants[$slot]
-                        );
-
-                        return $this->scope->variables[$op];
-                    }
                     if ($this->aliasVariableOpFromSlot($block, $op)) {
                         return $this->scope->variables[$op];
                     }
