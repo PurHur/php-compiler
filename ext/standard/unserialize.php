@@ -298,6 +298,10 @@ final class unserialize extends Internal
                 $frame
             );
         }
+        // php-src ext/standard/var.c — empty buffer → false with no Error-at-offset (#29483).
+        if ('' === $payload) {
+            return;
+        }
         $offset = VmUnserializeFormat::lastErrorOffset();
         $length = VmUnserializeFormat::lastPayloadLength();
         if (null === $offset || null === $length) {

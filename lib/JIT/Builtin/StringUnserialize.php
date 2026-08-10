@@ -378,6 +378,17 @@ final class StringUnserialize
         $lenI64 = $context->builder->load(
             $context->builder->structGep($payloadString, $strMap['length'])
         );
+        // php-src var.c — empty buffer has no Error-at-offset warning (#29483).
+        $fn = BasicBlockHelper::parentFunction($context);
+        $bbWarn = $fn->appendBasicBlock('unser_fail_warn');
+        $bbSkip = $fn->appendBasicBlock('unser_fail_skip');
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $lenI64,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $context->builder->branchIf($isEmpty, $bbSkip, $bbWarn);
+        $context->builder->positionAtEnd($bbWarn);
         $lenI32 = $context->builder->trunc($lenI64, $i32);
         $bufSize = $sizeT->constInt(128, false);
         $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
@@ -408,6 +419,8 @@ final class StringUnserialize
             $i32->constInt(0, false)
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+        $context->builder->branch($bbSkip);
+        $context->builder->positionAtEnd($bbSkip);
     }
 
     /**

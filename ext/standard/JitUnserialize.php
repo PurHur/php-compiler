@@ -83,6 +83,7 @@ final class JitUnserialize
 
         $bbObj = $fn->appendBasicBlock('unser_runtime_obj');
         $bbInt = $fn->appendBasicBlock('unser_runtime_int');
+        $bbEmpty = $fn->appendBasicBlock('unser_runtime_empty');
         $bbMerge = $fn->appendBasicBlock('unser_runtime_merge');
         $resultSlot = BasicBlockHelper::entryAlloca($context, $valuePtr);
 
@@ -91,7 +92,15 @@ final class JitUnserialize
         );
         $bbPeek = $fn->appendBasicBlock('unser_runtime_peek');
         $empty = $context->builder->icmp(Builder::INT_EQ, $strLen, $i64->constInt(0, false));
-        $context->builder->branchIf($empty, $bbInt, $bbPeek);
+        // php-src var.c — empty buffer → false, no Error-at-offset (#29483).
+        $context->builder->branchIf($empty, $bbEmpty, $bbPeek);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $context->builder->store(
+            JitJsonDecode::materializeScalar($context, false),
+            $resultSlot
+        );
+        $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbPeek);
         $bytesPtr = $context->builder->structGep($payloadString, $strMap['value']);
