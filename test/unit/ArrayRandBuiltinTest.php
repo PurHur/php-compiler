@@ -34,7 +34,7 @@ final class ArrayRandBuiltinTest extends TestCase
         $fn = new array_rand();
         $ht = new HashTable();
         $this->expectException(\ValueError::class);
-        $this->expectExceptionMessage('array_rand(): Argument #1 ($array) cannot be empty');
+        $this->expectExceptionMessage('array_rand(): Argument #1 ($array) must not be empty');
         $this->runRandResult($fn, $runtime, $ht, 1);
     }
 

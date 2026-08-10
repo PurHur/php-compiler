@@ -25,7 +25,7 @@ use PHPLLVM\Value;
  */
 final class ArrayRandLlvm
 {
-    private const EMPTY_ERROR = 'array_rand(): Argument #1 ($array) cannot be empty';
+    private const EMPTY_ERROR = 'array_rand(): Argument #1 ($array) must not be empty';
 
     private const NUM_RANGE_ERROR = 'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)';
 
