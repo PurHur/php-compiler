@@ -47,6 +47,17 @@ final class JitDomAttrRename
         self::$lastAttrIsOrphan = false;
     }
 
+    /** @return null|array{0: string, 1: string} */
+    public static function lastFetchedKey(): ?array
+    {
+        return self::$lastAttrKey;
+    }
+
+    public static function lastAttrIsOrphan(): bool
+    {
+        return self::$lastAttrIsOrphan;
+    }
+
     public static function rememberOrphan(): void
     {
         // Do not clear lastAttrKey — other rename sites in this function may still

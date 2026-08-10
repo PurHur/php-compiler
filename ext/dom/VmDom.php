@@ -3087,6 +3087,11 @@ final class VmDom
         if (!self::isAttr($attr)) {
             throw new \TypeError('DOMAttr::isId() must be called on a DOMAttr');
         }
+        // Thin-AOT createAttribute / property Attrs may lack DomRegistry (#29884).
+        // Orphan / unregistered attrs are never IDs (php-src ext/dom/attr.c).
+        if (!DomRegistry::has($attr)) {
+            return false;
+        }
         $attrState = DomRegistry::state($attr);
         $ownerElementId = $attrState->ownerElementId;
         if (null === $ownerElementId) {

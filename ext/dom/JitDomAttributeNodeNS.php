@@ -198,9 +198,8 @@ final class JitDomAttributeNodeNS
             DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
             $living = null !== JitDomLoadXMLUserScript::lastDocumentClass()
                 && str_starts_with(JitDomLoadXMLUserScript::lastDocumentClass(), 'Dom\\');
-            if ($living) {
-                JitDomAttrRename::rememberOrphan();
-            }
+            // Classic DOMAttr orphans are never IDs (#29884); living path already did this.
+            JitDomAttrRename::rememberOrphan();
 
             return self::boxObjectResult(
                 $context,
