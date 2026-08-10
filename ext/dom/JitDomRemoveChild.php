@@ -43,6 +43,7 @@ final class JitDomRemoveChild
         // childNodes length written by ParentNode::append (#27475 / #27044).
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             self::writeEmptyChildNodesList($context, $parent);
+            DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_post');
         }
 

@@ -86,8 +86,45 @@ final class DomUserScriptElementCacheLlvm
             $context->lookupFunction('__string__separate'),
             $empty
         );
+        $objPtr = $context->getTypeFromString('__object__*');
         $context->builder->store($i1->constInt(1, false), $context->module->getNamedGlobal(self::GLOBAL_OK));
         $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
+        $context->builder->store($objPtr->constNull(), $context->module->getNamedGlobal(self::GLOBAL_ELEM));
+    }
+
+    /**
+     * Drop the cached element when it is detached (replaceChild/removeChild; #29694).
+     *
+     * Keeps OK=1 so thin-AOT getElementById does not fall through to an uninitialized
+     * PROP_ELEMENT_ID_MAP after loadXML.
+     */
+    public static function invalidateIfElement(Context $context, Value $element): void
+    {
+        self::ensureGlobals($context);
+        $i1 = $context->getTypeFromString('int1');
+        $objPtr = $context->getTypeFromString('__object__*');
+
+        $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
+        $hasStore = $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
+        $skipBlock = BasicBlockHelper::append($context, 'dom_us_inv_skip');
+        $cmpBlock = BasicBlockHelper::append($context, 'dom_us_inv_cmp');
+        $clearBlock = BasicBlockHelper::append($context, 'dom_us_inv_clear');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_us_inv_done');
+        $context->builder->branchIf($hasStore, $cmpBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($cmpBlock);
+        $cachedElem = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ELEM));
+        $same = $context->builder->icmp(Builder::INT_EQ, $cachedElem, $element);
+        $context->builder->branchIf($same, $clearBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($clearBlock);
+        self::clearId($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     /** Whether the loadHTML element-id cache is live (authoritative over PROP_ELEMENT_ID_MAP; #19870). */
