@@ -239,6 +239,8 @@
             <file>./test/compliance/SubstrCompareNullCiStrictJITTest.php</file>
             <file>./test/compliance/SubstrCompareNullCiCoerceVMTest.php</file>
             <file>./test/compliance/SubstrCompareNullCiCoerceJITTest.php</file>
+            <file>./test/compliance/Base64DecodeStrictNullVMTest.php</file>
+            <file>./test/compliance/Base64DecodeStrictNullJITTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorVMTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorJITTest.php</file>
             <file>./test/compliance/FilePutContentsEmptyPathValueErrorVMTest.php</file>
