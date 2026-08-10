@@ -14001,6 +14001,10 @@ final class VmDom
     ): bool {
         self::ensureDocument($document);
         unset($flags);
+        // php-src routes the schema URI through php_libxml_external_entity_loader (#29596).
+        if (null !== VmLibxml::getExternalEntityLoader()) {
+            return self::schemaValidateViaExternalEntityLoader($ctx, $document, $filename, $frame);
+        }
         if ('' === $filename || !is_file($filename)) {
             $schemaPath = $filename;
             if ('' !== $schemaPath && '/' !== $schemaPath[0]) {
@@ -14052,6 +14056,10 @@ final class VmDom
         ?Frame $frame = null
     ): bool {
         self::ensureDocument($document);
+        // php-src routes the RNG URI through php_libxml_external_entity_loader (#29596).
+        if (null !== VmLibxml::getExternalEntityLoader()) {
+            return self::relaxNGValidateViaExternalEntityLoader($ctx, $document, $filename, $frame);
+        }
         if ('' === $filename || !is_file($filename)) {
             $rngPath = $filename;
             if ('' !== $rngPath && '/' !== $rngPath[0]) {
@@ -14223,6 +14231,186 @@ final class VmDom
             $frame,
             null,
             $prefix.$secondWarningMessage
+        );
+    }
+
+    /**
+     * schemaValidate()/relaxNGValidate() with libxml_set_external_entity_loader (#29596).
+     *
+     * php-src xmlSchemaNewParserCtxt / xmlRelaxNGNewParserCtxt invoke
+     * php_libxml_external_entity_loader for the filename URI — including when the path exists
+     * on disk — so a custom resolver can substitute or reject the resource.
+     */
+    private static function schemaValidateViaExternalEntityLoader(
+        Context $ctx,
+        ObjectEntry $document,
+        string $filename,
+        ?Frame $frame
+    ): bool {
+        $schemaPath = self::absoluteDomValidationResourcePath($filename);
+        if ('' === $schemaPath) {
+            self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
+
+            return false;
+        }
+
+        $content = VmLibxml::resolveExternalEntityContent($ctx, null, $schemaPath, $frame);
+        if (null === $content) {
+            self::reportDomSchemaResourceParseFailure($ctx, $frame, $schemaPath);
+            self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
+
+            return false;
+        }
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): not implemented in this compiler build');
+
+            return false;
+        }
+
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateSchemaDocumentSource($docXml, $content);
+        if (!$ok) {
+            $errors = self::filterDomMemParserResourceErrors(
+                VmDomValidationNative::consumeLastErrors()
+            );
+            self::reportDomLibxmlValidationErrors(
+                $ctx,
+                $frame,
+                'DOMDocument::schemaValidate()',
+                $errors
+            );
+            if (false === VmDomValidationNative::lastSchemaResourceParsed()) {
+                self::reportDomSchemaResourceParseFailure($ctx, $frame, $schemaPath);
+                self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
+            }
+        }
+
+        return $ok;
+    }
+
+    private static function relaxNGValidateViaExternalEntityLoader(
+        Context $ctx,
+        ObjectEntry $document,
+        string $filename,
+        ?Frame $frame
+    ): bool {
+        $rngPath = self::absoluteDomValidationResourcePath($filename);
+        if ('' === $rngPath) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
+
+            return false;
+        }
+
+        $content = VmLibxml::resolveExternalEntityContent($ctx, null, $rngPath, $frame);
+        if (null === $content) {
+            self::reportDomRelaxNGResourceLoadFailure($ctx, $frame, $rngPath);
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
+
+            return false;
+        }
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): not implemented in this compiler build');
+
+            return false;
+        }
+
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateRelaxNGDocumentSource($docXml, $content);
+        if (!$ok) {
+            $errors = self::filterDomMemParserResourceErrors(
+                VmDomValidationNative::consumeLastErrors()
+            );
+            self::reportDomLibxmlValidationErrors(
+                $ctx,
+                $frame,
+                'DOMDocument::relaxNGValidate()',
+                $errors
+            );
+            if (false === VmDomValidationNative::lastSchemaResourceParsed()) {
+                self::reportDomRelaxNGResourceLoadFailure($ctx, $frame, $rngPath);
+                self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
+            }
+        }
+
+        return $ok;
+    }
+
+    /**
+     * Drop mem-parser placeholders (in_memory_buffer / could not parse schemas) so entity-loader
+     * paths can emit php-src's filename-bearing SCHEMAP/RelaxNG diagnostics instead (#29596).
+     *
+     * @param list<array{level: int, code: int, column: int, message: string, file: string, line: int}> $errors
+     * @return list<array{level: int, code: int, column: int, message: string, file: string, line: int}>
+     */
+    private static function filterDomMemParserResourceErrors(array $errors): array
+    {
+        $out = [];
+        foreach ($errors as $record) {
+            $message = $record['message'];
+            if ("Failed to parse the XML resource 'in_memory_buffer'." === $message
+                || 'xmlRelaxNGParse: could not parse schemas' === $message
+            ) {
+                continue;
+            }
+            $out[] = $record;
+        }
+
+        return $out;
+    }
+
+    /** Absolute path for schema/RNG URI as passed to php_libxml_external_entity_loader (#29596). */
+    private static function absoluteDomValidationResourcePath(string $filename): string
+    {
+        if ('' === $filename || '/' === $filename[0]) {
+            return $filename;
+        }
+
+        return getcwd().'/'.$filename;
+    }
+
+    /** libxml2 SCHEMAP / code 3067 after entity-loader schema load failure (php-src #29596). */
+    private static function reportDomSchemaResourceParseFailure(
+        Context $ctx,
+        ?Frame $frame,
+        string $schemaPath
+    ): void {
+        $message = sprintf("Failed to parse the XML resource '%s'.", $schemaPath);
+        VmLibxml::handleError(
+            $ctx,
+            [
+                'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+                'code' => 3067,
+                'column' => 0,
+                'message' => $message,
+                'file' => '',
+                'line' => 0,
+            ],
+            $frame,
+            null,
+            'DOMDocument::schemaValidate(): '.$message
+        );
+    }
+
+    /** libxml2 RelaxNG code 1065 after entity-loader RNG load failure (php-src #29596). */
+    private static function reportDomRelaxNGResourceLoadFailure(
+        Context $ctx,
+        ?Frame $frame,
+        string $rngPath
+    ): void {
+        $message = sprintf('xmlRelaxNGParse: could not load %s', $rngPath);
+        VmLibxml::handleError(
+            $ctx,
+            [
+                'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+                'code' => 1065,
+                'column' => 0,
+                'message' => $message,
+                'file' => '',
+                'line' => 0,
+            ],
+            $frame,
+            null,
+            'DOMDocument::relaxNGValidate(): '.$message
         );
     }
 
