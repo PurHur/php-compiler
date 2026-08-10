@@ -8358,7 +8358,6 @@ class Compiler {
         if ($declared instanceof Op\Type\Reference) {
             $className = $this->staticNameFromCfgType($declared);
             if (null !== $className && '' !== $className) {
-                $label = ltrim($className, '\\');
                 $resolved = $this->resolveTypeHintClassName($className, $block);
                 if (null !== $resolved && '' !== $resolved) {
                     if ($variadicElement) {
@@ -8366,7 +8365,9 @@ class Compiler {
                     } else {
                         $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
                         $block->paramClassConstraints[$slot] = $resolved;
-                        $block->paramDeclaredTypeLabels[$slot] = $label;
+                        // Zend TypeError prints the resolved class for self/parent (zend_execute_API.c);
+                        // keep unresolved trait `parent` as the keyword (#29930; mirrors return #29911/#29912).
+                        $block->paramDeclaredTypeLabels[$slot] = ltrim($resolved, '\\');
                     }
                 }
             }
