@@ -675,6 +675,8 @@ final class EnumCaseSupport
      * Zend {@see zend_zval_type_name()} label (bool/int/…) for non-TypeError messages (#6236).
      *
      * Enum case operands surface the enum class name (E), not mixed/object.
+     * Legacy resource wrappers use lowercase {@code resource} (not ClassEntry {@code Resource})
+     * — php-src Zend/zend_types.h zend_zval_type_name (#29559).
      * For TypeError "… given"/"… returned" use {@see typeNameForTypeErrorActual()}.
      */
     public static function typeNameForVariable(Variable $value): string
@@ -683,6 +685,12 @@ final class EnumCaseSupport
         $enumClass = self::enumClassForCaseVariable($value);
         if (null !== $enumClass) {
             return $enumClass->name;
+        }
+        if (
+            Variable::TYPE_OBJECT === $value->type
+            && ResourceSupport::isResourceObject($value->toObject())
+        ) {
+            return 'resource';
         }
 
         return match ($value->type) {

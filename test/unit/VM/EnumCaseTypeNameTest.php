@@ -11,6 +11,9 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\IterableCheck;
+use PHPCompiler\VM\ResourceSupport;
+use PHPCompiler\VM\ResourceState;
+use PHPCompiler\VM\StringOffsetJitHelper;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
@@ -39,6 +42,23 @@ final class EnumCaseTypeNameTest extends TestCase
         $var->enumCase(new \PHPCompiler\VM\EnumCaseEntry($enum, 'Active', $backing));
 
         $this->assertSame('Status', EnumCaseSupport::typeNameForVariable($var));
+    }
+
+    /** @covers \PHPCompiler\VM\EnumCaseSupport::typeNameForVariable */
+    public function testResourceObjectUsesLowercaseResourceLabel(): void
+    {
+        $ctx = new Context(new Runtime());
+        BuiltinClasses::register($ctx);
+        $var = new Variable();
+        ResourceSupport::wrap($var, 1, ResourceState::KIND_STREAM, $ctx);
+
+        $this->assertSame('resource', EnumCaseSupport::typeNameForVariable($var));
+        $this->assertSame(
+            'Cannot access offset of type resource on string',
+            StringOffsetJitHelper::illegalDimTypeErrorMessage(
+                EnumCaseSupport::typeNameForVariable($var)
+            )
+        );
     }
 
     public function testIterableCheckRejectsEnumCaseWithClassName(): void
