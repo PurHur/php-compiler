@@ -2962,6 +2962,31 @@ final class PropertyHooks
     }
 
     /**
+     * Zend TypeError / ArgumentCountError callable label for synthetic hook methods (#29666).
+     *
+     * Maps {@code Class::__phpc_property_set_x} → {@code Class::$x::set} (and get symmetrically).
+     * Non-hook names are returned unchanged. Internal symbols stay for dispatch; only user-visible
+     * error framing uses this form (zend_property_hooks.c).
+     */
+    public static function zendTypeErrorCallableName(string $qualifiedName): string
+    {
+        $class = '';
+        $method = $qualifiedName;
+        if (str_contains($qualifiedName, '::')) {
+            [$class, $method] = explode('::', $qualifiedName, 2);
+        }
+        $hook = self::reflectionNameFromHookMethod(strtolower($method));
+        if (null === $hook) {
+            return $qualifiedName;
+        }
+        if ('' === $class) {
+            return $hook;
+        }
+
+        return $class.'::'.$hook;
+    }
+
+    /**
      * Resolve `$prop::get` / `$prop::set` ReflectionMethod names to synthetic hook methods (#26328).
      */
     public static function hookMethodFromReflectionName(string $methodLc): ?string

@@ -1893,4 +1893,29 @@ PHP;
         }
     }
 
+    /** @covers issue #29666 — TypeError framing uses Class::$prop::set/get, not __phpc_property_* */
+    public function testZendTypeErrorCallableNameMapsSyntheticHooks(): void
+    {
+        self::assertSame(
+            'C::$x::set',
+            PropertyHooks::zendTypeErrorCallableName('C::__phpc_property_set_x')
+        );
+        self::assertSame(
+            'C::$email::get',
+            PropertyHooks::zendTypeErrorCallableName('C::__phpc_property_get_email')
+        );
+        self::assertSame(
+            '$x::set',
+            PropertyHooks::zendTypeErrorCallableName('__phpc_property_set_x')
+        );
+        self::assertSame(
+            'C::normal',
+            PropertyHooks::zendTypeErrorCallableName('C::normal')
+        );
+        self::assertSame(
+            'strlen',
+            PropertyHooks::zendTypeErrorCallableName('strlen')
+        );
+    }
+
 }

@@ -104,6 +104,10 @@ final class ParamArgumentCountError
                 }
             }
         }
+        // Same recovery as {@see UserParamErrorContext} for property-hook invoke (#29666).
+        if ($callSiteLine <= 0) {
+            $callSiteLine = FatalSite::lineFromOpcodes($caller);
+        }
         if ($callSiteLine <= 0) {
             $callSiteLine = 1;
         }
@@ -119,7 +123,9 @@ final class ParamArgumentCountError
             $call = $frame->parent->call;
         }
         if ($call instanceof \PHPCompiler\Func\PHP) {
-            return $call->getName();
+            return \PHPCompiler\SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                $call->getName()
+            );
         }
         $method = null;
         $cfgFunc = $frame->block->func;
@@ -138,11 +144,13 @@ final class ParamArgumentCountError
                 $selfVar = $frame->calledArgs[0]->resolveIndirect();
             }
             if (null !== $selfVar && Variable::TYPE_OBJECT === $selfVar->type) {
-                return $selfVar->toObject()->class->name.'::'.$method;
+                return \PHPCompiler\SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                    $selfVar->toObject()->class->name.'::'.$method
+                );
             }
         }
         if (null !== $method) {
-            return $method;
+            return \PHPCompiler\SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName($method);
         }
 
         return '{closure}';

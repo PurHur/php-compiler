@@ -7402,7 +7402,9 @@ restart:
                                 if (isset($calleeBlock->paramNeverSlots[$slot])) {
                                     $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                     throw VM\ParamTypeError::forUserCallWithExpectedType(
-                                        $frame->call->getName(),
+                                        SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                                            $frame->call->getName()
+                                        ),
                                         $paramIdx,
                                         $paramName,
                                         'never',
@@ -7415,7 +7417,9 @@ restart:
                                     if (!IterableCheck::isIterable($arg, $this->context)) {
                                         $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                         throw VM\ParamTypeError::forUserCallWithExpectedType(
-                                            $frame->call->getName(),
+                                            SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                                                $frame->call->getName()
+                                            ),
                                             $paramIdx,
                                             $paramName,
                                             IterableCheck::TYPE_LABEL,
@@ -7430,7 +7434,9 @@ restart:
                                     if (!CallableCheck::isCallable($arg, $this->context, $frame)) {
                                         $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                         throw VM\ParamTypeError::forUserCallWithExpectedType(
-                                            $frame->call->getName(),
+                                            SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                                                $frame->call->getName()
+                                            ),
                                             $paramIdx,
                                             $paramName,
                                             CallableCheck::TYPE_LABEL,
@@ -7454,7 +7460,9 @@ restart:
                                         );
                                     } catch (\TypeError $e) {
                                         throw VM\ParamTypeError::forUserCallWithExpectedType(
-                                            $frame->call->getName(),
+                                            SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                                                $frame->call->getName()
+                                            ),
                                             $paramIdx,
                                             $paramName,
                                             $expected,
@@ -7473,7 +7481,9 @@ restart:
                                 if (!TypeCheck::parameterMatchesType($arg, $constraint, $literalBool)) {
                                     $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                     throw VM\ParamTypeError::forUserCall(
-                                        $frame->call->getName(),
+                                        SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                                            $frame->call->getName()
+                                        ),
                                         $paramIdx,
                                         $paramName,
                                         $constraint,
@@ -14012,9 +14022,16 @@ restart:
             : $this->context->swapRunStack(null);
         $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
         $this->context->propertyHookExternalCatchFrame = null;
+        $savedCallSiteLine = $parentFrame->callSiteLine;
+        if ($parentFrame->callSiteLine <= 0) {
+            $fromOp = VM\FatalSite::lineFromOpcodes($parentFrame);
+            if ($fromOp > 0) {
+                $parentFrame->callSiteLine = $fromOp;
+            }
+        }
         try {
             $this->emitPropertyHookDeprecationNotice($func, $rawProperty, $parentFrame);
-            $child = $func->getFrame($this->context, null);
+            $child = $func->getFrame($this->context, $parentFrame);
             $child->propertyHookRawProperty = $rawProperty;
             $child->calledClass = $classLc;
             $child->calledArgs = $args;
@@ -14034,6 +14051,7 @@ restart:
 
             return $out->resolveIndirect();
         } finally {
+            $parentFrame->callSiteLine = $savedCallSiteLine;
             $this->context->propertyHookExternalCatchFrame = $savedExternalCatch;
             if (null !== $savedStack) {
                 $this->context->swapRunStack($savedStack);
@@ -14786,6 +14804,14 @@ restart:
             : $this->context->swapRunStack(null);
         $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
         $this->context->propertyHookExternalCatchFrame = null;
+        $savedCallSiteLine = $parentFrame->callSiteLine;
+        // Stamp assign/fetch site so set-hook param TypeErrors cite "called in … on line N" (#29666).
+        if ($parentFrame->callSiteLine <= 0) {
+            $fromOp = VM\FatalSite::lineFromOpcodes($parentFrame);
+            if ($fromOp > 0) {
+                $parentFrame->callSiteLine = $fromOp;
+            }
+        }
         try {
             $this->emitPropertyHookDeprecationNotice($func, $rawProperty, $parentFrame);
             $child = $func->getFrame($this->context, $parentFrame);
@@ -14817,6 +14843,7 @@ restart:
 
             return $out->resolveIndirect();
         } finally {
+            $parentFrame->callSiteLine = $savedCallSiteLine;
             $this->context->propertyHookExternalCatchFrame = $savedExternalCatch;
             if (null !== $savedStack) {
                 $this->context->swapRunStack($savedStack);
@@ -21519,7 +21546,9 @@ restart:
         if (null !== $func->class) {
             $className = $func->class->value ?? null;
             if (is_string($className) && '' !== $className) {
-                return $className.'::'.$func->name;
+                return SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                    $className.'::'.$func->name
+                );
             }
         }
 
@@ -21528,7 +21557,9 @@ restart:
             return '{closure}';
         }
 
-        return $func->name;
+        return is_string($func->name)
+            ? SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName($func->name)
+            : $func->name;
     }
 
     private function emitCallDeprecationNotice(Frame $frame): void
