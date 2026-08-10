@@ -21904,11 +21904,8 @@ restart:
             return;
         }
         if ($block->returnTypeNever) {
-            $funcName = null;
-            if (null !== $block->func) {
-                $funcName = $block->func->name;
-            }
-            TypeCheck::assertNeverReturn($funcName);
+            // Zend-shaped callable label ({closure}), not php-cfg {anonymous}#N (#30020).
+            TypeCheck::assertNeverReturn($this->returnTypeCallableName($block->func));
 
             return;
         }

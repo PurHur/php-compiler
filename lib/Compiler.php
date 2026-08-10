@@ -912,6 +912,20 @@ class Compiler {
     }
 
     /**
+     * Arrow `fn(): never => expr` is not Zend's explicit-`return` compile fatal — expression bodies
+     * TypeError at call time with "must not implicitly return" (zend_compile.c / #30020).
+     */
+    protected function neverFunctionIsArrowExpressionBody(Block $block): bool
+    {
+        $func = $block->func;
+        if (null === $func) {
+            return false;
+        }
+
+        return ($func->callableOp ?? null) instanceof Op\Expr\ArrowFunction;
+    }
+
+    /**
      * @param list<Op\Expr\Param> $params
      */
     protected function assertNoDuplicateParameterNames(array $params): void
@@ -42688,11 +42702,18 @@ class Compiler {
                 if ($block->returnTypeNever) {
                     $neverFile = $terminal->getFile() ?: 'unknown';
                     $neverLine = $returnLine > 0 ? $returnLine : 1;
-                    if (!is_null($terminal->expr)) {
-                        $this->throwCompileError('A never-returning function must not return', $neverFile, $neverLine);
-                    }
                     if ($this->neverFunctionHasAbnormalExitBeforeReturn($block->orig, $terminal)) {
                         return [];
+                    }
+                    // Arrow expression body → runtime TypeError, not compile Fatal (#30020).
+                    if ($this->neverFunctionIsArrowExpressionBody($block)) {
+                        return [new OpCode(
+                            OpCode::TYPE_RETURN_VOID,
+                            $returnLineArg
+                        )];
+                    }
+                    if (!is_null($terminal->expr)) {
+                        $this->throwCompileError('A never-returning function must not return', $neverFile, $neverLine);
                     }
                     if ($this->neverFunctionReturnIsImplicitFalloff($terminal)) {
                         return [new OpCode(

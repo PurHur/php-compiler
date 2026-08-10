@@ -11093,6 +11093,9 @@ class JIT {
                     if (0 === $this->context->inlineIncludeDepth) {
                         if ($block->returnTypeNever) {
                             $neverFunc = null !== $block->func ? $block->func->name : null;
+                            if (null !== $neverFunc && '' !== $neverFunc) {
+                                $neverFunc = VM\ParamArgumentCountError::formatUserFunctionName($neverFunc);
+                            }
                             JIT\Builtin\TypeErrorRaise::emitRaise(
                                 $this->context,
                                 null !== $neverFunc && '' !== $neverFunc
@@ -11172,6 +11175,9 @@ class JIT {
                     }
                     if ($block->returnTypeNever) {
                         $neverFunc = null !== $block->func ? $block->func->name : null;
+                        if (null !== $neverFunc && '' !== $neverFunc) {
+                            $neverFunc = VM\ParamArgumentCountError::formatUserFunctionName($neverFunc);
+                        }
                         JIT\Builtin\TypeErrorRaise::emitRaise(
                             $this->context,
                             null !== $neverFunc && '' !== $neverFunc
