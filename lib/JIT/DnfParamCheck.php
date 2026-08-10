@@ -16,6 +16,13 @@ use PHPLLVM\Builder;
  */
 final class DnfParamCheck
 {
+    /** Optional Zend-shaped Argument TypeError context (#29859). */
+    private static ?string $paramFunctionName = null;
+
+    private static ?int $paramIndex = null;
+
+    private static ?string $paramName = null;
+
     /**
      * @param list<DnfArm> $arms
      */
@@ -31,7 +38,10 @@ final class DnfParamCheck
         Context $context,
         Variable $arg,
         array $arms,
-        string $kind = 'Argument'
+        string $kind = 'Argument',
+        ?string $functionName = null,
+        ?int $paramIndex = null,
+        ?string $paramName = null
     ): void {
         if ([] === $arms) {
             return;
@@ -68,7 +78,19 @@ final class DnfParamCheck
         $context->builder->positionAtEnd($check);
         $context->builder->branch($fail);
         $context->builder->positionAtEnd($fail);
-        self::raiseTypeErrorForValue($context, $arg, $kind, $expected);
+        $prevFn = self::$paramFunctionName;
+        $prevIdx = self::$paramIndex;
+        $prevName = self::$paramName;
+        self::$paramFunctionName = $functionName;
+        self::$paramIndex = $paramIndex;
+        self::$paramName = $paramName;
+        try {
+            self::raiseTypeErrorForValue($context, $arg, $kind, $expected);
+        } finally {
+            self::$paramFunctionName = $prevFn;
+            self::$paramIndex = $prevIdx;
+            self::$paramName = $prevName;
+        }
         $context->builder->positionAtEnd($pass);
         $context->builder->branch($resume);
         $context->builder->positionAtEnd($resume);
@@ -576,7 +598,7 @@ final class DnfParamCheck
         if (null !== $scalarGiven) {
             self::raiseTypeErrorAndAbort(
                 $context,
-                sprintf('%s must be of type %s, %s given', $kind, $expected, $scalarGiven)
+                self::formatTypeErrorMessage($context, $kind, $expected, $scalarGiven)
             );
 
             return;
@@ -597,8 +619,43 @@ final class DnfParamCheck
         }
         self::raiseTypeErrorAndAbort(
             $context,
-            sprintf('%s must be of type %s, mixed given', $kind, $expected)
+            self::formatTypeErrorMessage($context, $kind, $expected, 'mixed')
         );
+    }
+
+    /**
+     * Zend-shaped Argument TypeError when call-site context is available (#29859);
+     * otherwise keep the short `{kind} must be of type …` form.
+     */
+    private static function formatTypeErrorMessage(
+        Context $context,
+        string $kind,
+        string $expected,
+        string $given
+    ): string {
+        if (
+            'Argument' === $kind
+            && null !== self::$paramFunctionName
+            && null !== self::$paramIndex
+            && null !== self::$paramName
+        ) {
+            $message = sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, %s given',
+                self::$paramFunctionName,
+                self::$paramIndex + 1,
+                self::$paramName,
+                $expected,
+                $given
+            );
+            $path = $context->jitAotEntryScriptPath;
+            if ($context->callSiteLine > 0 && '' !== $path) {
+                $message .= sprintf(', called in %s on line %d', $path, $context->callSiteLine);
+            }
+
+            return $message;
+        }
+
+        return sprintf('%s must be of type %s, %s given', $kind, $expected, $given);
     }
 
     private static function emitValueBoxFailureMessage(
@@ -640,7 +697,7 @@ final class DnfParamCheck
             $context->builder->positionAtEnd($match);
             self::raiseTypeErrorAndAbort(
                 $context,
-                sprintf('%s must be of type %s, %s given', $kind, $expected, $label)
+                self::formatTypeErrorMessage($context, $kind, $expected, $label)
             );
             $check = $next;
         }
@@ -658,14 +715,15 @@ final class DnfParamCheck
         $context->builder->positionAtEnd($notObject);
         self::raiseTypeErrorAndAbort(
             $context,
-            sprintf('%s must be of type %s, mixed given', $kind, $expected)
+            self::formatTypeErrorMessage($context, $kind, $expected, 'mixed')
         );
     }
 
     private static function raiseTypeErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        // Catchable in try/catch; uncaught AOT prints Fatal TypeError and exit(255)
+        // via phpc_jit_abort_if_pending_type_error — not libc abort/SIGABRT (#29859).
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
     }
 
     private static function emitObjectFailureMessage(
@@ -690,7 +748,7 @@ final class DnfParamCheck
             $given = \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
                 ltrim($name, '\\')
             );
-            $message = sprintf('%s must be of type %s, %s given', $kind, $expected, $given);
+            $message = self::formatTypeErrorMessage($context, $kind, $expected, $given);
             $matchBlock = $fn->appendBasicBlock('dnf_fail_msg_'.$id);
             $nextBlock = $fn->appendBasicBlock('dnf_fail_try_'.$id);
             $context->builder->positionAtEnd($checkBlock);
@@ -706,7 +764,7 @@ final class DnfParamCheck
         $context->builder->positionAtEnd($defaultBlock);
         self::raiseTypeErrorAndAbort(
             $context,
-            sprintf('%s must be of type %s, object given', $kind, $expected)
+            self::formatTypeErrorMessage($context, $kind, $expected, 'object')
         );
     }
 

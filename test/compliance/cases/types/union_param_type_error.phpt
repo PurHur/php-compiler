@@ -10,5 +10,5 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 ?>
---EXPECT--
-TypeError: Argument must be of type int|string, array given
+--EXPECTF--
+TypeError: f(): Argument #1 ($x) must be of type string|int, array given, called in %s on line %d
