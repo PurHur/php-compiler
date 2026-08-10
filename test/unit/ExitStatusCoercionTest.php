@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\LlvmToolchain;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\ScriptExit;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #4696 */
+/** @covers issue #4696 / #29573 */
 final class ExitStatusCoercionTest extends TestCase
 {
     /**
@@ -36,6 +37,50 @@ final class ExitStatusCoercionTest extends TestCase
             'null' => ['<?php exit(null);', '', 0],
             'bool false' => ['<?php exit(false);', '', 0],
             'array' => ['<?php exit([]);', 'Array', 0],
+        ];
+    }
+
+    /**
+     * PHP 8.4 function form: bool → int exit status, no stdout (#29573).
+     *
+     * @dataProvider providePhp84BoolStatus
+     */
+    public function testExitBoolStatusIsIntUnderPhp84Profile(
+        string $code,
+        string $expectedOutput,
+        int $expectedStatus
+    ): void {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $this->assertTrue(CompilerVersion::supportsExitFunctionForm());
+            $runtime = new Runtime();
+            ob_start();
+            try {
+                $runtime->run($runtime->parseAndCompile($code, 'exit_bool_84.php'));
+                $this->fail('Expected ScriptExit');
+            } catch (ScriptExit $e) {
+                $this->assertSame($expectedStatus, $e->status);
+            }
+            $this->assertSame($expectedOutput, ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    public static function providePhp84BoolStatus(): array
+    {
+        return [
+            'true' => ['<?php exit(true);', '', 1],
+            'die true' => ['<?php die(true);', '', 1],
+            'false' => ['<?php exit(false);', '', 0],
         ];
     }
 

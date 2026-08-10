@@ -8,6 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\ShutdownQueue;
@@ -51,7 +52,24 @@ final class VmExit
         if (Variable::TYPE_NULL === $v->type) {
             return 0;
         }
-        if (Variable::TYPE_FLOAT === $v->type || Variable::TYPE_BOOLEAN === $v->type) {
+        // PHP 8.4+ exit()/die() string|int: bool coerces to int status (true→1), not string (#29573).
+        // Pre-8.4 construct form stringifies (true→"1" + exit 0). strict_types → TypeError.
+        if (Variable::TYPE_BOOLEAN === $v->type) {
+            if ($twoArgForm) {
+                return $v->toInt();
+            }
+            if (CompilerVersion::supportsExitFunctionForm()) {
+                if (self::callerStrictTypes($frame)) {
+                    throw self::typeErrorForStatus($v);
+                }
+
+                return $v->toInt();
+            }
+            echo $v->toString();
+
+            return 0;
+        }
+        if (Variable::TYPE_FLOAT === $v->type) {
             if ($twoArgForm) {
                 return $v->toInt();
             }
@@ -163,6 +181,19 @@ final class VmExit
             return $value->toObject()->class->name;
         }
 
-        return TypeCheck::typeNameForConstraint($value->type);
+        // Zend uses literal true/false in exit() TypeError "… given" (#6975 / #29573).
+        return EnumCaseSupport::typeNameForTypeErrorActual($value);
+    }
+
+    private static function callerStrictTypes(?Frame $frame): bool
+    {
+        if (null === $frame) {
+            return false;
+        }
+        if (null !== $frame->block && $frame->block->strictTypes) {
+            return true;
+        }
+
+        return InternalStrictArg::isCallerStrict($frame);
     }
 }

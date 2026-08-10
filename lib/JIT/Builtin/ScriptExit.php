@@ -51,6 +51,16 @@ final class ScriptExit
                 self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
                 break;
             case Variable::TYPE_NATIVE_BOOL:
+                // PHP 8.4+ string|int: bool → int status; do not print (#29573).
+                if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+                    if ($context->callerStrictTypes) {
+                        self::emitBoolStatusStrictTypeError($context, $context->helper->loadValue($arg));
+
+                        return;
+                    }
+                    self::callLibcExit($context, $context->helper->loadValue($arg));
+                    break;
+                }
                 self::emitNativeBool($context, $context->helper->loadValue($arg));
                 self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
                 break;
@@ -281,8 +291,17 @@ final class ScriptExit
             $context->lookupFunction('__value__readLong'),
             $boxedPtr
         );
-        self::emitNativeBool($context, $boolVal);
-        self::callLibcExit($context, $i64->constInt(0, false));
+        // PHP 8.4+ string|int: bool → int status; do not print (#29573).
+        if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+            if ($context->callerStrictTypes) {
+                self::emitBoolStatusStrictTypeError($context, $boolVal);
+            } else {
+                self::callLibcExit($context, $boolVal);
+            }
+        } else {
+            self::emitNativeBool($context, $boolVal);
+            self::callLibcExit($context, $i64->constInt(0, false));
+        }
 
         $context->builder->positionAtEnd($afterBool);
         $isDouble = $context->builder->icmp(
@@ -477,5 +496,26 @@ final class ScriptExit
             )
         );
         $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    /**
+     * PHP 8.4+ strict_types: bool status → TypeError with literal true/false (#6975 / #29573).
+     */
+    private static function emitBoolStatusStrictTypeError(Context $context, Value $boolVal): void
+    {
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolVal,
+            $boolVal->typeOf()->constInt(0, false)
+        );
+        $trueBlock = BasicBlockHelper::append($context, 'exit_bool_strict_true');
+        $falseBlock = BasicBlockHelper::append($context, 'exit_bool_strict_false');
+        $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($trueBlock);
+        self::emitStatusTypeErrorAndAbort($context, 'true');
+
+        $context->builder->positionAtEnd($falseBlock);
+        self::emitStatusTypeErrorAndAbort($context, 'false');
     }
 }
