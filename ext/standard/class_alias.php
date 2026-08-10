@@ -31,7 +31,8 @@ final class class_alias extends Internal
             throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $original = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'class_alias', 0, 'original class');
+        // php-src Zend/zend_builtin_functions.stub.php — string $class (not InternalArgInfo "original class") (#29661)
+        $original = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'class_alias', 0, 'class');
         $alias = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'class_alias', 1, 'alias');
         $autoload = true;
         if (3 === \count($frame->calledArgs)) {
@@ -61,7 +62,7 @@ final class class_alias extends Internal
 
         return JitClassAlias::invokeRuntime(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'class_alias', 0, 'original class'),
+            JitStringBuiltinArg::lower($context, $args[0], 'class_alias', 0, 'class'),
             JitStringBuiltinArg::lower($context, $args[1], 'class_alias', 1, 'alias'),
             $args[0],
             $args[1],
