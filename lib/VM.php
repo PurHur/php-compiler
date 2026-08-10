@@ -8593,6 +8593,18 @@ restart:
                         }
                     }
                     $propertyObject = VM\LazyObjectSupport::getLazyInstance($propertyObject);
+                    // Static prop via -> / ?->: E_NOTICE then dynamic/undefined (zend_object_handlers.c, #30017).
+                    // isset / ?? (propertyHookCoalesceRead) are silent; inaccessible protected/private Error.
+                    $catchFrame = $this->handleStaticPropertyAccessedAsInstance(
+                        $propertyObject,
+                        $name,
+                        $frame,
+                        $op->propertyHookCoalesceRead
+                    );
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     // __PHP_Incomplete_Class — block userland property ops (zend_object_handlers.c, #19632).
                     if (VM\IncompleteClassSupport::isIncomplete($propertyObject)) {
                         $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
@@ -16413,6 +16425,64 @@ restart:
                 break;
             }
             $currentLc = $entry->parentLc;
+        }
+
+        return null;
+    }
+
+
+    /**
+     * Zend zend_get_property_offset: declared static accessed via -> emits E_NOTICE then
+     * behaves as dynamic/undefined; inaccessible protected/private Error (unless silent /
+     * BP_VAR_IS). Parent private statics are invisible (goto dynamic). (#30017)
+     */
+    private function handleStaticPropertyAccessedAsInstance(
+        ObjectEntry $object,
+        string $propName,
+        Frame $frame,
+        bool $silent
+    ): ?Frame {
+        $objectLc = strtolower($object->class->name);
+        $meta = $this->resolveStaticPropertyVisibilityMeta($objectLc, strtolower($propName));
+        if (null === $meta) {
+            return null;
+        }
+        $vis = (int) $meta['visibility'];
+        $declLc = (string) $meta['declaringClassLc'];
+        // Parent private: not found on ce for instance lookup — no notice, no Error.
+        if (
+            ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0
+            && $declLc !== $objectLc
+        ) {
+            return null;
+        }
+        try {
+            PropertyVisibility::assertAccessible(
+                $vis,
+                $this->callerClassLc($frame),
+                $declLc,
+                $object->class->name,
+                $propName,
+                $objectLc,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                (int) ($meta['getVisibility'] ?? 0)
+            );
+        } catch (\LogicException $e) {
+            if ($silent) {
+                return null;
+            }
+
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+        if (!$silent) {
+            $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+            $this->context->errors->accessingStaticPropertyAsNonStatic(
+                $object->class->name,
+                $propName,
+                $this->context,
+                $frame,
+                $scriptFile
+            );
         }
 
         return null;
