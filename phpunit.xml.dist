@@ -185,6 +185,8 @@
             <file>./test/compliance/FilterVarDefaultStripEncodeJITTest.php</file>
             <file>./test/compliance/MbEncodingAliasesSpecialVMTest.php</file>
             <file>./test/compliance/MbConvertEncodingQuotedPrintableVMTest.php</file>
+            <file>./test/compliance/MbConvertEncodingNullStrictVMTest.php</file>
+            <file>./test/compliance/MbConvertEncodingNullStrictJITTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsVMTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsJITTest.php</file>
             <file>./test/compliance/AsymmetricVisibilityReadonlyPrivateSetOrderVMTest.php</file>
