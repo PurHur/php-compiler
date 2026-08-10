@@ -972,7 +972,12 @@ final class Variable {
         }
     }
 
-    public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
+    public function dimFetch(
+        self $dim,
+        ?Type $expectedType = null,
+        bool $forWrite = false,
+        bool $emitFloatKeyDeprecation = true
+    ): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
                 // Zend zend_check_string_offset — reject illegal dims before coerce (#22895).
@@ -1055,7 +1060,8 @@ final class Variable {
                             $this->context,
                             $ht,
                             $dim,
-                            $container->superglobalName
+                            $container->superglobalName,
+                            $emitFloatKeyDeprecation
                         );
                     }
                 }
@@ -1069,7 +1075,8 @@ final class Variable {
                         $this->context,
                         $ht,
                         $dim,
-                        $container->superglobalName
+                        $container->superglobalName,
+                        $emitFloatKeyDeprecation
                     );
                 }
                 if (self::TYPE_OBJECT === $dim->type) {
@@ -1133,7 +1140,7 @@ final class Variable {
 
                     return $boxed;
                 }
-                $index = self::materializePackedIndex($this->context, $dim, $forWrite);
+                $index = self::materializePackedIndex($this->context, $dim, $forWrite, $emitFloatKeyDeprecation);
                 // Scalar $arr[i]=… uses prepareIndexWrite; nested FETCH_DIM_W ($arr[i][j]=…)
                 // must return the live child HT so the inner write persists (#24011; string keys
                 // already branch on TYPE_ARRAY above — zend_execute.c ZEND_FETCH_DIM_W).
@@ -1224,16 +1231,23 @@ final class Variable {
      * first so later LLVM blocks still see a stable index (#AOT array_fill reads).
      * Float dims on write emit Zend precision-loss E_DEPRECATED (#19730).
      */
-    private static function materializePackedIndex(Context $context, self $dim, bool $forWrite = false): \PHPLLVM\Value
-    {
+    private static function materializePackedIndex(
+        Context $context,
+        self $dim,
+        bool $forWrite = false,
+        bool $emitFloatKeyDeprecation = true
+    ): \PHPLLVM\Value {
         $sizeT = $context->getTypeFromString('size_t');
         if (self::TYPE_NATIVE_DOUBLE === $dim->type) {
             $doubleVal = $context->helper->loadValue($dim);
             // Read/isset/unset and write: Zend float→int precision-loss E_DEPRECATED (#19730, #27948).
-            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
-                $context,
-                $doubleVal
-            );
+            // Coalesce left fetch may suppress a second warn after isset (#29664).
+            $truncated = $emitFloatKeyDeprecation
+                ? \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                    $context,
+                    $doubleVal
+                )
+                : $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
 
             return $context->builder->truncOrBitCast($truncated, $sizeT);
         }

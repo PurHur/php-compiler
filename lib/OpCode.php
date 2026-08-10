@@ -330,6 +330,12 @@ class OpCode {
      * (no undefined-key / scalar-offset warnings; missing → null) (#21991, zend_execute.c).
      */
     public bool $arrayDimFetchIs = false;
+    /**
+     * TYPE_ARRAY_DIM_FETCH after coalesce container isset — skip float→int E_DEPRECATED
+     * (isset already warned; Zend emits once for `$arr[$float] ??` / left `??=`) (#29664).
+     * Do not set on FETCH_DIM_W: missing `??=` warns again on write (Zend parity).
+     */
+    public bool $arrayDimFetchSkipFloatKeyDeprecation = false;
     /** unset() on PropertyFetch, not ArrayDimFetch (issue #19681, SimpleXML sxe_prop_dim_delete). */
     public bool $unsetOnProperty = false;
     /** ?? / ??= on static hooked properties: probe backing storage, not get hook (#9683). */
