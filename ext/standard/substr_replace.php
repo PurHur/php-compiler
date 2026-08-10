@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -33,7 +34,8 @@ final class substr_replace extends Internal
             0,
             'string'
         );
-        $replaceVar = self::requireStringOrArrayReplace($frame->calledArgs[1]);
+        // Z_PARAM_STR_OR_ARR — strict_types TypeError on null; else DEP+coerce (#29874).
+        $replaceVar = self::requireStringOrArrayReplace($frame, $frame->calledArgs[1]);
         $offsetVar = $frame->calledArgs[2]->resolveIndirect();
         $hasLength = 4 === $argc;
         $lengthVar = $hasLength ? $frame->calledArgs[3] : null;
@@ -49,7 +51,7 @@ final class substr_replace extends Internal
                     'substr_replace(): Argument #4 ($length) cannot be an array when working on a single string'
                 );
             }
-            $replace = self::resolveScalarReplace($frame->calledArgs[1], $replaceVar);
+            $replace = self::resolveScalarReplace($replaceVar);
             $offsetInt = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'substr_replace', 3, 'offset');
             $length = self::resolveScalarLength($lengthVar, $stringVar->toString());
             $frame->returnVar->string(VmString::substr_replace(
@@ -197,22 +199,34 @@ final class substr_replace extends Internal
     }
 
     /**
+     * Z_PARAM_STR_OR_ARR $replace — php-src string.c (#29874).
+     *
+     * Null: TypeError under caller strict_types; else E_DEPRECATED then coerce to "".
+     *
      * @throws \TypeError
      */
-    private static function requireStringOrArrayReplace(Variable $var): Variable
+    private static function requireStringOrArrayReplace(Frame $frame, Variable $var): Variable
     {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'substr_replace(): Argument #2 ($replace) must be of type array|string, null given'
+                );
+            }
+            VmNullStringParamDeprecation::emit($frame, 'substr_replace', 1, 'replace', 'array|string');
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
         if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(\sprintf(
                 'substr_replace(): Argument #2 ($replace) must be of type array|string, %s given',
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
-        if (
-            Variable::TYPE_STRING === $var->type
-            || Variable::TYPE_ARRAY === $var->type
-            || Variable::TYPE_NULL === $var->type
-        ) {
+        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
             return $var;
         }
 
@@ -239,10 +253,11 @@ final class substr_replace extends Internal
     /**
      * Scalar-string path: first replace element when $replace is an array (php-src string.c).
      */
-    private static function resolveScalarReplace(Variable $replaceArg, Variable $replaceVar): string
+    private static function resolveScalarReplace(Variable $replaceVar): string
     {
-        if (Variable::TYPE_STRING === $replaceVar->type || Variable::TYPE_NULL === $replaceVar->type) {
-            return VmString::coerceStringBuiltinArg($replaceArg, 'substr_replace', 1, 'replace', 'array|string');
+        // Null already resolved to "" (+ DEP) in requireStringOrArrayReplace (#29874).
+        if (Variable::TYPE_STRING === $replaceVar->type) {
+            return $replaceVar->toString();
         }
 
         foreach ($replaceVar->toArray()->iterateKeyed(true) as [, $value]) {
