@@ -93,6 +93,8 @@
             <file>./test/compliance/AnonymousClassImplementsNameJITTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameVMTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameJITTest.php</file>
+            <file>./test/compliance/SelfReturnTypeerrorResolvedNameVMTest.php</file>
+            <file>./test/compliance/SelfReturnTypeerrorResolvedNameJITTest.php</file>
             <file>./test/compliance/IncompleteClassAccessWarningPrefixVMTest.php</file>
             <file>./test/compliance/IncompleteClassAccessWarningPrefixJITTest.php</file>
             <file>./test/compliance/LazyGhostCloneInitializesVMTest.php</file>
