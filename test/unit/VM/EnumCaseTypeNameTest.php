@@ -136,6 +136,15 @@ final class EnumCaseTypeNameTest extends TestCase
                 'Cannot use "::class" on int',
                 EnumCaseSupport::formatClassPseudoConstTypeErrorMessage('int')
             );
+            // #29623 — Resource wrappers use lowercase "resource", not ClassEntry "Resource"
+            $ctx = new Context(new Runtime());
+            BuiltinClasses::register($ctx);
+            $res = new Variable();
+            ResourceSupport::wrap($res, 1, ResourceState::KIND_STREAM, $ctx);
+            $this->assertSame(
+                'Cannot use "::class" on resource',
+                EnumCaseSupport::classPseudoConstTypeErrorMessage($res)
+            );
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

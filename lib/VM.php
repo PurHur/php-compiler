@@ -11024,6 +11024,9 @@ restart:
 
     /**
      * Resolve `$operand::class` (Zend zend_compile.c FETCH_CLASS on enum case / object).
+     *
+     * Legacy Resource wrappers are not objects for {@code ::class} — Zend TypeError
+     * {@code Cannot use "::class" on resource} (#29623 / zend_execute.c).
      */
     private function resolveClassPseudoConstFromOperand(Variable $operand): ?string
     {
@@ -11032,7 +11035,12 @@ restart:
             return $operand->toEnumCase()->enumClass->name;
         }
         if (Variable::TYPE_OBJECT === $operand->type) {
-            return $operand->toObject()->class->name;
+            $object = $operand->toObject();
+            if (VM\ResourceSupport::isHiddenPseudoClassEntry($object->class)) {
+                return null;
+            }
+
+            return $object->class->name;
         }
 
         return null;

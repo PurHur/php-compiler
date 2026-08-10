@@ -688,8 +688,9 @@ final class EnumCaseSupport
         }
         if (
             Variable::TYPE_OBJECT === $value->type
-            && ResourceSupport::isResourceObject($value->toObject())
+            && ResourceSupport::isHiddenPseudoClassEntry($value->toObject()->class)
         ) {
+            // Open or closed Resource wrappers → lowercase "resource" (#29623 / #29559).
             return 'resource';
         }
 
