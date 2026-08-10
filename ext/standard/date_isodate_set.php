@@ -44,10 +44,10 @@ final class date_isodate_set extends Internal
             'object',
             $frame->vmContext
         );
-        $year = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'date_isodate_set', 2, 'year');
-        $week = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'date_isodate_set', 3, 'week');
+        $year = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, 'date_isodate_set', 2, 'year');
+        $week = VmMath::parseZParamLongBuiltinArgForFrame($frame, 2, 'date_isodate_set', 3, 'week');
         $dayOfWeek = (4 === $argc)
-            ? VmMath::parseIntBuiltinArg($frame->calledArgs[3], 'date_isodate_set', 4, 'dayOfWeek')
+            ? VmMath::parseZParamLongBuiltinArgForFrame($frame, 3, 'date_isodate_set', 4, 'dayOfWeek')
             : 1;
         DateTimeSupport::setISODate($datetime, $year, $week, $dayOfWeek);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($frame): void {

@@ -27,10 +27,12 @@ final class DateTimeSetISODate extends VmClassMethod
             'DateTime::setISODate()'
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
-        $year = VmMath::parseIntBuiltinArg($frame->calledArgs[1], "{$label}::setISODate", 0, 'year');
-        $week = VmMath::parseIntBuiltinArg($frame->calledArgs[2], "{$label}::setISODate", 1, 'week');
+        // Z_PARAM_LONG — caller strict_types → TypeError on null (#29842).
+        // Frame args include $this; user-visible Argument #1 ($year) …
+        $year = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, "{$label}::setISODate", 1, 'year');
+        $week = VmMath::parseZParamLongBuiltinArgForFrame($frame, 2, "{$label}::setISODate", 2, 'week');
         $dayOfWeek = (4 === $argc)
-            ? VmMath::parseIntBuiltinArg($frame->calledArgs[3], "{$label}::setISODate", 2, 'dayOfWeek')
+            ? VmMath::parseZParamLongBuiltinArgForFrame($frame, 3, "{$label}::setISODate", 3, 'dayOfWeek')
             : 1;
         if (null === $frame->returnVar) {
             return;
