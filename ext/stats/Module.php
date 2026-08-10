@@ -25,6 +25,16 @@ class Module extends ModuleAbstract
             new stats_standard_deviation(),
             new stats_variance(),
             new stats_covariance(),
+            new stats_absolute_deviation(),
+            new stats_harmonic_mean(),
+            new stats_skew(),
+            new stats_kurtosis(),
+            new stats_stat_percentile(),
+            new stats_stat_correlation(),
+            new stats_stat_powersum(),
+            new stats_stat_innerproduct(),
+            new stats_stat_factorial(),
+            new stats_stat_binomial_coef(),
         ];
     }
 }

@@ -24,6 +24,16 @@ final class StatsRuntimeStandaloneTest extends TestCase
         foreach ([
             '__compiler_stats_variance',
             '__compiler_stats_covariance',
+            '__compiler_stats_absolute_deviation',
+            '__compiler_stats_harmonic_mean',
+            '__compiler_stats_skew',
+            '__compiler_stats_kurtosis',
+            '__compiler_stats_percentile',
+            '__compiler_stats_correlation',
+            '__compiler_stats_powersum',
+            '__compiler_stats_innerproduct',
+            '__compiler_stats_factorial',
+            '__compiler_stats_binomial_coef',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);
