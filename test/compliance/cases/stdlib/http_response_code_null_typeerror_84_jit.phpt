@@ -1,5 +1,5 @@
 --TEST--
-stdlib http_response_code(null) — soft-null DEP+coerce JIT on PROFILE=8.4 (#21480, reverts #20962)
+stdlib http_response_code(null) — soft-null DEP+coerce JIT on PROFILE=8.4 outside strict_types (#30019 / #21480)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--

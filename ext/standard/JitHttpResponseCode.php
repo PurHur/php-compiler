@@ -10,8 +10,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\HttpResponseCode as Hrc;
 use PHPCompiler\JIT\Builtin\HttpResponseCodeJit;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -82,18 +82,16 @@ final class JitHttpResponseCode
         }
 
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
+            // Z_PARAM_LONG: declare(strict_types=1) → TypeError; else soft-null DEP+coerce (#30019).
             if ($context->callerStrictTypes) {
-                TypeErrorRaise::registerDeclarations($context);
-                TypeErrorRaise::ensureLinked($context);
-                TypeErrorRaise::emitRaise(
+                ExceptionBridge::emitTypeErrorAndAbort(
                     $context,
                     'http_response_code(): Argument #1 ($response_code) must be of type int, null given'
                 );
-                $context->builder->call($context->lookupFunction('abort'));
-            } else {
-                JitIntdiv::emitNullIntDeprecation($context, 'http_response_code', 1, 'response_code');
+
+                return $ptr;
             }
+            JitIntdiv::emitNullIntDeprecation($context, 'http_response_code', 1, 'response_code');
             $context->builder->call(
                 $context->lookupFunction('__phpc_http_response_code_apply'),
                 $i8->constInt(Hrc::APPLY_GET, false),
