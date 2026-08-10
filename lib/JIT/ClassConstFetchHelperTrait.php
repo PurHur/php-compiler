@@ -34,6 +34,9 @@ trait ClassConstFetchHelperTrait
     {
         $context = $objectType->jitContext();
         if (Variable::TYPE_OBJECT === $classVar->type) {
+            // Legacy Resource wrappers → TypeError, not class name "Resource" (#29623).
+            self::emitResourceClassPseudoConstGuard($context, $classVar);
+
             return ReflectionBuiltinHelper::getClassName($context, $classVar);
         }
         $label = self::compileTimeNonObjectTypeLabel($classVar);
@@ -859,7 +862,6 @@ trait ClassConstFetchHelperTrait
         TypeErrorRaise::ensureLinked($context);
         $objMap = $context->structFieldMap['__object__'];
         $fn = BasicBlockHelper::parentFunction($context);
-        $entry = $context->builder->getInsertBlock();
         $ok = $fn->appendBasicBlock('expr_class_pseudo_ok');
         $failEntry = $fn->appendBasicBlock('expr_class_pseudo_fail');
         $merge = $fn->appendBasicBlock('expr_class_pseudo_merge');
@@ -881,6 +883,24 @@ trait ClassConstFetchHelperTrait
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
+        $resourceClassId = self::resourceClassIdOrNull($context);
+        if (null !== $resourceClassId) {
+            $resourceFail = $fn->appendBasicBlock('expr_class_pseudo_resource');
+            $notResource = $fn->appendBasicBlock('expr_class_pseudo_not_resource');
+            $isResource = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($resourceClassId, 'int64')
+            );
+            $context->builder->branchIf($isResource, $resourceFail, $notResource);
+            $context->builder->positionAtEnd($resourceFail);
+            TypeErrorRaise::emitRaise(
+                $context,
+                \PHPCompiler\VM\EnumCaseSupport::formatClassPseudoConstTypeErrorMessage('resource')
+            );
+            $context->builder->returnVoid();
+            $context->builder->positionAtEnd($notResource);
+        }
         $nameWhenObject = self::classNameStringFromId($objectType, $classId);
         $context->builder->branch($merge);
 
@@ -890,6 +910,48 @@ trait ClassConstFetchHelperTrait
         $context->builder->positionAtEnd($merge);
 
         return $nameWhenObject;
+    }
+
+    /**
+     * Reject legacy Resource wrappers for {@code $expr::class} (zend_execute.c; #29623).
+     */
+    private static function emitResourceClassPseudoConstGuard(Context $context, Variable $classVar): void
+    {
+        $resourceClassId = self::resourceClassIdOrNull($context);
+        if (null === $resourceClassId) {
+            return;
+        }
+        TypeErrorRaise::ensureLinked($context);
+        $objMap = $context->structFieldMap['__object__'];
+        $obj = $context->helper->loadValue($classVar);
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $isResource = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $context->constantFromInteger($resourceClassId, 'int64')
+        );
+        $fn = BasicBlockHelper::parentFunction($context);
+        $continue = $fn->appendBasicBlock('expr_class_pseudo_obj_ok');
+        $fail = $fn->appendBasicBlock('expr_class_pseudo_obj_resource');
+        $context->builder->branchIf($isResource, $fail, $continue);
+        $context->builder->positionAtEnd($fail);
+        TypeErrorRaise::emitRaise(
+            $context,
+            \PHPCompiler\VM\EnumCaseSupport::formatClassPseudoConstTypeErrorMessage('resource')
+        );
+        $context->builder->returnVoid();
+        $context->builder->positionAtEnd($continue);
+    }
+
+    private static function resourceClassIdOrNull(Context $context): ?int
+    {
+        try {
+            return $context->type->object->lookup('Resource');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

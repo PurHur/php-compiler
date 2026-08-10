@@ -1,5 +1,5 @@
 --TEST--
-Language: $expr::class TypeError uses zend_zval_value_name under PROFILE=8.4 (#29576, #29592)
+Language: $expr::class TypeError uses zend_zval_value_name under PROFILE=8.4 (#29576, #29592, #29623)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -29,8 +29,22 @@ try {
 } catch (Throwable $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
+$f = fopen('php://memory', 'r');
+try {
+    echo $f::class, "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+fclose($f);
+try {
+    echo $f::class, "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 --EXPECT--
 TypeError: Cannot use "::class" on string
 TypeError: Cannot use "::class" on int
 TypeError: Cannot use "::class" on true
 TypeError: Cannot use "::class" on false
+TypeError: Cannot use "::class" on resource
+TypeError: Cannot use "::class" on resource
