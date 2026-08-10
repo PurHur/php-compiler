@@ -1046,6 +1046,9 @@ final class TypeCheck
 
     private static function coerceToBool(Variable $value, string $kind = 'Argument'): bool
     {
+        // php-src convert_to_boolean / zend_is_true (Zend/zend_operators.c) — not
+        // FILTER_VALIDATE_BOOLEAN. Weak bool params/properties accept any string except
+        // "" / "0" (#29860); null/array/object stay TypeError.
         switch ($value->type) {
             case Variable::TYPE_BOOLEAN:
                 return $value->toBool();
@@ -1054,14 +1057,9 @@ final class TypeCheck
             case Variable::TYPE_FLOAT:
                 return 0.0 !== $value->toFloat();
             case Variable::TYPE_STRING:
-                $lower = strtolower($value->toString());
-                if (in_array($lower, ['1', 'true', 'on', 'yes'], true)) {
-                    return true;
-                }
-                if (in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
-                    return false;
-                }
-                self::throwCoerceKindError($kind, 'bool', 'string given', Variable::TYPE_BOOLEAN, $value);
+                $s = $value->toString();
+
+                return '' !== $s && '0' !== $s;
         }
         self::throwCoerceKindError($kind, 'bool', self::valueTypeLabel($value).' given', Variable::TYPE_BOOLEAN, $value);
     }
