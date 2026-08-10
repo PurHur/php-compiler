@@ -21853,7 +21853,8 @@ restart:
             TypeCheck::assertStaticReturn(
                 $value,
                 $this->lateStaticClassLc($frame),
-                $this->context
+                $this->context,
+                $this->returnTypeCallableName($block->func)
             );
 
             return;

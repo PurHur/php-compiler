@@ -604,24 +604,33 @@ final class TypeCheck
         throw new \TypeError('A never-returning function must not return');
     }
 
+    /**
+     * `: static` return verify — Zend resolves late-bound class and prefixes Class::method(): (#29913).
+     */
     public static function assertStaticReturn(
         Variable $value,
         string $expectedClassLc,
-        Context $context
+        Context $context,
+        ?string $callableName = null
     ): void {
         $target = $value->resolveIndirect();
+        $expectedName = $context->classes[$expectedClassLc]->name ?? $expectedClassLc;
         if (Variable::TYPE_OBJECT !== $target->type) {
-            throw new \TypeError(
-                'Return value must be of type static, '.self::typeName($target->type).' given'
-            );
+            $message = 'Return value must be of type '.$expectedName.', '.self::valueTypeLabel($target).' returned';
+            if (null !== $callableName && '' !== $callableName) {
+                $message = "{$callableName}(): {$message}";
+            }
+
+            throw new \TypeError($message);
         }
         $entry = $target->toObject()->class;
         if (!InterfaceCheck::entryIsInstanceOf($entry, $expectedClassLc, $context)) {
-            $expectedName = $context->classes[$expectedClassLc]->name ?? $expectedClassLc;
+            $message = "Return value must be of type {$expectedName}, {$entry->name} returned";
+            if (null !== $callableName && '' !== $callableName) {
+                $message = "{$callableName}(): {$message}";
+            }
 
-            throw new \TypeError(
-                "Return value must be of type {$expectedName}, {$entry->name} returned"
-            );
+            throw new \TypeError($message);
         }
     }
 
