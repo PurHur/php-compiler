@@ -22,9 +22,9 @@ final class VmDomJitDispatch
      */
     public static function loadHTML(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
-        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680).
-        $html = VmString::coerceStringBuiltinArg(
-            ($extra[0] ?? self::missingArg('loadHTML', 0))->resolveIndirect(),
+        // Z_PARAM_STR: strict null → TypeError; weak → DEP + '' → ValueError (#30041 / #22680).
+        $html = self::stringArg(
+            $extra[0] ?? self::missingArg('loadHTML', 0),
             'DOMDocument::loadHTML',
             0,
             'source'
@@ -51,9 +51,9 @@ final class VmDomJitDispatch
      */
     public static function loadXML(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
-        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680 / #27039).
-        $xml = VmString::coerceStringBuiltinArg(
-            ($extra[0] ?? self::missingArg('loadXML', 0))->resolveIndirect(),
+        // Z_PARAM_STR: strict null → TypeError; weak → DEP + '' → ValueError (#30041 / #22680).
+        $xml = self::stringArg(
+            $extra[0] ?? self::missingArg('loadXML', 0),
             'DOMDocument::loadXML',
             0,
             'source'
@@ -1115,7 +1115,12 @@ final class VmDomJitDispatch
      */
     public static function xpathQuery(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
     {
-        $expression = self::stringArg($extra[0] ?? self::missingArg('query', 0), 'query', 0);
+        $expression = self::stringArg(
+            $extra[0] ?? self::missingArg('query', 0),
+            'DOMXPath::query',
+            0,
+            'expression'
+        );
         $contextNode = self::optionalDomNodeArg($extra[1] ?? null, 'query', 1);
         // php-src: omitted 3rd arg uses intern->register_node_ns (default true) (#20842).
         $registerNodeNS = \array_key_exists(2, $extra)
@@ -1130,7 +1135,12 @@ final class VmDomJitDispatch
      */
     public static function xpathEvaluate(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
     {
-        $expression = self::stringArg($extra[0] ?? self::missingArg('evaluate', 0), 'evaluate', 0);
+        $expression = self::stringArg(
+            $extra[0] ?? self::missingArg('evaluate', 0),
+            'DOMXPath::evaluate',
+            0,
+            'expression'
+        );
         $contextNode = self::optionalDomNodeArg($extra[1] ?? null, 'evaluate', 1);
         // php-src: omitted 3rd arg uses intern->register_node_ns (default true) (#20842).
         $registerNodeNS = \array_key_exists(2, $extra)

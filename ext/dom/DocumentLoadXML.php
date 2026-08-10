@@ -21,8 +21,14 @@ final class DocumentLoadXML extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::loadXML() expects at least 1 argument');
         }
-        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680).
-        $xml = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'DOMDocument::loadXML', 0, 'source');
+        // Z_PARAM_STR: strict null → TypeError; weak null → E_DEPRECATED then '' → ValueError (#30041, #22680).
+        $xml = VmString::internalMethodStringArgForFrame(
+            $frame,
+            1,
+            'DOMDocument::loadXML',
+            0,
+            'source'
+        );
         $options = 0;
         if (isset($frame->calledArgs[2])) {
             // Z_PARAM_LONG $options (#25768).

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -31,9 +32,9 @@ abstract class DomClassMethod extends VmClassMethod
         ?Frame $frame = null,
         string $paramName = 'value'
     ): string {
+        $function = str_ends_with($label, '()') ? substr($label, 0, -2) : $label;
         if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             // InternalStrictArg appends "()" — strip if callers pass "Class::method()".
-            $function = str_ends_with($label, '()') ? substr($label, 0, -2) : $label;
             InternalStrictArg::rejectNullString($var, $function, $paramName, $index, $frame);
         }
         $var = $var->resolveIndirect();
@@ -46,6 +47,9 @@ abstract class DomClassMethod extends VmClassMethod
             ));
         }
         if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_STR weak: E_DEPRECATED then coerce to '' (#30041, xpath.c / document.c).
+            VmNullStringParamDeprecation::emit($frame, $function, $index, $paramName);
+
             return '';
         }
 
