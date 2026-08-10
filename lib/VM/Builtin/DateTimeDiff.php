@@ -33,10 +33,13 @@ final class DateTimeDiff extends VmClassMethod
 
         $receiver = DateTimeSupport::requireDateTimeLike($frame->calledArgs[0], 'DateTime::diff()');
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
-        $target = DateTimeSupport::requireDateTimeLike(
+        // Zend zim_DateTime_diff — Argument #1 ($targetObject) DateTimeInterface (#29868).
+        $target = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[1],
             "{$label}::diff()",
-            $frame->vmContext
+            $frame->vmContext,
+            1,
+            'targetObject'
         );
 
         $absolute = false;
