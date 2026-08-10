@@ -13,7 +13,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\pgsql\VmPgsqlNative;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\sqlite3\Sqlite3Constants;
+use PHPCompiler\ext\sqlite3\VmSqlite3Authorizer;
 use PHPCompiler\ext\sqlite3\VmSqlite3Native;
 use PHPCompiler\ext\sqlite3\VmSqlite3Udf;
 use PHPCompiler\ext\spl\SplIteratorSupport;
@@ -279,6 +281,25 @@ final class VmPDO
             'sqlitecreateaggregate' => [new PDOSqliteCreateAggregate(), 'sqliteCreateAggregate'],
             'sqlitecreatecollation' => [new PDOSqliteCreateCollation(), 'sqliteCreateCollation'],
         ];
+        // PHP 8.5+ Pdo\Sqlite::setAuthorizer (pdo_sqlite.stub.php; #27676).
+        if (CompilerVersion::supportsSqlite3Php85Apis()) {
+            $methods['setauthorizer'] = [new PDOSqliteSetAuthorizer(), 'setAuthorizer'];
+            self::registerExactCaseClassConstants(
+                $sqlite,
+                [
+                    'OK' => Sqlite3Constants::OK,
+                    'DENY' => Sqlite3Constants::DENY,
+                    'IGNORE' => Sqlite3Constants::IGNORE,
+                    'CREATE_TABLE' => Sqlite3Constants::CREATE_TABLE,
+                ],
+                [
+                    'OK' => 'OK',
+                    'DENY' => 'DENY',
+                    'IGNORE' => 'IGNORE',
+                    'CREATE_TABLE' => 'CREATE_TABLE',
+                ]
+            );
+        }
         foreach ($methods as $lc => [$method, $display]) {
             $sqlite->methods[$lc] = $method;
             $sqlite->methodVisibility[$lc] = $pub;
@@ -871,6 +892,19 @@ final class PdoState
      * @var array<string, array{callback: Variable, closure: ?\PHPCompiler\VM\ClosureState, ctx: \PHPCompiler\VM\Context}>
      */
     public array $collations = [];
+
+    /**
+     * Pdo\Sqlite::setAuthorizer callback (php-src pdo_sqlite.stub.php; #27676).
+     *
+     * @var \PHPCompiler\VM\Variable|null
+     */
+    public $authorizer = null;
+
+    /** @var \PHPCompiler\VM\ClosureState|null */
+    public $authorizerClosure = null;
+
+    /** @var \PHPCompiler\VM\Context|null */
+    public $authorizerCtx = null;
 }
 
 final class PDOConstruct extends PdoClassMethod
@@ -992,6 +1026,19 @@ final class PDOExec extends PdoClassMethod
         );
         $state = VmPDO::state($receiver);
         $db = VmPDO::requireDb($receiver);
+        if (!VmSqlite3Authorizer::allowRegistered(
+            $state->authorizer,
+            $state->authorizerCtx,
+            'Pdo\\Sqlite::setAuthorizer',
+            $sql
+        )) {
+            VmPDO::raise($state, 'authorizer denied', 'HY000');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         try {
             VmSqlite3Native::exec($db, $sql);
             VmPDO::clearError($state);
@@ -1029,6 +1076,19 @@ final class PDOPrepare extends PdoClassMethod
         );
         $state = VmPDO::state($receiver);
         $db = VmPDO::requireDb($receiver);
+        if (!VmSqlite3Authorizer::allowRegistered(
+            $state->authorizer,
+            $state->authorizerCtx,
+            'Pdo\\Sqlite::setAuthorizer',
+            $sql
+        )) {
+            VmPDO::raise($state, 'authorizer denied', 'HY000');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         try {
             $stmt = VmSqlite3Native::prepare($db, $sql);
             VmPDO::clearError($state);
@@ -1066,6 +1126,19 @@ final class PDOQuery extends PdoClassMethod
         );
         $state = VmPDO::state($receiver);
         $db = VmPDO::requireDb($receiver);
+        if (!VmSqlite3Authorizer::allowRegistered(
+            $state->authorizer,
+            $state->authorizerCtx,
+            'Pdo\\Sqlite::setAuthorizer',
+            $sql
+        )) {
+            VmPDO::raise($state, 'authorizer denied', 'HY000');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         try {
             $stmt = VmSqlite3Native::prepare($db, $sql);
             // Execute immediately (php-src PDO::query).
@@ -1555,6 +1628,49 @@ final class PDOSqliteCreateCollation extends PdoClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
+    }
+}
+
+/**
+ * Pdo\Sqlite::setAuthorizer(?callable $callback): void (php-src pdo_sqlite.stub.php; #27676).
+ *
+ * Shares soft authorizer gate with {@see \PHPCompiler\ext\sqlite3\VmSqlite3Authorizer}.
+ */
+final class PDOSqliteSetAuthorizer extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setAuthorizer');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'Pdo\\Sqlite::setAuthorizer()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'Pdo\\Sqlite::setAuthorizer() expects exactly 1 argument, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('Pdo\\Sqlite::setAuthorizer() requires a VM context');
+        }
+        $state = VmPDO::state($receiver);
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            $state->authorizer = null;
+            $state->authorizerClosure = null;
+            $state->authorizerCtx = null;
+
+            return;
+        }
+        if (!VmCallable::isCallable($ctx, $arg)) {
+            throw new \TypeError(VmCallable::invalidCallbackTypeError('Pdo\\Sqlite::setAuthorizer'));
+        }
+        [$pinned, $closureState] = SplIteratorSupport::pinCallback($arg);
+        $state->authorizer = $pinned;
+        $state->authorizerClosure = $closureState;
+        $state->authorizerCtx = $ctx;
     }
 }
 

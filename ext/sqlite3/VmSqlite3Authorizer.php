@@ -21,7 +21,28 @@ final class VmSqlite3Authorizer
      */
     public static function allow(Sqlite3State $state, string $sql): bool
     {
-        if (null === $state->authorizer || null === $state->authorizerCtx) {
+        return self::allowRegistered(
+            $state->authorizer,
+            $state->authorizerCtx,
+            'SQLite3::setAuthorizer',
+            $sql,
+            $state->exceptions
+        );
+    }
+
+    /**
+     * Shared soft authorizer gate for SQLite3 + Pdo\Sqlite (#20683 / #27676).
+     *
+     * @return bool false when authorizer denies (caller should fail the statement)
+     */
+    public static function allowRegistered(
+        ?Variable $authorizer,
+        ?\PHPCompiler\VM\Context $authorizerCtx,
+        string $invokeAs,
+        string $sql,
+        bool $rethrow = false
+    ): bool {
+        if (null === $authorizer || null === $authorizerCtx) {
             return true;
         }
         $action = self::inferAction($sql);
@@ -38,14 +59,14 @@ final class VmSqlite3Authorizer
         }
         try {
             $ret = VmCallable::invokeAs(
-                'SQLite3::setAuthorizer',
-                $state->authorizerCtx,
-                $state->authorizer,
+                $invokeAs,
+                $authorizerCtx,
+                $authorizer,
                 $actionVar,
                 ...$nulls
             );
         } catch (\Throwable $e) {
-            if ($state->exceptions) {
+            if ($rethrow) {
                 throw $e;
             }
             @\trigger_error('An error occurred while invoking the authorizer callback', \E_USER_WARNING);
