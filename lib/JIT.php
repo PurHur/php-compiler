@@ -10477,11 +10477,12 @@ class JIT {
                             $vm = new VM\Variable();
                             $vm->string($literal);
                             if (OpCode::TYPE_PLUS === $op->type) {
+                                // php-src increment_string(): empty / non-alnum → E_DEPRECATED (#29658).
+                                $this->emitStringIncrementDeprecationsIfNeeded($literal);
                                 $vm->applyIncrement();
                             } else {
-                                if ('' !== $literal && !is_numeric($literal)) {
-                                    $this->emitNonNumericStringDecrementDeprecation();
-                                }
+                                // php-src decrement_function() string path (#29088, #29658).
+                                $this->emitStringDecrementDeprecationsIfNeeded($literal);
                                 $vm->applyDecrement();
                             }
                             $this->assignOperand($resultOp, $this->jitVariableFromVmConstant($vm), true);
@@ -17931,12 +17932,12 @@ class JIT {
             $vm = new VM\Variable();
             $vm->string($literal);
             if ($increment) {
+                // php-src increment_string(): empty / non-alnum → E_DEPRECATED (#29658).
+                $this->emitStringIncrementDeprecationsIfNeeded($literal);
                 $vm->applyIncrement();
             } else {
-                // php-src zend_operators.c — non-numeric string -- is a no-op with E_DEPRECATED (#29088).
-                if ('' !== $literal && !is_numeric($literal)) {
-                    $this->emitNonNumericStringDecrementDeprecation();
-                }
+                // php-src decrement_function() string path (#29088, #29658).
+                $this->emitStringDecrementDeprecationsIfNeeded($literal);
                 $vm->applyDecrement();
             }
             $newVar = $this->jitVariableFromVmConstant($vm);
@@ -18177,9 +18178,48 @@ class JIT {
     }
 
     /**
+     * PHP 8.3+ E_DEPRECATED for ++ on empty / non-alphanumeric string (zend_operators.c, #29658).
+     */
+    private function emitStringIncrementDeprecationsIfNeeded(string $literal): void
+    {
+        if (is_numeric($literal)) {
+            return;
+        }
+        if ('' !== $literal && \PHPCompiler\ext\standard\VmString::onlyAsciiAlphanumeric($literal)) {
+            return;
+        }
+        $this->emitIncDecStringDeprecation('Increment on non-alphanumeric string is deprecated');
+    }
+
+    /**
+     * PHP 8.3+ E_DEPRECATED for -- on empty or non-numeric string (#29088, #29658).
+     */
+    private function emitStringDecrementDeprecationsIfNeeded(string $literal): void
+    {
+        if ('' === $literal) {
+            $this->emitIncDecStringDeprecation('Decrement on empty string is deprecated as non-numeric');
+
+            return;
+        }
+        if (!is_numeric($literal)) {
+            $this->emitNonNumericStringDecrementDeprecation();
+        }
+    }
+
+    /**
      * PHP 8.3+ E_DEPRECATED for -- on non-numeric string (zend_operators.c, #29088).
      */
     private function emitNonNumericStringDecrementDeprecation(): void
+    {
+        $this->emitIncDecStringDeprecation(
+            'Decrement on non-numeric string has no effect and is deprecated'
+        );
+    }
+
+    /**
+     * Emit a compile-time E_DEPRECATED for string ++/-- (same profile gate as #26378 / #29088).
+     */
+    private function emitIncDecStringDeprecation(string $message): void
     {
         if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
             return;
@@ -18188,7 +18228,6 @@ class JIT {
             return;
         }
         JIT\Builtin\StringTriggerError::ensureLinked($this->context);
-        $message = 'Decrement on non-numeric string has no effect and is deprecated';
         $i8p = $this->context->getTypeFromString('int8*');
         $sizeT = $this->context->getTypeFromString('size_t');
         $i32 = $this->context->getTypeFromString('int32');

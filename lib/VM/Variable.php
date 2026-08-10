@@ -2851,9 +2851,11 @@ restart:
     }
 
     /**
-     * Zend decrement_function() string path (zend_operators.c).
+     * Zend increment_function() / decrement_function() string path (zend_operators.c).
      *
-     * Non-numeric strings are a no-op; PHP 8.3+ emits E_DEPRECATED (#29088).
+     * Non-numeric `--` is a no-op with E_DEPRECATED (#29088). Empty `--` coerces to -1 with
+     * E_DEPRECATED (#29658). Non-alnum / empty `++` uses increment_string() with E_DEPRECATED
+     * and no peri-mutate of non-alnum bytes (#29658, RFC saner-inc-dec-operators).
      */
     private function applyStringIncDec(
         int $opCode,
@@ -2867,11 +2869,17 @@ restart:
 
                 return;
             }
+            // php-src increment_string(): empty or non-ASCII-alnum → E_DEPRECATED (#29658).
+            if ('' === $str || !VmString::onlyAsciiAlphanumeric($str)) {
+                self::warnIncrementNonAlphanumericString($vm, $frame);
+            }
             $this->string(VmString::incrementStringOperator($str));
 
             return;
         }
         if ('' === $str) {
+            // php-src decrement_function(): empty string → E_DEPRECATED then int -1 (#29658).
+            self::warnDecrementEmptyString($vm, $frame);
             $this->int(-1);
 
             return;
@@ -2884,6 +2892,52 @@ restart:
         // php-src zend_operators.c — non-numeric string -- is a no-op with E_DEPRECATED (#29088).
         self::warnDecrementNonNumericString($vm, $frame);
         $this->string($str);
+    }
+
+    /**
+     * PHP 8.3+ E_DEPRECATED for `$s++` when `$s` is empty or not strictly alphanumeric (#29658).
+     *
+     * Same profile gate as bool/null no-effect warnings ({@see supportsIncDecNoEffectWarning}).
+     */
+    private static function warnIncrementNonAlphanumericString(
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
+        if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
+            return;
+        }
+        $context = $vm?->context ?? $frame?->vmContext;
+        if (null === $context) {
+            return;
+        }
+        $context->errors->internalDeprecated(
+            'Increment on non-alphanumeric string is deprecated',
+            $context,
+            $frame,
+            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null
+        );
+    }
+
+    /**
+     * PHP 8.3+ E_DEPRECATED for `$s--` / `--$s` when `$s` is '' (#29658).
+     */
+    private static function warnDecrementEmptyString(
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
+        if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
+            return;
+        }
+        $context = $vm?->context ?? $frame?->vmContext;
+        if (null === $context) {
+            return;
+        }
+        $context->errors->internalDeprecated(
+            'Decrement on empty string is deprecated as non-numeric',
+            $context,
+            $frame,
+            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null
+        );
     }
 
     /**

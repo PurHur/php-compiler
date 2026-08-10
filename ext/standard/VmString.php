@@ -4056,7 +4056,10 @@ final class VmString
     }
 
     /**
-     * Zend increment_string() for ++ on string operands (issue #3469).
+     * Zend increment_string() for ++ on string operands (issue #3469, #29658).
+     *
+     * Non-alphanumeric bytes stop the carry chain without peri-mutating them
+     * (php-src 8.3+ / RFC saner-inc-dec-operators). Empty → {@code '1'}.
      *
      * @see Zend/zend_operators.c increment_string()
      */
@@ -4074,6 +4077,7 @@ final class VmString
 
         // php-src increment_string(): $last tracks the last alphanumeric class seen,
         // including overflow ('z'/'Z'/'9'), so lengthening prepends the right case (#21911).
+        // Non-alnum at $position: carry=0; break — do not ASCII-bump the byte (#29658).
         do {
             $c = $incremented[$position];
             $ord = self::byteOrd($c);
@@ -4105,12 +4109,13 @@ final class VmString
                 }
                 $last = 3;
             } else {
-                if (!$carry) {
-                    $incremented[$position] = self::byteChr($ord + 1);
-                }
                 $carry = false;
+                break;
             }
-        } while ($carry && $position-- > 0);
+            if (!$carry) {
+                break;
+            }
+        } while ($position-- > 0);
 
         if ($carry) {
             $prefix = match ($last) {

@@ -64,6 +64,16 @@ final class StringIncDecTest extends TestCase
         $this->assertSame('1000', VmString::incrementStringOperator('999'));
     }
 
+    /** Non-alnum bytes stop the chain without peri-mutate (zend_operators.c, #29658). */
+    public function testIncrementStringOperatorStopsAtNonAlphanumeric(): void
+    {
+        $this->assertSame(' ', VmString::incrementStringOperator(' '));
+        $this->assertSame('a-', VmString::incrementStringOperator('a-'));
+        $this->assertSame('Z ', VmString::incrementStringOperator('Z '));
+        $this->assertSame('-cd', VmString::incrementStringOperator('-cc'));
+        $this->assertSame('1', VmString::incrementStringOperator(''));
+    }
+
     private function runIncDec(int $opCode, string $value): VMVariable
     {
         $left = new VMVariable();
