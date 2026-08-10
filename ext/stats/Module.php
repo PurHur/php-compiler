@@ -35,6 +35,22 @@ class Module extends ModuleAbstract
             new stats_stat_innerproduct(),
             new stats_stat_factorial(),
             new stats_stat_binomial_coef(),
+            new stats_dens_normal(),
+            new stats_dens_cauchy(),
+            new stats_dens_laplace(),
+            new stats_dens_logistic(),
+            new stats_dens_beta(),
+            new stats_dens_weibull(),
+            new stats_dens_uniform(),
+            new stats_dens_chisquare(),
+            new stats_dens_t(),
+            new stats_dens_gamma(),
+            new stats_dens_exponential(),
+            new stats_dens_f(),
+            new stats_dens_pmf_binomial(),
+            new stats_dens_pmf_poisson(),
+            new stats_dens_pmf_negative_binomial(),
+            new stats_dens_pmf_hypergeometric(),
         ];
     }
 }

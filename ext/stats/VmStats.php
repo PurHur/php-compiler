@@ -403,6 +403,11 @@ final class VmStats
         return $vr / $denom;
     }
 
+    public static function triggerWarning(?Frame $frame, string $message): void
+    {
+        self::warning($frame, $message);
+    }
+
     private static function warning(?Frame $frame, string $message): void
     {
         if (null !== $frame?->vmContext) {

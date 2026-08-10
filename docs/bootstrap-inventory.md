@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7302 |
-| Phase A inventory files (M2 ratio SSOT) | 7302 |
+| PHP files on vm.php path | 7319 |
+| Phase A inventory files (M2 ratio SSOT) | 7319 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23683 |
+| Source constructs flagged (warnings) | 23732 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4618,13 +4618,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zlib_encode.php` | 0 | 1 |
 | `ext/standard/zlib_get_coding_type.php` | 0 | 2 |
 | `ext/stats/JitStats.php` | 0 | 2 |
-| `ext/stats/Module.php` | 0 | 14 |
+| `ext/stats/Module.php` | 0 | 30 |
 | `ext/stats/StatsExtensionPolicy.php` | 0 | 1 |
 | `ext/stats/StatsFunction.php` | 0 | 1 |
 | `ext/stats/StatsJitHelper.php` | 0 | 1 |
 | `ext/stats/VmStats.php` | 0 | 1 |
+| `ext/stats/VmStatsDens.php` | 0 | 1 |
 | `ext/stats/stats_absolute_deviation.php` | 0 | 2 |
 | `ext/stats/stats_covariance.php` | 0 | 2 |
+| `ext/stats/stats_dens_beta.php` | 0 | 2 |
+| `ext/stats/stats_dens_cauchy.php` | 0 | 2 |
+| `ext/stats/stats_dens_chisquare.php` | 0 | 2 |
+| `ext/stats/stats_dens_exponential.php` | 0 | 2 |
+| `ext/stats/stats_dens_f.php` | 0 | 2 |
+| `ext/stats/stats_dens_gamma.php` | 0 | 2 |
+| `ext/stats/stats_dens_laplace.php` | 0 | 2 |
+| `ext/stats/stats_dens_logistic.php` | 0 | 2 |
+| `ext/stats/stats_dens_normal.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_binomial.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_hypergeometric.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_negative_binomial.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_poisson.php` | 0 | 2 |
+| `ext/stats/stats_dens_t.php` | 0 | 2 |
+| `ext/stats/stats_dens_uniform.php` | 0 | 2 |
+| `ext/stats/stats_dens_weibull.php` | 0 | 2 |
 | `ext/stats/stats_harmonic_mean.php` | 0 | 2 |
 | `ext/stats/stats_kurtosis.php` | 0 | 2 |
 | `ext/stats/stats_skew.php` | 0 | 2 |
@@ -41441,8 +41458,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/JitStats.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 269)
-- 19 class method(s)
+- new ArgumentCountError (line 305)
+- 20 class method(s)
 
 ### `ext/stats/Module.php`
 
@@ -41460,6 +41477,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new stats_stat_innerproduct (line 35)
 - new stats_stat_factorial (line 36)
 - new stats_stat_binomial_coef (line 37)
+- new stats_dens_normal (line 38)
+- new stats_dens_cauchy (line 39)
+- new stats_dens_laplace (line 40)
+- new stats_dens_logistic (line 41)
+- new stats_dens_beta (line 42)
+- new stats_dens_weibull (line 43)
+- new stats_dens_uniform (line 44)
+- new stats_dens_chisquare (line 45)
+- new stats_dens_t (line 46)
+- new stats_dens_gamma (line 47)
+- new stats_dens_exponential (line 48)
+- new stats_dens_f (line 49)
+- new stats_dens_pmf_binomial (line 50)
+- new stats_dens_pmf_poisson (line 51)
+- new stats_dens_pmf_negative_binomial (line 52)
+- new stats_dens_pmf_hypergeometric (line 53)
 - 1 class method(s)
 
 ### `ext/stats/StatsExtensionPolicy.php`
@@ -41475,12 +41508,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/StatsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/stats/VmStats.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s)
+- 17 class method(s)
+
+### `ext/stats/VmStatsDens.php`
+
+**Warnings** (review for bootstrap subset):
+- 20 class method(s)
 
 ### `ext/stats/stats_absolute_deviation.php`
 
@@ -41489,6 +41527,102 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/stats/stats_covariance.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_beta.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_cauchy.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_chisquare.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_exponential.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_f.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_gamma.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_laplace.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_logistic.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_normal.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_binomial.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_hypergeometric.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_negative_binomial.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_poisson.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_t.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_uniform.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_weibull.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
