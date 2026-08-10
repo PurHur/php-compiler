@@ -8,7 +8,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Zend-shaped "PHP Fatal error:" stderr prefix for compile fatals (#27718).
+ * Zend-shaped "PHP Fatal error:" stderr prefix for compile fatals (#27718, #29769).
  */
 final class CompileFatalDiagnosticShapeTest extends TestCase
 {
@@ -41,17 +41,18 @@ final class CompileFatalDiagnosticShapeTest extends TestCase
         $this->assertStringContainsString('Class B contains 1 abstract method', $output);
     }
 
-    public function testFinalConstOverrideEmitsZendShapedFatal(): void
+    public function testTemporaryArrayAppendEmitsZendShapedFatal(): void
     {
-        $code = "<?php\nclass A { final public const C = 1; }\nclass B extends A { const C = 2; }";
-        file_put_contents('/tmp/phpc_finalconst_27718.php', $code);
+        $code = "<?php\n[1, 2][] = 3;\n";
+        file_put_contents('/tmp/phpc_temp_write_29769.php', $code);
         $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 2).'/bin/vm.php')
-            .' '.escapeshellarg('/tmp/phpc_finalconst_27718.php').' 2>&1';
+            .' '.escapeshellarg('/tmp/phpc_temp_write_29769.php').' 2>&1';
         $output = shell_exec($cmd) ?? '';
-        @unlink('/tmp/phpc_finalconst_27718.php');
+        @unlink('/tmp/phpc_temp_write_29769.php');
 
         $this->assertStringContainsString('PHP Fatal error:', $output);
         $this->assertStringNotContainsString('parseAndCompile failure:', $output);
-        $this->assertStringContainsString('cannot override final constant', $output);
+        $this->assertStringContainsString('Cannot use temporary expression in write context', $output);
+        $this->assertMatchesRegularExpression('/on line \d+/', $output);
     }
 }
