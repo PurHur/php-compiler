@@ -923,7 +923,16 @@ class Compiler {
             }
             $name = $param->name->value;
             if (isset($seen[$name])) {
-                $this->throwCompileError(sprintf('Redefinition of parameter $%s', $name));
+                // Zend/zend_compile.c — file+line CompileFatal for CLI "Fatal error:" shape (#29979).
+                $detail = sprintf('Redefinition of parameter $%s', $name);
+                $sourceFile = $param->getFile();
+                if ('' === $sourceFile) {
+                    $sourceFile = 'unknown';
+                }
+                if (null === $this->compileAbortDetail) {
+                    $this->compileAbortDetail = $detail;
+                }
+                throw new CompileFatal($sourceFile, max(1, $param->getLine()), $detail);
             }
             $seen[$name] = true;
         }
@@ -6719,6 +6728,9 @@ class Compiler {
     protected function compileClassMethodDeclaration(Op\Stmt\ClassMethod $child, Block $result, ?int $declaringType = null): void
     {
         $this->registerMethodDeclaration($child->func->name);
+        // php-src Zend/zend_compile.c — duplicate params fatal before property promotion
+        // registers (`Redefinition of parameter $name`, not `Cannot redeclare Class::$name`) (#29979).
+        $this->assertNoDuplicateParameterNames($child->func->params);
         foreach ($child->func->params as $param) {
             $methodBlock = new Block(null);
             $methodBlock->func = $child->func;

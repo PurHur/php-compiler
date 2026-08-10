@@ -8,3 +8,5 @@ class C {
 echo "ok\n";
 --EXPECT_EXIT--
 255
+--EXPECTF--
+PHP Fatal error:  Redefinition of parameter $x in %s on line %d

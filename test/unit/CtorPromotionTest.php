@@ -88,4 +88,19 @@ PHP;
         $this->expectExceptionMessage('Cannot redeclare C::$x');
         $runtime->parseAndCompile($code, 'promotion_collision.php');
     }
+
+    /** Duplicate promoted ctor params match Zend wording (#29979). */
+    public function testDuplicatePromotedCtorParamsAreRedefinitionOfParameter(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public function __construct(public readonly int $a, public int $a) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Redefinition of parameter $a');
+        $runtime->parseAndCompile($code, 'promotion_dup_params.php');
+    }
 }
