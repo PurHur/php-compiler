@@ -36,6 +36,8 @@ use PHPLLVM\Value;
  * TypeErrors as Arg #1 ($separator) (#26277, #29087); join keeps zif_implode array-first
  * (php-src string_arginfo.h — frameless only on implode).
  * PROFILE≥8.4 string+null pieces TypeError names arg #2 ($array) (#26278; php-src string.c).
+ * PROFILE≥8.4 one-arg non-array: frameless implode(1) dual-arg TypeError (no soft-null DEP);
+ * join uses zif_implode — soft-null DEP then same dual-arg message (#29591).
  */
 final class implode extends Internal
 {
@@ -50,15 +52,32 @@ final class implode extends Internal
         $this->requireArgCountRange($frame, $this->getName(), 1, 2);
         $argc = \count($frame->calledArgs);
         if (1 === $argc) {
-            self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
-            $glue = '';
-            $ht = VmArray::requireArrayParam(
-                $frame->calledArgs[0],
-                $this->getName(),
-                1,
-                'array',
-                'array'
-            );
+            $first = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $first->type) {
+                $glue = '';
+                $ht = $first->toArray();
+            } elseif (self::rejectsArrayFirstAsSeparator($this->getName())) {
+                // ZEND_FRAMELESS_FUNCTION(implode, 1): non-array → dual-arg TypeError (#29591).
+                throw new \TypeError(self::nullPiecesStringFirstTypeErrorMessage($this->getName()));
+            } elseif (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+                // join keeps zif_implode: strict null → $separator TypeError; else soft-null DEP
+                // then pieces==NULL + string first → dual-arg (#29591; php-src string.c).
+                self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
+                if (Variable::TYPE_NULL === $first->type) {
+                    self::coerceSeparatorSoftNull($frame->calledArgs[0], $this->getName());
+                }
+                throw new \TypeError(self::nullPiecesStringFirstTypeErrorMessage($this->getName()));
+            } else {
+                self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
+                $glue = '';
+                $ht = VmArray::requireArrayParam(
+                    $frame->calledArgs[0],
+                    $this->getName(),
+                    1,
+                    'array',
+                    'array'
+                );
+            }
         } else {
             // php-src PHP_FUNCTION(implode): Z_PARAM_ARRAY_HT_OR_STR + Z_PARAM_ARRAY_HT_OR_NULL;
             // pieces == NULL + string first: PROFILE≥8.4 dual-arg TypeError (#26278); else #19566.
@@ -118,13 +137,7 @@ final class implode extends Internal
         }
         $argc = \count($args);
         if (1 === $argc) {
-            self::rejectNullSeparatorJit($context, $args[0], $this->getName());
-            $i64 = $context->getTypeFromString('int64');
-            $glue = $context->builder->call(
-                $context->lookupFunction('__string__alloc'),
-                $i64->constInt(0, false)
-            );
-            $haystack = $this->loadHaystack($context, $args[0], false);
+            return $this->jitOneArg($context, $args[0], $this->getName());
         } else {
             // php-src pieces == NULL (#19566): array-first empty glue, or Arg #1 ($array) string given.
             // PROFILE≥8.4 frameless implode(2): array + null → $separator TypeError (#26277).
@@ -172,6 +185,119 @@ final class implode extends Internal
         }
 
         return JitImplode::implode($context, $glue, $haystack);
+    }
+
+    /**
+     * One-arg implode/join — PROFILE≥8.4 frameless implode(1) dual-arg TypeError (#29591).
+     */
+    private function jitOneArg(Context $context, JITVariable $arg, string $function): Value
+    {
+        if (self::jitArgIsDefinitelyArray($arg)) {
+            return $this->jitOneArgEmptyGlue($context, $arg);
+        }
+        if (self::rejectsArrayFirstAsSeparator($function)) {
+            if (JITVariable::TYPE_VALUE === $arg->type) {
+                return $this->jitOneArgBoxedFrameless($context, $arg, $function);
+            }
+            self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            if (JITVariable::TYPE_VALUE === $arg->type) {
+                return $this->jitOneArgBoxedJoin84($context, $arg, $function);
+            }
+            self::rejectNullSeparatorJit($context, $arg, $function);
+            if (self::jitArgIsDefinitelyNull($arg)) {
+                self::lowerSeparatorSoftNull($context, $arg, $function);
+            }
+            self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        self::rejectNullSeparatorJit($context, $arg, $function);
+
+        return $this->jitOneArgEmptyGlue($context, $arg);
+    }
+
+    private function jitOneArgEmptyGlue(Context $context, JITVariable $arg): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $glue = $context->builder->call(
+            $context->lookupFunction('__string__alloc'),
+            $i64->constInt(0, false)
+        );
+        $haystack = $this->loadHaystack($context, $arg, false);
+
+        return JitImplode::implode($context, $glue, $haystack);
+    }
+
+    /** Boxed one-arg under frameless implode(1) ≥8.4 (#29591). */
+    private function jitOneArgBoxedFrameless(
+        Context $context,
+        JITVariable $arg,
+        string $function
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $arrayBlock = BasicBlockHelper::append($context, 'implode_one_arg_array');
+        $badBlock = BasicBlockHelper::append($context, 'implode_one_arg_dual');
+        $context->builder->branchIf(
+            self::jitValueBoxIsArray($context, $valuePtr),
+            $arrayBlock,
+            $badBlock
+        );
+        $context->builder->positionAtEnd($badBlock);
+        self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
+        $context->builder->positionAtEnd($arrayBlock);
+
+        return $this->jitOneArgEmptyGlue($context, $arg);
+    }
+
+    /** Boxed one-arg join on PROFILE≥8.4 — zif_implode soft-null + dual-arg (#29591). */
+    private function jitOneArgBoxedJoin84(
+        Context $context,
+        JITVariable $arg,
+        string $function
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $arrayBlock = BasicBlockHelper::append($context, 'join_one_arg_array');
+        $badBlock = BasicBlockHelper::append($context, 'join_one_arg_dual');
+        $context->builder->branchIf(
+            self::jitValueBoxIsArray($context, $valuePtr),
+            $arrayBlock,
+            $badBlock
+        );
+        $context->builder->positionAtEnd($badBlock);
+        self::rejectNullSeparatorJit($context, $arg, $function);
+        // Soft-null DEP when the box holds null; other non-arrays skip coerce (#29591).
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullBlock = BasicBlockHelper::append($context, 'join_one_arg_null_soft');
+        $otherBlock = BasicBlockHelper::append($context, 'join_one_arg_other');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NULL, false)
+            ),
+            $nullBlock,
+            $otherBlock
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        self::lowerSeparatorSoftNull($context, $arg, $function);
+        self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
+        $context->builder->positionAtEnd($otherBlock);
+        self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
+        $context->builder->positionAtEnd($arrayBlock);
+
+        return $this->jitOneArgEmptyGlue($context, $arg);
     }
 
     private function loadHaystack(Context $context, JITVariable $arg, bool $glueAndArrayForm): Value
