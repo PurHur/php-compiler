@@ -15352,9 +15352,13 @@ restart:
     }
 
     /**
-     * Reject writes to get-only hooked properties (#4687, #18072, #26006, Zend zend_object_handlers.c).
+     * Reject writes to get-only VIRTUAL hooked properties (#4687, #18072, #26006, #29674).
      *
-     * php-src PHP-8.4 external get-only VIRTUAL write uses "Property … is read-only".
+     * php-src: Zend/zend_object_handlers.c — omitting {@code set} on a *backed* property uses
+     * default write into the backing store (manual: "omitting a get or set hook means the default
+     * read or write behavior will be used"). Only VIRTUAL get-only props Error on write.
+     *
+     * PHP-8.4 external virtual write: "Property … is read-only".
      * "Must not write to virtual property" is only for raw backing-slot access inside a hook
      * ({@see raiseVirtualPropertyHookRawAccessError} / zend_throw_no_prop_backing_value_access).
      * php-src master tip uses "Cannot write to get-only virtual property …" for the external path —
@@ -15404,13 +15408,15 @@ restart:
         if (!$hasGetHook || $hasSetHook) {
             return null;
         }
+        // Backed get-only: default write to backing (ctor promo, `$this->x =`, external) — #29674.
+        if (!$virtual) {
+            return null;
+        }
         if ($this->propertyHasDistinctAsymmetricSetVisibility($classLc, $propName, $lvalue)) {
             return $this->enforceAsymmetricPropertyWrite($lvalue, $frame);
         }
 
-        $message = $virtual
-            ? sprintf('Property %s::$%s is read-only', $className, $propName)
-            : sprintf('Cannot write property %s::$%s without set hook', $className, $propName);
+        $message = sprintf('Property %s::$%s is read-only', $className, $propName);
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
             $message
