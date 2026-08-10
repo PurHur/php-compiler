@@ -5427,6 +5427,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('string|false|null', BuiltinInternalArgInfo::returnTypeLabelForFunction('shell_exec'));
     }
 
+    /** @covers issue #28919 */
+    public function testFsockopenPfsockopenStubNamesTypesAndDefaults(): void
+    {
+        foreach (['fsockopen', 'pfsockopen'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['hostname', 'port', 'error_code', 'error_message', 'timeout'], $names);
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'error_code', $fn));
+            self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'error_message', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'errno', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'errstr', $fn));
+            self::assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+            self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 2));
+            self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 3));
+            self::assertSame('?float', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 4));
+        }
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {
