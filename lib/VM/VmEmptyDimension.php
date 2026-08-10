@@ -93,6 +93,12 @@ final class VmEmptyDimension
 
                 return null;
             }
+            // Resource as array subject — empty soft-true like scalars (zend_execute.c, #30028).
+            if (ResourceSupport::isResourceObject($object)) {
+                $dst->bool(true);
+
+                return null;
+            }
             if (!$vm->objectImplementsArrayAccess($object)) {
                 $className = $object->class->name;
                 $catchFrame = $vm->propagateEmptyDimensionError(

@@ -5483,6 +5483,32 @@ restart:
                         }
                     } else {
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        // Resource as array subject — Zend Warning/null on read, scalar Error on write (#30028).
+                        if (
+                            Variable::TYPE_OBJECT === $container->type
+                            && VM\ResourceSupport::isResourceObject($container->toObject())
+                        ) {
+                            if ($forWrite) {
+                                $catchFrame = $this->dispatchVmError(
+                                    TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
+                            if (!$fetchIs) {
+                                $this->context->errors->arrayOffsetOnResource(
+                                    $this->context,
+                                    $frame,
+                                    $scriptFile
+                                );
+                            }
+                            $arg1->null();
+                            break;
+                        }
                         if (!$forWrite && TypeCheck::isScalarNonContainerDimRead($container)) {
                             if (!$fetchIs) {
                                 $resolved = $container->resolveIndirect();
@@ -9389,6 +9415,11 @@ restart:
                                 break;
                             }
                             if (!$op->issetOnProperty) {
+                                // Resource as array subject — isset soft-false like scalars (zend_execute.c, #30028).
+                                if (VM\ResourceSupport::isResourceObject($object)) {
+                                    $dst->bool(false);
+                                    break;
+                                }
                                 // isset($obj[$k]) without has_dimension / ArrayAccess — Zend Error
                                 // (ResourceBundle has read_dimension only; #25145).
                                 $catchFrame = $this->dispatchVmError(
