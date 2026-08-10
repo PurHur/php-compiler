@@ -182,10 +182,17 @@ class Native implements Call {
                 );
             }
             if (!$skipVariadicPackedTypeCheck && isset($this->paramDnfConstraintsByArg[$index])) {
+                $prefix = $this->receiverPrefix();
+                $userIdx = $index - $prefix;
+                $paramName = $this->paramNames[$userIdx] ?? ('param'.$userIdx);
                 \PHPCompiler\JIT\DnfParamCheck::enforce(
                     $context,
                     $arg,
-                    $this->paramDnfConstraintsByArg[$index]
+                    $this->paramDnfConstraintsByArg[$index],
+                    'Argument',
+                    $this->name,
+                    $userIdx,
+                    $paramName
                 );
             }
             if (!$skipVariadicPackedTypeCheck && isset($this->paramClassConstraintsByArg[$index])) {
@@ -786,10 +793,17 @@ class Native implements Call {
                 );
             }
             if (isset($this->paramDnfConstraintsByArg[$idx])) {
+                $prefix = $this->receiverPrefix();
+                $userIdx = $idx - $prefix;
+                $paramName = $this->paramNames[$userIdx] ?? ('param'.$userIdx);
                 \PHPCompiler\JIT\DnfParamCheck::enforce(
                     $context,
                     $arg,
-                    $this->paramDnfConstraintsByArg[$idx]
+                    $this->paramDnfConstraintsByArg[$idx],
+                    'Argument',
+                    $this->name,
+                    $userIdx,
+                    $paramName
                 );
             }
             if (isset($this->paramClassConstraintsByArg[$idx])) {
