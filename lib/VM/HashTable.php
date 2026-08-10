@@ -691,12 +691,13 @@ final class HashTable {
         Variable $index,
         bool $emitNullOffsetDeprecation = true,
         ?Frame $frame = null,
-        bool $emitFloatKeyDeprecation = true
+        bool $emitFloatKeyDeprecation = true,
+        string $illegalOffsetMessage = 'Illegal offset type'
     ): bool {
         if ($emitFloatKeyDeprecation) {
             self::warnFloatKeyPrecisionLossIfNeeded($index, null, $frame);
         }
-        $index = self::normalizeIndexKey($index, 'Illegal offset type', $emitNullOffsetDeprecation, $frame);
+        $index = self::normalizeIndexKey($index, $illegalOffsetMessage, $emitNullOffsetDeprecation, $frame);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 return null !== $this->findIndex($index->toInt());

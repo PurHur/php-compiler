@@ -1,5 +1,5 @@
 --TEST--
-Language: object array offset — array_key_exists/isset/key_exists throw TypeError (#6500)
+Language: object array offset — array_key_exists/isset/empty/key_exists throw TypeError (#6500, #29549)
 --FILE--
 <?php
 class K {}
@@ -25,6 +25,12 @@ try {
 }
 
 try {
+    var_export(empty($a[new K]));
+} catch (Throwable $e) {
+    echo 'empty: ', get_class($e), ': ', $e->getMessage(), "\n";
+}
+
+try {
     $a = ['x' => 1];
     var_export(isset($a['x']));
 } catch (Throwable $e) {
@@ -34,4 +40,5 @@ try {
 array_key_exists: TypeError: Illegal offset type
 key_exists: TypeError: Illegal offset type
 isset: TypeError: Illegal offset type in isset or empty
+empty: TypeError: Illegal offset type in isset or empty
 true
