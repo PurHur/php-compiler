@@ -1214,6 +1214,9 @@ final class Variable {
      *
      * Illegal dims (non-integral string / object / array) → false, no TypeError
      * ({@see zend_isset_dim_slow}, #22895).
+     *
+     * Float dims emit Zend Implicit-conversion E_DEPRECATED (not "String offset cast occurred");
+     * null/bool coerce silently — read-path cast warnings stay on {@see stringOffsetIndexFromDim} (#29557).
      */
     public static function stringOffsetIsSetFromDim(
         self $container,
@@ -1241,6 +1244,11 @@ final class Variable {
                 return false;
             }
             $rawIndex = (int) trim($dim->string);
+        } elseif (self::TYPE_FLOAT === $dim->type) {
+            $rawIndex = self::stringOffsetIssetIndexFromFloat($dim->float, $context, $frame);
+        } elseif (self::TYPE_NULL === $dim->type || self::TYPE_BOOLEAN === $dim->type) {
+            // zend_isset_dim: null/bool → long with no string-offset cast warning (#29557).
+            $rawIndex = $dim->toInt();
         } else {
             $rawIndex = self::stringOffsetIndexFromDim($dim, $reporter, $context, $frame, $file);
         }
@@ -1251,6 +1259,28 @@ final class Variable {
         }
 
         return $index >= 0 && $index < $len;
+    }
+
+    /**
+     * Float→int index for isset()/empty() on strings (#29557).
+     *
+     * php-src: Zend/zend_execute.c — zend_isset_dim; Zend/zend_operators.c — precision-loss deprecate.
+     */
+    public static function stringOffsetIssetIndexFromFloat(
+        float $value,
+        ?Context $context = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): int {
+        $ctx = $context;
+        if (null === $ctx) {
+            $vm = VmEngine::running();
+            $ctx = $vm?->context;
+        }
+        if (null !== $ctx) {
+            \PHPCompiler\ext\standard\VmMath::warnFloatToIntPrecisionLoss($value, $ctx, $frame);
+        }
+
+        return \PHPCompiler\ext\standard\VmMath::floatToZendLong($value);
     }
 
     /**
