@@ -1,5 +1,5 @@
 --TEST--
-Language: $expr::class TypeError uses zend_zval_value_name under PROFILE=8.4 (#29576)
+Language: $expr::class TypeError uses zend_zval_value_name under PROFILE=8.4 (#29576, #29592)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
