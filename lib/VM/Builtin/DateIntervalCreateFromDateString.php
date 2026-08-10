@@ -42,8 +42,10 @@ final class DateIntervalCreateFromDateString extends VmClassMethod
             ));
         }
 
-        $datetime = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — caller strict_types → TypeError on null (#29843).
+        $datetime = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'DateInterval::createFromDateString',
             0,
             'datetime'

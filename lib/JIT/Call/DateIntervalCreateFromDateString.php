@@ -29,6 +29,6 @@ final class DateIntervalCreateFromDateString implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return JitDateIntervalCreateFromDateString::invoke($context, ...$args);
+        return JitDateIntervalCreateFromDateString::invokeNamed($context, 'DateInterval::createFromDateString', ...$args);
     }
 }

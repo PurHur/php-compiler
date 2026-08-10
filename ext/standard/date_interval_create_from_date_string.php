@@ -41,8 +41,10 @@ final class date_interval_create_from_date_string extends Internal
             return;
         }
 
-        $datetime = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — caller strict_types → TypeError on null (#29843).
+        $datetime = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'date_interval_create_from_date_string',
             0,
             'datetime'
