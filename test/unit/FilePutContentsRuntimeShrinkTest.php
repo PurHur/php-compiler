@@ -86,7 +86,8 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
         $this->assertStringContainsString('phpc_file_put_contents_kernel', $source);
-        $this->assertStringContainsString('phpc_readfile_kernel', $source);
+        $this->assertStringNotContainsString('phpc_readfile_kernel', $source);
+        $this->assertStringContainsString("'readfile'", $source);
         $this->assertStringContainsString('runtime->modules', $source);
     }
 }

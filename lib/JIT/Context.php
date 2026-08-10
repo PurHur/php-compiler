@@ -941,7 +941,10 @@ class Context {
     {
         return match ($lc) {
             'phpc_file_put_contents_kernel',
-            'phpc_readfile_kernel',
+            // readfile NestedJIT leaf (#29915) — whitelist readfile →
+            // readfile::call → JitReadfileLibc (kernel Internal removed;
+            // peer file_get_contents #29833 / crypt #29545).
+            'readfile',
             // file_get_contents NestedJIT leaf (#29833) — whitelist file_get_contents →
             // file_get_contents::call → JitFileGetContentsLibc (kernel Internal removed;
             // peer crypt #29545 / random_bytes #29531; former kernel #29510 / #26756).

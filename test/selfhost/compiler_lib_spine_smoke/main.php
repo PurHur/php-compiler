@@ -4151,7 +4151,6 @@ require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key_long.
 require_once __DIR__.'/../../../ext/standard/phpc_object_invoke_destructor_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_object_is_constructed_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_object_release_storage_native.php';
-require_once __DIR__.'/../../../ext/standard/phpc_readfile_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_ob_write_stdout_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_url_rewriter_apply_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_rewrite_vars_set_tags_kernel.php';

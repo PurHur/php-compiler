@@ -14,6 +14,9 @@ use PHPLLVM\Value;
 
 /**
  * readfile() — stream file bytes to stdout; returns bytes read or false (php-src php_stream_passthru).
+ *
+ * NestedJIT leaf: {@see JitReadfile} → {@see JitReadfileLibc} so
+ * `@readfile` does not re-enter {@see ReadfileJitHelper} (#29915 / #29833).
  */
 final class readfile extends Internal
 {
