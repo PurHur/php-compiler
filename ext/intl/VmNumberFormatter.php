@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\ClassConstName;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -47,7 +48,15 @@ final class VmNumberFormatter
     public const PATTERN_RULEBASED = 9;
     /** ICU UNUM_IGNORE alias of UNUM_PATTERN_DECIMAL — was wrongly 9; #20993. */
     public const IGNORE = 0;
+    /** ICU UNUM_CURRENCY_ISO — PHP 8.5+ only (#28132). */
+    public const CURRENCY_ISO = 10;
+    /** ICU UNUM_CURRENCY_PLURAL — PHP 8.5+ only (#28132). */
+    public const CURRENCY_PLURAL = 11;
     public const CURRENCY_ACCOUNTING = 12;
+    /** ICU UNUM_DECIMAL_COMPACT_SHORT — PHP 8.5+ only (#28132). */
+    public const DECIMAL_COMPACT_SHORT = 14;
+    /** ICU UNUM_DECIMAL_COMPACT_LONG — PHP 8.5+ only (#28132). */
+    public const DECIMAL_COMPACT_LONG = 15;
     public const DEFAULT_STYLE = 1;
 
     public const PARSE_INT_ONLY = 0;
@@ -160,6 +169,13 @@ final class VmNumberFormatter
             'IGNORE' => self::IGNORE,
             'CURRENCY_ACCOUNTING' => self::CURRENCY_ACCOUNTING,
             'DEFAULT_STYLE' => self::DEFAULT_STYLE,
+            // PHP 8.5+ ICU style constants — withhold on ≤8.4 (#28132).
+            ...(CompilerVersion::supportsNumberFormatterPhp85StyleConsts() ? [
+                'CURRENCY_ISO' => self::CURRENCY_ISO,
+                'CURRENCY_PLURAL' => self::CURRENCY_PLURAL,
+                'DECIMAL_COMPACT_SHORT' => self::DECIMAL_COMPACT_SHORT,
+                'DECIMAL_COMPACT_LONG' => self::DECIMAL_COMPACT_LONG,
+            ] : []),
             'PARSE_INT_ONLY' => self::PARSE_INT_ONLY,
             'GROUPING_USED' => self::GROUPING_USED,
             'DECIMAL_ALWAYS_SHOWN' => self::DECIMAL_ALWAYS_SHOWN,
@@ -240,12 +256,13 @@ final class VmNumberFormatter
 
         $entry = new ClassEntry('NumberFormatter');
         $entry->isInternal = true;
+        // Exact Zend casing for defined()/constant()/hasConstant after #25910 (#28132 / #28097).
         foreach (self::classConstants() as $name => $value) {
-            $lc = strtolower($name);
+            $key = ClassConstName::key($name);
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$lc] = $const;
-            $entry->constNames[$lc] = $name;
+            $entry->constants[$key] = $const;
+            $entry->constNames[$key] = $name;
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
@@ -410,10 +427,12 @@ final class VmNumberFormatter
         return match ($style) {
             self::PERCENT => '#,##0%',
             self::CURRENCY => '¤#,##0.00',
+            self::CURRENCY_ISO, self::CURRENCY_PLURAL => '¤#,##0.00',
             self::CURRENCY_ACCOUNTING => '¤#,##0.00;(¤#,##0.00)',
             self::SCIENTIFIC => '#E0',
             self::PATTERN_DECIMAL, self::IGNORE => '#',
             self::SPELLOUT, self::ORDINAL, self::DURATION, self::PATTERN_RULEBASED => '',
+            self::DECIMAL_COMPACT_SHORT, self::DECIMAL_COMPACT_LONG => '#,##0.###',
             default => '#,##0.###',
         };
     }
@@ -448,7 +467,10 @@ final class VmNumberFormatter
 
             return $attrs;
         }
-        if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
+        if (self::CURRENCY === $style
+            || self::CURRENCY_ACCOUNTING === $style
+            || self::CURRENCY_ISO === $style
+            || self::CURRENCY_PLURAL === $style) {
             $attrs[self::FRACTION_DIGITS] = 2;
             $attrs[self::MIN_FRACTION_DIGITS] = 2;
             $attrs[self::MAX_FRACTION_DIGITS] = 2;
