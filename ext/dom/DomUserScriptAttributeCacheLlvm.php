@@ -23,6 +23,7 @@ final class DomUserScriptAttributeCacheLlvm
      *   slotByKey: array<string, Value>,
      *   presentByKey: array<string, true>,
      *   valueByKey: array<string, string>,
+     *   idBearingByKey: array<string, true>,
      *   lastCreateNamespace: ?string,
      *   lastCreateLocalName: ?string
      * }>
@@ -74,6 +75,47 @@ final class DomUserScriptAttributeCacheLlvm
 
         return false;
     }
+
+    /** True when setIdAttribute* marked this key as ID-bearing (#29884). */
+    public static function isIdBearingLiteral(string $namespace, string $localName): bool
+    {
+        $key = $namespace."\0".$localName;
+        foreach (self::$byModule as $state) {
+            if (isset($state['idBearingByKey'][$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Record / clear ID-bearing flag for setIdAttribute* (#29884). */
+    public static function markIdBearingLiteral(string $namespace, string $localName, bool $isId): void
+    {
+        // Bind to every active module state — setIdAttribute may run before/after Attr store.
+        if ([] === self::$byModule) {
+            // No module yet: stash pending for first state() call.
+            if ($isId) {
+                self::$pendingIdBearing[$namespace."\0".$localName] = true;
+            } else {
+                unset(self::$pendingIdBearing[$namespace."\0".$localName]);
+            }
+
+            return;
+        }
+        $key = $namespace."\0".$localName;
+        foreach (self::$byModule as &$state) {
+            if ($isId) {
+                $state['idBearingByKey'][$key] = true;
+            } else {
+                unset($state['idBearingByKey'][$key]);
+            }
+        }
+        unset($state);
+    }
+
+    /** @var array<string, true> */
+    private static array $pendingIdBearing = [];
 
     public static function literalValue(string $namespace, string $localName): ?string
     {
@@ -151,7 +193,7 @@ final class DomUserScriptAttributeCacheLlvm
         return $context->builder->load($global);
     }
 
-    /** @return array{slotByKey: array<string, Value>, presentByKey: array<string, true>, valueByKey: array<string, string>, lastCreateNamespace: ?string, lastCreateLocalName: ?string} */
+    /** @return array{slotByKey: array<string, Value>, presentByKey: array<string, true>, valueByKey: array<string, string>, idBearingByKey: array<string, true>, lastCreateNamespace: ?string, lastCreateLocalName: ?string} */
     private static function &state(Context $context): array
     {
         $id = spl_object_id($context->module);
@@ -160,9 +202,11 @@ final class DomUserScriptAttributeCacheLlvm
                 'slotByKey' => [],
                 'presentByKey' => [],
                 'valueByKey' => [],
+                'idBearingByKey' => self::$pendingIdBearing,
                 'lastCreateNamespace' => null,
                 'lastCreateLocalName' => null,
             ];
+            self::$pendingIdBearing = [];
         }
 
         return self::$byModule[$id];

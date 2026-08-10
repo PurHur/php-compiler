@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\DomElementTextContentRuntime;
 use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Builtin\DomGetElementsByTagNameRuntime;
 use PHPCompiler\JIT\Builtin\DomAdoptNodeRuntime;
+use PHPCompiler\JIT\Builtin\DomAttrIsIdRuntime;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Builtin\DomLivingApiRuntime;
@@ -819,6 +820,21 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('int1'),
             'PHPCompiler\\ext\\dom\\DomIsEqualNodeJitHelper::isEqualNodeArgv',
             '/ext/dom/DomIsEqualNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureAttrIsIdBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomAttrIsIdRuntime::ABI_NAME,
+            'dom_attr_is_id_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomAttrIsIdJitHelper::isIdArgv',
+            '/ext/dom/DomAttrIsIdJitHelper.php'
         );
     }
 

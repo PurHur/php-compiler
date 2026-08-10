@@ -134,6 +134,9 @@ final class DomInstanceMethodJit
         'domelement::setidattribute' => true,
         'domelement::setidattributens' => true,
         'domelement::setidattributenode' => true,
+        // DOMAttr::isId() — VmDomInstanceInvoke bridge (#29884, re-#20129).
+        'domattr::isid' => true,
+        'dom\\attr::isid' => true,
         'domelement::toggleattribute' => true,
         'domnode::contains' => true,
         'domnode::comparedocumentposition' => true,
@@ -407,6 +410,11 @@ final class DomInstanceMethodJit
             }
             if ('domelement::setidattributenode' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttributeNode();
+
+                return;
+            }
+            if ('domattr::isid' === $lc || 'dom\\attr::isid' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomAttrIsId();
 
                 return;
             }
@@ -828,6 +836,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::setidattribute');
             self::ensureProxy($context, 'domelement::setidattributens');
             self::ensureProxy($context, 'domelement::setidattributenode');
+            self::ensureProxy($context, 'domattr::isid');
+            self::ensureProxy($context, 'dom\\attr::isid');
             self::ensureProxy($context, 'domdocument::createattributens');
             self::ensureProxy($context, 'domdocument::createattribute');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
@@ -874,6 +884,7 @@ final class DomInstanceMethodJit
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild'],
         'domelement' => ['setattribute', 'removeattribute', 'setidattribute', 'setidattributens', 'setidattributenode'],
+        'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],
         'domnamednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],

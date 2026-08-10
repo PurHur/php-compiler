@@ -69,6 +69,15 @@ final class JitDomSetIdAttribute
             if (null !== $idLit && '' !== $idLit) {
                 self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
             }
+            $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $nameLit && '' !== $nameLit) {
+                DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $nameLit, true);
+            }
+        } elseif (JitDomDocumentMethodKernel::shouldUse($context) && !$isIdTrue) {
+            $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $nameLit && '' !== $nameLit) {
+                DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $nameLit, false);
+            }
         }
 
         return self::boxNull($context);
@@ -104,6 +113,17 @@ final class JitDomSetIdAttribute
             $idLit = self::resolveCompileTimeIdValue($args[2], $fromSetAttribute);
             if (null !== $idLit && '' !== $idLit) {
                 self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
+            }
+            $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString ?? '';
+            $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+            if (null !== $localLit && '' !== $localLit) {
+                DomUserScriptAttributeCacheLlvm::markIdBearingLiteral((string) $nsLit, $localLit, true);
+            }
+        } elseif (JitDomDocumentMethodKernel::shouldUse($context) && !$isIdTrue) {
+            $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString ?? '';
+            $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+            if (null !== $localLit && '' !== $localLit) {
+                DomUserScriptAttributeCacheLlvm::markIdBearingLiteral((string) $nsLit, $localLit, false);
             }
         }
 
