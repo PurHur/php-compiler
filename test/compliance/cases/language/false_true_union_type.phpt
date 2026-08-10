@@ -9,4 +9,4 @@ echo "ok\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-Fatal error: Type contains both true and false, bool must be used instead in %s on line %d
+PHP Fatal error:  Type contains both true and false, bool must be used instead in %s on line %d
