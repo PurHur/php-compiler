@@ -2621,7 +2621,6 @@ require_once __DIR__.'/../../../ext/standard/JitFgets.php';
 require_once __DIR__.'/../../../ext/standard/JitFile.php';
 require_once __DIR__.'/../../../ext/standard/JitFileGetContents.php';
 require_once __DIR__.'/../../../ext/standard/JitFileGetContentsLibc.php';
-require_once __DIR__.'/../../../ext/standard/phpc_file_get_contents_kernel.php';
 require_once __DIR__.'/../../../ext/standard/JitFilePutContents.php';
 require_once __DIR__.'/../../../ext/standard/JitFilePutContentsLibc.php';
 require_once __DIR__.'/../../../ext/standard/JitFileatime.php';

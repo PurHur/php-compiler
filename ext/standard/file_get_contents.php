@@ -18,6 +18,9 @@ use PHPLLVM\Value;
 
 /**
  * file_get_contents() — php://input reads REQUEST_BODY via getenv (issue #289, #291, #4157).
+ *
+ * NestedJIT leaf: {@see JitFileGetContents} → {@see JitFileGetContentsLibc} so
+ * `@file_get_contents` does not re-enter {@see FileGetContentsJitHelper} (#29833 / #29545).
  */
 final class file_get_contents extends Internal
 {
