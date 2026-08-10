@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\VmHttpResponse;
 use PHPCompiler\JIT\Builtin\HttpResponseCodeJit;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -24,17 +24,18 @@ final class JitHttpResponseCodeArg
         }
 
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
-            if (!$context->callerStrictTypes) {
-                \PHPCompiler\ext\standard\JitIntdiv::emitNullIntDeprecation(
-                    $context,
-                    'http_response_code',
-                    1,
-                    'response_code'
-                );
-            } else {
+            // Z_PARAM_LONG: declare(strict_types=1) → TypeError; else soft-null DEP+coerce (#30019).
+            if ($context->callerStrictTypes) {
                 self::emitTypeErrorAndAbort($context, $fn, 'null');
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
             }
+            \PHPCompiler\ext\standard\JitIntdiv::emitNullIntDeprecation(
+                $context,
+                'http_response_code',
+                1,
+                'response_code'
+            );
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -63,7 +64,34 @@ final class JitHttpResponseCodeArg
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
 
+        $nullBlock = BasicBlockHelper::append($context, 'jit_hrc_null');
+        $afterNull = BasicBlockHelper::append($context, 'jit_hrc_after_null');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        // Z_PARAM_LONG boxed null: strict → TypeError; else soft-null DEP+0 (#30019).
+        if ($context->callerStrictTypes) {
+            self::emitTypeErrorAndAbort($context, $fn, 'null');
+        } else {
+            \PHPCompiler\ext\standard\JitIntdiv::emitNullIntDeprecation(
+                $context,
+                'http_response_code',
+                1,
+                'response_code'
+            );
+        }
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock = BasicBlockHelper::append($context, 'jit_hrc_merge'));
+
+        $context->builder->positionAtEnd($afterNull);
         $enumBlock = BasicBlockHelper::append($context, 'jit_hrc_enum');
         $afterEnum = BasicBlockHelper::append($context, 'jit_hrc_after_enum');
         $isEnumCase = $context->builder->icmp(
@@ -76,9 +104,9 @@ final class JitHttpResponseCodeArg
         $context->builder->positionAtEnd($enumBlock);
         $enumLong = self::lowerResponseCodeEnumCase($context, $valuePtr, $fn);
         $enumEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($afterEnum);
-        $context->builder->positionAtEnd($afterEnum);
+        $context->builder->branch($mergeBlock);
 
+        $context->builder->positionAtEnd($afterEnum);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
         $boolTy = $i8->constInt(VmVariable::TYPE_BOOLEAN, false);
         $longTy = $i8->constInt(VmVariable::TYPE_INTEGER, false);
@@ -96,7 +124,7 @@ final class JitHttpResponseCodeArg
         $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $stringLong = JitLongArg::lowerStringValue($context, $strPtr);
         $stringEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($mergeBlock = BasicBlockHelper::append($context, 'jit_hrc_merge'));
+        $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($scalarBlock);
         $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
@@ -125,8 +153,8 @@ final class JitHttpResponseCodeArg
         self::emitTypeErrorAndAbort($context, $fn, self::compileTimeEnumGivenLabel($context, $arg));
         $context->builder->positionAtEnd($mergeBlock);
 
-        $i64 = $context->getTypeFromString('int64');
         $phi = $context->builder->phi($i64);
+        $phi->addIncoming($zero, $nullEnd);
         $phi->addIncoming($enumLong, $enumEnd);
         $phi->addIncoming($stringLong, $stringEnd);
         $phi->addIncoming($longVal, $longEnd);
@@ -173,16 +201,13 @@ final class JitHttpResponseCodeArg
 
     private static function emitTypeErrorAndAbort(Context $context, string $fn, string $given): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise(
+        ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             sprintf(
                 'http_response_code(): Argument #1 ($response_code) must be of type int, %s given',
                 $given
             )
         );
-        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function compileTimeEnumGivenLabel(Context $context, Variable $arg): string

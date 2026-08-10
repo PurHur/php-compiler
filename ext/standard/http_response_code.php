@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitHttpResponseCodeArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -34,7 +35,12 @@ final class http_response_code extends Internal
                 return;
             }
             if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
-                // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
+                // Z_PARAM_LONG: declare(strict_types=1) → TypeError; else soft-null DEP+coerce (#30019).
+                if (InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(
+                        'http_response_code(): Argument #1 ($response_code) must be of type int, null given'
+                    );
+                }
                 VmNullNumberParamDeprecation::emit($frame, 'http_response_code', 1, 'response_code', 'int');
 
                 return;
@@ -61,7 +67,12 @@ final class http_response_code extends Internal
             return;
         }
         if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
-            // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
+            // Z_PARAM_LONG: declare(strict_types=1) → TypeError; else soft-null DEP+coerce (#30019).
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'http_response_code(): Argument #1 ($response_code) must be of type int, null given'
+                );
+            }
             VmNullNumberParamDeprecation::emit($frame, 'http_response_code', 1, 'response_code', 'int');
             VmHttpResponse::assignReadResult(
                 $frame->returnVar,
@@ -99,7 +110,11 @@ final class http_response_code extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (1 === \count($args)) {
-            JitHttpResponseCodeArg::lower($context, $args[0], 'http_response_code() code');
+            $arg = $args[0];
+            // Literal null is handled once in JitHttpResponseCode::invoke (#30019).
+            if (JITVariable::TYPE_NULL !== $arg->type && !$arg->isNullConstant) {
+                JitHttpResponseCodeArg::lower($context, $arg, 'http_response_code() code');
+            }
         }
 
         return \call_user_func_array([JitHttpResponseCode::class, 'invoke'], array_merge([$context], $args));
