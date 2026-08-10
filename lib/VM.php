@@ -4850,11 +4850,14 @@ restart:
                         break;
                     }
                     // Zend: `$r = &$obj->hooked` requires `&get` (#22475, zend_object_handlers.c).
+                    // Without `&get`, read_property(BP_VAR_W) still invokes get for side effects,
+                    // then Errors unless the get result is an object (#29719).
                     $hookRefLvalue = $this->resolvePropertyHookRefWriteLvalue($rhsSlot, $frame);
                     if (null !== $hookRefLvalue) {
                         if (!$this->propertyHookGetIsByRef($hookRefLvalue)) {
-                            $catchFrame = $this->dispatchVmError(
-                                $this->indirectModificationOfHookedPropertyMessage($hookRefLvalue),
+                            $catchFrame = $this->assignRefFromHookedPropertyWithoutByRefGet(
+                                $writeTarget,
+                                $hookRefLvalue,
                                 $frame
                             );
                             if (null !== $catchFrame) {
@@ -14512,6 +14515,87 @@ restart:
         }
 
         return sprintf('Indirect modification of $%s is not allowed', $propName);
+    }
+
+    /**
+     * `$r = &$obj->hooked` without `&get` — php-src read_property(BP_VAR_W) (#29719).
+     *
+     * Invoke get when present (side effects / throw propagation). When get returns an
+     * object, Zend allows the temporary (no Indirect modification). Otherwise Error.
+     *
+     * @return ?Frame catch frame when get or Indirect modification throws
+     */
+    private function assignRefFromHookedPropertyWithoutByRefGet(
+        Variable $writeTarget,
+        Variable $hookLvalue,
+        Frame $frame,
+    ): ?Frame {
+        $owner = $this->resolvePropertyWriteOwner($hookLvalue);
+        $propName = $this->resolvePropertyWriteName($hookLvalue);
+        if (null !== $owner && null !== $propName) {
+            $meta = $this->classPropertyMeta($owner, $propName);
+            $hasGet = null !== $meta && null !== $meta->getHookMethodLc;
+            if (!$hasGet) {
+                $hasGet = null !== ReflectionPropertyHookSupport::runtimeHookClosure(
+                    $this->context,
+                    $owner->class,
+                    $propName,
+                    'get'
+                );
+            }
+            if ($hasGet) {
+                try {
+                    $hookValue = $this->fetchPropertyWithHooks($owner, $propName, $frame);
+                } catch (VM\PropertyHookRefWriteSignal $signal) {
+                    return $signal->catchFrame;
+                }
+                if (null !== $hookValue) {
+                    $resolved = $hookValue->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $resolved->type) {
+                        // Temporary from get — not a live property cell (#29719 / zend_object_handlers.c).
+                        $cell = new Variable();
+                        $cell->copyFrom($resolved);
+                        $this->bindAssignRefSharedCell($writeTarget, $cell);
+
+                        return null;
+                    }
+                }
+            }
+        } else {
+            $target = $hookLvalue->resolveIndirect();
+            $classLc = $hookLvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+            $staticPropName = $hookLvalue->objectPropertyName ?? $target->objectPropertyName;
+            if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+                $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName));
+                if (null !== $hooks && isset($hooks['get'])) {
+                    try {
+                        $hookValue = $this->fetchStaticPropertyWithHooks(
+                            $classLc,
+                            $staticPropName,
+                            $hooks['get'],
+                            $frame
+                        );
+                    } catch (VM\PropertyHookRefWriteSignal $signal) {
+                        return $signal->catchFrame;
+                    }
+                    if (null !== $hookValue) {
+                        $resolved = $hookValue->resolveIndirect();
+                        if (Variable::TYPE_OBJECT === $resolved->type) {
+                            $cell = new Variable();
+                            $cell->copyFrom($resolved);
+                            $this->bindAssignRefSharedCell($writeTarget, $cell);
+
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $this->dispatchVmError(
+            $this->indirectModificationOfHookedPropertyMessage($hookLvalue),
+            $frame
+        );
     }
 
     /**
