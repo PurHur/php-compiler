@@ -162,6 +162,8 @@ class Runtime {
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $astTraverser->addVisitor(new Ast\ReadonlyClassTraitPropertyCompileCheck());
         $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
+        // After NameResolver so `use function assert as …` resolves; injects expr text (#29630).
+        $astTraverser->addVisitor(new Ast\AssertExprMessageRewriter());
         $astTraverser->addVisitor(new ReadonlyFunctionAnnotator());
         $astTraverser->addVisitor(new TryCatchElseAttacher());
         $astTraverser->addVisitor(new CatchIntersectionAttacher());
