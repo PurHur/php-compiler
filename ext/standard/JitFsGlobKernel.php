@@ -11,11 +11,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin standalone AOT glob()/scandir() via libc glob(3)/scandir(3) (#27235, #27236, #5459).
+ * LLVM NestedJIT / iterator-thin leaf for glob()/scandir() — libc glob(3)/scandir(3)
+ * (#27235, #27236, #5459, #29986).
  *
- * NestedJIT of {@see FsGlobJitHelper} → {@see VmDirPure} calls host `\scandir()`, which under
- * thin AOT lowers back into the same helper (false/null). Peer {@see JitTempnamKernel}: emit the
- * platform leaf in LLVM; keep VmFsGlob/VmDir as VM SSOT. Embed/JIT keeps NestedJIT helper.
+ * Used while NestedJIT compiles {@see FsGlobJitHelper} `@\glob`/`@\scandir` via
+ * {@see JitFsGlob} — no always-on thin-AOT ABI fork for user-facing builtins
+ * (peer {@see JitTempnamKernel} #29940). GlobIterator/DirectoryIterator thin bridges
+ * still call {@see implement} directly for `__phpc_*_vec`.
  * php-src: ext/standard/dir.c — PHP_FUNCTION(glob), PHP_FUNCTION(scandir)
  */
 final class JitFsGlobKernel
@@ -41,11 +43,6 @@ final class JitFsGlobKernel
         '__phpc_glob_vec',
         '__phpc_scandir_vec',
     ];
-
-    public static function implementForThinAot(Context $context): void
-    {
-        self::implement($context);
-    }
 
     public static function implement(Context $context): void
     {
