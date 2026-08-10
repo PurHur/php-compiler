@@ -1045,6 +1045,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_error_string'));
     }
 
+    /** php-src openssl.stub.php — opaque OpenSSL* object returns (#28567). */
+    public function testOpensslOpaqueObjectReflectionReturns(): void
+    {
+        foreach (['openssl_pkey_new', 'openssl_pkey_get_public', 'openssl_pkey_get_private'] as $f) {
+            $this->assertSame(
+                'OpenSSLAsymmetricKey|false',
+                BuiltinInternalArgInfo::returnTypeLabelForFunction($f),
+                $f
+            );
+        }
+        $this->assertSame(
+            'OpenSSLCertificate|false',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_x509_read')
+        );
+        $this->assertSame(
+            'OpenSSLCertificateSigningRequest|bool',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_csr_new')
+        );
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_verify'));
+    }
+
     /** php-src openssl.stub.php — int $length; &$strong_result untyped (not integer / bool) (#28858). */
     public function testOpensslRandomPseudoBytesReflectionStubTypes(): void
     {
