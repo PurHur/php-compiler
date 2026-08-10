@@ -31,8 +31,12 @@ final class ObjectExitStatusLlvm
         ScriptExit::emitLibcExitWithStatus($context, $status);
     }
 
-    public static function emitExitStatusObjectGuard(Object_ $object, Context $context, Value $objPtr): void
-    {
+    public static function emitExitStatusObjectGuard(
+        Object_ $object,
+        Context $context,
+        Value $objPtr,
+        ?string $typeErrorGiven = null
+    ): void {
         $exitStatusId = $object->exitStatusEnumClassId();
         $enumEntries = self::nonExitStatusEnumEntries($object);
 
@@ -68,7 +72,7 @@ final class ObjectExitStatusLlvm
             }
             $context->builder->positionAtEnd($afterExitStatus);
         } elseif ([] === $enumEntries) {
-            self::emitStringableObjectExit($context, $objPtr);
+            self::emitStringableObjectExit($context, $objPtr, $typeErrorGiven);
 
             return;
         }
@@ -82,11 +86,14 @@ final class ObjectExitStatusLlvm
             true
         );
         $context->builder->positionAtEnd($typeErrorBlock);
-        self::emitStringableObjectExit($context, $objPtr);
+        self::emitStringableObjectExit($context, $objPtr, $typeErrorGiven);
     }
 
-    private static function emitStringableObjectExit(Context $context, Value $objPtr): void
-    {
+    private static function emitStringableObjectExit(
+        Context $context,
+        Value $objPtr,
+        ?string $typeErrorGiven = null
+    ): void {
         $objectVar = new JitVariable(
             $context,
             JitVariable::TYPE_OBJECT,
@@ -104,8 +111,12 @@ final class ObjectExitStatusLlvm
             return;
         }
         // PHP 8.4+ ZPP string|int: non-Stringable object → TypeError (#22492 / #4704).
+        // Prefer compile-time zend_zval_type_name label when known (Resource → resource, #29594).
         if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
-            ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
+            ScriptExit::emitStatusTypeErrorAndAbort(
+                $context,
+                null !== $typeErrorGiven && '' !== $typeErrorGiven ? $typeErrorGiven : 'object'
+            );
 
             return;
         }

@@ -21,7 +21,8 @@ final class JitOperandTypeLabel
         if (Variable::TYPE_OBJECT === $arg->type) {
             $classLabel = self::compileTimeObjectClassName($context, $arg);
             if (null !== $classLabel) {
-                return $classLabel;
+                // Legacy Resource wrappers → zend_zval_type_name "resource" (#29594 / #29559).
+                return 0 === strcasecmp($classLabel, 'Resource') ? 'resource' : $classLabel;
             }
         }
 

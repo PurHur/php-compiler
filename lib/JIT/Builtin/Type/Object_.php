@@ -7138,9 +7138,12 @@ class Object_ extends Type {
         ObjectExitStatusLlvm::emitExitStatusFromEnumCaseObject($this, $context, $objPtr);
     }
 
-    public function emitExitStatusObjectGuard(Context $context, PHPLLVM\Value $objPtr): void
-    {
-        ObjectExitStatusLlvm::emitExitStatusObjectGuard($this, $context, $objPtr);
+    public function emitExitStatusObjectGuard(
+        Context $context,
+        PHPLLVM\Value $objPtr,
+        ?string $typeErrorGiven = null
+    ): void {
+        ObjectExitStatusLlvm::emitExitStatusObjectGuard($this, $context, $objPtr, $typeErrorGiven);
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
