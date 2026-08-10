@@ -101,6 +101,8 @@
             <file>./test/compliance/GcControlReflectionReturnsVMTest.php</file>
             <file>./test/compliance/HashHmacAlgosReflectionReturnVMTest.php</file>
             <file>./test/compliance/HashFileReflectionReturnVMTest.php</file>
+            <file>./test/compliance/HashHmacFileNullAlgoStrictVMTest.php</file>
+            <file>./test/compliance/HashHmacFileNullAlgoStrictJITTest.php</file>
             <file>./test/compliance/OpensslErrorStringReflectionVMTest.php</file>
             <file>./test/compliance/OpensslEncryptDecryptReflectionVMTest.php</file>
             <file>./test/compliance/ProcOpenReflectionVMTest.php</file>
