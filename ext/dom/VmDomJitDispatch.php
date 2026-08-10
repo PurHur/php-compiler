@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\Context as VmContext;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VariableObject;
@@ -133,7 +134,13 @@ final class VmDomJitDispatch
      */
     public static function getElementById(ObjectEntry $document, array $extra): Variable
     {
-        $id = self::stringArg($extra[0] ?? self::missingArg('getElementById', 0), 'getElementById', 0);
+        // Full method label + elementId for Zend-shaped TypeError under strict_types (#29942).
+        $id = self::stringArg(
+            $extra[0] ?? self::missingArg('getElementById', 0),
+            'DOMDocument::getElementById',
+            0,
+            'elementId'
+        );
         $found = VmDom::getElementById($document, $id);
         $var = new Variable();
         if (null === $found) {
@@ -1226,9 +1233,19 @@ final class VmDomJitDispatch
         return $extra;
     }
 
-    private static function stringArg(Variable $var, string $label, int $index): string
-    {
-        return VmString::coerceStringBuiltinArg($var->resolveIndirect(), $label, $index, 'value');
+    private static function stringArg(
+        Variable $var,
+        string $label,
+        int $index,
+        string $paramName = 'value'
+    ): string {
+        $frame = VmDomJitFrame::executingFrame();
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+            $function = str_ends_with($label, '()') ? substr($label, 0, -2) : $label;
+            InternalStrictArg::rejectNullString($var, $function, $paramName, $index, $frame);
+        }
+
+        return VmString::coerceStringBuiltinArg($var->resolveIndirect(), $label, $index, $paramName);
     }
 
     private static function nullableStringArg(Variable $var, string $label, int $index): ?string

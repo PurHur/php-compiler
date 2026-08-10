@@ -20,7 +20,14 @@ final class DocumentGetElementById extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::getElementById() expects exactly 1 argument');
         }
-        $id = $this->stringArg($frame->calledArgs[1], 'DOMDocument::getElementById()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#29942, re-#18215).
+        $id = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMDocument::getElementById()',
+            0,
+            $frame,
+            'elementId'
+        );
         if (null === $frame->returnVar) {
             return;
         }

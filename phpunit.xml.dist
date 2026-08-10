@@ -202,6 +202,8 @@
             <file>./test/compliance/XmlParserFreeReflectionVMTest.php</file>
             <file>./test/compliance/XmlWriterFactoriesReflectionVMTest.php</file>
             <file>./test/compliance/DomDocumentLoadReflectionVMTest.php</file>
+            <file>./test/compliance/DomGetElementByIdNullStrictVMTest.php</file>
+            <file>./test/compliance/DomGetElementByIdNullStrictJITTest.php</file>
             <file>./test/compliance/PdoConstructPrepareQueryReflectionVMTest.php</file>
             <file>./test/compliance/PhpversionVMTest.php</file>
             <file>./test/compliance/PhpSbindirConstant84VMTest.php</file>
