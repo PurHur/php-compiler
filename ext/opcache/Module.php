@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\opcache;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 
 /**
@@ -28,6 +29,9 @@ class Module extends ModuleAbstract
             new opcache_compile_file(),
             new opcache_invalidate(),
             new opcache_is_script_cached(),
+            ...(CompilerVersion::supportsOpcacheIsScriptCachedInFileCache()
+                ? [new opcache_is_script_cached_in_file_cache()]
+                : []),
         ];
     }
 }

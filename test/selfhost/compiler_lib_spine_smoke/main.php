@@ -1376,6 +1376,7 @@ require_once __DIR__.'/../../../ext/opcache/opcache_get_configuration.php';
 require_once __DIR__.'/../../../ext/opcache/opcache_get_status.php';
 require_once __DIR__.'/../../../ext/opcache/opcache_invalidate.php';
 require_once __DIR__.'/../../../ext/opcache/opcache_is_script_cached.php';
+require_once __DIR__.'/../../../ext/opcache/opcache_is_script_cached_in_file_cache.php';
 require_once __DIR__.'/../../../ext/opcache/opcache_reset.php';
 require_once __DIR__.'/../../../ext/openssl/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslCipherIvLength.php';
