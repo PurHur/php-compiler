@@ -154,6 +154,8 @@
             <file>./test/compliance/DateOffsetGetTypeerrorDupPrefixVMTest.php</file>
             <file>./test/compliance/DateOffsetGetTypeerrorDupPrefixJITTest.php</file>
             <file>./test/compliance/DateTimestampGetTypeerrorDupPrefixVMTest.php</file>
+            <file>./test/compliance/DateTimeDiffNullStrictVMTest.php</file>
+            <file>./test/compliance/DateTimeDiffNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimeCreateFromFormatNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeCreateFromFormatNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampNullStrictVMTest.php</file>
