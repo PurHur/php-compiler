@@ -1546,4 +1546,36 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertFalse($dir['isOptional']);
         $this->assertSame(['ftp', 'directory'], BuiltinParamNames::forFunction('ftp_mlsd'));
     }
+
+    /** php-src ext/ftp/ftp.stub.php — connect/login/nlist core Reflection (#28570). */
+    public function testFtpCoreReflectionStubTypes(): void
+    {
+        $this->assertSame('FTP\\Connection|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftp_connect'));
+        $this->assertSame('FTP\\Connection|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftp_ssl_connect'));
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftp_nlist'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftp_quit'));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_login', 0));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_nlist', 0));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_close', 0));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_pasv', 0));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_get', 0));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_put', 0));
+        $this->assertSame(
+            ['hostname', 'port=', 'timeout='],
+            BuiltinParamNames::forFunction('ftp_connect')
+        );
+        $this->assertSame(
+            ['ftp', 'local_filename', 'remote_filename', 'mode=', 'offset='],
+            BuiltinParamNames::forFunction('ftp_get')
+        );
+        $this->assertSame(
+            ['ftp', 'remote_filename', 'local_filename', 'mode=', 'offset='],
+            BuiltinParamNames::forFunction('ftp_put')
+        );
+        $this->assertTrue(BuiltinParamNames::overrideEntryIsOptional('mode='));
+        $mode = BuiltinInternalArgInfo::paramInfoForFunction('ftp_put', 3);
+        $this->assertNotNull($mode);
+        $this->assertSame('mode', $mode['name']);
+        $this->assertSame('int', $mode['type']);
+    }
 }

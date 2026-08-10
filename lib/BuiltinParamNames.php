@@ -544,7 +544,8 @@ final class BuiltinParamNames
             // php-src ext/ftp/ftp.stub.php — InternalArgInfo still says host (#23644)
             case 'ftp_connect':
             case 'ftp_ssl_connect':
-                return ['hostname', 'port', 'timeout'];
+                // php-src ext/ftp/ftp.stub.php — port=21, timeout=90 (#28570)
+                return ['hostname', 'port=', 'timeout='];
             // php-src ext/ftp/ftp.stub.php — InternalArgInfo still says stream/local_file/… (#23656, #24639)
             case 'ftp_login':
                 return ['ftp', 'username', 'password'];
@@ -585,10 +586,11 @@ final class BuiltinParamNames
                 return ['ftp', 'option', 'value'];
             case 'ftp_get':
             case 'ftp_nb_get':
-                return ['ftp', 'local_filename', 'remote_filename', 'mode', 'offset'];
+                // php-src ext/ftp/ftp.stub.php — mode=FTP_BINARY, offset=0 (#28570)
+                return ['ftp', 'local_filename', 'remote_filename', 'mode=', 'offset='];
             case 'ftp_put':
             case 'ftp_nb_put':
-                return ['ftp', 'remote_filename', 'local_filename', 'mode', 'offset'];
+                return ['ftp', 'remote_filename', 'local_filename', 'mode=', 'offset='];
             case 'ftp_append':
                 // php-src ext/ftp/ftp.stub.php — int $mode = FTP_BINARY (#27686)
                 return ['ftp', 'remote_filename', 'local_filename', 'mode='];

@@ -651,6 +651,31 @@ final class BuiltinInternalDefaultValues
         'ftp_append' => [
             3 => ['kind' => 'int', 'value' => 2],
         ],
+        // php-src ext/ftp/ftp.stub.php — port=21, timeout=90; mode=FTP_BINARY, offset=0 (#28570)
+        'ftp_connect' => [
+            1 => ['kind' => 'int', 'value' => 21],
+            2 => ['kind' => 'int', 'value' => 90],
+        ],
+        'ftp_ssl_connect' => [
+            1 => ['kind' => 'int', 'value' => 21],
+            2 => ['kind' => 'int', 'value' => 90],
+        ],
+        'ftp_get' => [
+            3 => ['kind' => 'int', 'value' => 2],
+            4 => ['kind' => 'int', 'value' => 0],
+        ],
+        'ftp_nb_get' => [
+            3 => ['kind' => 'int', 'value' => 2],
+            4 => ['kind' => 'int', 'value' => 0],
+        ],
+        'ftp_put' => [
+            3 => ['kind' => 'int', 'value' => 2],
+            4 => ['kind' => 'int', 'value' => 0],
+        ],
+        'ftp_nb_put' => [
+            3 => ['kind' => 'int', 'value' => 2],
+            4 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/date/php_date.stub.php — string $datetime = "now", ?DateTimeZone $timezone = null (#25392)
         // Functions absent from InternalArgInfo entirely.
         'date_create' => [

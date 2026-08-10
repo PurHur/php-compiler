@@ -420,6 +420,10 @@ final class BuiltinInternalArgInfo
             // ext/ftp/ftp.stub.php — InternalArgInfo omits return; Zend bool / array|false (#27686, #27735)
             'ftp_append' => 'bool',
             'ftp_mlsd' => 'array|false',
+            // ext/ftp/ftp.stub.php — InternalArgInfo resource/array/empty; Zend FTP\Connection|false / array|false / bool (#28570)
+            'ftp_connect', 'ftp_ssl_connect' => 'FTP\\Connection|false',
+            'ftp_nlist' => 'array|false',
+            'ftp_quit' => 'bool',
             default => null,
         };
     }
@@ -924,7 +928,7 @@ final class BuiltinInternalArgInfo
                 2 => '?int',
                 default => null,
             },
-            // ext/ftp/ftp.stub.php — FTP\Connection + strings; InternalArgInfo untyped (#27686, #27735)
+            // ext/ftp/ftp.stub.php — FTP\Connection + strings; InternalArgInfo untyped (#27686, #27735, #28570)
             'ftp_append' => match ($index) {
                 0 => 'FTP\\Connection',
                 1, 2 => 'string',
@@ -934,6 +938,34 @@ final class BuiltinInternalArgInfo
             'ftp_mlsd' => match ($index) {
                 0 => 'FTP\\Connection',
                 1 => 'string',
+                default => null,
+            },
+            'ftp_login' => match ($index) {
+                0 => 'FTP\\Connection',
+                1, 2 => 'string',
+                default => null,
+            },
+            'ftp_close', 'ftp_quit' => 0 === $index ? 'FTP\\Connection' : null,
+            'ftp_pasv' => match ($index) {
+                0 => 'FTP\\Connection',
+                1 => 'bool',
+                default => null,
+            },
+            'ftp_nlist' => match ($index) {
+                0 => 'FTP\\Connection',
+                1 => 'string',
+                default => null,
+            },
+            'ftp_get', 'ftp_nb_get' => match ($index) {
+                0 => 'FTP\\Connection',
+                1, 2 => 'string',
+                3, 4 => 'int',
+                default => null,
+            },
+            'ftp_put', 'ftp_nb_put' => match ($index) {
+                0 => 'FTP\\Connection',
+                1, 2 => 'string',
+                3, 4 => 'int',
                 default => null,
             },
             // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
