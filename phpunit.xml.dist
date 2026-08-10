@@ -237,6 +237,8 @@
             <file>./test/compliance/MbDetectOrderNullGetterJITTest.php</file>
             <file>./test/compliance/MbSubstituteCharacterNullGetterVMTest.php</file>
             <file>./test/compliance/MbSubstituteCharacterNullGetterJITTest.php</file>
+            <file>./test/compliance/CollatorCreateNullTypeErrorVMTest.php</file>
+            <file>./test/compliance/CollatorCreateNullTypeErrorJITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictJITTest.php</file>
             <file>./test/compliance/TimezoneListIdentifiersNullStrictVMTest.php</file>

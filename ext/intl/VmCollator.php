@@ -518,9 +518,25 @@ final class VmCollator
         return null === $state ? 'U_ZERO_ERROR' : $state['errorMessage'];
     }
 
+    /**
+     * Z_PARAM_STR $locale for create/construct — null always TypeError (#29933, collator.stub.php).
+     *
+     * php-src collator_create.c / Collator::__construct use Z_PARAM_STR. Do not soft-coerce via
+     * {@see VmString::coerceStringBuiltinArg} (null→"" then default locale) or the 8.4.0-dev
+     * {@see VmString::coerceZparamStrBuiltinArg} gate (version_compare treats -dev as &lt; 8.4.0).
+     */
     public static function coerceLocaleArg(Variable $var, string $function, int $position): string
     {
-        return VmString::coerceStringBuiltinArg($var, $function, $position, 'locale');
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($locale) must be of type string, null given',
+                $function,
+                $position + 1
+            ));
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $function, $position, 'locale', 'string', false);
     }
 
     /**
@@ -999,6 +1015,33 @@ final class CollatorConstruct extends VmClassMethod
         $locale = VmCollator::coerceLocaleArg($frame->calledArgs[1], 'Collator::__construct', 0);
         VmCollator::initObject($receiver->toObject(), $locale);
     }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        // Receiver + locale. Compile-time null $locale — Z_PARAM_STR (#29933).
+        if (\count($args) >= 2) {
+            $locale = $args[1];
+            $nullConst = \PHPCompiler\JIT\Variable::TYPE_NULL === $locale->type
+                || ($locale->isNullConstant ?? false);
+            if ($nullConst) {
+                \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+                \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'Collator::__construct(): Argument #1 ($locale) must be of type string, null given'
+                );
+                $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                $ptr = \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    $ptr
+                );
+
+                return \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($context, $ptr);
+            }
+        }
+
+        return parent::call($context, ...$args);
+    }
 }
 
 /** Collator::create() — php-src collator_create (#5747). */
@@ -1023,6 +1066,32 @@ final class CollatorCreate extends VmClassMethod
             return;
         }
         $frame->returnVar->object(VmCollator::create($frame->vmContext, $locale));
+    }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        if (\count($args) >= 1) {
+            $locale = $args[0];
+            $nullConst = \PHPCompiler\JIT\Variable::TYPE_NULL === $locale->type
+                || ($locale->isNullConstant ?? false);
+            if ($nullConst) {
+                \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+                \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'Collator::create(): Argument #1 ($locale) must be of type string, null given'
+                );
+                $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                $ptr = \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    $ptr
+                );
+
+                return \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($context, $ptr);
+            }
+        }
+
+        return parent::call($context, ...$args);
     }
 }
 
