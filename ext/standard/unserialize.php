@@ -36,9 +36,10 @@ final class unserialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #18840 TypeError).
-        $payload = VmString::coerceTrimFamilyStringArg(
-            $frame->calledArgs[0],
+        // Soft-null DEP+coerce on 8.4 outside strict_types — Zend Z_PARAM_STR (#21223; #29765 strict edge).
+        $payload = VmString::trimFamilyStringArgForFrame(
+            $frame,
+            0,
             'unserialize',
             0,
             'data'
