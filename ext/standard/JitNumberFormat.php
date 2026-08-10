@@ -72,8 +72,9 @@ final class JitNumberFormat
             false
         );
         $i64 = $context->getTypeFromString('int64');
+        // Z_PARAM_LONG $decimals — strict_types → TypeError on null; else soft-null (#29764).
         $decimals = ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
-            ? JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'number_format', 2, 'decimals')
+            ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'number_format', 2, 'decimals')
             : $i64->constInt(0, false);
         $mode = $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
 
