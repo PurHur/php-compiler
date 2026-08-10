@@ -11,10 +11,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_pow_int via PowIntJitHelper PHP (#9515, #23097).
+ * JIT/AOT link for __phpc_pow_int via PowIntJitHelper PHP (#9515, #23097, #29678).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathFrexp #22575).
- * Integer exponent fast path delegates to {@see \PHPCompiler\ext\standard\VmMath::powInt}.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathFrexp #22575 /
+ * Ldexp #29578). NestedJIT-safe int**int peel lives in
+ * {@see \PHPCompiler\ext\standard\PowIntJitHelper} (no VmMath::powInt / `**` /
+ * `\is_int` under helper compile — #29678 / Fpow #28674 shape).
  * php-src: Zend/zend_operators.c — pow_function integer fast path
  */
 final class PowIntRuntime
