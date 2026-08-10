@@ -962,6 +962,10 @@ class Context {
             // sys_get_temp_dir NestedJIT leaf (#29433) — whitelist sys_get_temp_dir →
             // SysGetTempDirRuntime::invokeNestedLeaf (thin getenv/realpath; always-on LLVM removed).
             'sys_get_temp_dir',
+            // tempnam NestedJIT leaf (#29940) — whitelist tempnam → tempnam::call →
+            // StringTempnam / JitTempnamKernel mkstemp leaf (thin-AOT always-on kernel removed;
+            // peer sys_get_temp_dir #29433 / gethostname #29364).
+            'tempnam',
 
             // getenv(3) NestedJIT leaf (#29313) — whitelist getenv → getenv_::call →
             // JitEnv::getenvNestedLeaf / StringGetenv::invokeNestedLeaf (kernel removed).

@@ -9,51 +9,68 @@ use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\SysGetTempDirRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin standalone AOT tempnam() via libc mkstemp (#27089).
+ * LLVM NestedJIT leaf for tempnam() — thin libc mkstemp (#27089, #29940).
  *
- * NestedJIT of TempnamJitHelper → VmFsOpenPure host fopen cannot create files under
- * thin AOT (returns null). Peer: SysGetTempDirRuntime libc getenv/realpath (#26929).
- * Embed/JIT keeps NestedJIT {@see \PHPCompiler\JIT\Builtin\StringTempnam}.
+ * Used while NestedJIT compiles {@see TempnamJitHelper} `@tempnam` via
+ * {@see \PHPCompiler\JIT\Builtin\StringTempnam} — no always-on thin-AOT ABI fork
+ * (peer SysGetTempDirRuntime #29433 / gethostname #29364).
  * php-src: ext/standard/file.c — php_tempnam / php_open_temporary_file
  */
 final class JitTempnamKernel
 {
     private const PATH_MAX = 4096;
 
-    private const ABI = '__phpc_jit_tempnam';
+    /** Module-local NestedJIT leaf — distinct from helper-bridge {@code __phpc_jit_tempnam}. */
+    private const LEAF_ABI = '__phpc_jit_tempnam_leaf';
 
-    public static function implementForThinAot(Context $context): void
+    /** @return Value `__string__*` — null when tempnam fails (crypt #29545 NestedJIT shape) */
+    public static function invoke(Context $context, Value $directory, Value $prefix): Value
     {
-        $probe = $context->module->getNamedFunction(self::ABI);
+        self::ensureNestedLeafBody($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::LEAF_ABI),
+            $directory,
+            $prefix
+        );
+    }
+
+    public static function ensureNestedLeafBody(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::LEAF_ABI);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
+            $context->registerFunction(self::LEAF_ABI, $probe);
 
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         TypeErrorRaise::ensureLinked($context);
         StringTriggerError::ensureLinked($context);
-        SysGetTempDirRuntime::ensureLinked($context);
         self::ensureLibc($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($valuePtr, false, $strPtr, $strPtr)
+                self::LEAF_ABI,
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr)
             );
 
         self::emit($context, $fn);
-        $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction(self::LEAF_ABI, $fn);
+
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function ensureLibc(Context $context): void
@@ -141,7 +158,7 @@ final class JitTempnamKernel
         $context->builder->branchIf($dirEmpty, $resolveDirBb, $useArgDirBb);
 
         $context->builder->positionAtEnd($resolveDirBb);
-        $sysDir = $context->builder->call($context->lookupFunction('__compiler_sys_get_temp_dir'));
+        $sysDir = SysGetTempDirRuntime::invokeNestedLeaf($context);
         $sysNull = $context->builder->icmp(Builder::INT_EQ, $sysDir, $nullStr);
         $sysOkBb = $fn->appendBasicBlock('tempnam_kernel_sys_ok');
         $context->builder->branchIf($sysNull, $failBb, $sysOkBb);
@@ -172,7 +189,7 @@ final class JitTempnamKernel
         $context->builder->positionAtEnd($fallback);
         // php-src: failed primary → notice + system temp fallback.
         self::emitNotice($context);
-        $fbDir = $context->builder->call($context->lookupFunction('__compiler_sys_get_temp_dir'));
+        $fbDir = SysGetTempDirRuntime::invokeNestedLeaf($context);
         $fbNull = $context->builder->icmp(Builder::INT_EQ, $fbDir, $nullStr);
         $tryFb = $fn->appendBasicBlock('tempnam_kernel_try_fb');
         $context->builder->branchIf($fbNull, $failBb, $tryFb);
@@ -185,20 +202,14 @@ final class JitTempnamKernel
         self::returnStringValue($context, $tpl);
 
         $context->builder->positionAtEnd($failBb);
-        $failSlot = JitValueBox::alloc($context);
-        $failPtr = JitValueBox::pointer($context, $failSlot);
-        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
-        $context->builder->returnValue($failPtr);
+        $context->builder->returnValue($strPtr->constNull());
     }
 
     private static function returnStringValue(Context $context, Value $cstr): void
     {
         $pathStr = self::cstrToString($context, $cstr);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $pathStr);
-        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
-        $context->builder->returnValue($ptr);
+        $context->builder->returnValue($owned);
     }
 
     private static function copyNormalizedPrefix(

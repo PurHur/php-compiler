@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * tempnam() for compiled JIT/AOT modules (#15685, php-in-PHP).
+ * tempnam() for compiled JIT/AOT modules (#15685, #29940, php-in-PHP).
  *
- * SSOT: {@see VmFsTempnam}, {@see FsDirJitHelper}
- * php-src: ext/standard/file.c — php_tempnam
+ * Leaf is `@tempnam` → NestedJIT whitelist {@see tempnam} →
+ * {@see \PHPCompiler\JIT\Builtin\StringTempnam} → {@see JitTempnamKernel}
+ * mkstemp leaf (peer SysGetTempDirJitHelper #29433 / GetcwdJitHelper #29429).
+ * Empty string on failure so the bridge can box to false.
+ * php-src: ext/standard/file.c — php_tempnam / PHP_FUNCTION(tempnam)
  */
 final class TempnamJitHelper
 {
-    /** @return string|null null when tempnam() fails */
-    public static function resolveArgv(string $directory, string $prefix): ?string
+    /** @return string empty when tempnam() fails */
+    public static function resolveArgv(string $directory, string $prefix): string
     {
-        return FsDirJitHelper::tempnam($directory, $prefix);
-    }
+        $path = \tempnam($directory, $prefix);
 
-    public static function consumeNotice(): bool
-    {
-        return FsDirJitHelper::consumeTempnamNotice();
+        return \is_string($path) ? $path : '';
     }
 }
