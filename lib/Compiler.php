@@ -14739,10 +14739,11 @@ class Compiler {
         $leftBlock->inheritScopeFrom($block);
         if ($useContainerIsset) {
             if (null !== $dimFetch) {
+                // Container isset already emitted float→int DEP; left read must not (#29664).
                 if (count($dimFetchChain) >= 2) {
-                    $this->compileArrayDimFetchReadChain($dimFetchChain, $leftBlock);
+                    $this->compileArrayDimFetchReadChain($dimFetchChain, $leftBlock, true);
                 } else {
-                    $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
+                    $this->compileArrayDimFetchRead($dimFetch, $leftBlock, true);
                 }
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
                 // ??= left branch: skip store when result is the assign lvalue (php-src: no write when set).
@@ -15287,16 +15288,23 @@ class Compiler {
 
     /**
      * Emit a read fetch in $block (used by ?? left branch when the stmt fetch was skipped).
+     *
+     * @param bool $skipFloatKeyDeprecation When true, isset already warned for this dim (#29664).
      */
-    private function compileArrayDimFetchRead(Op\Expr\ArrayDimFetch $fetch, Block $block): void
-    {
+    private function compileArrayDimFetchRead(
+        Op\Expr\ArrayDimFetch $fetch,
+        Block $block,
+        bool $skipFloatKeyDeprecation = false
+    ): void {
         $this->rejectArrayEmptyOffsetRead($fetch, $block);
-        $block->addOpCode(new OpCode(
+        $op = new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH,
             $this->compileOperand($fetch->result, $block, false),
             $this->compileArrayDimFetchContainerSlot($fetch, $block),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
-        ));
+        );
+        $op->arrayDimFetchSkipFloatKeyDeprecation = $skipFloatKeyDeprecation;
+        $block->addOpCode($op);
     }
 
     /**
@@ -15329,11 +15337,21 @@ class Compiler {
      * Read each dim in an outermost-first nested ?? / ??= left branch (#28954).
      *
      * @param list<Op\Expr\ArrayDimFetch> $chain
+     * @param bool                        $skipFloatKeyDeprecation Last-dim isset already warned (#29664).
      */
-    private function compileArrayDimFetchReadChain(array $chain, Block $block): void
-    {
-        foreach ($chain as $fetch) {
-            $this->compileArrayDimFetchRead($fetch, $block);
+    private function compileArrayDimFetchReadChain(
+        array $chain,
+        Block $block,
+        bool $skipFloatKeyDeprecation = false
+    ): void {
+        $last = count($chain) - 1;
+        foreach ($chain as $i => $fetch) {
+            // Only the final dim shares the coalesce isset probe; prefixes used quiet FETCH_DIM_IS.
+            $this->compileArrayDimFetchRead(
+                $fetch,
+                $block,
+                $skipFloatKeyDeprecation && $i === $last
+            );
         }
     }
 

@@ -5200,7 +5200,15 @@ restart:
                                     '' !== $frame->scriptPath ? $frame->scriptPath : null
                                 );
                             }
-                            $arg1->indirect($table->findVariable($arg3, $forWrite, $this->context, $frame));
+                            // Coalesce left read: isset already emitted float→int DEP (#29664).
+                            $emitFloatKeyDep = !$op->arrayDimFetchSkipFloatKeyDeprecation;
+                            $arg1->indirect($table->findVariable(
+                                $arg3,
+                                $forWrite,
+                                $this->context,
+                                $frame,
+                                $emitFloatKeyDep
+                            ));
                             if ($forWrite) {
                                 $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                             }

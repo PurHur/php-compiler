@@ -8633,6 +8633,23 @@ class JIT {
                     }
                     $dimOp = $block->getOperand($op->arg3);
                     $dim = $this->context->getVariableFromOp($dimOp);
+                    // Coalesce left fetch: isset already emitted float→int DEP (#29664).
+                    $emitFloatKeyDeprecation = !$op->arrayDimFetchSkipFloatKeyDeprecation;
+                    if (
+                        !$emitFloatKeyDeprecation
+                        && Variable::TYPE_NATIVE_DOUBLE === $dim->type
+                    ) {
+                        $truncated = $this->context->builder->fptosi(
+                            $this->context->helper->loadValue($dim),
+                            $this->context->getTypeFromString('int64')
+                        );
+                        $dim = new Variable(
+                            $this->context,
+                            Variable::TYPE_NATIVE_LONG,
+                            Variable::KIND_VALUE,
+                            $truncated
+                        );
+                    }
                     $containerOp = $block->getOperand($op->arg2);
                     $containerUserType = $containerOp->type->userType ?? '';
                     // User-script AOT: SimpleXMLElement dim via host tree (#26863, #27438).
@@ -8746,7 +8763,7 @@ class JIT {
                             $this->context->setVariableOp($resultOp, $nullVar);
                             $this->context->builder->branch($doneIs);
                             $this->context->builder->positionAtEnd($hasKey);
-                            $fetched = $value->dimFetch($dim, $resultOp->type, false);
+                            $fetched = $value->dimFetch($dim, $resultOp->type, false, $emitFloatKeyDeprecation);
                             $this->assignOperand($resultOp, $fetched);
                             $this->context->builder->branch($doneIs);
                             $this->context->builder->positionAtEnd($doneIs);
@@ -8844,7 +8861,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } elseif ($forceBranchMerge) {
@@ -8892,7 +8909,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } elseif ($forceBranchMerge) {

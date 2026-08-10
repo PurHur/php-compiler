@@ -215,6 +215,8 @@
             <file>./test/compliance/IssetEmptyStringOffsetBoolNullJITTest.php</file>
             <file>./test/compliance/EmptyArrFloatDimDepVMTest.php</file>
             <file>./test/compliance/EmptyArrFloatDimDepJITTest.php</file>
+            <file>./test/compliance/FloatDimCoalesceDepVMTest.php</file>
+            <file>./test/compliance/FloatDimCoalesceDepJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
