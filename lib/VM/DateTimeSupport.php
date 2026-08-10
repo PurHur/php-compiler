@@ -95,18 +95,43 @@ final class DateTimeSupport
         return self::splitTimestampNumber($num);
     }
 
-    public static function requireDateTimeZone(Variable $var, string $label): ObjectEntry
-    {
+    public static function requireDateTimeZone(
+        Variable $var,
+        string $label,
+        ?int $argNum = null,
+        ?string $argName = null
+    ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError("{$label} must be of type DateTimeZone");
+            throw self::dateTimeZoneTypeError($label, $argNum, $argName, $var);
         }
         $obj = $var->toObject();
         if (self::CLASS_DATETIMEZONE !== strtolower($obj->class->name)) {
-            throw new \TypeError("{$label} must be of type DateTimeZone");
+            throw self::dateTimeZoneTypeError($label, $argNum, $argName, $var, $obj->class->name);
         }
 
         return $obj;
+    }
+
+    private static function dateTimeZoneTypeError(
+        string $label,
+        ?int $argNum,
+        ?string $argName,
+        Variable $var,
+        ?string $objectClass = null
+    ): \TypeError {
+        $given = null !== $objectClass
+            ? $objectClass
+            : ReflectionSupport::valueTypeLabelPublic($var);
+        if (null !== $argNum) {
+            $param = null !== $argName ? " (\${$argName})" : '';
+
+            return new \TypeError(
+                "{$label}: Argument #{$argNum}{$param} must be of type DateTimeZone, {$given} given"
+            );
+        }
+
+        return new \TypeError("{$label} must be of type DateTimeZone, {$given} given");
     }
 
     public static function requireDateTime(

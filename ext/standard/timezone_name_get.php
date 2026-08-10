@@ -34,7 +34,9 @@ final class timezone_name_get extends Internal
         }
         $zone = DateTimeSupport::requireDateTimeZone(
             $frame->calledArgs[0],
-            'timezone_name_get(): Argument #1 ($object)'
+            'timezone_name_get()',
+            1,
+            'object'
         );
         $name = DateTimeSupport::timezoneName($zone);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($name): void {

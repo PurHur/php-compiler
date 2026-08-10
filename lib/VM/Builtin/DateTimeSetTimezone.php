@@ -26,9 +26,12 @@ final class DateTimeSetTimezone extends VmClassMethod
             $frame->vmContext
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // Zend zim_DateTime_setTimezone — Argument #1 ($timezone) (#29869).
         $timezone = DateTimeSupport::requireDateTimeZone(
             $frame->calledArgs[1],
-            "{$label}::setTimezone() timezone"
+            "{$label}::setTimezone()",
+            1,
+            'timezone'
         );
         if (null === $frame->returnVar) {
             return;
