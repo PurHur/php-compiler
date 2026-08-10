@@ -2296,7 +2296,7 @@ class Compiler {
         // Serializable / forbidden-implements / trait-use stay in source order for DECLARE
         // side effects (#18781, #25109, #25912). Subclasses of those classes stay in source
         // order too — hoisting them ahead leaves deferred parent inheritance pending across
-        // preceding runtime opcodes, which finalize as Class "Parent" not found (#29552).
+        // preceding runtime opcodes, which finalize as Class "Parent" not found (#29552, #29566).
         $sourceOrderClassLcs = $this->sourceOrderClassRegistrationLcs($ops);
         foreach ($ops as $child) {
             if ($child instanceof Op\Stmt\Interface_) {
@@ -7404,7 +7404,7 @@ class Compiler {
 
     /**
      * Same-file classes that must DECLARE in source order, including subclasses of
-     * those classes (#29552).
+     * those classes (#29552, #29566).
      *
      * @param list<Op> $ops
      * @return array<string, true> lowercase class names
@@ -7442,7 +7442,7 @@ class Compiler {
             }
         }
 
-        // Propagate to same-file subclasses so they are not hoisted before the parent (#29552).
+        // Propagate to same-file subclasses so they are not hoisted before the parent (#29552, #29566).
         $changed = true;
         while ($changed) {
             $changed = false;
