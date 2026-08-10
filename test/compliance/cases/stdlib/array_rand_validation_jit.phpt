@@ -21,6 +21,6 @@ try {
     echo 'num_exceed: ', $e->getMessage(), "\n";
 }
 --EXPECT--
-empty: array_rand(): Argument #1 ($array) cannot be empty
+empty: array_rand(): Argument #1 ($array) must not be empty
 num_zero: array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)
 num_exceed: array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)

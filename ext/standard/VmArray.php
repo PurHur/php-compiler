@@ -1291,7 +1291,7 @@ final class VmArray
     {
         $numAvail = $ht->getNumElements();
         if (0 === $numAvail) {
-            throw new \ValueError('array_rand(): Argument #1 ($array) cannot be empty');
+            throw new \ValueError('array_rand(): Argument #1 ($array) must not be empty');
         }
         if ($num < 1 || $num > $numAvail) {
             throw new \ValueError(
