@@ -64,6 +64,10 @@ class Module extends ModuleAbstract
             new stats_rand_ranf(),
             new stats_rand_gen_normal(),
             new stats_rand_gen_iuniform(),
+            new stats_rand_gen_beta(),
+            new stats_rand_gen_exponential(),
+            new stats_rand_gen_gamma(),
+            new stats_rand_phrase_to_seeds(),
         ];
     }
 }

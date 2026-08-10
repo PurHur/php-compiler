@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\Stats;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -418,6 +419,52 @@ final class JitStats
                 $high
             )
         );
+    }
+
+    /**
+     * gen_beta / gen_exponential / gen_gamma via op-coded dispatcher (#29622).
+     *
+     * @param array<int, JITVariable> $args
+     */
+    public static function randGen(Context $context, int $op, int $arity, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, $arity, $arity, 'stats_rand_gen');
+        Stats::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $opVal = $i64->constInt($op, false);
+        $a = self::loadDouble($context, $args[0], 'stats_rand_gen', 'a');
+        $b = $arity >= 2
+            ? self::loadDouble($context, $args[1], 'stats_rand_gen', 'b')
+            : $double->constReal(0.0);
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_rand_gen'),
+                $opVal,
+                $a,
+                $b
+            )
+        );
+    }
+
+    /** @param array<int, JITVariable> $args */
+    public static function randPhraseToSeeds(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 1, 1, 'stats_rand_phrase_to_seeds');
+        Stats::ensureLinked($context);
+        $phrase = JitStringArg::lower($context, $args[0], 'stats_rand_phrase_to_seeds phrase');
+        $ht = $context->builder->call(
+            $context->lookupFunction('__compiler_stats_rand_phrase_to_seeds'),
+            $phrase
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
+        $context->refcount->addref($ht);
+
+        return $ptr;
     }
 
     /** @param array<int, JITVariable> $args */
