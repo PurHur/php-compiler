@@ -43,11 +43,25 @@ final class TimezoneOffsetRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition broke thin-AOT
+        // DateTimeZone::getOffset (BasicBlockHelper::append → no parent) (#29732 / re-#27308).
+        // Peer: TimezoneLocationRuntime (#24801).
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureExternals($context);
         self::ensureJitHelperCompiled($context);
         self::implementOffsetBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementOffsetBridge(Context $context): void

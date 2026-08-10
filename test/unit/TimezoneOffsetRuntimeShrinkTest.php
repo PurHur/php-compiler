@@ -28,7 +28,10 @@ final class TimezoneOffsetRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('setenv')", $source);
         $this->assertStringNotContainsString("lookupFunction('localtime_r')", $source);
         $this->assertStringNotContainsString("lookupFunction('timegm')", $source);
-        $this->assertLessThan(160, \substr_count($source, "\n") + 1);
+        // Thin AOT getOffset needs insert-block restore (#29732 / peer LocationRuntime).
+        $this->assertStringContainsString('getInsertBlock', $source);
+        $this->assertStringContainsString('positionAtEnd($savedBlock)', $source);
+        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
     }
 
     public function testTimezoneOffsetJitHelperDelegatesToVmDateTimeNative(): void

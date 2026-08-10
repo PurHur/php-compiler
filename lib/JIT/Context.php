@@ -114,6 +114,23 @@ class Context {
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
+    /**
+     * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
+     */
+    public ?Operand $lastDateTimeZoneNewResultOp = null;
+
+    public ?Variable $lastDateTimeZoneNewResultVar = null;
+
+    /** Named local last assigned a DateTimeZone object — construct stamps zone id here (#29732). */
+    public ?string $lastAssignedDateTimeZoneLocalName = null;
+
+    /**
+     * Local name → IANA/offset id for DateTimeZone instances (method dispatch) (#29732).
+     *
+     * @var array<string, string>
+     */
+    public array $dateTimeZoneLocalNames = [];
+
     /** Operand for mb_encode/decode_numericentity() convmap during FUNCCALL lowering (#7237, #18035). */
     public ?Operand $jitMbNumericEntityConvmapOperand = null;
 

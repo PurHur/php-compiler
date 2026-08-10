@@ -11606,10 +11606,26 @@ class JIT {
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
+                    if (
+                        !empty($this->context->scope->pendingDateTimeZoneGetOffset)
+                        && $this->context->scope->toCall instanceof JIT\Call\DateTimeZoneGetOffset
+                        && \count($callArgs) < 2
+                    ) {
+                        // DateTime::getOffset() has no datetime arg — do not use Zone proxy (#29732).
+                        $this->context->scope->toCall = null;
+                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
+                    } elseif (!empty($this->context->scope->pendingDateTimeZoneGetOffset)) {
+                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
+                    }
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
+                    $this->syncDateTimeZoneConstructMetaToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                     } finally {
@@ -11901,6 +11917,16 @@ class JIT {
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
+                    if (
+                        !empty($this->context->scope->pendingDateTimeZoneGetOffset)
+                        && $this->context->scope->toCall instanceof JIT\Call\DateTimeZoneGetOffset
+                        && \count($callArgs) < 2
+                    ) {
+                        $this->context->scope->toCall = null;
+                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
+                    } elseif (!empty($this->context->scope->pendingDateTimeZoneGetOffset)) {
+                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
+                    }
                     $result = $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
@@ -11910,6 +11936,11 @@ class JIT {
                     $this->context->jitMbNumericEntityConvmapOperand = $savedMbNumericEntityConvmapOperand;
                     $this->context->jitMbNumericEntityConvmapBlock = $savedMbNumericEntityConvmapBlock;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
+                    $this->syncDateTimeZoneConstructMetaToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
                     $this->context->callerStrictTypes = $prevStrict;
                     $this->assignCallResultOperand(
                         $block->getOperand($op->arg1),
@@ -12372,6 +12403,11 @@ class JIT {
                                 $proxyName = strtolower($resolvedName).'::'.'__construct';
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                                if (0 === strcasecmp($resolvedName, 'DateTimeZone')) {
+                                    // Remember New result so construct can stamp zone id onto `$z` (#29732).
+                                    $this->context->lastDateTimeZoneNewResultOp = $resultOp;
+                                    $this->context->lastDateTimeZoneNewResultVar = $this->context->getVariableFromOp($resultOp);
+                                }
                             } elseif (
                                 null !== ($inheritedCtor = $this->context->type->object->inheritedConstructorProxyLc($resolvedName))
                             ) {
@@ -16526,6 +16562,14 @@ class JIT {
                 JIT\JitValueBox::pointer($this->context, $result->value),
                 $value
             );
+            // Value-box locals must keep DateTimeZone/DateTime fold stamps (#29732).
+            $this->syncCompileTimeString($result, $value, false);
+            $this->syncCompileTimeFloat($result, $value, false);
+            $this->syncCompileTimeBcmathNumber($result, $value, false);
+            $this->syncCompileTimeDomTagName($result, $value, false);
+            $this->syncCompileTimeDatePeriod($result, $value, false);
+            $result->compileTimeLong = $value->compileTimeLong ?? $result->compileTimeLong;
+            $this->noteDateTimeZoneLocal($resultOp, $value);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
@@ -16580,6 +16624,7 @@ class JIT {
                     $this->syncCompileTimeBcmathNumber($result, $value, $force);
                     $this->syncCompileTimeDomTagName($result, $value, $force);
                     $this->syncCompileTimeDatePeriod($result, $value, $force);
+                    $this->noteDateTimeZoneLocal($resultOp, $value);
 
                     return;
                 }
@@ -16601,6 +16646,7 @@ class JIT {
             $this->syncCompileTimeBcmathNumber($result, $value, $force);
             $this->syncCompileTimeDomTagName($result, $value, $force);
             $this->syncCompileTimeDatePeriod($result, $value, $force);
+            $this->noteDateTimeZoneLocal($resultOp, $value);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             if ($value->isJitGenerator) {
                 $resolved = JIT\OperandName::resolve($resultOp);
@@ -17547,6 +17593,29 @@ class JIT {
         if ($force || null !== $src->compileTimeDateInterval) {
             $dest->compileTimeDateInterval = $src->compileTimeDateInterval;
         }
+        // DateTimeZone zone id — must not share compileTimeString with class name (#29732).
+        if ($force || null !== $src->compileTimeTimezoneName) {
+            $dest->compileTimeTimezoneName = $src->compileTimeTimezoneName;
+        }
+    }
+
+    /**
+     * Record that a named local holds a DateTimeZone with a known id (#29732).
+     */
+    private function noteDateTimeZoneLocal(Operand $resultOp, Variable $value): void
+    {
+        if (null === $value->compileTimeTimezoneName || '' === $value->compileTimeTimezoneName) {
+            return;
+        }
+        $assignedName = JIT\OperandName::resolve($resultOp);
+        if (null === $assignedName || '' === $assignedName) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($assignedName);
+        $this->context->lastAssignedDateTimeZoneLocalName = $resolved;
+        $this->context->dateTimeZoneLocalNames[$resolved] = $value->compileTimeTimezoneName;
+        $this->context->bindVariableByName($resolved, $value);
+        $this->context->scope->variables[$resultOp] = $value;
     }
 
     private function copyValueBoxJitFlags(Variable $dest, Variable $src, bool $force = false): void
@@ -17834,6 +17903,84 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
+     * @param list<\PHPCfg\Operand|null>|null $callOperands
+     */
+    private function syncDateTimeZoneConstructMetaToAliases(
+        ?JIT\Call $toCall,
+        array $callArgs,
+        ?array $callOperands = null
+    ): void {
+        if (!$toCall instanceof JIT\Call\DateTimeZoneConstruct) {
+            return;
+        }
+        if ([] === $callArgs) {
+            return;
+        }
+        $first = $callArgs[0];
+        if (is_array($first)) {
+            $first = $first['unpack'] ?? null;
+        }
+        if (!$first instanceof JIT\Variable || null === $first->compileTimeTimezoneName) {
+            return;
+        }
+        $stamp = static function (JIT\Variable $bound) use ($first): void {
+            $bound->compileTimeTimezoneName = $first->compileTimeTimezoneName;
+            $bound->classUserType = $first->classUserType ?? 'DateTimeZone';
+            if (
+                null === $bound->compileTimeString
+                || 'DateTimeZone' === $bound->compileTimeString
+            ) {
+                $bound->compileTimeString = $first->compileTimeTimezoneName;
+            }
+        };
+        $stamp($first);
+        $resultVar = $this->context->lastDateTimeZoneNewResultVar;
+        if ($resultVar instanceof JIT\Variable) {
+            $stamp($resultVar);
+        }
+        $resultOp = $this->context->lastDateTimeZoneNewResultOp;
+        if ($resultOp instanceof \PHPCfg\Operand) {
+            $this->context->scope->variables[$resultOp] = $first;
+            $name = JIT\OperandName::resolve($resultOp);
+            if (null !== $name && '' !== $name) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($name),
+                    $first
+                );
+            }
+        }
+        // Stamp the named local that received the New DateTimeZone assign (#29732).
+        $localName = $this->context->lastAssignedDateTimeZoneLocalName;
+        if (null !== $localName && isset($this->context->namedVariableBindings[$localName])) {
+            $stamp($this->context->namedVariableBindings[$localName]);
+            $this->context->bindVariableByName($localName, $first);
+            $this->context->dateTimeZoneLocalNames[$localName] = (string) $first->compileTimeTimezoneName;
+        }
+        if (null !== $resultOp && null !== ($n = JIT\OperandName::resolve($resultOp)) && '' !== $n) {
+            $this->context->dateTimeZoneLocalNames[$this->context->resolveRefAliasName($n)] =
+                (string) $first->compileTimeTimezoneName;
+        }
+        // Also stamp preallocated locals that still carry the New_ class-name hint.
+        foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+            if ($bound === $first) {
+                $this->context->dateTimeZoneLocalNames[$boundName] = (string) $first->compileTimeTimezoneName;
+                continue;
+            }
+            if (
+                'DateTimeZone' === ($bound->classUserType ?? '')
+                || 'DateTimeZone' === ($bound->compileTimeString ?? '')
+            ) {
+                $stamp($bound);
+                $this->context->dateTimeZoneLocalNames[$boundName] = (string) $first->compileTimeTimezoneName;
+            }
+        }
+        $this->context->lastDateTimeZoneNewResultOp = null;
+        $this->context->lastDateTimeZoneNewResultVar = null;
+        $this->context->lastAssignedDateTimeZoneLocalName = null;
     }
 
     /**
@@ -19252,6 +19399,42 @@ class JIT {
             return;
         }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        $methodLcEarlyDispatch = strtolower($methodName);
+        // DateTimeZone::{getOffset,getTransitions,getName} — CFG often types `$z` as plain
+        // `object`, so the Call proxy never binds and ExternalMethod returns 0/null (#29732).
+        // DateTime::getOffset() has no Call proxy; distinguish at EXEC by argc (Zone needs 1).
+        if (
+            \in_array($methodLcEarlyDispatch, ['getoffset', 'gettransitions', 'getname'], true)
+            && $this->context->functionIsRegistered('datetimezone::'.$methodLcEarlyDispatch)
+        ) {
+            $recvName = JIT\OperandName::resolve($receiverOp);
+            $knownZone = null !== $recvName
+                && '' !== $recvName
+                && isset($this->context->dateTimeZoneLocalNames[$this->context->resolveRefAliasName($recvName)]);
+            if ($knownZone) {
+                $zoneId = $this->context->dateTimeZoneLocalNames[$this->context->resolveRefAliasName($recvName)];
+                $receiverVar->compileTimeTimezoneName = $zoneId;
+                $receiverVar->classUserType = 'DateTimeZone';
+                if (
+                    null === $receiverVar->compileTimeString
+                    || 'DateTimeZone' === $receiverVar->compileTimeString
+                ) {
+                    $receiverVar->compileTimeString = $zoneId;
+                }
+            }
+            if ($knownZone || 'getoffset' === $methodLcEarlyDispatch || 'gettransitions' === $methodLcEarlyDispatch) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                    'datetimezone::'.$methodLcEarlyDispatch
+                );
+                $this->context->scope->args = [$receiverVar];
+                if ('getoffset' === $methodLcEarlyDispatch) {
+                    // May be DateTime::getOffset() (0 args) — rewrite at EXEC if argc==1 (#29732).
+                    $this->context->scope->pendingDateTimeZoneGetOffset = true;
+                }
+
+                return;
+            }
+        }
         if (JIT\GeneratorHelper::isGeneratorVariable($receiverVar)) {
             $methodLc = strtolower($methodName);
             $proxyName = 'generator::'.$methodLc;
@@ -19402,6 +19585,19 @@ class JIT {
                     $className = 'ReflectionAttribute';
                     $declaringClassLc = 'reflectionattribute';
                 }
+            } elseif (
+                \in_array($methodLc, ['getoffset', 'gettransitions', 'getname'], true)
+                && (
+                    'datetimezone' === $receiverHintLc
+                    || (null !== ($receiverVar->compileTimeTimezoneName ?? null)
+                        && '' !== $receiverVar->compileTimeTimezoneName)
+                )
+                && $this->context->functionIsRegistered('datetimezone::'.$methodLc)
+            ) {
+                // Stored `$z = new DateTimeZone(...)` often loses CFG object userType; route
+                // zone methods via compileTimeTimezoneName / classUserType (#29732 / #29733 / #29734).
+                $className = 'DateTimeZone';
+                $declaringClassLc = 'datetimezone';
             } elseif (
                 'getmangledname' === $methodLc
                 && $this->context->functionIsRegistered('reflectionproperty::getmangledname')
