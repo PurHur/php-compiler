@@ -8,7 +8,8 @@ echo $c->x, "\n";
 
 final class GetOnly { public string $x = "a" { get => strtoupper($this->x); } }
 $c2 = new GetOnly();
-try { $c2->x = "b"; echo "write_ok\n"; } catch (Error $e) { echo "write_error\n"; }
+// Backed get-only: default write to backing, get still transforms reads (#29674).
+try { $c2->x = "b"; echo "write_ok:", $c2->x, "\n"; } catch (Error $e) { echo "write_error\n"; }
 --EXPECT--
 b
-write_error
+write_ok:B

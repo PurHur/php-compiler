@@ -332,10 +332,12 @@ final class PropertyHookDispatchLlvm
     }
 
     /**
-     * Block stores to get-only hooked properties (#4687, #26006).
+     * Block stores to get-only VIRTUAL hooked properties (#4687, #26006, #29674).
      *
-     * PHP-8.4: virtual → "Property … is read-only"; backed get-only → without set hook.
-     * "Must not write to virtual property" is the raw backing-slot path only — not here.
+     * Backed get-only omits {@code set} and uses default write into the backing store
+     * (zend_object_handlers.c / php.net property-hooks manual). Only virtual get-only Errors.
+     * PHP-8.4: "Property … is read-only". "Must not write to virtual property" is the raw
+     * backing-slot path only — not here.
      *
      * @return bool true when the store was blocked (caller must skip propertyStore)
      */
@@ -352,6 +354,10 @@ final class PropertyHookDispatchLlvm
             ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
             ?? null;
         if (!is_array($meta) || isset($meta['set']) || !isset($meta['get'])) {
+            return false;
+        }
+        // Backed get-only: allow default propertyStore (ctor promo + later assigns) — #29674.
+        if (empty($meta['virtual'])) {
             return false;
         }
         if (self::propertyHasDistinctAsymmetricSetVisibility($context, $className, $propertyName, $staticProperty)) {
@@ -371,9 +377,7 @@ final class PropertyHookDispatchLlvm
             return false;
         }
 
-        $message = !empty($meta['virtual'])
-            ? sprintf('Property %s::$%s is read-only', $className, $propertyName)
-            : sprintf('Cannot write property %s::$%s without set hook', $className, $propertyName);
+        $message = sprintf('Property %s::$%s is read-only', $className, $propertyName);
         if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
             TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
         } else {
