@@ -5444,6 +5444,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #28483 */
+    public function testFstatStubReturnArrayFalse(): void
+    {
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('fstat'));
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {
