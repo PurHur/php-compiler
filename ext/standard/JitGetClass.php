@@ -10,6 +10,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -59,7 +60,10 @@ final class JitGetClass
             return self::boxed($context, $arg, $allowString, $allowStringKnownFalse);
         }
 
-        self::emitTypeErrorAndAbort($context, self::scalarTypeError($arg->type));
+        self::emitTypeErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR, JitOperandTypeLabel::givenLabel($context, $arg))
+        );
 
         return $context->builder->load($context->constantStringFromString(''));
     }
@@ -234,24 +238,6 @@ final class JitGetClass
         // terminator (unterminated siblings poison the object ok-path, #26854).
         if (null === $context->builder->getInsertBlock()?->getTerminator()) {
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
-        }
-    }
-
-    private static function scalarTypeError(int $type): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return \sprintf(self::TYPE_ERROR, 'int');
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return \sprintf(self::TYPE_ERROR, 'float');
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return \sprintf(self::TYPE_ERROR, 'bool');
-            case JITVariable::TYPE_STRING:
-                return \sprintf(self::TYPE_ERROR, 'string');
-            case JITVariable::TYPE_NULL:
-                return \sprintf(self::TYPE_ERROR, 'null');
-            default:
-                return \sprintf(self::TYPE_ERROR, 'mixed');
         }
     }
 

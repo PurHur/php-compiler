@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -70,7 +71,13 @@ final class method_exists_ extends Internal
             JITVariable::TYPE_STRING,
             JITVariable::TYPE_VALUE,
         ], true)) {
-            self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($args[0]->type));
+            self::emitJitTypeErrorAndAbort(
+                $context,
+                \sprintf(
+                    self::OBJECT_OR_CLASS_TYPE_ERROR,
+                    JitOperandTypeLabel::givenLabel($context, $args[0])
+                )
+            );
             $i1 = $context->getTypeFromString('int1');
 
             return $i1->constInt(0, false);
@@ -111,16 +118,5 @@ final class method_exists_ extends Internal
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function jitTypeErrorMessage(int $type): string
-    {
-        return match ($type) {
-            JITVariable::TYPE_NATIVE_LONG => \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'int'),
-            JITVariable::TYPE_NATIVE_DOUBLE => \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'float'),
-            JITVariable::TYPE_NATIVE_BOOL => \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'bool'),
-            JITVariable::TYPE_NULL => \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null'),
-            default => \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'mixed'),
-        };
     }
 }

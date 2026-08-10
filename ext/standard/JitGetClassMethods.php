@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\StringGetClassMethods;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -35,7 +36,10 @@ final class JitGetClassMethods
             return self::routeThroughPhpHelper($context, $classArg);
         }
 
-        self::emitTypeErrorAndAbort($context, self::scalarTypeError($classArg->type));
+        self::emitTypeErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR, JitOperandTypeLabel::givenLabel($context, $classArg))
+        );
 
         return self::returnFalse($context);
     }
@@ -78,22 +82,6 @@ final class JitGetClassMethods
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function scalarTypeError(int $type): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return \sprintf(self::TYPE_ERROR, 'int');
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return \sprintf(self::TYPE_ERROR, 'float');
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return \sprintf(self::TYPE_ERROR, 'bool');
-            case JITVariable::TYPE_NULL:
-                return \sprintf(self::TYPE_ERROR, 'null');
-            default:
-                return \sprintf(self::TYPE_ERROR, 'mixed');
-        }
     }
 
     private static function returnFalse(Context $context): Value

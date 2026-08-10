@@ -94,11 +94,11 @@ final class VmClassHas
             '%s(): Argument #1 ($%s) must be of type object|string, %s given',
             $function,
             $paramLabel,
-            self::vmTypeName($objectOrClass->type)
+            EnumCaseSupport::typeNameForTypeErrorActual($objectOrClass)
         ));
     }
 
-    /** php-src ext/standard/class.c — get_parent_class() operand (#12689). */
+    /** php-src ext/standard/class.c — get_parent_class() operand (#12689, #29631). */
     public static function requireObjectOrValidClassName(Variable $objectOrClass, string $function): void
     {
         $objectOrClass = $objectOrClass->resolveIndirect();
@@ -107,10 +107,11 @@ final class VmClassHas
             || Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
             return;
         }
+        // zend_zval_value_name — bool actuals are "true"/"false", not "bool" (#29097 / #29631).
         throw new \TypeError(\sprintf(
             '%s(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given',
             $function,
-            self::vmTypeName($objectOrClass->type)
+            EnumCaseSupport::typeNameForTypeErrorActual($objectOrClass)
         ));
     }
 

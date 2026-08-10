@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -59,7 +60,11 @@ final class get_class_ extends Internal
                     throw new \TypeError(\sprintf(self::TYPE_ERROR, 'resource'));
                 }
                 if (Variable::TYPE_OBJECT !== $value->type) {
-                    throw new \TypeError(\sprintf(self::TYPE_ERROR, self::vmTypeName($value->type)));
+                    // zend_zval_value_name — bool → true/false (#29097 / #29631).
+                    throw new \TypeError(\sprintf(
+                        self::TYPE_ERROR,
+                        EnumCaseSupport::typeNameForTypeErrorActual($value)
+                    ));
                 }
                 $ret->string($value->toObject()->class->name);
             }
@@ -90,27 +95,5 @@ final class get_class_ extends Internal
             $context->constantFromBool(false),
             true
         );
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        switch ($type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
-        }
     }
 }

@@ -816,7 +816,7 @@ final class VmReflection
         }
         throw new \TypeError(\sprintf(
             'method_exists(): Argument #1 ($object_or_class) must be of type object|string, %s given',
-            VmClassHas::vmTypeName($objectOrClass->type)
+            EnumCaseSupport::typeNameForTypeErrorActual($objectOrClass)
         ));
     }
 
@@ -2784,7 +2784,7 @@ final class VmReflection
         $arg = $arg->resolveIndirect();
         $given = Variable::TYPE_STRING === $arg->type
             ? 'string'
-            : VmClassHas::vmTypeName($arg->type);
+            : EnumCaseSupport::typeNameForTypeErrorActual($arg);
         throw new \TypeError(\sprintf(
             'get_class_methods(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given',
             $given
