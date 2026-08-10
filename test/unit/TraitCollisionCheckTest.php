@@ -192,17 +192,19 @@ PHP;
         $code = <<<'PHP'
 <?php
 trait T {
-    public string $x { get; set; }
+    abstract public string $x { get; set; }
 }
-class C {
+abstract class C {
     use T;
+}
+class D extends C {
     public string $x {
         get => $this->__x;
         set(string $v) { $this->__x = $v; }
     }
     private string $__x = '';
 }
-$c = new C();
+$c = new D();
 $c->x = 'hi';
 echo $c->x, "\n";
 PHP;
@@ -211,5 +213,34 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame("hi\n", ob_get_clean());
+    }
+
+    public function testTraitClassSameHookedPropertyComposeFatal(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks require PHP_COMPILER_PROFILE=8.4');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {
+    abstract public int $x { get; }
+}
+class C {
+    use T;
+    public int $x {
+        get => 5;
+    }
+}
+echo (new C)->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_hook_compose_conflict.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'PHP Fatal error:  C and T define the same hooked property ($x) in the composition of C. '
+            .'Conflict resolution between hooked properties is currently not supported. Class was composed'
+        );
+        $runtime->run($block);
     }
 }

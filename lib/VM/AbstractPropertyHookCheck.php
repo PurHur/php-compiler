@@ -65,6 +65,39 @@ final class AbstractPropertyHookCheck
     }
 
     /**
+     * True when the property has hook metadata or linked hook methods (#30009).
+     *
+     * Mirrors php-src `zend_property_info->hooks != NULL` for trait composition.
+     */
+    public static function propertyHasHooks(
+        ClassEntry $declaringClass,
+        ClassProperty $prop,
+        Context $context
+    ): bool {
+        if (null !== $prop->getHookMethodLc
+            || null !== $prop->setHookMethodLc
+            || null !== $prop->unsetHookMethodLc
+            || $prop->propertyHookVirtual) {
+            return true;
+        }
+
+        return self::registryHasHooks($context->propertyHookRegistry, $declaringClass->name, $prop->name);
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $registry
+     */
+    public static function registryHasHooks(array $registry, string $className, string $propName): bool
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+        $propMeta = $registry[$lc][$propName]
+            ?? $registry[$lc][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta);
+    }
+
+    /**
      * Walk CE chain from $entry (including entry not yet in context->classes).
      *
      * @return array<string, array<string, true>> lcProp => hook kind => true

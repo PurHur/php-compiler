@@ -19543,10 +19543,21 @@ restart:
                         continue 2;
                     }
                     if (null === $existingFromTraitLc && $existing->declaringClassLc === $classLc) {
-                        if ($trait->isTrait
-                            && VM\AbstractPropertyHookCheck::isAbstractHookProperty($trait, $property, $this->context)) {
-                            $this->mergeTraitAbstractPropertyHookOverride($entry, $trait, $property, $existing);
-                            continue 2;
+                        // Zend: either side hooked → compose Fatal; class redeclare is not an
+                        // implementation of abstract trait hooks (#30009, zend_inheritance.c).
+                        $existingOwner = isset($this->context->classes[$existing->declaringClassLc])
+                            ? $this->context->classes[$existing->declaringClassLc]
+                            : $entry;
+                        if (VM\AbstractPropertyHookCheck::propertyHasHooks($existingOwner, $existing, $this->context)
+                            || VM\AbstractPropertyHookCheck::propertyHasHooks($trait, $property, $this->context)) {
+                            $this->throwTraitPropertyCompositionFatal(
+                                TraitCompositionConflictMessage::sameHookedClassTraitProperty(
+                                    $entry->name,
+                                    $traitName,
+                                    $property->name
+                                ),
+                                $entry
+                            );
                         }
                         // Identical class+trait definitions merge; keep the class property (#22850).
                         if (VM\TraitPropertyCompatibility::instancePropertiesCompatible($existing, $property)) {
@@ -19557,6 +19568,29 @@ restart:
                                 $entry->name,
                                 $traitName,
                                 $property->name
+                            ),
+                            $entry
+                        );
+                    }
+                    $prevTraitEntry = isset($entry->traitPropertySources[$propLc])
+                        ? ($this->context->classes[strtolower(ltrim($entry->traitPropertySources[$propLc], '\\'))] ?? null)
+                        : ($this->context->classes[$existing->declaringClassLc] ?? null);
+                    $prevHasHooks = null !== $prevTraitEntry
+                        && VM\AbstractPropertyHookCheck::propertyHasHooks($prevTraitEntry, $existing, $this->context);
+                    $traitHasHooks = VM\AbstractPropertyHookCheck::propertyHasHooks($trait, $property, $this->context);
+                    if ($prevHasHooks || $traitHasHooks) {
+                        $prevTrait = $entry->traitPropertySources[$propLc]
+                            ?? (
+                                isset($this->context->classes[$existing->declaringClassLc])
+                                    ? $this->context->classes[$existing->declaringClassLc]->name
+                                    : $existing->declaringClassLc
+                            );
+                        $this->throwTraitPropertyCompositionFatal(
+                            TraitCompositionConflictMessage::sameHookedProperty(
+                                $prevTrait,
+                                $traitName,
+                                $property->name,
+                                $entry->name
                             ),
                             $entry
                         );
@@ -19602,29 +19636,6 @@ restart:
                 $entry->propertySourceLocations[$propLc] = $trait->propertySourceLocations[$propLc];
             }
         }
-    }
-
-    /**
-     * Class concrete hooks satisfy trait semicolon hook stubs — keep class property (#7316).
-     */
-    protected function mergeTraitAbstractPropertyHookOverride(
-        ClassEntry $entry,
-        ClassEntry $trait,
-        VM\ClassProperty $traitProp,
-        VM\ClassProperty $classProp
-    ): void {
-        $traitLc = strtolower($trait->name);
-        $childLc = strtolower($entry->name);
-        $prop = $traitProp->name;
-        $meta = $this->context->propertyHookRegistry[$traitLc][$prop]
-            ?? $this->context->propertyHookRegistry[$traitLc][strtolower($prop)]
-            ?? null;
-        if (!is_array($meta)) {
-            return;
-        }
-        $mergeMeta = $this->propertyHookMetaForInheritedBackingField($entry, $classProp, $meta, $childLc, $prop);
-        $this->context->propertyHookRegistry[$childLc][$prop] = $mergeMeta;
-        $this->linkPropertyHooks($entry, $classProp);
     }
 
     private function cloneClassPropertyForEntry(VM\ClassProperty $property, ClassEntry $entry): VM\ClassProperty
@@ -20540,18 +20551,45 @@ restart:
                                 ? strtolower(ltrim($entry->traitPropertySources[$propLc], '\\'))
                                 : $declaringLc;
                             $traitEntry = $this->context->classes[$traitOriginLc] ?? null;
-                            if (null !== $traitEntry
-                                && $traitEntry->isTrait
-                                && VM\AbstractPropertyHookCheck::isAbstractHookProperty(
-                                    $traitEntry,
-                                    $existing,
-                                    $this->context
-                                )) {
-                                $traitAbstractHookOverride = [$traitEntry, $existing];
-                                unset($entry->properties[$idx]);
-                                unset($entry->traitPropertySources[$propLc]);
-                                $entry->properties = array_values($entry->properties);
-                                break;
+                            $traitName = $entry->traitPropertySources[$propLc]
+                                ?? (
+                                    isset($this->context->classes[$declaringLc])
+                                        ? $this->context->classes[$declaringLc]->name
+                                        : $declaringLc
+                                );
+                            $existingHasHooks = (null !== $traitEntry
+                                    && VM\AbstractPropertyHookCheck::propertyHasHooks(
+                                        $traitEntry,
+                                        $existing,
+                                        $this->context
+                                    ))
+                                || VM\AbstractPropertyHookCheck::registryHasHooks(
+                                    $this->context->propertyHookRegistry,
+                                    $traitOriginLc,
+                                    $existing->name
+                                );
+                            $incomingHasHooks = VM\AbstractPropertyHookCheck::propertyHasHooks(
+                                $entry,
+                                $incoming,
+                                $this->context
+                            ) || VM\AbstractPropertyHookCheck::registryHasHooks(
+                                $this->context->propertyHookRegistry,
+                                $entry->name,
+                                $incoming->name
+                            );
+                            // Zend: either side hooked → compose Fatal (#30009); do not treat class
+                            // redeclaration as implementing abstract trait hooks (#7316 was wrong).
+                            if ($existingHasHooks || $incomingHasHooks) {
+                                $this->throwTraitPropertyCompositionFatal(
+                                    TraitCompositionConflictMessage::sameHookedClassTraitProperty(
+                                        $entry->name,
+                                        is_string($traitName) ? $traitName : (string) $traitName,
+                                        $name->toString()
+                                    ),
+                                    $entry,
+                                    null,
+                                    $frame
+                                );
                             }
                             // Class redeclare of trait property: identical → replace with class (#22850).
                             if (VM\TraitPropertyCompatibility::instancePropertiesCompatible($existing, $incoming)) {
@@ -20560,16 +20598,10 @@ restart:
                                 $entry->properties = array_values($entry->properties);
                                 break;
                             }
-                            $traitName = $entry->traitPropertySources[$propLc]
-                                ?? (
-                                    isset($this->context->classes[$declaringLc])
-                                        ? $this->context->classes[$declaringLc]->name
-                                        : $declaringLc
-                                );
                             $this->throwTraitPropertyCompositionFatal(
                                 TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                                     $entry->name,
-                                    $traitName,
+                                    is_string($traitName) ? $traitName : (string) $traitName,
                                     $name->toString()
                                 ),
                                 $entry,
@@ -20591,14 +20623,6 @@ restart:
                     }
                     if (null !== $op->sourceLocation) {
                         $entry->propertySourceLocations[$propLc] = $op->sourceLocation;
-                    }
-                    if (null !== $traitAbstractHookOverride) {
-                        $this->mergeTraitAbstractPropertyHookOverride(
-                            $entry,
-                            $traitAbstractHookOverride[0],
-                            $traitAbstractHookOverride[1],
-                            $prop
-                        );
                     }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
