@@ -102,7 +102,10 @@ final class EnumCaseTypeNameTest extends TestCase
         }
     }
 
-    /** @covers \PHPCompiler\VM\EnumCaseSupport::classPseudoConstTypeErrorMessage */
+    /**
+     * @covers \PHPCompiler\VM\EnumCaseSupport::classPseudoConstTypeErrorMessage
+     * @covers issue #29576 / #29592
+     */
     public function testClassPseudoConstTypeErrorMessageProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -116,6 +119,7 @@ final class EnumCaseTypeNameTest extends TestCase
                 'Cannot use "::class" on string',
                 EnumCaseSupport::classPseudoConstTypeErrorMessage($s)
             );
+            // #29592 — bool uses concrete true/false, not "bool"
             $t = new Variable(Variable::TYPE_BOOLEAN);
             $t->bool(true);
             $this->assertSame(
