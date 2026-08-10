@@ -22,8 +22,8 @@ try {
 $a = [1, 2];
 echo 'var reset: ', reset($a), ' end: ', end($a), "\n";
 --EXPECT--
-reset: Error: reset(): Argument #1 ($array) cannot be passed by reference
-end: Error: end(): Argument #1 ($array) cannot be passed by reference
+reset: Error: reset(): Argument #1 ($array) could not be passed by reference
+end: Error: end(): Argument #1 ($array) could not be passed by reference
 var reset: 1 end: 2
 --CREDITS--
 PurHur/php-compiler issue #10295

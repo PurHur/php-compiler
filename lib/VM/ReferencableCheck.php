@@ -304,7 +304,7 @@ final class ReferencableCheck
             return;
         }
         throw new \Error(\sprintf(
-            '%s(): Argument #%d ($%s) cannot be passed by reference',
+            '%s(): Argument #%d ($%s) could not be passed by reference',
             $fn,
             $paramIdx + 1,
             $paramName

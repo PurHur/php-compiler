@@ -1,5 +1,5 @@
 --TEST--
-AOT: sort() on null throws Error cannot be passed by reference (#4333, ext/standard/array.c)
+AOT: sort() on null throws Error could not be passed by reference (#4333/#29624, ext/standard/array.c)
 --FILE--
 <?php
 try {
@@ -9,4 +9,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-sort(): Argument #1 ($array) cannot be passed by reference
+sort(): Argument #1 ($array) could not be passed by reference

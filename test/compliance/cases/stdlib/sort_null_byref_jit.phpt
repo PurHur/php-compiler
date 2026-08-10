@@ -1,5 +1,5 @@
 --TEST--
-stdlib: sort() on null throws Error cannot be passed by reference (JIT, #4333, ext/standard/array.c)
+stdlib: sort() on null throws Error could not be passed by reference (JIT, #4333, ext/standard/array.c)
 --FILE--
 <?php
 error_reporting(0);
@@ -14,12 +14,12 @@ foreach ($fns as $fn) {
 }
 --EXPECTF--
 %A
-sort: sort(): Argument #1 ($array) cannot be passed by reference
-rsort: rsort(): Argument #1 ($array) cannot be passed by reference
-asort: asort(): Argument #1 ($array) cannot be passed by reference
-arsort: arsort(): Argument #1 ($array) cannot be passed by reference
-ksort: ksort(): Argument #1 ($array) cannot be passed by reference
-krsort: krsort(): Argument #1 ($array) cannot be passed by reference
-usort: usort(): Argument #1 ($array) cannot be passed by reference
-uasort: uasort(): Argument #1 ($array) cannot be passed by reference
-uksort: uksort(): Argument #1 ($array) cannot be passed by reference
+sort: sort(): Argument #1 ($array) could not be passed by reference
+rsort: rsort(): Argument #1 ($array) could not be passed by reference
+asort: asort(): Argument #1 ($array) could not be passed by reference
+arsort: arsort(): Argument #1 ($array) could not be passed by reference
+ksort: ksort(): Argument #1 ($array) could not be passed by reference
+krsort: krsort(): Argument #1 ($array) could not be passed by reference
+usort: usort(): Argument #1 ($array) could not be passed by reference
+uasort: uasort(): Argument #1 ($array) could not be passed by reference
+uksort: uksort(): Argument #1 ($array) could not be passed by reference

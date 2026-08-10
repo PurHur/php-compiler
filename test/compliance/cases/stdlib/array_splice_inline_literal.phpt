@@ -16,7 +16,7 @@ var_export(array_splice($a, 0, 0, ['x']));
 echo "\n";
 echo 'var count: ', count($a), "\n";
 --EXPECT--
-inline: Error: array_splice(): Argument #1 ($array) cannot be passed by reference
+inline: Error: array_splice(): Argument #1 ($array) could not be passed by reference
 array (
 )
 var count: 1

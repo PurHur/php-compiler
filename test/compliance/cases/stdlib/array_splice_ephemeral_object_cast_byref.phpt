@@ -13,4 +13,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-array_splice(): Argument #1 ($array) cannot be passed by reference
+array_splice(): Argument #1 ($array) could not be passed by reference

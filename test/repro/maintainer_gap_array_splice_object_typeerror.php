@@ -5,7 +5,7 @@ try {
     echo "fail: no exception\n";
     exit(1);
 } catch (Error $e) {
-    if (!str_contains($e->getMessage(), 'cannot be passed by reference')) {
+    if (!str_contains($e->getMessage(), 'could not be passed by reference')) {
         echo 'fail: wrong message: ', $e->getMessage(), "\n";
         exit(1);
     }

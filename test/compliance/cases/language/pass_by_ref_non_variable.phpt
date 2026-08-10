@@ -39,10 +39,10 @@ $arr = [1, 2];
 sort($arr);
 echo implode(',', $arr), "\n";
 --EXPECT--
-user: f(): Argument #1 ($x) cannot be passed by reference
-assign: f(): Argument #1 ($x) cannot be passed by reference
-sort: sort(): Argument #1 ($array) cannot be passed by reference
-array: g(): Argument #1 ($a) cannot be passed by reference
+user: f(): Argument #1 ($x) could not be passed by reference
+assign: f(): Argument #1 ($x) could not be passed by reference
+sort: sort(): Argument #1 ($array) could not be passed by reference
+array: g(): Argument #1 ($a) could not be passed by reference
 1
 1,2
 --CREDITS--

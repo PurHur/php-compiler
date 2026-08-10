@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 final class JitArrayPush
 {
     public const BY_REF_ERROR =
-        'array_push(): Argument #1 ($array) cannot be passed by reference';
+        'array_push(): Argument #1 ($array) could not be passed by reference';
 
     /**
      * @return bool false when compile-time operand is definitely non-array (caller must not lower push)
