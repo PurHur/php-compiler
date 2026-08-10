@@ -297,6 +297,43 @@ final class JitStats
         );
     }
 
+    /**
+     * cdf_* via op-coded dispatcher (#29588). Last arg is int $which.
+     *
+     * @param array<int, JITVariable> $args
+     */
+    public static function cdf(Context $context, int $op, int $arity, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, $arity, $arity, 'stats_cdf');
+        Stats::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $opVal = $i64->constInt($op, false);
+        $whichIdx = $arity - 1;
+        $which = JitLongArg::lower($context, $args[$whichIdx], 'stats_cdf which');
+        $a = self::loadDouble($context, $args[0], 'stats_cdf', 'a');
+        $b = $whichIdx >= 1
+            ? self::loadDouble($context, $args[1], 'stats_cdf', 'b')
+            : $double->constReal(0.0);
+        // For arity 3 (t/chisquare): args are par1, par2, which → c unused
+        // For arity 4 (normal/gamma): args are par1, par2, par3, which
+        $c = $arity >= 4
+            ? self::loadDouble($context, $args[2], 'stats_cdf', 'c')
+            : $double->constReal(0.0);
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_cdf'),
+                $opVal,
+                $which,
+                $a,
+                $b,
+                $c
+            )
+        );
+    }
+
     /** @param array<int, JITVariable> $args */
     private static function requireArgc(array $args, int $min, int $max, string $function): void
     {

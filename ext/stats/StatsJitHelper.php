@@ -120,4 +120,15 @@ final class StatsJitHelper
 
         return false === $result ? \NAN : $result;
     }
+
+    /**
+     * cdf_* dispatcher — op codes in {@see VmStatsCdf}.
+     * Returns NAN on failure (boxed as false by JitStats).
+     */
+    public static function cdf(int $op, int $which, float $a, float $b, float $c): float
+    {
+        $result = VmStatsCdf::dispatch($op, $which, $a, $b, $c, null);
+
+        return false === $result ? \NAN : $result;
+    }
 }

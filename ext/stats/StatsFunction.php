@@ -65,6 +65,10 @@ abstract class StatsFunction extends Internal
             'stats_dens_pmf_poisson' => JitStats::dens($context, VmStatsDens::OP_PMF_POISSON, 2, ...$args),
             'stats_dens_pmf_negative_binomial' => JitStats::dens($context, VmStatsDens::OP_PMF_NEGBIN, 3, ...$args),
             'stats_dens_pmf_hypergeometric' => JitStats::dens($context, VmStatsDens::OP_PMF_HYPER, 4, ...$args),
+            'stats_cdf_normal' => JitStats::cdf($context, VmStatsCdf::OP_NORMAL, 4, ...$args),
+            'stats_cdf_t' => JitStats::cdf($context, VmStatsCdf::OP_T, 3, ...$args),
+            'stats_cdf_chisquare' => JitStats::cdf($context, VmStatsCdf::OP_CHISQUARE, 3, ...$args),
+            'stats_cdf_gamma' => JitStats::cdf($context, VmStatsCdf::OP_GAMMA, 4, ...$args),
             default => throw new \LogicException('unsupported stats builtin: '.$this->getName()),
         };
     }
