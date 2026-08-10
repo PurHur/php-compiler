@@ -710,6 +710,7 @@ final class EnumCaseSupport
      *
      * Booleans use literal {@code true}/{@code false} (zend_execute.c), not {@code bool}.
      * Same spelling as php-src {@code zend_zval_value_name()} for non-object scalars.
+     * Anonymous class names strip NUL+filepath provenance (C %s stops at NUL; #29569 / #26031).
      */
     public static function typeNameForTypeErrorActual(Variable $value): string
     {
@@ -718,7 +719,9 @@ final class EnumCaseSupport
             return $value->toBool() ? 'true' : 'false';
         }
 
-        return self::typeNameForVariable($value);
+        return \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
+            self::typeNameForVariable($value)
+        );
     }
 
     /**

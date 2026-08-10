@@ -238,7 +238,10 @@ final class IntersectionParamCheck
         $defaultBlock = $fn->appendBasicBlock('iface_fail_default');
         $checkBlock = $entry;
         foreach ($objectType->allClassNamesById() as $id => $name) {
-            $given = strtolower(ltrim($name, '\\'));
+            // Preserve case; strip @anonymous\0file:line$id like zend %s (#29569 / #26031).
+            $given = \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
+                ltrim($name, '\\')
+            );
             $message = sprintf('%s must be of type %s, %s given', $kind, $expected, $given);
             $matchBlock = $fn->appendBasicBlock('iface_fail_msg_'.$id);
             $nextBlock = $fn->appendBasicBlock('iface_fail_try_'.$id);

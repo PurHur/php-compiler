@@ -22,7 +22,12 @@ final class JitOperandTypeLabel
             $classLabel = self::compileTimeObjectClassName($context, $arg);
             if (null !== $classLabel) {
                 // Legacy Resource wrappers → zend_zval_type_name "resource" (#29594 / #29559).
-                return 0 === strcasecmp($classLabel, 'Resource') ? 'resource' : $classLabel;
+                if (0 === strcasecmp($classLabel, 'Resource')) {
+                    return 'resource';
+                }
+
+                // TypeError "… given": strip anon NUL provenance (#29569 / #26031).
+                return \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($classLabel);
             }
         }
 
