@@ -590,7 +590,8 @@ final class BuiltinParamNames
             case 'ftp_nb_put':
                 return ['ftp', 'remote_filename', 'local_filename', 'mode', 'offset'];
             case 'ftp_append':
-                return ['ftp', 'remote_filename', 'local_filename', 'mode'];
+                // php-src ext/ftp/ftp.stub.php — int $mode = FTP_BINARY (#27686)
+                return ['ftp', 'remote_filename', 'local_filename', 'mode='];
             case 'ftp_fget':
             case 'ftp_nb_fget':
                 return ['ftp', 'stream', 'remote_filename', 'mode', 'offset'];
