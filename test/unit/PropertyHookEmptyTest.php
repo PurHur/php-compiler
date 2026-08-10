@@ -15,6 +15,8 @@ final class PropertyHookEmptyTest extends TestCase
 
     protected function setUp(): void
     {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
         $this->skipUnlessPropertyHooksEnabled();
     }
 
@@ -80,5 +82,29 @@ PHP;
         ob_start();
         $rt->run($block);
         self::assertSame("GET\nbool(true)\n", ob_get_clean());
+    }
+
+    /** Inside get: empty($this->prop) on uninitialized same-name backing is true (#29688). */
+    public function testVmEmptyInsideGetOnUninitializedSameNameBacking(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public string $prop {
+        get {
+            echo empty($this->prop) ? "E1" : "E0";
+            return $this->prop ?? "x";
+        }
+        set => $this->prop = $value;
+    }
+}
+$c = new C;
+echo $c->prop, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame("E1x\n", ob_get_clean());
     }
 }

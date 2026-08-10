@@ -147,7 +147,17 @@ final class PropertyHookDispatchLlvm
 
             return $context->builder->and($notNull, $notUndef);
         }
-        $loaded = $context->helper->loadValue($fetched);
+        // Raw-hook / write-only backing probe: isset is BP_VAR_IS (#29688).
+        $savedClass = $fetched->objectPropertyClassName;
+        $savedName = $fetched->objectPropertyName;
+        $fetched->objectPropertyClassName = null;
+        $fetched->objectPropertyName = null;
+        try {
+            $loaded = $context->helper->loadValue($fetched);
+        } finally {
+            $fetched->objectPropertyClassName = $savedClass;
+            $fetched->objectPropertyName = $savedName;
+        }
         $nullPtr = $context->getTypeFromString('void*')->constNull();
 
         return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);

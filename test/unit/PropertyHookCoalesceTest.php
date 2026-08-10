@@ -15,6 +15,8 @@ final class PropertyHookCoalesceTest extends TestCase
 
     protected function setUp(): void
     {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
         $this->skipUnlessPropertyHooksEnabled();
     }
 
@@ -64,5 +66,26 @@ PHP;
         ob_start();
         $rt->run($block);
         self::assertSame("hello\nrhs\n", ob_get_clean());
+    }
+
+    /** Inside get: $this->prop ?? default on uninitialized same-name backing (#29688). */
+    public function testVmCoalesceInsideGetOnUninitializedSameNameBacking(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public string $prop {
+        get => $this->prop ?? "default";
+        set => $this->prop = $value;
+    }
+}
+$c = new C;
+echo $c->prop, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame("default\n", ob_get_clean());
     }
 }

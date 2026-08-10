@@ -1451,6 +1451,11 @@ class VM {
         if (null === $frame) {
             return $this->issetHookedPropertyWithoutGetHook($object, $propName);
         }
+        // Inside get/set for this prop: isset($this->prop) is BP_VAR_IS on backing
+        // (zend_should_call_hook) — uninitialized typed slots are unset, not Error (#29688).
+        if ($this->isPropertyHookRawWrite($frame, $propName)) {
+            return $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        }
         try {
             $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
         } catch (VM\PropertyHookRefWriteSignal) {
@@ -1479,6 +1484,18 @@ class VM {
         Variable $dst,
         ?Frame $frame = null
     ): ?Frame {
+        // Inside get/set for this prop: $this->prop ?? … is BP_VAR_IS on backing
+        // (zend_should_call_hook) — skip typed-uninit Error from raw re-entry (#29688).
+        if (null !== $frame && $this->isPropertyHookRawWrite($frame, $propName)) {
+            $rawBacking = $this->hookedPropertyBackingValue($object, $propName);
+            if (false !== $rawBacking) {
+                $this->copyPropertyValueForIsMode($dst, $rawBacking);
+            } else {
+                $dst->undefined();
+            }
+
+            return null;
+        }
         if (null !== $frame && $this->instancePropertyHasGetHook($object, $propName)) {
             try {
                 $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
@@ -1493,7 +1510,7 @@ class VM {
         }
         $backing = $this->hookedPropertyBackingValue($object, $propName);
         if (false !== $backing) {
-            $dst->copyFrom($backing);
+            $this->copyPropertyValueForIsMode($dst, $backing);
 
             return null;
         }
@@ -1798,6 +1815,21 @@ class VM {
      *
      * @return Variable|false false when the property is not hooked
      */
+    /**
+     * BP_VAR_IS / ?? copy — uninitialized typed slots become undefined without Error (#29688).
+     * {@see Variable::copyFrom} asserts readable (BP_VAR_R).
+     */
+    private function copyPropertyValueForIsMode(Variable $dst, Variable $src): void
+    {
+        $src = $src->resolveIndirect();
+        if ($src->isUndefined() || VM\TypedPropertyCheck::isUninitialized($src)) {
+            $dst->undefined();
+
+            return;
+        }
+        $dst->copyFrom($src);
+    }
+
     private function hookedPropertyBackingValue(ObjectEntry $object, string $propName): Variable|false
     {
         if (!$this->instancePropertyHasHooks($object, $propName)) {
@@ -2004,6 +2036,22 @@ class VM {
             return false;
         }
         if (!$this->instancePropertyHasGetHook($object, $propName)) {
+            $backing = $this->hookedPropertyBackingValue($object, $propName);
+            if (false === $backing) {
+                return false;
+            }
+            $uninit = $backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing);
+            if ($uninit) {
+                $dst->bool(true);
+
+                return true;
+            }
+            $dst->bool(!ext\standard\boolval::isTruthy($backing));
+
+            return true;
+        }
+        // Inside get/set for this prop: empty($this->prop) probes backing quietly (#29688).
+        if ($this->isPropertyHookRawWrite($frame, $propName)) {
             $backing = $this->hookedPropertyBackingValue($object, $propName);
             if (false === $backing) {
                 return false;
