@@ -41,7 +41,9 @@ final class date_timezone_set extends Internal
         );
         $timezone = DateTimeSupport::requireDateTimeZone(
             $frame->calledArgs[1],
-            'date_timezone_set(): Argument #2 ($timezone)'
+            'date_timezone_set()',
+            2,
+            'timezone'
         );
         DateTimeSupport::setTimezone($datetime, $timezone);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($frame): void {

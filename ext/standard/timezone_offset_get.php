@@ -34,7 +34,9 @@ final class timezone_offset_get extends Internal
         }
         $zone = DateTimeSupport::requireDateTimeZone(
             $frame->calledArgs[0],
-            'timezone_offset_get(): Argument #1 ($object)'
+            'timezone_offset_get()',
+            1,
+            'object'
         );
         $datetime = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[1],
