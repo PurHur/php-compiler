@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** Shared VM wiring for stats builtins (PECL stats; issue #5748). */
+/** Shared VM wiring for stats builtins (PECL stats; issue #5748 / #28080). */
 abstract class StatsFunction extends Internal
 {
     public function execute(Frame $frame): void
@@ -25,6 +25,11 @@ abstract class StatsFunction extends Internal
 
             return;
         }
+        if (\is_int($result)) {
+            $frame->returnVar->int($result);
+
+            return;
+        }
         $frame->returnVar->float($result);
     }
 
@@ -34,12 +39,22 @@ abstract class StatsFunction extends Internal
             'stats_variance' => JitStats::variance($context, ...$args),
             'stats_standard_deviation' => JitStats::standardDeviation($context, ...$args),
             'stats_covariance' => JitStats::covariance($context, ...$args),
+            'stats_absolute_deviation' => JitStats::absoluteDeviation($context, ...$args),
+            'stats_harmonic_mean' => JitStats::harmonicMean($context, ...$args),
+            'stats_skew' => JitStats::skew($context, ...$args),
+            'stats_kurtosis' => JitStats::kurtosis($context, ...$args),
+            'stats_stat_percentile' => JitStats::percentile($context, ...$args),
+            'stats_stat_correlation' => JitStats::correlation($context, ...$args),
+            'stats_stat_powersum' => JitStats::powersum($context, ...$args),
+            'stats_stat_innerproduct' => JitStats::innerproduct($context, ...$args),
+            'stats_stat_factorial' => JitStats::factorial($context, ...$args),
+            'stats_stat_binomial_coef' => JitStats::binomialCoef($context, ...$args),
             default => throw new \LogicException('unsupported stats builtin: '.$this->getName()),
         };
     }
 
-    /** @return float|false */
-    abstract protected function compute(Frame $frame): float|bool;
+    /** @return float|int|false */
+    abstract protected function compute(Frame $frame): float|int|bool;
 
     protected function requireArrayArg(Frame $frame, int $index, string $label): Variable
     {
@@ -55,6 +70,39 @@ abstract class StatsFunction extends Internal
         }
 
         return $var;
+    }
+
+    protected function requireFloatArg(Frame $frame, int $index, string $label): float
+    {
+        $var = $frame->calledArgs[$index]->resolveIndirect();
+
+        return match ($var->type) {
+            Variable::TYPE_INTEGER => (float) $var->toInt(),
+            Variable::TYPE_FLOAT => $var->toFloat(),
+            default => throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type float, %s given',
+                $this->getName(),
+                $index + 1,
+                $label,
+                self::debugTypeName($var)
+            )),
+        };
+    }
+
+    protected function requireIntArg(Frame $frame, int $index, string $label): int
+    {
+        $var = $frame->calledArgs[$index]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $this->getName(),
+                $index + 1,
+                $label,
+                self::debugTypeName($var)
+            ));
+        }
+
+        return $var->toInt();
     }
 
     protected function optionalSampleFlag(Frame $frame, int $index): bool
