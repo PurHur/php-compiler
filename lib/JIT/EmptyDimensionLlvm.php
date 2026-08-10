@@ -209,12 +209,35 @@ final class EmptyDimensionLlvm
         if (Variable::TYPE_OBJECT === $dim->type) {
             return self::compileHashTableObjectDimIsEmpty($context, $ht, $dim);
         }
-        if (Variable::TYPE_VALUE === $dim->type) {
-            // Runtime object/array/enum keys: same TypeError as isset.
-            HashTableHelper::offsetIsSetDim($context, $ht, $dim);
+        // Float→int E_DEPRECATED once for empty($arr[$float]) — Zend zend_isset_dim (#29560).
+        if (Variable::TYPE_NATIVE_DOUBLE === $dim->type) {
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($dim)
+            );
+            $dim = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $truncated
+            );
         }
 
-        $read = HashTableHelper::readDimToValueBox($context, $ht, $dim, $superglobalName);
+        $emitFloatKeyDeprecation = true;
+        if (Variable::TYPE_VALUE === $dim->type) {
+            // Runtime object/array/enum keys: same TypeError as isset (#29549 / #29567).
+            // offsetIsSetDim also emits float→int DEP; read must not re-warn (#29560).
+            HashTableHelper::offsetIsSetDim($context, $ht, $dim);
+            $emitFloatKeyDeprecation = false;
+        }
+
+        $read = HashTableHelper::readDimToValueBox(
+            $context,
+            $ht,
+            $dim,
+            $superglobalName,
+            $emitFloatKeyDeprecation
+        );
 
         return EmptyObjectPropertyLlvm::compileEmptyFromValue($context, $read);
     }

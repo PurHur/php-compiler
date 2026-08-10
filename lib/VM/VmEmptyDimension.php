@@ -39,6 +39,7 @@ final class VmEmptyDimension
             $table = $container->toArray();
             try {
                 // Same illegal-offset wording as isset() / ZEND_ISSET_ISEMPTY_DIM_OBJ (#29549).
+                // Float→int E_DEPRECATED once here; findVariable must not re-warn (#29560).
                 if (!$table->keyExists(
                     $dim,
                     false,
@@ -50,7 +51,7 @@ final class VmEmptyDimension
 
                     return null;
                 }
-                $stored = $table->findVariable($dim, false, $vm->context, $frame);
+                $stored = $table->findVariable($dim, false, $vm->context, $frame, false);
                 $dst->bool(!boolval::isTruthy($stored->resolveIndirect()));
             } catch (\TypeError $e) {
                 return $vm->propagateEmptyDimensionTypeError($e, $frame);

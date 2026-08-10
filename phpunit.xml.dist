@@ -205,6 +205,10 @@
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorJITTest.php</file>
             <file>./test/compliance/FilePutContentsEmptyPathValueErrorVMTest.php</file>
             <file>./test/compliance/FilePutContentsEmptyPathValueErrorJITTest.php</file>
+            <file>./test/compliance/IssetEmptyStringOffsetFloatVMTest.php</file>
+            <file>./test/compliance/IssetEmptyStringOffsetFloatJITTest.php</file>
+            <file>./test/compliance/EmptyArrFloatDimDepVMTest.php</file>
+            <file>./test/compliance/EmptyArrFloatDimDepJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
