@@ -468,6 +468,40 @@ final class JitStats
     }
 
     /** @param array<int, JITVariable> $args */
+    public static function randIbinomialNegative(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 2, 2, 'stats_rand_ibinomial_negative');
+        Stats::ensureLinked($context);
+        $n = JitLongArg::lower($context, $args[0], 'stats_rand_ibinomial_negative n');
+        $p = self::loadDouble($context, $args[1], 'stats_rand_ibinomial_negative', 'p');
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_rand_ibinomial_negative'),
+                $n,
+                $p
+            )
+        );
+    }
+
+    /** @param array<int, JITVariable> $args */
+    public static function randGenIpoisson(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 1, 1, 'stats_rand_gen_ipoisson');
+        Stats::ensureLinked($context);
+        $mu = self::loadDouble($context, $args[0], 'stats_rand_gen_ipoisson', 'mu');
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_rand_gen_ipoisson'),
+                $mu
+            )
+        );
+    }
+
+    /** @param array<int, JITVariable> $args */
     public static function randPhraseToSeeds(Context $context, JITVariable ...$args): Value
     {
         self::requireArgc($args, 1, 1, 'stats_rand_phrase_to_seeds');
@@ -533,11 +567,29 @@ final class JitStats
         string $label
     ): Value {
         $double = $context->getTypeFromString('double');
-        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type || JITVariable::TYPE_FLOAT === $arg->type) {
-            return $context->builder->load($arg->value);
+        // AOT float literals are KIND_VALUE constants — use loadValue, not raw load (#29684).
+        if (null !== $arg->compileTimeFloat) {
+            return $double->constReal((float) $arg->compileTimeFloat);
         }
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || JITVariable::TYPE_INTEGER === $arg->type) {
-            return $context->builder->siToFp(JitLongArg::lower($context, $arg, $function.' '.$label), $double);
+        if (null !== $arg->compileTimeLong) {
+            return $double->constReal((float) $arg->compileTimeLong);
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->builder->siToFp(
+                $context->helper->loadValue($arg),
+                $double
+            );
+        }
+        if (JitValueBox::isValueOperand($arg)) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readDouble'),
+                $valuePtr
+            );
         }
         throw new \TypeError(\sprintf(
             '%s(): Argument ($%s) must be of type float, %s given',

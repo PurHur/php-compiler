@@ -175,6 +175,7 @@ final class StatsJitHelper
             VmStatsRand::OP_GEN_CHISQUARE => VmStatsRand::genChisquare($a, null),
             VmStatsRand::OP_GEN_F => VmStatsRand::genF($a, $b, null),
             VmStatsRand::OP_GEN_FUNIFORM => VmStatsRand::genFuniform($a, $b, null),
+            VmStatsRand::OP_GEN_T => VmStatsRand::genT($a, null),
             default => false,
         };
 
@@ -185,6 +186,22 @@ final class StatsJitHelper
     public static function randIbinomial(int $n, float $pp): float
     {
         $result = VmStatsRand::ibinomial($n, $pp, null);
+
+        return false === $result ? \NAN : (float) $result;
+    }
+
+    /** Returns float or NAN on failure (#29684). */
+    public static function randIbinomialNegative(int $n, float $p): float
+    {
+        $result = VmStatsRand::ibinomialNegative($n, $p, null);
+
+        return false === $result ? \NAN : (float) $result;
+    }
+
+    /** Returns float or NAN on failure (#29684). */
+    public static function randGenIpoisson(float $mu): float
+    {
+        $result = VmStatsRand::genIpoisson($mu, null);
 
         return false === $result ? \NAN : (float) $result;
     }

@@ -1,5 +1,5 @@
 --TEST--
-stdlib stats rand_* remaining generators — PECL stats parity (#29622, #29649, ext/stats)
+stdlib stats rand_* remaining generators — PECL stats parity (#29622, #29649, #29684, ext/stats)
 --ENV--
 PHP_COMPILER_ENABLE_STATS=1
 --FILE--
@@ -9,6 +9,12 @@ echo "\n";
 echo function_exists('stats_rand_gen_chisquare') ? 'Y' : 'N';
 echo "\n";
 echo function_exists('stats_rand_ibinomial') ? 'Y' : 'N';
+echo "\n";
+echo function_exists('stats_rand_gen_ipoisson') ? 'Y' : 'N';
+echo "\n";
+echo function_exists('stats_rand_ibinomial_negative') ? 'Y' : 'N';
+echo "\n";
+echo function_exists('stats_rand_gen_t') ? 'Y' : 'N';
 echo "\n";
 $funcs = get_extension_funcs('stats') ?: [];
 echo count($funcs) >= 50 ? 'funcs_ok' : 'funcs_bad='.count($funcs);
@@ -56,10 +62,36 @@ $i2 = stats_rand_ibinomial(10, 0.5);
 echo ($i1 === $i2 && $i1 >= 0 && $i1 <= 10) ? 'ibin_ok' : 'ibin_bad';
 echo "\n";
 echo $i1, "\n";
+stats_rand_setall(10, 20);
+$p1 = stats_rand_gen_ipoisson(5.0);
+stats_rand_setall(10, 20);
+$p2 = stats_rand_gen_ipoisson(5.0);
+echo ($p1 === $p2 && $p1 >= 0) ? 'poi_ok' : 'poi_bad';
+echo "\n";
+echo $p1, "\n";
+stats_rand_setall(10, 20);
+$n1 = stats_rand_ibinomial_negative(5, 0.5);
+stats_rand_setall(10, 20);
+$n2 = stats_rand_ibinomial_negative(5, 0.5);
+echo ($n1 === $n2 && $n1 >= 0) ? 'neg_ok' : 'neg_bad';
+echo "\n";
+echo $n1, "\n";
+stats_rand_setall(10, 20);
+$t1 = stats_rand_gen_t(10.0);
+stats_rand_setall(10, 20);
+$t2 = stats_rand_gen_t(10.0);
+echo ($t1 === $t2) ? 't_ok' : 't_bad';
+echo "\n";
+echo round($t1, 8), "\n";
 var_export(@stats_rand_gen_exponential(-1.0));
+echo "\n";
+var_export(@stats_rand_gen_ipoisson(-1.0));
 echo "\n";
 ?>
 --EXPECT--
+Y
+Y
+Y
 Y
 Y
 Y
@@ -75,4 +107,11 @@ fu_ok
 0.99980736
 ibin_ok
 10
+poi_ok
+15
+neg_ok
+8
+t_ok
+-2.23623444
+false
 false

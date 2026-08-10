@@ -21,6 +21,7 @@ final class VmStatsRand
     public const OP_GEN_CHISQUARE = 4;
     public const OP_GEN_F = 5;
     public const OP_GEN_FUNIFORM = 6;
+    public const OP_GEN_T = 7;
 
     private const NUMG = 32;
 
@@ -281,6 +282,50 @@ final class VmStatsRand
         }
 
         return VmStatsRandlib::ignbin($n, $pp);
+    }
+
+    /** @return int|false */
+    public static function genIpoisson(float $mu, ?Frame $frame)
+    {
+        if ($mu < 0.0) {
+            VmStats::triggerWarning($frame, \sprintf('mu < 0.0 . mu : %16.6E', $mu));
+
+            return false;
+        }
+
+        return VmStatsRandlib::ignpoi($mu);
+    }
+
+    /** @return int|false */
+    public static function ibinomialNegative(int $n, float $p, ?Frame $frame)
+    {
+        // PECL php_stats.c: n <= 0 warns "n < 0"; p outside [0,1] warns out of range.
+        // RANLIB ignnbn also rejects p==0/p==1 — return false instead of aborting.
+        if ($n <= 0) {
+            VmStats::triggerWarning($frame, \sprintf('n < 0. n : %ld', $n));
+
+            return false;
+        }
+        if ($p <= 0.0 || $p >= 1.0) {
+            VmStats::triggerWarning($frame, \sprintf('p is out of range. p : %16.6E', $p));
+
+            return false;
+        }
+
+        return VmStatsRandlib::ignnbn($n, $p);
+    }
+
+    /** @return float|false */
+    public static function genT(float $df, ?Frame $frame)
+    {
+        if ($df <= 0.0) {
+            VmStats::triggerWarning($frame, \sprintf('df <= 0 . df : %16.6E', $df));
+
+            return false;
+        }
+
+        // PECL: gennor(0,1) / sqrt(genchi(df)/df)
+        return VmStatsRandlib::snorm() / \sqrt(VmStatsRandlib::genchi($df) / $df);
     }
 
     public static function getsdHashTable(): HashTable

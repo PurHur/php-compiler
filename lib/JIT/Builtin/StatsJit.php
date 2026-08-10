@@ -57,6 +57,10 @@ final class StatsJit
 
     private const ABI_RAND_IBINOMIAL = '__compiler_stats_rand_ibinomial';
 
+    private const ABI_RAND_IBINOMIAL_NEGATIVE = '__compiler_stats_rand_ibinomial_negative';
+
+    private const ABI_RAND_GEN_IPOISSON = '__compiler_stats_rand_gen_ipoisson';
+
     private const ABI_RAND_PHRASE = '__compiler_stats_rand_phrase_to_seeds';
 
     private const HELPER_PATH = '/ext/stats/StatsJitHelper.php';
@@ -103,6 +107,10 @@ final class StatsJit
 
     private const RAND_IBINOMIAL_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randIbinomial';
 
+    private const RAND_IBINOMIAL_NEGATIVE_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randIbinomialNegative';
+
+    private const RAND_GEN_IPOISSON_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randGenIpoisson';
+
     private const RAND_PHRASE_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randPhraseToSeeds';
 
     /** @var list<string> */
@@ -128,6 +136,8 @@ final class StatsJit
         self::RAND_GEN_IUNIFORM_HELPER,
         self::RAND_GEN_HELPER,
         self::RAND_IBINOMIAL_HELPER,
+        self::RAND_IBINOMIAL_NEGATIVE_HELPER,
+        self::RAND_GEN_IPOISSON_HELPER,
         self::RAND_PHRASE_HELPER,
     ];
 
@@ -154,6 +164,8 @@ final class StatsJit
         self::ABI_RAND_GEN_IUNIFORM,
         self::ABI_RAND_GEN,
         self::ABI_RAND_IBINOMIAL,
+        self::ABI_RAND_IBINOMIAL_NEGATIVE,
+        self::ABI_RAND_GEN_IPOISSON,
         self::ABI_RAND_PHRASE,
     ];
 
@@ -401,6 +413,28 @@ final class StatsJit
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#29649'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_IBINOMIAL_NEGATIVE,
+            'stats_rand_ibinomial_negative_bridge_entry',
+            [$i64, $double],
+            $double,
+            self::RAND_IBINOMIAL_NEGATIVE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29684'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_GEN_IPOISSON,
+            'stats_rand_gen_ipoisson_bridge_entry',
+            [$double],
+            $double,
+            self::RAND_GEN_IPOISSON_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29684'
         );
         JitVmHelperLink::ensureBridge(
             $context,

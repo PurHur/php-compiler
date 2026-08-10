@@ -111,7 +111,10 @@ abstract class StatsFunction extends Internal
             'stats_rand_gen_chisquare' => JitStats::randGen($context, VmStatsRand::OP_GEN_CHISQUARE, 1, ...$args),
             'stats_rand_gen_f' => JitStats::randGen($context, VmStatsRand::OP_GEN_F, 2, ...$args),
             'stats_rand_gen_funiform' => JitStats::randGen($context, VmStatsRand::OP_GEN_FUNIFORM, 2, ...$args),
+            'stats_rand_gen_t' => JitStats::randGen($context, VmStatsRand::OP_GEN_T, 1, ...$args),
             'stats_rand_ibinomial' => JitStats::randIbinomial($context, ...$args),
+            'stats_rand_ibinomial_negative' => JitStats::randIbinomialNegative($context, ...$args),
+            'stats_rand_gen_ipoisson' => JitStats::randGenIpoisson($context, ...$args),
             'stats_rand_phrase_to_seeds' => JitStats::randPhraseToSeeds($context, ...$args),
             default => throw new \LogicException('unsupported stats builtin: '.$this->getName()),
         };

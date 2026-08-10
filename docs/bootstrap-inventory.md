@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7351 |
-| Phase A inventory files (M2 ratio SSOT) | 7351 |
+| PHP files on vm.php path | 7354 |
+| Phase A inventory files (M2 ratio SSOT) | 7354 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23828 |
+| Source constructs flagged (warnings) | 23837 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4618,7 +4618,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zlib_encode.php` | 0 | 1 |
 | `ext/standard/zlib_get_coding_type.php` | 0 | 2 |
 | `ext/stats/JitStats.php` | 0 | 2 |
-| `ext/stats/Module.php` | 0 | 58 |
+| `ext/stats/Module.php` | 0 | 61 |
 | `ext/stats/StatsExtensionPolicy.php` | 0 | 1 |
 | `ext/stats/StatsFunction.php` | 0 | 2 |
 | `ext/stats/StatsJitHelper.php` | 0 | 1 |
@@ -4668,10 +4668,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_rand_gen_f.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_funiform.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_gamma.php` | 0 | 2 |
+| `ext/stats/stats_rand_gen_ipoisson.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_iuniform.php` | 0 | 2 |
 | `ext/stats/stats_rand_gen_normal.php` | 0 | 2 |
+| `ext/stats/stats_rand_gen_t.php` | 0 | 2 |
 | `ext/stats/stats_rand_getsd.php` | 0 | 2 |
 | `ext/stats/stats_rand_ibinomial.php` | 0 | 2 |
+| `ext/stats/stats_rand_ibinomial_negative.php` | 0 | 2 |
 | `ext/stats/stats_rand_phrase_to_seeds.php` | 0 | 2 |
 | `ext/stats/stats_rand_ranf.php` | 0 | 2 |
 | `ext/stats/stats_rand_setall.php` | 0 | 2 |
@@ -41489,8 +41492,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/JitStats.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 493)
-- 29 class method(s)
+- new ArgumentCountError (line 527)
+- 31 class method(s)
 
 ### `ext/stats/Module.php`
 
@@ -41551,7 +41554,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new stats_rand_gen_f (line 78)
 - new stats_rand_gen_funiform (line 79)
 - new stats_rand_ibinomial (line 80)
-- new stats_rand_phrase_to_seeds (line 81)
+- new stats_rand_ibinomial_negative (line 81)
+- new stats_rand_gen_ipoisson (line 82)
+- new stats_rand_gen_t (line 83)
+- new stats_rand_phrase_to_seeds (line 84)
 - 1 class method(s)
 
 ### `ext/stats/StatsExtensionPolicy.php`
@@ -41568,7 +41574,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/StatsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- 24 class method(s)
 
 ### `ext/stats/VmStats.php`
 
@@ -41588,14 +41594,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/VmStatsRand.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 289)
-- new HashTable (line 303)
-- 18 class method(s)
+- new HashTable (line 334)
+- new HashTable (line 348)
+- 21 class method(s)
 
 ### `ext/stats/VmStatsRandlib.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 16 class method(s)
 
 ### `ext/stats/stats_absolute_deviation.php`
 
@@ -41843,6 +41849,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/stats/stats_rand_gen_ipoisson.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/stats/stats_rand_gen_iuniform.php`
 
 **Warnings** (review for bootstrap subset):
@@ -41855,6 +41867,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/stats/stats_rand_gen_t.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/stats/stats_rand_getsd.php`
 
 **Warnings** (review for bootstrap subset):
@@ -41862,6 +41880,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/stats/stats_rand_ibinomial.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_rand_ibinomial_negative.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
