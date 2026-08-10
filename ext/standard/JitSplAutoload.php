@@ -114,7 +114,14 @@ final class JitSplAutoload
     {
         SplAutoloadOutput::ensureLinked($context);
 
-        $strPtr = JitStringBuiltinArg::lower($context, $className, 'spl_autoload_call', 0, 'class_name');
+        // Z_PARAM_STR — Zend stub `$class`; caller strict_types → TypeError on null (#29820).
+        $strPtr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $className,
+            'spl_autoload_call',
+            0,
+            'class'
+        );
         $map = $context->structFieldMap[$strPtr->typeOf()->getElementType()->getName()];
         $classPtr = $context->builder->load(
             $context->builder->structGep($strPtr, $map['value'])
