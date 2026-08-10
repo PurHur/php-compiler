@@ -26,7 +26,8 @@ final class basename extends Internal
         }
         $suffix = '';
         if (2 === $argc) {
-            $suffix = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'basename', 1, 'suffix');
+            // php-src Z_PARAM_STR: null → E_DEPRECATED + coerce "" (#29705; peer path soft-null #21779).
+            $suffix = VmString::trimFamilyStringArgForFrame($frame, 1, 'basename', 1, 'suffix');
         }
         $frame->returnVar->string(VmString::basename($path, $suffix));
     }
@@ -48,7 +49,8 @@ final class basename extends Internal
         }
         $path = JitFilestatArg::lowerPathComponentFilename($context, $args[0], 'basename', 0, 'path');
         if (2 === $argc) {
-            $suffix = JitStringBuiltinArg::lower($context, $args[1], 'basename', 1, 'suffix');
+            // Soft-null DEP+coerce on 8.4 (not typed TypeError) — #29705 / php-src basename.c.
+            $suffix = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'basename', 1, 'suffix');
 
             return JitPath::basenameWithSuffix($context, $path, $suffix);
         }
