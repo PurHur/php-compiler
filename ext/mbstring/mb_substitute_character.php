@@ -28,7 +28,11 @@ final class mb_substitute_character extends Internal
                 $argc
             ));
         }
-        if (0 === $argc) {
+        // php-src Z_PARAM_STR_OR_LONG_OR_NULL — omitted/null selects getter
+        // (mbstring.stub.php int|string|null $substchar = null); #29919.
+        if (0 === $argc
+            || Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type
+        ) {
             if (null === $frame->returnVar) {
                 return;
             }
@@ -51,8 +55,27 @@ final class mb_substitute_character extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_substitute_character() expects at most 1 argument, %d given',
+                $argc
+            ));
+        }
+        // Compile-time omitted/null getter fold (php-src Z_PARAM_STR_OR_LONG_OR_NULL); setters stay VM-only.
+        if (0 === $argc
+            || (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
+        ) {
+            $value = MbstringState::substituteCharacter();
+            if (\is_int($value)) {
+                return $context->getTypeFromString('int64')->constInt($value, false);
+            }
+
+            return $context->builder->load($context->constantStringFromString($value));
+        }
+
         throw new \LogicException(
-            'mb_substitute_character() JIT is not supported in this compiler build'
+            'mb_substitute_character() JIT setter is not supported in this compiler build'
         );
     }
 }

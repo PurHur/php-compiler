@@ -413,6 +413,12 @@ final class MbstringState
             };
         }
         if ($substchar instanceof Variable) {
+            $resolved = $substchar->resolveIndirect();
+            // Explicit null ≡ omitted arg → getter (php-src Z_PARAM_STR_OR_LONG_OR_NULL; #29919).
+            if (Variable::TYPE_NULL === $resolved->type) {
+                return self::substituteCharacter(null);
+            }
+
             return self::setSubstituteFromVariable($substchar);
         }
         if (\is_string($substchar)) {

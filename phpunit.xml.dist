@@ -230,6 +230,8 @@
             <file>./test/compliance/MbChrOrdNullStrictJITTest.php</file>
             <file>./test/compliance/MbDetectOrderNullGetterVMTest.php</file>
             <file>./test/compliance/MbDetectOrderNullGetterJITTest.php</file>
+            <file>./test/compliance/MbSubstituteCharacterNullGetterVMTest.php</file>
+            <file>./test/compliance/MbSubstituteCharacterNullGetterJITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictJITTest.php</file>
             <file>./test/compliance/TimezoneListIdentifiersNullStrictVMTest.php</file>
