@@ -8,7 +8,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM\RedundantTrueFalseUnionCheck;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #12045, #17996, #26555 */
+/** @covers issue #12045, #17996, #26555, #29961 */
 final class TrueFalseUnionTypeTest extends TestCase
 {
     public function testTrueFalseUnionParamCompilesThenFatalsAtRuntime(): void
@@ -23,6 +23,21 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'true_false_union_param.php');
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(RedundantTrueFalseUnionCheck::FATAL_MESSAGE);
+        $runtime->run($block, false);
+    }
+
+    public function testFalseTrueUnionParamUsesMustWording(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(false|true $x): string {
+    return 't';
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'false_true_union_param.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('bool must be used instead');
         $runtime->run($block, false);
     }
 
