@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ClassConstName;
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
@@ -192,12 +193,13 @@ final class VmIntlChar
 
         $entry = new ClassEntry('IntlChar');
         $entry->isInternal = true;
+        // Exact Zend casing for defined()/hasConstant after #25910 (#30000 / #28132).
         foreach (self::classConstants() as $name => $value) {
-            $lc = strtolower($name);
+            $key = ClassConstName::key($name);
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$lc] = $const;
-            $entry->constNames[$lc] = $name;
+            $entry->constants[$key] = $const;
+            $entry->constNames[$key] = $name;
         }
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
         $methods = [

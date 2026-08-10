@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ClassConstName;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -89,12 +90,13 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('Normalizer');
         $entry->isInternal = true;
+        // Exact Zend casing for defined()/hasConstant after #25910 (#30000 / #28132).
         foreach (VmNormalizer::classConstants() as $name => $value) {
-            $lc = strtolower($name);
+            $key = ClassConstName::key($name);
             $const = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$lc] = $const;
-            $entry->constNames[$lc] = $name;
+            $entry->constants[$key] = $const;
+            $entry->constNames[$key] = $name;
         }
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
         $methods = [
