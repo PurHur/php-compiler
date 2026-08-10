@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7362 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23871 |
+| Source constructs flagged (warnings) | 23872 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1556,7 +1556,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_strtolower.php` | 0 | 3 |
 | `ext/mbstring/mb_strtoupper.php` | 0 | 3 |
 | `ext/mbstring/mb_strwidth.php` | 0 | 2 |
-| `ext/mbstring/mb_substitute_character.php` | 0 | 2 |
+| `ext/mbstring/mb_substitute_character.php` | 0 | 3 |
 | `ext/mbstring/mb_substr.php` | 0 | 4 |
 | `ext/mbstring/mb_substr_count.php` | 0 | 2 |
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
@@ -16595,61 +16595,61 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmNumberFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 257)
-- new Variable (line 262)
-- new NumberFormatterConstruct (line 269)
-- new NumberFormatterCreate (line 273)
-- new NumberFormatterFormat (line 274)
-- new NumberFormatterFormatCurrency (line 275)
-- new NumberFormatterParse (line 276)
-- new NumberFormatterParseCurrency (line 277)
-- new NumberFormatterGetAttribute (line 278)
-- new NumberFormatterSetAttribute (line 279)
-- new NumberFormatterGetSymbol (line 280)
-- new NumberFormatterSetSymbol (line 281)
-- new NumberFormatterGetTextAttribute (line 282)
-- new NumberFormatterSetTextAttribute (line 283)
-- new NumberFormatterGetPattern (line 284)
-- new NumberFormatterSetPattern (line 285)
-- new NumberFormatterGetLocale (line 286)
-- new NumberFormatterGetErrorCode (line 287)
-- new NumberFormatterGetErrorMessage (line 288)
-- new Error (line 306)
-- new ObjectEntry (line 308)
-- new ArgumentCountError (line 2216)
-- new Error (line 2224)
-- new IntlException (line 2234)
-- new ArgumentCountError (line 2251)
-- new ArgumentCountError (line 2292)
-- new Error (line 2300)
-- new ArgumentCountError (line 2337)
-- new Error (line 2345)
-- new ArgumentCountError (line 2374)
-- new Error (line 2382)
-- new ArgumentCountError (line 2437)
-- new Error (line 2445)
-- new ArgumentCountError (line 2498)
-- new Error (line 2506)
-- new ArgumentCountError (line 2538)
-- new Error (line 2546)
-- new ArgumentCountError (line 2570)
-- new Error (line 2578)
-- new ArgumentCountError (line 2606)
-- new Error (line 2614)
-- new ArgumentCountError (line 2638)
-- new Error (line 2646)
-- new ArgumentCountError (line 2674)
-- new Error (line 2682)
-- new ArgumentCountError (line 2706)
-- new Error (line 2714)
-- new ArgumentCountError (line 2741)
-- new Error (line 2749)
-- new ArgumentCountError (line 2772)
-- new Error (line 2780)
-- new ArgumentCountError (line 2807)
-- new Error (line 2815)
-- new ArgumentCountError (line 2836)
-- new Error (line 2844)
+- new ClassEntry (line 263)
+- new Variable (line 268)
+- new NumberFormatterConstruct (line 275)
+- new NumberFormatterCreate (line 279)
+- new NumberFormatterFormat (line 280)
+- new NumberFormatterFormatCurrency (line 281)
+- new NumberFormatterParse (line 282)
+- new NumberFormatterParseCurrency (line 283)
+- new NumberFormatterGetAttribute (line 284)
+- new NumberFormatterSetAttribute (line 285)
+- new NumberFormatterGetSymbol (line 286)
+- new NumberFormatterSetSymbol (line 287)
+- new NumberFormatterGetTextAttribute (line 288)
+- new NumberFormatterSetTextAttribute (line 289)
+- new NumberFormatterGetPattern (line 290)
+- new NumberFormatterSetPattern (line 291)
+- new NumberFormatterGetLocale (line 292)
+- new NumberFormatterGetErrorCode (line 293)
+- new NumberFormatterGetErrorMessage (line 294)
+- new Error (line 312)
+- new ObjectEntry (line 314)
+- new ArgumentCountError (line 2225)
+- new Error (line 2233)
+- new IntlException (line 2243)
+- new ArgumentCountError (line 2260)
+- new ArgumentCountError (line 2301)
+- new Error (line 2309)
+- new ArgumentCountError (line 2346)
+- new Error (line 2354)
+- new ArgumentCountError (line 2383)
+- new Error (line 2391)
+- new ArgumentCountError (line 2446)
+- new Error (line 2454)
+- new ArgumentCountError (line 2507)
+- new Error (line 2515)
+- new ArgumentCountError (line 2547)
+- new Error (line 2555)
+- new ArgumentCountError (line 2579)
+- new Error (line 2587)
+- new ArgumentCountError (line 2615)
+- new Error (line 2623)
+- new ArgumentCountError (line 2647)
+- new Error (line 2655)
+- new ArgumentCountError (line 2683)
+- new Error (line 2691)
+- new ArgumentCountError (line 2715)
+- new Error (line 2723)
+- new ArgumentCountError (line 2750)
+- new Error (line 2758)
+- new ArgumentCountError (line 2781)
+- new Error (line 2789)
+- new ArgumentCountError (line 2816)
+- new Error (line 2824)
+- new ArgumentCountError (line 2845)
+- new Error (line 2853)
 - 78 class method(s)
 
 ### `ext/intl/VmResourceBundle.php`
@@ -18920,8 +18920,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/MbstringState.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 427)
-- new Variable (line 429)
+- new HashTable (line 433)
+- new Variable (line 435)
 - 43 class method(s)
 
 ### `ext/mbstring/Module.php`
@@ -19453,6 +19453,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
+- new ArgumentCountError (line 60)
 - 2 class method(s)
 
 ### `ext/mbstring/mb_substr.php`

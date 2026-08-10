@@ -1,5 +1,5 @@
 --TEST--
-NumberFormatter CURRENCY_ISO/DECIMAL_COMPACT_* withheld on PROFILE=8.4 (#28132)
+NumberFormatter CURRENCY_ISO/DECIMAL_COMPACT_* withheld on PROFILE=8.4 (#28132 / #29998)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
@@ -16,8 +16,10 @@ foreach ([
     'CURRENCY_ACCOUNTING',
     'CURRENCY_ISO',
     'CURRENCY_PLURAL',
+    'CASH_CURRENCY',
     'DECIMAL_COMPACT_SHORT',
     'DECIMAL_COMPACT_LONG',
+    'CURRENCY_STANDARD',
 ] as $c) {
     $full = 'NumberFormatter::'.$c;
     echo $c, '=', defined($full) ? 'y' : 'n', "\n";
@@ -28,5 +30,7 @@ CURRENCY=y
 CURRENCY_ACCOUNTING=y
 CURRENCY_ISO=n
 CURRENCY_PLURAL=n
+CASH_CURRENCY=n
 DECIMAL_COMPACT_SHORT=n
 DECIMAL_COMPACT_LONG=n
+CURRENCY_STANDARD=n
