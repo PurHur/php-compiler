@@ -21859,6 +21859,10 @@ restart:
             return;
         }
         if (null !== $block->returnDnfConstraints && null !== $value) {
+            // `: iterable` as Traversable|array DNF on generators — wrapper type only (#26468 / #29888).
+            if ($this->generatorHasTraversableReturnTypeLabel($block)) {
+                return;
+            }
             DnfCheck::assertMatches(
                 $value,
                 $block->returnDnfConstraints,
@@ -21905,12 +21909,19 @@ restart:
 
     private function generatorHasTraversableReturnTypeLabel(Block $block): bool
     {
-        if (!$block->isGenerator || null === $block->returnClassConstraint) {
+        if (!$block->isGenerator) {
             return false;
         }
-        $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
+        $returnLabel = ltrim(
+            $block->returnDeclaredTypeLabel ?? $block->returnClassConstraint ?? '',
+            '\\'
+        );
+        if ('' === $returnLabel) {
+            return false;
+        }
 
         // Zend: these declare the Generator wrapper at invoke, not getReturn() (#16141, #26468).
+        // Bare `: iterable` keeps returnDeclaredTypeLabel=iterable with Traversable|array DNF (#29888).
         return in_array($returnLabel, ['Generator', 'Iterator', 'Traversable', 'iterable', 'object'], true);
     }
 
@@ -21922,14 +21933,13 @@ restart:
         if ($block->returnTypeStatic) {
             return true;
         }
+        if ($this->generatorHasTraversableReturnTypeLabel($block)) {
+            return false;
+        }
         if (null !== $block->returnDnfConstraints) {
             return true;
         }
         if (null !== $block->returnClassConstraint) {
-            if ($this->generatorHasTraversableReturnTypeLabel($block)) {
-                return false;
-            }
-
             return true;
         }
         if (null !== $block->returnTypeConstraint) {

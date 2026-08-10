@@ -1032,7 +1032,9 @@ class JIT {
             return;
         }
         $return->addref();
-        if (null !== $cfgBlock->returnDnfConstraints) {
+        if (null !== $cfgBlock->returnDnfConstraints
+            && !JIT\ClassReturnCheck::generatorSkipsBodyReturnCheck($cfgBlock)
+        ) {
             JIT\DnfParamCheck::enforce(
                 $this->context,
                 $return,
@@ -11201,7 +11203,9 @@ class JIT {
                         );
                     } else {
                         $return->addref();
-                        if (null !== $block->returnDnfConstraints) {
+                        if (null !== $block->returnDnfConstraints
+                            && !JIT\ClassReturnCheck::generatorSkipsBodyReturnCheck($block)
+                        ) {
                             JIT\DnfParamCheck::enforce(
                                 $this->context,
                                 $return,
@@ -13067,7 +13071,9 @@ class JIT {
             return;
         }
         $value->addref();
-        if (null !== $block->returnDnfConstraints) {
+        if (null !== $block->returnDnfConstraints
+            && !JIT\ClassReturnCheck::generatorSkipsBodyReturnCheck($block)
+        ) {
             JIT\DnfParamCheck::enforce(
                 $this->context,
                 $value,
@@ -13110,15 +13116,13 @@ class JIT {
         if ($block->returnTypeMixed || $block->returnTypeStatic) {
             return true;
         }
+        if (JIT\ClassReturnCheck::generatorSkipsBodyReturnCheck($block)) {
+            return false;
+        }
         if (null !== $block->returnDnfConstraints) {
             return true;
         }
         if (null !== $block->returnClassConstraint) {
-            $label = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
-            if ($block->isGenerator && in_array($label, ['Generator', 'Iterator', 'Traversable', 'iterable', 'object'], true)) {
-                return false;
-            }
-
             return true;
         }
 
@@ -14479,6 +14483,11 @@ class JIT {
             $lit = strtolower($cfgFunc->returnType->name);
             if ('void' === $lit || 'never' === $lit) {
                 return 'void';
+            }
+            // Bare `: iterable` is Traversable|array — boxed `__value__` ABI, not class
+            // `__object__*` (Type::fromDecl maps the name to TYPE_OBJECT, #29888).
+            if ('iterable' === $lit) {
+                return '__value__';
             }
         }
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
