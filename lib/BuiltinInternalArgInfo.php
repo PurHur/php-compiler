@@ -270,6 +270,13 @@ final class BuiltinInternalArgInfo
             'openssl_error_string' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27916)
             'openssl_cipher_key_length' => 'int|false',
+            // ext/openssl/openssl.stub.php — InternalArgInfo resource/int/bool (pre-8.0) (#28567)
+            'openssl_pkey_new',
+            'openssl_pkey_get_public',
+            'openssl_pkey_get_private' => 'OpenSSLAsymmetricKey|false',
+            'openssl_x509_read' => 'OpenSSLCertificate|false',
+            'openssl_csr_new' => 'OpenSSLCertificateSigningRequest|bool',
+            'openssl_verify' => 'int|false',
             // ext/intl/grapheme/grapheme.stub.php — InternalArgInfo size_t/string/int without |false (#27884)
             'grapheme_strlen' => 'int|false|null',
             'grapheme_substr',
