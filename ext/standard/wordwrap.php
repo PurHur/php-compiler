@@ -43,12 +43,9 @@ final class wordwrap extends Internal
         }
         $break = "\n";
         if (isset($frame->calledArgs[2])) {
-            $break = VmString::coerceZparamStrBuiltinArg(
-                $frame->calledArgs[2],
-                'wordwrap',
-                2,
-                'break'
-            );
+            // Soft-null DEP+coerce then empty ValueError (php-src string.c; #29720).
+            // Do not use coerceZparamStrBuiltinArg (8.4 TypeError) — Zend deprecates null $break.
+            $break = self::vmStringArg($frame, 2, 'break');
         }
         $cut = false;
         if (isset($frame->calledArgs[3])) {
@@ -83,7 +80,8 @@ final class wordwrap extends Internal
             $width = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'wordwrap', 2, 'width');
         }
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            $break = JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'wordwrap', 2, 'break');
+            // Soft-null DEP+coerce then empty ValueError (php-src string.c; #29720).
+            $break = self::jitStringArg($context, $args[2], 2, 'break');
         } else {
             $break = $context->builder->load($context->constantStringFromString("\n"));
         }
@@ -158,10 +156,17 @@ final class wordwrap extends Internal
         return self::compileTimeInt($args[1], null);
     }
 
+    /**
+     * Compile-time $break when a string literal; null TYPE_NULL must not fold
+     * (soft-null needs runtime DEP then empty ValueError — #29720 / peer #29354).
+     */
     private static function compileTimeBreak(array $args): ?string
     {
         if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             return "\n";
+        }
+        if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+            return null;
         }
 
         return JitStringArg::compileTimeLiteral($args[2]);
