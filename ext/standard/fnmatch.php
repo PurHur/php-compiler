@@ -30,11 +30,13 @@ final class fnmatch extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // php-src fnmatch.c — pattern null DEP+coerce on 8.4 (#20554, #21366).
-        $pattern = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fnmatch', 1, 'pattern', 'string', false);
-        $filename = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'fnmatch', 2, 'filename');
+        // php-src fnmatch.c — pattern null DEP+coerce on 8.4 (#20554, #21366, #29660).
+        // VmString argIndex is 0-based (helpers add +1 for the user-facing parameter number).
+        $pattern = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fnmatch', 0, 'pattern', 'string', false);
+        $filename = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'fnmatch', 1, 'filename');
         $flags = 0;
         if (3 === $argc) {
+            // VmMath userArgIndex is already 1-based (no +1 in intBuiltinTypeError).
             $flags = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'fnmatch', 3, 'flags');
         }
         $frame->returnVar->bool(VmFnmatch::match($pattern, $filename, $flags));
@@ -57,8 +59,8 @@ final class fnmatch extends Internal
 
         return JitFnmatch::invoke(
             $context,
-            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'fnmatch', 1, 'pattern'),
-            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'fnmatch', 2, 'filename'),
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'fnmatch', 0, 'pattern'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'fnmatch', 1, 'filename'),
             $flags
         );
     }
