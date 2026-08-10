@@ -2819,22 +2819,10 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($compare);
         $valCur = $this->context->builder->structGep($cur, $nodeMap['value']);
         $valNext = $this->context->builder->structGep($next, $nodeMap['value']);
-        $typeCur = $this->context->builder->load($this->context->builder->structGep($valCur, $valueMap['type']));
-        $isString = $this->context->builder->icmp(Builder::INT_EQ, $typeCur, $stringTag);
-        $cmpStr = $fn->appendBasicBlock('natsort_val_cmp_str');
-        $cmpLong = $fn->appendBasicBlock('natsort_val_cmp_long');
-        $cmpDone = $fn->appendBasicBlock('natsort_val_cmp_done');
-        $this->context->builder->branchIf($isString, $cmpStr, $cmpLong);
-
-        $this->context->builder->positionAtEnd($cmpStr);
-        $strCur = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readString'),
-            $valCur
-        );
-        $strNext = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readString'),
-            $valNext
-        );
+        // php-src php_natsort: printable-string natural compare (null → "") (#29691).
+        $strval = new \PHPCompiler\ext\standard\strval();
+        $strCur = $strval->valueToString($this->context, $valCur);
+        $strNext = $strval->valueToString($this->context, $valNext);
         $cmp = $this->context->builder->call(
             $this->context->lookupFunction('strnatcmp'),
             $this->stringDataPtr($strCur),
@@ -2844,24 +2832,6 @@ class HashTable extends Type
             $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false)),
             $needsSwapSlot
         );
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpLong);
-        $longCur = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readLong'),
-            $valCur
-        );
-        $longNext = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readLong'),
-            $valNext
-        );
-        $this->context->builder->store(
-            $this->context->builder->icmp(Builder::INT_SGT, $longCur, $longNext),
-            $needsSwapSlot
-        );
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpDone);
         $needsSwap = $this->context->builder->load($needsSwapSlot);
         $swapBlock = $fn->appendBasicBlock('natsort_val_swap');
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
@@ -2974,22 +2944,10 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($compare);
         $valCur = $this->context->builder->structGep($cur, $nodeMap['value']);
         $valNext = $this->context->builder->structGep($next, $nodeMap['value']);
-        $typeCur = $this->context->builder->load($this->context->builder->structGep($valCur, $valueMap['type']));
-        $isString = $this->context->builder->icmp(Builder::INT_EQ, $typeCur, $stringTag);
-        $cmpStr = $fn->appendBasicBlock('natcasesort_val_cmp_str');
-        $cmpLong = $fn->appendBasicBlock('natcasesort_val_cmp_long');
-        $cmpDone = $fn->appendBasicBlock('natcasesort_val_cmp_done');
-        $this->context->builder->branchIf($isString, $cmpStr, $cmpLong);
-
-        $this->context->builder->positionAtEnd($cmpStr);
-        $strCur = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readString'),
-            $valCur
-        );
-        $strNext = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readString'),
-            $valNext
-        );
+        // php-src php_natcasesort: printable-string natural compare (null → "") (#29691 / #29704).
+        $strval = new \PHPCompiler\ext\standard\strval();
+        $strCur = $strval->valueToString($this->context, $valCur);
+        $strNext = $strval->valueToString($this->context, $valNext);
         $cmp = $this->context->builder->call(
             $this->context->lookupFunction('strnatcasecmp'),
             $this->stringDataPtr($strCur),
@@ -2999,24 +2957,6 @@ class HashTable extends Type
             $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false)),
             $needsSwapSlot
         );
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpLong);
-        $longCur = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readLong'),
-            $valCur
-        );
-        $longNext = $this->context->builder->call(
-            $this->context->lookupFunction('__value__readLong'),
-            $valNext
-        );
-        $this->context->builder->store(
-            $this->context->builder->icmp(Builder::INT_SGT, $longCur, $longNext),
-            $needsSwapSlot
-        );
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpDone);
         $needsSwap = $this->context->builder->load($needsSwapSlot);
         $swapBlock = $fn->appendBasicBlock('natcasesort_val_swap');
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
@@ -3350,14 +3290,11 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($main);
         $ht = $fn->getParam(0);
         $htMap = $this->context->structFieldMap['__hashtable__'];
-        $valueMap = $this->context->structFieldMap['__value__'];
         $sizeT = $this->context->getTypeFromString('size_t');
         $i1 = $this->context->getTypeFromString('int1');
         $i32 = $this->context->getTypeFromString('int32');
-        $i8 = $this->context->getTypeFromString('int8');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
-        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
         $valueType = $this->context->getTypeFromString('__value__');
 
         $n = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['nextFreeElement']));
@@ -3400,39 +3337,17 @@ class HashTable extends Type
         $j = $this->context->builder->addNoSignedWrap($i, $one);
         $valCur = $this->listEntryAt($ht, $htMap, $i);
         $valNext = $this->listEntryAt($ht, $htMap, $j);
-        $typeCur = $this->context->builder->load($this->context->builder->structGep($valCur, $valueMap['type']));
-        $isString = $this->context->builder->icmp(Builder::INT_EQ, $typeCur, $stringTag);
-        $cmpStr = $fn->appendBasicBlock($tag.'_cmp_str');
-        $cmpLong = $fn->appendBasicBlock($tag.'_cmp_long');
-        $cmpDone = $fn->appendBasicBlock($tag.'_cmp_done');
-        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
-        $this->context->builder->branchIf($isString, $cmpStr, $cmpLong);
-
-        $this->context->builder->positionAtEnd($cmpStr);
-        $strCur = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valCur);
-        $strNext = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valNext);
+        // php-src php_natsort / php_natcasesort: always printable-string natural compare
+        // (null → "" so mixed null+strings keep natural order among strings) (#29691).
+        $strval = new \PHPCompiler\ext\standard\strval();
+        $strCur = $strval->valueToString($this->context, $valCur);
+        $strNext = $strval->valueToString($this->context, $valNext);
         $cmp = $this->context->builder->call(
             $this->context->lookupFunction($cmpName),
             $this->stringDataPtr($strCur),
             $this->stringDataPtr($strNext)
         );
-        $this->context->builder->store(
-            $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false)),
-            $needsSwapSlot
-        );
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpLong);
-        $longCur = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valCur);
-        $longNext = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valNext);
-        $this->context->builder->store(
-            $this->context->builder->icmp(Builder::INT_SGT, $longCur, $longNext),
-            $needsSwapSlot
-        );
-        $this->context->builder->branch($cmpDone);
-
-        $this->context->builder->positionAtEnd($cmpDone);
-        $needsSwap = $this->context->builder->load($needsSwapSlot);
+        $needsSwap = $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false));
         $swapBlock = $fn->appendBasicBlock($tag.'_swap');
         $advance = $fn->appendBasicBlock($tag.'_advance');
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);

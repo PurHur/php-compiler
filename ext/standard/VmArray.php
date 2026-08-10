@@ -1137,7 +1137,7 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** natsort() — return array sorted by value using natural order; preserves keys (#9600). */
+    /** natsort() — return array sorted by value using natural order; preserves keys (#9600, #29691). */
     public static function natsortCopy(HashTable $ht): HashTable
     {
         if ($ht->getNumElements() < 2) {
@@ -1154,7 +1154,9 @@ final class VmArray
         } elseif (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)) {
             VmInternalCompare::sortKeyedPairsByValueInt($pairs);
         } else {
-            VmInternalCompare::sortKeyedPairsByValueWithFlags($pairs, StdlibConstants::SORT_REGULAR);
+            // Mixed types (null/bool/… + strings): php-src php_natsort always uses natural
+            // string compare after printable coercion — not SORT_REGULAR (#29691).
+            VmInternalCompare::sortKeyedPairsByValueWithFlags($pairs, StdlibConstants::SORT_NATURAL);
         }
 
         return self::hashTableFromSortedPairs($pairs);
