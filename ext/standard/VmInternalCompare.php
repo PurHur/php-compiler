@@ -84,7 +84,9 @@ final class VmInternalCompare
             $function,
             $argIndex + 1,
             '$flags',
-            false
+            false,
+            $frame,
+            $argIndex
         );
     }
 
@@ -103,7 +105,9 @@ final class VmInternalCompare
             $function,
             2,
             '$flags',
-            false
+            false,
+            $frame,
+            1
         );
     }
 
@@ -116,9 +120,29 @@ final class VmInternalCompare
         string $function,
         int $argNum,
         string $paramName,
-        bool $allowSortingEnum
+        bool $allowSortingEnum,
+        ?Frame $frame = null,
+        int $argIndex = 1
     ): int {
+        // Z_PARAM_LONG soft-null: E_DEPRECATED then coerce to 0; strict_types → TypeError (#29385).
         if (Variable::TYPE_NULL === $flagsArg->type) {
+            if (null !== $frame) {
+                return VmMath::parseZParamLongBuiltinArgForFrame(
+                    $frame,
+                    $argIndex,
+                    $function,
+                    $argNum,
+                    ltrim($paramName, '$')
+                );
+            }
+            VmNullNumberParamDeprecation::emit(
+                null,
+                $function,
+                $argNum,
+                ltrim($paramName, '$'),
+                'int'
+            );
+
             return StdlibConstants::SORT_REGULAR;
         }
         if ($allowSortingEnum) {
@@ -180,7 +204,7 @@ final class VmInternalCompare
         ?Block $block = null,
         ?Operand $flagsOp = null
     ): int {
-        $resolved = self::tryResolveJitSortFlags($context, $flagsArg);
+        $resolved = self::tryResolveJitSortFlags($context, $flagsArg, $function);
         if (null === $resolved && null !== $block && null !== $flagsOp) {
             $resolved = self::tryResolveJitSortFlagsFromBlock($context, $block, $flagsOp);
         }
@@ -196,9 +220,19 @@ final class VmInternalCompare
         return $resolved;
     }
 
-    public static function tryResolveJitSortFlags(Context $context, JITVariable $flagsArg): ?int
-    {
+    public static function tryResolveJitSortFlags(
+        Context $context,
+        JITVariable $flagsArg,
+        string $function = 'sort'
+    ): ?int {
         if (JITVariable::TYPE_NULL === $flagsArg->type || ($flagsArg->isNullConstant ?? false)) {
+            // Z_PARAM_LONG soft-null (#29385); skip DEP IR on user-script AOT (#21593).
+            if ($context->callerStrictTypes) {
+                \PHPCompiler\JIT\InternalStrictArg::requireInt($context, $flagsArg, $function, 'flags', 2);
+            } elseif (!$context->isUserScriptAot()) {
+                JitIntdiv::emitNullIntDeprecation($context, $function, 2, 'flags');
+            }
+
             return StdlibConstants::SORT_REGULAR;
         }
         $constName = $flagsArg->compileTimeConstantName ?? null;
