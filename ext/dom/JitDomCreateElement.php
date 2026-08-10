@@ -46,7 +46,9 @@ final class JitDomCreateElement
                 self::initTextContentSlot($context, $obj, $args[2] ?? null);
                 self::storeOwnerAndNullParent($context, $obj, $args[0]);
 
-                return $obj;
+                // Box like invokeViaHelper so nested appendChild(createElement()) ARG_SEND
+                // receives a __value__* (#29638). Raw __object__* temps abort AOT.
+                return self::boxObjectResult($context, $obj);
             }
             // Runtime name — helper applies xmlValidateName + strictErrorChecking.
             return self::invokeViaHelper($context, ...$args);
@@ -54,10 +56,10 @@ final class JitDomCreateElement
 
         $nameLit = self::compileTimeStringArg($args[1]);
         if (null !== $nameLit) {
-            return self::materializeElementFromLiteral($context, $nameLit);
+            return self::boxObjectResult($context, self::materializeElementFromLiteral($context, $nameLit));
         }
 
-        return self::materializeElementFromRuntimeName($context, $args[1]);
+        return self::boxObjectResult($context, self::materializeElementFromRuntimeName($context, $args[1]));
     }
 
     /** Mirror VmDom::isValidXmlName for compile-time literal gating (#24804). */
@@ -91,7 +93,7 @@ final class JitDomCreateElement
             self::initTextContentSlot($context, $obj, $args[2] ?? null, $elementClass);
             self::storeOwnerAndNullParent($context, $obj, $args[0], $elementClass);
 
-            return $obj;
+            return self::boxObjectResult($context, $obj);
         }
 
         // Runtime name — helper is document-aware but needs a real ObjectEntry document.
@@ -414,5 +416,18 @@ final class JitDomCreateElement
             $nullVar,
             JITVariable::TYPE_VALUE
         );
+    }
+
+    private static function boxObjectResult(Context $context, Value $object): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $object
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 }

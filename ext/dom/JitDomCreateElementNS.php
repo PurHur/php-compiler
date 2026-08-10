@@ -52,7 +52,8 @@ final class JitDomCreateElementNS
                     $obj = self::materializeElementNSFromLiterals($context, $nsLit, $nameLit, $valueLit);
                     self::storeOwnerAndNullParent($context, $obj, $args[0]);
 
-                    return $obj;
+                    // Box like invokeViaHelper — nested appendChild(createElementNS()) (#29638).
+                    return self::boxObjectResult($context, $obj);
                 }
             }
 
@@ -101,7 +102,7 @@ final class JitDomCreateElementNS
                 );
                 self::storeOwnerAndNullParent($context, $obj, $args[0], $elementClass);
 
-                return $obj;
+                return self::boxObjectResult($context, $obj);
             }
         }
 
@@ -457,5 +458,18 @@ final class JitDomCreateElementNS
             $propVar,
             JITVariable::TYPE_NULL
         );
+    }
+
+    private static function boxObjectResult(Context $context, Value $object): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $object
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 }
