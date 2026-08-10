@@ -125,4 +125,41 @@ final class AttributeNewInstanceRuntime
         ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, 'Attribute class not found');
     }
+
+    /**
+     * Args present but attribute class has no constructor (#29955).
+     *
+     * php-src: object_init_with_constructor() Error — zend_get_attribute_object path.
+     */
+    public static function emitNoCtorArgsError(Context $context, string $classDisplayName): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise(
+            $context,
+            \PHPCompiler\VM\ReflectionSupport::attributeNoCtorArgsMessage($classDisplayName)
+        );
+    }
+
+    /** True when ReflectionAttribute::args has at least one entry (argc>0). */
+    public static function emitArgsNonEmpty(Context $context, Value $attrObj): Value
+    {
+        $argsVar = $context->type->object->propertyFetch($attrObj, 'ReflectionAttribute', 'args');
+        if (Variable::TYPE_HASHTABLE === $argsVar->type) {
+            $argsHt = $argsVar->value;
+        } else {
+            $argsHt = HashTableHelper::readHashtableFromValueBox($context, $argsVar);
+        }
+        $n = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $argsHt
+        );
+        $sizeT = $context->getTypeFromString('size_t');
+
+        return $context->builder->icmp(
+            \PHPLLVM\Builder::INT_UGT,
+            $n,
+            $sizeT->constInt(0, false)
+        );
+    }
 }

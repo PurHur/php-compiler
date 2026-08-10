@@ -47,8 +47,10 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
         ReflectionSupport::assertAttributeNewInstanceNoDelayedValidationError($receiver);
         // Abstract / interface / trait / enum: Error like `new` (php-src zend_get_attribute_object, #26238).
         ReflectionSupport::assertAttributeNewInstanceInstantiable($classEntry);
-        $object = new ObjectEntry($classEntry);
         $argSpecs = ReflectionSupport::argsFromReflectionObject($receiver);
+        // Args + no ctor → Error (php-src object_init_with_constructor, #29955).
+        ReflectionSupport::assertAttributeNewInstanceCtorAllowsArgs($classEntry, $argSpecs);
+        $object = new ObjectEntry($classEntry);
         $thisVar = new Variable();
         $thisVar->object($object);
         $vm = VM::running();
