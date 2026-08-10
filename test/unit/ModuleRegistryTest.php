@@ -16,9 +16,13 @@ final class ModuleRegistryTest extends TestCase
         $runtime = new Runtime(Runtime::MODE_NORMAL);
 
         $this->assertTrue(VmInfo::extension_loaded('standard'));
-        $this->assertTrue(VmInfo::extension_loaded('types'));
+        // Compiler-internal types module is not a php-src extension (#28155).
+        $this->assertFalse(VmInfo::extension_loaded('types'));
         $this->assertTrue(VmInfo::extension_loaded('hash'));
-        $this->assertTrue(VmInfo::extension_loaded('zip'));
+        $this->assertSame(
+            \PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension(),
+            VmInfo::extension_loaded('zip')
+        );
         $this->assertTrue(VmInfo::extension_loaded('spl'));
         $this->assertTrue(VmInfo::extension_loaded('json'));
         $this->assertTrue(VmInfo::extension_loaded('date'));
@@ -26,10 +30,15 @@ final class ModuleRegistryTest extends TestCase
         $this->assertTrue(VmInfo::extension_loaded('zlib'));
         $this->assertTrue(VmInfo::extension_loaded('openssl'));
         $this->assertFalse(VmInfo::extension_loaded('curl'));
-        $this->assertTrue(VmInfo::extension_loaded('sqlite3'));
+        $this->assertSame(
+            \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtensionLoaded(),
+            VmInfo::extension_loaded('sqlite3')
+        );
         $this->assertFalse(VmInfo::extension_loaded('nonexistent_xyz'));
 
-        $this->assertNotFalse(VmInfo::phpversion('zip'));
+        if (\PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension()) {
+            $this->assertNotFalse(VmInfo::phpversion('zip'));
+        }
         $this->assertNotFalse(VmInfo::phpversion('spl'));
         $this->assertFalse(VmInfo::phpversion('nonexistent_xyz'));
 
@@ -38,9 +47,17 @@ final class ModuleRegistryTest extends TestCase
         $this->assertSame('10.44', ModuleRegistry::getLibraryExtensionVersion('pcre'));
 
         $loaded = ModuleRegistry::getLoadedExtensions();
-        $this->assertContains('zip', $loaded);
-        $this->assertContains('spl', $loaded);
+        if (\PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension()) {
+            $this->assertContains('zip', $loaded);
+        } else {
+            $this->assertNotContains('zip', $loaded);
+        }
+        $this->assertContains('SPL', $loaded);
         $this->assertContains('hash', $loaded);
+        $this->assertContains('Core', $loaded);
+        $this->assertNotContains('types', $loaded);
+        $this->assertSame('Core', ModuleRegistry::displayNameForExtension('core'));
+        $this->assertSame('Zend OPcache', ModuleRegistry::displayNameForExtension('zend opcache'));
 
         unset($runtime);
     }
@@ -51,7 +68,8 @@ final class ModuleRegistryTest extends TestCase
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/InfoJitHelper.php');
         $this->assertStringContainsString('InfoJitHelper', $bridge);
         $this->assertStringContainsString('ModuleRegistry::getLoadedExtensions', $helper);
-        $this->assertStringContainsString('ModuleRegistry::getExtensionFunctions', $helper);
+        // get_extension_funcs path is VmInfo::get_extension_funcs → ModuleRegistry (#13803).
+        $this->assertStringContainsString('VmInfo::get_extension_funcs', $helper);
         $this->assertStringNotContainsString('ModuleRegistry::extensionFunctionMap', $bridge);
     }
 

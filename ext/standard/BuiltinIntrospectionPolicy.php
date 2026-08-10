@@ -344,6 +344,10 @@ final class BuiltinIntrospectionPolicy
     public static function extensionIsAdvertised(string $extension): bool
     {
         $ext = strtolower($extension);
+        // Compiler-internal type builtins module — not a php-src zend_module_entry (#28155).
+        if ('types' === $ext) {
+            return false;
+        }
         if ('bcmath' === $ext) {
             return CompilerVersion::advertisesBcmath();
         }
