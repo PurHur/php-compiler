@@ -68,6 +68,27 @@ final class NatcasesortBuiltinTest extends TestCase
         $this->assertSame(['c:V1', 'a:v2', 'b:V10'], $out);
     }
 
+    public function testNaturalCaseSortWithNullKeepsStringNaturalOrder(): void
+    {
+        $runtime = new Runtime();
+        $fn = new natcasesort_();
+        $ht = new HashTable();
+        $null = new VMVariable();
+        $null->null();
+        $ht->addIndex(0, $null);
+        foreach ([1 => 'img2.png', 2 => 'img10.png', 3 => 'img1.png'] as $i => $v) {
+            $val = new VMVariable();
+            $val->string($v);
+            $ht->addIndex($i, $val);
+        }
+        $sorted = $this->runNatcasesort($fn, $runtime, $ht);
+        $vals = [];
+        foreach ($sorted->iterate(true) as $v) {
+            $vals[] = VMVariable::TYPE_NULL === $v->type ? null : $v->toString();
+        }
+        $this->assertSame([null, 'img1.png', 'img2.png', 'img10.png'], $vals);
+    }
+
     private function runNatcasesort(Internal $fn, Runtime $runtime, HashTable $array): HashTable
     {
         $frame = $fn->getFrame($runtime->vmContext);
