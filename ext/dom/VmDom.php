@@ -8502,7 +8502,13 @@ final class VmDom
         if (isset($state->attributes['id'])) {
             $state->attributeIsId['id'] = true;
         }
-        self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument, $frame);
+        // Opaque text elements: do not re-parse `<` as markup until the matching end tag
+        // (libxml htmlReadMemory; #29799).
+        if (self::htmlElementHasOpaqueTextContent($localName)) {
+            self::appendHtmlOpaqueTextChild($ctx, $entry, $inner, $ownerDocument, $localName);
+        } else {
+            self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument, $frame);
+        }
         // HTML `<template>` keeps parsed descendants in a DocumentFragment, not childIds
         // (php-src html5_parser.c / php_dom_add_templated_content; #26034).
         if (self::isHtmlTemplateElement($entry)) {
@@ -8510,6 +8516,58 @@ final class VmDom
         }
 
         return $entry;
+    }
+
+    /**
+     * HTML elements whose content is opaque text until the matching end tag
+     * (libxml htmlReadMemory; script/style RAWTEXT + title/textarea/… RCDATA-like; #29799).
+     */
+    private static function htmlElementHasOpaqueTextContent(string $tagLc): bool
+    {
+        return 'script' === $tagLc
+            || 'style' === $tagLc
+            || 'xmp' === $tagLc
+            || 'iframe' === $tagLc
+            || 'noscript' === $tagLc
+            || 'noembed' === $tagLc
+            || 'noframes' === $tagLc
+            || 'plaintext' === $tagLc
+            || 'title' === $tagLc
+            || 'textarea' === $tagLc
+            || 'listing' === $tagLc;
+    }
+
+    /**
+     * Whether opaque HTML text expands character references (libxml htmlReadMemory; #29799).
+     *
+     * script/style keep entity markup raw; other opaque elements decode (&lt; → <).
+     */
+    private static function htmlOpaqueTextDecodesEntities(string $tagLc): bool
+    {
+        return 'script' !== $tagLc && 'style' !== $tagLc;
+    }
+
+    /** Single text child for opaque HTML elements (libxml htmlReadMemory; #29799). */
+    private static function appendHtmlOpaqueTextChild(
+        Context $ctx,
+        ObjectEntry $parent,
+        string $inner,
+        ObjectEntry $ownerDocument,
+        string $tagLc,
+    ): void {
+        if ('' === $inner) {
+            return;
+        }
+        $text = self::htmlOpaqueTextDecodesEntities($tagLc)
+            ? self::decodeHtmlCharacterReferences($inner)
+            : $inner;
+        if ('' === $text) {
+            return;
+        }
+        $state = DomRegistry::state($parent);
+        $textNode = self::createTextNode($ctx, $text, $ownerDocument);
+        $state->childIds[] = $textNode->id;
+        self::linkChildToParent($textNode, $parent);
     }
 
     private static function appendHtmlChildren(
@@ -8620,6 +8678,10 @@ final class VmDom
         }
 
         $tag = strtolower($open['tag']);
+        // Opaque text: only the matching end tag closes; `<` inside is literal (#29799).
+        if (self::htmlElementHasOpaqueTextContent($tag)) {
+            return self::findHtmlOpaqueTextElementEnd($content, $open['end'], $tag);
+        }
         /** @var list<string> $stack */
         $stack = [$tag];
         $scan = $open['end'];
@@ -8686,6 +8748,30 @@ final class VmDom
         // #25988 non-optional div/span/…). Well-formed start tags get no libxml warning.
         while ([] !== $stack) {
             array_pop($stack);
+        }
+
+        return $len;
+    }
+
+    /**
+     * End offset for opaque HTML elements — scan for matching close tag only (#29799).
+     *
+     * @return int byte offset after the closing tag, or strlen($content) if unclosed
+     */
+    private static function findHtmlOpaqueTextElementEnd(string $content, int $scan, string $tagLc): int
+    {
+        $len = \strlen($content);
+        while ($scan < $len) {
+            if ('<' !== $content[$scan]) {
+                ++$scan;
+
+                continue;
+            }
+            $close = self::scanHtmlCloseTagAt($content, $scan);
+            if (null !== $close && strtolower($close['tag']) === $tagLc) {
+                return $close['end'];
+            }
+            ++$scan;
         }
 
         return $len;
