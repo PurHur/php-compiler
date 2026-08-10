@@ -98,12 +98,14 @@ final class JitTimezoneOffsetGet
 
         TimezoneOffsetRuntime::ensureLinked($context);
 
-        $zoneObj = self::requireDateTimeZoneObject($context, $zoneArg, $zoneTypeError);
-        $dtObj = self::requireDateTimeInterfaceObject($context, $datetimeArg, $datetimeTypeError);
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
 
-        // TYPE_STRING props are __string__* slots — do not load before the offset ABI (#27307/#27308).
+        // Thin AOT: NestedJIT helper link shifts class_ids so assertClassOneOf aborts
+        // ("object given"). Read zone-name prop without class_id check (#29732).
+        $zoneObj = self::requireObjectValue($context, $zoneArg, $zoneTypeError, 'array');
         $zoneNamePtr = JitTimezoneProceduralArg::readStringPropPtr(
             $context,
             $object,
@@ -111,10 +113,28 @@ final class JitTimezoneOffsetGet
             'DateTimeZone',
             DateTimeSupport::TZ_NAME_PROPERTY
         );
-        $ts = self::readTimestampProp($context, $object, $dtObj);
 
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
+        if (null !== $timestamp) {
+            // Common case: DateTime(Immutable) construct stamped compileTimeLong (#29732).
+            $context->builder->call(
+                $context->lookupFunction('__phpc_timezone_offset_seconds'),
+                $zoneNamePtr,
+                $context->getTypeFromString('int64')->constInt($timestamp, true),
+                $ptr
+            );
+
+            return $ptr;
+        }
+
+        $dtObj = self::requireObjectValue($context, $datetimeArg, $datetimeTypeError, 'array');
+        // Prefer DateTimeImmutable prop layout then DateTime — avoid class_id branch (#29732).
+        $ts = self::readLongProp(
+            $context,
+            $object,
+            $dtObj,
+            'DateTimeImmutable',
+            DateTimeSupport::TS_PROPERTY
+        );
         $context->builder->call(
             $context->lookupFunction('__phpc_timezone_offset_seconds'),
             $zoneNamePtr,
@@ -127,7 +147,17 @@ final class JitTimezoneOffsetGet
 
     private static function tryCompileTimeZoneName(Context $context, JITVariable $arg): ?string
     {
-        if (null !== $arg->compileTimeString && '' !== $arg->compileTimeString) {
+        // Dedicated stamp from DateTimeZone::__construct — survives assign (#29732).
+        if (null !== $arg->compileTimeTimezoneName && '' !== $arg->compileTimeTimezoneName) {
+            return $arg->compileTimeTimezoneName;
+        }
+        // Legacy: construct also wrote zone id into compileTimeString (pre-#29732).
+        // Ignore class-name collision from New_ (`DateTimeZone`).
+        if (
+            null !== $arg->compileTimeString
+            && '' !== $arg->compileTimeString
+            && 0 !== strcasecmp($arg->compileTimeString, 'DateTimeZone')
+        ) {
             return $arg->compileTimeString;
         }
 

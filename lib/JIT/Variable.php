@@ -136,6 +136,14 @@ final class Variable {
     public ?string $compileTimeDatePeriodTimezone = null;
 
     /**
+     * IANA / offset id from DateTimeZone::__construct (not class name).
+     *
+     * Distinct from {@see $compileTimeString}: `new DateTimeZone` stamps the class name on
+     * compileTimeString for scope hints; zone id must survive assign for AOT fold (#29732).
+     */
+    public ?string $compileTimeTimezoneName = null;
+
+    /**
      * DateInterval::__construct() parse when $duration is a compile-time string (#26772).
      *
      * @var array{y:int,m:int,d:int,h:int,i:int,s:int,f:float,invert:int}|null

@@ -191,8 +191,16 @@ final class JitDateTimeConstruct
         string $function
     ): ?string {
         unset($function, $context);
-        // Prefer stamped zone id from DateTimeZone::__construct (#26772).
-        if (null !== $arg->compileTimeString && '' !== $arg->compileTimeString) {
+        // Dedicated stamp from DateTimeZone::__construct (#29732 / peer #26772).
+        if (null !== $arg->compileTimeTimezoneName && '' !== $arg->compileTimeTimezoneName) {
+            return $arg->compileTimeTimezoneName;
+        }
+        // Legacy stamp; ignore New_ class-name collision on compileTimeString.
+        if (
+            null !== $arg->compileTimeString
+            && '' !== $arg->compileTimeString
+            && 0 !== strcasecmp($arg->compileTimeString, 'DateTimeZone')
+        ) {
             return $arg->compileTimeString;
         }
         $lit = self::compileTimeStringArg($arg);

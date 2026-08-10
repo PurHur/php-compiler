@@ -54,6 +54,11 @@ class Scope {
     public bool $preserveNewResultOnNullCall = false;
 
     /**
+     * METHODCALL_INIT bound datetimezone::getoffset; EXEC may rewrite if argc==1 (#29732).
+     */
+    public bool $pendingDateTimeZoneGetOffset = false;
+
+    /**
      * Fiber::suspend() was short-circuited in a resume function — next FUNCCALL_EXEC_RETURN
      * must load {@see __fiber_state__}::resume_argument (#26801, Zend/zend_fibers.c).
      */

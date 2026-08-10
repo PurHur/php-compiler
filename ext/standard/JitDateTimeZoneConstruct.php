@@ -58,6 +58,8 @@ final class JitDateTimeZoneConstruct
             JITVariable::TYPE_STRING
         );
         ReflectionSetup::markConstructed($context, $obj);
+        // Zone id on dedicated field — compileTimeString stays class name from New_ (#29732).
+        $args[0]->compileTimeTimezoneName = $name;
         $args[0]->compileTimeString = $name;
 
         $slot = JitValueBox::alloc($context);
