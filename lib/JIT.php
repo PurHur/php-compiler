@@ -11203,6 +11203,16 @@ class JIT {
                         );
                     } else {
                         $return->addref();
+                        if ($block->returnTypeStatic) {
+                            $objectType = $this->context->type->object;
+                            assert($objectType instanceof JIT\Builtin\Type\Object_);
+                            JIT\LateStaticBindingHelper::emitAssertStaticReturn(
+                                $objectType,
+                                $block,
+                                $return,
+                                $this->jitReturnTypeCallableName($block->func)
+                            );
+                        }
                         if (null !== $block->returnDnfConstraints
                             && !JIT\ClassReturnCheck::generatorSkipsBodyReturnCheck($block)
                         ) {
