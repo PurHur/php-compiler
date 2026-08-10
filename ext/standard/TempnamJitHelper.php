@@ -9,17 +9,17 @@ namespace PHPCompiler\ext\standard;
  *
  * Leaf is `@tempnam` → NestedJIT whitelist {@see tempnam} →
  * {@see \PHPCompiler\JIT\Builtin\StringTempnam} → {@see JitTempnamKernel}
- * mkstemp leaf (peer SysGetTempDirJitHelper #29433 / GetcwdJitHelper #29429).
- * Empty string on failure so the bridge can box to false.
+ * mkstemp leaf (peer FileGetContentsJitHelper #29833 / SysGetTempDirJitHelper #29433).
+ * Null on failure so the ABI bridge returns null `__string__*` (call site boxes false).
  * php-src: ext/standard/file.c — php_tempnam / PHP_FUNCTION(tempnam)
  */
 final class TempnamJitHelper
 {
-    /** @return string empty when tempnam() fails */
-    public static function resolveArgv(string $directory, string $prefix): string
+    /** @return string|null null when tempnam() fails */
+    public static function resolveArgv(string $directory, string $prefix): ?string
     {
         $path = \tempnam($directory, $prefix);
 
-        return \is_string($path) ? $path : '';
+        return \is_string($path) ? $path : null;
     }
 }

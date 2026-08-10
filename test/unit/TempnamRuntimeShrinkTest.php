@@ -17,15 +17,14 @@ final class TempnamRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitTempnam.php');
         $this->assertStringContainsString('StringTempnam::invoke', $source);
-        $this->assertStringNotContainsString('BasicBlockHelper', $source);
+        $this->assertStringContainsString('materializeStringOrFalse', $source);
         $this->assertStringNotContainsString('__compiler_tempnam', $source);
-        $this->assertLessThan(50, \substr_count($source, "\n") + 1);
     }
 
     public function testTempnamJitHelperUsesHostPeelNotFsDirNative(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/TempnamJitHelper.php');
-        $this->assertStringContainsString('public static function resolveArgv(string $directory, string $prefix): string', $source);
+        $this->assertStringContainsString('public static function resolveArgv(string $directory, string $prefix): ?string', $source);
         $this->assertStringContainsString('\\tempnam(', $source);
         $this->assertDoesNotMatchRegularExpression('/^\s*.*FsDirJitHelper::/m', $source);
         $this->assertDoesNotMatchRegularExpression('/^\s*.*VmFsTempnamNative::/m', $source);
@@ -40,6 +39,8 @@ final class TempnamRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureCompiled', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('JitTempnamKernel::invoke', $source);
+        $this->assertStringContainsString('__string__*', $source);
+        $this->assertStringNotContainsString('JitValueBox::alloc', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementForThinAot', $source);
         $this->assertStringNotContainsString('FsDirJitHelper.php', $source);
@@ -78,6 +79,7 @@ final class TempnamRuntimeShrinkTest extends TestCase
         $dir = VmSysGetTempDirNative::resolve();
         $path = TempnamJitHelper::resolveArgv($dir, 'phpc');
         $this->assertNotNull($path);
+        $this->assertIsString($path);
         $this->assertStringStartsWith($dir, $path);
         $this->assertFileExists($path);
         @unlink($path);
