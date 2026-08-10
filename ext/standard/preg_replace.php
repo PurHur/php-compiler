@@ -78,9 +78,10 @@ final class preg_replace extends Internal
 
         $pattern = self::patternOrReplacementOperand($patternVar, $frame->calledArgs[0], 'preg_replace', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailureOperand($frame, 'preg_replace', $pattern);
+        // Use resolved $replacementVar so soft-null DEP is not re-emitted as type "string" (#29722).
         $replacement = self::patternOrReplacementOperand(
             $replacementVar,
-            $frame->calledArgs[1],
+            $replacementVar,
             'preg_replace',
             1,
             'replacement'
