@@ -1216,7 +1216,8 @@ final class Variable {
      * ({@see zend_isset_dim_slow}, #22895).
      *
      * Float dims emit Zend Implicit-conversion E_DEPRECATED (not "String offset cast occurred");
-     * null/bool coerce silently — read-path cast warnings stay on {@see stringOffsetIndexFromDim} (#29557).
+     * null/bool coerce silently — read-path cast warnings stay on {@see stringOffsetIndexFromDim}
+     * (#29557 float; #29558 null/bool isset/empty).
      */
     public static function stringOffsetIsSetFromDim(
         self $container,
@@ -1247,7 +1248,7 @@ final class Variable {
         } elseif (self::TYPE_FLOAT === $dim->type) {
             $rawIndex = self::stringOffsetIssetIndexFromFloat($dim->float, $context, $frame);
         } elseif (self::TYPE_NULL === $dim->type || self::TYPE_BOOLEAN === $dim->type) {
-            // zend_isset_dim: null/bool → long with no string-offset cast warning (#29557).
+            // zend_isset_dim: null/bool → long with no string-offset cast warning (#29558).
             $rawIndex = $dim->toInt();
         } else {
             $rawIndex = self::stringOffsetIndexFromDim($dim, $reporter, $context, $frame, $file);

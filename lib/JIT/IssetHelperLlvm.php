@@ -360,7 +360,7 @@ final class IssetHelperLlvm
                 $truncated
             );
         } elseif (Variable::TYPE_NATIVE_BOOL === $dim->type) {
-            // Silent coerce (no string-offset cast warning) — matches zend_isset_dim (#29557).
+            // Silent coerce (no string-offset cast warning) — matches zend_isset_dim (#29558).
             $dim = $dim->castTo(Variable::TYPE_NATIVE_LONG);
         } elseif (Variable::TYPE_NULL === $dim->type) {
             $dim = new Variable(
