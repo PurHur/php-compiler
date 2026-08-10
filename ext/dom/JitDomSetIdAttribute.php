@@ -21,6 +21,9 @@ use PHPLLVM\Value;
  * stores {@see DomUserScriptElementCacheLlvm} using a compile-time id value (from
  * loadXML literal or a preceding setAttribute('id', …)) so getElementById avoids
  * reading an uninitialized id map after loadXML.
+ *
+ * setAttribute reusing an id already in the compile-time loadXML literal skips/clears
+ * the cache — xmlAddID first-wins after replaceChild (#29694 / re-#25274).
  */
 final class JitDomSetIdAttribute
 {
@@ -64,7 +67,7 @@ final class JitDomSetIdAttribute
             $fromSetAttribute = false;
             $idLit = self::resolveCompileTimeIdValue($args[1], $fromSetAttribute);
             if (null !== $idLit && '' !== $idLit) {
-                self::storeCacheFirstWins($context, $element, $idLit, $fromSetAttribute);
+                self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
             }
         }
 
@@ -100,7 +103,7 @@ final class JitDomSetIdAttribute
             $fromSetAttribute = false;
             $idLit = self::resolveCompileTimeIdValue($args[2], $fromSetAttribute);
             if (null !== $idLit && '' !== $idLit) {
-                self::storeCacheFirstWins($context, $element, $idLit, $fromSetAttribute);
+                self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
             }
         }
 
@@ -134,7 +137,7 @@ final class JitDomSetIdAttribute
             $fromSetAttribute = false;
             $idLit = self::resolveCompileTimeNodeIdValue($fromSetAttribute);
             if (null !== $idLit && '' !== $idLit) {
-                self::storeCacheFirstWins($context, $element, $idLit, $fromSetAttribute);
+                self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
             }
         }
 
@@ -206,6 +209,43 @@ final class JitDomSetIdAttribute
         }
 
         return null;
+    }
+
+    /**
+     * Gate thin-AOT id-cache stores on compile-time duplicate-id proof (#29694).
+     *
+     * setAttribute('id', $v) when loadXML already contained id="$v" matches php-src
+     * xmlAddID first-wins (replaceChild same id): DomRegistry rejects the new
+     * registration, so the LLVM cache must not claim the replacement — including
+     * on cache miss after a different id overwrote the single-slot cache.
+     *
+     * @param bool $fromSetAttribute True when the id value came from setAttribute('id', …).
+     */
+    private static function storeCacheIfElementOwnsId(
+        Context $context,
+        Value $element,
+        string $idLit,
+        bool $fromSetAttribute
+    ): void {
+        if ($fromSetAttribute && self::loadXmlLiteralAlreadyDefinesId($idLit)) {
+            return;
+        }
+        // setAttribute-sourced fresh ids overwrite; loadXML-resolved ids are first-wins.
+        self::storeCacheFirstWins($context, $element, $idLit, $fromSetAttribute);
+    }
+
+    /** True when compile-time loadXML text already has this id attribute value. */
+    private static function loadXmlLiteralAlreadyDefinesId(string $idLit): bool
+    {
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === $xml) {
+            return false;
+        }
+
+        return 1 === preg_match(
+            '/\bid\s*=\s*(["\'])'.preg_quote($idLit, '/').'\1/',
+            $xml
+        );
     }
 
     private static function storeCacheFirstWins(

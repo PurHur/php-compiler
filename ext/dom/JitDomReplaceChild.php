@@ -78,6 +78,8 @@ final class JitDomReplaceChild
         }
 
         JitDomReplaceChildLiveSlots::sync($context, $parent, $newChild, $oldChild, $childCount);
+        // Drop thin-AOT getElementById cache when the cached element is detached (#29694).
+        DomUserScriptElementCacheLlvm::invalidateIfElement($context, $oldChild);
 
         // Element nav slots — only-child replace collapses to newChild (#27216).
         $objectType = $context->type->object;
