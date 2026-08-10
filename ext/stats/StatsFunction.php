@@ -25,6 +25,26 @@ abstract class StatsFunction extends Internal
 
             return;
         }
+        if (true === $result) {
+            $frame->returnVar->bool(true);
+
+            return;
+        }
+        if (\is_array($result)) {
+            $ht = new \PHPCompiler\VM\HashTable();
+            foreach ($result as $item) {
+                $cell = new Variable();
+                if (\is_int($item)) {
+                    $cell->int($item);
+                } else {
+                    $cell->float((float) $item);
+                }
+                $ht->append($cell);
+            }
+            $frame->returnVar->array($ht);
+
+            return;
+        }
         if (\is_int($result)) {
             $frame->returnVar->int($result);
 
@@ -69,12 +89,17 @@ abstract class StatsFunction extends Internal
             'stats_cdf_t' => JitStats::cdf($context, VmStatsCdf::OP_T, 3, ...$args),
             'stats_cdf_chisquare' => JitStats::cdf($context, VmStatsCdf::OP_CHISQUARE, 3, ...$args),
             'stats_cdf_gamma' => JitStats::cdf($context, VmStatsCdf::OP_GAMMA, 4, ...$args),
+            'stats_rand_setall' => JitStats::randSetall($context, ...$args),
+            'stats_rand_getsd' => JitStats::randGetsd($context, ...$args),
+            'stats_rand_ranf' => JitStats::randRanf($context, ...$args),
+            'stats_rand_gen_normal' => JitStats::randGenNormal($context, ...$args),
+            'stats_rand_gen_iuniform' => JitStats::randGenIuniform($context, ...$args),
             default => throw new \LogicException('unsupported stats builtin: '.$this->getName()),
         };
     }
 
-    /** @return float|int|false */
-    abstract protected function compute(Frame $frame): float|int|bool;
+    /** @return float|int|false|true|array */
+    abstract protected function compute(Frame $frame): float|int|bool|array;
 
     protected function requireArrayArg(Frame $frame, int $index, string $label): Variable
     {

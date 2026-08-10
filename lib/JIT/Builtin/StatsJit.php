@@ -43,6 +43,16 @@ final class StatsJit
 
     private const ABI_CDF = '__compiler_stats_cdf';
 
+    private const ABI_RAND_SETALL = '__compiler_stats_rand_setall';
+
+    private const ABI_RAND_GETSD = '__compiler_stats_rand_getsd';
+
+    private const ABI_RAND_RANF = '__compiler_stats_rand_ranf';
+
+    private const ABI_RAND_GEN_NORMAL = '__compiler_stats_rand_gen_normal';
+
+    private const ABI_RAND_GEN_IUNIFORM = '__compiler_stats_rand_gen_iuniform';
+
     private const HELPER_PATH = '/ext/stats/StatsJitHelper.php';
 
     private const VARIANCE_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::variance';
@@ -73,6 +83,16 @@ final class StatsJit
 
     private const CDF_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::cdf';
 
+    private const RAND_SETALL_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randSetall';
+
+    private const RAND_GETSD_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randGetsd';
+
+    private const RAND_RANF_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randRanf';
+
+    private const RAND_GEN_NORMAL_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randGenNormal';
+
+    private const RAND_GEN_IUNIFORM_HELPER = 'PHPCompiler\\ext\\stats\\StatsJitHelper::randGenIuniform';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::VARIANCE_HELPER,
@@ -89,6 +109,11 @@ final class StatsJit
         self::BINOM_HELPER,
         self::DENS_HELPER,
         self::CDF_HELPER,
+        self::RAND_SETALL_HELPER,
+        self::RAND_GETSD_HELPER,
+        self::RAND_RANF_HELPER,
+        self::RAND_GEN_NORMAL_HELPER,
+        self::RAND_GEN_IUNIFORM_HELPER,
     ];
 
     /** @var list<string> */
@@ -107,6 +132,11 @@ final class StatsJit
         self::ABI_BINOM,
         self::ABI_DENS,
         self::ABI_CDF,
+        self::ABI_RAND_SETALL,
+        self::ABI_RAND_GETSD,
+        self::ABI_RAND_RANF,
+        self::ABI_RAND_GEN_NORMAL,
+        self::ABI_RAND_GEN_IUNIFORM,
     ];
 
     public static function implement(Context $context): void
@@ -275,6 +305,61 @@ final class StatsJit
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#29588'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_SETALL,
+            'stats_rand_setall_bridge_entry',
+            [$i64, $i64],
+            $i1,
+            self::RAND_SETALL_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29589'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_GETSD,
+            'stats_rand_getsd_bridge_entry',
+            [],
+            $htPtr,
+            self::RAND_GETSD_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29589'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_RANF,
+            'stats_rand_ranf_bridge_entry',
+            [],
+            $double,
+            self::RAND_RANF_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29589'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_GEN_NORMAL,
+            'stats_rand_gen_normal_bridge_entry',
+            [$double, $double],
+            $double,
+            self::RAND_GEN_NORMAL_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29589'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RAND_GEN_IUNIFORM,
+            'stats_rand_gen_iuniform_bridge_entry',
+            [$i64, $i64],
+            $double,
+            self::RAND_GEN_IUNIFORM_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#29589'
         );
         self::ensureLibcSqrt($context);
         self::registerLinkedRuntime($context);

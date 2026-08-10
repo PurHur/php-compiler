@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7324 |
-| Phase A inventory files (M2 ratio SSOT) | 7324 |
+| PHP files on vm.php path | 7330 |
+| Phase A inventory files (M2 ratio SSOT) | 7330 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23745 |
+| Source constructs flagged (warnings) | 23763 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4618,13 +4618,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zlib_encode.php` | 0 | 1 |
 | `ext/standard/zlib_get_coding_type.php` | 0 | 2 |
 | `ext/stats/JitStats.php` | 0 | 2 |
-| `ext/stats/Module.php` | 0 | 34 |
+| `ext/stats/Module.php` | 0 | 39 |
 | `ext/stats/StatsExtensionPolicy.php` | 0 | 1 |
-| `ext/stats/StatsFunction.php` | 0 | 1 |
+| `ext/stats/StatsFunction.php` | 0 | 2 |
 | `ext/stats/StatsJitHelper.php` | 0 | 1 |
 | `ext/stats/VmStats.php` | 0 | 1 |
 | `ext/stats/VmStatsCdf.php` | 0 | 1 |
 | `ext/stats/VmStatsDens.php` | 0 | 1 |
+| `ext/stats/VmStatsRand.php` | 0 | 2 |
 | `ext/stats/stats_absolute_deviation.php` | 0 | 2 |
 | `ext/stats/stats_cdf_chisquare.php` | 0 | 2 |
 | `ext/stats/stats_cdf_gamma.php` | 0 | 2 |
@@ -4649,6 +4650,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_dens_weibull.php` | 0 | 2 |
 | `ext/stats/stats_harmonic_mean.php` | 0 | 2 |
 | `ext/stats/stats_kurtosis.php` | 0 | 2 |
+| `ext/stats/stats_rand_gen_iuniform.php` | 0 | 2 |
+| `ext/stats/stats_rand_gen_normal.php` | 0 | 2 |
+| `ext/stats/stats_rand_getsd.php` | 0 | 2 |
+| `ext/stats/stats_rand_ranf.php` | 0 | 2 |
+| `ext/stats/stats_rand_setall.php` | 0 | 2 |
 | `ext/stats/stats_skew.php` | 0 | 2 |
 | `ext/stats/stats_standard_deviation.php` | 0 | 2 |
 | `ext/stats/stats_stat_binomial_coef.php` | 0 | 2 |
@@ -41463,8 +41469,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/JitStats.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 342)
-- 21 class method(s)
+- new ArgumentCountError (line 428)
+- 26 class method(s)
 
 ### `ext/stats/Module.php`
 
@@ -41502,6 +41508,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new stats_cdf_t (line 55)
 - new stats_cdf_chisquare (line 56)
 - new stats_cdf_gamma (line 57)
+- new stats_rand_setall (line 58)
+- new stats_rand_getsd (line 59)
+- new stats_rand_ranf (line 60)
+- new stats_rand_gen_normal (line 61)
+- new stats_rand_gen_iuniform (line 62)
 - 1 class method(s)
 
 ### `ext/stats/StatsExtensionPolicy.php`
@@ -41512,12 +41523,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/StatsFunction.php`
 
 **Warnings** (review for bootstrap subset):
+- new Variable (line 36)
 - 8 class method(s)
 
 ### `ext/stats/StatsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 19 class method(s)
 
 ### `ext/stats/VmStats.php`
 
@@ -41533,6 +41545,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 20 class method(s)
+
+### `ext/stats/VmStatsRand.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 191)
+- 10 class method(s)
 
 ### `ext/stats/stats_absolute_deviation.php`
 
@@ -41673,6 +41691,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/stats/stats_kurtosis.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_rand_gen_iuniform.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_rand_gen_normal.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_rand_getsd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 2 class method(s)
+
+### `ext/stats/stats_rand_ranf.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_rand_setall.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -53295,7 +53343,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitOperandTypeLabel.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 113)
+- new Variable (line 118)
 - 7 class method(s)
 
 ### `lib/JIT/JitPowNumericOperandGuard.php`
@@ -58258,20 +58306,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 639)
 - new Variable (line 648)
 - new Variable (line 652)
-- new Variable (line 772)
-- new EnumCaseEntry (line 778)
-- new Variable (line 793)
-- new Variable (line 803)
-- new Variable (line 864)
-- new Variable (line 871)
-- new Variable (line 878)
-- new Variable (line 900)
-- new Variable (line 910)
-- new Variable (line 917)
-- new Variable (line 925)
-- new HashTable (line 1004)
-- new Variable (line 1013)
-- new Error (line 1123)
+- new Variable (line 775)
+- new EnumCaseEntry (line 781)
+- new Variable (line 796)
+- new Variable (line 806)
+- new Variable (line 867)
+- new Variable (line 874)
+- new Variable (line 881)
+- new Variable (line 903)
+- new Variable (line 913)
+- new Variable (line 920)
+- new Variable (line 928)
+- new HashTable (line 1007)
+- new Variable (line 1016)
+- new Error (line 1126)
 - 55 class method(s)
 
 ### `lib/VM/EnumCasesJitHelper.php`

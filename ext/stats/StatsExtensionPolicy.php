@@ -44,6 +44,7 @@ final class StatsExtensionPolicy
             || str_contains($testFileName, 'stats_stat_')
             || str_contains($testFileName, 'stats_dens')
             || str_contains($testFileName, 'stats_cdf')
+            || str_contains($testFileName, 'stats_rand')
             || str_contains($testFileName, 'extension_loaded_stats')
             || str_contains($testFileName, 'maintainer_gap_stats')
             || str_contains($testFileName, 'stats_phantom')
