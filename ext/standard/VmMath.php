@@ -463,9 +463,20 @@ final class VmMath
         string $paramName
     ): int {
         if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireInt($frame, $argIndex, $function, $paramName);
+            // Use $userArgIndex for TypeError — method frames include $this (#29829).
+            $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $arg->type) {
+                throw new \TypeError(
+                    self::intBuiltinTypeError(
+                        $function,
+                        $userArgIndex,
+                        $paramName,
+                        EnumCaseSupport::typeNameForTypeErrorActual($arg)
+                    )
+                );
+            }
 
-            return $frame->calledArgs[$argIndex]->resolveIndirect()->toInt();
+            return $arg->toInt();
         }
         $var = $frame->calledArgs[$argIndex];
         $resolved = $var->resolveIndirect();
