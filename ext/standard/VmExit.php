@@ -71,7 +71,16 @@ final class VmExit
         }
         if (Variable::TYPE_FLOAT === $v->type) {
             if ($twoArgForm) {
-                return $v->toInt();
+                return self::floatStatusToInt($v->toFloat(), $frame);
+            }
+            // PHP 8.4+ exit()/die() string|int: float → int status + precision DEP (#29574).
+            // Pre-8.4 construct form stringifies (1.5→"1.5" + exit 0).
+            if (CompilerVersion::supportsExitFunctionForm()) {
+                if (self::callerStrictTypes($frame)) {
+                    throw self::typeErrorForStatus($v);
+                }
+
+                return self::floatStatusToInt($v->toFloat(), $frame);
             }
             echo $v->toString();
 
@@ -192,5 +201,22 @@ final class VmExit
         }
 
         return InternalStrictArg::isCallerStrict($frame);
+    }
+
+    /**
+     * Truncate float→int like Zend zend_dval_to_lval; E_DEPRECATED on precision loss (#29574).
+     */
+    private static function floatStatusToInt(float $value, ?Frame $frame): int
+    {
+        $ctx = null !== $frame ? $frame->vmContext : null;
+        if (null === $ctx) {
+            $vm = VM::running();
+            $ctx = $vm?->context;
+        }
+        if (null !== $ctx) {
+            VmMath::warnFloatToIntPrecisionLoss($value, $ctx, $frame);
+        }
+
+        return VmMath::floatToZendLong($value);
     }
 }

@@ -43,6 +43,20 @@ final class ScriptExit
                 self::callLibcExit($context, $context->helper->loadValue($arg));
                 break;
             case Variable::TYPE_NATIVE_DOUBLE:
+                // PHP 8.4+ string|int: float → int status + precision DEP; do not print (#29574).
+                if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+                    if ($context->callerStrictTypes) {
+                        self::emitStatusTypeErrorAndAbort($context, 'float');
+
+                        return;
+                    }
+                    $longVal = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                        $context,
+                        $context->helper->loadValue($arg)
+                    );
+                    self::callLibcExit($context, $longVal);
+                    break;
+                }
                 $doubleVal = $context->helper->loadValue($arg);
                 $context->builder->call(
                     $context->lookupFunction('__phpc_ob_echo_double'),
@@ -317,11 +331,24 @@ final class ScriptExit
             $context->lookupFunction('__value__readDouble'),
             $boxedPtr
         );
-        $context->builder->call(
-            $context->lookupFunction('__phpc_ob_echo_double'),
-            $doubleVal
-        );
-        self::callLibcExit($context, $i64->constInt(0, false));
+        // PHP 8.4+ string|int: boxed float → int status + precision DEP (#29574).
+        if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+            if ($context->callerStrictTypes) {
+                self::emitStatusTypeErrorAndAbort($context, 'float');
+            } else {
+                $longVal = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                    $context,
+                    $doubleVal
+                );
+                self::callLibcExit($context, $longVal);
+            }
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__phpc_ob_echo_double'),
+                $doubleVal
+            );
+            self::callLibcExit($context, $i64->constInt(0, false));
+        }
 
         $context->builder->positionAtEnd($afterDouble);
         $isEnumCase = $context->builder->icmp(
