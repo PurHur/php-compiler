@@ -49,14 +49,18 @@ final class ExceptionConstruct implements Call
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $object = $context->type->object;
 
-        if (isset($args[1]) && Variable::TYPE_NULL !== $args[1]->type) {
-            if (Variable::TYPE_STRING !== $args[1]->type) {
-                $msgStr = $context->builder->load($context->constantStringFromString(''));
-                $msgVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $msgStr);
-            } else {
-                $msgStr = $context->helper->loadValue($args[1]);
-                $msgVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $msgStr);
-            }
+        if (isset($args[1]) && Variable::TYPE_NULL !== $args[1]->type && empty($args[1]->isNullConstant)) {
+            // FuncCall temps are often TYPE_VALUE boxes — the old non-STRING → "" path wiped
+            // UnhandledMatchError messages from phpc_match_unhandled_operand_message (#29747).
+            // Zend: string $message — Z_PARAM_STR coerce via JitStringBuiltinArg (incl. boxed).
+            $msgStr = JitStringBuiltinArg::lower(
+                $context,
+                $args[1],
+                $this->constructClassName.'::__construct',
+                0,
+                'message'
+            );
+            $msgVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $msgStr);
         } else {
             $msgStr = $context->builder->load($context->constantStringFromString(''));
             $msgVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $msgStr);

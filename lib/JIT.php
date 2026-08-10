@@ -8282,8 +8282,20 @@ class JIT {
                         }
                         if (null !== $destOp) {
                             $destUsed = [] !== $destOp->usages;
-                            if ($destUsed || $forceAssign) {
-                                $this->assignOperand($destOp, $value, $destUsed || $forceAssign);
+                            // php-cfg Assign result temps often have empty Operand::$usages when the
+                            // value only feeds ARG_SEND (match subject snapshot → message helper).
+                            // Still write the result so ARG_SEND does not read an uninitialized
+                            // null value box (#29747 / Block::assignResultSlotConsumedByLaterOp).
+                            $resultConsumedLater = null !== $op->arg1
+                                && $op->arg1 !== $op->arg2
+                                && $op->arg1 !== $rhsSlot
+                                && !$block->assignTempSlotIsDead((int) $op->arg1);
+                            if ($destUsed || $forceAssign || $resultConsumedLater) {
+                                $this->assignOperand(
+                                    $destOp,
+                                    $value,
+                                    $destUsed || $forceAssign || $resultConsumedLater
+                                );
                             }
                         }
                     }
@@ -17413,36 +17425,21 @@ class JIT {
             }
         }
         if ('__string__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
+            // Replace the value-box Variable with a typed string. The previous path wrote the
+            // string into the existing box but set isNullConstant while emitting the null-ptr
+            // IR arm — that PHP-side flag stuck even when the runtime takes the copy arm, so
+            // UnhandledMatchError::__construct saw a "null" message after match helpers (#29747).
             $dest->free();
-            $isNullPtr = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $value,
-                $value->typeOf()->constNull()
+            unset($this->context->scope->variables[$result]);
+            $this->context->setVariableOp(
+                $result,
+                new Variable(
+                    $this->context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $value
+                )
             );
-            $nullBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_null_ptr');
-            $copyBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_copy_ptr');
-            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_ptr_done');
-            $this->context->builder->branchIf($isNullPtr, $nullBlock, $copyBlock);
-            $this->context->builder->positionAtEnd($nullBlock);
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeNull'),
-                JIT\JitValueBox::pointer($this->context, $dest->value)
-            );
-            $dest->isNullConstant = true;
-            $this->context->builder->branch($doneBlock);
-            $this->context->builder->positionAtEnd($copyBlock);
-            $owned = $this->context->builder->call(
-                $this->context->lookupFunction('__string__separate'),
-                $value
-            );
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeString'),
-                JIT\JitValueBox::pointer($this->context, $dest->value),
-                $owned
-            );
-            $this->context->builder->branch($doneBlock);
-            $this->context->builder->positionAtEnd($doneBlock);
-            $dest->addref();
 
             return;
         }
