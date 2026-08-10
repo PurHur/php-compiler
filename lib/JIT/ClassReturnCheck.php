@@ -262,13 +262,47 @@ final class ClassReturnCheck
         ?string $callableName,
         string $expected
     ): void {
-        unset($objectType);
-        $given = self::scalarGivenLabel($arg);
-        if (null !== $given) {
-            self::raiseReturnTypeError($context, $callableName, $expected, $given);
+        $scalarGiven = self::scalarGivenLabel($arg);
+        if (null !== $scalarGiven) {
+            self::raiseReturnTypeError($context, $callableName, $expected, $scalarGiven);
 
             return;
         }
+        // Compile-time class_id when available (zend_execute_API.c prints concrete class).
+        $compileTime = JitOperandTypeLabel::givenLabel($context, $arg);
+        if ('object' !== $compileTime) {
+            self::raiseReturnTypeError($context, $callableName, $expected, $compileTime);
+
+            return;
+        }
+        // Runtime cascade over known class ids — same shape as ClassParamCheck (#29911 / #29912).
+        $obj = self::objectPointer($context, $arg);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $entry = $context->builder->getInsertBlock();
+        $defaultBlock = $fn->appendBasicBlock('class_return_fail_default');
+        $checkBlock = $entry;
+        foreach ($objectType->allClassNamesById() as $id => $name) {
+            $given = \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
+                ltrim($name, '\\')
+            );
+            $matchBlock = $fn->appendBasicBlock('class_return_fail_msg_'.$id);
+            $nextBlock = $fn->appendBasicBlock('class_return_fail_try_'.$id);
+            $context->builder->positionAtEnd($checkBlock);
+            $expectedId = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expectedId);
+            $context->builder->branchIf($isId, $matchBlock, $nextBlock);
+            $context->builder->positionAtEnd($matchBlock);
+            self::raiseReturnTypeError($context, $callableName, $expected, $given);
+            $checkBlock = $nextBlock;
+        }
+        $context->builder->positionAtEnd($checkBlock);
+        $context->builder->branch($defaultBlock);
+        $context->builder->positionAtEnd($defaultBlock);
         self::raiseReturnTypeError($context, $callableName, $expected, 'object');
     }
 
