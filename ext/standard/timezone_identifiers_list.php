@@ -45,8 +45,10 @@ final class timezone_identifiers_list extends Internal
         $timezoneGroup = DateTimeZoneSupport::GROUP_ALL;
         $countryCode = null;
         if (\array_key_exists(0, $frame->calledArgs) && null !== $frame->calledArgs[0]) {
-            $timezoneGroup = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[0],
+            // php-src php_date.stub.php int $timezoneGroup — null TypeError under strict_types (#29844).
+            $timezoneGroup = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                0,
                 'timezone_identifiers_list',
                 1,
                 'timezoneGroup'
