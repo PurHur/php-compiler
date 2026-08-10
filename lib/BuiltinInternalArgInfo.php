@@ -1106,8 +1106,12 @@ final class BuiltinInternalArgInfo
                 1, 2 => 'bool',
                 default => null,
             },
-            // ext/standard/array.stub.php — int|float $step = 1 (InternalArgInfo int) (#25480)
-            'range' => 2 === $index ? 'int|float' : null,
+            // ext/standard/array.stub.php — string|int|float $start/$end; int|float $step = 1 (#25480, #29348)
+            'range' => match ($index) {
+                0, 1 => 'string|int|float',
+                2 => 'int|float',
+                default => null,
+            },
             // ext/standard/basic_functions.stub.php — int $levels = 1 (missing from InternalArgInfo) (#25480)
             'dirname' => 1 === $index ? 'int' : null,
             // ext/standard/math.stub.php — int|float $num (InternalArgInfo float) (#25595)
