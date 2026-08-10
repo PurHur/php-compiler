@@ -27,11 +27,14 @@ final class DateTimeSetTimestamp extends VmClassMethod
             $frame->vmContext
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
-        $timestamp = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1],
+        // Z_PARAM_LONG — caller strict_types → TypeError on null (#29841).
+        // Frame arg 1 includes $this; user-visible Argument #1 ($timestamp).
+        $timestamp = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
             "{$label}::setTimestamp",
             1,
-            'unixTimestamp'
+            'timestamp'
         );
         if (null === $frame->returnVar) {
             return;

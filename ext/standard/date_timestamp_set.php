@@ -39,11 +39,12 @@ final class date_timestamp_set extends Internal
             'object',
             $frame->vmContext
         );
-        $timestamp = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1],
+        $timestamp = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
             'date_timestamp_set',
             2,
-            'unixTimestamp'
+            'timestamp'
         );
         DateTimeSupport::setTimestamp($datetime, $timestamp);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($frame): void {
