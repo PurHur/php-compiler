@@ -9,12 +9,14 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringBase64Decode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** base64_decode() — RFC 4648 decode with optional $strict (php-src ext/standard/base64.c). */
@@ -31,13 +33,10 @@ final class base64_decode extends Internal
         $this->requireArgCountRange($frame, 'base64_decode', 1, 2);
         $argc = \count($frame->calledArgs);
         $data = self::vmStringArg($frame);
+        // Z_PARAM_BOOL — strict_types TypeError; else null→false + E_DEPRECATED (php-src base64.c; #29867).
         $strict = false;
         if (2 === $argc) {
-            $strictVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $strictVar->type) {
-                throw new \LogicException('base64_decode() argument #2 ($strict) must be a boolean in this compiler build');
-            }
-            $strict = $strictVar->toBool();
+            $strict = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'base64_decode', 2, 'strict');
         }
         $result = VmString::base64_decode($data, $strict);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($result): void {
@@ -64,13 +63,24 @@ final class base64_decode extends Internal
 
             return $unreachable;
         }
-        $strict = null;
         $strictConst = false;
         if (2 === $argc) {
-            $strict = $this->jitBool($context, $args[1], 'base64_decode() argument #2 ($strict)');
+            // Compile-time non-bool under strict: TypeError then stop IR (#29867).
+            // Continuing past abort leaves a terminator mid-block under AOT (substr_compare #29756).
+            if ($context->callerStrictTypes && self::isCompileTimeNonBoolStrict($args[1])) {
+                // Mirror requireInt: ensure insert block before TypeError+abort (#29779 / #29867).
+                JitNativeString::ensureInsertBlock($context);
+                JitInternalStrictArg::requireBool($context, $args[1], 'base64_decode', 'strict', 2);
+
+                return $context->constantFromBool(false);
+            }
+            // Soft-null DEP+coerce outside strict; helper ABI is non-strict-only (#26890).
+            JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'base64_decode', 'strict', 2);
             $ct = $args[1]->compileTimeBool ?? null;
             if (null !== $ct) {
                 $strictConst = (bool) $ct;
+            } elseif (self::isCompileTimeNull($args[1])) {
+                $strictConst = false;
             }
         }
         // Null → soft-coerce to "" without helper IR (base64_decode("") === ""; #21188).
@@ -88,7 +98,11 @@ final class base64_decode extends Internal
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
             $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         }
-        if (null !== $literal && (1 === $argc || null !== ($args[1]->compileTimeBool ?? null))) {
+        if (null !== $literal && (
+            1 === $argc
+            || null !== ($args[1]->compileTimeBool ?? null)
+            || self::isCompileTimeNull($args[1])
+        )) {
             $result = VmString::base64_decode($literal, $strictConst);
             if (false === $result) {
                 return $context->constantFromBool(false);
@@ -141,5 +155,23 @@ final class base64_decode extends Internal
             0,
             'string'
         );
+    }
+
+    private static function isCompileTimeNull(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
+    }
+
+    /** Compile-time operand that cannot satisfy Z_PARAM_BOOL under strict_types. */
+    private static function isCompileTimeNonBoolStrict(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type || null !== ($arg->compileTimeBool ?? null)) {
+            return false;
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type && !self::isCompileTimeNull($arg)) {
+            return false;
+        }
+
+        return true;
     }
 }
