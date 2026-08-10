@@ -762,7 +762,9 @@ class Compiler {
                 if (null !== $resolved && '' !== $resolved) {
                     $block->returnTypeConstraint = Variable::TYPE_OBJECT;
                     $block->returnClassConstraint = $resolved;
-                    $block->returnDeclaredTypeLabel = ltrim($refName, '\\');
+                    // Zend TypeError prints the resolved class for self/parent (zend_execute_API.c);
+                    // keep unresolved trait `parent` as the keyword (#29911, #29912).
+                    $block->returnDeclaredTypeLabel = ltrim($resolved, '\\');
                 }
 
                 return;
