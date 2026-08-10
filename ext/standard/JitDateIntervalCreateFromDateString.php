@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -23,23 +24,35 @@ final class JitDateIntervalCreateFromDateString
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        return self::invokeNamed($context, 'date_interval_create_from_date_string', ...$args);
+    }
+
+    /** Shared bake path for procedural + DateInterval::createFromDateString (#29843). */
+    public static function invokeNamed(Context $context, string $function, JITVariable ...$args): Value
+    {
         if (1 !== \count($args)) {
             throw new \LogicException(
-                'date_interval_create_from_date_string() expects exactly 1 argument in this compiler build'
+                $function.'() expects exactly 1 argument in this compiler build'
             );
         }
 
-        $lit = self::compileTimeStringArg($args[0]);
-        if (null === $lit) {
-            throw new \LogicException(
-                'date_interval_create_from_date_string() requires compile-time string operands in this compiler build (issue #4606)'
-            );
+        // string $datetime — null TypeError under caller strict_types (#29843).
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            JitInternalStrictArg::requireString($context, $args[0], $function, 'datetime', 1);
+            $lit = '';
+        } else {
+            $lit = self::compileTimeStringArg($args[0]);
+            if (null === $lit) {
+                throw new \LogicException(
+                    $function.'() requires compile-time string operands in this compiler build (issue #4606)'
+                );
+            }
         }
 
         $warning = null;
         $parsed = VmDateInterval::parseFromDateString($lit, $warning);
         if (null === $parsed) {
-            return self::emitParseFailure($context, (string) $warning);
+            return self::emitParseFailure($context, $function, (string) $warning);
         }
 
         return self::materializeDateInterval($context, $lit, $parsed);
@@ -55,9 +68,9 @@ final class JitDateIntervalCreateFromDateString
         return $arg->compileTimeString;
     }
 
-    private static function emitParseFailure(Context $context, string $warning): Value
+    private static function emitParseFailure(Context $context, string $function, string $warning): Value
     {
-        self::emitParseWarning($context, $warning);
+        self::emitParseWarning($context, $function, $warning);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(0, false));
@@ -65,9 +78,9 @@ final class JitDateIntervalCreateFromDateString
         return $ptr;
     }
 
-    private static function emitParseWarning(Context $context, string $warning): void
+    private static function emitParseWarning(Context $context, string $function, string $warning): void
     {
-        $msg = 'date_interval_create_from_date_string(): '.$warning;
+        $msg = $function.'(): '.$warning;
         $msgStr = $context->builder->pointerCast(
             $context->constantFromString($msg),
             $context->getTypeFromString('int8*')

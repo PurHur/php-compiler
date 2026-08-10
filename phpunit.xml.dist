@@ -195,6 +195,8 @@
             <file>./test/compliance/IsASubclassNullClassStrictJITTest.php</file>
             <file>./test/compliance/TimezoneListIdentifiersNullStrictVMTest.php</file>
             <file>./test/compliance/TimezoneListIdentifiersNullStrictJITTest.php</file>
+            <file>./test/compliance/DateIntervalCreateFromDateStringNullStrictVMTest.php</file>
+            <file>./test/compliance/DateIntervalCreateFromDateStringNullStrictJITTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsVMTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsJITTest.php</file>
             <file>./test/compliance/AsymmetricVisibilityReadonlyPrivateSetOrderVMTest.php</file>
