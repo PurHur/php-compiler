@@ -929,21 +929,41 @@ final class InheritanceVariance
         string $parentClass,
         MethodSig $parent
     ): string {
+        // Property-hook synthetics: Zend cites Class::$prop::get/set() (zend_inheritance.c, #29690).
+        $methodDisplay = self::hookMethodDisplayName($methodLc);
+        $childReturn = $child->formatReturn($childClass);
+        $parentReturn = $parent->formatReturn($parentClass);
+        // Instance set hooks often omit `: void` in lowered PHP; Zend still prints it.
+        if (null !== \PHPCompiler\SourcePreprocessor\PropertyHooks::propertyNameFromSetHookMethod($methodLc)) {
+            if ('' === $childReturn) {
+                $childReturn = ': void';
+            }
+            if ('' === $parentReturn) {
+                $parentReturn = ': void';
+            }
+        }
         // Zend prefixes `& ` before Class::method when the declaration returns by-ref
         // (zend_inheritance.c / zend_error, #26530).
         return sprintf(
             'Declaration of %s%s::%s(%s)%s must be compatible with %s%s::%s(%s)%s',
             $child->returnsByRef ? '& ' : '',
             $childClass,
-            $methodLc,
+            $methodDisplay,
             $child->formatParams($childClass),
-            $child->formatReturn($childClass),
+            $childReturn,
             $parent->returnsByRef ? '& ' : '',
             $parentClass,
-            $methodLc,
+            $methodDisplay,
             $parent->formatParams($parentClass),
-            $parent->formatReturn($parentClass)
+            $parentReturn
         );
+    }
+
+    /** `$prop::get` / `$prop::set` for synthetic PropertyHooks methods; else the method LC. */
+    private static function hookMethodDisplayName(string $methodLc): string
+    {
+        return \PHPCompiler\SourcePreprocessor\PropertyHooks::reflectionNameFromHookMethod($methodLc)
+            ?? $methodLc;
     }
 
     /**

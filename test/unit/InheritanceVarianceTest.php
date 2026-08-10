@@ -1049,4 +1049,127 @@ PHP;
         $runtime->run($block);
         $this->assertSame("2\n", ob_get_clean());
     }
+
+    /**
+     * Hooked property type widen: Zend cites $prop::get() prototypes (#29690).
+     */
+    public function testHookedPropertyTypeWidenCitesGetHook(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+                $this->markTestSkipped('property hooks disabled on reference profile');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class A {
+  public string $prop {
+    get => "a";
+    set(string $v) {}
+  }
+}
+class B extends A {
+  public string|int $prop {
+    get => 1;
+    set(string|int $v) {}
+  }
+}
+PHP;
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Declaration of B::$prop::get(): string|int must be compatible with A::$prop::get(): string'
+            );
+            $runtime->parseAndCompile($code, 'hook_prop_type_widen.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    /**
+     * Set-only hooked property type narrow: Zend cites $prop::set() (#29690).
+     */
+    public function testHookedPropertyTypeNarrowCitesSetHook(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+                $this->markTestSkipped('property hooks disabled on reference profile');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class A {
+  public string|int $prop {
+    set(string|int $v) {}
+  }
+}
+class B extends A {
+  public string $prop {
+    set(string $v) {}
+  }
+}
+PHP;
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Declaration of B::$prop::set(string $v): void must be compatible with A::$prop::set(string|int $v): void'
+            );
+            $runtime->parseAndCompile($code, 'hook_prop_type_narrow_set.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    /** Plain vs hooked still uses property-type LSP wording (#29690). */
+    public function testPlainChildAgainstHookedParentUsesPropertyTypeMessage(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+                $this->markTestSkipped('property hooks disabled on reference profile');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class A {
+  public string $prop {
+    get => "a";
+    set {}
+  }
+}
+class B extends A {
+  public int $prop;
+}
+PHP;
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Type of B::$prop must be string (as in class A)');
+            $runtime->parseAndCompile($code, 'plain_vs_hooked_prop.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
 }
