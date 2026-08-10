@@ -129,6 +129,10 @@ final class BuiltinInternalArgInfo
             'stream_filter_append', 'stream_filter_prepend' => '',
             // ext/standard/proc_open.stub.php — no return type; InternalArgInfo says resource (#27847)
             'proc_open' => '',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo string/int/empty; Zend unions (#28842)
+            'exec', 'system' => 'string|false',
+            'passthru' => '?false',
+            'shell_exec' => 'string|false|null',
             // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |bool) (#27684)
             'stream_socket_enable_crypto' => 'int|bool',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#25480, #28223)
