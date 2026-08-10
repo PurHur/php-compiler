@@ -121,21 +121,12 @@ final class exit_ extends Internal
         if (null !== $status) {
             ScriptExit::emit($context, $status);
         } else {
-            ScriptExit::emit($context, self::jitNullStatus($context));
+            // Bare exit()/die() — default status 0; must not look like exit(null) (#29575).
+            ScriptExit::emitLibcExitWithStatus(
+                $context,
+                $context->getTypeFromString('int64')->constInt(0, false)
+            );
         }
-    }
-
-    private static function jitNullStatus(Context $context): JITVariable
-    {
-        $null = new JITVariable(
-            $context,
-            JITVariable::TYPE_NULL,
-            JITVariable::KIND_VALUE,
-            $context->getTypeFromString('__value__*')->constNull()
-        );
-        $null->isNullConstant = true;
-
-        return $null;
     }
 
     private static function jitRequireStringOrIntStatus(Context $context, JITVariable $arg, string $function): void

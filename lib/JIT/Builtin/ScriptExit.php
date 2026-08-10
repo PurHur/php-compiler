@@ -33,6 +33,21 @@ final class ScriptExit
     {
         switch ($arg->type) {
             case Variable::TYPE_NULL:
+                // PHP 8.4+ string|int: null → E_DEPRECATED then status 0 (#29575).
+                if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+                    if ($context->callerStrictTypes) {
+                        self::emitStatusTypeErrorAndAbort($context, 'null');
+
+                        return;
+                    }
+                    \PHPCompiler\JIT\JitStringBuiltinArg::emitNullStringParamDeprecation(
+                        $context,
+                        'exit',
+                        0,
+                        'status',
+                        'string|int'
+                    );
+                }
                 self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
                 break;
             case Variable::TYPE_STRING:
@@ -256,7 +271,23 @@ final class ScriptExit
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
 
         $context->builder->positionAtEnd($nullBlock);
-        self::callLibcExit($context, $i64->constInt(0, false));
+        // PHP 8.4+ string|int: boxed null → E_DEPRECATED then status 0 (#29575).
+        if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+            if ($context->callerStrictTypes) {
+                self::emitStatusTypeErrorAndAbort($context, 'null');
+            } else {
+                \PHPCompiler\JIT\JitStringBuiltinArg::emitNullStringParamDeprecation(
+                    $context,
+                    'exit',
+                    0,
+                    'status',
+                    'string|int'
+                );
+                self::callLibcExit($context, $i64->constInt(0, false));
+            }
+        } else {
+            self::callLibcExit($context, $i64->constInt(0, false));
+        }
 
         $context->builder->positionAtEnd($afterNull);
         $isString = $context->builder->icmp(
