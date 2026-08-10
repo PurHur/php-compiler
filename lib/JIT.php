@@ -1037,7 +1037,8 @@ class JIT {
                 $this->context,
                 $return,
                 $cfgBlock->returnDnfConstraints,
-                'Return value'
+                'Return value',
+                $this->jitReturnTypeCallableName($cfgBlock->func)
             );
         }
         if (!$this->emitJitClassReturnTypeCheck($cfgBlock, $return)) {
@@ -11205,7 +11206,8 @@ class JIT {
                                 $this->context,
                                 $return,
                                 $block->returnDnfConstraints,
-                                'Return value'
+                                'Return value',
+                                $this->jitReturnTypeCallableName($block->func)
                             );
                         }
                         if (!$this->emitJitClassReturnTypeCheck($block, $return)) {
@@ -13070,7 +13072,8 @@ class JIT {
                 $this->context,
                 $value,
                 $block->returnDnfConstraints,
-                'Return value'
+                'Return value',
+                $this->jitReturnTypeCallableName($block->func)
             );
         }
         if (!$this->emitJitClassReturnTypeCheck($block, $value)) {
