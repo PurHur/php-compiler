@@ -32,9 +32,10 @@ final class date_offset_get extends Internal
                 \sprintf('date_offset_get() expects exactly 1 argument, %d given', $argc)
             );
         }
+        // Bare function label + argNum — DateTimeSupport formats Argument #N (#29864).
         $datetime = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[0],
-            'date_offset_get(): Argument #1 ($object)',
+            'date_offset_get()',
             $frame->vmContext,
             1,
             'object'
