@@ -278,6 +278,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_document_schema_validate_warning.phpt',
             'dom_document_schema_validate_warning.phpt'
         );
+        yield 'dom_schema_validate_entity_loader.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_schema_validate_entity_loader.phpt',
+            'dom_schema_validate_entity_loader.phpt'
+        );
         yield 'dom_document_validate_source.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_document_validate_source.phpt',
             'dom_document_validate_source.phpt'

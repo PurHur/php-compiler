@@ -174,20 +174,24 @@ final class VmLibxml
             }
             $content = self::materializeExternalEntityLoaderResult($ctx, $result);
             if (null === $content) {
-                // Custom loader returned null/false — php-src reports entity id "NULL" (code 1).
+                // php-src ext/libxml/libxml.c — php_libxml_external_entity_loader (#29596):
+                // public ID NULL → "because the resolver function returned null"; else quote the ID.
+                $message = null === $publicId
+                    ? 'Failed to load external entity because the resolver function returned null'
+                    : sprintf('Failed to load external entity "%s"', $publicId);
                 self::handleError(
                     $ctx,
                     [
                         'level' => LibxmlConstants::LIBXML_ERR_ERROR,
                         'code' => 1,
                         'column' => 0,
-                        'message' => 'Failed to load external entity "NULL"',
+                        'message' => $message,
                         'file' => '',
                         'line' => 0,
                     ],
                     $frame,
                     null,
-                    'Failed to load external entity "NULL"'
+                    $message
                 );
 
                 return null;

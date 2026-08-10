@@ -22,6 +22,14 @@ final class VmDomValidationNative
     /** @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}> */
     private static array $lastErrors = [];
 
+    /**
+     * Whether the last validate* call successfully parsed the schema/RNG resource itself
+     * (before document validation). Used so entity-loader paths can emit php-src's
+     * "Failed to parse the XML resource" / "xmlRelaxNGParse: could not load" only on
+     * schema parse failure (#29596).
+     */
+    private static ?bool $lastSchemaResourceParsed = null;
+
     public static function available(): bool
     {
         return null !== self::ffi();
@@ -36,6 +44,12 @@ final class VmDomValidationNative
         self::$lastErrors = [];
 
         return $errors;
+    }
+
+    /** @see $lastSchemaResourceParsed */
+    public static function lastSchemaResourceParsed(): ?bool
+    {
+        return self::$lastSchemaResourceParsed;
     }
 
     public static function validateSchemaDocument(string $docXml, string $schemaPath): bool
@@ -169,6 +183,7 @@ final class VmDomValidationNative
     private static function validateSchemaAgainstDoc(string $docXml, callable $newParserCtxt): bool
     {
         self::$lastErrors = [];
+        self::$lastSchemaResourceParsed = null;
         $ffi = self::ffi();
         if (null === $ffi) {
             return false;
@@ -186,6 +201,7 @@ final class VmDomValidationNative
 
             $parser = $newParserCtxt($ffi);
             if (null === $parser) {
+                self::$lastSchemaResourceParsed = false;
                 self::captureLibxmlErrors();
                 $ffi->xmlFreeDoc($doc);
 
@@ -195,11 +211,13 @@ final class VmDomValidationNative
             $schema = $ffi->xmlSchemaParse($parser);
             $ffi->xmlSchemaFreeParserCtxt($parser);
             if (null === $schema) {
+                self::$lastSchemaResourceParsed = false;
                 self::captureLibxmlErrors();
                 $ffi->xmlFreeDoc($doc);
 
                 return false;
             }
+            self::$lastSchemaResourceParsed = true;
 
             $valid = $ffi->xmlSchemaNewValidCtxt($schema);
             if (null === $valid) {
@@ -293,6 +311,7 @@ final class VmDomValidationNative
     private static function validateRelaxNGAgainstDoc(string $docXml, callable $newParserCtxt): bool
     {
         self::$lastErrors = [];
+        self::$lastSchemaResourceParsed = null;
         $ffi = self::ffi();
         if (null === $ffi) {
             return false;
@@ -310,6 +329,7 @@ final class VmDomValidationNative
 
             $parser = $newParserCtxt($ffi);
             if (null === $parser) {
+                self::$lastSchemaResourceParsed = false;
                 self::captureLibxmlErrors();
                 $ffi->xmlFreeDoc($doc);
 
@@ -319,11 +339,13 @@ final class VmDomValidationNative
             $grammar = $ffi->xmlRelaxNGParse($parser);
             $ffi->xmlRelaxNGFreeParserCtxt($parser);
             if (null === $grammar) {
+                self::$lastSchemaResourceParsed = false;
                 self::captureLibxmlErrors();
                 $ffi->xmlFreeDoc($doc);
 
                 return false;
             }
+            self::$lastSchemaResourceParsed = true;
 
             $valid = $ffi->xmlRelaxNGNewValidCtxt($grammar);
             if (null === $valid) {
