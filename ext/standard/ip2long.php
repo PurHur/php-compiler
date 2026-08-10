@@ -26,7 +26,8 @@ final class ip2long extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('ip2long() requires exactly one argument in this compiler build');
         }
-        $ip = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ip2long', 0, 'ip');
+        // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29785).
+        $ip = VmString::stringBuiltinArgForFrame($frame, 0, 'ip2long', 0, 'ip', false);
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,10 +45,11 @@ final class ip2long extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ip2long() requires exactly one argument in this compiler build');
         }
+        // Soft-null outside strict_types; strict → TypeError (#29785).
+        $ip = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'ip2long', 0, 'ip')
+            : JitStringBuiltinArg::lower($context, $args[0], 'ip2long', 0, 'ip', 'string', null, false);
 
-        return JitInet::ip2long(
-            $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'ip2long', 0, 'ip')
-        );
+        return JitInet::ip2long($context, $ip);
     }
 }
