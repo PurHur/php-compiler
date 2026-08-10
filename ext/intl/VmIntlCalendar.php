@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\ClassConstName;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
@@ -236,12 +237,13 @@ final class VmIntlCalendar
 
         $entry = new ClassEntry('IntlCalendar');
         $entry->isInternal = true;
+        // Exact Zend casing for defined()/hasConstant after #25910 (#29999 / #28132).
         foreach (self::classConstants() as $name => $value) {
-            $lc = strtolower($name);
+            $key = ClassConstName::key($name);
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$lc] = $const;
-            $entry->constNames[$lc] = $name;
+            $entry->constants[$key] = $const;
+            $entry->constNames[$key] = $name;
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
@@ -310,11 +312,11 @@ final class VmIntlCalendar
         $greg->isInternal = true;
         $greg->parentLc = self::CLASS_LC;
         foreach (self::classConstants() as $name => $value) {
-            $lc = strtolower($name);
+            $key = ClassConstName::key($name);
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $greg->constants[$lc] = $const;
-            $greg->constNames[$lc] = $name;
+            $greg->constants[$key] = $const;
+            $greg->constNames[$key] = $name;
         }
         $construct = new IntlGregorianCalendarConstruct();
         $greg->constructor = $construct;
