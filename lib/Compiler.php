@@ -42944,6 +42944,7 @@ class Compiler {
      */
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
+        $this->rejectIllegalLiteralClassNameOperand($expr);
         $constName = $this->staticNameFromOperand($expr->name);
         $className = $this->staticNameFromOperand($expr->class);
         if (null !== $constName && null !== $className) {
@@ -42971,6 +42972,7 @@ class Compiler {
         Block $block,
         Operand $destOperand
     ): array {
+        $this->rejectIllegalLiteralClassNameOperand($expr);
         $constName = $this->staticNameFromOperand($expr->name);
         $className = $this->staticNameFromOperand($expr->class);
         if (null !== $constName
@@ -43000,6 +43002,26 @@ class Compiler {
         }
 
         return [$op];
+    }
+
+    /**
+     * Zend zend_compile.c — non-string literal class names are compile-time fatals (#29625).
+     *
+     * Parenthesized int/float scalars lower to {@see Operand\Literal} (unlike true/false/null,
+     * which are ConstFetch → Temporary). `Foo::bar` / `(1)::class` both use this path.
+     */
+    protected function rejectIllegalLiteralClassNameOperand(Op\Expr\ClassConstFetch $expr): void
+    {
+        $class = $this->unwrapOperandChain($expr->class);
+        if (!$class instanceof Operand\Literal || \is_string($class->value)) {
+            return;
+        }
+
+        throw new CompileFatal(
+            $expr->getFile() ?: 'unknown',
+            max(1, $expr->getLine()),
+            'Illegal class name'
+        );
     }
 
     /**
