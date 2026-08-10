@@ -177,11 +177,8 @@ final class VmExit
 
     private static function statusTypeName(Variable $value): string
     {
-        if (Variable::TYPE_OBJECT === $value->type) {
-            return $value->toObject()->class->name;
-        }
-
-        // Zend uses literal true/false in exit() TypeError "… given" (#6975 / #29573).
+        // Zend zend_zval_type_name / zend_zval_value_name: bool → true/false,
+        // legacy Resource wrappers → lowercase "resource" (#29594 / #29559 / #6975).
         return EnumCaseSupport::typeNameForTypeErrorActual($value);
     }
 

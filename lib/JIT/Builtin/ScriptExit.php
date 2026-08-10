@@ -449,7 +449,8 @@ final class ScriptExit
 
             return;
         }
-        $context->type->object->emitExitStatusObjectGuard($context, $objPtr);
+        $typeErrorGiven = null !== $arg ? JitOperandTypeLabel::givenLabel($context, $arg) : null;
+        $context->type->object->emitExitStatusObjectGuard($context, $objPtr, $typeErrorGiven);
     }
 
     private static function emitBoxedEnumCaseError(Context $context, Value $boxedPtr): void
