@@ -1702,6 +1702,49 @@ PHP;
         }
     }
 
+    /** @covers issue #29673 — promoted ctor typed set(string $v) must not type-compat Fatal */
+    public function testAllowsMatchingTypedSetOnPromotedConstructorParam(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $src = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public string $name {
+            set(string $v) { $this->name = strtoupper($v); }
+        }
+    ) {}
+}
+PHP;
+            [$out, $registry] = (new PropertyHooks())->process($src, 'promoted_typed_set.php');
+            self::assertStringContainsString('function __phpc_property_set_name(string $v)', $out);
+            self::assertSame('__phpc_property_set_name', $registry['c']['name']['set'] ?? null);
+
+            // Untyped set on typed promoted param still Fatal (#29419 preserved).
+            $untyped = <<<'PHP'
+<?php
+class C {
+    public function __construct(
+        public string $name {
+            set($v) { $this->name = $v; }
+        }
+    ) {}
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::setHookValueTypeCompatError('v', 'C', 'name'));
+            (new PropertyHooks())->process($untyped, 'promoted_untyped_set.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #29672 — explicit *(set) + matching set(string $v) must not type-compat Fatal */
     public function testAllowsMatchingTypedSetWithExplicitAsymmetricSetVisibility(): void
     {
