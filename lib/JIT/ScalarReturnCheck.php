@@ -528,13 +528,7 @@ final class ScalarReturnCheck
         if (null === $func) {
             return null;
         }
-        if (null !== $func->class) {
-            $className = $func->class->value ?? null;
-            if (is_string($className) && '' !== $className) {
-                return $className.'::'.$func->name;
-            }
-        }
 
-        return $func->name;
+        return \PHPCompiler\VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func);
     }
 }

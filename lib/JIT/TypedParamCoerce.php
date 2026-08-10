@@ -356,7 +356,7 @@ final class TypedParamCoerce
     ): string {
         $message = sprintf(
             '%s(): Argument #%d ($%s) must be of type %s, %s given',
-            $functionName,
+            \PHPCompiler\VM\ParamArgumentCountError::formatUserFunctionName($functionName),
             $userParamIndex + 1,
             $paramName,
             $expected,

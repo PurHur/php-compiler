@@ -29,7 +29,9 @@ final class UserParamErrorContext
         $paramName = $frame->block->paramNames[$paramIndex] ?? 'param'.$paramIndex;
 
         return new self(
-            ParamArgumentCountError::formatUserFunctionName(self::resolveFunctionName($frame)),
+            ParamArgumentCountError::formatUserFunctionName(
+                ParamArgumentCountError::resolveFunctionName($frame)
+            ),
             $paramIndex,
             $paramName,
             ...self::callSite($frame),
@@ -94,44 +96,4 @@ final class UserParamErrorContext
         return [$scriptPath, $callSiteLine];
     }
 
-    private static function resolveFunctionName(Frame $frame): string
-    {
-        // Callee ARG_RECV frames leave $frame->call null; the caller still holds Func\PHP (#19526).
-        $call = $frame->call;
-        if (!($call instanceof \PHPCompiler\Func\PHP) && null !== $frame->parent) {
-            $call = $frame->parent->call;
-        }
-        if ($call instanceof \PHPCompiler\Func\PHP) {
-            return \PHPCompiler\SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
-                $call->getName()
-            );
-        }
-        $method = null;
-        $cfgFunc = $frame->block->func;
-        if (null !== $cfgFunc && \is_string($cfgFunc->name)) {
-            $method = $cfgFunc->name;
-        }
-        // Only instance methods use arg0 as $this — free functions may take an object (#19526).
-        $isInstanceMethod = null !== $cfgFunc
-            && null !== $cfgFunc->class
-            && !(($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC);
-        if (null !== $method && $isInstanceMethod) {
-            $selfVar = null;
-            if ([] !== $frame->callArgs) {
-                $selfVar = $frame->callArgs[0]->resolveIndirect();
-            } elseif (\array_key_exists(0, $frame->calledArgs)) {
-                $selfVar = $frame->calledArgs[0]->resolveIndirect();
-            }
-            if (null !== $selfVar && Variable::TYPE_OBJECT === $selfVar->type) {
-                return \PHPCompiler\SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
-                    $selfVar->toObject()->class->name.'::'.$method
-                );
-            }
-        }
-        if (null !== $method) {
-            return \PHPCompiler\SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName($method);
-        }
-
-        return '{closure}';
-    }
 }

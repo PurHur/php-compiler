@@ -641,7 +641,7 @@ final class DnfParamCheck
         ) {
             $message = sprintf(
                 '%s(): Argument #%d ($%s) must be of type %s, %s given',
-                self::$paramFunctionName,
+                \PHPCompiler\VM\ParamArgumentCountError::formatUserFunctionName(self::$paramFunctionName),
                 self::$paramIndex + 1,
                 self::$paramName,
                 $expected,
@@ -663,7 +663,9 @@ final class DnfParamCheck
                 $given
             );
             if (null !== self::$paramFunctionName && '' !== self::$paramFunctionName) {
-                $message = self::$paramFunctionName.'(): '.$message;
+                $message = \PHPCompiler\VM\ParamArgumentCountError::formatUserFunctionName(
+                    self::$paramFunctionName
+                ).'(): '.$message;
             }
 
             return $message;

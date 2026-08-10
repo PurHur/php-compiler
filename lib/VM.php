@@ -21955,23 +21955,8 @@ restart:
         if (null === $func) {
             return null;
         }
-        if (null !== $func->class) {
-            $className = $func->class->value ?? null;
-            if (is_string($className) && '' !== $className) {
-                return SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
-                    $className.'::'.$func->name
-                );
-            }
-        }
 
-        // Zend TypeError prefixes use `{closure}` for anonymous funcs (#26486).
-        if (is_string($func->name) && preg_match('/^\{anonymous\}#\d+$/', $func->name)) {
-            return '{closure}';
-        }
-
-        return is_string($func->name)
-            ? SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName($func->name)
-            : $func->name;
+        return VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func);
     }
 
     private function emitCallDeprecationNotice(Frame $frame): void
