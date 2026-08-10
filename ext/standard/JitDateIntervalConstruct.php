@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -25,11 +26,17 @@ final class JitDateIntervalConstruct
         if (\count($args) < 2) {
             throw new \ArgumentCountError('DateInterval::__construct() expects exactly 1 argument, 0 given');
         }
-        $lit = self::compileTimeStringArg($args[1]);
-        if (null === $lit) {
-            throw new \LogicException(
-                'DateInterval::__construct() requires a compile-time string $duration in this compiler build (#26772)'
-            );
+        // string $duration — null TypeError under caller strict_types (#29828).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            JitInternalStrictArg::requireString($context, $args[1], 'DateInterval::__construct', 'duration', 1);
+            $lit = '';
+        } else {
+            $lit = self::compileTimeStringArg($args[1]);
+            if (null === $lit) {
+                throw new \LogicException(
+                    'DateInterval::__construct() requires a compile-time string $duration in this compiler build (#26772)'
+                );
+            }
         }
         $parsed = VmDateInterval::parseSpec($lit);
         $args[0]->compileTimeDateInterval = $parsed;

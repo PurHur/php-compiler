@@ -25,8 +25,11 @@ final class DateIntervalConstruct extends VmClassMethod
             $frame->calledArgs[0],
             'DateInterval::__construct()'
         );
-        $spec = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        // Z_PARAM_STR — caller strict_types → TypeError on null before parse (#29828).
+        // Frame arg 1 includes $this; user-visible Argument #1 ($duration).
+        $spec = VmString::internalMethodStringArgForFrame(
+            $frame,
+            1,
             'DateInterval::__construct',
             0,
             'duration'
