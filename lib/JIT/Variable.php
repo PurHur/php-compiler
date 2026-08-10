@@ -1355,9 +1355,13 @@ final class Variable {
         if (self::TYPE_OBJECT === $dim->type) {
             // Compile-time class name is not always on the JIT Variable; Zend uses the live class.
             // Prefer overloaded/property class hints when present (#22895).
+            // Legacy Resource wrappers → zend_zval_type_name "resource" (#29559).
             $className = $dim->magicGetOverloadedClass
                 ?? $dim->objectPropertyClassName
                 ?? 'object';
+            if (0 === strcasecmp($className, 'Resource')) {
+                $className = 'resource';
+            }
             HashTableHelper::emitIllegalOffsetType(
                 $context,
                 \PHPCompiler\VM\StringOffsetJitHelper::illegalDimTypeErrorMessage($className)
