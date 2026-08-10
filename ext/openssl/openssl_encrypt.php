@@ -37,7 +37,8 @@ final class openssl_encrypt extends Internal
         // Z_PARAM_STR $data — soft-null DEP+coerce on forward profile (#21445, reverts #20263;
         // php-src ext/openssl/openssl.c — Zend 8.4 still deprecates null → '').
         $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'openssl_encrypt', 0, 'data');
-        $cipherAlgo = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'openssl_encrypt', 1, 'cipher_algo');
+        // Z_PARAM_STR $cipher_algo — TypeError under caller strict_types (#29956).
+        $cipherAlgo = VmString::stringBuiltinArgForFrame($frame, 1, 'openssl_encrypt', 1, 'cipher_algo');
         $passphrase = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'openssl_encrypt', 2, 'passphrase');
         $options = 0;
         if ($argc >= 4) {
