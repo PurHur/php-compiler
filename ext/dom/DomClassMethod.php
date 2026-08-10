@@ -32,7 +32,9 @@ abstract class DomClassMethod extends VmClassMethod
         string $paramName = 'value'
     ): string {
         if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::rejectNullString($var, $label, $paramName, $index, $frame);
+            // InternalStrictArg appends "()" — strip if callers pass "Class::method()".
+            $function = str_ends_with($label, '()') ? substr($label, 0, -2) : $label;
+            InternalStrictArg::rejectNullString($var, $function, $paramName, $index, $frame);
         }
         $var = $var->resolveIndirect();
         if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {

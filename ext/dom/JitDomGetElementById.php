@@ -41,6 +41,18 @@ final class JitDomGetElementById
 
         self::ensureDocumentPropertyLayout($context);
 
+        // Compile-time null under strict_types: raise TypeError and stop — do not continue
+        // into id-map IR after a catchable throw (module verify: terminator mid-block; #29942).
+        if ($context->callerStrictTypes && JITVariable::TYPE_NULL === $args[1]->type) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'DOMDocument::getElementById(): Argument #1 ($elementId) must be of type string, null given'
+            );
+
+            return self::boxNullResult($context);
+        }
+
         // After a compile-time getElementById hit (typical: source loadHTML), further lookups
         // must use the runtime id map so importNode materialize on a *different* document is
         // visible (HTML→XML; #20830). Pairing again would fabricate an element on the wrong doc.
@@ -379,13 +391,13 @@ final class JitDomGetElementById
 
     private static function loadStringArg(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-
-        return $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            JitValueBox::valuePtrFromVariable($context, $arg)
+        // Z_PARAM_STR + caller strict_types — null must TypeError, not readString segfault (#29942).
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $arg,
+            'DOMDocument::getElementById',
+            0,
+            'elementId'
         );
     }
 }
