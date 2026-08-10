@@ -125,6 +125,8 @@ final class VmPreg
     /**
      * Z_PARAM_STR_OR_ARR on preg_replace() $replacement — null coerces to '' (delete match) outside strict_types (#17871).
      *
+     * Soft-null DEP type is array|string (php_pcre.stub.php; #29722) — same shape as $subject/#21198.
+     *
      * @throws \TypeError
      */
     public static function resolveStringOrArrayReplacement(
@@ -141,6 +143,8 @@ final class VmPreg
                     self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
                 );
             }
+            // php-src Z_PARAM_STR_OR_ARR: E_DEPRECATED then coerce to "" (#17871, #29722).
+            VmNullStringParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'array|string');
             $empty = new Variable();
             $empty->string('');
 
