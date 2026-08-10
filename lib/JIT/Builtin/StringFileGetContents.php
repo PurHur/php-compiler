@@ -11,11 +11,11 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_file_get_contents via FileGetContentsJitHelper PHP (#29510).
+ * JIT/AOT link for __compiler_file_get_contents via FileGetContentsJitHelper PHP (#29510, #29833).
  *
- * Always {@see JitVmHelperLink} → helper → {@see phpc_file_get_contents_kernel} (Internal::call libc).
- * Pre-registerModule NestedJIT resolves kernels via Runtime modules (#15417 / #20290).
- * Thin libc open/read stays only behind the kernel (#26756) — not inlined into this ABI bridge.
+ * Always {@see JitVmHelperLink} → helper → `@file_get_contents` → NestedJIT
+ * {@see \PHPCompiler\ext\standard\JitFileGetContentsLibc} (kernel Internal removed).
+ * Thin libc open/read stays only behind the NestedJIT leaf (#26756) — not inlined into this ABI bridge.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::fileGetContents()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_mem
  */

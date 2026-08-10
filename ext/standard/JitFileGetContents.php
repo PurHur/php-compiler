@@ -8,10 +8,16 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for file_get_contents() via {@see \PHPCompiler\JIT\Builtin\StringFileGetContents}. */
+/**
+ * LLVM lowering for file_get_contents() via {@see \PHPCompiler\JIT\Builtin\StringFileGetContents}.
+ *
+ * NestedJIT leaf: {@see JitFileGetContentsLibc} so `@file_get_contents` does not re-enter
+ * {@see FileGetContentsJitHelper} via `__compiler_file_get_contents` (#29833 / #29545).
+ */
 final class JitFileGetContents
 {
     public static function emitLengthValueErrorIfNegative(Context $context, Value $length): void
@@ -46,6 +52,13 @@ final class JitFileGetContents
 
     public static function invoke(Context $context, Value $pathStr): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return self::materializeStringOrFalse(
+                $context,
+                JitFileGetContentsLibc::call($context, $pathStr)
+            );
+        }
+
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr
@@ -56,10 +69,12 @@ final class JitFileGetContents
 
     public static function invokeSlice(Context $context, Value $pathStr, Value $offset, Value $length): Value
     {
-        $contents = $context->builder->call(
-            $context->lookupFunction('__compiler_file_get_contents'),
-            $pathStr
-        );
+        $contents = NestedJitCompileScope::isActive()
+            ? JitFileGetContentsLibc::call($context, $pathStr)
+            : $context->builder->call(
+                $context->lookupFunction('__compiler_file_get_contents'),
+                $pathStr
+            );
         $strPtr = $context->getTypeFromString('__string__*');
         $failed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtr->constNull());
 
