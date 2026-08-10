@@ -1702,6 +1702,50 @@ PHP;
         }
     }
 
+    /** @covers issue #29672 — explicit *(set) + matching set(string $v) must not type-compat Fatal */
+    public function testAllowsMatchingTypedSetWithExplicitAsymmetricSetVisibility(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            foreach (['private(set)', 'protected(set)', 'public(set)', '(private(set))'] as $asym) {
+                $src = <<<PHP
+<?php
+class C {
+    public {$asym} string \$x {
+        set(string \$v) { \$this->x = strtoupper(\$v); }
+    }
+}
+PHP;
+                [$out] = (new PropertyHooks())->process($src, 'hook_aviz_typed_set.php');
+                self::assertStringContainsString(
+                    'function __phpc_property_set_x(string $v)',
+                    $out,
+                    "failed for asymmetric modifier {$asym}"
+                );
+            }
+
+            // Untyped set on typed + asymmetric still Fatal (#29419 preserved).
+            $untyped = <<<'PHP'
+<?php
+class C {
+    public private(set) string $x {
+        set($v) { $this->x = $v; }
+    }
+}
+PHP;
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage(PropertyHooks::setHookValueTypeCompatError('v', 'C', 'x'));
+            (new PropertyHooks())->process($untyped, 'hook_aviz_untyped_set.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #29442 — set(&$value) is compile-fatal */
     public function testRejectsByRefSetHookParam(): void
     {

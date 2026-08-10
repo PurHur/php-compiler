@@ -2696,11 +2696,26 @@ final class PropertyHooks
 
     private function propertyTypeFromDeclHead(string $propDeclHead): ?string
     {
+        // Strip asymmetric set-visibility before type extraction (#29672).
+        // Otherwise `public private(set) string $x` yields type `private(set) string`
+        // and matching `set(string $v)` falsely fails the XOR/compat check.
+        // Same forms as {@see rejectAsymmetricDeclSetWithoutSetHook} / final+private gate:
+        // `private(set)` and parenthesized `(private(set))`.
         $s = preg_replace(
-            '/\b(public|protected|private|static|readonly|abstract|final)\s+/',
+            '/\(\s*(?:public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
             '',
             $propDeclHead
         ) ?? $propDeclHead;
+        $s = preg_replace(
+            '/\b(?:public|protected|private)\s*\(\s*set\s*\)/i',
+            '',
+            $s
+        ) ?? $s;
+        $s = preg_replace(
+            '/\b(public|protected|private|static|readonly|abstract|final|virtual)\s+/',
+            '',
+            $s
+        ) ?? $s;
         $s = trim($s);
         if (!preg_match('/^(.+?)\s+\$/', $s, $m)) {
             return null;
