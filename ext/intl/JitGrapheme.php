@@ -277,7 +277,12 @@ final class JitGrapheme
         if (null === $offset) {
             return null;
         }
-        $result = $search($hay, $needle, $offset);
+        try {
+            $result = $search($hay, $needle, $offset);
+        } catch (\ValueError $e) {
+            // Invalid constant offset — leave to runtime (php-src-strict ValueError).
+            return null;
+        }
         if (false === $result) {
             return $context->getTypeFromString('bool')->constInt(0, false);
         }

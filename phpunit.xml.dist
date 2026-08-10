@@ -193,6 +193,7 @@
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageJITTest.php</file>
             <file>./test/compliance/MbSplitEmptyPatternVMTest.php</file>
+            <file>./test/compliance/GraphemePosEmptyNeedleVMTest.php</file>
             <file>./test/compliance/MbStrstrFamilyReflectionVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullJITTest.php</file>

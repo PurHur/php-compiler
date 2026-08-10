@@ -30,6 +30,6 @@ echo "\n";
 5
 3
 false
-false
+5
 4
 5
