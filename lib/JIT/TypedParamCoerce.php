@@ -295,7 +295,8 @@ final class TypedParamCoerce
         return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $phi);
     }
 
-    private static function stringIsNumeric(Context $context, Value $strPtr): Value
+    /** Zend is_numeric()-shaped check for weak int param/return coercion (#29745 / #29858). */
+    public static function stringIsNumeric(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
