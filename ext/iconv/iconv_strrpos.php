@@ -30,7 +30,9 @@ final class iconv_strrpos extends IconvStringFunction
         if (null === $frame->returnVar) {
             return;
         }
-        $encoding = 3 === $argc ? $this->coerceEncoding($frame, 2) : 'UTF-8';
+        $encoding = 3 === $argc
+            ? $this->coerceEncoding($frame, 2)
+            : IconvEncodingState::getInternalEncoding();
         $this->writeIntOrFalse($frame, VmIconv::iconvStrrpos($haystack, $needle, $encoding, $frame));
     }
 }

@@ -31,7 +31,7 @@ final class iconv_substr extends IconvStringFunction
             return;
         }
         $length = null;
-        $encoding = 'UTF-8';
+        $encoding = IconvEncodingState::getInternalEncoding();
         if (3 === $argc) {
             $length = $this->coerceLength($frame, 2);
         } elseif (4 === $argc) {

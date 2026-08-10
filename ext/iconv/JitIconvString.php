@@ -64,7 +64,7 @@ final class JitIconvString
         $hayLit = self::softNullStringLit($context, $args[0], 'iconv_strpos', 0, 'haystack');
         $needleLit = self::softNullStringLit($context, $args[1], 'iconv_strpos', 1, 'needle');
         $offsetLit = $argc >= 3 ? self::tryCompileTimeInt($context, $args[2]) : 0;
-        $encodingLit = $argc >= 4 ? self::encodingLiteral($args, 3) : 'UTF-8';
+        $encodingLit = self::encodingLiteral($args, 3);
         if (null !== $hayLit && null !== $needleLit && null !== $offsetLit && null !== $encodingLit) {
             $result = VmIconv::iconvStrpos($hayLit, $needleLit, $offsetLit, $encodingLit);
             if (false === $result) {
@@ -107,15 +107,20 @@ final class JitIconvString
             }
         }
 
+        $defaultEncoding = IconvEncodingState::getInternalEncoding();
         if ($argc >= 4) {
             $encodingIsNull = JITVariable::TYPE_NULL === $args[3]->type || $args[3]->isNullConstant;
-            $encoding = $encodingIsNull
-                ? $context->builder->load($context->constantStringFromString('UTF-8'))
-                : ($context->callerStrictTypes
+            $encodingLit = JitStringBuiltinArg::compileTimeLiteral($args[3]);
+            if ($encodingIsNull || (null !== $encodingLit && '' === $encodingLit)) {
+                // Empty/null encoding → internal charset (#29497).
+                $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
+            } else {
+                $encoding = $context->callerStrictTypes
                     ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[3], 'iconv_substr', 3, 'encoding')
-                    : JitStringBuiltinArg::lowerZparamStr($context, $args[3], 'iconv_substr', 3, 'encoding'));
+                    : JitStringBuiltinArg::lowerZparamStr($context, $args[3], 'iconv_substr', 3, 'encoding');
+            }
         } else {
-            $encoding = $context->builder->load($context->constantStringFromString('UTF-8'));
+            $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
         }
 
         StringIconvSubstr::ensureLinked($context);
@@ -154,7 +159,7 @@ final class JitIconvString
             }
         }
 
-        $encodingLit = $argc >= 4 ? self::encodingLiteral($args, 3) : 'UTF-8';
+        $encodingLit = self::encodingLiteral($args, 3);
         if (null === $encodingLit) {
             return null;
         }
@@ -286,13 +291,21 @@ final class JitIconvString
     private static function encodingLiteral(array $args, int $index): ?string
     {
         if (!isset($args[$index])) {
-            return 'UTF-8';
+            return IconvEncodingState::getInternalEncoding();
+        }
+        if (JITVariable::TYPE_NULL === $args[$index]->type || $args[$index]->isNullConstant) {
+            return IconvEncodingState::getInternalEncoding();
         }
         if (JITVariable::TYPE_STRING !== $args[$index]->type) {
             return null;
         }
+        $lit = $args[$index]->compileTimeString ?? null;
+        if (null === $lit) {
+            return null;
+        }
 
-        return $args[$index]->compileTimeString ?? null;
+        // Empty encoding → internal/default charset (#29497).
+        return VmIconv::resolveOptionalEncoding($lit);
     }
 
     private static function tryCompileTimeInt(Context $context, JITVariable $arg): ?int

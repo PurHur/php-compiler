@@ -29,7 +29,9 @@ final class iconv_strlen extends IconvStringFunction
         if (null === $frame->returnVar) {
             return;
         }
-        $encoding = 2 === $argc ? $this->coerceEncoding($frame, 1) : 'UTF-8';
+        $encoding = 2 === $argc
+            ? $this->coerceEncoding($frame, 1)
+            : IconvEncodingState::getInternalEncoding();
         $this->writeIntOrFalse($frame, VmIconv::iconvStrlen($input, $encoding, $frame));
     }
 }
