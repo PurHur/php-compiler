@@ -25,6 +25,15 @@ final class DomElementGetAttribute implements Call
         if (isset($args[1])) {
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         }
+
+        // Live Attr::$value first — setAttribute stores presentByKey without valueByKey, and
+        // Attr::$value writes must update getAttribute (php-src attr.c; #19281 / #29642).
+        // The compile-time valueByKey shortcut below is only for parse-time Attrs that never
+        // got an object slot (or as fallback when the live cache miss returns empty).
+        if (JitDomAttributeNodeNS::userScriptAttrCacheHasName($context, $args[1] ?? null)) {
+            return JitDomAttributeNodeNS::invokeGetAttributeLive($context, ...$args);
+        }
+
         if (null !== $nameLit && DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', $nameLit)) {
             return self::boxConstantString(
                 $context,
@@ -32,12 +41,7 @@ final class DomElementGetAttribute implements Call
             );
         }
 
-        // Live Attr cache when setAttribute/getAttributeNode populated it (#19281);
-        // otherwise fall back to importNode/getElementById HTML-id stub (#19212).
-        if (JitDomAttributeNodeNS::userScriptAttrCacheHasName($context, $args[1] ?? null)) {
-            return JitDomAttributeNodeNS::invokeGetAttributeLive($context, ...$args);
-        }
-
+        // Otherwise fall back to importNode/getElementById HTML-id stub (#19212).
         return JitDomImportNode::invokeGetAttribute($context, ...$args);
     }
 

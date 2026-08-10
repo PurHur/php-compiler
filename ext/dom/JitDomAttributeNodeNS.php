@@ -356,6 +356,20 @@ final class JitDomAttributeNodeNS
 
     public const CLASS_LIVING_ATTR = 'Dom\\Attr';
 
+    /**
+     * Class layout for Attrs in the user-script cache (#27108 / #29642).
+     * Living Dom\* documents materialize Dom\Attr; classic DOMDocument uses DOMAttr.
+     */
+    public static function attrClassForUserScriptCache(): string
+    {
+        $docClass = JitDomLoadXMLUserScript::lastDocumentClass();
+        if (null !== $docClass && str_starts_with((string) $docClass, 'Dom\\')) {
+            return self::CLASS_LIVING_ATTR;
+        }
+
+        return self::CLASS_ATTR;
+    }
+
     /** Seed Dom\Attr::rename for method_exists under thin AOT (#27108). */
     public static function ensureLivingAttrMethods(Context $context): void
     {
@@ -662,7 +676,9 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($createBlock);
         $created = self::materializeAttrFromLiterals($context, '', $nameLit, $valueLit);
         DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
-        DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $nameLit, $created);
+        // Record initial value for parse-style hasPresentLiteral readers; live getAttribute
+        // still prefers Attr::$value so later writes stay visible (#29642).
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $nameLit, $created, $valueLit);
         $context->builder->store($created, $resultSlot);
         $context->builder->branch($doneBlock);
 
@@ -765,7 +781,8 @@ final class JitDomAttributeNodeNS
 
         $context->builder->positionAtEnd($objBlock);
         // Attr cache may hold Dom\Attr (living createFromString) or DOMAttr (#27108).
-        $attrClass = self::CLASS_LIVING_ATTR;
+        // Classic setAttribute materializes DOMAttr; reading Dom\Attr slots missed live writes (#29642).
+        $attrClass = self::attrClassForUserScriptCache();
         $valueVar = $context->type->object->propertyFetch($attr, $attrClass, self::PROP_VALUE);
         $str = $context->helper->loadValue($valueVar);
         $context->builder->store(self::boxStringResult($context, $str), $resultSlot);
