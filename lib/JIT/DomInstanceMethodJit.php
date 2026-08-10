@@ -119,6 +119,9 @@ final class DomInstanceMethodJit
         'dom\\document::importnode' => true,
         'dom\\xmldocument::importnode' => true,
         'dom\\htmldocument::importnode' => true,
+        'dom\\document::adoptnode' => true,
+        'dom\\xmldocument::adoptnode' => true,
+        'dom\\htmldocument::adoptnode' => true,
         'domelement::getattribute' => true,
         'domnode::getattribute' => true,
         'domelement::setattribute' => true,
@@ -270,14 +273,27 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domdocument::adoptnode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentAdoptNode();
+
+                return;
+            }
             if ('dom\\document::importlegacynode' === $lc
                 || 'dom\\xmldocument::importlegacynode' === $lc
                 || 'dom\\htmldocument::importlegacynode' === $lc
                 || 'dom\\document::importnode' === $lc
                 || 'dom\\xmldocument::importnode' === $lc
                 || 'dom\\htmldocument::importnode' === $lc
+                || 'dom\\document::adoptnode' === $lc
+                || 'dom\\xmldocument::adoptnode' === $lc
+                || 'dom\\htmldocument::adoptnode' === $lc
             ) {
                 if (!preg_match('/^(dom\\\\[a-z0-9_]+)::([a-z0-9_]+)$/', $lc, $livingImportMatches)) {
+                    return;
+                }
+                if ('adoptnode' === $livingImportMatches[2]) {
+                    $context->functionProxies[$lc] = new Call\DomDocumentAdoptNode();
+
                     return;
                 }
                 $context->functionProxies[$lc] = new Call\DomInstanceMethod(
@@ -654,8 +670,16 @@ final class DomInstanceMethodJit
                 || 'dom\\document::importnode' === $lc
                 || 'dom\\xmldocument::importnode' === $lc
                 || 'dom\\htmldocument::importnode' === $lc
+                || 'dom\\document::adoptnode' === $lc
+                || 'dom\\xmldocument::adoptnode' === $lc
+                || 'dom\\htmldocument::adoptnode' === $lc
             ) {
                 if (!preg_match('/^(dom\\\\[a-z0-9_]+)::([a-z0-9_]+)$/', $lc, $livingImportMatches)) {
+                    return;
+                }
+                if ('adoptnode' === $livingImportMatches[2]) {
+                    $context->functionProxies[$lc] = new Call\DomDocumentAdoptNode();
+
                     return;
                 }
                 $context->functionProxies[$lc] = new Call\DomInstanceMethod(
@@ -788,6 +812,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\document::importnode');
             self::ensureProxy($context, 'dom\\xmldocument::importnode');
             self::ensureProxy($context, 'dom\\htmldocument::importnode');
+            self::ensureProxy($context, 'dom\\document::adoptnode');
+            self::ensureProxy($context, 'dom\\xmldocument::adoptnode');
+            self::ensureProxy($context, 'dom\\htmldocument::adoptnode');
             self::ensureProxy($context, 'domelement::getattribute');
             self::ensureProxy($context, 'domnode::getattribute');
             self::ensureProxy($context, 'domelement::hasattribute');

@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\DomCreateElementRuntime;
 use PHPCompiler\JIT\Builtin\DomElementTextContentRuntime;
 use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Builtin\DomGetElementsByTagNameRuntime;
+use PHPCompiler\JIT\Builtin\DomAdoptNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Builtin\DomLivingApiRuntime;
@@ -151,6 +152,23 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('__object__*'),
             'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::importNodeArgv',
             '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    /** DOMDocument::adoptNode() — thin AOT (#29853). */
+    public static function ensureAdoptNodeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomAdoptNodeRuntime::ABI_NAME,
+            'dom_adopt_node_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomAdoptNodeJitHelper::adoptNodeArgv',
+            '/ext/dom/DomAdoptNodeJitHelper.php'
         );
     }
 
