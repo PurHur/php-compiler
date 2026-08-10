@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -29,11 +28,13 @@ final class spl_autoload_call extends Internal
             throw new \LogicException('spl_autoload_call() requires exactly one argument');
         }
         $ctx = VmReflection::requireContext($frame);
-        $className = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — Zend stub `$class`; caller strict_types → TypeError on null (#29820).
+        $className = VmString::stringBuiltinArgForFrame(
+            $frame,
+            0,
             'spl_autoload_call',
             0,
-            'class_name'
+            'class'
         );
         VmSplAutoload::runStack($ctx, $className);
     }
