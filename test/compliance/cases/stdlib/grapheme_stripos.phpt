@@ -26,6 +26,6 @@ echo grapheme_strrpos('ababa', 'a', 1), "\n";
 1
 false
 3
-false
+0
 false
 4

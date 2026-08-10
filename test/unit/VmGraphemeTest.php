@@ -95,7 +95,12 @@ final class VmGraphemeTest extends TestCase
         $s = "a\xCC\x81b";
         $this->assertSame(1, VmGrapheme::strpos($s, 'b'));
         $this->assertFalse(VmGrapheme::strpos($s, 'z'));
-        $this->assertFalse(VmGrapheme::strpos($s, ''));
+        // Empty needle → UTF-16 code-unit offset (php-src grapheme_strpos_utf16; #29495)
+        $this->assertSame(0, VmGrapheme::strpos($s, ''));
+        $this->assertSame(2, VmGrapheme::strpos($s, '', 1));
+        $this->assertSame(3, VmGrapheme::strrpos($s, ''));
+        $this->assertSame(0, VmGrapheme::strpos('ab', ''));
+        $this->assertSame(2, VmGrapheme::strrpos('ab', ''));
         $this->assertSame(1, VmGrapheme::strpos('ababa', 'b', 1));
     }
 }

@@ -101,56 +101,56 @@ final class VmGrapheme
     }
 
     /**
-     * grapheme_strpos() — grapheme index search (php-src ext/intl/grapheme; #3352).
+     * grapheme_strpos() — grapheme index search (php-src ext/intl/grapheme; #3352, #29495).
      *
-     * @return int|false grapheme index of first match
+     * @return int|false grapheme index of first match (UTF-16 code-unit index for empty needle)
      */
     public static function strpos(string $haystack, string $needle, int $offset = 0): int|false
     {
         if ('' === $needle) {
-            return false;
+            return self::emptyNeedlePos($haystack, $offset, false, 'grapheme_strpos');
         }
 
         return self::graphemePosSearch($haystack, $needle, $offset, false, false);
     }
 
     /**
-     * grapheme_stripos() — case-insensitive grapheme index search (php-src ext/intl/grapheme; #6153).
+     * grapheme_stripos() — case-insensitive grapheme index search (php-src ext/intl/grapheme; #6153, #29495).
      *
-     * @return int|false grapheme index of first match
+     * @return int|false grapheme index of first match (UTF-16 code-unit index for empty needle)
      */
     public static function stripos(string $haystack, string $needle, int $offset = 0): int|false
     {
         if ('' === $needle) {
-            return false;
+            return self::emptyNeedlePos($haystack, $offset, false, 'grapheme_stripos');
         }
 
         return self::graphemePosSearch($haystack, $needle, $offset, true, false);
     }
 
     /**
-     * grapheme_strrpos() — reverse grapheme index search (php-src ext/intl/grapheme; #6153).
+     * grapheme_strrpos() — reverse grapheme index search (php-src ext/intl/grapheme; #6153, #29495).
      *
-     * @return int|false grapheme index of last match
+     * @return int|false grapheme index of last match (UTF-16 code-unit index for empty needle)
      */
     public static function strrpos(string $haystack, string $needle, int $offset = 0): int|false
     {
         if ('' === $needle) {
-            return false;
+            return self::emptyNeedlePos($haystack, $offset, true, 'grapheme_strrpos');
         }
 
         return self::graphemePosSearch($haystack, $needle, $offset, false, true);
     }
 
     /**
-     * grapheme_strripos() — case-insensitive reverse grapheme index search (php-src ext/intl/grapheme; #20810).
+     * grapheme_strripos() — case-insensitive reverse grapheme index search (php-src ext/intl/grapheme; #20810, #29495).
      *
-     * @return int|false grapheme index of last match
+     * @return int|false grapheme index of last match (UTF-16 code-unit index for empty needle)
      */
     public static function strripos(string $haystack, string $needle, int $offset = 0): int|false
     {
         if ('' === $needle) {
-            return false;
+            return self::emptyNeedlePos($haystack, $offset, true, 'grapheme_strripos');
         }
 
         return self::graphemePosSearch($haystack, $needle, $offset, true, true);
@@ -212,6 +212,127 @@ final class VmGrapheme
     }
 
     /**
+     * Empty-needle *pos family (php-src grapheme_strpos_utf16 / ascii fast path; #29495).
+     *
+     * Returns a UTF-16 code-unit index: forward → grapheme-offset boundary; reverse with
+     * non-negative offset → full UTF-16 length; reverse with negative offset → boundary.
+     *
+     * @return int|false
+     */
+    private static function emptyNeedlePos(
+        string $haystack,
+        int $offset,
+        bool $last,
+        string $functionName
+    ): int|false {
+        $hayByteLen = \strlen($haystack);
+        if (self::isOutsideStringOffset($offset, $hayByteLen)) {
+            throw new \ValueError(
+                $functionName.'(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+            );
+        }
+
+        // ASCII fast paths mirror grapheme_string.c (strpos offset>=0; strrpos always).
+        if (self::isAscii($haystack)) {
+            if ($last) {
+                return self::asciiEmptyNeedleRpos($hayByteLen, $offset);
+            }
+            if ($offset >= 0) {
+                return $offset;
+            }
+
+            return $hayByteLen + $offset;
+        }
+
+        $graphemes = self::splitGraphemes($haystack);
+        if (null === $graphemes) {
+            return false;
+        }
+
+        $utf16Pos = self::graphemeOffsetToUtf16Pos($graphemes, $offset);
+        if (false === $utf16Pos) {
+            throw new \ValueError(
+                $functionName.'(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+            );
+        }
+
+        if ($last && $offset >= 0) {
+            return self::utf16CodeUnitCount($haystack);
+        }
+
+        return $utf16Pos;
+    }
+
+    /**
+     * OUTSIDE_STRING from php-src ext/intl/grapheme/grapheme_util.h — byte-length window.
+     */
+    private static function isOutsideStringOffset(int $offset, int $maxLen): bool
+    {
+        // INT32_MIN / INT32_MAX — zend_long offset must fit int32_t before byte check.
+        if ($offset <= -2147483647 - 1 || $offset > 2147483647) {
+            return true;
+        }
+        if ($offset < 0) {
+            return -$offset > $maxLen;
+        }
+
+        return $offset > $maxLen;
+    }
+
+    /**
+     * grapheme_strrpos_ascii() empty-needle branch (needle_len == 0).
+     */
+    private static function asciiEmptyNeedleRpos(int $hayLen, int $offset): int
+    {
+        if ($offset >= 0) {
+            return $hayLen;
+        }
+
+        return $hayLen + $offset;
+    }
+
+    /**
+     * grapheme_get_haystack_offset() — UTF-16 index at grapheme boundary for $offset.
+     *
+     * @param list<string> $graphemes
+     *
+     * @return int|false
+     */
+    private static function graphemeOffsetToUtf16Pos(array $graphemes, int $offset): int|false
+    {
+        if (0 === $offset) {
+            return 0;
+        }
+
+        $n = \count($graphemes);
+        if ($offset > 0) {
+            if ($offset > $n) {
+                return false;
+            }
+            $pos = 0;
+            for ($i = 0; $i < $offset; ++$i) {
+                $pos += self::utf16CodeUnitCount($graphemes[$i]);
+            }
+
+            return $pos;
+        }
+
+        $steps = -$offset;
+        if ($steps > $n) {
+            return false;
+        }
+        $pos = 0;
+        for ($i = 0; $i < $n; ++$i) {
+            $pos += self::utf16CodeUnitCount($graphemes[$i]);
+        }
+        for ($i = $n - 1; $i >= $n - $steps; --$i) {
+            $pos -= self::utf16CodeUnitCount($graphemes[$i]);
+        }
+
+        return $pos;
+    }
+
+    /**
      * @return int|false grapheme index
      */
     private static function graphemePosSearch(
@@ -268,7 +389,8 @@ final class VmGrapheme
         $hayLen = \count($hay);
         $needLen = \count($need);
         if (0 === $needLen) {
-            return 0;
+            // Empty needle is handled in emptyNeedlePos(); defensive fallback.
+            return $reverse ? $hayLen : $startIndex;
         }
         if ($needLen > $hayLen) {
             return false;
