@@ -1162,7 +1162,7 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** natcasesort() — return array sorted by value using natural case-insensitive order (#2372, #9600). */
+    /** natcasesort() — return array sorted by value using natural case-insensitive order (#2372, #9600, #29704). */
     public static function natcasesortCopy(HashTable $ht): HashTable
     {
         if ($ht->getNumElements() < 2) {
@@ -1179,7 +1179,12 @@ final class VmArray
         } elseif (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)) {
             VmInternalCompare::sortKeyedPairsByValueInt($pairs);
         } else {
-            VmInternalCompare::sortKeyedPairsByValueWithFlags($pairs, StdlibConstants::SORT_REGULAR);
+            // Mixed types (null/bool/… + strings): php-src php_natcasesort always uses
+            // natural case-insensitive string compare after printable coercion (#29704).
+            VmInternalCompare::sortKeyedPairsByValueWithFlags(
+                $pairs,
+                StdlibConstants::SORT_NATURAL | StdlibConstants::SORT_FLAG_CASE
+            );
         }
 
         return self::hashTableFromSortedPairs($pairs);

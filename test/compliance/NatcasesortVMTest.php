@@ -17,6 +17,10 @@ final class NatcasesortVMTest extends BaseTest
             __DIR__.'/cases/stdlib/natcasesort.phpt',
             'natcasesort.phpt'
         );
+        yield 'natcasesort_null_elements.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/natcasesort_null_elements.phpt',
+            'natcasesort_null_elements.phpt'
+        );
     }
 
     public function setUp(): void
