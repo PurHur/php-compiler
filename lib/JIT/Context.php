@@ -966,6 +966,11 @@ class Context {
             // StringTempnam / JitTempnamKernel mkstemp leaf (thin-AOT always-on kernel removed;
             // peer sys_get_temp_dir #29433 / gethostname #29364).
             'tempnam',
+            // glob()/scandir() NestedJIT leaf (#29986) — whitelist → glob_/scandir::call →
+            // JitFsGlob collectList / JitFsGlobKernel libc vec (thin-AOT always-on fork removed;
+            // peer tempnam #29940 / sys_get_temp_dir #29433).
+            'glob',
+            'scandir',
 
             // getenv(3) NestedJIT leaf (#29313) — whitelist getenv → getenv_::call →
             // JitEnv::getenvNestedLeaf / StringGetenv::invokeNestedLeaf (kernel removed).

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitFsGlobKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -16,9 +17,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT ABI for GlobIterator construct snapshot (#27422).
  *
- * Thin standalone AOT: libc {@see __phpc_glob_vec} (peer #27235) — NestedJIT of
- * VmFsGlob under user-script AOT returns empty. Embed: NestedJIT
- * {@see \PHPCompiler\ext\spl\GlobIteratorSnapshotJitHelper}.
+ * Thin standalone AOT: libc {@see __phpc_glob_vec} via {@see JitFsGlobKernel::implement}
+ * directly (#29986 — user-facing glob() no longer always-on links the kernel). Embed:
+ * NestedJIT {@see \PHPCompiler\ext\spl\GlobIteratorSnapshotJitHelper}.
  * php-src: ext/spl/spl_directory.c — GlobIterator
  */
 final class GlobIteratorSnapshotRuntime
@@ -60,7 +61,9 @@ final class GlobIteratorSnapshotRuntime
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
         if ($context->isThinStandaloneAotMain()) {
-            StringFsGlob::ensureLinked($context);
+            // User-facing glob() no longer always-on links the libc kernel (#29986); iterators
+            // still need __phpc_glob_vec for the thin snapshot bridge.
+            JitFsGlobKernel::implement($context);
             self::emitThinAotBridge($context, $probe);
         } else {
             StringFsGlob::ensureLinked($context);

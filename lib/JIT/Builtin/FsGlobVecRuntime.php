@@ -11,8 +11,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for glob()/scandir() via FsGlobJitHelper PHP (#11515, #12909).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SysGetTempDirRuntime #22187).
- * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\FsGlobJitHelper}; thin LLVM
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SysGetTempDirRuntime #22187 / #29986).
+ * Embed + thin standalone AOT compile {@see \PHPCompiler\ext\standard\FsGlobJitHelper}; thin LLVM
  * bridge forwards the ABI. php-src: ext/standard/dir.c
  */
 final class FsGlobVecRuntime
@@ -52,7 +52,7 @@ final class FsGlobVecRuntime
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#22205'
+            '#29986'
         );
     }
 }

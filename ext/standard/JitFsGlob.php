@@ -12,14 +12,16 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for glob() and scandir() (#5459/#11515/#12909/#27235/#27236).
+ * LLVM lowering for glob() and scandir() (#5459/#11515/#12909/#27235/#27236/#29986).
  *
- * Thin standalone AOT: libc vec collectors via {@see JitFsGlobKernel}.
- * Embed/JIT: NestedJIT {@see FsGlobJitHelper} (`?array` ABI — #20652).
+ * Embed + thin standalone AOT: NestedJIT {@see FsGlobJitHelper} (`?array` ABI — #20652).
+ * NestedJIT leaf (helper `@\glob`/`@\scandir`): libc vec collectors via {@see JitFsGlobKernel}
+ * (tempnam #29940 shape — no always-on thin-AOT kernel fork).
  */
 final class JitFsGlob
 {
@@ -28,7 +30,7 @@ final class JitFsGlob
     public static function glob(Context $context, Value $patternStr, Value $flagsI32): Value
     {
         StringFsGlobVecJit::implement($context);
-        if ($context->isThinStandaloneAotMain()) {
+        if (NestedJitCompileScope::isActive()) {
             return self::collectList($context, '__phpc_glob_vec', $patternStr, $flagsI32, 'glob');
         }
 
@@ -45,7 +47,7 @@ final class JitFsGlob
     {
         StringTriggerErrorJit::implement($context);
         StringFsGlobVecJit::implement($context);
-        if ($context->isThinStandaloneAotMain()) {
+        if (NestedJitCompileScope::isActive()) {
             return self::collectList($context, '__phpc_scandir_vec', $pathStr, $sortI32, 'scandir');
         }
 
@@ -83,6 +85,7 @@ final class JitFsGlob
         $falseSlot = JitValueBox::alloc($context);
         $falsePtr = JitValueBox::pointer($context, $falseSlot);
         JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
+        $failTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
@@ -96,7 +99,7 @@ final class JitFsGlob
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
-        $result->addIncoming($falsePtr, $failBlock);
+        $result->addIncoming($falsePtr, $failTail);
         $result->addIncoming($okPtr, $okTail);
 
         return $result;

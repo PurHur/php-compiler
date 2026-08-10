@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitFsGlobKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -16,9 +17,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT ABI for DirectoryIterator construct snapshot (#27289).
  *
- * Thin standalone AOT: libc {@see __phpc_scandir_vec} (peer #27236) — NestedJIT of
- * DirHandle→VmDirPure→scandir recurses / returns empty under user-script AOT.
- * Embed: NestedJIT {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
+ * Thin standalone AOT: libc {@see __phpc_scandir_vec} via {@see JitFsGlobKernel::implement}
+ * directly (#29986 — user-facing scandir() no longer always-on links the kernel). Embed:
+ * NestedJIT {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
  * Linked at Type init (not mid-construct) so NestedJIT cannot orphan the user insert block.
  * php-src: ext/spl/spl_directory.c — spl_filesystem_dir_open
  */
@@ -58,7 +59,8 @@ final class DirectoryIteratorSnapshotRuntime
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
         if ($context->isThinStandaloneAotMain()) {
-            StringFsGlob::ensureLinked($context);
+            // User-facing scandir() no longer always-on links the libc kernel (#29986).
+            JitFsGlobKernel::implement($context);
             self::emitThinAotBridge($context, $probe);
         } else {
             StringDir::ensureLinked($context);
