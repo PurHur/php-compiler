@@ -274,13 +274,26 @@ final class ClassReturnCheck
 
     private static function generatorHasTraversableReturnTypeLabel(Block $block): bool
     {
-        if (!$block->isGenerator || null === $block->returnClassConstraint) {
+        if (!$block->isGenerator) {
             return false;
         }
-        $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
+        $returnLabel = ltrim(
+            $block->returnDeclaredTypeLabel ?? $block->returnClassConstraint ?? '',
+            '\\'
+        );
+        if ('' === $returnLabel) {
+            return false;
+        }
 
         // Mirror VM (#16141, #26468): wrapper types only — not getReturn()/body completion.
+        // Bare `: iterable` keeps returnDeclaredTypeLabel=iterable with Traversable|array DNF (#29888).
         return \in_array($returnLabel, ['Generator', 'Iterator', 'Traversable', 'iterable', 'object'], true);
+    }
+
+    /** @internal used by JIT return epilogues for generator `: iterable` DNF skips (#29888). */
+    public static function generatorSkipsBodyReturnCheck(Block $block): bool
+    {
+        return self::generatorHasTraversableReturnTypeLabel($block);
     }
 
     private static function callableName(?Func $func): ?string

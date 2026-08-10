@@ -560,10 +560,16 @@ final class TypeCheck
 
     /**
      * Expected-type label for zend_verify_return_error "none returned" (#26486).
-     * Prefer {@see ReflectionTypeSupport::cfgTypeStringForDump} so nullable/union match Zend.
+     * Prefer DNF pretty-print when present so bare `: iterable` → Traversable|array (#29888);
+     * otherwise {@see ReflectionTypeSupport::cfgTypeStringForDump} for nullable/union labels.
      */
     public static function expectedReturnTypeLabelForNoneReturned(Block $block): string
     {
+        if (null !== $block->returnDnfConstraints) {
+            return \PHPCompiler\DnfType::zendTypeErrorLabel(
+                \PHPCompiler\DnfType::formatUnionType($block->returnDnfConstraints)
+            );
+        }
         if (null !== $block->returnDeclaredType) {
             return ReflectionTypeSupport::cfgTypeStringForDump($block->returnDeclaredType);
         }
@@ -575,11 +581,6 @@ final class TypeCheck
         }
         if (null !== $block->returnDeclaredTypeLabel && '' !== $block->returnDeclaredTypeLabel) {
             return ltrim($block->returnDeclaredTypeLabel, '\\');
-        }
-        if (null !== $block->returnDnfConstraints) {
-            return \PHPCompiler\DnfType::zendTypeErrorLabel(
-                \PHPCompiler\DnfType::formatUnionType($block->returnDnfConstraints)
-            );
         }
         if (null !== $block->returnClassConstraint && '' !== $block->returnClassConstraint) {
             return ltrim($block->returnClassConstraint, '\\');

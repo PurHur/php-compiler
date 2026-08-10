@@ -819,6 +819,17 @@ class Compiler {
 
                 return;
             }
+            // Bare `: iterable` — mapFromType treats it as a class name, so returns reject
+            // arrays and TypeError says "iterable". Use the iterable DNF arm (array|Traversable
+            // match) with Zend TypeError display Traversable|array (#29888 / #4829 sibling).
+            if ('iterable' === $returnLc) {
+                $block->returnDnfConstraints = [
+                    ['kind' => 'literal', 'name' => 'iterable', 'display' => 'Traversable|array'],
+                ];
+                $block->returnDeclaredTypeLabel = 'iterable';
+
+                return;
+            }
             $declType = Type::fromDecl($returnType->name);
             $mapped = Variable::mapFromType($declType);
             if (Variable::TYPE_OBJECT === $mapped) {
