@@ -6144,8 +6144,7 @@ restart:
                             }
                             $catchFrame = $this->dispatchVmTypeError(
                                 new \TypeError(
-                                    'Cannot use "::class" on value of type '
-                                    .$this->valueDebugTypeLabel($classOperand)
+                                    VM\EnumCaseSupport::classPseudoConstTypeErrorMessage($classOperand)
                                 ),
                                 $frame
                             );
@@ -6158,8 +6157,7 @@ restart:
                         if (Variable::TYPE_OBJECT !== $classOperand->type) {
                             $catchFrame = $this->dispatchVmTypeError(
                                 new \TypeError(
-                                    'Cannot use "::class" on value of type '
-                                    .$this->valueDebugTypeLabel($classOperand)
+                                    VM\EnumCaseSupport::classPseudoConstTypeErrorMessage($classOperand)
                                 ),
                                 $frame
                             );

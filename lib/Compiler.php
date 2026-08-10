@@ -43052,7 +43052,7 @@ class Compiler {
         throw new CompileFatal(
             $expr->getFile() ?: 'unknown',
             max(1, $expr->getLine()),
-            'Cannot use "::class" on value of type '.$this->compileTimeValueTypeLabel($folded)
+            \PHPCompiler\VM\EnumCaseSupport::classPseudoConstTypeErrorMessage($folded)
         );
     }
 

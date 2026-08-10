@@ -38,10 +38,17 @@ trait ClassConstFetchHelperTrait
         }
         $label = self::compileTimeNonObjectTypeLabel($classVar);
         if (null !== $label) {
+            if (
+                Variable::TYPE_NATIVE_BOOL === $classVar->type
+                && \PHPCompiler\CompilerVersion::supportsClassPseudoConstValueNameTypeError()
+                && null !== $classVar->compileTimeLong
+            ) {
+                $label = 0 !== $classVar->compileTimeLong ? 'true' : 'false';
+            }
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitRaise(
                 $context,
-                'Cannot use "::class" on value of type '.$label
+                \PHPCompiler\VM\EnumCaseSupport::formatClassPseudoConstTypeErrorMessage($label)
             );
 
             return $context->builder->load($context->constantStringFromString(''));
@@ -912,22 +919,27 @@ trait ClassConstFetchHelperTrait
         $masked = $context->builder->and($kind, $i8->constInt(0x7f, false));
         $fn = BasicBlockHelper::parentFunction($context);
         $checkBlock = $context->builder->getInsertBlock();
+        $useValueName = \PHPCompiler\CompilerVersion::supportsClassPseudoConstValueNameTypeError();
+        // JIT __value__ type tags (Variable::TYPE_* & 0x7f) — not VM Variable::TYPE_*.
         $labels = [
-            4 => 'string',
-            1 => 'int',
-            2 => 'float',
-            3 => 'bool',
-            0 => 'null',
-            6 => 'array',
+            Variable::TYPE_STRING & 0x7f => 'string',
+            Variable::TYPE_NATIVE_LONG => 'int',
+            Variable::TYPE_NATIVE_DOUBLE => 'float',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_HASHTABLE & 0x7f => 'array',
         ];
-        $n = count($labels);
+        if (!$useValueName) {
+            $labels[Variable::TYPE_NATIVE_BOOL] = 'bool';
+        }
+        $pending = count($labels) + ($useValueName ? 1 : 0);
         $i = 0;
         foreach ($labels as $tag => $typeName) {
             ++$i;
             $raiseBlock = $fn->appendBasicBlock('expr_class_pseudo_err_'.$typeName);
-            $nextCheck = ($i < $n)
-                ? $fn->appendBasicBlock('expr_class_pseudo_try_'.$typeName)
-                : $fn->appendBasicBlock('expr_class_pseudo_err_mixed');
+            $isLast = $i >= $pending;
+            $nextCheck = $isLast
+                ? $fn->appendBasicBlock('expr_class_pseudo_err_mixed')
+                : $fn->appendBasicBlock('expr_class_pseudo_try_'.$typeName);
             $context->builder->positionAtEnd($checkBlock);
             $isTag = $context->builder->icmp(
                 Builder::INT_EQ,
@@ -938,13 +950,50 @@ trait ClassConstFetchHelperTrait
             $context->builder->positionAtEnd($raiseBlock);
             TypeErrorRaise::emitRaise(
                 $context,
-                'Cannot use "::class" on value of type '.$typeName
+                \PHPCompiler\VM\EnumCaseSupport::formatClassPseudoConstTypeErrorMessage($typeName)
             );
             $context->builder->returnVoid();
             $checkBlock = $nextCheck;
         }
+        if ($useValueName) {
+            $raiseTrue = $fn->appendBasicBlock('expr_class_pseudo_err_true');
+            $raiseFalse = $fn->appendBasicBlock('expr_class_pseudo_err_false');
+            $mixed = $fn->appendBasicBlock('expr_class_pseudo_err_mixed_vn');
+            $boolCheck = $fn->appendBasicBlock('expr_class_pseudo_bool_val');
+            $context->builder->positionAtEnd($checkBlock);
+            $isBool = $context->builder->icmp(
+                Builder::INT_EQ,
+                $masked,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            );
+            $context->builder->branchIf($isBool, $boolCheck, $mixed);
+            $context->builder->positionAtEnd($boolCheck);
+            $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+            $isTrue = $context->builder->icmp(
+                Builder::INT_NE,
+                $boolByte,
+                $i8->constInt(0, false)
+            );
+            $context->builder->branchIf($isTrue, $raiseTrue, $raiseFalse);
+            $context->builder->positionAtEnd($raiseTrue);
+            TypeErrorRaise::emitRaise(
+                $context,
+                \PHPCompiler\VM\EnumCaseSupport::formatClassPseudoConstTypeErrorMessage('true')
+            );
+            $context->builder->returnVoid();
+            $context->builder->positionAtEnd($raiseFalse);
+            TypeErrorRaise::emitRaise(
+                $context,
+                \PHPCompiler\VM\EnumCaseSupport::formatClassPseudoConstTypeErrorMessage('false')
+            );
+            $context->builder->returnVoid();
+            $checkBlock = $mixed;
+        }
         $context->builder->positionAtEnd($checkBlock);
-        TypeErrorRaise::emitRaise($context, 'Cannot use "::class" on value of type mixed');
+        TypeErrorRaise::emitRaise(
+            $context,
+            \PHPCompiler\VM\EnumCaseSupport::formatClassPseudoConstTypeErrorMessage('mixed')
+        );
         $context->builder->returnVoid();
     }
 }
