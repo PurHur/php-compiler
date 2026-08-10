@@ -39,7 +39,10 @@ final class base_convert_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $numStr = VmString::trimFamilyStringArgForFrame($frame, 0, 'base_convert', 1, 'num');
+        // String soft-null DEP/TypeError indices are 0-based (VmNullStringParamDeprecation adds +1).
+        // Passing 1 here cited parameter #2 ($num); Zend cites #1 (#29320). Int bases stay 1-based
+        // (VmNullNumberParamDeprecation uses the display index as-is).
+        $numStr = VmString::trimFamilyStringArgForFrame($frame, 0, 'base_convert', 0, 'num');
         $fromBase = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'base_convert', 2, 'from_base');
         $toBase = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'base_convert', 3, 'to_base');
 
