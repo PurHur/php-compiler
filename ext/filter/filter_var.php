@@ -11,6 +11,8 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
+use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -105,6 +107,18 @@ final class filter_var extends Internal
         // mega-CFG so AOT does not pull broken helper ABIs for this passthrough (#20988).
         if (1 === $argc) {
             return JitFilter::boxFilterDefault($context, $value);
+        }
+        // php-src Z_PARAM_LONG $filter — null → Deprecated + coerce 0 → Unknown filter (#29723).
+        if (JITVariable::TYPE_NULL === $filterArg->type || $filterArg->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                throw new \LogicException(
+                    'filter_var(): Argument #2 ($filter) must be of type int, null given'
+                );
+            }
+            JitIntdiv::emitNullIntDeprecation($context, 'filter_var', 2, 'filter', 'int');
+            JitBuiltinWarning::emit($context, VmFilter::unknownFilterWarningMessage(0, 'filter_var'));
+
+            return JitFilter::boxedFalse($context);
         }
         // Constant value + filter + options array → VmFilter SSOT (options['default'], #29046).
         $folded = self::tryFoldConstOptionsFilter($context, $value, $filterArg, $optionsArg);

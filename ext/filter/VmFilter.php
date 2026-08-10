@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
 use PHPCompiler\ext\standard\VmInetPure;
+use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -799,6 +800,9 @@ final class VmFilter
             return $resolved->toInt();
         }
         if (Variable::TYPE_NULL === $resolved->type) {
+            // php-src Z_PARAM_LONG null → E_DEPRECATED then coerce to 0 (#29723).
+            VmNullNumberParamDeprecation::emit($frame, $function, $userArgIndex, $paramName, 'int');
+
             return 0;
         }
         $given = match ($resolved->type) {
