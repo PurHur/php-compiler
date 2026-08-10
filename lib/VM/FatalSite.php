@@ -34,7 +34,13 @@ final class FatalSite
                 return self::normalizeDisplaySite($file, $def, $frame);
             }
         }
+        // This frame's callSiteLine (pending FUNCCALL_EXEC on the caller), else the current
+        // opcode line. Only then walk parent callSiteLine — otherwise mid-callee Errors
+        // (private(set) assign, etc.) would cite the call that entered the method (#29665).
         $line = $frame->callSiteLine;
+        if ($line <= 0) {
+            $line = self::lineFromOpcodes($frame);
+        }
         if ($line <= 0) {
             for ($f = $frame->parent; null !== $f; $f = $f->parent) {
                 if ($f->returnSiteLine > 0) {
@@ -45,9 +51,6 @@ final class FatalSite
                     break;
                 }
             }
-        }
-        if ($line <= 0) {
-            $line = self::lineFromOpcodes($frame);
         }
 
         return self::normalizeDisplaySite($file, $line, $frame);

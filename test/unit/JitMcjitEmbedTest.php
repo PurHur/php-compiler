@@ -396,4 +396,45 @@ PHP);
         $this->assertStringContainsString("'x' => 7", $out);
         $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
     }
+
+    /** @covers issue #29665 — asymmetric private(set) is a real property; do not MCJIT-pad */
+    public function testDoesNotPadClassWithPrivateSetProperty(): void
+    {
+        $in = <<<'PHP'
+<?php
+class A {
+    public private(set) string $x = "a";
+}
+class B extends A {
+    public function setX(string $v): void
+    {
+        $this->x = $v;
+    }
+}
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringNotContainsString(
+            'class A { private bool $__phpcMcjitClassPad',
+            $out
+        );
+        $this->assertStringContainsString('public private(set) string $x', $out);
+        // B is propertyless — still padded, but body newlines must remain so assign stays on line 8.
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+        $lines = explode("\n", $out);
+        $this->assertSame('        $this->x = $v;', $lines[7] ?? '');
+    }
+
+    /** @covers issue #29665 — parenthesized asymmetric set form */
+    public function testDoesNotPadClassWithParenthesizedPrivateSetProperty(): void
+    {
+        $in = <<<'PHP'
+<?php
+class Demo {
+    public (private(set)) string $name = 'x';
+}
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringContainsString('public (private(set)) string $name', $out);
+    }
 }

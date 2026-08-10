@@ -169,9 +169,11 @@ final class JitMcjitEmbed
             }
             $trimmed = trim($realBody);
             $pad = $isReadonlyClass ? self::EMPTY_READONLY_CLASS_PAD : self::EMPTY_CLASS_PAD;
+            // Keep the original body (newlines) so Error::getLine() / opcodes stay on the
+            // user source lines — trim()+rejoin collapsed multi-line classes (#29665).
             $replacement = '' === $trimmed
                 ? $realHeader.'{ '.$pad.' }'
-                : $realHeader.'{ '.$pad.' '.$trimmed.' }';
+                : $realHeader.'{ '.$pad.$realBody.'}';
             $out = substr($out, 0, $offset).$replacement.substr($out, $offset + \strlen($realFull));
         }
 
@@ -333,8 +335,14 @@ final class JitMcjitEmbed
             $body
         ) ?? $body;
 
+        // Include PHP 8.4 asymmetric set modifiers (`public private(set) T $x`,
+        // `public (private(set)) T $x`) — otherwise MCJIT pad collapses those classes
+        // and shifts Error::getLine() (#29665).
         return (bool) preg_match(
-            '/\b(?:public|protected|private|var|readonly)\s+(?:[\w\\\\|?]+\s+)*\$/',
+            '/\b(?:public|protected|private|var|readonly)\b'
+            .'(?:\s*\(\s*(?:public|protected|private)\s*\(\s*set\s*\)\s*\)'
+            .'|\s+(?:public|protected|private)\s*\(\s*set\s*\))*'
+            .'\s+(?:[\w\\\\|?]+\s+)*\$/',
             $stripped
         );
     }
