@@ -335,6 +335,92 @@ final class JitStats
     }
 
     /** @param array<int, JITVariable> $args */
+    public static function randSetall(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 2, 2, 'stats_rand_setall');
+        Stats::ensureLinked($context);
+        $s1 = JitLongArg::lower($context, $args[0], 'stats_rand_setall iseed1');
+        $s2 = JitLongArg::lower($context, $args[1], 'stats_rand_setall iseed2');
+        $ok = $context->builder->call(
+            $context->lookupFunction('__compiler_stats_rand_setall'),
+            $s1,
+            $s2
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeBool($context, $slot, $ok);
+
+        return $ptr;
+    }
+
+    /** @param array<int, JITVariable> $args */
+    public static function randGetsd(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 0, 0, 'stats_rand_getsd');
+        Stats::ensureLinked($context);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__compiler_stats_rand_getsd')
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
+        $context->refcount->addref($ht);
+
+        return $ptr;
+    }
+
+    /** @param array<int, JITVariable> $args */
+    public static function randRanf(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 0, 0, 'stats_rand_ranf');
+        Stats::ensureLinked($context);
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_rand_ranf')
+            ),
+            false
+        );
+    }
+
+    /** @param array<int, JITVariable> $args */
+    public static function randGenNormal(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 2, 2, 'stats_rand_gen_normal');
+        Stats::ensureLinked($context);
+        $av = self::loadDouble($context, $args[0], 'stats_rand_gen_normal', 'av');
+        $sd = self::loadDouble($context, $args[1], 'stats_rand_gen_normal', 'sd');
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_rand_gen_normal'),
+                $av,
+                $sd
+            )
+        );
+    }
+
+    /** @param array<int, JITVariable> $args */
+    public static function randGenIuniform(Context $context, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, 2, 2, 'stats_rand_gen_iuniform');
+        Stats::ensureLinked($context);
+        $low = JitLongArg::lower($context, $args[0], 'stats_rand_gen_iuniform low');
+        $high = JitLongArg::lower($context, $args[1], 'stats_rand_gen_iuniform high');
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_rand_gen_iuniform'),
+                $low,
+                $high
+            )
+        );
+    }
+
+    /** @param array<int, JITVariable> $args */
     private static function requireArgc(array $args, int $min, int $max, string $function): void
     {
         $argc = \count($args);

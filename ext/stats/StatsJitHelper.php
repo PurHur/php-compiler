@@ -131,4 +131,34 @@ final class StatsJitHelper
 
         return false === $result ? \NAN : $result;
     }
+
+    public static function randSetall(int $iseed1, int $iseed2): bool
+    {
+        return VmStatsRand::setall($iseed1, $iseed2);
+    }
+
+    public static function randGetsd(): HashTable
+    {
+        return VmStatsRand::getsdHashTable();
+    }
+
+    public static function randRanf(): float
+    {
+        return VmStatsRand::ranf();
+    }
+
+    public static function randGenNormal(float $av, float $sd): float
+    {
+        $result = VmStatsRand::genNormal($av, $sd, null);
+
+        return false === $result ? \NAN : $result;
+    }
+
+    /** Returns float (integral) or NAN on failure — JIT boxes like other stats results. */
+    public static function randGenIuniform(int $low, int $high): float
+    {
+        $result = VmStatsRand::genIuniform($low, $high, null);
+
+        return false === $result ? \NAN : (float) $result;
+    }
 }

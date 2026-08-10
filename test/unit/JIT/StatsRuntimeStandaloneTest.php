@@ -36,6 +36,11 @@ final class StatsRuntimeStandaloneTest extends TestCase
             '__compiler_stats_binomial_coef',
             '__compiler_stats_dens',
             '__compiler_stats_cdf',
+            '__compiler_stats_rand_setall',
+            '__compiler_stats_rand_getsd',
+            '__compiler_stats_rand_ranf',
+            '__compiler_stats_rand_gen_normal',
+            '__compiler_stats_rand_gen_iuniform',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);

@@ -55,6 +55,11 @@ class Module extends ModuleAbstract
             new stats_cdf_t(),
             new stats_cdf_chisquare(),
             new stats_cdf_gamma(),
+            new stats_rand_setall(),
+            new stats_rand_getsd(),
+            new stats_rand_ranf(),
+            new stats_rand_gen_normal(),
+            new stats_rand_gen_iuniform(),
         ];
     }
 }
