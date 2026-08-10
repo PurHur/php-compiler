@@ -20,7 +20,14 @@ final class DocumentCreateTextNode extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::createTextNode() expects at least 1 argument');
         }
-        $data = $this->stringArg($frame->calledArgs[1], 'DOMDocument::createTextNode()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
+        $data = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMDocument::createTextNode()',
+            0,
+            $frame,
+            'data'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createTextNode() requires VM context in this compiler build');
         }

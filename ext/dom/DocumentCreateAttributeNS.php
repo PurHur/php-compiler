@@ -21,7 +21,14 @@ final class DocumentCreateAttributeNS extends DomClassMethod
             throw new \LogicException('DOMDocument::createAttributeNS() expects at least 2 arguments');
         }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMDocument::createAttributeNS()', 0);
-        $qualifiedName = $this->stringArg($frame->calledArgs[2], 'DOMDocument::createAttributeNS()', 1);
+        // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
+        $qualifiedName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMDocument::createAttributeNS()',
+            1,
+            $frame,
+            'qualifiedName'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createAttributeNS() requires VM context in this compiler build');
         }

@@ -20,8 +20,21 @@ final class ElementSetAttribute extends DomClassMethod
         if (\count($frame->calledArgs) < 3) {
             throw new \LogicException('DOMElement::setAttribute() expects at least 2 arguments');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMElement::setAttribute()', 0);
-        $value = $this->stringArg($frame->calledArgs[2], 'DOMElement::setAttribute()', 1);
+        // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMElement::setAttribute()',
+            0,
+            $frame,
+            'qualifiedName'
+        );
+        $value = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMElement::setAttribute()',
+            1,
+            $frame,
+            'value'
+        );
         // php-src element.c — name_len == 0 → ValueError (#24480).
         VmDom::rejectEmptyQualifiedName($name, 'DOMElement::setAttribute', 1);
         // php-src DOM_RET_OBJ / xmlns → true (#24538).

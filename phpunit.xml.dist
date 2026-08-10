@@ -206,6 +206,8 @@
             <file>./test/compliance/DomGetElementByIdNullStrictJITTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictJITTest.php</file>
+            <file>./test/compliance/DomCreateNullStrictVMTest.php</file>
+            <file>./test/compliance/DomCreateNullStrictJITTest.php</file>
             <file>./test/compliance/PdoConstructPrepareQueryReflectionVMTest.php</file>
             <file>./test/compliance/PhpversionVMTest.php</file>
             <file>./test/compliance/PhpSbindirConstant84VMTest.php</file>

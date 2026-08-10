@@ -20,10 +20,23 @@ final class DocumentCreateElement extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::createElement() expects at least 1 argument');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMDocument::createElement()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMDocument::createElement()',
+            0,
+            $frame,
+            'localName'
+        );
         $value = '';
         if (isset($frame->calledArgs[2])) {
-            $value = $this->stringArg($frame->calledArgs[2], 'DOMDocument::createElement()', 1);
+            $value = $this->stringArg(
+                $frame->calledArgs[2],
+                'DOMDocument::createElement()',
+                1,
+                $frame,
+                'value'
+            );
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createElement() requires VM context in this compiler build');

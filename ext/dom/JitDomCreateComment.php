@@ -37,6 +37,17 @@ final class JitDomCreateComment
             throw new \LogicException('DOMDocument::createComment() expects receiver and data');
         }
 
+        // Compile-time null under strict_types (#29985, peer #29959).
+        if ($context->callerStrictTypes && JITVariable::TYPE_NULL === $args[1]->type) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'DOMDocument::createComment(): Argument #1 ($data) must be of type string, null given'
+            );
+
+            return self::boxNullResult($context);
+        }
+
         $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         if (null !== $lit) {
             return self::materialize($context, $lit);
@@ -131,5 +142,17 @@ final class JitDomCreateComment
             $context->lookupFunction('__value__readString'),
             JitValueBox::valuePtrFromVariable($context, $arg)
         );
+    }
+
+    private static function boxNullResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $ptr
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 }
