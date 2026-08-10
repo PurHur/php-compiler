@@ -1025,6 +1025,10 @@ final class BuiltinParamNames
                 return ['from', 'to', 'length', 'offset'];
             case 'stream_socket_client':
                 return ['address', 'error_code', 'error_message', 'timeout', 'flags', 'context'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says errno/errstr (#28919)
+            case 'fsockopen':
+            case 'pfsockopen':
+                return ['hostname', 'port', 'error_code', 'error_message', 'timeout'];
             // php-src ext/standard/streamsfuncs.stub.php — InternalArgInfo still says localaddress/errcode/errstring (#23937)
             case 'stream_socket_server':
                 return ['address', 'error_code', 'error_message', 'flags', 'context'];

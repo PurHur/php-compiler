@@ -123,6 +123,8 @@ final class BuiltinInternalArgInfo
             'stream_context_create' => '',
             // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#27848)
             'stream_socket_client' => '',
+            // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says resource (#28919)
+            'fsockopen', 'pfsockopen' => '',
             // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#28857)
             'stream_socket_server' => '',
             // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says resource (#28908)
@@ -1065,6 +1067,12 @@ final class BuiltinInternalArgInfo
             'stream_socket_client' => match ($index) {
                 1, 2 => '',
                 3 => '?float',
+                default => null,
+            },
+            // ext/standard/basic_functions.stub.php — untyped &$error_* outs + ?float $timeout (#28919)
+            'fsockopen', 'pfsockopen' => match ($index) {
+                2, 3 => '',
+                4 => '?float',
                 default => null,
             },
             // ext/standard/streamsfuncs.stub.php — untyped &$error_* outs (#28857)

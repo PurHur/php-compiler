@@ -836,6 +836,19 @@ final class BuiltinInternalDefaultValues
         'pathinfo' => [
             1 => ['kind' => 'int', 'value' => 15],
         ],
+        // php-src ext/standard/basic_functions.stub.php — port=-1; error outs/timeout null (#28919)
+        'fsockopen' => [
+            1 => ['kind' => 'int', 'value' => -1],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+        ],
+        'pfsockopen' => [
+            1 => ['kind' => 'int', 'value' => -1],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
