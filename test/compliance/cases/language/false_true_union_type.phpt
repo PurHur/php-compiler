@@ -1,8 +1,8 @@
 --TEST--
-Language: true|false union type — runtime fatal, bool must be used instead (#12045, #17996, #29961, zend_compile.c)
+Language: false|true union type — runtime fatal, bool must be used instead (#29961, zend_compile.c)
 --FILE--
 <?php
-function f(true|false $x): string {
+function f(false|true $x): string {
     return 't';
 }
 echo "ok\n";

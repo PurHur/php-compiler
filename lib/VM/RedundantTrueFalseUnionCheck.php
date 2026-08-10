@@ -15,14 +15,15 @@ use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
 
 /**
- * Zend zend_compile_type — redundant true/false/bool union members (#12045, #17996, #26555).
+ * Zend zend_compile_type — redundant true/false/bool union members (#12045, #17996, #26555, #29961).
  *
  * php-src validates when the function/class member is registered (VM FUNCDEF / property
  * declare); JIT CLI hits the same path via runtime->run after emit.
+ * Fatal wording matches php-src: "bool must be used instead" (not "should").
  */
 final class RedundantTrueFalseUnionCheck
 {
-    public const FATAL_MESSAGE = 'Type contains both true and false, bool should be used instead';
+    public const FATAL_MESSAGE = 'Type contains both true and false, bool must be used instead';
 
     public const DUPLICATE_TRUE_MESSAGE = 'Duplicate type true is redundant';
 
