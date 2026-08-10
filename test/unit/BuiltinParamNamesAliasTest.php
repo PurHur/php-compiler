@@ -5418,6 +5418,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('socket_write', 2));
     }
 
+    /** @covers issue #28842 */
+    public function testExecFamilyStubReturnTypes(): void
+    {
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('exec'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('system'));
+        self::assertSame('?false', BuiltinInternalArgInfo::returnTypeLabelForFunction('passthru'));
+        self::assertSame('string|false|null', BuiltinInternalArgInfo::returnTypeLabelForFunction('shell_exec'));
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {

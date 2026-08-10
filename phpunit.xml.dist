@@ -104,6 +104,7 @@
             <file>./test/compliance/OpensslErrorStringReflectionVMTest.php</file>
             <file>./test/compliance/OpensslEncryptDecryptReflectionVMTest.php</file>
             <file>./test/compliance/ProcOpenReflectionVMTest.php</file>
+            <file>./test/compliance/ExecFamilyReflectionReturnsVMTest.php</file>
             <file>./test/compliance/IconvStrlenReflectionVMTest.php</file>
             <file>./test/compliance/MbCaseInvalidUtf8SubstVMTest.php</file>
             <file>./test/compliance/StreamCopyToStreamReflectionVMTest.php</file>
