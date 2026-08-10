@@ -326,6 +326,20 @@ final class ErrorReporter
     }
 
     /**
+     * Zend E_WARNING for dim-read on a resource container (zend_execute.c, #30028).
+     *
+     * PHP 8.3+ shortens "on value of type resource" → "on resource"; PROFILE≥8.3 matches.
+     */
+    public static function arrayOffsetOnResourceMessage(): string
+    {
+        if (version_compare(\PHPCompiler\CompilerVersion::languageProfileVersion(), '8.3.0', '>=')) {
+            return 'Trying to access array offset on resource';
+        }
+
+        return self::arrayOffsetOnNonContainerMessage('resource');
+    }
+
+    /**
      * Zend E_WARNING for ZEND_FETCH_DIM_R on scalars (zend_execute.c, #4867).
      */
     public function arrayOffsetOnNonContainer(
@@ -336,6 +350,22 @@ final class ErrorReporter
     ): void {
         $this->emitWarning(
             self::arrayOffsetOnNonContainerMessage($typeName),
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    /**
+     * Zend E_WARNING for ZEND_FETCH_DIM_R when the container is a resource (#30028).
+     */
+    public function arrayOffsetOnResource(
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            self::arrayOffsetOnResourceMessage(),
             $context,
             $frame,
             $file
