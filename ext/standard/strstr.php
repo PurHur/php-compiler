@@ -20,8 +20,9 @@ final class strstr extends Internal
         // php-src ext/standard/string.stub.php — ArgumentCountError (#28228).
         $this->requireArgCountRange($frame, 'strstr', 2, 3);
         $argc = \count($frame->calledArgs);
-        $haystackStr = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'strstr', 0, 'haystack');
-        $needleStr = VmString::coerceTrimFamilyStringArg($frame->calledArgs[1], 'strstr', 1, 'needle');
+        // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29766 / #21189).
+        $haystackStr = VmString::trimFamilyStringArgForFrame($frame, 0, 'strstr', 0, 'haystack');
+        $needleStr = VmString::trimFamilyStringArgForFrame($frame, 1, 'strstr', 1, 'needle');
         $beforeNeedle = false;
         if (3 === $argc) {
             // Z_PARAM_BOOL — null→false + E_DEPRECATED (php-src string.c; #21702).
@@ -54,11 +55,14 @@ final class strstr extends Internal
             );
         }
 
-        return JitStrstr::find(
-            $context,
-            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strstr', 0, 'haystack'),
-            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'strstr', 1, 'needle'),
-            $before
-        );
+        // Soft-null outside strict_types — Zend 8.4 deprecate+coerce (#21189); strict → TypeError (#29766).
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strstr', 0, 'haystack')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strstr', 0, 'haystack');
+        $needle = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'strstr', 1, 'needle')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'strstr', 1, 'needle');
+
+        return JitStrstr::find($context, $hay, $needle, $before);
     }
 }
