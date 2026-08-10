@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * class_alias() — register alternate class names (issue #3095).
  *
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_alias)
+ * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(class_alias)
  */
 final class class_alias extends Internal
 {
@@ -31,9 +31,10 @@ final class class_alias extends Internal
             throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        // php-src Zend/zend_builtin_functions.stub.php — string $class (not InternalArgInfo "original class") (#29661)
-        $original = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'class_alias', 0, 'class');
-        $alias = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'class_alias', 1, 'alias');
+        // php-src Zend/zend_builtin_functions.stub.php — string $class / string $alias.
+        // Z_PARAM_STR: declare(strict_types=1) → TypeError on null; else soft-null DEP+coerce (#29816 / #29661).
+        $original = VmString::trimFamilyStringArgForFrame($frame, 0, 'class_alias', 0, 'class');
+        $alias = VmString::trimFamilyStringArgForFrame($frame, 1, 'class_alias', 1, 'alias');
         $autoload = true;
         if (3 === \count($frame->calledArgs)) {
             $autoloadArg = $frame->calledArgs[2]->resolveIndirect();
@@ -54,16 +55,29 @@ final class class_alias extends Internal
             throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
         }
         $autoloadArg = 3 === \count($args) ? $args[2] : null;
-        $originalLit = JitStringArg::compileTimeLiteral($args[0]);
-        $aliasLit = JitStringArg::compileTimeLiteral($args[1]);
-        if (null !== $originalLit && null !== $aliasLit) {
-            return JitClassAlias::invokeLiteral($context, $originalLit, $aliasLit, $autoloadArg);
+        // Under strict_types, force Z_PARAM_STR TypeError before literal fold (#29816).
+        if (!$context->callerStrictTypes) {
+            $originalLit = JitStringArg::compileTimeLiteral($args[0]);
+            $aliasLit = JitStringArg::compileTimeLiteral($args[1]);
+            if (null !== $originalLit && null !== $aliasLit
+                && !(JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+                && !(JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+            ) {
+                return JitClassAlias::invokeLiteral($context, $originalLit, $aliasLit, $autoloadArg);
+            }
         }
+
+        $originalStr = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'class_alias', 0, 'class')
+            : JitStringBuiltinArg::lower($context, $args[0], 'class_alias', 0, 'class', 'string', null, false);
+        $aliasStr = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'class_alias', 1, 'alias')
+            : JitStringBuiltinArg::lower($context, $args[1], 'class_alias', 1, 'alias', 'string', null, false);
 
         return JitClassAlias::invokeRuntime(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'class_alias', 0, 'class'),
-            JitStringBuiltinArg::lower($context, $args[1], 'class_alias', 1, 'alias'),
+            $originalStr,
+            $aliasStr,
             $args[0],
             $args[1],
             $autoloadArg
