@@ -109,13 +109,21 @@ final class JitTimezoneTransitionsGet
 
     private static function tryCompileTimeZoneName(Context $context, JITVariable $arg): ?string
     {
-        // DateTimeZone::__construct leaves the zone name on $this (#26772 / #26799).
-        if (null !== $arg->compileTimeString && '' !== $arg->compileTimeString) {
+        // Dedicated stamp from DateTimeZone::__construct / local-name map (#29732 / #29734).
+        if (null !== $arg->compileTimeTimezoneName && '' !== $arg->compileTimeTimezoneName) {
+            return $arg->compileTimeTimezoneName;
+        }
+        // Ignore New_ class-name collision on compileTimeString.
+        if (
+            null !== $arg->compileTimeString
+            && '' !== $arg->compileTimeString
+            && 0 !== strcasecmp($arg->compileTimeString, 'DateTimeZone')
+        ) {
             return $arg->compileTimeString;
         }
 
         $literal = JitStringBuiltinArg::compileTimeLiteral($arg);
-        if (null !== $literal) {
+        if (null !== $literal && '' !== $literal) {
             return $literal;
         }
 
