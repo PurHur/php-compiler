@@ -65,7 +65,7 @@ final class JitOpensslDigest
             $method,
             'openssl_digest',
             1,
-            'method'
+            'digest_algo'
         );
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_openssl_digest'),

@@ -35,7 +35,8 @@ final class openssl_digest extends Internal
         // Z_PARAM_STR $data — soft-null DEP+coerce on forward profile (#21517, reverts #20207;
         // php-src ext/openssl/openssl.c — Zend 8.4 still deprecates null → '').
         $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'openssl_digest', 0, 'data');
-        $method = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'openssl_digest', 1, 'method');
+        // Z_PARAM_STR $digest_algo — TypeError under caller strict_types (#29956; openssl.stub.php).
+        $method = VmString::stringBuiltinArgForFrame($frame, 1, 'openssl_digest', 1, 'digest_algo');
         $rawOutput = false;
         if (3 === $argc) {
             $rawOutput = VmOpenssl::coerceBoolArg(
