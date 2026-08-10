@@ -141,6 +141,7 @@ final class AttributeTargetValidator
      * Comma-separated allowed-target labels (IS_REPEATABLE bit ignored).
      *
      * php-src: zend_attributes.c / ReflectionAttribute::newInstance Error text.
+     * Empty mask (Attribute(0)) yields '' so the message reads "(allowed targets: )" (#29918).
      */
     public static function formatAllowedTargets(int $flags): string
     {
@@ -151,7 +152,7 @@ final class AttributeTargetValidator
             }
         }
 
-        return [] !== $names ? implode(', ', $names) : 'none';
+        return implode(', ', $names);
     }
 
     /**
