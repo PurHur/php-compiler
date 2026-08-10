@@ -1,13 +1,13 @@
 --TEST--
-stdlib stats cdf_* which=1 family — PECL stats parity (#29588, #29621, #29648, ext/stats)
+stdlib stats cdf_* which=1 family — PECL stats parity (#29588, #29621, #29648, #29683, ext/stats)
 --ENV--
 PHP_COMPILER_ENABLE_STATS=1
 --FILE--
 <?php
-echo function_exists('stats_cdf_binomial') ? 'Y' : 'N';
+echo function_exists('stats_cdf_negative_binomial') ? 'Y' : 'N';
 echo "\n";
 $funcs = get_extension_funcs('stats') ?: [];
-echo count($funcs) >= 48 ? 'funcs_ok' : 'funcs_bad='.count($funcs);
+echo count($funcs) >= 53 ? 'funcs_ok' : 'funcs_bad='.count($funcs);
 echo "\n";
 echo round(stats_cdf_normal(0.0, 0.0, 1.0, 1), 8), "\n";
 echo round(stats_cdf_normal(1.0, 0.0, 1.0, 1), 8), "\n";
@@ -25,6 +25,7 @@ echo round(stats_cdf_cauchy(0.0, 0.0, 1.0, 1), 8), "\n";
 echo round(stats_cdf_logistic(0.0, 0.0, 1.0, 1), 8), "\n";
 echo round(stats_cdf_weibull(1.0, 1.0, 1.0, 1), 8), "\n";
 echo round(stats_cdf_uniform(0.5, 0.0, 1.0, 1), 8), "\n";
+echo round(stats_cdf_negative_binomial(3.0, 5.0, 0.5, 1), 8), "\n";
 var_export(@stats_cdf_weibull(1.0, 1.0, 1.0, 9));
 echo "\n";
 ?>
@@ -47,4 +48,5 @@ funcs_ok
 0.5
 0.63212056
 0.5
+0.36328125
 false

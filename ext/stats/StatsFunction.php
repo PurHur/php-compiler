@@ -99,6 +99,7 @@ abstract class StatsFunction extends Internal
             'stats_cdf_logistic' => JitStats::cdf($context, VmStatsCdf::OP_LOGISTIC, 4, ...$args),
             'stats_cdf_weibull' => JitStats::cdf($context, VmStatsCdf::OP_WEIBULL, 4, ...$args),
             'stats_cdf_uniform' => JitStats::cdf($context, VmStatsCdf::OP_UNIFORM, 4, ...$args),
+            'stats_cdf_negative_binomial' => JitStats::cdf($context, VmStatsCdf::OP_NEGATIVE_BINOMIAL, 4, ...$args),
             'stats_rand_setall' => JitStats::randSetall($context, ...$args),
             'stats_rand_getsd' => JitStats::randGetsd($context, ...$args),
             'stats_rand_ranf' => JitStats::randRanf($context, ...$args),

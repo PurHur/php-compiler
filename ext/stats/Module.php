@@ -65,6 +65,7 @@ class Module extends ModuleAbstract
             new stats_cdf_logistic(),
             new stats_cdf_weibull(),
             new stats_cdf_uniform(),
+            new stats_cdf_negative_binomial(),
             new stats_rand_setall(),
             new stats_rand_getsd(),
             new stats_rand_ranf(),

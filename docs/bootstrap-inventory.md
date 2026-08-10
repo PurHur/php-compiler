@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7350 |
-| Phase A inventory files (M2 ratio SSOT) | 7350 |
+| PHP files on vm.php path | 7351 |
+| Phase A inventory files (M2 ratio SSOT) | 7351 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23825 |
+| Source constructs flagged (warnings) | 23828 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4618,7 +4618,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zlib_encode.php` | 0 | 1 |
 | `ext/standard/zlib_get_coding_type.php` | 0 | 2 |
 | `ext/stats/JitStats.php` | 0 | 2 |
-| `ext/stats/Module.php` | 0 | 57 |
+| `ext/stats/Module.php` | 0 | 58 |
 | `ext/stats/StatsExtensionPolicy.php` | 0 | 1 |
 | `ext/stats/StatsFunction.php` | 0 | 2 |
 | `ext/stats/StatsJitHelper.php` | 0 | 1 |
@@ -4637,6 +4637,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_cdf_gamma.php` | 0 | 2 |
 | `ext/stats/stats_cdf_laplace.php` | 0 | 2 |
 | `ext/stats/stats_cdf_logistic.php` | 0 | 2 |
+| `ext/stats/stats_cdf_negative_binomial.php` | 0 | 2 |
 | `ext/stats/stats_cdf_normal.php` | 0 | 2 |
 | `ext/stats/stats_cdf_poisson.php` | 0 | 2 |
 | `ext/stats/stats_cdf_t.php` | 0 | 2 |
@@ -41537,19 +41538,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new stats_cdf_logistic (line 65)
 - new stats_cdf_weibull (line 66)
 - new stats_cdf_uniform (line 67)
-- new stats_rand_setall (line 68)
-- new stats_rand_getsd (line 69)
-- new stats_rand_ranf (line 70)
-- new stats_rand_gen_normal (line 71)
-- new stats_rand_gen_iuniform (line 72)
-- new stats_rand_gen_beta (line 73)
-- new stats_rand_gen_exponential (line 74)
-- new stats_rand_gen_gamma (line 75)
-- new stats_rand_gen_chisquare (line 76)
-- new stats_rand_gen_f (line 77)
-- new stats_rand_gen_funiform (line 78)
-- new stats_rand_ibinomial (line 79)
-- new stats_rand_phrase_to_seeds (line 80)
+- new stats_cdf_negative_binomial (line 68)
+- new stats_rand_setall (line 69)
+- new stats_rand_getsd (line 70)
+- new stats_rand_ranf (line 71)
+- new stats_rand_gen_normal (line 72)
+- new stats_rand_gen_iuniform (line 73)
+- new stats_rand_gen_beta (line 74)
+- new stats_rand_gen_exponential (line 75)
+- new stats_rand_gen_gamma (line 76)
+- new stats_rand_gen_chisquare (line 77)
+- new stats_rand_gen_f (line 78)
+- new stats_rand_gen_funiform (line 79)
+- new stats_rand_ibinomial (line 80)
+- new stats_rand_phrase_to_seeds (line 81)
 - 1 class method(s)
 
 ### `ext/stats/StatsExtensionPolicy.php`
@@ -41576,7 +41578,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/VmStatsCdf.php`
 
 **Warnings** (review for bootstrap subset):
-- 25 class method(s)
+- 26 class method(s)
 
 ### `ext/stats/VmStatsDens.php`
 
@@ -41650,6 +41652,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/stats/stats_cdf_logistic.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_cdf_negative_binomial.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
