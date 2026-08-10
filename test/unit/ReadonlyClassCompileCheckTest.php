@@ -170,7 +170,7 @@ PHP;
         $this->assertSame('1', ob_get_clean());
     }
 
-    /** @covers issue #6862 */
+    /** @covers issue #6862 / #29980 — Zend applies property-info fatals, not a class-level static ban */
     public function testReadonlyClassStaticPropertyFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
@@ -181,8 +181,38 @@ readonly class R {
 }
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Readonly class R cannot declare static properties');
+        $this->expectExceptionMessage('Readonly property R::$label cannot have default value');
         $runtime->parseAndCompile($code, 'readonly_class_static.php');
+    }
+
+    /** @covers issue #29980 */
+    public function testReadonlyClassTypedStaticPropertyCannotBeReadonlyMessage(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class R {
+    public static int $x;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Static property R::$x cannot be readonly');
+        $runtime->parseAndCompile($code, 'readonly_class_typed_static.php');
+    }
+
+    /** @covers issue #29980 */
+    public function testReadonlyClassUntypedStaticPropertyMustHaveType(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class R {
+    public static $x;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly property R::$x must have type');
+        $runtime->parseAndCompile($code, 'readonly_class_untyped_static.php');
     }
 
     public function testStaticReadonlyPropertyFailsAtCompileTime(): void
