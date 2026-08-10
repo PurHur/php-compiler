@@ -3244,6 +3244,26 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
+    /**
+     * PHP 8.5+ opcache_is_script_cached_in_file_cache() (ext/opcache/opcache.stub.php; #27675).
+     *
+     * Withheld on ≤8.4 so function_exists matches Zend. Enable via stable 8.5.0+ or
+     * explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsOpcacheIsScriptCachedInFileCache(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
     /** array_first()/array_last() visible to function_exists() — stable 8.5+ or forward PROFILE=8.5 (#21173). */
     public static function advertisesPhp85ArrayFirstLast(): bool
     {
