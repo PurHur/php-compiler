@@ -128,9 +128,10 @@ final class VmEmptyDimension
                 return null;
             }
             try {
+                // Index already warned via isset path (#29557) — silent coerce for the char fetch.
                 $rawIndex = Variable::stringOffsetIndexFromDim(
                     $dim,
-                    $vm->context->errors,
+                    null,
                     $vm->context,
                     $frame,
                     $scriptFile

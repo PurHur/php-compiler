@@ -72,7 +72,28 @@ final class EmptyDimensionLlvm
 
     private static function compileStringOffsetIsEmpty(Context $context, Variable $container, Variable $dim): Value
     {
-        if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
+        if (Variable::TYPE_NATIVE_DOUBLE === $dim->type) {
+            // Same float→int deprecate as isset; then truthiness of the byte (#29557).
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($dim)
+            );
+            $dim = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $truncated
+            );
+        } elseif (Variable::TYPE_NATIVE_BOOL === $dim->type) {
+            $dim = $dim->castTo(Variable::TYPE_NATIVE_LONG);
+        } elseif (Variable::TYPE_NULL === $dim->type) {
+            $dim = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger(0)
+            );
+        } elseif (Variable::TYPE_NATIVE_LONG !== $dim->type) {
             return $context->constantFromBool(true);
         }
         $str = $context->helper->loadValue($container);

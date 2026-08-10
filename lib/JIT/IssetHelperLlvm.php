@@ -347,6 +347,28 @@ final class IssetHelperLlvm
                 Variable::KIND_VALUE,
                 $context->constantFromInteger((int) trim($lit))
             );
+        } elseif (Variable::TYPE_NATIVE_DOUBLE === $dim->type) {
+            // zend_isset_dim: float→int Implicit-conversion E_DEPRECATED (#29557).
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($dim)
+            );
+            $dim = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $truncated
+            );
+        } elseif (Variable::TYPE_NATIVE_BOOL === $dim->type) {
+            // Silent coerce (no string-offset cast warning) — matches zend_isset_dim (#29557).
+            $dim = $dim->castTo(Variable::TYPE_NATIVE_LONG);
+        } elseif (Variable::TYPE_NULL === $dim->type) {
+            $dim = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger(0)
+            );
         } elseif (Variable::TYPE_NATIVE_LONG !== $dim->type) {
             return $i1->constInt(0, false);
         }

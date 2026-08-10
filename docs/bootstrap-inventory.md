@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7292 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23647 |
+| Source constructs flagged (warnings) | 23651 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6263,7 +6263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
 | `lib/JIT/EmptyDimensionHelper.php` | 0 | 1 |
-| `lib/JIT/EmptyDimensionLlvm.php` | 0 | 4 |
+| `lib/JIT/EmptyDimensionLlvm.php` | 0 | 6 |
 | `lib/JIT/EmptyObjectPropertyHelper.php` | 0 | 1 |
 | `lib/JIT/EmptyObjectPropertyLlvm.php` | 0 | 4 |
 | `lib/JIT/EmptyStaticPropertyHelper.php` | 0 | 3 |
@@ -6321,7 +6321,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/InternalStrictArg.php` | 0 | 1 |
 | `lib/JIT/IntersectionParamCheck.php` | 0 | 2 |
 | `lib/JIT/IssetHelper.php` | 0 | 1 |
-| `lib/JIT/IssetHelperLlvm.php` | 0 | 5 |
+| `lib/JIT/IssetHelperLlvm.php` | 0 | 7 |
 | `lib/JIT/IteratorHelper.php` | 0 | 1 |
 | `lib/JIT/IteratorProtocolHelper.php` | 0 | 1 |
 | `lib/JIT/JitArrayColumnArg.php` | 0 | 2 |
@@ -37896,7 +37896,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
-- new ArgumentCountError (line 65)
+- new ArgumentCountError (line 66)
 - 6 class method(s)
 
 ### `ext/standard/fileatime.php`
@@ -52525,9 +52525,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/EmptyDimensionLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 104)
-- new Variable (line 148)
-- new Variable (line 186)
+- new Variable (line 81)
+- new Variable (line 90)
+- new Variable (line 125)
+- new Variable (line 169)
+- new Variable (line 207)
 - 5 class method(s)
 
 ### `lib/JIT/EmptyObjectPropertyHelper.php`
@@ -52924,6 +52926,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 303)
 - new Variable (line 317)
 - new Variable (line 344)
+- new Variable (line 356)
+- new Variable (line 366)
 - 10 class method(s)
 
 ### `lib/JIT/IteratorHelper.php`
@@ -58991,34 +58995,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 763)
 - new Error (line 937)
 - new Error (line 948)
-- new self (line 1330)
-- new Error (line 1367)
-- new Variable (line 1521)
-- new EnumCaseEntry (line 1523)
-- new self (line 2095)
-- new self (line 2267)
-- new self (line 2275)
-- new self (line 2283)
-- new self (line 2285)
-- new self (line 2542)
-- new ArithmeticError (line 2659)
-- new self (line 2679)
-- new self (line 2787)
-- new Error (line 2794)
-- new DivisionByZeroError (line 2940)
-- new DivisionByZeroError (line 2947)
-- new self (line 3007)
-- new Error (line 3046)
-- new self (line 3067)
-- new self (line 3081)
-- new Error (line 3120)
-- new self (line 3141)
-- new self (line 3149)
-- new Error (line 3347)
-- new Error (line 3353)
-- new Error (line 3378)
-- new Error (line 3386)
-- 133 class method(s)
+- new self (line 1360)
+- new Error (line 1397)
+- new Variable (line 1551)
+- new EnumCaseEntry (line 1553)
+- new self (line 2125)
+- new self (line 2297)
+- new self (line 2305)
+- new self (line 2313)
+- new self (line 2315)
+- new self (line 2572)
+- new ArithmeticError (line 2689)
+- new self (line 2709)
+- new self (line 2817)
+- new Error (line 2824)
+- new DivisionByZeroError (line 2970)
+- new DivisionByZeroError (line 2977)
+- new self (line 3037)
+- new Error (line 3076)
+- new self (line 3097)
+- new self (line 3111)
+- new Error (line 3150)
+- new self (line 3171)
+- new self (line 3179)
+- new Error (line 3377)
+- new Error (line 3383)
+- new Error (line 3408)
+- new Error (line 3416)
+- 134 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`
 
@@ -59078,7 +59082,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 97)
 - new Variable (line 107)
-- new Variable (line 148)
+- new Variable (line 149)
 - 2 class method(s)
 
 ### `lib/VM/VmEnumNumericOperandGuard.php`
