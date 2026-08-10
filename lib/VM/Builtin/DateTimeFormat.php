@@ -9,9 +9,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
 
 /**
- * DateTime::format(string $format) — VM (#3072).
+ * DateTime::format(string $format) — VM (#3072, #29819).
  *
  * Soft-null $format on 8.4 — Zend deprecate+coerce (ext/date/php_date.c; #21536, reverts #20693 TypeError).
+ * Caller strict_types → TypeError Argument #1 ($format) (skip $this; #29819).
  */
 final class DateTimeFormat extends VmClassMethod
 {
