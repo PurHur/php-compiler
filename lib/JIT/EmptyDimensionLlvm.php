@@ -174,9 +174,57 @@ final class EmptyDimensionLlvm
         }
         $superglobalName = VmIsset::superglobalName($container, $containerOp, VmIsset::isSelfHostAot());
         $ht = HashTableHelper::loadHashtablePointer($context, $container);
+
+        // ZEND_ISSET_ISEMPTY_DIM_OBJ — illegal offsets share isset/empty TypeError text (#29549 / #29567).
+        if (Variable::TYPE_HASHTABLE === $dim->type) {
+            HashTableHelper::emitIllegalOffsetTypeForKey(
+                $context,
+                $dim,
+                'Illegal offset type in isset or empty'
+            );
+
+            return $context->constantFromBool(true);
+        }
+        if (Variable::TYPE_OBJECT === $dim->type) {
+            return self::compileHashTableObjectDimIsEmpty($context, $ht, $dim);
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            // Runtime object/array/enum keys: same TypeError as isset.
+            HashTableHelper::offsetIsSetDim($context, $ht, $dim);
+        }
+
         $read = HashTableHelper::readDimToValueBox($context, $ht, $dim, $superglobalName);
 
         return EmptyObjectPropertyLlvm::compileEmptyFromValue($context, $read);
+    }
+
+    /**
+     * empty($arr[$object]) — resource warn+cast, else TypeError with isset/empty wording (#29549).
+     */
+    private static function compileHashTableObjectDimIsEmpty(
+        Context $context,
+        Value $ht,
+        Variable $dim
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->store($i1->constInt(1, false), $resultSlot);
+        $done = BasicBlockHelper::append($context, 'ht_empty_obj_dim_done');
+        HashTableResourceKeyLlvm::emitObjectDimOrIllegal(
+            $context,
+            $dim,
+            'Illegal offset type in isset or empty',
+            static function (Value $index) use ($context, $ht, $resultSlot, $done): void {
+                $box = HashTableHelper::readIndexedToValueBox($context, $ht, $index);
+                $empty = EmptyObjectPropertyLlvm::compileEmptyFromValue($context, $box);
+                $context->builder->store($empty, $resultSlot);
+                $context->builder->branch($done);
+            }
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function hashtableFromValueBox(Context $context, Variable $container): Variable
