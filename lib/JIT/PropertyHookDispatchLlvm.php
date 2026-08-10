@@ -102,6 +102,72 @@ final class PropertyHookDispatchLlvm
     }
 
     /**
+     * Dim/append on hooked property without `&get` — Zend get_property_ptr_ptr (#29748 / #28590).
+     *
+     * Invoke get when present (side effects), then throw catchable
+     * {@code Error: Indirect modification of Class::$prop is not allowed}.
+     *
+     * @return bool true when Error was emitted (caller must not load the live slot)
+     */
+    public static function emitDimWriteRequiresByRefGetGuard(
+        Context $context,
+        ?\PHPCompiler\JIT $jit,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): bool {
+        if (PropertyHookJitHelper::isRawHookWrite($context, $propertyName, $enclosingBlock)) {
+            return false;
+        }
+        $registry = $context->runtime->vmContext->propertyHookRegistry ?? [];
+        $fromRegistry = PropertyHookJitHelper::dimWriteRequiresByRefGet(
+            $registry,
+            $declaringClass,
+            $propertyName
+        );
+        $getLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        $setLc = strtolower(PropertyHooks::setHookMethodName($propertyName));
+        $getProxy = self::resolveHookProxy($context, $declaringClass, $getLc);
+        $setProxy = self::resolveHookProxy($context, $declaringClass, $setLc);
+        $hasHookMethod = (null !== $getProxy && !self::proxyIsStatic($context, $getProxy))
+            || (null !== $setProxy && !self::proxyIsStatic($context, $setProxy));
+        if (!$fromRegistry && !$hasHookMethod) {
+            return false;
+        }
+        // Registry may lag AOT method registration — still honor `&get` when recorded.
+        $lcClass = strtolower(ltrim($declaringClass, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $registry[$lcClass][$propertyName]
+            ?? $registry[$lcClass][$propLc]
+            ?? null;
+        if (is_array($meta) && !empty($meta['getByRef'])) {
+            return false;
+        }
+        // Side effects / throw propagation from get — same order as VM PROPERTY_FETCH (#29748).
+        self::tryEmitPropertyGet($context, $receiver, $declaringClass, $propertyName, $enclosingBlock);
+        $displayClass = ltrim($declaringClass, '\\');
+        if ('' === $displayClass) {
+            $displayClass = 'stdClass';
+        }
+        $message = sprintf(
+            'Indirect modification of %s::$%s is not allowed',
+            $displayClass,
+            $propertyName
+        );
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+        } else {
+            ErrorRaise::emitRaise($context, $message);
+            // Pending Error alone is swallowed by dim-write continuation — hard-stop (#29748).
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->clearInsertionPosition();
+        }
+
+        return true;
+    }
+
+    /**
      * isset($obj->prop) on hooked properties (#9671, #29214, zend_std_has_property).
      * When a get hook exists, always invoke it (same-name / expression-bodied set included);
      * write-only (no get) probes the backing slot.

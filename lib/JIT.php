@@ -12620,6 +12620,7 @@ class JIT {
                         }
                     }
                     $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                    $forDimWrite = $this->varFetchDestUsedAsDimWriteContainer($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
                         $classId = $this->context->type->object->lookup($declaringClass);
                         if (
@@ -12769,6 +12770,30 @@ class JIT {
                             }
                         }
                         if (!$forWrite) {
+                            // `$o->hooked[]=` / `$o->hooked[$k]=` without `&get` (#29748 / #28590).
+                            // Try-body `$o` often loses CFG userType → generic "object"; recover
+                            // the hooked declaring class before the guard (#29748).
+                            $hookClass = $declaringClass;
+                            if ($forDimWrite) {
+                                $hookClass = $this->resolveHookedPropertyDeclaringClass(
+                                    $obj,
+                                    $declaringClass,
+                                    $name->value
+                                );
+                            }
+                            if (
+                                $forDimWrite
+                                && JIT\PropertyHookDispatch::emitDimWriteRequiresByRefGetGuard(
+                                    $this->context,
+                                    $this,
+                                    $receiver,
+                                    $hookClass,
+                                    $name->value,
+                                    $block
+                                )
+                            ) {
+                                break;
+                            }
                             $hookFetched = JIT\PropertyHookDispatch::tryEmitPropertyGet(
                                 $this->context,
                                 $receiver,
@@ -13676,6 +13701,51 @@ class JIT {
         }
 
         return null;
+    }
+
+    /**
+     * Recover hooked-property owner when CFG userType collapsed to generic "object" (#29748).
+     */
+    private function resolveHookedPropertyDeclaringClass(
+        Operand $obj,
+        string $declaringClass,
+        string $propertyName
+    ): string {
+        $lc = strtolower(ltrim($declaringClass, '\\'));
+        if ('object' !== $lc && 'stdclass' !== $lc && '' !== $lc) {
+            return $declaringClass;
+        }
+        if ($this->context->hasVariableOpInScopes($obj)) {
+            $recv = $this->context->getVariableFromOpInScopes($obj);
+            $tagged = $recv->classUserType ?? null;
+            if (is_string($tagged) && '' !== $tagged && 'object' !== strtolower($tagged)) {
+                return $tagged;
+            }
+        }
+        $registry = $this->context->runtime->vmContext->propertyHookRegistry ?? [];
+        $propLc = strtolower($propertyName);
+        $objectType = $this->context->type->object;
+        foreach ($registry as $lcClass => $props) {
+            if (!is_array($props)) {
+                continue;
+            }
+            $meta = $props[$propertyName] ?? $props[$propLc] ?? null;
+            if (!is_array($meta) || (!isset($meta['get']) && !isset($meta['set']))) {
+                continue;
+            }
+            // Prefer the Object_ display name when registered.
+            if ($objectType instanceof JIT\Builtin\Type\Object_) {
+                foreach ($objectType->allClassNamesById() as $className) {
+                    if (strtolower(ltrim((string) $className, '\\')) === (string) $lcClass) {
+                        return (string) $className;
+                    }
+                }
+            }
+
+            return (string) $lcClass;
+        }
+
+        return $declaringClass;
     }
 
     private function resolvePropertyDeclaringClass(Operand $obj, Block $block, ?string $propName): string
@@ -22886,6 +22956,43 @@ class JIT {
         }
 
         return OpCode::destSlotUsedAsAssignLvalue($next, $destSlot);
+    }
+
+    /**
+     * True when fetch dest is the container for `$prop[]=` / `$prop[$k]=` / unset dim (#29748).
+     */
+    private function varFetchDestUsedAsDimWriteContainer(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $ops = $block->opCodes;
+        $n = \count($ops);
+        for ($i = $opIndex + 1; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (OpCode::destSlotUsedAsDimWriteContainer($next, $destSlot)) {
+                return true;
+            }
+            if (
+                OpCode::TYPE_PROPERTY_FETCH === $next->type
+                || OpCode::TYPE_PROPERTY_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg1 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH === $next->type
+                || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+            ) {
+                continue;
+            }
+            if (OpCode::TYPE_UNSET === $next->type) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     private function varFetchDestUsedAsIncDec(Block $block, int $opIndex, int $destSlot): bool
