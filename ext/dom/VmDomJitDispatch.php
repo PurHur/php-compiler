@@ -245,8 +245,15 @@ final class VmDomJitDispatch
      */
     public static function createElement(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('createElement', 0), 'createElement', 0);
-        $value = isset($extra[1]) ? self::stringArg($extra[1], 'createElement', 1) : '';
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('createElement', 0),
+            'DOMDocument::createElement',
+            0,
+            'localName'
+        );
+        $value = isset($extra[1])
+            ? self::stringArg($extra[1], 'DOMDocument::createElement', 1, 'value')
+            : '';
 
         return VmDom::createElement($ctx, $name, $document, $value);
     }
@@ -256,7 +263,12 @@ final class VmDomJitDispatch
      */
     public static function createAttribute(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('createAttribute', 0), 'createAttribute', 0);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('createAttribute', 0),
+            'DOMDocument::createAttribute',
+            0,
+            'localName'
+        );
 
         return VmDom::createAttribute($ctx, $name, $document);
     }
@@ -529,7 +541,12 @@ final class VmDomJitDispatch
      */
     public static function hasAttribute(ObjectEntry $element, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('hasAttribute', 0), 'hasAttribute', 0);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('hasAttribute', 0),
+            'DOMElement::hasAttribute',
+            0,
+            'qualifiedName'
+        );
         $var = new Variable();
         $var->bool(VmDom::hasAttribute($element, $name));
 
@@ -562,7 +579,12 @@ final class VmDomJitDispatch
      */
     public static function getAttribute(ObjectEntry $element, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('getAttribute', 0), 'getAttribute', 0);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('getAttribute', 0),
+            'DOMElement::getAttribute',
+            0,
+            'qualifiedName'
+        );
         $value = VmDom::getAttribute($element, $name);
         $var = new Variable();
         if (null === $value) {
@@ -607,8 +629,18 @@ final class VmDomJitDispatch
      */
     public static function setAttribute(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('setAttribute', 0), 'setAttribute', 0);
-        $value = self::stringArg($extra[1] ?? self::missingArg('setAttribute', 1), 'setAttribute', 1);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('setAttribute', 0),
+            'DOMElement::setAttribute',
+            0,
+            'qualifiedName'
+        );
+        $value = self::stringArg(
+            $extra[1] ?? self::missingArg('setAttribute', 1),
+            'DOMElement::setAttribute',
+            1,
+            'value'
+        );
         // php-src element.c — name_len == 0 → ValueError (#24480).
         VmDom::rejectEmptyQualifiedName($name, 'DOMElement::setAttribute', 1);
         // php-src DOM_RET_OBJ / xmlns → true (#24538).
@@ -620,7 +652,12 @@ final class VmDomJitDispatch
      */
     public static function removeAttribute(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('removeAttribute', 0), 'removeAttribute', 0);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('removeAttribute', 0),
+            'DOMElement::removeAttribute',
+            0,
+            'qualifiedName'
+        );
         $var = new Variable();
         $var->bool(VmDom::removeAttributeNS($ctx, $element, null, $name));
 
@@ -1042,7 +1079,12 @@ final class VmDomJitDispatch
      */
     public static function createTextNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
-        $data = self::stringArg($extra[0] ?? self::missingArg('createTextNode', 0), 'createTextNode', 0);
+        $data = self::stringArg(
+            $extra[0] ?? self::missingArg('createTextNode', 0),
+            'DOMDocument::createTextNode',
+            0,
+            'data'
+        );
         $result = new Variable();
         $result->object(VmDom::createTextNode($ctx, $data, $document));
 

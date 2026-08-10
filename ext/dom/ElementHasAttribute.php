@@ -20,7 +20,14 @@ final class ElementHasAttribute extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMElement::hasAttribute() expects at least 1 argument');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMElement::hasAttribute()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMElement::hasAttribute()',
+            0,
+            $frame,
+            'qualifiedName'
+        );
         if (null === $frame->returnVar) {
             return;
         }

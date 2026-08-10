@@ -21,10 +21,23 @@ final class DocumentCreateElementNS extends DomClassMethod
             throw new \LogicException('DOMDocument::createElementNS() expects at least 2 arguments');
         }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMDocument::createElementNS()', 0);
-        $qualifiedName = $this->stringArg($frame->calledArgs[2], 'DOMDocument::createElementNS()', 1);
+        // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
+        $qualifiedName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMDocument::createElementNS()',
+            1,
+            $frame,
+            'qualifiedName'
+        );
         $value = '';
         if (isset($frame->calledArgs[3])) {
-            $value = $this->stringArg($frame->calledArgs[3], 'DOMDocument::createElementNS()', 2);
+            $value = $this->stringArg(
+                $frame->calledArgs[3],
+                'DOMDocument::createElementNS()',
+                2,
+                $frame,
+                'value'
+            );
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createElementNS() requires VM context in this compiler build');

@@ -20,7 +20,14 @@ final class DocumentCreateAttribute extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::createAttribute() expects at least 1 argument');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMDocument::createAttribute()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMDocument::createAttribute()',
+            0,
+            $frame,
+            'localName'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createAttribute() requires VM context in this compiler build');
         }

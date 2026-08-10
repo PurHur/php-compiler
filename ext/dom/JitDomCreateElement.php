@@ -35,6 +35,17 @@ final class JitDomCreateElement
             throw new \LogicException('DOMDocument::createElement() expects receiver and name');
         }
 
+        // Compile-time null under strict_types: raise TypeError and stop (#29985, peer #29959).
+        if ($context->callerStrictTypes && JITVariable::TYPE_NULL === $args[1]->type) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'DOMDocument::createElement(): Argument #1 ($localName) must be of type string, null given'
+            );
+
+            return self::boxNullResult($context);
+        }
+
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $nameLit = self::compileTimeStringArg($args[1]);
             // Invalid literal must not silently materialize (#24804 / #20594 AOT gap).
@@ -446,6 +457,18 @@ final class JitDomCreateElement
             $context->lookupFunction('__value__writeObject'),
             $ptr,
             $object
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    private static function boxNullResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $ptr
         );
 
         return JitValueBox::normalizeValuePtr($context, $ptr);

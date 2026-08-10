@@ -130,6 +130,17 @@ final class JitDomAttributeNodeNS
             throw new \LogicException('DOMDocument::createAttribute() expects receiver and name');
         }
 
+        // Compile-time null under strict_types (#29985, peer #29959).
+        if ($context->callerStrictTypes && JITVariable::TYPE_NULL === $args[1]->type) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'DOMDocument::createAttribute(): Argument #1 ($localName) must be of type string, null given'
+            );
+
+            return self::boxNullResult($context);
+        }
+
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_createattr_cont');
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
