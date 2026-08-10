@@ -98,4 +98,27 @@ final class PropertyHookDispatch
     ): bool {
         return PropertyHookDispatchLlvm::emitWriteOnlyVirtualReadGuard($context, $jit, $className, $propertyName, $staticProperty);
     }
+
+    /**
+     * `$o->hooked[]=` / `$o->hooked[$k]=` without `&get` — invoke get then Error (#29748).
+     *
+     * @return bool true when the fetch was refused (caller must skip slot load)
+     */
+    public static function emitDimWriteRequiresByRefGetGuard(
+        Context $context,
+        ?\PHPCompiler\JIT $jit,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): bool {
+        return PropertyHookDispatchLlvm::emitDimWriteRequiresByRefGetGuard(
+            $context,
+            $jit,
+            $receiver,
+            $declaringClass,
+            $propertyName,
+            $enclosingBlock
+        );
+    }
 }

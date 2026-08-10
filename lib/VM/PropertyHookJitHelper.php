@@ -44,6 +44,31 @@ final class PropertyHookJitHelper
         return $propertyName;
     }
 
+    /**
+     * Dim/append/unset-dim on hooked props requires `&get` (zend_object_handlers, #28590 / #29748).
+     *
+     * @param array<string, array<string, mixed>> $registry propertyHookRegistry
+     */
+    public static function dimWriteRequiresByRefGet(
+        array $registry,
+        string $declaringClass,
+        string $propertyName
+    ): bool {
+        $lcClass = strtolower(ltrim($declaringClass, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $registry[$lcClass][$propertyName]
+            ?? $registry[$lcClass][$propLc]
+            ?? null;
+        if (!is_array($meta)) {
+            return false;
+        }
+        if (!isset($meta['get']) && !isset($meta['set'])) {
+            return false;
+        }
+        // `&get` may mutate the live target; non-by-ref get yields a temporary (#28590).
+        return empty($meta['getByRef']);
+    }
+
     public static function isRawHookWrite(
         Context $context,
         string $propertyName,
