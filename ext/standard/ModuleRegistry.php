@@ -18,6 +18,24 @@ final class ModuleRegistry
     /** @var list<string> */
     private static array $loaded = [];
 
+    /**
+     * php-src zend_module_entry.name display casing (ext/standard/info.c; #28155).
+     * Keys are lowercase registry names; values are case-sensitive names from php-src.
+     *
+     * @var array<string, string>
+     */
+    private const DISPLAY_NAMES = [
+        'core' => 'Core',
+        'ffi' => 'FFI',
+        'pdo' => 'PDO',
+        'phar' => 'Phar',
+        'reflection' => 'Reflection',
+        'spl' => 'SPL',
+        'simplexml' => 'SimpleXML',
+        'zend opcache' => 'Zend OPcache',
+        'opcache' => 'Zend OPcache',
+    ];
+
     /** @var array<string, list<string>> */
     private static array $extensionFunctions = [];
 
@@ -302,10 +320,25 @@ final class ModuleRegistry
      */
     public static function getLoadedExtensions(): array
     {
-        return array_values(array_filter(
-            self::$loaded,
-            static fn (string $name): bool => BuiltinIntrospectionPolicy::extensionIsAdvertised($name)
-        ));
+        $names = [];
+        foreach (self::$loaded as $name) {
+            if (!BuiltinIntrospectionPolicy::extensionIsAdvertised($name)) {
+                continue;
+            }
+            $names[] = self::displayNameForExtension($name);
+        }
+
+        return $names;
+    }
+
+    /**
+     * Case-sensitive php-src module name for get_loaded_extensions() (#28155).
+     */
+    public static function displayNameForExtension(string $extension): string
+    {
+        $lc = strtolower($extension);
+
+        return self::DISPLAY_NAMES[$lc] ?? $lc;
     }
 
     /**
