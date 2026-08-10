@@ -13096,12 +13096,15 @@ class Compiler {
                         );
                     }
                     // One property write; publish used result without re-writing the slot (#29194).
-                    $ops[] = new OpCode(
+                    // Stamp ASSIGN (not only the fetch) so JIT private(set) Errors cite the write (#29665).
+                    $writeOp = new OpCode(
                         OpCode::TYPE_ASSIGN,
                         $fetchSlot,
                         $fetchSlot,
                         $rhsSlot
                     );
+                    $this->assignSourceMetadata($writeOp, $expr);
+                    $ops[] = $writeOp;
                     if ([] !== $expr->result->usages) {
                         $resultSlot = $this->compileOperand($expr->result, $block, false);
                         $ops[] = new OpCode(
@@ -13130,14 +13133,18 @@ class Compiler {
                     // Write the property once. A follow-up ASSIGN must not use fetchSlot as dest —
                     // that re-invokes __set for `$r = ($obj->prop = $v)` (#29194). Publish the
                     // expression value into resultSlot only (dest=resultSlot).
+                    // Stamp the ASSIGN with the Assign expr so mid-method private(set) Errors
+                    // report the write line, not a stale callSiteLine (#29665 / zend_object_handlers.c).
+                    $writeOp = new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $fetchSlot,
+                        $fetchSlot,
+                        $rhsSlot
+                    );
+                    $this->assignSourceMetadata($writeOp, $expr);
                     $ops = [
                         $fetchOp,
-                        new OpCode(
-                            OpCode::TYPE_ASSIGN,
-                            $fetchSlot,
-                            $fetchSlot,
-                            $rhsSlot
-                        ),
+                        $writeOp,
                     ];
                     if ([] !== $expr->result->usages) {
                         $resultSlot = $this->compileOperand($expr->result, $block, false);

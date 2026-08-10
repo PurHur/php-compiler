@@ -8092,6 +8092,10 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_ASSIGN:
+                    // Stamp assign opline so mid-method private(set) Errors match Zend (#29665).
+                    if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
+                        $this->context->callSiteLine = $op->sourceLocation->startLine;
+                    }
                     $rhsSlot = $this->assignRhsSlot($op);
                     $rhsOperand = $block->getOperand($rhsSlot);
                     if (isset($this->context->coalesceMergeSlotOperands[(int) $rhsSlot])) {
