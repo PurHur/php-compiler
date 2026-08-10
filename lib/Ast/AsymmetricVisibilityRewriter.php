@@ -652,22 +652,37 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesDuplicateSetModifierRules(string $line): bool
     {
-        return 1 === preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+        // php-src Zend/zend_compile.c zend_add_member_modifier (#6774 / #29672).
+        // Same-visibility get+set (`public public(set)`, `public(set) public`) is legal on
+        // PHP 8.4 — one read PPP + one set PPP. Reject only true duplicates:
+        //   - two set modifiers (`private(set) private(set)`)
+        //   - two bare read modifiers after stripping set tokens
+        //     (`public public private(set)`, `public public(set) public`)
+        //   - parenthesized same-vis forms Zend parse-rejects (`public (public(set))`)
+        if (1 === preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
             $line
-        )
-            || 1 === preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
-                $line
-            )
-            || 1 === preg_match(
-                '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
-                $line
-            )
-            || 1 === preg_match(
-                '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
-                $line
-            );
+        ) || 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
+            $line
+        )) {
+            return true;
+        }
+        if (preg_match_all('/\b(?:public|protected|private)\s*\(\s*set\s*\)/i', $line) >= 2) {
+            return true;
+        }
+        $sansSet = preg_replace(
+            '/\(\s*(?:public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
+            '',
+            $line
+        ) ?? $line;
+        $sansSet = preg_replace(
+            '/\b(?:public|protected|private)\s*\(\s*set\s*\)/i',
+            '',
+            $sansSet
+        ) ?? $sansSet;
+
+        return preg_match_all('/\b(?:public|protected|private)\b/i', $sansSet) >= 2;
     }
 
     private static function lineHasExplicitReadPlusSetModifier(string $line): bool

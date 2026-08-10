@@ -167,12 +167,29 @@ PHP;
         );
     }
 
-    public function testPublicPublicSetCompileErrors(): void
+    /** @covers issue #29672 — Zend 8.4 accepts same-visibility `public public(set)` */
+    public function testPublicPublicSetRewrites(): void
     {
         $source = <<<'PHP'
 <?php
 class Demo {
     public public(set) string $name = 'x';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:public*/ /*phpc-asymmetric-explicit-read*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
+    /** True duplicate set modifiers remain fatal (Zend: Multiple access type modifiers). */
+    public function testDuplicateSetModifiersCompileError(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    public private(set) private(set) string $name = 'x';
 }
 PHP;
         $this->expectException(\CompileError::class);
