@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Context;
  */
 final class MbstringAotFoldState
 {
-    /** @var array<int, array{http?: string, internal?: string}> */
+    /** @var array<int, array{http?: string, internal?: string, detect?: list<string>}> */
     private static array $byContext = [];
 
     public static function httpOutput(Context $context): ?string
@@ -35,5 +35,17 @@ final class MbstringAotFoldState
     public static function setInternalEncoding(Context $context, string $encoding): void
     {
         self::$byContext[spl_object_id($context)]['internal'] = $encoding;
+    }
+
+    /** @return list<string>|null */
+    public static function detectOrder(Context $context): ?array
+    {
+        return self::$byContext[spl_object_id($context)]['detect'] ?? null;
+    }
+
+    /** @param list<string> $order */
+    public static function setDetectOrder(Context $context, array $order): void
+    {
+        self::$byContext[spl_object_id($context)]['detect'] = $order;
     }
 }
