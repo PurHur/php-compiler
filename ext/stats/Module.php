@@ -78,6 +78,9 @@ class Module extends ModuleAbstract
             new stats_rand_gen_f(),
             new stats_rand_gen_funiform(),
             new stats_rand_ibinomial(),
+            new stats_rand_ibinomial_negative(),
+            new stats_rand_gen_ipoisson(),
+            new stats_rand_gen_t(),
             new stats_rand_phrase_to_seeds(),
         ];
     }

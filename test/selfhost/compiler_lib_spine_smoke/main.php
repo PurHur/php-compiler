@@ -94,6 +94,9 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+// Thin AOT PDO driver honesty (#27619 / #28643) — inventory units must stay on spine (#1922).
+
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5961,7 +5964,6 @@ require_once __DIR__.'/../../../lib/JIT/Call/NestedClosureInvoke.php';
 require_once __DIR__.'/../../../lib/JIT/Call/NestedJitCompileScopeIsActiveTrue.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ObjectCompareSpaceship.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ObjectNestedReceiver.php';
-// Thin AOT PDO driver honesty (#27619 / #28643) — inventory units must stay on spine (#1922).
 require_once __DIR__.'/../../../lib/JIT/Call/PdoConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/PdoGetAvailableDrivers.php';
 require_once __DIR__.'/../../../lib/JIT/Call/PdoQuote.php';
@@ -7432,6 +7434,22 @@ require_once __DIR__.'/../../../ext/soap/UseSoapErrorHandlerJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Call/NoOpConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/MultipleIteratorZipLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfStrtolApply.php';
+require_once __DIR__.'/../../../ext/stats/stats_cdf_binomial.php';
+require_once __DIR__.'/../../../ext/stats/stats_cdf_cauchy.php';
+require_once __DIR__.'/../../../ext/stats/stats_cdf_laplace.php';
+require_once __DIR__.'/../../../ext/stats/stats_cdf_logistic.php';
+require_once __DIR__.'/../../../ext/stats/stats_cdf_negative_binomial.php';
+require_once __DIR__.'/../../../ext/stats/stats_cdf_uniform.php';
+require_once __DIR__.'/../../../ext/stats/stats_cdf_weibull.php';
+require_once __DIR__.'/../../../ext/stats/stats_rand_gen_chisquare.php';
+require_once __DIR__.'/../../../ext/stats/stats_rand_gen_f.php';
+require_once __DIR__.'/../../../ext/stats/stats_rand_gen_funiform.php';
+require_once __DIR__.'/../../../ext/stats/stats_rand_ibinomial.php';
+require_once __DIR__.'/../../../lib/JIT/JitIncDec.php';
+require_once __DIR__.'/../../../lib/VM/VmIncDec.php';
+require_once __DIR__.'/../../../ext/stats/stats_rand_gen_ipoisson.php';
+require_once __DIR__.'/../../../ext/stats/stats_rand_gen_t.php';
+require_once __DIR__.'/../../../ext/stats/stats_rand_ibinomial_negative.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -7462,6 +7480,4 @@ unset($__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../lib/JIT/JitIncDec.php';
-require_once __DIR__.'/../../../lib/VM/VmIncDec.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

@@ -37,7 +37,7 @@ final class VmStatsRandlib
     private static float $sgSi = 0.0;
     private static float $sgC = 0.0;
 
-    /** Reset Cheng/sgamma/ignbin caches when setall() reseeds (#29622, #29649). */
+    /** Reset Cheng/sgamma/ignbin/ignpoi caches when setall() reseeds (#29622, #29649, #29684). */
     public static function resetCaches(): void
     {
         self::$betOldA = -1.0E37;
@@ -46,6 +46,9 @@ final class VmStatsRandlib
         self::$sgAaa = 0.0;
         self::$binPsave = -1.0E37;
         self::$binNsave = -214748365;
+        self::$poiMuold = -1.0E37;
+        self::$poiMuprev = -1.0E37;
+        self::$poiL = 0;
     }
 
     /** RANLIB genchi(df) = 2*sgamma(df/2) (#29649). */
@@ -241,6 +244,255 @@ final class VmStatsRandlib
         }
 
         return $ix;
+    }
+
+    private static float $poiMuold = -1.0E37;
+    private static float $poiMuprev = -1.0E37;
+    private static float $poiS = 0.0;
+    private static float $poiD = 0.0;
+    private static int $poiLl = 0;
+    private static float $poiOmega = 0.0;
+    private static float $poiB1 = 0.0;
+    private static float $poiB2 = 0.0;
+    private static float $poiC = 0.0;
+    private static float $poiC0 = 0.0;
+    private static float $poiC1 = 0.0;
+    private static float $poiC2 = 0.0;
+    private static float $poiC3 = 0.0;
+    private static int $poiL = 0;
+    private static int $poiM = 0;
+    private static float $poiP = 0.0;
+    private static float $poiQ = 0.0;
+    private static float $poiP0 = 0.0;
+    /** @var list<float> */
+    private static array $poiPp = [];
+
+    /**
+     * RANLIB ignpoi(mu) — Ahrens–Dieter Poisson (#29684).
+     *
+     * Preconditions: mu ≥ 0 (checked by caller).
+     */
+    public static function ignpoi(float $mu): int
+    {
+        static $a0 = -0.5;
+        static $a1 = 0.3333333;
+        static $a2 = -0.2500068;
+        static $a3 = 0.2000118;
+        static $a4 = -0.1661269;
+        static $a5 = 0.1421878;
+        static $a6 = -0.1384794;
+        static $a7 = 0.125006;
+        static $fact = [
+            1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0, 5040.0, 40320.0, 362880.0,
+        ];
+
+        if ($mu !== self::$poiMuprev) {
+            if ($mu < 10.0) {
+                return self::ignpoiCaseB($mu);
+            }
+            self::$poiMuprev = $mu;
+            self::$poiS = \sqrt($mu);
+            self::$poiD = 6.0 * $mu * $mu;
+            self::$poiLl = (int) ($mu - 1.1484);
+        }
+
+        $s = self::$poiS;
+        $d = self::$poiD;
+        $ll = self::$poiLl;
+        $g = $mu + $s * self::snorm();
+        $ignpoi = 0;
+        $fk = 0.0;
+        $difmuk = 0.0;
+        $u = 0.0;
+        $startAtHat = false;
+
+        if ($g >= 0.0) {
+            $ignpoi = (int) $g;
+            if ($ignpoi >= $ll) {
+                return $ignpoi;
+            }
+            $fk = (float) $ignpoi;
+            $difmuk = $mu - $fk;
+            $u = VmStatsRand::ranf();
+            if ($d * $u >= $difmuk * $difmuk * $difmuk) {
+                return $ignpoi;
+            }
+        } else {
+            $startAtHat = true;
+        }
+
+        if ($mu !== self::$poiMuold) {
+            self::$poiMuold = $mu;
+            self::$poiOmega = 0.3989423 / $s;
+            self::$poiB1 = 4.166667E-2 / $mu;
+            self::$poiB2 = 0.3 * self::$poiB1 * self::$poiB1;
+            self::$poiC3 = 0.1428571 * self::$poiB1 * self::$poiB2;
+            self::$poiC2 = self::$poiB2 - 15.0 * self::$poiC3;
+            self::$poiC1 = self::$poiB1 - 6.0 * self::$poiB2 + 45.0 * self::$poiC3;
+            self::$poiC0 = 1.0 - self::$poiB1 + 3.0 * self::$poiB2 - 15.0 * self::$poiC3;
+            self::$poiC = 0.1069 / $mu;
+        }
+
+        if (!$startAtHat) {
+            [$px, $py, $fx, $fy] = self::ignpoiStepF(
+                $ignpoi,
+                $fk,
+                $difmuk,
+                $mu,
+                $s,
+                $fact,
+                $a0,
+                $a1,
+                $a2,
+                $a3,
+                $a4,
+                $a5,
+                $a6,
+                $a7
+            );
+            if ($fy - $u * $fy <= $py * \exp($px - $fx)) {
+                return $ignpoi;
+            }
+        }
+
+        while (true) {
+            $e = self::sexpo();
+            $u = VmStatsRand::ranf();
+            $u += ($u - 1.0);
+            $t = 1.8 + self::fsign($e, $u);
+            if ($t <= -0.6744) {
+                continue;
+            }
+            $ignpoi = (int) ($mu + $s * $t);
+            $fk = (float) $ignpoi;
+            $difmuk = $mu - $fk;
+            [$px, $py, $fx, $fy] = self::ignpoiStepF(
+                $ignpoi,
+                $fk,
+                $difmuk,
+                $mu,
+                $s,
+                $fact,
+                $a0,
+                $a1,
+                $a2,
+                $a3,
+                $a4,
+                $a5,
+                $a6,
+                $a7
+            );
+            if (self::$poiC * \abs($u) > $py * \exp($px + $e) - $fy * \exp($fx + $e)) {
+                continue;
+            }
+
+            return $ignpoi;
+        }
+    }
+
+    /**
+     * @param list<float> $fact
+     * @return array{0: float, 1: float, 2: float, 3: float}
+     */
+    private static function ignpoiStepF(
+        int $ignpoi,
+        float $fk,
+        float $difmuk,
+        float $mu,
+        float $s,
+        array $fact,
+        float $a0,
+        float $a1,
+        float $a2,
+        float $a3,
+        float $a4,
+        float $a5,
+        float $a6,
+        float $a7
+    ): array {
+        if ($ignpoi < 10) {
+            $px = -$mu;
+            $py = ($mu ** $ignpoi) / $fact[$ignpoi];
+        } else {
+            $del = 8.333333E-2 / $fk;
+            $del -= (4.8 * $del * $del * $del);
+            $v = $difmuk / $fk;
+            if (\abs($v) <= 0.25) {
+                // C: fk*v*v*(((((((a7*v+…)+a0)-del  (subtraction outside the * chain)
+                $px = $fk * $v * $v * ((((((($a7 * $v + $a6) * $v + $a5) * $v + $a4) * $v + $a3) * $v + $a2) * $v + $a1) * $v + $a0) - $del;
+            } else {
+                $px = $fk * \log(1.0 + $v) - $difmuk - $del;
+            }
+            $py = 0.3989423 / \sqrt($fk);
+        }
+        $x = (0.5 - $difmuk) / $s;
+        $xx = $x * $x;
+        $fx = -0.5 * $xx;
+        $fy = self::$poiOmega * ((((self::$poiC3 * $xx + self::$poiC2) * $xx + self::$poiC1) * $xx) + self::$poiC0);
+
+        return [$px, $py, $fx, $fy];
+    }
+
+    /** CASE B of ignpoi — mu < 10 inversion table. */
+    private static function ignpoiCaseB(float $mu): int
+    {
+        self::$poiMuprev = -1.0E37;
+        if ($mu !== self::$poiMuold) {
+            self::$poiMuold = $mu;
+            self::$poiM = \max(1, (int) $mu);
+            self::$poiL = 0;
+            self::$poiP = \exp(-$mu);
+            self::$poiQ = self::$poiP;
+            self::$poiP0 = self::$poiP;
+            self::$poiPp = \array_fill(0, 35, 0.0);
+        }
+
+        while (true) {
+            $u = VmStatsRand::ranf();
+            if ($u <= self::$poiP0) {
+                return 0;
+            }
+            if (0 !== self::$poiL) {
+                $j = 1;
+                if ($u > 0.458) {
+                    $j = \min(self::$poiL, self::$poiM);
+                }
+                for ($k = $j; $k <= self::$poiL; ++$k) {
+                    if ($u <= self::$poiPp[$k - 1]) {
+                        return $k;
+                    }
+                }
+                if (35 === self::$poiL) {
+                    continue;
+                }
+            }
+            $l = self::$poiL + 1;
+            for ($k = $l; $k <= 35; ++$k) {
+                self::$poiP = self::$poiP * $mu / (float) $k;
+                self::$poiQ += self::$poiP;
+                self::$poiPp[$k - 1] = self::$poiQ;
+                if ($u <= self::$poiQ) {
+                    self::$poiL = $k;
+
+                    return $k;
+                }
+            }
+            self::$poiL = 35;
+        }
+    }
+
+    /**
+     * RANLIB ignnbn(n,p) — negative binomial via gamma+Poisson (#29684).
+     *
+     * Preconditions: n > 0, 0 < p < 1 (checked by caller).
+     */
+    public static function ignnbn(int $n, float $p): int
+    {
+        $r = (float) $n;
+        $a = $p / (1.0 - $p);
+        $y = self::sgamma($r) / $a;
+
+        return self::ignpoi($y);
     }
 
     /** RANLIB sexpo() — Ahrens–Dieter SA. */

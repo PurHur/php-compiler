@@ -43,6 +43,8 @@ final class StatsRuntimeStandaloneTest extends TestCase
             '__compiler_stats_rand_gen_iuniform',
             '__compiler_stats_rand_gen',
             '__compiler_stats_rand_ibinomial',
+            '__compiler_stats_rand_ibinomial_negative',
+            '__compiler_stats_rand_gen_ipoisson',
             '__compiler_stats_rand_phrase_to_seeds',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);

@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for pecl-stats rand_* family (#29589, #29622). */
+/** VM compliance for pecl-stats rand_* family (#29589, #29622, #29649, #29684). */
 final class StatsRandTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
