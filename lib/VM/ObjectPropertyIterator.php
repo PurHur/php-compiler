@@ -15,6 +15,8 @@ use PHPCompiler\Frame;
  * Foreach key listing must not invoke get hooks — only {@see \PHPCompiler\VM::readObjectForeachProperty}
  * on value fetch (#29702, zend_property_hooks.c). Pass by-ref only when the callback's first
  * parameter is by-ref (#23552).
+ *
+ * array_walk by-ref writeback updates hook backing without set (#29703).
  */
 final class ObjectPropertyIterator
 {
@@ -30,12 +32,15 @@ final class ObjectPropertyIterator
 
     private int $pos = -1;
 
+    private readonly int $purpose;
+
     public function __construct(
         private readonly ObjectEntry $object,
         private readonly \PHPCompiler\VM $vm,
         private readonly Frame $frame,
         int $purpose = self::PURPOSE_FOREACH,
     ) {
+        $this->purpose = $purpose;
         if (self::PURPOSE_ARRAY_WALK === $purpose) {
             foreach ($vm->collectObjectArrayWalkPropertyKeys($object, $frame) as $mangledKey) {
                 $this->keys[] = $mangledKey;
@@ -84,7 +89,8 @@ final class ObjectPropertyIterator
             $this->object,
             $this->storageNames[$this->pos],
             $this->frame,
-            $byRef
+            $byRef,
+            self::PURPOSE_ARRAY_WALK === $this->purpose
         );
     }
 }

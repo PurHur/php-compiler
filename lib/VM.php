@@ -14861,6 +14861,10 @@ restart:
      */
     private function dispatchPropertySetHookAssign(Variable $lvalue, Variable $value, Frame $frame): bool
     {
+        // array_walk object HT writeback mutates backing without set (#29703).
+        if ($this->lvalueSkipsPropertySetHook($lvalue)) {
+            return false;
+        }
         $target = $lvalue->resolveIndirect();
         $classLc = $lvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
         $staticPropName = $lvalue->objectPropertyName ?? $target->objectPropertyName;
@@ -14957,13 +14961,17 @@ restart:
     }
 
     /**
-     * Object foreach value read — invoke get hooks like get_object_vars() (#9470, zend_property_hooks.c).
+     * Object foreach / array_walk value read (#9470, #29703, zend_property_hooks.c).
+     *
+     * By-value foreach invokes get hooks like get_object_vars(). array_walk by-ref aliases
+     * hook backing storage so writeback skips set (php_array_walk HT update).
      */
     public function readObjectForeachProperty(
         ObjectEntry $object,
         string $name,
         Frame $frame,
-        bool $byRef
+        bool $byRef,
+        bool $arrayWalkRawBacking = false,
     ): Variable {
         $meta = $this->classPropertyMeta($object, $name);
         if (!$byRef && null !== $meta?->getHookMethodLc) {
@@ -14975,6 +14983,12 @@ restart:
                 return $copy;
             }
         }
+        if ($byRef && $arrayWalkRawBacking) {
+            $alias = $this->arrayWalkByRefHookBackingAlias($object, $name, $meta);
+            if (null !== $alias) {
+                return $alias;
+            }
+        }
         $prop = $object->getProperty($name);
         if ($byRef) {
             return $prop;
@@ -14983,6 +14997,116 @@ restart:
         $copy->copyFrom($prop->resolveIndirect());
 
         return $copy;
+    }
+
+    /**
+     * array_walk by-ref into a hooked property — alias backing without set-hook dispatch (#29703).
+     */
+    private function arrayWalkByRefHookBackingAlias(
+        ObjectEntry $object,
+        string $name,
+        ?VM\ClassProperty $meta,
+    ): ?Variable {
+        if (null === $meta || null === $meta->setHookMethodLc) {
+            return null;
+        }
+        $backing = $this->resolveArrayWalkHookBackingStorage($object, $name);
+        if (null === $backing) {
+            return null;
+        }
+        if (Variable::TYPE_INDIRECT !== $backing->type) {
+            $shared = new Variable();
+            $shared->copyFrom($backing);
+            $this->copyPropertyTypeMetadataOntoCell($shared, $backing);
+            $shared->objectPropertyOwner = $object;
+            $shared->objectPropertyName = $name;
+            $backing->indirect($shared);
+        } else {
+            $shared = $backing->resolveIndirect();
+            $this->copyPropertyTypeMetadataOntoCell($shared, $backing);
+            if (null === $shared->objectPropertyOwner) {
+                $shared->objectPropertyOwner = $object;
+                $shared->objectPropertyName = $name;
+            }
+        }
+        $alias = new Variable();
+        $alias->indirect($shared);
+        $alias->skipPropertySetHook = true;
+
+        return $alias;
+    }
+
+    /**
+     * Backing cell for array_walk object HT writeback (setBacking / getBacking / declared slot).
+     */
+    private function resolveArrayWalkHookBackingStorage(ObjectEntry $object, string $name): ?Variable
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$name]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($name)]
+            ?? null;
+        $backingName = is_array($propMeta)
+            ? ($propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null)
+            : null;
+        if (is_string($backingName) && '' !== $backingName && $object->hasProperty($backingName)) {
+            return $object->getProperty($backingName);
+        }
+        if ($object->hasProperty($name)) {
+            return $object->getProperty($name);
+        }
+
+        return null;
+    }
+
+    /** Move typed-property metadata onto the shared value cell for HT-style by-ref writes. */
+    private function copyPropertyTypeMetadataOntoCell(Variable $cell, Variable $typeMeta): void
+    {
+        if (null === $cell->typeConstraint && null !== $typeMeta->typeConstraint) {
+            $cell->typeConstraint = $typeMeta->typeConstraint;
+        }
+        if (null === $cell->classConstraint && null !== $typeMeta->classConstraint) {
+            $cell->classConstraint = $typeMeta->classConstraint;
+        }
+        if (null === $cell->literalBoolType && null !== $typeMeta->literalBoolType) {
+            $cell->literalBoolType = $typeMeta->literalBoolType;
+        }
+        if (null === $cell->unionTypeConstraints && null !== $typeMeta->unionTypeConstraints) {
+            $cell->unionTypeConstraints = $typeMeta->unionTypeConstraints;
+        }
+        if (null === $cell->declaredTypeLabel && null !== $typeMeta->declaredTypeLabel) {
+            $cell->declaredTypeLabel = $typeMeta->declaredTypeLabel;
+        }
+        if (null === $cell->genericArrayTypeSpec && null !== $typeMeta->genericArrayTypeSpec) {
+            $cell->genericArrayTypeSpec = $typeMeta->genericArrayTypeSpec;
+        }
+        if (null === $cell->dnfArms && null !== $typeMeta->dnfArms) {
+            $cell->dnfArms = $typeMeta->dnfArms;
+        }
+    }
+
+    /** True when an assign lvalue is an array_walk HT alias that must skip set hooks (#29703). */
+    private function lvalueSkipsPropertySetHook(Variable $lvalue): bool
+    {
+        $var = $lvalue;
+        $seen = [];
+        while (true) {
+            $id = \spl_object_id($var);
+            if (isset($seen[$id])) {
+                return false;
+            }
+            $seen[$id] = true;
+            if ($var->skipPropertySetHook) {
+                return true;
+            }
+            if (!$var->isIndirect()) {
+                return false;
+            }
+            $next = $var->directIndirectTarget();
+            if (null === $next) {
+                return false;
+            }
+            $var = $next;
+        }
     }
 
     private function fetchPropertyWithHooks(ObjectEntry $object, string $name, Frame $frame): ?Variable

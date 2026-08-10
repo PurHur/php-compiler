@@ -122,6 +122,13 @@ final class Variable {
     public bool $propertyAssignLvalue = false;
 
     /**
+     * array_walk / array_walk_recursive by-ref alias into object property HT storage.
+     * Writes mutate the backing cell without invoking set hooks (php-src php_array_walk /
+     * zend_property_hooks.c, #29703). Must not be set on the permanent property slot.
+     */
+    public bool $skipPropertySetHook = false;
+
+    /**
      * True when this INDIRECT was produced by PROPERTY_FETCH_WRITE (or static fetch) used as a
      * reference-acquisition temp (`$r = &$obj->prop` / by-ref return fetch). ASSIGN_REF re-checks
      * visibility only for these temps — not for already-acquired by-ref call returns (#29456).
@@ -1011,6 +1018,7 @@ final class Variable {
         $this->typedPropertyByRef = false;
         $this->propertyAssignLvalue = false;
         $this->propertyRefAcquisition = false;
+        $this->skipPropertySetHook = false;
         $this->type = self::TYPE_INDIRECT;
         $this->indirect = $value;
     }
