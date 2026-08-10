@@ -32,9 +32,10 @@ final class date_timestamp_get extends Internal
                 \sprintf('date_timestamp_get() expects exactly 1 argument, %d given', $argc)
             );
         }
+        // Bare function label + argNum — DateTimeSupport formats Argument #N (#29877).
         $datetime = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[0],
-            'date_timestamp_get(): Argument #1 ($object)',
+            'date_timestamp_get()',
             $frame->vmContext,
             1,
             'object'
