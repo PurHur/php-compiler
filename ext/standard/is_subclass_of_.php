@@ -10,13 +10,16 @@ use PHPCompiler\JIT\Builtin\StringClassExists;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * is_subclass_of() — extends-chain matching (php-src ext/standard/class.c, issue #3478).
+ * is_subclass_of() — extends-chain matching (php-src Zend/zend_builtin_functions.c, issue #3478).
+ *
+ * Z_PARAM_STR $class: declare(strict_types=1) → TypeError on null; else soft-null DEP+coerce (#29817).
  */
 final class is_subclass_of_ extends Internal
 {
@@ -41,7 +44,8 @@ final class is_subclass_of_ extends Internal
             ));
         }
         $ctx = VmReflection::requireContext($frame);
-        $parentName = VmReflection::stringArg($frame->calledArgs[1], 'is_subclass_of() class_name', 1);
+        // php-src zend_builtin_functions.stub.php — string $class (Z_PARAM_STR, #29817).
+        $parentName = VmString::trimFamilyStringArgForFrame($frame, 1, 'is_subclass_of', 1, 'class');
         $allowString = true;
         if (3 === \count($frame->calledArgs)) {
             $allowString = $frame->calledArgs[2]->resolveIndirect()->toBool();
@@ -75,6 +79,13 @@ final class is_subclass_of_ extends Internal
                 'is_subclass_of() expects at most 3 arguments, %d given',
                 $argc
             ));
+        }
+        // Z_PARAM_STR $class — strict TypeError / soft-null DEP (#29817).
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            self::jitClassArg($context, $args[1]);
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
         }
         $allowString = $context->constantFromBool(true);
         $allowStringKnownFalse = false;
@@ -119,5 +130,27 @@ final class is_subclass_of_ extends Internal
         }
 
         return false;
+    }
+
+    /** Z_PARAM_STR $class — caller strict_types vs soft-null (#29817). */
+    private static function jitClassArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'is_subclass_of',
+                1,
+                'class'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
+            'is_subclass_of',
+            1,
+            'class'
+        );
     }
 }
