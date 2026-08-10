@@ -655,6 +655,20 @@ final class DnfParamCheck
             return $message;
         }
 
+        // zend_verify_return_type — "… returned" + optional fn(): prefix (#29887).
+        if ('Return value' === $kind) {
+            $message = sprintf(
+                'Return value must be of type %s, %s returned',
+                $expected,
+                $given
+            );
+            if (null !== self::$paramFunctionName && '' !== self::$paramFunctionName) {
+                $message = self::$paramFunctionName.'(): '.$message;
+            }
+
+            return $message;
+        }
+
         return sprintf('%s must be of type %s, %s given', $kind, $expected, $given);
     }
 

@@ -811,6 +811,14 @@ class Compiler {
 
                 return;
             }
+            // Bare `: callable` — Variable::mapFromType has no TYPE_CALLABLE mapping, so
+            // without DNF arms zend_verify_return_type is skipped (#29887). Reuse the same
+            // literal-arm path as ?callable / callable|… unions (DnfCheck / DnfParamCheck).
+            if ('callable' === $returnLc) {
+                $block->returnDnfConstraints = [['kind' => 'literal', 'name' => 'callable']];
+
+                return;
+            }
             $declType = Type::fromDecl($returnType->name);
             $mapped = Variable::mapFromType($declType);
             if (Variable::TYPE_OBJECT === $mapped) {
