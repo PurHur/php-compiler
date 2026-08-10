@@ -710,11 +710,22 @@ final class HashTable {
         }
     }
 
-    public function findVariable(Variable $index, bool $forWrite, ?Context $vmContext = null, ?Frame $frame = null): ?Variable {
+    /**
+     * @param bool $emitFloatKeyDeprecation When false, skip float→int E_DEPRECATED (caller already warned; empty-dim #29560).
+     */
+    public function findVariable(
+        Variable $index,
+        bool $forWrite,
+        ?Context $vmContext = null,
+        ?Frame $frame = null,
+        bool $emitFloatKeyDeprecation = true
+    ): ?Variable {
         if ($forWrite && null !== $vmContext) {
             $index = self::normalizeIndexKeyForWrite($index, $vmContext, $frame);
         } else {
-            self::warnFloatKeyPrecisionLossIfNeeded($index, $vmContext, $frame);
+            if ($emitFloatKeyDeprecation) {
+                self::warnFloatKeyPrecisionLossIfNeeded($index, $vmContext, $frame);
+            }
             $index = self::normalizeIndexKey($index, 'Illegal offset type', true, $frame);
         }
         switch ($index->type) {

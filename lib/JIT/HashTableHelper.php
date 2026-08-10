@@ -134,9 +134,16 @@ final class HashTableHelper
         Context $context,
         Value $ht,
         Variable $dim,
-        ?string $superglobalName = null
+        ?string $superglobalName = null,
+        bool $emitFloatKeyDeprecation = true
     ): Variable {
-        return HashTableReadLlvm::readDimToValueBox($context, $ht, $dim, $superglobalName);
+        return HashTableReadLlvm::readDimToValueBox(
+            $context,
+            $ht,
+            $dim,
+            $superglobalName,
+            $emitFloatKeyDeprecation
+        );
     }
 
     public static function readStringAt(Context $context, Value $ht, Value $index): Value

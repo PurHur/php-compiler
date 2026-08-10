@@ -321,12 +321,17 @@ final class HashTableReadLlvm
         return $phi;
     }
 
-    /** Read an element keyed by a boxed dimension into a stack {@see __value__} slot (#16390). */
+    /**
+     * Read an element keyed by a boxed dimension into a stack {@see __value__} slot (#16390).
+     *
+     * @param bool $emitFloatKeyDeprecation When false, truncate float keys silently (empty-dim #29560).
+     */
     public static function readValueBoxKeyToValueBox(
         Context $context,
         Value $ht,
         Variable $dim,
-        ?string $superglobalName
+        ?string $superglobalName,
+        bool $emitFloatKeyDeprecation = true
     ): Variable {
         $valPtr = self::valuePtrFromDim($context, $dim);
         $valueMap = $context->structFieldMap['__value__'];
@@ -407,10 +412,10 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($floatKeyBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
         // Dim read: float→int E_DEPRECATED for finite fractional + INF/NAN (#27926, #27948).
-        $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
-            $context,
-            $doubleVal
-        );
+        // Empty-dim may suppress a second warning after offsetIsSetDim (#29560).
+        $truncatedLong = $emitFloatKeyDeprecation
+            ? \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning($context, $doubleVal)
+            : $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
         $floatIndex = $context->builder->truncOrBitCast(
             $truncatedLong,
             $context->getTypeFromString('size_t')
@@ -621,11 +626,15 @@ final class HashTableReadLlvm
      *
      * @param string|null $superglobalName When set, string keys use superglobal-safe read (issue #273).
      */
+    /**
+     * @param bool $emitFloatKeyDeprecation When false, truncate float keys silently (caller already warned; #29560).
+     */
     public static function readDimToValueBox(
         Context $context,
         Value $ht,
         Variable $dim,
-        ?string $superglobalName = null
+        ?string $superglobalName = null,
+        bool $emitFloatKeyDeprecation = true
     ): Variable {
         if (Variable::TYPE_NULL === $dim->type) {
             DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
@@ -653,10 +662,10 @@ final class HashTableReadLlvm
             return self::readIndexedToValueBox($context, $ht, $index);
         }
         if (Variable::TYPE_NATIVE_DOUBLE === $dim->type) {
-            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
-                $context,
-                $context->helper->loadValue($dim)
-            );
+            $doubleVal = $context->helper->loadValue($dim);
+            $truncated = $emitFloatKeyDeprecation
+                ? \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning($context, $doubleVal)
+                : $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
             $index = $context->builder->truncOrBitCast(
                 $truncated,
                 $context->getTypeFromString('size_t')
@@ -668,7 +677,13 @@ final class HashTableReadLlvm
             return self::readObjectKeyToValueBox($context, $ht, $context->helper->loadValue($dim));
         }
         if (Variable::TYPE_VALUE === $dim->type) {
-            return self::readValueBoxKeyToValueBox($context, $ht, $dim, $superglobalName);
+            return self::readValueBoxKeyToValueBox(
+                $context,
+                $ht,
+                $dim,
+                $superglobalName,
+                $emitFloatKeyDeprecation
+            );
         }
 
         throw new \LogicException(
