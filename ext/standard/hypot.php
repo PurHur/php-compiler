@@ -26,20 +26,18 @@ final class hypot extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'hypot', 2);
-        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
-        $x = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        // Z_PARAM_DOUBLE: strict_types TypeError; else soft-null DEP+coerce (#29782, #29319).
+        $x = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'hypot',
             1,
-            'x',
-            $frame
+            'x'
         );
-        $y = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
+        $y = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'hypot',
             2,
-            'y',
-            $frame
+            'y'
         );
         if (null === $frame->returnVar) {
             return;

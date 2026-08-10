@@ -19,11 +19,10 @@ final class log10 extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('log10() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(VmMath::log10(VmMath::parseDoubleBuiltinArg($v, 'log10', 1, 'num')));
+        $frame->returnVar->float(VmMath::log10(VmMath::parseStrictFloatBuiltinArgForFrame($frame, 'log10', 1, 'num')));
     }
 
     public Context $context;

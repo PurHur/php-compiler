@@ -28,8 +28,8 @@ final class tan extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('tan() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'tan',
             1,
             'num'

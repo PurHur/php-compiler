@@ -21,8 +21,8 @@ final class deg2rad extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('deg2rad() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'deg2rad',
             1,
             'num'

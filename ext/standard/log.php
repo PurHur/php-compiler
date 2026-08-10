@@ -29,8 +29,8 @@ final class log extends Internal
     {
         // php-src math.c ZEND_PARSE_PARAMETERS_START(1, 2) — ArgumentCountError (#21980).
         $this->requireArgCountRange($frame, 'log', 1, 2);
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'log',
             1,
             'num'
@@ -39,8 +39,8 @@ final class log extends Internal
             return;
         }
         if (2 === \count($frame->calledArgs)) {
-            $base = VmMath::parseDoubleBuiltinArg(
-                $frame->calledArgs[1]->resolveIndirect(),
+            $base = VmMath::parseStrictFloatBuiltinArgForFrame(
+                $frame,
                 'log',
                 2,
                 'base'

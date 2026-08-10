@@ -247,6 +247,8 @@
             <file>./test/compliance/AsymmetricVisibilityReadonlyPrivateSetOrderVMTest.php</file>
             <file>./test/compliance/MathBinaryFloatNullSoftVMTest.php</file>
             <file>./test/compliance/MathBinaryFloatNullSoftJITTest.php</file>
+            <file>./test/compliance/MathFloatNullStrictTypesVMTest.php</file>
+            <file>./test/compliance/MathFloatNullStrictTypesJITTest.php</file>
             <file>./test/compliance/PowNullSilentVMTest.php</file>
             <file>./test/compliance/PowNullSilentJITTest.php</file>
             <file>./test/compliance/WordwrapEmptyBreakMessageVMTest.php</file>

@@ -27,20 +27,18 @@ final class atan2 extends Internal
     {
         // php-src ext/standard/math.c — ArgumentCountError (#21982).
         $this->requireExactArgCount($frame, 'atan2', 2);
-        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
-        $y = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        // Z_PARAM_DOUBLE: strict_types TypeError; else soft-null DEP+coerce (#29782, #29319).
+        $y = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'atan2',
             1,
-            'y',
-            $frame
+            'y'
         );
-        $x = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
+        $x = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'atan2',
             2,
-            'x',
-            $frame
+            'x'
         );
         if (null === $frame->returnVar) {
             return;

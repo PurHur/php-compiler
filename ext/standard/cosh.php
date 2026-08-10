@@ -28,8 +28,8 @@ final class cosh extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('cosh() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'cosh',
             1,
             'num'

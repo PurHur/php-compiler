@@ -28,8 +28,8 @@ final class acosh extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('acosh() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'acosh',
             1,
             'num'

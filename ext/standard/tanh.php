@@ -28,8 +28,8 @@ final class tanh extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('tanh() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'tanh',
             1,
             'num'

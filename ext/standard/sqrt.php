@@ -28,12 +28,11 @@ final class sqrt extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('sqrt() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'sqrt',
             1,
-            'num',
-            $frame
+            'num'
         );
         if (null === $frame->returnVar) {
             return;

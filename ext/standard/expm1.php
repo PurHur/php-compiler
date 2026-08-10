@@ -19,11 +19,10 @@ final class expm1 extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('expm1() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(VmMath::expm1(VmMath::parseDoubleBuiltinArg($v, 'expm1', 1, 'num')));
+        $frame->returnVar->float(VmMath::expm1(VmMath::parseStrictFloatBuiltinArgForFrame($frame, 'expm1', 1, 'num')));
     }
 
     public Context $context;
