@@ -60,4 +60,28 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'delayed_attr_promoted_valid.php'));
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** @covers issue #29918 — Attribute(0) empty allowed-targets list matches Zend */
+    public function testZeroTargetMaskErrorListsEmptyAllowedTargets(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[Attribute(0)]
+class A {}
+#[A]
+class C {}
+try {
+    (new ReflectionClass(C::class))->getAttributes()[0]->newInstance();
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attr_zero_targets_29918.php'));
+        $this->assertSame(
+            "Error: Attribute \"A\" cannot target class (allowed targets: )\n",
+            ob_get_clean()
+        );
+    }
 }
