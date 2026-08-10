@@ -31,8 +31,9 @@ final class bcdivmod extends Internal
             return;
         }
 
-        $left = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'bcdivmod', 0, 'num1');
-        $right = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'bcdivmod', 1, 'num2');
+        // Z_PARAM_STR: caller strict_types → TypeError; else soft-null DEP+coerce (#29977).
+        $left = VmString::stringBuiltinArgForFrame($frame, 0, 'bcdivmod', 0, 'num1');
+        $right = VmString::stringBuiltinArgForFrame($frame, 1, 'bcdivmod', 1, 'num2');
         $scale = null;
         if (isset($frame->calledArgs[2])) {
             $scale = VmBcMathNumber::optionalScaleArg($frame->calledArgs[2], 'bcdivmod', 3, $frame);

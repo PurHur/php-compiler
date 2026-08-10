@@ -56,7 +56,8 @@ abstract class BcmathFunction extends Internal
 
     protected function requireStringArg(Frame $frame, int $index, string $label): string
     {
-        return VmString::coerceStringBuiltinArg($frame->calledArgs[$index], $this->getName(), $index, $label);
+        // Z_PARAM_STR: caller strict_types → TypeError; else soft-null DEP+coerce (#29977, re-#28992).
+        return VmString::stringBuiltinArgForFrame($frame, $index, $this->getName(), $index, $label);
     }
 
     protected function optionalScale(Frame $frame, int $index): ?int
