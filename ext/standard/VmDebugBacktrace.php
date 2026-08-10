@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
+use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPCompiler\VM\FatalSite;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCfg\Func;
@@ -379,6 +380,9 @@ final class VmDebugBacktrace
     /**
      * php-cfg stores anon closures/arrows as `{anonymous}#N`; Zend backtraces use `{closure}`
      * (zend_closures.c / zend_builtin_functions.c, #23184). Keep `{main}` for empty top-level.
+     *
+     * Synthetic property-hook methods are renamed to `$prop::get` / `$prop::set` so Exception
+     * traces match zend_property_hooks.c (#29689; set TypeError messages are #29666).
      */
     private static function zendBacktraceFunctionName(string $name, bool $hasClass): string
     {
@@ -387,6 +391,10 @@ final class VmDebugBacktrace
         }
         if ('' === $name && !$hasClass) {
             return '{main}';
+        }
+        $hook = PropertyHooks::reflectionNameFromHookMethod($name);
+        if (null !== $hook) {
+            return $hook;
         }
 
         return $name;
