@@ -156,6 +156,8 @@
             <file>./test/compliance/PropertyHookWriteOnlyVirtualCoalesceJITTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnVMTest.php</file>
             <file>./test/compliance/UnserializeMalformedObjectWarnJITTest.php</file>
+            <file>./test/compliance/UnserializeEmptySilentVMTest.php</file>
+            <file>./test/compliance/UnserializeEmptySilentJITTest.php</file>
             <file>./test/compliance/DynPropIncUndefinedWarnVMTest.php</file>
             <file>./test/compliance/DynPropIncUndefinedWarnJITTest.php</file>
             <file>./test/compliance/XmlGetCurrentReflectionVMTest.php</file>
