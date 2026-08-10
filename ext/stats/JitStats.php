@@ -261,6 +261,42 @@ final class JitStats
         );
     }
 
+    /**
+     * dens_* / dens_pmf_* via op-coded dispatcher (#29587).
+     *
+     * @param array<int, JITVariable> $args
+     */
+    public static function dens(Context $context, int $op, int $arity, JITVariable ...$args): Value
+    {
+        self::requireArgc($args, $arity, $arity, 'stats_dens');
+        Stats::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $opVal = $i64->constInt($op, false);
+        $a = self::loadDouble($context, $args[0], 'stats_dens', 'a');
+        $b = $arity >= 2
+            ? self::loadDouble($context, $args[1], 'stats_dens', 'b')
+            : $double->constReal(0.0);
+        $c = $arity >= 3
+            ? self::loadDouble($context, $args[2], 'stats_dens', 'c')
+            : $double->constReal(0.0);
+        $d = $arity >= 4
+            ? self::loadDouble($context, $args[3], 'stats_dens', 'd')
+            : $double->constReal(0.0);
+
+        return self::boxStatsResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stats_dens'),
+                $opVal,
+                $a,
+                $b,
+                $c,
+                $d
+            )
+        );
+    }
+
     /** @param array<int, JITVariable> $args */
     private static function requireArgc(array $args, int $min, int $max, string $function): void
     {

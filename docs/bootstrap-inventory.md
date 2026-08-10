@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7302 |
-| Phase A inventory files (M2 ratio SSOT) | 7302 |
+| PHP files on vm.php path | 7319 |
+| Phase A inventory files (M2 ratio SSOT) | 7319 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23683 |
+| Source constructs flagged (warnings) | 23731 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4618,13 +4618,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zlib_encode.php` | 0 | 1 |
 | `ext/standard/zlib_get_coding_type.php` | 0 | 2 |
 | `ext/stats/JitStats.php` | 0 | 2 |
-| `ext/stats/Module.php` | 0 | 14 |
+| `ext/stats/Module.php` | 0 | 30 |
 | `ext/stats/StatsExtensionPolicy.php` | 0 | 1 |
 | `ext/stats/StatsFunction.php` | 0 | 1 |
 | `ext/stats/StatsJitHelper.php` | 0 | 1 |
 | `ext/stats/VmStats.php` | 0 | 1 |
+| `ext/stats/VmStatsDens.php` | 0 | 1 |
 | `ext/stats/stats_absolute_deviation.php` | 0 | 2 |
 | `ext/stats/stats_covariance.php` | 0 | 2 |
+| `ext/stats/stats_dens_beta.php` | 0 | 2 |
+| `ext/stats/stats_dens_cauchy.php` | 0 | 2 |
+| `ext/stats/stats_dens_chisquare.php` | 0 | 2 |
+| `ext/stats/stats_dens_exponential.php` | 0 | 2 |
+| `ext/stats/stats_dens_f.php` | 0 | 2 |
+| `ext/stats/stats_dens_gamma.php` | 0 | 2 |
+| `ext/stats/stats_dens_laplace.php` | 0 | 2 |
+| `ext/stats/stats_dens_logistic.php` | 0 | 2 |
+| `ext/stats/stats_dens_normal.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_binomial.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_hypergeometric.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_negative_binomial.php` | 0 | 2 |
+| `ext/stats/stats_dens_pmf_poisson.php` | 0 | 2 |
+| `ext/stats/stats_dens_t.php` | 0 | 2 |
+| `ext/stats/stats_dens_uniform.php` | 0 | 2 |
+| `ext/stats/stats_dens_weibull.php` | 0 | 2 |
 | `ext/stats/stats_harmonic_mean.php` | 0 | 2 |
 | `ext/stats/stats_kurtosis.php` | 0 | 2 |
 | `ext/stats/stats_skew.php` | 0 | 2 |
@@ -6273,7 +6290,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
 | `lib/JIT/EmptyDimensionHelper.php` | 0 | 1 |
-| `lib/JIT/EmptyDimensionLlvm.php` | 0 | 8 |
+| `lib/JIT/EmptyDimensionLlvm.php` | 0 | 7 |
 | `lib/JIT/EmptyObjectPropertyHelper.php` | 0 | 1 |
 | `lib/JIT/EmptyObjectPropertyLlvm.php` | 0 | 4 |
 | `lib/JIT/EmptyStaticPropertyHelper.php` | 0 | 3 |
@@ -41441,8 +41458,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/JitStats.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 269)
-- 19 class method(s)
+- new ArgumentCountError (line 305)
+- 20 class method(s)
 
 ### `ext/stats/Module.php`
 
@@ -41460,6 +41477,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new stats_stat_innerproduct (line 35)
 - new stats_stat_factorial (line 36)
 - new stats_stat_binomial_coef (line 37)
+- new stats_dens_normal (line 38)
+- new stats_dens_cauchy (line 39)
+- new stats_dens_laplace (line 40)
+- new stats_dens_logistic (line 41)
+- new stats_dens_beta (line 42)
+- new stats_dens_weibull (line 43)
+- new stats_dens_uniform (line 44)
+- new stats_dens_chisquare (line 45)
+- new stats_dens_t (line 46)
+- new stats_dens_gamma (line 47)
+- new stats_dens_exponential (line 48)
+- new stats_dens_f (line 49)
+- new stats_dens_pmf_binomial (line 50)
+- new stats_dens_pmf_poisson (line 51)
+- new stats_dens_pmf_negative_binomial (line 52)
+- new stats_dens_pmf_hypergeometric (line 53)
 - 1 class method(s)
 
 ### `ext/stats/StatsExtensionPolicy.php`
@@ -41475,12 +41508,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/StatsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/stats/VmStats.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s)
+- 17 class method(s)
+
+### `ext/stats/VmStatsDens.php`
+
+**Warnings** (review for bootstrap subset):
+- 20 class method(s)
 
 ### `ext/stats/stats_absolute_deviation.php`
 
@@ -41489,6 +41527,102 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/stats/stats_covariance.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_beta.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_cauchy.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_chisquare.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_exponential.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_f.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_gamma.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_laplace.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_logistic.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_normal.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_binomial.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_hypergeometric.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_negative_binomial.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_pmf_poisson.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_t.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_uniform.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/stats/stats_dens_weibull.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -52609,8 +52743,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 90)
 - new Variable (line 125)
 - new Variable (line 169)
-- new Variable (line 218)
-- new Variable (line 278)
+- new Variable (line 255)
 - 6 class method(s)
 - 1 closure(s)
 
@@ -52779,13 +52912,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 45)
 - new Variable (line 89)
-- new Variable (line 335)
-- new Variable (line 348)
-- new Variable (line 358)
-- new Variable (line 426)
-- new Variable (line 447)
-- new Variable (line 484)
-- new Variable (line 506)
+- new Variable (line 328)
+- new Variable (line 341)
+- new Variable (line 351)
+- new Variable (line 419)
+- new Variable (line 440)
+- new Variable (line 477)
+- new Variable (line 499)
 - 46 class method(s)
 
 ### `lib/JIT/HashTableKeyFilterLlvm.php`
@@ -52843,9 +52976,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 69)
 - new Variable (line 119)
 - new Variable (line 165)
-- new Variable (line 481)
-- new Variable (line 523)
-- new Variable (line 716)
+- new Variable (line 476)
+- new Variable (line 518)
+- new Variable (line 701)
 - 17 class method(s)
 - 1 closure(s)
 
@@ -58317,91 +58450,91 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 552)
 - new Variable (line 558)
 - new Variable (line 566)
-- new Variable (line 745)
-- new ScriptExit (line 968)
-- new Variable (line 987)
-- new Variable (line 1008)
-- new Variable (line 1063)
-- new self (line 1143)
-- new Variable (line 1145)
-- new self (line 1158)
-- new Variable (line 1172)
-- new self (line 1188)
-- new Variable (line 1193)
-- new Variable (line 1215)
-- new self (line 1231)
-- new Variable (line 1233)
-- new Variable (line 1243)
-- new self (line 1275)
-- new Variable (line 1277)
-- new Variable (line 1286)
-- new self (line 1314)
-- new Variable (line 1316)
-- new Variable (line 1334)
-- new self (line 1395)
-- new self (line 1410)
-- new Variable (line 1412)
-- new Variable (line 1427)
-- new self (line 1466)
-- new Variable (line 1467)
-- new Variable (line 1479)
-- new Variable (line 1484)
-- new Variable (line 1487)
-- new self (line 1499)
-- new Variable (line 1501)
-- new Variable (line 1531)
-- new Variable (line 1539)
-- new Variable (line 1565)
-- new self (line 1583)
-- new Variable (line 1586)
-- new self (line 1612)
-- new Variable (line 1614)
-- new Variable (line 1641)
-- new Variable (line 1649)
-- new self (line 1653)
-- new Variable (line 1656)
-- new Variable (line 1661)
-- new Variable (line 1680)
-- new Variable (line 1685)
-- new self (line 1692)
-- new Variable (line 1694)
-- new Variable (line 1699)
-- new self (line 1714)
-- new self (line 1730)
-- new Variable (line 1736)
-- new Variable (line 1744)
-- new self (line 1765)
-- new Variable (line 1771)
-- new self (line 1793)
-- new Variable (line 1801)
-- new self (line 1816)
-- new Variable (line 1914)
-- new Variable (line 1920)
-- new Variable (line 1926)
-- new self (line 1944)
-- new Variable (line 1983)
-- new Variable (line 1985)
-- new Variable (line 2000)
-- new Variable (line 2006)
-- new Variable (line 2014)
-- new HashTableBucket (line 2121)
-- new self (line 2143)
-- new self (line 2148)
-- new Variable (line 2150)
-- new Variable (line 2155)
-- new Variable (line 2163)
-- new self (line 2173)
-- new self (line 2181)
-- new Variable (line 2183)
-- new Variable (line 2192)
-- new Variable (line 2200)
-- new Error (line 2378)
-- new Variable (line 2420)
-- new Variable (line 2426)
+- new Variable (line 734)
+- new ScriptExit (line 957)
+- new Variable (line 976)
+- new Variable (line 997)
+- new Variable (line 1052)
+- new self (line 1132)
+- new Variable (line 1134)
+- new self (line 1147)
+- new Variable (line 1161)
+- new self (line 1177)
+- new Variable (line 1182)
+- new Variable (line 1204)
+- new self (line 1220)
+- new Variable (line 1222)
+- new Variable (line 1232)
+- new self (line 1264)
+- new Variable (line 1266)
+- new Variable (line 1275)
+- new self (line 1303)
+- new Variable (line 1305)
+- new Variable (line 1323)
+- new self (line 1384)
+- new self (line 1399)
+- new Variable (line 1401)
+- new Variable (line 1416)
+- new self (line 1455)
+- new Variable (line 1456)
+- new Variable (line 1468)
+- new Variable (line 1473)
+- new Variable (line 1476)
+- new self (line 1488)
+- new Variable (line 1490)
+- new Variable (line 1520)
+- new Variable (line 1528)
+- new Variable (line 1554)
+- new self (line 1572)
+- new Variable (line 1575)
+- new self (line 1601)
+- new Variable (line 1603)
+- new Variable (line 1630)
+- new Variable (line 1638)
+- new self (line 1642)
+- new Variable (line 1645)
+- new Variable (line 1650)
+- new Variable (line 1669)
+- new Variable (line 1674)
+- new self (line 1681)
+- new Variable (line 1683)
+- new Variable (line 1688)
+- new self (line 1703)
+- new self (line 1719)
+- new Variable (line 1725)
+- new Variable (line 1733)
+- new self (line 1754)
+- new Variable (line 1760)
+- new self (line 1782)
+- new Variable (line 1790)
+- new self (line 1805)
+- new Variable (line 1903)
+- new Variable (line 1909)
+- new Variable (line 1915)
+- new self (line 1933)
+- new Variable (line 1972)
+- new Variable (line 1974)
+- new Variable (line 1989)
+- new Variable (line 1995)
+- new Variable (line 2003)
+- new HashTableBucket (line 2110)
+- new self (line 2132)
+- new self (line 2137)
+- new Variable (line 2139)
+- new Variable (line 2144)
+- new Variable (line 2152)
+- new self (line 2162)
+- new self (line 2170)
+- new Variable (line 2172)
+- new Variable (line 2181)
+- new Variable (line 2189)
+- new Error (line 2367)
+- new Variable (line 2409)
+- new Variable (line 2415)
+- new HashTableBucket (line 2653)
+- new Variable (line 2653)
 - new HashTableBucket (line 2664)
 - new Variable (line 2664)
-- new HashTableBucket (line 2675)
-- new Variable (line 2675)
 - 124 class method(s)
 
 ### `lib/VM/HashTableJitHelper.php`
@@ -59162,9 +59295,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmEmptyDimension.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 105)
-- new Variable (line 115)
-- new Variable (line 157)
+- new Variable (line 104)
+- new Variable (line 114)
+- new Variable (line 156)
 - 2 class method(s)
 
 ### `lib/VM/VmEnumNumericOperandGuard.php`

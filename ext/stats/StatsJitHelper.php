@@ -109,4 +109,15 @@ final class StatsJitHelper
     {
         return VmStats::binomialCoef($x, $n);
     }
+
+    /**
+     * dens_* dispatcher — op codes in {@see VmStatsDens}.
+     * Returns NAN on failure (boxed as false by JitStats).
+     */
+    public static function dens(int $op, float $a, float $b, float $c, float $d): float
+    {
+        $result = VmStatsDens::dispatch($op, $a, $b, $c, $d, null);
+
+        return false === $result ? \NAN : $result;
+    }
 }

@@ -34,6 +34,7 @@ final class StatsRuntimeStandaloneTest extends TestCase
             '__compiler_stats_innerproduct',
             '__compiler_stats_factorial',
             '__compiler_stats_binomial_coef',
+            '__compiler_stats_dens',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);
