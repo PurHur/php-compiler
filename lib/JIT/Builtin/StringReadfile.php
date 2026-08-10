@@ -11,10 +11,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188, #19966, #20290).
+ * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188, #19966, #29915).
  *
- * Always {@see JitVmHelperLink} → helper → {@see phpc_readfile_kernel} (Internal::call libc).
- * Pre-registerModule NestedJIT resolves kernels via Runtime modules (#15417 / #20290).
+ * Always {@see JitVmHelperLink} → helper → `@readfile` → NestedJIT
+ * whitelist {@see \PHPCompiler\ext\standard\readfile} → {@see JitReadfileLibc}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::readfile()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_passthru
  */
