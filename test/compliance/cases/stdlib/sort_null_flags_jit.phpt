@@ -1,5 +1,5 @@
 --TEST--
-stdlib sort()/rsort()/asort()/arsort()/ksort()/krsort() null $flags — Z_PARAM_LONG soft-null DEP (#29385, ext/standard/array.c)
+stdlib sort()/rsort()/asort()/arsort()/ksort()/krsort() null $flags — Z_PARAM_LONG soft-null DEP (JIT) (#29385, ext/standard/array.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--

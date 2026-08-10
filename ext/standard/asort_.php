@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ValueSortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -65,26 +64,14 @@ final class asort_ extends Internal
         if (1 === $argc) {
             ValueSortRuntime::asortByValue($context, $args[0]);
         } else {
-            self::jitSortByValueWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
+            self::jitSortByValueWithFlags(
+                $context,
+                $args[0],
+                VmInternalCompare::resolveJitSortFlags($context, $args[1], 'asort')
+            );
         }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
-    }
-
-    private static function resolveJitSortFlags(Context $context, JITVariable $flagsArg): int
-    {
-        if (null !== $flagsArg->compileTimeConstantName) {
-            $phpVar = $context->runtime->vmContext->constantFetch($flagsArg->compileTimeConstantName);
-            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
-                return $phpVar->toInt();
-            }
-        }
-        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type) {
-            throw new \LogicException(
-                'asort() flags must be a predefined constant in JIT/AOT in this compiler build'
-            );
-        }
-        throw new \LogicException('asort() flags must be an integer in this compiler build');
     }
 
     private static function jitSortByValueWithFlags(Context $context, JITVariable $array, int $flags): void
