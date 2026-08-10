@@ -892,6 +892,34 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ {@code $expr::class} TypeError uses {@code zend_zval_value_name} (#29576).
+     *
+     * Zend 8.2: {@code Cannot use "::class" on value of type string}
+     * Zend 8.3+: {@code Cannot use "::class" on string} (bool → {@code true}/{@code false})
+     * php-src: Zend/zend_vm_def.h ZEND_FETCH_CLASS_NAME; Zend/zend_API.c zend_zval_value_name().
+     *
+     * Same withhold shape as {@see supportsTypedIllegalContainerOffset()} — default 8.4.0-dev
+     * reference matches Zend 8.2 wording until {@code PHP_COMPILER_PROFILE=8.3}/{@code 8.4}.
+     */
+    public static function supportsClassPseudoConstValueNameTypeError(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ TENTATIVE_RETURN Core constant (Zend/zend_attributes.h, issue #18060).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+ or

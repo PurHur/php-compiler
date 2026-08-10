@@ -102,6 +102,72 @@ final class EnumCaseTypeNameTest extends TestCase
         }
     }
 
+    /** @covers \PHPCompiler\VM\EnumCaseSupport::classPseudoConstTypeErrorMessage */
+    public function testClassPseudoConstTypeErrorMessageProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassPseudoConstValueNameTypeError());
+            $s = new Variable(Variable::TYPE_STRING);
+            $s->string('stdClass');
+            $this->assertSame(
+                'Cannot use "::class" on string',
+                EnumCaseSupport::classPseudoConstTypeErrorMessage($s)
+            );
+            $t = new Variable(Variable::TYPE_BOOLEAN);
+            $t->bool(true);
+            $this->assertSame(
+                'Cannot use "::class" on true',
+                EnumCaseSupport::classPseudoConstTypeErrorMessage($t)
+            );
+            $f = new Variable(Variable::TYPE_BOOLEAN);
+            $f->bool(false);
+            $this->assertSame(
+                'Cannot use "::class" on false',
+                EnumCaseSupport::classPseudoConstTypeErrorMessage($f)
+            );
+            $this->assertSame(
+                'Cannot use "::class" on int',
+                EnumCaseSupport::formatClassPseudoConstTypeErrorMessage('int')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    /** @covers \PHPCompiler\VM\EnumCaseSupport::classPseudoConstTypeErrorMessage */
+    public function testClassPseudoConstTypeErrorMessageDefaultLegacy(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        try {
+            $this->assertFalse(CompilerVersion::supportsClassPseudoConstValueNameTypeError());
+            $s = new Variable(Variable::TYPE_STRING);
+            $s->string('stdClass');
+            $this->assertSame(
+                'Cannot use "::class" on value of type string',
+                EnumCaseSupport::classPseudoConstTypeErrorMessage($s)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
     /** @covers \PHPCompiler\VM\EnumCaseSupport::illegalArrayOffsetMessage */
     public function testIllegalArrayOffsetMessageForEnumCaseObjectProfile84(): void
     {

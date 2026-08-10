@@ -709,6 +709,7 @@ final class EnumCaseSupport
      * Zend TypeError actual-value label ("… given" / "… returned") (#29097).
      *
      * Booleans use literal {@code true}/{@code false} (zend_execute.c), not {@code bool}.
+     * Same spelling as php-src {@code zend_zval_value_name()} for non-object scalars.
      */
     public static function typeNameForTypeErrorActual(Variable $value): string
     {
@@ -718,6 +719,36 @@ final class EnumCaseSupport
         }
 
         return self::typeNameForVariable($value);
+    }
+
+    /**
+     * TypeError text for {@code $expr::class} on a non-object (#29576).
+     *
+     * php-src Zend/zend_vm_def.h — {@code Cannot use "::class" on %s} with
+     * {@code zend_zval_value_name}; Zend 8.2 used {@code on value of type %s} + type name.
+     */
+    public static function classPseudoConstTypeErrorMessage(Variable $value): string
+    {
+        if (CompilerVersion::supportsClassPseudoConstValueNameTypeError()) {
+            return 'Cannot use "::class" on '.self::typeNameForTypeErrorActual($value);
+        }
+
+        return 'Cannot use "::class" on value of type '.self::typeNameForVariable($value);
+    }
+
+    /**
+     * Format {@code $expr::class} TypeError from a precomputed label (#29576).
+     *
+     * JIT compile-time paths pass a zend_zval_value_name / zend_zval_type_name spelling;
+     * the PROFILE gate only chooses the {@code on} vs {@code on value of type} wrapper.
+     */
+    public static function formatClassPseudoConstTypeErrorMessage(string $label): string
+    {
+        if (CompilerVersion::supportsClassPseudoConstValueNameTypeError()) {
+            return 'Cannot use "::class" on '.$label;
+        }
+
+        return 'Cannot use "::class" on value of type '.$label;
     }
 
     public static function enumCaseNameForVariable(Variable $value): string
