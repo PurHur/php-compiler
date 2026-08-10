@@ -59,7 +59,13 @@ final class ScalarReturnCheck
                     $expectedLabel
                 );
             }
-            $coerced = self::coerceWeak($context, $return, $expectedJit);
+            $coerced = self::coerceWeak(
+                $context,
+                $return,
+                $expectedJit,
+                $callableName,
+                $expectedLabel
+            );
             if (null === $coerced) {
                 self::raiseReturnTypeError($context, $callableName, $expectedLabel, $givenLabel);
 
@@ -91,7 +97,13 @@ final class ScalarReturnCheck
 
             return false;
         }
-        $coerced = self::coerceWeak($context, $return, $expectedJit);
+        $coerced = self::coerceWeak(
+            $context,
+            $return,
+            $expectedJit,
+            $callableName,
+            $expectedLabel
+        );
         if (null === $coerced) {
             self::raiseReturnTypeError($context, $callableName, $expectedLabel, $givenLabel);
 
@@ -335,8 +347,13 @@ final class ScalarReturnCheck
         };
     }
 
-    private static function coerceWeak(Context $context, Variable $return, int $expectedJit): ?Variable
-    {
+    private static function coerceWeak(
+        Context $context,
+        Variable $return,
+        int $expectedJit,
+        ?string $callableName,
+        string $expectedLabel
+    ): ?Variable {
         switch ($expectedJit) {
             case Variable::TYPE_STRING:
                 try {
@@ -357,6 +374,15 @@ final class ScalarReturnCheck
                         )
                     );
                 }
+                // zend_verify_return_type: non-numeric strings TypeError (not intval→0) (#29858).
+                if (Variable::TYPE_STRING === $return->type) {
+                    return self::coerceWeakIntFromString(
+                        $context,
+                        $return,
+                        $callableName,
+                        $expectedLabel
+                    );
+                }
 
                 return new Variable(
                     $context,
@@ -365,6 +391,41 @@ final class ScalarReturnCheck
                     JitZendScalarCast::emitIntCast($context, $return)
                 );
             case Variable::TYPE_NATIVE_DOUBLE:
+                // Keep emitFloatCast for non-string; string uses is_numeric like VM (#29858 sibling).
+                if (Variable::TYPE_STRING === $return->type) {
+                    $literal = JitStringArg::compileTimeLiteral($return);
+                    if (null !== $literal) {
+                        if ('' === $literal || !is_numeric($literal)) {
+                            return null;
+                        }
+
+                        return new Variable(
+                            $context,
+                            Variable::TYPE_NATIVE_DOUBLE,
+                            Variable::KIND_VALUE,
+                            $context->getTypeFromString('double')->constReal((float) $literal)
+                        );
+                    }
+                    $strPtr = JitStringArg::lower($context, $return, 'Return value');
+                    $isNumeric = TypedParamCoerce::stringIsNumeric($context, $strPtr);
+                    $okBlock = BasicBlockHelper::append($context, 'scalar_return_float_str_ok');
+                    $failBlock = BasicBlockHelper::append($context, 'scalar_return_float_str_fail');
+                    $context->builder->branchIf($isNumeric, $okBlock, $failBlock);
+
+                    $context->builder->positionAtEnd($failBlock);
+                    self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'string');
+
+                    $context->builder->positionAtEnd($okBlock);
+                    $doubleVal = JitZendScalarCast::emitFloatCast($context, $return);
+
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_NATIVE_DOUBLE,
+                        Variable::KIND_VALUE,
+                        $doubleVal
+                    );
+                }
+
                 return new Variable(
                     $context,
                     Variable::TYPE_NATIVE_DOUBLE,
@@ -383,6 +444,46 @@ final class ScalarReturnCheck
         }
     }
 
+    /**
+     * Weak `: int` from string — reject non-numeric like VM TypeCheck::coerceToInt (#29858).
+     *
+     * @return Variable|null null when a compile-time literal is non-numeric (caller raises)
+     */
+    private static function coerceWeakIntFromString(
+        Context $context,
+        Variable $return,
+        ?string $callableName,
+        string $expectedLabel
+    ): ?Variable {
+        $literal = JitStringArg::compileTimeLiteral($return);
+        if (null !== $literal) {
+            if ('' === $literal || !is_numeric($literal)) {
+                return null;
+            }
+
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger((int) (float) $literal)
+            );
+        }
+
+        $strPtr = JitStringArg::lower($context, $return, 'Return value');
+        $isNumeric = TypedParamCoerce::stringIsNumeric($context, $strPtr);
+        $okBlock = BasicBlockHelper::append($context, 'scalar_return_int_str_ok');
+        $failBlock = BasicBlockHelper::append($context, 'scalar_return_int_str_fail');
+        $context->builder->branchIf($isNumeric, $okBlock, $failBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'string');
+
+        $context->builder->positionAtEnd($okBlock);
+        $longVal = JitLongArg::lowerStringValue($context, $strPtr);
+
+        return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $longVal);
+    }
+
     private static function raiseReturnTypeError(
         Context $context,
         ?string $callableName,
@@ -393,9 +494,29 @@ final class ScalarReturnCheck
         if (null !== $callableName && '' !== $callableName) {
             $message = "{$callableName}(): {$message}";
         }
-        // Same bridge as ClassReturnCheck — catchable when a *local* try is active;
-        // otherwise pending + abort (caller try/catch for callee return TypeError is
-        // the same gap as class returns today).
+        // Local try: catchable immediately. Cross-function (caller try): pend + return so
+        // invokeJitCall's emitCheckPendingThrowAfterCall can catch (#26486 / #29858).
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+            if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+
+            return;
+        }
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            Builtin\TypeErrorRaise::registerDeclarations($context);
+            Builtin\TypeErrorRaise::ensureLinked($context);
+            Builtin\TypeErrorRaise::ensureStandaloneBodies($context);
+            TryCatchHelper::emitPendTypeErrorForCaller($context, $message);
+            Builtin\TypeErrorRaise::emitRaise($context, $message);
+            $fn = $context->builder->getInsertBlock()?->getParent();
+            if ($fn instanceof \PHPLLVM\Value\Function_) {
+                TryCatchHelper::emitPropagateReturnAfterPendingThrow($context, $fn);
+            }
+
+            return;
+        }
         ExceptionBridge::emitTypeErrorAndAbort($context, $message);
         if (null === $context->builder->getInsertBlock()?->getTerminator()) {
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
