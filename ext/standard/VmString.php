@@ -410,9 +410,21 @@ final class VmString
         bool $rejectNullOnForwardProfile = true
     ): string {
         if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
+            // Use $userArgIndex for the TypeError message — method frames include $this at
+            // index 0, so Zend cites Argument #1 for the first user param (#29819).
+            $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+            if (Variable::TYPE_STRING !== $arg->type) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError(
+                        $function,
+                        $userArgIndex,
+                        $paramName,
+                        VmStreamArg::debugTypeName($arg)
+                    )
+                );
+            }
 
-            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
+            return $arg->toString();
         }
 
         return self::coerceStringBuiltinArg(
