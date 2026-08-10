@@ -241,6 +241,7 @@
             <file>./test/compliance/SplAutoloadCallNullStrictVMTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictJITTest.php</file>
             <file>./test/compliance/OpcacheIsScriptCachedInFileCacheVMTest.php</file>
+            <file>./test/compliance/PdoSqliteSetAuthorizerVMTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsVMTest.php</file>
             <file>./test/compliance/NestedFunctionExceptionGetTraceArgsJITTest.php</file>
             <file>./test/compliance/AsymmetricVisibilityReadonlyPrivateSetOrderVMTest.php</file>
