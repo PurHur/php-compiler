@@ -1144,6 +1144,7 @@ class JITTest extends BaseTest {
             if (!CompilerVersion::supportsExitFunctionForm()
                 && (str_contains($name, 'exit_function_php84')
                     || str_contains($name, 'exit_function_strict_types')
+                    || str_contains($name, 'exit_bool_status_php84')
                     || str_contains($name, 'exit_die_two_args')
                     || str_contains($name, 'exit_type_error')
                     || str_contains($name, 'exit_array_status_type_error')

@@ -10400,12 +10400,18 @@ class JIT {
                         break;
                     }
                     $exitArg = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    if (null !== $op->exitMessageSlot) {
-                        $messageArg = $this->context->getVariableFromOp($block->getOperand($op->exitMessageSlot));
-                        JIT\Builtin\ScriptExit::emitWithMessage($this->context, $exitArg, $messageArg);
-                        break;
+                    $prevExitStrict = $this->context->callerStrictTypes;
+                    $this->context->callerStrictTypes = $block->strictTypes;
+                    try {
+                        if (null !== $op->exitMessageSlot) {
+                            $messageArg = $this->context->getVariableFromOp($block->getOperand($op->exitMessageSlot));
+                            JIT\Builtin\ScriptExit::emitWithMessage($this->context, $exitArg, $messageArg);
+                            break;
+                        }
+                        JIT\Builtin\ScriptExit::emit($this->context, $exitArg);
+                    } finally {
+                        $this->context->callerStrictTypes = $prevExitStrict;
                     }
-                    JIT\Builtin\ScriptExit::emit($this->context, $exitArg);
                     break;
                 case OpCode::TYPE_POW:
                     $powLeftOp = $block->getOperand($op->arg2);
