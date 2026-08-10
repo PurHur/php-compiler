@@ -11,7 +11,9 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for clamp() via ClampJitHelper PHP.
  *
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath::clamp()}
+ * NestedJIT-safe peel lives in {@see \PHPCompiler\ext\standard\ClampJitHelper}
+ * (no VmMath clamp helper / is_nan / Variable spaceship — #29730 / Ldexp #29578).
+ * VM SSOT remains {@see \PHPCompiler\ext\standard\VmMath::clamp()}.
  * php-src: ext/standard/math.c — PHP_FUNCTION(clamp)
  */
 final class MathClamp
