@@ -205,6 +205,10 @@
             <file>./test/compliance/RoundNullModeForward84JITTest.php</file>
             <file>./test/compliance/SubstrCompareNullOffsetVMTest.php</file>
             <file>./test/compliance/SubstrCompareNullOffsetJITTest.php</file>
+            <file>./test/compliance/SubstrCompareNullCiStrictVMTest.php</file>
+            <file>./test/compliance/SubstrCompareNullCiStrictJITTest.php</file>
+            <file>./test/compliance/SubstrCompareNullCiCoerceVMTest.php</file>
+            <file>./test/compliance/SubstrCompareNullCiCoerceJITTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorVMTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorJITTest.php</file>
             <file>./test/compliance/FilePutContentsEmptyPathValueErrorVMTest.php</file>

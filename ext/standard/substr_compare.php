@@ -10,6 +10,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringSubstrCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -48,10 +50,16 @@ final class substr_compare extends Internal
                 $length = self::requireIntArg($frame->calledArgs[3], 'substr_compare', 4, 'length');
             }
         }
+        // Z_PARAM_BOOL $case_insensitive — strict TypeError; soft-null DEP+coerce (#29756).
         $caseInsensitive = false;
         if (5 === $argc) {
-            $ci = $frame->calledArgs[4]->resolveIndirect();
-            $caseInsensitive = $ci->toBool();
+            $caseInsensitive = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                4,
+                'substr_compare',
+                5,
+                'case_insensitive'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -105,13 +113,27 @@ final class substr_compare extends Internal
                 $lengthVal = self::lowerStrictIntArg($context, $args[3], 'substr_compare', 4, 'length');
             }
         }
+        // Z_PARAM_BOOL $case_insensitive — strict TypeError; soft-null DEP+coerce (#29756).
+        // Compile-time null under strict: emit catchable TypeError and stop (do not continue
+        // after terminator — lowerCoerceZParamBool would soft-null-DEP into a dead block).
         $ci = $i32->constInt(0, false);
         if (5 === $argc) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[4]->type) {
-                throw new \LogicException('substr_compare() case_insensitive must be a boolean in this compiler build');
+            if ($context->callerStrictTypes && self::isCompileTimeNull($args[4])) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'substr_compare(): Argument #5 ($case_insensitive) must be of type bool, null given'
+                );
+
+                return $i64->constInt(0, false);
             }
             $ci = $context->builder->zExt(
-                $this->jitBool($context, $args[4], 'substr_compare() case_insensitive'),
+                JitBoolArg::lowerCoerceZParamBool(
+                    $context,
+                    $args[4],
+                    'substr_compare',
+                    'case_insensitive',
+                    5
+                ),
                 $i32
             );
         }
