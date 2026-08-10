@@ -12639,6 +12639,20 @@ class JIT {
                     $forDimWrite = $this->varFetchDestUsedAsDimWriteContainer($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
                         $classId = $this->context->type->object->lookup($declaringClass);
+                        // Static via -> / ?->: visibility Error for inaccessible statics (#30017).
+                        // Notice is VM-complete; JIT mid-body Notice SEGVs under MCJIT (pre-existing).
+                        $staticAsInstance = JIT\StaticPropertyAsNonStaticJitGuard::emitBeforeInstanceFetch(
+                            $this->context->type->object,
+                            $this,
+                            $block,
+                            $classId,
+                            $declaringClass,
+                            $name->value,
+                            (bool) $op->propertyHookCoalesceRead
+                        );
+                        if (JIT\StaticPropertyAsNonStaticJitGuard::CONTINUE !== $staticAsInstance) {
+                            break;
+                        }
                         if (
                             $forWrite
                             && !$this->context->type->object->hasProperty($classId, $name->value)

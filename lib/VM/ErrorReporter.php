@@ -391,6 +391,27 @@ final class ErrorReporter
     }
 
     /**
+     * Zend E_NOTICE when a declared static property is accessed via -> / ?->
+     * (zend_object_handlers.c zend_get_property_offset; #30017).
+     *
+     * Uses the receiver class name (not the declaring class) in the message.
+     */
+    public function accessingStaticPropertyAsNonStatic(
+        string $className,
+        string $propertyName,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitNotice(
+            sprintf('Accessing static property %s::$%s as non static', $className, $propertyName),
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    /**
      * Zend E_WARNING for property read on non-object including null (zend_fetch.c, #5276, #10381).
      */
     public function propertyReadOnNonObject(
