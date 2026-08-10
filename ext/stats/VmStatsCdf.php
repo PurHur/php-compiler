@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\stats;
 use PHPCompiler\Frame;
 
 /**
- * PECL stats_cdf_* cumulative distributions — which=1 (CDF) first (#29588).
+ * PECL stats_cdf_* cumulative distributions — which=1 (CDF) first (#29588, #29621).
  *
- * php-src: pecl-math-stats php_stats.c (DCDFLIB cdfnor/cdft/cdfchi/cdfgam).
+ * php-src: pecl-math-stats php_stats.c (DCDFLIB + closed-form exponential).
  * Algorithms are PHP ports of the standard Abramowitz–Stegun reductions;
  * inverse / which≥2 modes return PECL-style Computation Error for now.
  */
@@ -19,6 +19,10 @@ final class VmStatsCdf
     public const OP_T = 2;
     public const OP_CHISQUARE = 3;
     public const OP_GAMMA = 4;
+    public const OP_BETA = 5;
+    public const OP_F = 6;
+    public const OP_POISSON = 7;
+    public const OP_EXPONENTIAL = 8;
 
     private const PI = \M_PI;
 
@@ -38,6 +42,10 @@ final class VmStatsCdf
             self::OP_T => self::t($a, $b, $which, $frame),
             self::OP_CHISQUARE => self::chisquare($a, $b, $which, $frame),
             self::OP_GAMMA => self::gamma($a, $b, $c, $which, $frame),
+            self::OP_BETA => self::beta($a, $b, $c, $which, $frame),
+            self::OP_F => self::f($a, $b, $c, $which, $frame),
+            self::OP_POISSON => self::poisson($a, $b, $which, $frame),
+            self::OP_EXPONENTIAL => self::exponential($a, $b, $which, $frame),
             default => false,
         };
     }
@@ -124,6 +132,98 @@ final class VmStatsCdf
         }
 
         return self::regularizedLowerGamma($shape, $x / $scale);
+    }
+
+    /** @return float|false */
+    public static function beta(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        // which=1: P from X, A, B
+        $x = $par1;
+        $a = $par2;
+        $b = $par3;
+        if ($a <= 0.0 || $b <= 0.0 || $x < 0.0 || $x > 1.0) {
+            return self::computationError($frame);
+        }
+
+        return self::regularizedIncompleteBeta($x, $a, $b);
+    }
+
+    /** @return float|false */
+    public static function f(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        // which=1: P from F, DFN, DFD
+        $f = $par1;
+        $dfn = $par2;
+        $dfd = $par3;
+        if ($dfn <= 0.0 || $dfd <= 0.0 || $f < 0.0) {
+            return self::computationError($frame);
+        }
+        $x = ($dfn * $f) / ($dfn * $f + $dfd);
+
+        return self::regularizedIncompleteBeta($x, $dfn / 2.0, $dfd / 2.0);
+    }
+
+    /** @return float|false */
+    public static function poisson(float $par1, float $par2, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 3) {
+            self::warning($frame, 'Third parameter should be in the 1..3 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        // which=1: P from S, XLAM — P(X ≤ floor(S)) for Poisson(λ)
+        $s = $par1;
+        $xlam = $par2;
+        if ($xlam < 0.0 || $s < 0.0) {
+            return self::computationError($frame);
+        }
+        $k = (int) \floor($s);
+
+        // P(X ≤ k) = Q(k+1, λ) = 1 − P(k+1, λ) (regularized lower incomplete gamma)
+        return 1.0 - self::regularizedLowerGamma((float) ($k + 1), $xlam);
+    }
+
+    /** @return float|false */
+    public static function exponential(float $par1, float $par2, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 3) {
+            self::warning($frame, 'Third parameter should be in the 1..3 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        // which=1: P from X, SCALE — PECL exponential_cdf(x/scale)
+        $x = $par1;
+        $scale = $par2;
+        if ($scale <= 0.0) {
+            return self::computationError($frame);
+        }
+        if ($x < 0.0) {
+            return 0.0;
+        }
+
+        return 1.0 - \exp(-$x / $scale);
     }
 
     public static function standardNormalCdf(float $z): float
