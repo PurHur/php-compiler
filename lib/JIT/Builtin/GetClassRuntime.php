@@ -130,6 +130,9 @@ PHP;
             'RuntimeException',
             // json_decode/encode JSON_THROW_ON_ERROR compile-time fold (#27623).
             'JsonException',
+            // Match / arithmetic engine errors — catch get_class before throw registers (#29747).
+            'UnhandledMatchError', 'ArithmeticError', 'DivisionByZeroError',
+            'ArgumentCountError', 'ParseError', 'CompileError', 'AssertionError',
         ] as $name) {
             $object->lookup($name);
         }
