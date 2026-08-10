@@ -682,7 +682,13 @@ final class AsymmetricVisibilityRewriter
             $sansSet
         ) ?? $sansSet;
 
-        return preg_match_all('/\b(?:public|protected|private)\b/i', $sansSet) >= 2;
+        // Adjacent duplicate bare PPP (`public public …`) after stripping set tokens.
+        // Count>=2 is wrong for `public function __construct(public private(set) …)` —
+        // method vis + promoted-param vis are not duplicate property modifiers (#29672).
+        return 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\b/i',
+            $sansSet
+        );
     }
 
     private static function lineHasExplicitReadPlusSetModifier(string $line): bool
