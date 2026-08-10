@@ -53,10 +53,14 @@ final class VmNumberFormatter
     /** ICU UNUM_CURRENCY_PLURAL — PHP 8.5+ only (#28132). */
     public const CURRENCY_PLURAL = 11;
     public const CURRENCY_ACCOUNTING = 12;
+    /** ICU UNUM_CASH_CURRENCY — PHP 8.5+ only (#29998). */
+    public const CASH_CURRENCY = 13;
     /** ICU UNUM_DECIMAL_COMPACT_SHORT — PHP 8.5+ only (#28132). */
     public const DECIMAL_COMPACT_SHORT = 14;
     /** ICU UNUM_DECIMAL_COMPACT_LONG — PHP 8.5+ only (#28132). */
     public const DECIMAL_COMPACT_LONG = 15;
+    /** ICU UNUM_CURRENCY_STANDARD — PHP 8.5+ only (#29998). */
+    public const CURRENCY_STANDARD = 16;
     public const DEFAULT_STYLE = 1;
 
     public const PARSE_INT_ONLY = 0;
@@ -173,8 +177,10 @@ final class VmNumberFormatter
             ...(CompilerVersion::supportsNumberFormatterPhp85StyleConsts() ? [
                 'CURRENCY_ISO' => self::CURRENCY_ISO,
                 'CURRENCY_PLURAL' => self::CURRENCY_PLURAL,
+                'CASH_CURRENCY' => self::CASH_CURRENCY,
                 'DECIMAL_COMPACT_SHORT' => self::DECIMAL_COMPACT_SHORT,
                 'DECIMAL_COMPACT_LONG' => self::DECIMAL_COMPACT_LONG,
+                'CURRENCY_STANDARD' => self::CURRENCY_STANDARD,
             ] : []),
             'PARSE_INT_ONLY' => self::PARSE_INT_ONLY,
             'GROUPING_USED' => self::GROUPING_USED,
@@ -428,6 +434,7 @@ final class VmNumberFormatter
             self::PERCENT => '#,##0%',
             self::CURRENCY => '¤#,##0.00',
             self::CURRENCY_ISO, self::CURRENCY_PLURAL => '¤#,##0.00',
+            self::CASH_CURRENCY, self::CURRENCY_STANDARD => '¤#,##0.00',
             self::CURRENCY_ACCOUNTING => '¤#,##0.00;(¤#,##0.00)',
             self::SCIENTIFIC => '#E0',
             self::PATTERN_DECIMAL, self::IGNORE => '#',
@@ -470,7 +477,9 @@ final class VmNumberFormatter
         if (self::CURRENCY === $style
             || self::CURRENCY_ACCOUNTING === $style
             || self::CURRENCY_ISO === $style
-            || self::CURRENCY_PLURAL === $style) {
+            || self::CURRENCY_PLURAL === $style
+            || self::CASH_CURRENCY === $style
+            || self::CURRENCY_STANDARD === $style) {
             $attrs[self::FRACTION_DIGITS] = 2;
             $attrs[self::MIN_FRACTION_DIGITS] = 2;
             $attrs[self::MAX_FRACTION_DIGITS] = 2;
