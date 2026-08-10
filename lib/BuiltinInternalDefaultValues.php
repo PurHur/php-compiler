@@ -647,6 +647,10 @@ final class BuiltinInternalDefaultValues
         'session_create_id' => [
             0 => ['kind' => 'string', 'value' => ''],
         ],
+        // php-src ext/ftp/ftp.stub.php — int $mode = FTP_BINARY (absent from InternalArgInfo) (#27686)
+        'ftp_append' => [
+            3 => ['kind' => 'int', 'value' => 2],
+        ],
         // php-src ext/date/php_date.stub.php — string $datetime = "now", ?DateTimeZone $timezone = null (#25392)
         // Functions absent from InternalArgInfo entirely.
         'date_create' => [

@@ -1505,4 +1505,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
             BuiltinParamNames::forClassMethod('xmlreader::xml')
         );
     }
+
+    /** php-src ext/ftp/ftp.stub.php — FTP\Connection stubs; InternalArgInfo untyped (#27686). */
+    public function testFtpAppendReflectionStubTypes(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftp_append'));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_append', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_append', 1));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_append', 2));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_append', 3));
+        $ftp = BuiltinInternalArgInfo::paramInfoForFunction('ftp_append', 0);
+        $this->assertNotNull($ftp);
+        $this->assertSame('ftp', $ftp['name']);
+        $this->assertSame('FTP\\Connection', $ftp['type']);
+        $mode = BuiltinInternalArgInfo::paramInfoForFunction('ftp_append', 3);
+        $this->assertNotNull($mode);
+        $this->assertSame('mode', $mode['name']);
+        $this->assertSame('int', $mode['type']);
+        $this->assertTrue($mode['isOptional']);
+        $this->assertSame(
+            ['ftp', 'remote_filename', 'local_filename', 'mode='],
+            BuiltinParamNames::forFunction('ftp_append')
+        );
+    }
 }

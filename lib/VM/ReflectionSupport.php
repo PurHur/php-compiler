@@ -2202,16 +2202,19 @@ final class ReflectionSupport
         return $block->paramDefaultConstantNames[$index] ?? null;
     }
 
-    /** php-src round() $mode = RoundingMode::HalfAwayFromZero (#28535). */
+    /** php-src round() $mode = RoundingMode::HalfAwayFromZero (#28535); ftp_append $mode = FTP_BINARY (#27686). */
     private static function internalParameterDefaultConstantName(
         Context $ctx,
         ObjectEntry $reflection,
     ): ?string {
+        $callableLc = strtolower(self::internalCallableName($ctx, $reflection));
+        $index = self::parameterIndexForReflection($reflection);
+        if ('ftp_append' === $callableLc && 3 === $index) {
+            return 'FTP_BINARY';
+        }
         if (!CompilerVersion::supportsRoundingModeEnum()) {
             return null;
         }
-        $callableLc = strtolower(self::internalCallableName($ctx, $reflection));
-        $index = self::parameterIndexForReflection($reflection);
         if ('round' === $callableLc && 2 === $index) {
             return 'RoundingMode::HalfAwayFromZero';
         }
