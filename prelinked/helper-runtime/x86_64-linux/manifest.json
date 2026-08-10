@@ -1,13 +1,13 @@
 {
     "version": 1,
-    "generated_at": "2026-08-10T05:25:59+00:00",
+    "generated_at": "2026-08-10T07:45:24+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "d68150213f5e48886c15",
     "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
     "unit_count": 375,
-    "published_fresh": 51,
+    "published_fresh": 10,
     "kept_live_unpublished": 0,
-    "total_bytes": 657444310,
-    "refresh": "targeted publish for #29692 (51 VmString-stale after #29695; spine pecl-stats cdf/rand)"
+    "total_bytes": 657510952,
+    "refresh": "targeted publish for #29726 (10 array/sort STALE units)"
 }
