@@ -9,10 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * Internal JIT/AOT link for VmMath::ldexp via LdexpJitHelper PHP (#15073, #24607).
+ * Internal JIT/AOT link for ldexp via LdexpJitHelper PHP (#15073, #24607, #29578).
  *
+ * NestedJIT-safe peel lives in {@see \PHPCompiler\ext\standard\LdexpJitHelper}
+ * (frexp #29156 shape — no VmMath is_nan/is_infinite/pow-of-two under helper compile).
  * Userland ldexp() is not registered (absent from php-src math.stub.php). This bridge
- * remains for internal/helper use; SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * remains for internal/helper use.
  */
 final class MathLdexp
 {
