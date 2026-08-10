@@ -24,6 +24,8 @@ use PHPCompiler\VM\ClassReadonly;
  * Zend/zend_inheritance.c — inheritance_check_properties(), readonly parent/child checks;
  * per-property MODIFIER_READONLY cannot have default initializer (#3149, #3551);
  * PHP 8.2+ readonly class (ZEND_ACC_READONLY) inherits readonly on instance props — defaults rejected (#18090, re-#18074);
+ * PHP 8.2+ readonly class also sets ZEND_ACC_READONLY on static props — Zend then applies
+ *   type → default → "Static property … cannot be readonly" (#29980; no separate class-level static ban);
  * PHP 8.3+ anonymous classes may use per-property `readonly` with defaults (#6724);
  * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991);
  * PHP 8.4+ hooked properties cannot be readonly (#19172, zend_compile_property_hooks);
@@ -89,7 +91,9 @@ final class ReadonlyClassCompileCheck
                 AttributeNames::fromOp($class),
                 $display
             );
-            $this->verifyReadonlyClassNoStaticProperties($class, $display);
+            // php-src zend_compile_property_info: ZEND_ACC_READONLY_CLASS ⇒ ZEND_ACC_READONLY on
+            // every property (including static). Fatal order: type → default → static (#29980).
+            $this->verifyReadonlyClassStaticPropertySemantics($class, $display);
         }
         $this->verifyNoStaticReadonlyProperties($class, $display);
         $parentLc = null;
@@ -126,14 +130,29 @@ final class ReadonlyClassCompileCheck
         return $properties;
     }
 
-    private function verifyReadonlyClassNoStaticProperties(Op\Stmt\Class_ $class, string $classDisplay): void
+    /**
+     * Readonly-class static members: match zend_compile_property_info fatal order (#29980).
+     * php-src does not emit "Readonly class … cannot declare static properties".
+     */
+    private function verifyReadonlyClassStaticPropertySemantics(Op\Stmt\Class_ $class, string $classDisplay): void
     {
         foreach ($class->stmts->children as $member) {
             if (!$member instanceof Op\Stmt\Property || !$member->static) {
                 continue;
             }
+            $propName = $this->propertyDisplayName($member->name);
+            if (!$this->propertyHasDeclaredType($member->declaredType ?? null)) {
+                throw new \CompileError(
+                    "Readonly property {$classDisplay}::\${$propName} must have type"
+                );
+            }
+            if (null !== $member->defaultVar || null !== $member->defaultBlock) {
+                throw new \CompileError(
+                    "Readonly property {$classDisplay}::\${$propName} cannot have default value"
+                );
+            }
             throw new \CompileError(
-                "Readonly class {$classDisplay} cannot declare static properties"
+                "Static property {$classDisplay}::\${$propName} cannot be readonly"
             );
         }
     }
@@ -144,6 +163,7 @@ final class ReadonlyClassCompileCheck
             if (!$member instanceof Op\Stmt\Property || !$member->static) {
                 continue;
             }
+            // Readonly-class statics already handled in verifyReadonlyClassStaticPropertySemantics.
             if (!$this->isCfgPropertyReadonly($member)) {
                 continue;
             }
@@ -160,7 +180,7 @@ final class ReadonlyClassCompileCheck
         }
     }
 
-      private function verifyReadonlyPropertyRequiresType(): void
+    private function verifyReadonlyPropertyRequiresType(): void
     {
         foreach ($this->classes as $lc => $meta) {
             foreach ($this->scriptClasses[$lc] ?? [] as $class) {
