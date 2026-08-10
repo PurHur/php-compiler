@@ -196,11 +196,7 @@ final class IncompleteClassSupport
         if ('{main}' === $name || '' === $name) {
             return 'main';
         }
-        // Host/VM anonymous labels → Zend zend_error `{closure}` (#29025).
-        if (str_starts_with($name, '{anonymous}') || str_starts_with($name, '{closure}')) {
-            return '{closure}';
-        }
-
+        // Host/VM anonymous labels → Zend zend_error `{closure}` / `Class::{closure}` (#29025, #29953).
         return ParamArgumentCountError::formatUserFunctionName($name);
     }
 }
