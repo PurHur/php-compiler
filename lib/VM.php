@@ -2499,6 +2499,137 @@ class VM {
     }
 
     /**
+     * Foreach property names — same visibility as get_object_vars(), without get-hook side effects (#29702).
+     *
+     * php-src: ZEND_FE_RESET / get_properties_for(FOREACH) lists slots; FE_FETCH invokes get once
+     * per hooked property. Building the key list must not call zend_read_property_ex.
+     *
+     * @return list<string>
+     */
+    public function collectObjectForeachPropertyKeys(ObjectEntry $object, Frame $frame): array
+    {
+        // Enum / DateInterval bags have no get-hook double-read risk; reuse the vars map.
+        if (VM\EnumCaseSupport::isEnumCase($object)) {
+            return array_keys($this->collectObjectVarsForBuiltin($object, $frame));
+        }
+        if (null !== $this->dateIntervalObjectVarsPropertyMap($object)) {
+            return array_keys($this->collectObjectVarsForBuiltin($object, $frame));
+        }
+
+        $ctx = $this->context;
+        $scopeFrame = $frame;
+        while (null !== $scopeFrame && null !== $scopeFrame->handler) {
+            $scopeFrame = $scopeFrame->parent;
+        }
+        if (null === $scopeFrame) {
+            $scopeFrame = $frame;
+        }
+        $callerClassLc = $this->callerClassLc($scopeFrame);
+        if (
+            null === $callerClassLc
+            && $object->class->isInternal
+            && !$object->class->allowsDynamicProperties
+            && !$this->internalClassExportsGetObjectVars($object)
+        ) {
+            return [];
+        }
+
+        /** @var list<string> $keys */
+        $keys = [];
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        /** @var array<string, true> $seenPrivate */
+        $seenPrivate = [];
+        /** @var array<string, true> $seenDeclaredLc */
+        $seenDeclaredLc = [];
+        foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                $isPrivate = ($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
+                $seenDeclaredLc[$lc] = true;
+                if ($isPrivate) {
+                    $privKey = ($meta->declaringClassLc !== '' ? $meta->declaringClassLc : strtolower($class->name))."\0".$lc;
+                    if (isset($seenPrivate[$privKey])) {
+                        continue;
+                    }
+                    $seenPrivate[$privKey] = true;
+                    if (isset($seenLc[$lc])) {
+                        continue;
+                    }
+                } elseif (isset($seenLc[$lc])) {
+                    continue;
+                }
+                if (JitMcjitEmbed::isEmbedClassPadProperty($meta->name)) {
+                    continue;
+                }
+                if ($meta->phpInvisible) {
+                    if (!$isPrivate) {
+                        $seenLc[$lc] = true;
+                    }
+                    continue;
+                }
+                if (!$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                    continue;
+                }
+                if (null !== $meta->getHookMethodLc) {
+                    // List only — value fetch via readObjectForeachProperty invokes get once (#29702).
+                    $keys[] = $meta->name;
+
+                    continue;
+                }
+                if (!$object->hasPropertyForMeta($meta)) {
+                    if (!$meta->prototype->hasDeclaredTypeConstraint()) {
+                        $keys[] = $meta->name;
+                    }
+
+                    continue;
+                }
+                $value = $object->getPropertyForMeta($meta)->resolveIndirect();
+                if (
+                    Variable::TYPE_UNDEFINED === $value->type
+                    && (
+                        $meta->prototype->hasDeclaredTypeConstraint()
+                        || null !== $meta->default
+                        || $meta->hasRuntimeDefaultInit()
+                        || !$meta->prototype->isUndefined()
+                    )
+                ) {
+                    continue;
+                }
+                if (VM\TypedPropertyCheck::isUninitialized($value)) {
+                    if ($meta->prototype->hasDeclaredTypeConstraint()) {
+                        continue;
+                    }
+                }
+                $keys[] = $meta->name;
+            }
+        }
+        foreach ($object->getRawProperties() as $name => $prop) {
+            $nameLc = strtolower($name);
+            if (isset($seenDeclaredLc[$nameLc]) || isset($seenLc[$nameLc])) {
+                continue;
+            }
+            if (JitMcjitEmbed::isEmbedClassPadProperty($name)) {
+                continue;
+            }
+            if (DateTimeSupport::isInternalStorageProperty((string) $name)) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                continue;
+            }
+            $keys[] = (string) $name;
+        }
+
+        return $keys;
+    }
+
+    /**
      * var_dump()/print_r()/debug_zval_dump() property list — mangled keys, no get hooks (#29379).
      *
      * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_DEBUG) walks the property table

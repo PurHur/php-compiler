@@ -12,8 +12,9 @@ use PHPCompiler\Frame;
  * PURPOSE_FOREACH: visibility matches get_object_vars() (#23430).
  * PURPOSE_ARRAY_WALK: full property table with Zend-mangled keys (#23552, #23431, #23565).
  *
- * Values always go through {@see \PHPCompiler\VM::readObjectForeachProperty}.
- * Pass by-ref only when the callback's first parameter is by-ref (#23552).
+ * Foreach key listing must not invoke get hooks — only {@see \PHPCompiler\VM::readObjectForeachProperty}
+ * on value fetch (#29702, zend_property_hooks.c). Pass by-ref only when the callback's first
+ * parameter is by-ref (#23552).
  */
 final class ObjectPropertyIterator
 {
@@ -43,7 +44,8 @@ final class ObjectPropertyIterator
 
             return;
         }
-        $names = array_keys($vm->collectObjectVarsForBuiltin($object, $frame));
+        // Keys only — collectObjectVarsForBuiltin() would invoke get before FE_FETCH (#29702).
+        $names = $vm->collectObjectForeachPropertyKeys($object, $frame);
         $this->keys = $names;
         $this->storageNames = $names;
     }
