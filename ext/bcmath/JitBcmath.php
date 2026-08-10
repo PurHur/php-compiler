@@ -181,6 +181,30 @@ final class JitBcmath
             );
         }
 
+        // Z_PARAM_STR before unimplemented — null TypeError under strict_types (#29977).
+        if ($context->callerStrictTypes && self::isNullStringArg($args[0])) {
+            return JitStringBuiltinArg::lower($context, $args[0], 'bcpow', 0, 'num');
+        }
+        if ($context->callerStrictTypes && self::isNullStringArg($args[1])) {
+            return JitStringBuiltinArg::lower($context, $args[1], 'bcpow', 1, 'exponent');
+        }
+        JitStringBuiltinArg::lower($context, $args[0], 'bcpow', 0, 'num');
+        JitStringBuiltinArg::lower($context, $args[1], 'bcpow', 1, 'exponent');
+        $baseSoft = self::nullConstantAsEmptyString($args[0], $baseLit);
+        $expSoft = self::nullConstantAsEmptyString($args[1], $expLit);
+        if (
+            null !== $baseSoft
+            && null !== $expSoft
+            && (!isset($args[2]) || null !== $scaleLit)
+            && self::$compileTimeScaleKnown
+        ) {
+            $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
+
+            return $context->builder->load(
+                $context->constantStringFromString(VmBcmath::pow($baseSoft, $expSoft, $scale))
+            );
+        }
+
         throw new \LogicException('bcpow() not implemented for JIT with non-constant operands in this compiler build');
     }
 
@@ -198,6 +222,24 @@ final class JitBcmath
 
             return $context->builder->load(
                 $context->constantStringFromString(VmBcmath::sqrt($numLit, $scale))
+            );
+        }
+
+        // Z_PARAM_STR before unimplemented — null TypeError under strict_types (#29977).
+        $numLowered = JitStringBuiltinArg::lower($context, $args[0], 'bcsqrt', 0, 'num');
+        if ($context->callerStrictTypes && self::isNullStringArg($args[0])) {
+            return $numLowered;
+        }
+        $numSoft = self::nullConstantAsEmptyString($args[0], $numLit);
+        if (
+            null !== $numSoft
+            && (!isset($args[1]) || null !== $scaleLit)
+            && self::$compileTimeScaleKnown
+        ) {
+            $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
+
+            return $context->builder->load(
+                $context->constantStringFromString(VmBcmath::sqrt($numSoft, $scale))
             );
         }
 
@@ -519,6 +561,25 @@ final class JitBcmath
     private static function compileTimeString(JITVariable $arg): ?string
     {
         return JitStringArg::compileTimeLiteral($arg) ?? $arg->compileTimeString;
+    }
+
+    /** Null Z_PARAM_STR soft-coerce → "" for compile-time fold after lower() (#29977). */
+    private static function isNullStringArg(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant;
+    }
+
+    /**
+     * After {@see JitStringBuiltinArg::lower} soft-null DEP, fold null constants as "".
+     * Under caller strict_types lower() already aborted — caller should not use the result.
+     */
+    private static function nullConstantAsEmptyString(JITVariable $arg, ?string $lit): ?string
+    {
+        if (self::isNullStringArg($arg)) {
+            return '';
+        }
+
+        return $lit;
     }
 
     private static function compileTimeLong(JITVariable $arg): ?int
