@@ -88,6 +88,40 @@ PHP;
         );
     }
 
+    public function testNeverArrowExpressionBodyRaisesTypeErrorNotCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+try {
+    $f = fn(): never => 1;
+    $f();
+    echo "ok\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'never_arrow.php'));
+        $out = ob_get_clean();
+        $this->assertStringStartsWith('TypeError: {closure', $out);
+        $this->assertStringContainsString('(): never-returning function must not implicitly return', $out);
+        $this->assertStringNotContainsString('Fatal', $out);
+    }
+
+    public function testNeverNamedValueReturnStillCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(): never {
+    return 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $runtime->parseAndCompile($code, 'never_named_value_return.php');
+    }
+
     public function testNeverCallSiteDoesNotFallThroughAfterThrowInTry(): void
     {
         $runtime = new Runtime();
