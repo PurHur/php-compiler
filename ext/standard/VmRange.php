@@ -148,7 +148,7 @@ final class VmRange
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_STR_OR_LONG soft-null — DEP then coerce to 0 (#29348; peer $step #29352).
+            // Zend 8.2 untyped coerce; 8.3+ Z_PARAM_NUMBER_OR_STR soft-null (#29348 / #29767).
             self::rejectOrCoerceNullEndpoint($frame, $argIndex, $paramName);
 
             return 0;
@@ -206,7 +206,7 @@ final class VmRange
             return $var->toBool() ? 1.0 : 0.0;
         }
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_STR_OR_LONG soft-null — DEP then coerce to 0.0 (#29348).
+            // Zend 8.2 untyped coerce; 8.3+ Z_PARAM_NUMBER_OR_STR soft-null (#29348 / #29767).
             self::rejectOrCoerceNullEndpoint($frame, $argIndex, $paramName);
 
             return 0.0;
@@ -261,11 +261,17 @@ final class VmRange
     }
 
     /**
-     * php-src Z_PARAM_STR_OR_LONG $start/$end null: strict_types → TypeError; else DEP then 0 (#29348).
-     * Type label is string|int|float (array.stub.php), not int|float|string.
+     * php-src range() $start/$end null (#29348, #29767):
+     * - PHP 8.2 untyped endpoints: coerce null→0 with no DEP (strict_types ignored).
+     * - PHP 8.3+ Z_PARAM_NUMBER_OR_STR (string|int|float): strict_types → TypeError; else DEP then 0.
+     * Gate: {@see CompilerVersion::supportsRangeStrictEndpointTypes()}.
      */
     private static function rejectOrCoerceNullEndpoint(?Frame $frame, int $argIndex, string $paramName): void
     {
+        if (!CompilerVersion::supportsRangeStrictEndpointTypes()) {
+            // Zend 8.2: untyped $start/$end — silent coerce (#29767).
+            return;
+        }
         if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             throw new \TypeError(
                 sprintf(

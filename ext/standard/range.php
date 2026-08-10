@@ -195,8 +195,10 @@ final class range extends Internal
     }
 
     /**
-     * Z_PARAM_STR_OR_LONG soft-null on $start/$end — DEP (string|int|float) then 0 (#29348).
-     * Caller strict_types → TypeError (Zend).
+     * range() $start/$end null (#29348, #29767):
+     * - PHP 8.2 untyped: coerce to 0 (strict_types ignored).
+     * - PHP 8.3+ Z_PARAM_NUMBER_OR_STR: strict → TypeError; else DEP then 0.
+     * Gate: {@see CompilerVersion::supportsRangeStrictEndpointTypes()}.
      */
     private static function lowerIntEndpointArg(
         Context $context,
@@ -205,6 +207,44 @@ final class range extends Internal
         string $paramName
     ): Value {
         if (self::jitIsNullArg($arg)) {
+            if (CompilerVersion::supportsRangeStrictEndpointTypes()) {
+                if ($context->callerStrictTypes) {
+                    ExceptionBridge::emitTypeErrorAndAbort(
+                        $context,
+                        sprintf(
+                            'range(): Argument #%d ($%s) must be of type string|int|float, null given',
+                            $argIndex,
+                            $paramName
+                        )
+                    );
+
+                    return $context->getTypeFromString('int64')->constInt(0, false);
+                }
+                // Skip DEP IR on user-script AOT (thin standalone trigger_error mid-fold — peer #21593 / #29352).
+                if (!$context->isUserScriptAot()) {
+                    JitIntdiv::emitNullIntDeprecation(
+                        $context,
+                        'range',
+                        $argIndex,
+                        $paramName,
+                        'string|int|float'
+                    );
+                }
+            }
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return JitLongArg::lower($context, $arg, 'range() '.$paramName);
+    }
+
+    /** Soft-null float $start/$end → 0.0; typed soft-null only on 8.3+ (#29348, #29767). */
+    private static function lowerFloatEndpointNull(
+        Context $context,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if (CompilerVersion::supportsRangeStrictEndpointTypes()) {
             if ($context->callerStrictTypes) {
                 ExceptionBridge::emitTypeErrorAndAbort(
                     $context,
@@ -215,9 +255,8 @@ final class range extends Internal
                     )
                 );
 
-                return $context->getTypeFromString('int64')->constInt(0, false);
+                return $context->getTypeFromString('double')->constReal(0.0);
             }
-            // Skip DEP IR on user-script AOT (thin standalone trigger_error mid-fold — peer #21593 / #29352).
             if (!$context->isUserScriptAot()) {
                 JitIntdiv::emitNullIntDeprecation(
                     $context,
@@ -227,39 +266,6 @@ final class range extends Internal
                     'string|int|float'
                 );
             }
-
-            return $context->getTypeFromString('int64')->constInt(0, false);
-        }
-
-        return JitLongArg::lower($context, $arg, 'range() '.$paramName);
-    }
-
-    /** Soft-null float $start/$end → 0.0 with string|int|float DEP (#29348). */
-    private static function lowerFloatEndpointNull(
-        Context $context,
-        int $argIndex,
-        string $paramName
-    ): Value {
-        if ($context->callerStrictTypes) {
-            ExceptionBridge::emitTypeErrorAndAbort(
-                $context,
-                sprintf(
-                    'range(): Argument #%d ($%s) must be of type string|int|float, null given',
-                    $argIndex,
-                    $paramName
-                )
-            );
-
-            return $context->getTypeFromString('double')->constReal(0.0);
-        }
-        if (!$context->isUserScriptAot()) {
-            JitIntdiv::emitNullIntDeprecation(
-                $context,
-                'range',
-                $argIndex,
-                $paramName,
-                'string|int|float'
-            );
         }
 
         return $context->getTypeFromString('double')->constReal(0.0);

@@ -65,6 +65,19 @@ final class RangeNullEndpointSoftNullTest extends TestCase
         );
     }
 
+    /** Default / Zend 8.2 profile: untyped $start — coerce under strict_types (#29767). */
+    public function testVmStrictTypesCoerceUnderDefaultProfile(): void
+    {
+        $out = $this->runBin('bin/vm.php', $this->strictProbeCode(), ['PHP_COMPILER_PROFILE' => '']);
+        $this->assertSame("ok\n", $out);
+    }
+
+    public function testJitStrictTypesCoerceUnderDefaultProfile(): void
+    {
+        $out = $this->runBin('bin/jit.php', $this->strictProbeCode(), ['PHP_COMPILER_PROFILE' => '']);
+        $this->assertSame("ok\n", $out);
+    }
+
     private function probeCode(): string
     {
         return <<<'PHP'
@@ -87,8 +100,8 @@ PHP;
 declare(strict_types=1);
 error_reporting(E_ALL);
 try {
-    range(null, 3);
-    echo "ok\n";
+    $r = range(null, 3);
+    echo ($r === [0, 1, 2, 3]) ? "ok\n" : "bad\n";
 } catch (Throwable $e) {
     echo get_class($e), "\n";
     echo $e->getMessage(), "\n";

@@ -995,11 +995,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ range() TypeError for array/object/resource endpoints (proper-range-semantics RFC).
+     * PHP 8.3+ range() typed endpoints (string|int|float via Z_PARAM_NUMBER_OR_STR).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 zval_get_long coerce). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#23592).
-     * php-src: ext/standard/array.c PHP_FUNCTION(range)
+     * Covers: TypeError for array/object/resource (#23592); null under caller strict_types
+     * TypeError / non-strict soft-null DEP (#29348). Withheld on 8.4.0-dev reference profile
+     * (matches Zend 8.2 untyped $start/$end — null coerces under strict_types, #29767).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4`.
+     * php-src: ext/standard/array.c PHP_FUNCTION(range); basic_functions.stub.php
      */
     public static function supportsRangeStrictEndpointTypes(): bool
     {
