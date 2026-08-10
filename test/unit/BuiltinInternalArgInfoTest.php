@@ -1528,4 +1528,22 @@ final class BuiltinInternalArgInfoTest extends TestCase
             BuiltinParamNames::forFunction('ftp_append')
         );
     }
+
+    /** php-src ext/ftp/ftp.stub.php — FTP\Connection stubs; InternalArgInfo untyped (#27735). */
+    public function testFtpMlsdReflectionStubTypes(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftp_mlsd'));
+        $this->assertSame('FTP\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_mlsd', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('ftp_mlsd', 1));
+        $ftp = BuiltinInternalArgInfo::paramInfoForFunction('ftp_mlsd', 0);
+        $this->assertNotNull($ftp);
+        $this->assertSame('ftp', $ftp['name']);
+        $this->assertSame('FTP\\Connection', $ftp['type']);
+        $dir = BuiltinInternalArgInfo::paramInfoForFunction('ftp_mlsd', 1);
+        $this->assertNotNull($dir);
+        $this->assertSame('directory', $dir['name']);
+        $this->assertSame('string', $dir['type']);
+        $this->assertFalse($dir['isOptional']);
+        $this->assertSame(['ftp', 'directory'], BuiltinParamNames::forFunction('ftp_mlsd'));
+    }
 }

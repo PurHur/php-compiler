@@ -417,8 +417,9 @@ final class BuiltinInternalArgInfo
             // ext/sockets/sockets.stub.php — InternalArgInfo omits |false (#28568)
             'socket_read' => 'string|false',
             'socket_write' => 'int|false',
-            // ext/ftp/ftp.stub.php — InternalArgInfo omits return; Zend bool (#27686)
+            // ext/ftp/ftp.stub.php — InternalArgInfo omits return; Zend bool / array|false (#27686, #27735)
             'ftp_append' => 'bool',
+            'ftp_mlsd' => 'array|false',
             default => null,
         };
     }
@@ -923,11 +924,16 @@ final class BuiltinInternalArgInfo
                 2 => '?int',
                 default => null,
             },
-            // ext/ftp/ftp.stub.php — FTP\Connection + strings; InternalArgInfo untyped (#27686)
+            // ext/ftp/ftp.stub.php — FTP\Connection + strings; InternalArgInfo untyped (#27686, #27735)
             'ftp_append' => match ($index) {
                 0 => 'FTP\\Connection',
                 1, 2 => 'string',
                 3 => 'int',
+                default => null,
+            },
+            'ftp_mlsd' => match ($index) {
+                0 => 'FTP\\Connection',
+                1 => 'string',
                 default => null,
             },
             // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
