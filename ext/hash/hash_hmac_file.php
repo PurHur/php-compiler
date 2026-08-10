@@ -24,6 +24,7 @@ use PHPLLVM\Value;
  * hash_hmac_file() — HMAC over file contents (ext/hash/hash.c, issue #3221).
  *
  * Excess argc → ArgumentCountError (#28315).
+ * Z_PARAM_STR $algo/$key — caller strict_types → TypeError on null (#29890; peer hash_file #21572).
  */
 final class hash_hmac_file extends Internal
 {
@@ -40,9 +41,11 @@ final class hash_hmac_file extends Internal
             return;
         }
         $argc = \count($frame->calledArgs);
-        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_hmac_file', 0, 'algo');
+        // Z_PARAM_STR $algo — non-strict null is E_DEPRECATED + '' then ValueError (#29890, peer #21572).
+        $algo = VmString::trimFamilyStringArgForFrame($frame, 0, 'hash_hmac_file', 0, 'algo');
         $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 1, 'hash_hmac_file', 'filename');
-        $key = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'hash_hmac_file', 2, 'key');
+        // Z_PARAM_STR $key — same soft-null / strict_types rules as hash_hmac (#21557).
+        $key = VmString::trimFamilyStringArgForFrame($frame, 2, 'hash_hmac_file', 2, 'key');
         $raw = false;
         if (4 === $argc) {
             $rawArg = $frame->calledArgs[3]->resolveIndirect();
@@ -79,9 +82,13 @@ final class hash_hmac_file extends Internal
         if (isset($args[3])) {
             $raw = JitBoolArg::lower($context, $args[3], 'hash_hmac_file() raw_output');
         }
-        $algo = JitStringBuiltinArg::lower($context, $args[0], 'hash_hmac_file', 0, 'algo');
+        $algo = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_hmac_file', 0, 'algo')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'hash_hmac_file', 0, 'algo');
         $path = JitStreamPath::lowerNonEmptyPath($context, $args[1], 'hash_hmac_file', 1, 'filename');
-        $key = JitStringBuiltinArg::lower($context, $args[2], 'hash_hmac_file', 2, 'key');
+        $key = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'hash_hmac_file', 2, 'key')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[2], 'hash_hmac_file', 2, 'key');
 
         return JitHashFile::hashHmac($context, $algo, $path, $key, $raw);
     }
