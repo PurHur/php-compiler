@@ -110,6 +110,7 @@ class Native implements Call {
     public function callWithArgMap(Context $context, array $args): Value {
         ksort($args);
         $this->rejectSkippedEffectivelyRequiredArgs($context, $args);
+        $this->rejectTooFewPositionalArgs($context, $args);
         // CallArgv: parameter-index order with defaults for skipped named optionals (#24948).
         // Keep $args sparse for RECV / LLVM binding; only the func_* snapshot is densified.
         $sentArgs = $this->densifyCallArgvArgs($args);
@@ -243,6 +244,74 @@ class Native implements Call {
         }
 
         return $out;
+    }
+
+    /**
+     * Positional too-few-args → Zend "Too few arguments to function …" (zend_execute.c, #29746).
+     *
+     * @param array<int, Variable> $args
+     */
+    private function rejectTooFewPositionalArgs(Context $context, array $args): void
+    {
+        if ([] === $this->paramNames) {
+            return;
+        }
+        $prefix = $this->receiverPrefix();
+        $passed = 0;
+        foreach ($args as $idx => $_) {
+            if ((int) $idx < $prefix) {
+                continue;
+            }
+            ++$passed;
+        }
+        $minRequired = $this->countMinimumRequiredUserParams();
+        if ($passed >= $minRequired) {
+            return;
+        }
+        $userCount = \count($this->paramNames);
+        $hasTrailingOptional = $minRequired < $userCount;
+        $expectedPhrase = $hasTrailingOptional
+            ? \sprintf('at least %d expected', $minRequired)
+            : \sprintf('exactly %d expected', $minRequired);
+        $block = $context->jitCurrentBlock;
+        $scriptPath = null !== $block ? $block->scriptPath() : '';
+        if ('' === $scriptPath) {
+            $scriptPath = 'Standard input code';
+        }
+        $callSiteLine = max(1, $context->callSiteLine);
+        $function = \PHPCompiler\VM\ParamArgumentCountError::formatUserFunctionName($this->name);
+        \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+            $context,
+            \sprintf(
+                'Too few arguments to function %s(), %d passed in %s on line %d and %s',
+                $function,
+                $passed,
+                $scriptPath,
+                $callSiteLine,
+                $expectedPhrase
+            )
+        );
+    }
+
+    /** Minimum user parameters that must be passed (zend_execute / #25728). */
+    private function countMinimumRequiredUserParams(): int
+    {
+        $userCount = \count($this->paramNames);
+        $required = $userCount;
+        $prefix = $this->receiverPrefix();
+        for ($i = $userCount - 1; $i >= 0; --$i) {
+            if (null !== $this->namedArgsVariadicIndex && $i === $this->namedArgsVariadicIndex) {
+                $required = $i;
+                continue;
+            }
+            if (isset($this->defaultArgs[$prefix + $i])) {
+                $required = $i;
+                continue;
+            }
+            break;
+        }
+
+        return $required;
     }
 
     /**
