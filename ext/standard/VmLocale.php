@@ -51,16 +51,35 @@ final class VmLocale
     }
 
     /**
-     * nl_langinfo() — locale item lookup (php-src ext/standard/nl_langinfo.c; #3382).
+     * nl_langinfo() — locale item lookup (php-src ext/standard/nl_langinfo.c; #3382, #29459).
      */
-    public static function nlLanginfo(int $item): string|false
+    public static function nlLanginfo(int $item, ?\PHPCompiler\Frame $frame = null): string|false
     {
-        // php-src ext/standard/nl_langinfo.c — invalid item returns false without warning (#19232).
+        // php-src ext/standard/nl_langinfo.c — invalid item: E_WARNING then false (#29459).
         if (!self::isValidNlLanginfoItem($item)) {
+            self::emitInvalidNlLanginfoItemWarning($item, $frame);
+
             return false;
         }
 
         return VmLocalePure::nlLanginfo($item);
+    }
+
+    private static function emitInvalidNlLanginfoItemWarning(int $item, ?\PHPCompiler\Frame $frame): void
+    {
+        $message = \sprintf("nl_langinfo(): Item '%d' is not valid", $item);
+        if (null !== $frame?->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                $message,
+                \PHPCompiler\VM\ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+
+            return;
+        }
+        @\trigger_error($message, \E_WARNING);
     }
 
     public static function isValidNlLanginfoItem(int $item): bool

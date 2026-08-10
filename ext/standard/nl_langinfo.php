@@ -35,7 +35,7 @@ final class nl_langinfo extends Internal
         }
 
         $itemVar = $frame->calledArgs[0]->resolveIndirect();
-        $result = VmLocale::nlLanginfo(self::parseItemArg($itemVar));
+        $result = VmLocale::nlLanginfo(self::parseItemArg($itemVar), $frame);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
