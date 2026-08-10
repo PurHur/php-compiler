@@ -55,7 +55,9 @@ final class DnfCheck
                 }
             }
         }
-        $expected = \PHPCompiler\DnfType::formatUnionType($arms);
+        $expected = \PHPCompiler\DnfType::zendTypeErrorLabel(
+            \PHPCompiler\DnfType::formatUnionType($arms)
+        );
         if ('Property' === $kind && null !== $propertyMeta && null !== $propertyMeta->declaredTypeLabel) {
             throw self::propertyTypeError($propertyMeta, $propertyMeta->declaredTypeLabel, $resolved);
         }
