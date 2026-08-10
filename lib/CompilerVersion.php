@@ -3078,6 +3078,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ NumberFormatter CURRENCY_ISO / CURRENCY_PLURAL / DECIMAL_COMPACT_*
+     * (ext/intl/formatter/formatter.stub.php; ICU UNUM_* styles; #28132).
+     *
+     * Withheld on ≤8.4 (reference + PROFILE=8.4). Enable via stable 8.5.0+ or
+     * explicit `PHP_COMPILER_PROFILE=8.5` forward profile — same shape as
+     * {@see advertisesIntlListFormatter()}.
+     */
+    public static function supportsNumberFormatterPhp85StyleConsts(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ LIBXML_RECOVER (ext/libxml/libxml.stub.php; XML_PARSE_RECOVER; #24439).
      *
      * Withheld on 8.4.0-dev reference / PROFILE=8.2 (Zend 8.2 defined() false). Enable via
