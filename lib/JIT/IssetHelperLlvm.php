@@ -64,7 +64,6 @@ final class IssetHelperLlvm
 
     private static function compileVariableIsSet(Context $context, Variable $var): Value
     {
-        $loaded = $context->helper->loadValue($var);
         $i1 = $context->getTypeFromString('int1');
 
         switch ($var->type) {
@@ -75,18 +74,25 @@ final class IssetHelperLlvm
             case Variable::TYPE_NATIVE_DOUBLE:
                 return $i1->constInt(1, false);
             case Variable::TYPE_STRING:
+                // Avoid TypedPropertyUninitGuard: isset is BP_VAR_IS (#29688).
+                $loaded = self::loadValueQuietForIsset($context, $var);
                 $null = $context->getTypeFromString('__string__*')->constNull();
 
                 return $context->builder->icmp(Builder::INT_NE, $loaded, $null);
             case Variable::TYPE_VALUE:
+                // Quiet type-byte probe — must not Error on typed uninit (#29688 / #3298).
                 $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
                 $typeField = $context->structFieldMap['__value__']['type'];
                 $typeByte = $context->builder->load(
                     $context->builder->structGep($valuePtr, $typeField)
                 );
-                $nullType = $context->getTypeFromString('int8')->constInt(0, false);
+                $i8 = $context->getTypeFromString('int8');
+                $nullType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false);
+                $undefType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false);
+                $notNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+                $notUndef = $context->builder->icmp(Builder::INT_NE, $typeByte, $undefType);
 
-                return $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+                return $context->builder->and($notNull, $notUndef);
             case Variable::TYPE_OBJECT:
                 $objPtr = Variable::KIND_VALUE === $var->kind
                     ? $var->value
@@ -95,12 +101,67 @@ final class IssetHelperLlvm
 
                 return $context->builder->icmp(Builder::INT_NE, $objPtr, $null);
             case Variable::TYPE_HASHTABLE:
+                $loaded = self::loadValueQuietForIsset($context, $var);
                 $null = $context->getTypeFromString('__hashtable__*')->constNull();
 
                 return $context->builder->icmp(Builder::INT_NE, $loaded, $null);
             default:
+                // Native property slots tagged as typed props: probe without Error (#29688).
+                if (
+                    null !== $var->objectPropertyClassName
+                    && null !== $var->objectPropertyName
+                ) {
+                    return self::compileTaggedPropertySlotIsSet($context, $var);
+                }
+                $loaded = $context->helper->loadValue($var);
+
                 return $i1->constInt(1, false);
         }
+    }
+
+    /**
+     * loadValue without TypedPropertyUninitGuard — isset/?? quiet probes (#29688).
+     */
+    private static function loadValueQuietForIsset(Context $context, Variable $var): Value
+    {
+        // Mirror Helper::loadValue but skip the typed-uninit raise used for BP_VAR_R.
+        $savedClass = $var->objectPropertyClassName;
+        $savedName = $var->objectPropertyName;
+        $var->objectPropertyClassName = null;
+        $var->objectPropertyName = null;
+        try {
+            return $context->helper->loadValue($var);
+        } finally {
+            $var->objectPropertyClassName = $savedClass;
+            $var->objectPropertyName = $savedName;
+        }
+    }
+
+    /** Quiet isset for non-VALUE property slot Variables (native typed storage). */
+    private static function compileTaggedPropertySlotIsSet(Context $context, Variable $var): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        // Fall back to reading as VALUE box when the slot is boxed.
+        if (Variable::TYPE_VALUE === $var->type || null !== $var->valueBoxAliasPtr) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
+            if (null !== $valuePtr) {
+                $typeField = $context->structFieldMap['__value__']['type'];
+                $typeByte = $context->builder->load(
+                    $context->builder->structGep($valuePtr, $typeField)
+                );
+                $i8 = $context->getTypeFromString('int8');
+                $nullType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false);
+                $undefType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false);
+                $notNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+                $notUndef = $context->builder->icmp(Builder::INT_NE, $typeByte, $undefType);
+
+                return $context->builder->and($notNull, $notUndef);
+            }
+        }
+        $loaded = self::loadValueQuietForIsset($context, $var);
+        $nullPtr = $context->getTypeFromString('void*')->constNull();
+
+        return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
     }
 
     private static function compileOffsetIsSet(

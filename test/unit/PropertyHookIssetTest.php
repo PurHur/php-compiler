@@ -117,6 +117,27 @@ PHP;
         self::assertSame("GET\nbool(true)\n", ob_get_clean());
     }
 
+    /** Inside get: isset($this->prop) on uninitialized same-name backing is false (#29688). */
+    public function testVmIssetInsideGetOnUninitializedSameNameBacking(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public string $prop {
+        get => isset($this->prop) ? $this->prop : "missing";
+        set => $this->prop = $value;
+    }
+}
+$c = new C;
+echo $c->prop, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame("missing\n", ob_get_clean());
+    }
+
     public function testVmIssetOnSeparateBackingInvokesGetHook(): void
     {
         $code = <<<'PHP'

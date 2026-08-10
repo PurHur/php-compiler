@@ -7245,7 +7245,17 @@ class Object_ extends Type {
 
             return $this->context->builder->and($notNull, $notUndef);
         }
-        $loaded = $this->context->helper->loadValue($prop);
+        // isset is BP_VAR_IS — do not raise typed-uninit Error (#29688).
+        $savedClass = $prop->objectPropertyClassName;
+        $savedName = $prop->objectPropertyName;
+        $prop->objectPropertyClassName = null;
+        $prop->objectPropertyName = null;
+        try {
+            $loaded = $this->context->helper->loadValue($prop);
+        } finally {
+            $prop->objectPropertyClassName = $savedClass;
+            $prop->objectPropertyName = $savedName;
+        }
         $nullPtr = $this->context->getTypeFromString('void*')->constNull();
 
         return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $loaded, $nullPtr);
