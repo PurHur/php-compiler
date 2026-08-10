@@ -13035,7 +13035,9 @@ class JIT {
         if (null !== $func->class) {
             $className = $func->class->value ?? null;
             if (is_string($className) && '' !== $className) {
-                return $className.'::'.$func->name;
+                return SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName(
+                    $className.'::'.$func->name
+                );
             }
         }
 
@@ -13044,7 +13046,9 @@ class JIT {
             return '{closure}';
         }
 
-        return $func->name;
+        return is_string($func->name)
+            ? SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName($func->name)
+            : $func->name;
     }
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
