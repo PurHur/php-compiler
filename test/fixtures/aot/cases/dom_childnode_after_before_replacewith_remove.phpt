@@ -1,5 +1,5 @@
 --TEST--
-AOT: DOM ChildNode after/before/replaceWith/remove (#26752, ext/dom/php_dom.stub.php)
+AOT: DOM ChildNode after/before/replaceWith/remove (#26752, #29644; empty → <tag/> per libxml/#29409)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -31,4 +31,5 @@ echo 'remove=', trim($d4->saveXML($d4->documentElement)), "\n";
 after=<root><a/><z/></root>
 before=<root><z/><a/></root>
 replaceWith=<root><z/></root>
-remove=<root></root>
+remove=<root/>
+
