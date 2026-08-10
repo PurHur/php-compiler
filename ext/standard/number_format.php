@@ -32,9 +32,11 @@ final class number_format extends Internal
             return;
         }
         $num = VmNumberFormat::coerceFloat($frame->calledArgs[0]->resolveIndirect(), $frame);
+        // Z_PARAM_LONG $decimals — strict_types → TypeError on null; else soft-null DEP+coerce (#29764).
         $decimals = isset($frame->calledArgs[1])
-            ? VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
+            ? VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'number_format',
                 2,
                 'decimals'
