@@ -7,11 +7,12 @@ namespace PHPCompiler\ext\stats;
 use PHPCompiler\Frame;
 
 /**
- * PECL stats_cdf_* cumulative distributions — which=1 (CDF) first (#29588, #29621).
+ * PECL stats_cdf_* cumulative distributions — which=1 (CDF) first (#29588, #29621, #29648).
  *
- * php-src: pecl-math-stats php_stats.c (DCDFLIB + closed-form exponential).
+ * php-src: pecl-math-stats php_stats.c (DCDFLIB + closed-form families).
  * Algorithms are PHP ports of the standard Abramowitz–Stegun reductions;
- * inverse / which≥2 modes return PECL-style Computation Error for now.
+ * inverse / which≥2 modes return PECL-style Computation Error for now
+ * (closed-form families implement which=1 only in this slice).
  */
 final class VmStatsCdf
 {
@@ -23,6 +24,12 @@ final class VmStatsCdf
     public const OP_F = 6;
     public const OP_POISSON = 7;
     public const OP_EXPONENTIAL = 8;
+    public const OP_BINOMIAL = 9;
+    public const OP_LAPLACE = 10;
+    public const OP_CAUCHY = 11;
+    public const OP_LOGISTIC = 12;
+    public const OP_WEIBULL = 13;
+    public const OP_UNIFORM = 14;
 
     private const PI = \M_PI;
 
@@ -46,6 +53,12 @@ final class VmStatsCdf
             self::OP_F => self::f($a, $b, $c, $which, $frame),
             self::OP_POISSON => self::poisson($a, $b, $which, $frame),
             self::OP_EXPONENTIAL => self::exponential($a, $b, $which, $frame),
+            self::OP_BINOMIAL => self::binomial($a, $b, $c, $which, $frame),
+            self::OP_LAPLACE => self::laplace($a, $b, $c, $which, $frame),
+            self::OP_CAUCHY => self::cauchy($a, $b, $c, $which, $frame),
+            self::OP_LOGISTIC => self::logistic($a, $b, $c, $which, $frame),
+            self::OP_WEIBULL => self::weibull($a, $b, $c, $which, $frame),
+            self::OP_UNIFORM => self::uniform($a, $b, $c, $which, $frame),
             default => false,
         };
     }
@@ -224,6 +237,158 @@ final class VmStatsCdf
         }
 
         return 1.0 - \exp(-$x / $scale);
+    }
+
+    /**
+     * Binomial CDF which=1: P from S, N, PR — Abr. & Stegun 26.5.24 / DCDFLIB cdfbin.
+     * P(X ≤ floor(S)) = I_{1−PR}(N−S, S+1).
+     *
+     * @return float|false
+     */
+    public static function binomial(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        $s = $par1;
+        $n = $par2;
+        $pr = $par3;
+        if ($n < 0.0 || $pr < 0.0 || $pr > 1.0 || $s < 0.0) {
+            return self::computationError($frame);
+        }
+        if ($s >= $n) {
+            return 1.0;
+        }
+        // I_{1-p}(n-s, s+1) with integer success count
+        $k = (float) \floor($s);
+
+        return self::regularizedIncompleteBeta(1.0 - $pr, $n - $k, $k + 1.0);
+    }
+
+    /** @return float|false */
+    public static function laplace(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        $x = $par1;
+        $mean = $par2;
+        $sd = $par3;
+        if (0.0 == $sd) {
+            return self::computationError($frame);
+        }
+        $t = ($x - $mean) / $sd;
+        if ($t <= 0.0) {
+            return 0.5 * \exp($t);
+        }
+
+        return 1.0 - 0.5 * \exp(-$t);
+    }
+
+    /** @return float|false */
+    public static function cauchy(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        $x = $par1;
+        $mean = $par2;
+        $sd = $par3;
+        if (0.0 == $sd) {
+            return self::computationError($frame);
+        }
+        $t = ($x - $mean) / $sd;
+
+        return 0.5 + (\atan($t) / self::PI);
+    }
+
+    /** @return float|false */
+    public static function logistic(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        $x = $par1;
+        $mean = $par2;
+        $sd = $par3;
+        if (0.0 == $sd) {
+            return self::computationError($frame);
+        }
+        $t = ($x - $mean) / $sd;
+
+        return 1.0 / (1.0 + \exp(-$t));
+    }
+
+    /** @return float|false */
+    public static function weibull(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        // which=1: P from X, A (shape), B (scale) — PECL 1-exp(-(x/b)^a)
+        $x = $par1;
+        $a = $par2;
+        $b = $par3;
+        if ($a <= 0.0 || $b <= 0.0) {
+            return self::computationError($frame);
+        }
+        if ($x < 0.0) {
+            return 0.0;
+        }
+
+        return 1.0 - \exp(-(($x / $b) ** $a));
+    }
+
+    /** @return float|false */
+    public static function uniform(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        $x = $par1;
+        $a = $par2;
+        $b = $par3;
+        if ($a == $b) {
+            return self::computationError($frame);
+        }
+        if ($x < $a) {
+            return 0.0;
+        }
+        if ($x > $b) {
+            return 1.0;
+        }
+
+        return ($x - $a) / ($b - $a);
     }
 
     public static function standardNormalCdf(float $z): float
