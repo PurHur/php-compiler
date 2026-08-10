@@ -9,6 +9,14 @@ namespace PHPCompiler\VM;
  */
 final class TraitCompositionConflictMessage
 {
+    /**
+     * Missing trait in {@code use} — Zend/zend_compile.c {@code Trait "%s" not found} (#30012).
+     */
+    public static function notFound(string $traitName): string
+    {
+        return sprintf('Trait "%s" not found', $traitName);
+    }
+
     public static function incompatibleProperty(
         string $firstTrait,
         string $secondTrait,

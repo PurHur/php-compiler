@@ -18810,7 +18810,7 @@ restart:
             $this->context->autoloadClass($traitName);
         }
         if (!isset($this->context->classes[$traitLc])) {
-            throw new \LogicException("Trait {$traitName} not found");
+            $this->throwTraitNotFoundFatal($traitName);
         }
         $trait = $this->context->classes[$traitLc];
         if (!$trait->isTrait) {
@@ -18956,9 +18956,36 @@ restart:
         if ([] === $this->context->deferredTraitUses) {
             return;
         }
-        $missing = $this->context->deferredTraitUses[0]['traitNames'][0] ?? 'unknown';
+        $deferred = $this->context->deferredTraitUses[0];
+        $missing = $deferred['traitNames'][0] ?? 'unknown';
+        /** @var ClassEntry|null $entry */
+        $entry = $deferred['entry'] ?? null;
+        /** @var Frame|null $warningFrame */
+        $warningFrame = $deferred['warningFrame'] ?? null;
+        $this->throwTraitNotFoundFatal($missing, $entry, $warningFrame);
+    }
 
-        throw new \LogicException("Trait {$missing} not found");
+    /**
+     * Zend compile/runtime fatal for an unresolved {@code use Trait;} (#30012, zend_compile.c).
+     *
+     * @return never
+     */
+    protected function throwTraitNotFoundFatal(
+        string $traitName,
+        ?ClassEntry $entry = null,
+        ?Frame $frame = null,
+    ): void {
+        $location = $entry?->sourceLocation;
+        $file = $location?->filename ?? '';
+        if ('' === $file && null !== $frame && '' !== $frame->scriptPath) {
+            $file = $frame->scriptPath;
+        }
+        $line = $location?->startLine ?? 1;
+        TraitCompositionConflictMessage::throwRuntimeFatal(
+            TraitCompositionConflictMessage::notFound($traitName),
+            $file,
+            $line,
+        );
     }
 
     protected function flushDeferredClassConstants(): void

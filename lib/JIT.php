@@ -15197,7 +15197,13 @@ class JIT {
         foreach ($traitNames as $traitName) {
             $traitLc = strtolower(ltrim($traitName, '\\'));
             if (!$object->hasDeclaredClass($traitName)) {
-                throw new \LogicException("Could not find trait {$traitName}");
+                // Missing use-target: Zend Trait "%s" not found (#30012, zend_compile.c).
+                // Adaptation losers still use "Could not find trait" below (zend_traits.c).
+                VM\TraitCompositionConflictMessage::throwRuntimeFatal(
+                    VM\TraitCompositionConflictMessage::notFound($traitName),
+                    '',
+                    1,
+                );
             }
             if (!$object->isTraitClass($traitLc)) {
                 throw new \LogicException("{$traitName} is not a trait");
