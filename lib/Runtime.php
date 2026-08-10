@@ -424,6 +424,8 @@ class Runtime {
         CurlyBraceOffsetRejector::reject($code, $filename);
         ClassConstBraceDerefRejector::reject($code, $filename);
         ClassConstDynamicFetchRejector::reject($code, $filename);
+        // Before php-parser: Zend "Cannot use the abstract modifier on a class constant" (#30011).
+        AbstractClassConstRejector::reject($code, $filename);
         EncapsedCoalesceRejector::reject($code, $filename);
         NestedTernaryRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
