@@ -39,9 +39,10 @@ final class date_date_set extends Internal
             'object',
             $frame->vmContext
         );
-        $year = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, 'date_date_set', 1, 'year');
-        $month = VmMath::parseZParamLongBuiltinArgForFrame($frame, 2, 'date_date_set', 2, 'month');
-        $day = VmMath::parseZParamLongBuiltinArgForFrame($frame, 3, 'date_date_set', 3, 'day');
+        // Frame index 1 = $year; Zend Argument # is 2 (after $object) — #29863.
+        $year = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, 'date_date_set', 2, 'year');
+        $month = VmMath::parseZParamLongBuiltinArgForFrame($frame, 2, 'date_date_set', 3, 'month');
+        $day = VmMath::parseZParamLongBuiltinArgForFrame($frame, 3, 'date_date_set', 4, 'day');
         DateTimeSupport::setDate($datetime, $year, $month, $day);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($frame): void {
             $ret->copyFrom($frame->calledArgs[0]);

@@ -150,6 +150,7 @@
             <file>./test/compliance/DateTimeFormatArgindexNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimeSetDateSetTimeNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeSetDateSetTimeNullStrictJITTest.php</file>
+            <file>./test/compliance/DateDateSetTimeSetArgindexNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeCreateFromFormatNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeCreateFromFormatNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampNullStrictVMTest.php</file>
