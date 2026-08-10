@@ -30,6 +30,7 @@ final class VmStatsCdf
     public const OP_LOGISTIC = 12;
     public const OP_WEIBULL = 13;
     public const OP_UNIFORM = 14;
+    public const OP_NEGATIVE_BINOMIAL = 15;
 
     private const PI = \M_PI;
 
@@ -59,6 +60,7 @@ final class VmStatsCdf
             self::OP_LOGISTIC => self::logistic($a, $b, $c, $which, $frame),
             self::OP_WEIBULL => self::weibull($a, $b, $c, $which, $frame),
             self::OP_UNIFORM => self::uniform($a, $b, $c, $which, $frame),
+            self::OP_NEGATIVE_BINOMIAL => self::negativeBinomial($a, $b, $c, $which, $frame),
             default => false,
         };
     }
@@ -268,6 +270,33 @@ final class VmStatsCdf
         $k = (float) \floor($s);
 
         return self::regularizedIncompleteBeta(1.0 - $pr, $n - $k, $k + 1.0);
+    }
+
+    /**
+     * Negative binomial CDF which=1: P from S, XN, PR — DCDFLIB cdfnbn / A&S.
+     * P(X ≤ floor(S)) failures before XN successes = I_PR(XN, S+1).
+     *
+     * @return float|false
+     */
+    public static function negativeBinomial(float $par1, float $par2, float $par3, int $which, ?Frame $frame)
+    {
+        if ($which < 1 || $which > 4) {
+            self::warning($frame, 'Fourth parameter should be in the 1..4 range');
+
+            return false;
+        }
+        if (1 !== $which) {
+            return self::computationError($frame);
+        }
+        $s = $par1;
+        $xn = $par2;
+        $pr = $par3;
+        if ($xn <= 0.0 || $pr < 0.0 || $pr > 1.0 || $s < 0.0) {
+            return self::computationError($frame);
+        }
+        $k = (float) \floor($s);
+
+        return self::regularizedIncompleteBeta($pr, $xn, $k + 1.0);
     }
 
     /** @return float|false */
