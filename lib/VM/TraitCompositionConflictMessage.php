@@ -35,6 +35,37 @@ final class TraitCompositionConflictMessage
     }
 
     /**
+     * Hooked property trait composition — Zend rejects any hook↔hook or hook↔plain merge (#30009).
+     *
+     * php-src: Zend/zend_inheritance.c zend_do_traits_property_binding
+     * (`colliding_prop->hooks || property_info->hooks`).
+     */
+    public static function sameHookedProperty(
+        string $first,
+        string $second,
+        string $propertyName,
+        string $className,
+    ): string {
+        return sprintf(
+            '%s and %s define the same hooked property ($%s) in the composition of %s. '
+            .'Conflict resolution between hooked properties is currently not supported. Class was composed',
+            $first,
+            $second,
+            $propertyName,
+            $className,
+        );
+    }
+
+    /** Class vs trait hooked property — class name first (#30009, zend_inheritance.c). */
+    public static function sameHookedClassTraitProperty(
+        string $className,
+        string $traitName,
+        string $propertyName,
+    ): string {
+        return self::sameHookedProperty($className, $traitName, $propertyName, $className);
+    }
+
+    /**
      * Runtime E_ERROR fatal for trait property composition (#17995, zend_inheritance.c).
      *
      * @return never

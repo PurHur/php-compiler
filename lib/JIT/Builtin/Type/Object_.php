@@ -5030,6 +5030,16 @@ class Object_ extends Type {
         if (null === $current) {
             return;
         }
+        $className = $this->classNameForId($classId);
+        $traitName = $this->classNameForId((int) $pending['declaringId']);
+        if ($this->jitPropertyHasHooks($className, $name)
+            || $this->jitPropertyHasHooks($traitName, $name)) {
+            throw new \LogicException(TraitCompositionConflictMessage::sameHookedClassTraitProperty(
+                $className,
+                $traitName,
+                $name
+            ));
+        }
         if ($this->instancePropertySnapshotsCompatible(
             $pending,
             $this->snapshotInstanceProperty($classId, $classId, $current)
@@ -5037,8 +5047,8 @@ class Object_ extends Type {
             return;
         }
         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-            $this->classNameForId($classId),
-            $this->classNameForId((int) $pending['declaringId']),
+            $className,
+            $traitName,
             $name
         ));
     }
@@ -5126,6 +5136,17 @@ class Object_ extends Type {
             ),
             $this->snapshotInstanceProperty($traitId, $traitId, $traitPropset)
         );
+    }
+
+    /** Hook metadata from VM property-hook registry (#30009, zend_inheritance.c). */
+    private function jitPropertyHasHooks(string $className, string $propName): bool
+    {
+        $registry = $this->context->runtime->vmContext->propertyHookRegistry ?? [];
+        if (!is_array($registry)) {
+            return false;
+        }
+
+        return \PHPCompiler\VM\AbstractPropertyHookCheck::registryHasHooks($registry, $className, $propName);
     }
 
     /**
@@ -5994,9 +6015,6 @@ class Object_ extends Type {
             $nameLc = strtolower($name);
             foreach ($this->properties[$classId] ?? [] as $existing) {
                 if (strtolower($existing[1]) === $nameLc) {
-                    if ($this->jitInstancePropertiesCompatible($classId, $traitId, $name, $existing, $propset)) {
-                        continue 2;
-                    }
                     $prevTraitId = $this->instancePropertyTraitSourceId[$classId][$nameLc]
                         ?? (
                             // Before #26593 remapping, declaring id was the trait.
@@ -6004,6 +6022,30 @@ class Object_ extends Type {
                                 ? ($this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? null)
                                 : null
                         );
+                    $prevName = null === $prevTraitId
+                        ? $className
+                        : $this->classNameForId($prevTraitId);
+                    $classOrPrevHasHooks = $this->jitPropertyHasHooks($prevName, $name);
+                    $traitHasHooks = $this->jitPropertyHasHooks($traitName, $name)
+                        || $this->jitPropertyHasHooks($this->classNameForId($traitId), $name);
+                    if ($classOrPrevHasHooks || $traitHasHooks) {
+                        if (null === $prevTraitId) {
+                            throw new \LogicException(TraitCompositionConflictMessage::sameHookedClassTraitProperty(
+                                $className,
+                                $traitName,
+                                $name
+                            ));
+                        }
+                        throw new \LogicException(TraitCompositionConflictMessage::sameHookedProperty(
+                            $prevName,
+                            $traitName,
+                            $name,
+                            $className
+                        ));
+                    }
+                    if ($this->jitInstancePropertiesCompatible($classId, $traitId, $name, $existing, $propset)) {
+                        continue 2;
+                    }
                     if (null === $prevTraitId) {
                         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                             $className,
@@ -6012,7 +6054,7 @@ class Object_ extends Type {
                         ));
                     }
                     throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
-                        $this->classNameForId($prevTraitId),
+                        $prevName,
                         $traitName,
                         $name,
                         $className
