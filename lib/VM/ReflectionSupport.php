@@ -893,6 +893,32 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionAttribute::newInstance() — refuse args when the attribute class has no ctor (#29955).
+     *
+     * php-src: zend_get_attribute_object() → object_init_with_constructor() (Zend/zend_API.c)
+     * throws Error when argc>0 and the class has no constructor.
+     * Empty `#[A]` / `#[A()]` (argc=0) still succeed without a user ctor.
+     *
+     * @param list<array{name: ?string, value: mixed}> $argSpecs
+     */
+    public static function assertAttributeNewInstanceCtorAllowsArgs(
+        ClassEntry $attributeClass,
+        array $argSpecs,
+    ): void {
+        if ([] === $argSpecs || null !== $attributeClass->constructor) {
+            return;
+        }
+
+        throw new \Error(self::attributeNoCtorArgsMessage($attributeClass->name));
+    }
+
+    /** php-src object_init_with_constructor Error text for attribute instantiation (#29955). */
+    public static function attributeNoCtorArgsMessage(string $className): string
+    {
+        return 'Attribute class '.ltrim($className, '\\').' does not have a constructor, cannot pass arguments';
+    }
+
+    /**
      * ReflectionAttribute::newInstance() — reject non-IS_REPEATABLE user duplicates (#22930).
      *
      * php-src: ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)

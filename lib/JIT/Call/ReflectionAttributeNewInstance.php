@@ -48,12 +48,16 @@ final class ReflectionAttributeNewInstance implements Call
         $ctorArg = AttributeNewInstanceRuntime::emitReadCtorArgFromAttrOwner($context, $attrObj);
 
         $ctorDone = BasicBlockHelper::append($context, 'attr_newinstance_ctor_done_'.$tag);
+        /** @var array<int, array{lc: string, name: string}> $userIds */
         $userIds = [];
         foreach ($context->type->object->allClassNamesById() as $id => $displayName) {
             if (!$context->type->object->hasUserDeclaredClass($displayName)) {
                 continue;
             }
-            $userIds[(int) $id] = strtolower(ltrim($displayName, '\\'));
+            $userIds[(int) $id] = [
+                'lc' => strtolower(ltrim($displayName, '\\')),
+                'name' => ltrim($displayName, '\\'),
+            ];
         }
         $ctorIds = array_keys($userIds);
         $ctorN = count($ctorIds);
@@ -72,12 +76,24 @@ final class ReflectionAttributeNewInstance implements Call
                 $onMiss = ($i < $ctorN - 1) ? $ctorChecks[$i + 1] : $ctorDone;
                 $context->builder->branchIf($isMatch, $onMatch, $onMiss);
                 $context->builder->positionAtEnd($onMatch);
-                $proxyName = $userIds[$id].'::__construct';
+                $proxyName = $userIds[$id]['lc'].'::__construct';
                 if ($context->functionIsRegistered($proxyName)) {
                     $context->resolveFunctionProxy($proxyName)->call($context, $thisVar, $ctorArg);
+                    AttributeNewInstanceRuntime::emitApplyConstructorPropertyArgs($context, $obj, $id, $ctorArg);
+                    $context->builder->branch($ctorDone);
+                } else {
+                    // No ctor: argc>0 → Error (#29955); argc=0 succeeds like Zend.
+                    $hasArgs = AttributeNewInstanceRuntime::emitArgsNonEmpty($context, $attrObj);
+                    $noCtorErr = BasicBlockHelper::append($context, 'attr_newinstance_nocto_'.$tag.'_'.$id);
+                    $noCtorOk = BasicBlockHelper::append($context, 'attr_newinstance_noctook_'.$tag.'_'.$id);
+                    $context->builder->branchIf($hasArgs, $noCtorErr, $noCtorOk);
+                    $context->builder->positionAtEnd($noCtorErr);
+                    AttributeNewInstanceRuntime::emitNoCtorArgsError($context, $userIds[$id]['name']);
+                    $context->builder->store($null, $resultSlot);
+                    $context->builder->branch($merge);
+                    $context->builder->positionAtEnd($noCtorOk);
+                    $context->builder->branch($ctorDone);
                 }
-                AttributeNewInstanceRuntime::emitApplyConstructorPropertyArgs($context, $obj, $id, $ctorArg);
-                $context->builder->branch($ctorDone);
             }
         }
         $context->builder->positionAtEnd($ctorDone);
