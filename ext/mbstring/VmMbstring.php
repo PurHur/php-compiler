@@ -3754,6 +3754,13 @@ final class VmMbstring
             return false;
         }
 
+        // Oniguruma empty-pattern split returns the subject as one piece (php-src
+        // php_mbregex.c / #29496). Do not route "" through the PCRE delimiter wrapper
+        // (that path warns "invalid pattern delimiter" and returns false).
+        if ('' === $pattern) {
+            return [$string];
+        }
+
         $regex = self::mbSplitRegex($pattern);
         if (null === $regex) {
             return false;
