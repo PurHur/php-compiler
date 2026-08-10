@@ -366,17 +366,14 @@ final class JitDomLoadXMLUserScript
         array $parsed
     ): void {
         $document = self::loadObjectArg($context, $receiver);
-        // Tag must carry compileTimeString so createElement materializes an __object__*
-        // (not invokeViaHelper's boxed %__value__*) for id-map / __phpc_dom_us_elem (#25119).
-        $tagVar = new JITVariable(
+        // Raw __object__* — invoke() boxes for call ABI (#29638) and must not feed id-map /
+        // __phpc_dom_us_elem (#25119 / #29736).
+        $element = JitDomCreateElement::materializeForUserScriptDocument(
             $context,
-            JITVariable::TYPE_STRING,
-            JITVariable::KIND_VALUE,
-            $context->builder->load($context->constantStringFromString($parsed['tag']))
+            $receiver,
+            $parsed['tag'],
+            $parsed['text']
         );
-        $tagVar->compileTimeString = $parsed['tag'];
-        $element = JitDomCreateElement::invoke($context, $receiver, $tagVar);
-        self::storeElementTextContent($context, $element, $parsed['text']);
         self::storeElementInIdMap($context, $document, $parsed['id'], $element);
         $idStr = $context->builder->load($context->constantStringFromString($parsed['id']));
         DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
