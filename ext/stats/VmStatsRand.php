@@ -18,6 +18,9 @@ final class VmStatsRand
     public const OP_GEN_BETA = 1;
     public const OP_GEN_EXPONENTIAL = 2;
     public const OP_GEN_GAMMA = 3;
+    public const OP_GEN_CHISQUARE = 4;
+    public const OP_GEN_F = 5;
+    public const OP_GEN_FUNIFORM = 6;
 
     private const NUMG = 32;
 
@@ -217,6 +220,67 @@ final class VmStatsRand
         }
 
         return VmStatsRandlib::sgamma($r) / $a;
+    }
+
+    /** @return float|false */
+    public static function genChisquare(float $df, ?Frame $frame)
+    {
+        if ($df <= 0.0) {
+            VmStats::triggerWarning($frame, \sprintf('df <= 0.0. df : %16.6E', $df));
+
+            return false;
+        }
+
+        return VmStatsRandlib::genchi($df);
+    }
+
+    /** @return float|false */
+    public static function genF(float $dfn, float $dfd, ?Frame $frame)
+    {
+        // PECL PHP wrapper uses < 0; RANLIB genf aborts on ≤ 0 — treat ≤0 as error.
+        if ($dfn <= 0.0 || $dfd <= 0.0) {
+            VmStats::triggerWarning($frame, \sprintf(
+                'Degrees of freedom nonpositive. DFN value:%16.6E DFD value:%16.6E',
+                $dfn,
+                $dfd
+            ));
+
+            return false;
+        }
+
+        return VmStatsRandlib::genf($dfn, $dfd);
+    }
+
+    /** @return float|false */
+    public static function genFuniform(float $low, float $high, ?Frame $frame)
+    {
+        if ($low > $high) {
+            VmStats::triggerWarning($frame, \sprintf(
+                'low greater than high. low : %16.6E  high : %16.6E',
+                $low,
+                $high
+            ));
+
+            return false;
+        }
+
+        return VmStatsRandlib::genunf($low, $high);
+    }
+
+    /** @return int|false */
+    public static function ibinomial(int $n, float $pp, ?Frame $frame)
+    {
+        if ($n < 0 || $pp < 0.0 || $pp > 1.0) {
+            VmStats::triggerWarning($frame, \sprintf(
+                'Bad values for the arguments. n : %ld  pp : %16.6E',
+                $n,
+                $pp
+            ));
+
+            return false;
+        }
+
+        return VmStatsRandlib::ignbin($n, $pp);
     }
 
     public static function getsdHashTable(): HashTable
