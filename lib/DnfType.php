@@ -227,8 +227,8 @@ final class DnfType
             $parts[] = $part;
         }
 
-        // Match zend_type_to_string order (classes first, then MAY_BE_* builtins).
-        return implode('|', self::zendSortUnionMemberNames($parts));
+        // Match zend_type_to_string order + simple T|null → ?T (TypeError / Reflection, #29960).
+        return self::zendCanonicalUnionLabel($parts);
     }
 
     /**

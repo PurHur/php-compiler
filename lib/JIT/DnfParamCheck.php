@@ -56,7 +56,8 @@ final class DnfParamCheck
         }
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        $expected = DnfType::formatUnionType($arms);
+        // Simple T|null → ?T (zend_type_to_string / TypeError, #29960).
+        $expected = DnfType::zendTypeErrorLabel(DnfType::formatUnionType($arms));
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof \PHPLLVM\Value\Function_);
         $entry = $context->builder->getInsertBlock();

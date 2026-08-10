@@ -1163,6 +1163,8 @@ final class TypeCheck
             ?? (null !== $literalBoolType
                 ? $literalBoolType
                 : ($target->declaredTypeLabel ?? self::typeName($constraint)));
+        // Param/return TypeErrors: T|null → ?T (zend_type pretty-print, #29960).
+        $expected = \PHPCompiler\DnfType::zendTypeErrorLabel($expected);
         if ($propertyWrite && ('Property' === $kind || 'Static variable' === $kind)) {
             return self::propertyTypeError($target, $expected, $value);
         }
