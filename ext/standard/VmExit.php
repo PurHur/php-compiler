@@ -50,6 +50,18 @@ final class VmExit
             return $v->toInt();
         }
         if (Variable::TYPE_NULL === $v->type) {
+            if ($twoArgForm) {
+                return 0;
+            }
+            // PHP 8.4+ exit()/die() string|int: null → E_DEPRECATED then status 0 (#29575).
+            // Pre-8.4 construct form exits 0 silently. strict_types → TypeError.
+            if (CompilerVersion::supportsExitFunctionForm()) {
+                if (self::callerStrictTypes($frame)) {
+                    throw self::typeErrorForStatus($v);
+                }
+                VmNullStringParamDeprecation::emit($frame, 'exit', 0, 'status', 'string|int');
+            }
+
             return 0;
         }
         // PHP 8.4+ exit()/die() string|int: bool coerces to int status (true→1), not string (#29573).

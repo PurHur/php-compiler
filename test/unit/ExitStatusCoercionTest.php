@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM\ScriptExit;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #4696 / #29573 / #29574 */
+/** @covers issue #4696 / #29573 / #29574 / #29575 */
 final class ExitStatusCoercionTest extends TestCase
 {
     /**
@@ -157,6 +157,115 @@ final class ExitStatusCoercionTest extends TestCase
         $this->assertSame('', $stdout !== false ? $stdout : '');
         $this->assertMatchesRegularExpression(
             '/^PHP Deprecated:\s+Implicit conversion from float 1\.5 to int loses precision in .+( on line \d+)?\s*$/m',
+            $stderr !== false ? $stderr : ''
+        );
+    }
+
+    /**
+     * PHP 8.4 function form: null → status 0 + null-param E_DEPRECATED (#29575).
+     *
+     * @dataProvider providePhp84NullStatus
+     */
+    public function testExitNullStatusIsZeroUnderPhp84Profile(
+        string $code,
+        string $expectedOutput,
+        int $expectedStatus
+    ): void {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $this->assertTrue(CompilerVersion::supportsExitFunctionForm());
+            $runtime = new Runtime();
+            ob_start();
+            try {
+                $runtime->run($runtime->parseAndCompile($code, 'exit_null_84.php'));
+                $this->fail('Expected ScriptExit');
+            } catch (ScriptExit $e) {
+                $this->assertSame($expectedStatus, $e->status);
+            }
+            $this->assertSame($expectedOutput, ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    public static function providePhp84NullStatus(): array
+    {
+        return [
+            'exit null' => ['<?php exit(null);', '', 0],
+            'die null' => ['<?php die(null);', '', 0],
+        ];
+    }
+
+    public function testExitNullStatusEmitsDeprecatedOnStderrUnderPhp84(): void
+    {
+        $repo = dirname(__DIR__, 2);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_exit_null_');
+        $this->assertNotFalse($tmp);
+        file_put_contents($tmp, "<?php\nerror_reporting(E_ALL);\nexit(null);\n");
+        $env = $_ENV;
+        $env['PHP_COMPILER_PROFILE'] = '8.4';
+        LlvmToolchain::applyProcessEnv($env, $repo);
+        $proc = proc_open(
+            [PHP_BINARY, $repo.'/bin/vm.php', $tmp],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $repo,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($tmp);
+
+        $this->assertSame(0, $exit);
+        $this->assertSame('', $stdout !== false ? $stdout : '');
+        $this->assertMatchesRegularExpression(
+            '/^PHP Deprecated:\s+exit\(\): Passing null to parameter #1 \(\$status\) of type string\|int is deprecated in .+( on line \d+)?\s*$/m',
+            $stderr !== false ? $stderr : ''
+        );
+    }
+
+    public function testDieNullStatusEmitsDeprecatedOnStderrUnderPhp84(): void
+    {
+        $repo = dirname(__DIR__, 2);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_die_null_');
+        $this->assertNotFalse($tmp);
+        file_put_contents($tmp, "<?php\nerror_reporting(E_ALL);\ndie(null);\n");
+        $env = $_ENV;
+        $env['PHP_COMPILER_PROFILE'] = '8.4';
+        LlvmToolchain::applyProcessEnv($env, $repo);
+        $proc = proc_open(
+            [PHP_BINARY, $repo.'/bin/vm.php', $tmp],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $repo,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($tmp);
+
+        $this->assertSame(0, $exit);
+        $this->assertSame('', $stdout !== false ? $stdout : '');
+        $this->assertMatchesRegularExpression(
+            '/^PHP Deprecated:\s+exit\(\): Passing null to parameter #1 \(\$status\) of type string\|int is deprecated in .+( on line \d+)?\s*$/m',
             $stderr !== false ? $stderr : ''
         );
     }

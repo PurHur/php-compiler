@@ -1146,6 +1146,7 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'exit_function_strict_types')
                     || str_contains($name, 'exit_bool_status_php84')
                     || str_contains($name, 'exit_float_status_php84')
+                    || str_contains($name, 'exit_null_status_php84')
                     || str_contains($name, 'exit_resource_typeerror_php84')
                     || str_contains($name, 'exit_die_two_args')
                     || str_contains($name, 'exit_type_error')
