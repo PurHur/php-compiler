@@ -2294,7 +2294,10 @@ class Compiler {
         // resolves at DECLARE_CLASS like Zend early-binding (#25624).
         // Enums stay in source order so enum_exists() before declaration matches Zend (#5013).
         // Serializable / forbidden-implements / trait-use stay in source order for DECLARE
-        // side effects (#18781, #25109, #25912).
+        // side effects (#18781, #25109, #25912). Subclasses of those classes stay in source
+        // order too — hoisting them ahead leaves deferred parent inheritance pending across
+        // preceding runtime opcodes, which finalize as Class "Parent" not found (#29552).
+        $sourceOrderClassLcs = $this->sourceOrderClassRegistrationLcs($ops);
         foreach ($ops as $child) {
             if ($child instanceof Op\Stmt\Interface_) {
                 $block->addOpCode($this->compileInterface($child, $block));
@@ -2309,7 +2312,7 @@ class Compiler {
             if (!$child instanceof Op\Stmt\Class_) {
                 continue;
             }
-            if ($this->requiresSourceOrderClassRegistration($child)) {
+            if ($this->classIsSourceOrderRegistration($child, $sourceOrderClassLcs)) {
                 continue;
             }
             $block->addOpCode($this->compileClassLike($child, $block));
@@ -2470,7 +2473,7 @@ class Compiler {
                 case Op\Stmt\Trait_::class:
                     break;
                 case Op\Stmt\Class_::class:
-                    if ($this->requiresSourceOrderClassRegistration($child)) {
+                    if ($this->classIsSourceOrderRegistration($child, $sourceOrderClassLcs)) {
                         $block->addOpCode($this->compileClassLike($child, $block));
                     }
                     break;
@@ -7397,6 +7400,78 @@ class Compiler {
         // Keep implements classes in source order so autoload callbacks registered above
         // the declaration are visible (Zend early-binds types, not user autoload timing).
         return $class instanceof Op\Stmt\Class_ && [] !== $class->implements;
+    }
+
+    /**
+     * Same-file classes that must DECLARE in source order, including subclasses of
+     * those classes (#29552).
+     *
+     * @param list<Op> $ops
+     * @return array<string, true> lowercase class names
+     */
+    protected function sourceOrderClassRegistrationLcs(array $ops): array
+    {
+        /** @var array<string, Op\Stmt\Class_> */
+        $classes = [];
+        /** @var array<string, ?string> child lc => parent lc when parent name is static */
+        $extends = [];
+        foreach ($ops as $child) {
+            if (!$child instanceof Op\Stmt\Class_) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($child->name);
+            if (null === $name) {
+                continue;
+            }
+            $lc = strtolower(ltrim($name, '\\'));
+            $classes[$lc] = $child;
+            $parentLc = null;
+            if (null !== $child->extends) {
+                $parentName = $this->staticNameFromOperand($child->extends);
+                if (null !== $parentName) {
+                    $parentLc = strtolower(ltrim($parentName, '\\'));
+                }
+            }
+            $extends[$lc] = $parentLc;
+        }
+
+        $sourceOrder = [];
+        foreach ($classes as $lc => $class) {
+            if ($this->requiresSourceOrderClassRegistration($class)) {
+                $sourceOrder[$lc] = true;
+            }
+        }
+
+        // Propagate to same-file subclasses so they are not hoisted before the parent (#29552).
+        $changed = true;
+        while ($changed) {
+            $changed = false;
+            foreach ($extends as $lc => $parentLc) {
+                if (isset($sourceOrder[$lc]) || null === $parentLc || !isset($sourceOrder[$parentLc])) {
+                    continue;
+                }
+                $sourceOrder[$lc] = true;
+                $changed = true;
+            }
+        }
+
+        return $sourceOrder;
+    }
+
+    /**
+     * @param array<string, true> $sourceOrderClassLcs
+     */
+    protected function classIsSourceOrderRegistration(Op\Stmt\Class_ $class, array $sourceOrderClassLcs): bool
+    {
+        $name = $this->staticNameFromOperand($class->name);
+        if (null !== $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if (isset($sourceOrderClassLcs[$lc])) {
+                return true;
+            }
+        }
+
+        return $this->requiresSourceOrderClassRegistration($class);
     }
 
     /**
