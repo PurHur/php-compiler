@@ -31,7 +31,9 @@ final class iconv_strpos extends IconvStringFunction
             return;
         }
         $offset = 3 <= $argc ? $this->coerceOffset($frame, 2) : 0;
-        $encoding = 4 === $argc ? $this->coerceEncoding($frame, 3) : 'UTF-8';
+        $encoding = 4 === $argc
+            ? $this->coerceEncoding($frame, 3)
+            : IconvEncodingState::getInternalEncoding();
         $this->writeIntOrFalse($frame, VmIconv::iconvStrpos($haystack, $needle, $offset, $encoding, $frame));
     }
 }

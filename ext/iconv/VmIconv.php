@@ -78,6 +78,21 @@ final class VmIconv
             : IconvEncodingState::getOutputEncoding();
     }
 
+    /**
+     * Optional $encoding on iconv_strlen / substr / strpos / strrpos.
+     *
+     * php-src: NULL → get_internal_encoding(); "" is passed through to iconv (locale
+     * codeset on glibc). This port maps both to internal_encoding (#29497).
+     */
+    public static function resolveOptionalEncoding(string $encoding): string
+    {
+        if ('' !== $encoding) {
+            return $encoding;
+        }
+
+        return IconvEncodingState::getInternalEncoding();
+    }
+
     public static function iconv(string $fromEncoding, string $toEncoding, string $input, ?Frame $frame = null): string|false
     {
         $fromEncoding = self::resolveIconvEncoding($fromEncoding, true);
@@ -158,10 +173,12 @@ final class VmIconv
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            return 'UTF-8';
+            return IconvEncodingState::getInternalEncoding();
         }
 
-        return self::coerceEncodingArg($var, $function, $argIndex, $param, $frame);
+        return self::resolveOptionalEncoding(
+            self::coerceEncodingArg($var, $function, $argIndex, $param, $frame)
+        );
     }
 
     /** UCS-4LE is the internal width used by php-src _php_iconv_strlen / strpos family. */
@@ -169,6 +186,7 @@ final class VmIconv
 
     public static function iconvStrlen(string $input, string $encoding, ?Frame $frame = null): int|false
     {
+        $encoding = self::resolveOptionalEncoding($encoding);
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
             self::triggerUnsupportedEncodingWarning($frame, 'iconv_strlen', $encoding, self::HELPER_WIDTH_ENCODING);
 
@@ -192,6 +210,7 @@ final class VmIconv
         string $encoding,
         ?Frame $frame = null
     ): string|false {
+        $encoding = self::resolveOptionalEncoding($encoding);
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
             self::triggerUnsupportedEncodingWarning($frame, 'iconv_substr', $encoding, self::HELPER_WIDTH_ENCODING);
 
@@ -214,6 +233,7 @@ final class VmIconv
         string $encoding,
         ?Frame $frame = null
     ): int|false {
+        $encoding = self::resolveOptionalEncoding($encoding);
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
             self::triggerUnsupportedEncodingWarning($frame, 'iconv_strpos', $encoding, self::HELPER_WIDTH_ENCODING);
 
@@ -233,6 +253,7 @@ final class VmIconv
         string $encoding,
         ?Frame $frame = null
     ): int|false {
+        $encoding = self::resolveOptionalEncoding($encoding);
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
             self::triggerUnsupportedEncodingWarning($frame, 'iconv_strrpos', $encoding, self::HELPER_WIDTH_ENCODING);
 
