@@ -71,4 +71,30 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'trait_abstract_ok.php'));
         $this->assertSame("C:7\n", ob_get_clean());
     }
+
+    /**
+     * Abstract class may import abstract trait methods; concrete child must run (#29552).
+     * error_reporting before the decls is the regression trigger (hoisted child vs source-order parent).
+     */
+    public function testAbstractClassImportsAbstractTraitMethodAndChildRuns(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+error_reporting(E_ALL);
+trait TAbs {
+    abstract public function f();
+}
+abstract class A {
+    use TAbs;
+}
+class B extends A {
+    public function f() { return 1; }
+}
+echo (new B)->f(), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'trait_abstract_class_ok.php'));
+        $this->assertSame("1\n", ob_get_clean());
+    }
 }
