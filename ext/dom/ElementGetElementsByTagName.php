@@ -20,7 +20,14 @@ final class ElementGetElementsByTagName extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMElement::getElementsByTagName() expects at least 1 argument');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMElement::getElementsByTagName()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#29959, re-#29942 / #18215).
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMElement::getElementsByTagName()',
+            0,
+            $frame,
+            'qualifiedName'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMElement::getElementsByTagName() requires VM context in this compiler build');
         }
