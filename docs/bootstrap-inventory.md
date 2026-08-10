@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7362 |
-| Phase A inventory files (M2 ratio SSOT) | 7362 |
+| PHP files on vm.php path | 7363 |
+| Phase A inventory files (M2 ratio SSOT) | 7363 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23871 |
+| Source constructs flagged (warnings) | 23874 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1190,7 +1190,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmUConverter.php` | 0 | 60 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
 | `ext/intl/collator_compare.php` | 0 | 2 |
-| `ext/intl/collator_create.php` | 0 | 3 |
+| `ext/intl/collator_create.php` | 0 | 4 |
 | `ext/intl/collator_get_attribute.php` | 0 | 3 |
 | `ext/intl/collator_get_error_code.php` | 0 | 3 |
 | `ext/intl/collator_get_error_message.php` | 0 | 3 |
@@ -5137,6 +5137,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/AOT/LinkerProcessPolyfill.php` | 0 | 1 |
 | `lib/AOT/ProjectGraph.php` | 0 | 3 |
 | `lib/AOT/ValueBox.php` | 0 | 1 |
+| `lib/AbstractClassConstRejector.php` | 0 | 2 |
 | `lib/AbstractEnumSourceRewriter.php` | 0 | 2 |
 | `lib/Ast/AbstractEnumMarker.php` | 0 | 1 |
 | `lib/Ast/AssertExprMessageRewriter.php` | 0 | 5 |
@@ -16039,40 +16040,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 170)
 - new Variable (line 272)
 - new HashTable (line 276)
-- new Variable (line 644)
-- new HashTable (line 648)
-- new Variable (line 879)
-- new Variable (line 881)
-- new HashTable (line 894)
+- new Variable (line 660)
+- new HashTable (line 664)
+- new Variable (line 895)
 - new Variable (line 897)
-- new Error (line 904)
-- new ArgumentCountError (line 989)
-- new ArgumentCountError (line 1016)
-- new ArgumentCountError (line 1041)
-- new Error (line 1049)
-- new ArgumentCountError (line 1084)
-- new Error (line 1092)
-- new ArgumentCountError (line 1118)
-- new Error (line 1126)
-- new ArgumentCountError (line 1152)
-- new Error (line 1160)
-- new ArgumentCountError (line 1182)
-- new Error (line 1190)
-- new ArgumentCountError (line 1219)
-- new Error (line 1227)
-- new ArgumentCountError (line 1248)
-- new Error (line 1256)
-- new ArgumentCountError (line 1279)
-- new Error (line 1287)
-- new ArgumentCountError (line 1315)
-- new Error (line 1323)
-- new ArgumentCountError (line 1347)
-- new Error (line 1355)
-- new ArgumentCountError (line 1383)
-- new Error (line 1391)
-- new ArgumentCountError (line 1412)
-- new Error (line 1420)
-- 48 class method(s)
+- new HashTable (line 910)
+- new Variable (line 913)
+- new Error (line 920)
+- new ArgumentCountError (line 1005)
+- new ArgumentCountError (line 1059)
+- new ArgumentCountError (line 1110)
+- new Error (line 1118)
+- new ArgumentCountError (line 1153)
+- new Error (line 1161)
+- new ArgumentCountError (line 1187)
+- new Error (line 1195)
+- new ArgumentCountError (line 1221)
+- new Error (line 1229)
+- new ArgumentCountError (line 1251)
+- new Error (line 1259)
+- new ArgumentCountError (line 1288)
+- new Error (line 1296)
+- new ArgumentCountError (line 1317)
+- new Error (line 1325)
+- new ArgumentCountError (line 1348)
+- new Error (line 1356)
+- new ArgumentCountError (line 1384)
+- new Error (line 1392)
+- new ArgumentCountError (line 1416)
+- new Error (line 1424)
+- new ArgumentCountError (line 1452)
+- new Error (line 1460)
+- new ArgumentCountError (line 1481)
+- new Error (line 1489)
+- 50 class method(s)
 - 2 closure(s)
 
 ### `ext/intl/VmGrapheme.php`
@@ -16840,9 +16841,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/collator_create.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new Error (line 41)
-- 2 class method(s)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 48)
+- new Error (line 65)
+- 3 class method(s)
 
 ### `ext/intl/collator_get_attribute.php`
 
@@ -45484,6 +45486,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/AbstractClassConstRejector.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 54)
+- 4 class method(s)
+
 ### `lib/AbstractEnumSourceRewriter.php`
 
 **Warnings** (review for bootstrap subset):
@@ -54563,11 +54571,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SealedClassPreprocessor (line 411)
 - new StaticClassPreprocessor (line 414)
 - new SourcePreprocessor\PropertyHooks (line 417)
-- new State (line 572)
-- new ReflectionProperty (line 606)
-- new ReflectionProperty (line 609)
-- new LintCompiler (line 1021)
-- new Variable (line 1152)
+- new State (line 574)
+- new ReflectionProperty (line 608)
+- new ReflectionProperty (line 611)
+- new LintCompiler (line 1023)
+- new Variable (line 1154)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
