@@ -48,7 +48,8 @@ final class CompareUnlikeHelper
                 $object = Variable::TYPE_OBJECT === $left->type ? $left : $right;
                 $bool = Variable::TYPE_BOOLEAN === $left->type ? $left : $right;
                 $casted = (int) $object->toBool();
-                $cmp = CompareJitHelper::longSpaceship($casted, (int) $bool->bool);
+                // Variable::$bool is private — use toBool() (#29629 / zend_operators.c).
+                $cmp = CompareJitHelper::longSpaceship($casted, (int) $bool->toBool());
 
                 return Variable::TYPE_OBJECT === $left->type ? $cmp : -$cmp;
             }
@@ -80,7 +81,8 @@ final class CompareUnlikeHelper
                 $array = Variable::TYPE_ARRAY === $left->type ? $left : $right;
                 $bool = Variable::TYPE_BOOLEAN === $left->type ? $left : $right;
                 $arrayTruthy = self::zendIsTrue($array);
-                $boolVal = (int) $bool->bool;
+                // Variable::$bool is private — use toBool() (#29629 / zend_operators.c).
+                $boolVal = (int) $bool->toBool();
                 if ($arrayTruthy === (bool) $boolVal) {
                     return 0;
                 }
