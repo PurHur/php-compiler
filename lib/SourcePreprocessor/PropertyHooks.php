@@ -2711,6 +2711,16 @@ final class PropertyHooks
             '',
             $s
         ) ?? $s;
+        // Promoted ctor params: `$ownDeclHead` may still include `function __construct(`.
+        // Greedy `.*` forces the rightmost newline/`(`/`,`–bounded visibility so type
+        // extraction sees `public string $name`, not the construct prefix (#29673).
+        if (preg_match(
+            '/.*[\n(,]\s*((?:public|protected|private)\b[\s\S]*)$/is',
+            $s,
+            $m
+        )) {
+            $s = $m[1];
+        }
         $s = preg_replace(
             '/\b(public|protected|private|static|readonly|abstract|final|virtual)\s+/',
             '',
