@@ -9,10 +9,12 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -52,6 +54,12 @@ final class mb_convert_encoding extends Internal
             ));
         }
         $sourceVar = $frame->calledArgs[0]->resolveIndirect();
+        // array|string $string — caller strict_types → TypeError on null; else soft-null (#29777 / #21282).
+        if (Variable::TYPE_NULL === $sourceVar->type && InternalStrictArg::isCallerStrict($frame)) {
+            throw new \TypeError(
+                'mb_convert_encoding(): Argument #1 ($string) must be of type array|string, null given'
+            );
+        }
         if (Variable::TYPE_ARRAY === $sourceVar->type) {
             $result = VmMbstring::convertEncodingSourceArray(
                 $sourceVar->toArray(),
@@ -70,7 +78,7 @@ final class mb_convert_encoding extends Internal
 
             return;
         }
-        // array|string $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21282).
+        // Non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21282).
         $source = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'mb_convert_encoding',
@@ -97,7 +105,29 @@ final class mb_convert_encoding extends Internal
             throw new \LogicException('mb_convert_encoding() requires two or three arguments');
         }
 
-        $sourceLit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        // Compile-time null $string — strict TypeError / weak soft-null (#29777 / #21282).
+        $sourceIsNull = JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant;
+        if ($sourceIsNull) {
+            if (JitInternalStrictArg::rejectNullStringOrArray(
+                $context,
+                $args[0],
+                'mb_convert_encoding',
+                'string',
+                1,
+                false
+            )) {
+                return self::foldFalse($context);
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'mb_convert_encoding',
+                0,
+                'string',
+                'array|string'
+            );
+        }
+
+        $sourceLit = $sourceIsNull ? '' : JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
         $fromLit = 2 === $argc ? 'UTF-8' : JitStringBuiltinArg::compileTimeLiteral($args[2]);
         if (null !== $sourceLit && null !== $toLit && null !== $fromLit) {
