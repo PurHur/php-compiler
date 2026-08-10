@@ -80,10 +80,14 @@ final class JitFdiv
                 } elseif ('float' === $expectedType) {
                     JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
                 }
+                // Catchable TypeError terminates the insert block — open a dead cont so
+                // callers (MathSin::invoke, …) can emit without "terminator in middle" (#29782).
+                BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_null_strict_te_cont');
             } elseif ('number' === $expectedType) {
                 self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
             } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull() && $forwardProfileStrictDoubleNull) {
                 self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
+                BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_null_fwd_te_cont');
             } elseif ('float' === $expectedType) {
                 // Z_PARAM_DOUBLE null coerce (sqrt/sin; #19756, #20432).
                 self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'float');

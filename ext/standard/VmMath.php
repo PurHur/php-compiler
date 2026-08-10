@@ -724,7 +724,11 @@ final class VmMath
     }
 
     /**
-     * float builtin args with strict_types TypeError on string (#11497, ext/standard/math.c).
+     * float builtin args with caller strict_types TypeError on null/string/bool
+     * (#11497, #29782, ext/standard/math.c Z_PARAM_DOUBLE + zend_verify_arg_type).
+     * Soft path (no strict_types): E_DEPRECATED + coerce via {@see parseDoubleBuiltinArg}.
+     *
+     * @param int $userArgIndex 1-based parameter index (matches Zend Argument #N)
      */
     public static function parseStrictFloatBuiltinArgForFrame(
         Frame $frame,
@@ -732,8 +736,9 @@ final class VmMath
         int $userArgIndex,
         string $paramName
     ): float {
+        $slot = $userArgIndex - 1;
         if (InternalStrictArg::isCallerStrict($frame)) {
-            $arg = InternalStrictArg::requireFloat($frame, 0, $function, $paramName);
+            $arg = InternalStrictArg::requireFloat($frame, $slot, $function, $paramName);
             if (Variable::TYPE_INTEGER === $arg->type) {
                 return (float) $arg->toInt();
             }
@@ -742,10 +747,11 @@ final class VmMath
         }
 
         return self::parseDoubleBuiltinArg(
-            $frame->calledArgs[0],
+            $frame->calledArgs[$slot],
             $function,
             $userArgIndex,
-            $paramName
+            $paramName,
+            $frame
         );
     }
 

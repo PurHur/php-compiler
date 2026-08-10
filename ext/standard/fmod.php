@@ -27,20 +27,18 @@ final class fmod extends Internal
     {
         // php-src ext/standard/math.c — ArgumentCountError (#21982).
         $this->requireExactArgCount($frame, 'fmod', 2);
-        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
-        $num1 = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        // Z_PARAM_DOUBLE: strict_types TypeError; else soft-null DEP+coerce (#29782, #29319).
+        $num1 = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'fmod',
             1,
-            'num1',
-            $frame
+            'num1'
         );
-        $num2 = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
+        $num2 = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'fmod',
             2,
-            'num2',
-            $frame
+            'num2'
         );
         if (null === $frame->returnVar) {
             return;

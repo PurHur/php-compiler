@@ -28,8 +28,8 @@ final class cos extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('cos() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'cos',
             1,
             'num'

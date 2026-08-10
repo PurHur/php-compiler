@@ -15,7 +15,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathExp;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -29,8 +28,8 @@ final class exp extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('exp() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'exp',
             1,
             'num'
@@ -49,14 +48,8 @@ final class exp extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('exp() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $asFloat = pow::toJitDouble($context, $args[0], $double);
-        if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
-            JitLongArg::lower($context, $args[0], 'exp() argument #1');
-        }
-        if (isset($args[1]) && JITVariable::TYPE_NATIVE_LONG === $args[1]->type) {
-            JitLongArg::lower($context, $args[1], 'exp() argument #2');
-        }
+        // Z_PARAM_DOUBLE via JitFdiv — strict_types null/string TypeError (#29782).
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'exp', 'float');
 
         return MathExp::invoke($context, $asFloat);
     }

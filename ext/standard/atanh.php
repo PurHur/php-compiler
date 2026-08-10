@@ -28,8 +28,8 @@ final class atanh extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('atanh() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'atanh',
             1,
             'num'

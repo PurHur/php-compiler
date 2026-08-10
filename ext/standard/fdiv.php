@@ -29,20 +29,18 @@ final class fdiv extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, self::FUNCTION, 2);
-        // Z_PARAM_DOUBLE soft-null: E_DEPRECATED + coerce (php-src math.c; #29319, re-#24198).
-        $a = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        // Z_PARAM_DOUBLE: strict_types TypeError; else soft-null DEP+coerce (#29782, #29319).
+        $a = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             self::FUNCTION,
             1,
-            'num1',
-            $frame
+            'num1'
         );
-        $b = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
+        $b = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             self::FUNCTION,
             2,
-            'num2',
-            $frame
+            'num2'
         );
         if (null === $frame->returnVar) {
             return;

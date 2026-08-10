@@ -28,12 +28,11 @@ final class sin extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('sin() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'sin',
             1,
-            'num',
-            $frame
+            'num'
         );
         if (null === $frame->returnVar) {
             return;

@@ -19,11 +19,10 @@ final class log1p extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('log1p() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(VmMath::log1p(VmMath::parseDoubleBuiltinArg($v, 'log1p', 1, 'num')));
+        $frame->returnVar->float(VmMath::log1p(VmMath::parseStrictFloatBuiltinArgForFrame($frame, 'log1p', 1, 'num')));
     }
 
     public Context $context;
