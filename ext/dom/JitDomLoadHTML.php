@@ -32,19 +32,21 @@ final class JitDomLoadHTML
             throw new \LogicException('DOMDocument::loadHTML() expects receiver and HTML string');
         }
 
-        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680).
-        // Emit DEP directly — avoid JitStringBuiltinArg::lower() which can leave the
-        // insert block without a parent after constant-string materialization in AOT try.
-        if (self::isNullOrEmptySource($args[1])) {
-            if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
-                JitStringBuiltinArg::emitNullStringParamDeprecation(
-                    $context,
-                    'DOMDocument::loadHTML',
-                    0,
-                    'source'
-                );
+        // Z_PARAM_STR: strict null → TypeError; weak null → DEP then '' → ValueError (#30041 / #22680).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                return self::emitNullSourceTypeError($context);
             }
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'DOMDocument::loadHTML',
+                0,
+                'source'
+            );
 
+            return self::emitEmptySourceValueError($context, 'DOMDocument::loadHTML()');
+        }
+        if (self::isEmptySourceLiteral($args[1])) {
             return self::emitEmptySourceValueError($context, 'DOMDocument::loadHTML()');
         }
 
@@ -54,7 +56,13 @@ final class JitDomLoadHTML
             self::emitBoxedNullEmptySourceGuard($context, $args[1], 'DOMDocument::loadHTML()');
         }
 
-        $htmlStr = JitStringBuiltinArg::lower($context, $args[1], 'DOMDocument::loadHTML', 0, 'source');
+        $htmlStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'DOMDocument::loadHTML',
+            0,
+            'source'
+        );
 
         if (JitDomLoadHTMLUserScript::shouldUse($context)) {
             return JitDomLoadHTMLUserScript::invoke($context, ...$args);
@@ -101,13 +109,17 @@ final class JitDomLoadHTML
             $okBlock
         );
         $context->builder->positionAtEnd($nullBlock);
-        JitStringBuiltinArg::emitNullStringParamDeprecation(
-            $context,
-            'DOMDocument::loadHTML',
-            0,
-            'source'
-        );
-        self::emitEmptySourceValueError($context, $method);
+        if ($context->callerStrictTypes) {
+            self::emitNullSourceTypeError($context);
+        } else {
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'DOMDocument::loadHTML',
+                0,
+                'source'
+            );
+            self::emitEmptySourceValueError($context, $method);
+        }
         // emitEmptySourceValueError leaves insert terminated (catchable) or on a dead block.
         // Only continue on the ok path when still open.
         $insert = BasicBlockHelper::tryGetInsertBlock($context);
@@ -115,6 +127,15 @@ final class JitDomLoadHTML
             $context->builder->branch($okBlock);
         }
         $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function emitNullSourceTypeError(Context $context): Value
+    {
+        $message = 'DOMDocument::loadHTML(): Argument #1 ($source) must be of type string, null given';
+        \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+        \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+
+        return $context->getTypeFromString('int1')->constInt(0, false);
     }
 
     private static function emitEmptySourceValueError(Context $context, string $method): Value
@@ -141,11 +162,8 @@ final class JitDomLoadHTML
         return $context->getTypeFromString('int1')->constInt(0, false);
     }
 
-    private static function isNullOrEmptySource(JITVariable $sourceArg): bool
+    private static function isEmptySourceLiteral(JITVariable $sourceArg): bool
     {
-        if (JITVariable::TYPE_NULL === $sourceArg->type || $sourceArg->isNullConstant) {
-            return true;
-        }
         $lit = JitStringBuiltinArg::compileTimeLiteral($sourceArg) ?? $sourceArg->compileTimeString;
 
         return null !== $lit && '' === $lit;

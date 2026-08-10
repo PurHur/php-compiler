@@ -21,7 +21,14 @@ final class XPathEvaluate extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMXPath::evaluate() expects at least 1 argument');
         }
-        $expression = $this->stringArg($frame->calledArgs[1], 'DOMXPath::evaluate()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#30041).
+        $expression = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMXPath::evaluate()',
+            0,
+            $frame,
+            'expression'
+        );
         $context = $this->optionalDomNodeArg($frame, 2, 'DOMXPath::evaluate()', 1);
         // php-src: bool register_node_ns = intern->register_node_ns; optional |b overrides (#20842).
         $registerNodeNS = DomRegistry::state($xpath)->xpathRegisterNodeNamespaces;

@@ -21,6 +21,20 @@ final class JitDomXPathQuery
             throw new \LogicException('DOMXPath::query() expects receiver and expression');
         }
 
+        // Compile-time null under strict_types: raise TypeError before user-script (#30041).
+        if ($context->callerStrictTypes && JITVariable::TYPE_NULL === $args[1]->type) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'DOMXPath::query(): Argument #1 ($expression) must be of type string, null given'
+            );
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
+            return JitValueBox::normalizeValuePtr($context, $ptr);
+        }
+
         if (JitDomXPathQueryUserScript::shouldUse($context)) {
             $us = JitDomXPathQueryUserScript::tryInvoke($context, ...$args);
             if (null !== $us) {
@@ -77,16 +91,13 @@ final class JitDomXPathQuery
 
     private static function loadStringArg(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                JitValueBox::valuePtrFromVariable($context, $arg)
-            );
-        }
-
-        throw new \LogicException('DOMXPath::query() expression must be a string');
+        // Z_PARAM_STR + caller strict_types — null must TypeError (#30041).
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $arg,
+            'DOMXPath::query',
+            0,
+            'expression'
+        );
     }
 }

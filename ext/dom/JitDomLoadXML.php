@@ -28,18 +28,22 @@ final class JitDomLoadXML
             throw new \LogicException('DOMDocument::loadXML() expects receiver and XML string');
         }
 
-        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680).
-        // Emit DEP directly — avoid JitStringBuiltinArg::lower() (same AOT try pitfall as loadHTML).
-        if (self::isNullOrEmptySource($args[1])) {
-            if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
-                JitStringBuiltinArg::emitNullStringParamDeprecation(
-                    $context,
-                    'DOMDocument::loadXML',
-                    0,
-                    'source'
-                );
+        // Z_PARAM_STR: strict null → TypeError; weak null → DEP then '' (#30041).
+        // Empty '' (after weak coerce or literal) → ValueError (#22680).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                return self::emitNullSourceTypeError($context, 'DOMDocument::loadXML');
             }
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'DOMDocument::loadXML',
+                0,
+                'source'
+            );
 
+            return self::emitEmptySourceValueError($context);
+        }
+        if (self::isEmptySourceLiteral($args[1])) {
             return self::emitEmptySourceValueError($context);
         }
 
@@ -47,7 +51,13 @@ final class JitDomLoadXML
             self::emitBoxedNullEmptySourceGuard($context, $args[1]);
         }
 
-        $xmlStr = JitStringBuiltinArg::lower($context, $args[1], 'DOMDocument::loadXML', 0, 'source');
+        $xmlStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'DOMDocument::loadXML',
+            0,
+            'source'
+        );
 
         if (JitDomLoadXMLUserScript::shouldUse($context)) {
             $us = JitDomLoadXMLUserScript::tryInvoke($context, ...$args);
@@ -113,18 +123,33 @@ final class JitDomLoadXML
             $okBlock
         );
         $context->builder->positionAtEnd($nullBlock);
-        JitStringBuiltinArg::emitNullStringParamDeprecation(
-            $context,
-            'DOMDocument::loadXML',
-            0,
-            'source'
-        );
-        self::emitEmptySourceValueError($context);
+        if ($context->callerStrictTypes) {
+            self::emitNullSourceTypeError($context, 'DOMDocument::loadXML');
+        } else {
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'DOMDocument::loadXML',
+                0,
+                'source'
+            );
+            self::emitEmptySourceValueError($context);
+        }
         $insert = BasicBlockHelper::tryGetInsertBlock($context);
         if (null !== $insert && null === $insert->getTerminator()) {
             $context->builder->branch($okBlock);
         }
         $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function emitNullSourceTypeError(Context $context, string $function): Value
+    {
+        $message = $function.'(): Argument #1 ($source) must be of type string, null given';
+        \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+        \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int32')->constInt(0, false));
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     private static function emitEmptySourceValueError(Context $context): Value
@@ -153,11 +178,8 @@ final class JitDomLoadXML
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
-    private static function isNullOrEmptySource(JITVariable $sourceArg): bool
+    private static function isEmptySourceLiteral(JITVariable $sourceArg): bool
     {
-        if (JITVariable::TYPE_NULL === $sourceArg->type || $sourceArg->isNullConstant) {
-            return true;
-        }
         $lit = JitStringBuiltinArg::compileTimeLiteral($sourceArg) ?? $sourceArg->compileTimeString;
 
         return null !== $lit && '' === $lit;

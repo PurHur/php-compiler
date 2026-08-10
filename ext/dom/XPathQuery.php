@@ -21,7 +21,14 @@ final class XPathQuery extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMXPath::query() expects at least 1 argument');
         }
-        $expression = $this->stringArg($frame->calledArgs[1], 'DOMXPath::query()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#30041).
+        $expression = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMXPath::query()',
+            0,
+            $frame,
+            'expression'
+        );
         $context = null;
         if (isset($frame->calledArgs[2])) {
             $context = $this->optionalDomNodeArg($frame->calledArgs[2], 'DOMXPath::query()', 1);
