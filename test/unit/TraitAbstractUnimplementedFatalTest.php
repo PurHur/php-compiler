@@ -97,4 +97,28 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'trait_abstract_class_ok.php'));
         $this->assertSame("1\n", ob_get_clean());
     }
+
+    /**
+     * Concrete trait-using parent + subclass after a runtime prelude (#29566).
+     * Hoisting the child ahead of source-order parent DECLARE used to fatal Class "A" not found.
+     */
+    public function testConcreteTraitParentWithPreludeAndSubclassRuns(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo "start\n";
+trait T {
+    public function n() { return 1; }
+}
+class A {
+    use T;
+}
+class B extends A {}
+echo (new B)->n(), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'trait_prelude_subclass_29566.php'));
+        $this->assertSame("start\n1\n", ob_get_clean());
+    }
 }
