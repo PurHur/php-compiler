@@ -122,14 +122,7 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
-    /**
-     * PHP 8.3+ typed constants on interfaces (Zend/zend_compile.c, issue #5980, #7042, #24917).
-     *
-     * Same withholding as supportsTypedClassConstants(): an interface typed constant is a typed
-     * class constant, and Zend 8.2 rejects both with the same parse error. Do not use a plain
-     * VERSION compare here — that re-enabled SKIPIF acceptance on the 8.4.0-dev reference profile
-     * while the class form stayed withheld (#24809 / #24917).
-     */
+    /** PHP 8.3+ typed constants on interfaces (Zend/zend_compile.c, issue #5980, #7042, #24917). */
     public static function supportsInterfaceTypedConstants(): bool
     {
         return self::supportsTypedClassConstants();
