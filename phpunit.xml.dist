@@ -147,6 +147,8 @@
             <file>./test/compliance/StreamSocketClientNullSoftVMTest.php</file>
             <file>./test/compliance/StreamSocketClientNullStrictVMTest.php</file>
             <file>./test/compliance/StreamSocketServerReflectionVMTest.php</file>
+            <file>./test/compliance/StreamSocketServerNullSoftVMTest.php</file>
+            <file>./test/compliance/StreamSocketServerNullStrictVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorReflectionVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorHandledVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorHandledJITTest.php</file>
