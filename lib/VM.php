@@ -5524,7 +5524,7 @@ restart:
                             if (!$fetchIs) {
                                 $resolved = $container->resolveIndirect();
                                 $this->context->errors->arrayOffsetOnNonContainer(
-                                    TypeCheck::typeNameForConstraint($resolved->type),
+                                    VM\ErrorReporter::arrayOffsetTypeLabel($resolved),
                                     $this->context,
                                     $frame,
                                     $scriptFile
