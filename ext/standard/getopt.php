@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -17,6 +19,11 @@ use PHPLLVM\Value;
  *
  * VM: GetoptEngine over SAPI argv snapshot. JIT/AOT: GetoptJitHelper via JitGetopt (#3251 phase 2).
  * rest_index by-ref is VM-only.
+ *
+ * Z_PARAM_STR $short_options: caller strict_types → TypeError on null; soft path DEP+coerce (#30358).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.c PHP_FUNCTION(getopt)
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php
  */
 final class getopt extends Internal
 {
@@ -48,11 +55,14 @@ final class getopt extends Internal
             throw new \LogicException('getopt() requires VM context in this compiler build');
         }
 
-        $shortOptions = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#30358).
+        $shortOptions = VmString::stringBuiltinArgForFrame(
+            $frame,
+            0,
             'getopt',
             0,
-            'short_options'
+            'short_options',
+            false
         );
 
         $longOptions = [];
@@ -110,6 +120,25 @@ final class getopt extends Internal
         if ($argc >= 3) {
             throw new \LogicException('getopt() rest_index by-ref is VM-only in this compiler build (issue #3251)');
         }
+        // Soft-null outside strict_types; strict → TypeError (#30358).
+        // Early return after compile-time null TypeError — no getopt helper after abort
+        // (AOT module verify: terminator mid-block; peer getservbyname #30281).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+            JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                'getopt',
+                0,
+                'short_options',
+                'string',
+                null,
+                false
+            );
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
         $longOptions = 2 === $argc ? self::resolveJitLongOptions($context, $args[1]) : [];
 
         return JitGetopt::invoke($context, $args[0], $longOptions);

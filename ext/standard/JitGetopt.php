@@ -28,7 +28,17 @@ final class JitGetopt
         Getopt::ensureLinked($context);
         CliArgvRuntime::ensureLinked($context);
 
-        $shortStr = JitStringBuiltinArg::lower($context, $shortArg, 'getopt', 0, 'short_options');
+        // Z_PARAM_STR — caller strict_types → TypeError on null; soft-null outside (#30358).
+        $shortStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $shortArg,
+            'getopt',
+            0,
+            'short_options',
+            'string',
+            null,
+            false
+        );
         $longHt = self::longOptionsHashtable($context, $longOptions);
         $argvHt = CliArgvRuntime::buildArgvHashtable($context);
 
