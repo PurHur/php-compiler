@@ -1578,7 +1578,7 @@ final class CompilerVersion
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::isForwardProfileAtLeast('8.4.0');
     }
 
     /**
@@ -4425,7 +4425,7 @@ final class CompilerVersion
      */
     public static function supportsParenthesizedAsymmetricSetModifier(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::isForwardProfileAtLeast('8.4.0');
     }
 
     /**
