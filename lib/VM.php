@@ -8620,6 +8620,11 @@ restart:
                             }
                             break;
                         }
+                        if ($op->propertyHookCoalesceRead) {
+                            // ?? / ??= BP_VAR_IS on non-object — silent null (#30120, zend_vm_def.h).
+                            $result->null();
+                            break;
+                        }
                         if ($op->nullsafeFetchPropertyRead) {
                             // IS-mode (??/isset/empty) or null: silent like FETCH_OBJ_IS (#18026).
                             // R-mode nullsafe on scalar/array: warn like plain -> (#26365).
