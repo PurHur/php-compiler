@@ -27,6 +27,17 @@ final class VmUnset
     }
 
     /**
+     * ZEND_UNSET_OBJ on a non-object — silent no-op (zend_vm_def.h; #30065).
+     *
+     * Unlike ZEND_UNSET_DIM, property unset never autovivifies false→array and never
+     * Errors on scalars/arrays/null — the operand is simply ignored.
+     */
+    public static function isNonObjectUnsetPropNoop(bool $unsetOnProperty, int $containerType): bool
+    {
+        return $unsetOnProperty && Variable::TYPE_OBJECT !== $containerType;
+    }
+
+    /**
      * ZEND_UNSET_DIM on null/undef — silent no-op (zend_vm_def.h; #30099).
      *
      * Zend: type <= IS_FALSE and not IS_FALSE falls through without convert or Error.

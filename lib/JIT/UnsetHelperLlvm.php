@@ -35,12 +35,30 @@ final class UnsetHelperLlvm
         if ($op->unsetOnProperty && self::shouldNoopDateIntervalUnsetFromOps($containerOp, $dimOp, $block, $context)) {
             return;
         }
-        if (Variable::TYPE_OBJECT === $container->type) {
-            if ($op->unsetOnProperty) {
+        // ZEND_UNSET_OBJ: typed non-objects are a silent no-op (#30065). Value-box receivers
+        // still need a runtime object check (object → property unset; else no-op).
+        if ($op->unsetOnProperty) {
+            if (Variable::TYPE_OBJECT === $container->type) {
                 self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
 
                 return;
             }
+            if (Variable::TYPE_VALUE === $container->type) {
+                self::compileValueBoxPropertyUnset(
+                    $context,
+                    $block,
+                    $containerOp,
+                    $dimOp,
+                    $container,
+                    $jit
+                );
+
+                return;
+            }
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $container->type) {
             if (ArrayAccessHelper::tryCompileOffsetUnset($context, $container, $dim, $containerOp)) {
                 return;
             }
@@ -76,7 +94,6 @@ final class UnsetHelperLlvm
                 $dimOp,
                 $container,
                 $dim,
-                $op->unsetOnProperty,
                 $op,
                 $jit
             );
@@ -84,6 +101,56 @@ final class UnsetHelperLlvm
             return;
         }
         throw new \LogicException('unset() offset only supports arrays and objects in this compiler build');
+    }
+
+    /**
+     * Value-box ZEND_UNSET_OBJ: unset property when runtime type is object; else no-op (#30065).
+     */
+    private static function compileValueBoxPropertyUnset(
+        Context $context,
+        Block $block,
+        Operand $containerOp,
+        Operand $dimOp,
+        Variable $container,
+        ?\PHPCompiler\JIT $jit = null
+    ): void {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $tag = 'up'.(string) spl_object_id($context);
+
+        $objectBb = BasicBlockHelper::append($context, 'unset_obj_vb_object_'.$tag);
+        $noopBb = BasicBlockHelper::append($context, 'unset_obj_vb_noop_'.$tag);
+        $doneBb = BasicBlockHelper::append($context, 'unset_obj_vb_done_'.$tag);
+
+        $baseType = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(VmVariable::TYPE_OBJECT, false)
+        );
+        $isJitObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($isObject, $isJitObject),
+            $objectBb,
+            $noopBb
+        );
+
+        $context->builder->positionAtEnd($objectBb);
+        self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($noopBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
     /**
@@ -219,7 +286,6 @@ final class UnsetHelperLlvm
         Operand $dimOp,
         Variable $container,
         Variable $dim,
-        bool $unsetOnProperty,
         OpCode $op,
         ?\PHPCompiler\JIT $jit = null
     ): void {
@@ -292,10 +358,7 @@ final class UnsetHelperLlvm
             $context->lookupFunction('__value__readObject'),
             $valuePtr
         );
-        if ($unsetOnProperty) {
-            self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
-            $context->builder->branch($doneBb);
-        } elseif (ArrayAccessHelper::tryCompileOffsetUnset($context, $objVar, $dim, $containerOp)) {
+        if (ArrayAccessHelper::tryCompileOffsetUnset($context, $objVar, $dim, $containerOp)) {
             $context->builder->branch($doneBb);
         } else {
             self::emitCannotUseObjectAsArray($context, $objVar, $containerOp);
