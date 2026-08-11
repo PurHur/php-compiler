@@ -50,7 +50,8 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
         );
         $this->assertStringNotContainsString("'phpc_file_get_contents_kernel'", $context);
         $this->assertStringNotContainsString("'phpc_readfile_kernel'", $context);
-        $this->assertStringContainsString("'phpc_file_put_contents_kernel'", $context);
+        $this->assertStringNotContainsString("'phpc_file_put_contents_kernel'", $context);
+        $this->assertMatchesRegularExpression("/'file_put_contents'/", $context);
         $this->assertMatchesRegularExpression("/'readfile'/", $context);
     }
 

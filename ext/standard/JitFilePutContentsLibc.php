@@ -6,19 +6,72 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for {@see phpc_file_put_contents_kernel} — thin libc fopen/fwrite (#19966).
+ * LLVM NestedJIT leaf for file_put_contents() — thin libc fopen/fwrite (#19966, #30127).
  *
- * Used inside {@see FilePutContentsJitHelper} so nested helper TUs do not recurse through
- * file_put_contents() under user-script AOT (#16075; same shape as {@see JitRenameKernel}).
+ * Used while NestedJIT compiles {@see FilePutContentsJitHelper} `@file_put_contents` so the
+ * helper does not re-enter `__compiler_file_put_contents` (file_get_contents #29833 shape).
+ * Peer: {@see JitFileGetContentsLibc} (#29833) / {@see JitReadfileLibc} (#29915).
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
  */
 final class JitFilePutContentsLibc
 {
+    private const ABI = '__phpc_file_put_contents_libc';
+
+    private const BRIDGE_ENTRY = 'fpc_libc_entry';
+
     private const FILE_APPEND = 8;
+
+    /** @return Value i64 — bytes written, or -1 when open/write fails */
+    public static function call(Context $context, Value $path, Value $data, Value $flags): Value
+    {
+        self::ensureLibcFunction($context);
+
+        return $context->builder->call($context->lookupFunction(self::ABI), $path, $data, $flags);
+    }
+
+    private static function ensureLibcFunction(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        LibcExtern::register($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($i64, false, $strPtr, $strPtr, $i64)
+            );
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        self::emitBody($context, $fn);
+        $context->registerFunction(self::ABI, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
 
     /** Emit libc write path; builder must be positioned at the bridge entry block. */
     public static function emitBody(Context $context, LlvmFunction $fn): void

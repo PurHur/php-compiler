@@ -940,7 +940,10 @@ class Context {
     private static function isPreRegisterModuleNestedJitKernel(string $lc): bool
     {
         return match ($lc) {
-            'phpc_file_put_contents_kernel',
+            // file_put_contents NestedJIT leaf (#30127) — whitelist file_put_contents →
+            // file_put_contents::call → JitFilePutContentsLibc (kernel Internal removed;
+            // peer file_get_contents #29833 / readfile #29915).
+            'file_put_contents',
             // readfile NestedJIT leaf (#29915) — whitelist readfile →
             // readfile::call → JitReadfileLibc (kernel Internal removed;
             // peer file_get_contents #29833 / crypt #29545).
