@@ -23,7 +23,7 @@ final class JitObGetStatus
         ObStatusRuntime::ensureLinked($context);
 
         $full = isset($args[0])
-            ? JitBoolArg::lower($context, $args[0], 'ob_get_status() full_status')
+            ? JitBoolArg::lowerCoerceZParamBool($context, $args[0], 'ob_get_status', 'full_status', 1)
             : $context->constantFromBool(false);
 
         $slot = JitValueBox::alloc($context);
