@@ -89,7 +89,7 @@ final class ReferencableCheck
                     if (!array_key_exists($argIndex, $calledArgs)) {
                         continue;
                     }
-                    self::assertArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
+                    self::assertUserByRefArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
                 }
                 continue;
             }
@@ -98,8 +98,39 @@ final class ReferencableCheck
                 continue;
             }
             $paramName = $calleeBlock->paramNames[$idx] ?? 'param'.$idx;
-            self::assertArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
+            self::assertUserByRefArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
         }
+    }
+
+    /**
+     * User/method by-ref actuals: call/method/new return temps → E_NOTICE + bind temp
+     * (zend_execute.c ZEND_SEND_VAR_NO_REF, #30027). Other non-variables stay Error.
+     */
+    private static function assertUserByRefArgument(
+        string $fn,
+        int $paramIdx,
+        string $paramName,
+        Variable $arg,
+        Frame $caller
+    ): void {
+        if (self::isStringOffsetRef($arg)) {
+            throw new \Error(Variable::STRING_OFFSET_REF_ERROR);
+        }
+        if (self::isReferenceable($arg, $caller)) {
+            return;
+        }
+        // FuncCall / MethodCall / StaticCall / New_ result temps — Notice then continue (#30027).
+        if (self::isFuncCallReturnTempArg($arg, $caller)) {
+            self::emitNonVariableByRefNotice($caller);
+
+            return;
+        }
+        throw new \Error(\sprintf(
+            '%s(): Argument #%d ($%s) could not be passed by reference',
+            $fn,
+            $paramIdx + 1,
+            $paramName
+        ));
     }
 
     public static function variadicByRefParamIndex(Block $calleeBlock): ?int
