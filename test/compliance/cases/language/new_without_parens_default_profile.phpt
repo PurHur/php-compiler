@@ -1,17 +1,16 @@
 --TEST--
-Language: `new Class()->method()` rejected on default 8.4.0-dev reference profile (#24883, re-#22783 / #24755, Zend/zend_language_parser.y)
+Language: `new Class()->method()` works on default 8.4.0-dev profile (#30207, re-#24883 / #24755, Zend/zend_language_parser.y)
 --SKIPIF--
 <?php
-// Key off PROFILE env — not supportsDereferencableNewWithoutOuterParens(). If the gate
-// wrongly returns true on the reference profile, skipping would hide the regression (#24883).
+// Explicit PROFILE < 8.4 disables dereferencable new — separate test covers that case.
 $raw = getenv('PHP_COMPILER_PROFILE');
 if (is_string($raw) && '' !== trim($raw)) {
     $v = trim($raw);
     if (preg_match('/^\d+\.\d+$/', $v)) {
         $v .= '.0';
     }
-    if (version_compare($v, '8.4.0', '>=')) {
-        die('skip dereferencable new enabled on PHP 8.4+ forward profile');
+    if (version_compare($v, '8.4.0', '<')) {
+        die('skip dereferencable new disabled on pre-8.4 forward profile');
     }
 }
 ?>
@@ -21,7 +20,5 @@ class Builder {
     public function build(): string { return 'built'; }
 }
 echo new Builder()->build(), "\n";
---EXPECT_EXIT--
-255
---EXPECTF--
-%AParse error%Aunexpected token "->"%A
+--EXPECT--
+built
