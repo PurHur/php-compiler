@@ -3168,7 +3168,9 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+        if (version_compare(self::VERSION, '8.4.0', '>=')
+            || str_starts_with(self::VERSION, '8.4.0-')
+        ) {
             return true;
         }
 
