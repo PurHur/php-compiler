@@ -42,7 +42,7 @@ final class finfo_file extends Internal
             return;
         }
         $finfo = VmFinfo::requireFinfoArg($frame->calledArgs[0], 'finfo_file', 0);
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'finfo_file', 1, 'filename');
+        $path = VmString::stringBuiltinArgForFrame($frame, 1, 'finfo_file', 1, 'filename');
         $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo_file', 3, 'flags');
         $result = VmFinfo::file($finfo, $path, $flags, $frame, 'finfo_file');
         if (false === $result) {

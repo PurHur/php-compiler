@@ -42,7 +42,7 @@ final class finfo_buffer extends Internal
             return;
         }
         $finfo = VmFinfo::requireFinfoArg($frame->calledArgs[0], 'finfo_buffer', 0);
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'finfo_buffer', 1, 'string');
+        $string = VmString::stringBuiltinArgForFrame($frame, 1, 'finfo_buffer', 1, 'string');
         $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo_buffer', 3, 'flags');
         $result = VmFinfo::buffer($finfo, $string, $flags, 'finfo_buffer');
         $frame->returnVar->string($result);

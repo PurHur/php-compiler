@@ -110,7 +110,7 @@ final class FinfoFileMethod extends VmClassMethod
             return;
         }
         $object = $frame->calledArgs[0]->resolveIndirect()->toObject();
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'finfo::file', 0, 'filename');
+        $path = VmString::stringBuiltinArgForFrame($frame, 1, 'finfo::file', 0, 'filename');
         $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo::file', 2, 'flags');
         $result = VmFinfo::file($object, $path, $flags, $frame, 'finfo::file');
         if (false === $result) {
@@ -147,7 +147,7 @@ final class FinfoBufferMethod extends VmClassMethod
             return;
         }
         $object = $frame->calledArgs[0]->resolveIndirect()->toObject();
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'finfo::buffer', 0, 'string');
+        $string = VmString::stringBuiltinArgForFrame($frame, 1, 'finfo::buffer', 0, 'string');
         $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo::buffer', 2, 'flags');
         $result = VmFinfo::buffer($object, $string, $flags, 'finfo::buffer');
         $frame->returnVar->string($result);
