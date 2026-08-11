@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 /**
- * openssl_get_cipher_methods() / openssl_get_md_methods() for compiled JIT/AOT (#21103, php-in-PHP).
+ * openssl_get_cipher_methods() / openssl_get_md_methods() for compiled JIT/AOT (#21103, #30148, php-in-PHP).
  *
- * Kernel path: {@see phpc_openssl_cipher_methods_kernel} / {@see phpc_openssl_md_methods_kernel}
- * (hash_algos #20652 shape — NestedJIT leaf avoids OpensslCipherRegistry under user-script AOT).
+ * Always NestedJIT'd via {@see \PHPCompiler\JIT\JitVmHelperLink} (no thin registry fork).
+ * NestedJIT-safe: return {@see OpensslCipherRegistry} list consts (hash_algos #28750 / password_algos #9908 shape) —
+ * no NestedJIT registry kernel / LLVM hashtable-build leaf re-entry (#30148).
  *
  * Return type is `array` (not HashTable): NestedJIT maps class HashTable to object ABI (#20652).
  *
@@ -24,7 +25,7 @@ final class OpensslMethodsJitHelper
     {
         unset($aliases);
 
-        return \phpc_openssl_cipher_methods_kernel();
+        return OpensslCipherRegistry::CIPHER_METHODS;
     }
 
     /**
@@ -34,6 +35,6 @@ final class OpensslMethodsJitHelper
     {
         unset($aliases);
 
-        return \phpc_openssl_md_methods_kernel();
+        return OpensslCipherRegistry::MD_METHODS;
     }
 }

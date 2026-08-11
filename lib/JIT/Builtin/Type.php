@@ -710,7 +710,7 @@ class Type extends Builtin {
         );
         $fnOpensslDigest = $this->context->module->addFunction('__compiler_openssl_digest', $fntypeOpensslDigest);
         $this->context->registerFunction('__compiler_openssl_digest', $fnOpensslDigest);
-        // openssl_get_cipher_methods / openssl_get_md_methods — JitOpensslMethodsKernel (#21103)
+        // openssl_get_cipher_methods / openssl_get_md_methods — OpensslMethodsJitHelper (#21103 / #30148)
         $fntypeOpensslMethods = $this->context->context->functionType($htPtr, false, $i64);
         $fnOpensslCipherMethods = $this->context->module->addFunction(
             '__compiler_openssl_get_cipher_methods',

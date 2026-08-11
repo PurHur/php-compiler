@@ -87,8 +87,8 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             'lib/JIT/Builtin/OpensslSignRuntime.php' => 'OpensslSignJitHelper',
             'lib/JIT/Builtin/OpensslEncryptRuntime.php' => 'OpensslEncryptJitHelper',
             'lib/JIT/Builtin/OpensslDigestRuntime.php' => 'OpensslDigestJitHelper',
-            'lib/JIT/Builtin/OpensslMethodsRuntime.php' => 'JitOpensslMethodsKernel',
-            'ext/openssl/OpensslMethodsJitHelper.php' => 'phpc_openssl_cipher_methods_kernel',
+            'lib/JIT/Builtin/OpensslMethodsRuntime.php' => 'OpensslMethodsJitHelper',
+            'ext/openssl/OpensslMethodsJitHelper.php' => 'OpensslCipherRegistry::CIPHER_METHODS',
             'lib/JIT/Builtin/LibcryptRuntime.php' => 'LibcryptJitHelper',
             'ext/standard/LibcryptJitHelper.php' => 'cryptArgv',
         ];

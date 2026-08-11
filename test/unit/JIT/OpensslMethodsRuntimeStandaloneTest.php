@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\openssl\OpensslCipherRegistry;
+use PHPCompiler\ext\openssl\OpensslMethodsJitHelper;
 use PHPCompiler\JIT\Builtin\OpensslMethodsCrypto;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #21103: openssl_get_*_methods LLVM ABI via JitOpensslMethodsKernel PHP.
+ * openssl_get_*_methods: NestedJIT-safe OpensslCipherRegistry lists — no registry kernel (#21103, #30148).
  *
  * @group aot-lint
  */
@@ -20,11 +22,41 @@ final class OpensslMethodsRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/openssl_methods.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/runtime/openssl_methods.c');
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/OpensslMethodsRuntime.php');
-        $this->assertStringContainsString('JitOpensslMethodsKernel', $runtime);
+        $this->assertStringContainsString('OpensslMethodsJitHelper', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringNotContainsString('JitOpensslMethodsKernel', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
+        $this->assertStringNotContainsString('phpc_openssl_cipher_methods_kernel', $runtime);
+        $this->assertStringNotContainsString('__hashtable__setStringAt', $runtime);
+
         $helper = (string) file_get_contents(__DIR__.'/../../../ext/openssl/OpensslMethodsJitHelper.php');
-        $this->assertStringContainsString('phpc_openssl_cipher_methods_kernel', $helper);
-        $this->assertStringContainsString('phpc_openssl_md_methods_kernel', $helper);
+        $this->assertStringContainsString('OpensslCipherRegistry::CIPHER_METHODS', $helper);
+        $this->assertStringContainsString('OpensslCipherRegistry::MD_METHODS', $helper);
+        $this->assertStringNotContainsString('phpc_openssl_cipher_methods_kernel', $helper);
+        $this->assertStringNotContainsString('phpc_openssl_md_methods_kernel', $helper);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../ext/openssl/phpc_openssl_cipher_methods_kernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../ext/openssl/phpc_openssl_md_methods_kernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../ext/openssl/JitOpensslMethodsKernel.php');
+
+        $this->assertSame(OpensslCipherRegistry::CIPHER_METHODS, OpensslMethodsJitHelper::cipherMethodsArgv(0));
+        $this->assertSame(OpensslCipherRegistry::MD_METHODS, OpensslMethodsJitHelper::mdMethodsArgv(0));
+    }
+
+    public function testContextNoLongerAllowlistsOpensslMethodsKernels(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Context.php');
+        $this->assertStringNotContainsString('phpc_openssl_cipher_methods_kernel', $source);
+        $this->assertStringNotContainsString('phpc_openssl_md_methods_kernel', $source);
+    }
+
+    public function testSpineBundleIncludesHelperOmitsKernel(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('OpensslMethodsJitHelper.php', $spine);
+        $this->assertStringContainsString('OpensslMethodsRuntime.php', $spine);
+        $this->assertStringNotContainsString('JitOpensslMethodsKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_openssl_cipher_methods_kernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_openssl_md_methods_kernel.php', $spine);
     }
 
     /**
