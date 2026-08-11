@@ -50,12 +50,31 @@ final class JitDateParse
         if (2 !== \count($args)) {
             throw new \LogicException('date_parse_from_format() expects exactly 2 arguments in this compiler build');
         }
-        $formatLit = self::compileTimeStringArg($args[0]);
-        $dateLit = self::compileTimeStringArg($args[1]);
-        if (null === $formatLit || null === $dateLit) {
-            throw new \LogicException(
-                'date_parse_from_format() requires compile-time string operands in this compiler build (issue #6172)'
-            );
+        // Z_PARAM_STR — caller strict_types → TypeError on null (#30308).
+        // Soft-null (non-strict) still lowers via lowerZparamStr → DEP+coerce to "".
+        $formatIsNull = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        $dateIsNull = JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false);
+        if ($formatIsNull) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'date_parse_from_format', 0, 'format');
+            $formatLit = '';
+        } else {
+            $formatLit = self::compileTimeStringArg($args[0]);
+            if (null === $formatLit) {
+                throw new \LogicException(
+                    'date_parse_from_format() requires compile-time string operands in this compiler build (issue #6172)'
+                );
+            }
+        }
+        if ($dateIsNull) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'date_parse_from_format', 1, 'datetime');
+            $dateLit = '';
+        } else {
+            $dateLit = self::compileTimeStringArg($args[1]);
+            if (null === $dateLit) {
+                throw new \LogicException(
+                    'date_parse_from_format() requires compile-time string operands in this compiler build (issue #6172)'
+                );
+            }
         }
 
         $parsed = VmDateTimeNative::parseFromFormatComponents($formatLit, $dateLit);

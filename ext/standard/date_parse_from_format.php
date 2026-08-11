@@ -32,17 +32,20 @@ final class date_parse_from_format extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $format = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — caller strict_types → TypeError on null (#30308; peer date_create_from_format).
+        $format = VmString::stringBuiltinArgForFrame(
+            $frame,
+            0,
             'date_parse_from_format',
             0,
             'format'
         );
-        $date = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
+        $date = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
             'date_parse_from_format',
             1,
-            'date'
+            'datetime'
         );
         $frame->returnVar->array(VmDate::parseResultToHashTable(
             VmDateTimeNative::parseFromFormatComponents($format, $date)
