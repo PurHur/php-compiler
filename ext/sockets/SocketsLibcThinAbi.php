@@ -16,6 +16,15 @@ final class SocketsLibcThinAbi
 
     private static bool $unavailable = false;
 
+    /**
+     * Last php_set_inet_addr-style host-lookup failure (php-src: -10000 - h_errno).
+     * Consumed by bind/connect/sendto when sockaddr resolution fails (#30315).
+     */
+    private static ?int $lastHostLookupError = null;
+
+    /** php-src sockets_strerror() host-lookup band (ext/sockets/sockets.c). */
+    private const HOST_LOOKUP_BASE = -10000;
+
     public static function available(): bool
     {
         return null !== self::ffi();
@@ -33,8 +42,32 @@ final class SocketsLibcThinAbi
         return (int) $loc[0];
     }
 
+    /**
+     * Consume pending host-lookup error from the last failed inet sockaddr build.
+     */
+    public static function consumeHostLookupError(): ?int
+    {
+        $err = self::$lastHostLookupError;
+        self::$lastHostLookupError = null;
+
+        return $err;
+    }
+
     public static function strerror(int $errno): string
     {
+        // php-src sockets_strerror(): error < -10000 → hstrerror(-error - 10000) (#30315).
+        if ($errno < self::HOST_LOOKUP_BASE) {
+            $h = -$errno - (-self::HOST_LOOKUP_BASE);
+            // Classic hstrerror(3) messages for h_errno 1..5 (glibc / php-src HAVE_HSTRERROR).
+            return match ($h) {
+                1 => 'Unknown host',
+                2 => 'Host name lookup failure',
+                3 => 'Unknown server error',
+                4 => 'No address associated with name',
+                5 => 'Unknown resolver error',
+                default => 'Host lookup error '.$h,
+            };
+        }
         $ffi = self::ffi();
         if (null === $ffi) {
             return 'Unknown error '.$errno;
@@ -91,6 +124,7 @@ final class SocketsLibcThinAbi
             return -1;
         }
 
+        self::$lastHostLookupError = null;
         $sa = self::makeSockaddrIn($ffi, $addr, $port);
         if (null === $sa) {
             return -1;
@@ -106,6 +140,7 @@ final class SocketsLibcThinAbi
             return -1;
         }
 
+        self::$lastHostLookupError = null;
         $sa = self::makeSockaddrIn($ffi, $addr, $port);
         if (null === $sa) {
             return -1;
@@ -268,6 +303,7 @@ final class SocketsLibcThinAbi
         if ($length <= 0) {
             return 0;
         }
+        self::$lastHostLookupError = null;
         $sa = self::makeSockaddrIn($ffi, $addr, $port);
         if (null === $sa) {
             return -1;
@@ -636,6 +672,7 @@ final class SocketsLibcThinAbi
         if (null === $ffi) {
             return null;
         }
+        self::$lastHostLookupError = null;
         $sa = self::makeSockaddrIn($ffi, $addr, $port);
         if (null === $sa) {
             return null;
@@ -779,6 +816,10 @@ final class SocketsLibcThinAbi
     }
 
     /**
+     * php_set_inet_addr() — inet_pton then hostname resolve (php-src sockaddr_conv.c; #30315).
+     *
+     * On host-lookup failure sets {@see $lastHostLookupError} to -10000 - h_errno style codes.
+     *
      * @return \FFI\CData|null struct sockaddr_in
      */
     private static function makeSockaddrIn(\FFI $ffi, string $addr, int $port): mixed
@@ -788,11 +829,49 @@ final class SocketsLibcThinAbi
         $sa->sin_family = 2; // AF_INET
         $sa->sin_port = $ffi->htons($port & 0xffff);
         $dst = \FFI::addr($sa->sin_addr);
-        if (1 !== (int) $ffi->inet_pton(2, $addr, $ffi->cast('void*', $dst))) {
-            return null;
+        if (1 === (int) $ffi->inet_pton(2, $addr, $ffi->cast('void*', $dst))) {
+            return $sa;
         }
 
-        return $sa;
+        // Hostname path (php_network_gethostbyname / getaddrinfo). Empty string fails like Zend.
+        $hintStruct = $ffi->new('struct addrinfo');
+        $ffi->memset(\FFI::addr($hintStruct), 0, \FFI::sizeof($hintStruct));
+        $hintStruct->ai_family = 2; // AF_INET
+        $res = $ffi->new('struct addrinfo*');
+        // Pass "" as node (not NULL) so empty address does not resolve as wildcard (#30315).
+        $rc = (int) $ffi->getaddrinfo($addr, null, \FFI::addr($hintStruct), \FFI::addr($res));
+        if (0 !== $rc) {
+            // Map common EAI_* to php-src -10000 - h_errno band (empty → NO_ADDRESS / -10004).
+            self::$lastHostLookupError = match ($rc) {
+                -2, -5 => self::HOST_LOOKUP_BASE - 4, // EAI_NONAME / EAI_NODATA → NO_ADDRESS
+                -3 => self::HOST_LOOKUP_BASE - 2, // EAI_AGAIN → TRY_AGAIN
+                -11, -12 => self::HOST_LOOKUP_BASE - 3, // EAI_SYSTEM / EAI_OVERFLOW → NO_RECOVERY-ish
+                default => self::HOST_LOOKUP_BASE - 1, // Unknown host
+            };
+
+            return null;
+        }
+        $head = $res[0];
+        try {
+            $cur = $head;
+            while (null !== $cur) {
+                if (2 === (int) $cur->ai_family && null !== $cur->ai_addr && (int) $cur->ai_addrlen >= 16) {
+                    // Copy full sockaddr_in from getaddrinfo, then restore requested port.
+                    \FFI::memcpy($sa, $cur->ai_addr, 16);
+                    $sa->sin_family = 2;
+                    $sa->sin_port = $ffi->htons($port & 0xffff);
+
+                    return $sa;
+                }
+                $next = $cur->ai_next;
+                $cur = null !== $next ? $next : null;
+            }
+        } finally {
+            $ffi->freeaddrinfo(\FFI::addr($head));
+        }
+        self::$lastHostLookupError = self::HOST_LOOKUP_BASE - 4;
+
+        return null;
     }
 
     private static function ffiEnabled(): bool
