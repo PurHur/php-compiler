@@ -29,15 +29,23 @@ use PHPLLVM\Value;
  */
 final class JitVfscanf
 {
-    public static function parse(Context $context, JITVariable ...$args): Value
+    public static function parse(Context $context, string $function, JITVariable ...$args): Value
     {
         $argc = \count($args);
         if ($argc < 2) {
-            throw new \LogicException('vfscanf() expects at least two arguments');
+            throw new \LogicException($function.'() expects at least two arguments');
         }
 
         $handleLit = $args[0]->compileTimeLong ?? null;
+        // $format soft-null on 8.4 (Zend DEP+coerce; #30236, ext/standard/file.c Z_PARAM_STR).
         $fmtLit = $args[1]->compileTimeString ?? null;
+        if (($args[1]->isNullConstant ?? false) && null === $fmtLit) {
+            if ($context->callerStrictTypes) {
+                $fmtLit = null;
+            } else {
+                $fmtLit = '';
+            }
+        }
         if (null !== $handleLit && null !== $fmtLit && self::canFoldCompileTime($fmtLit, $argc - 2)) {
             return self::parseCompileTime($context, (int) $handleLit, $fmtLit, \array_slice($args, 2));
         }
@@ -45,13 +53,21 @@ final class JitVfscanf
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $handle = $context->builder->truncOrBitCast(
-            JitLongArg::lower($context, $args[0], 'vfscanf() stream'),
+            JitLongArg::lower($context, $args[0], $function.'() stream'),
             $i64
         );
-        $fmt = JitStringBuiltinArg::lower($context, $args[1], 'vfscanf', 1, 'format');
+        $fmt = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], $function, 1, 'format')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], $function, 1, 'format');
+        // declare(strict_types=1): null format rejects via lowerStrictOrCoercible — do not continue (#30236).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+        ) {
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
         $outCount = $argc - 2;
         if (0 === $outCount) {
-            throw new \LogicException('vfscanf() without by-ref targets requires compile-time stream/format in this compiler build');
+            throw new \LogicException($function.'() without by-ref targets requires compile-time stream/format in this compiler build');
         }
 
         $useStrtol = null !== $fmtLit

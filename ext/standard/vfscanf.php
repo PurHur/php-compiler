@@ -31,7 +31,8 @@ final class vfscanf extends Internal
             'vfscanf',
             1
         );
-        $format = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'vfscanf', 1, 'format');
+        // Z_PARAM_STR $format — TypeError under strict_types; soft-null otherwise (#30236).
+        $format = VmString::trimFamilyStringArgForFrame($frame, 1, 'vfscanf', 1, 'format');
         $outVars = [];
         for ($i = 2; $i < $argc; ++$i) {
             $outVars[] = $frame->calledArgs[$i];
@@ -65,6 +66,6 @@ final class vfscanf extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitVfscanf::parse($context, ...$args);
+        return JitVfscanf::parse($context, 'vfscanf', ...$args);
     }
 }
