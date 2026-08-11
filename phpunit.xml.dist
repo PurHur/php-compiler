@@ -288,6 +288,8 @@
             <file>./test/compliance/SubstrCompareNullCiCoerceJITTest.php</file>
             <file>./test/compliance/Base64DecodeStrictNullVMTest.php</file>
             <file>./test/compliance/Base64DecodeStrictNullJITTest.php</file>
+            <file>./test/compliance/InArrayArraySearchStrictNullVMTest.php</file>
+            <file>./test/compliance/InArrayArraySearchStrictNullJITTest.php</file>
             <file>./test/compliance/SubstrReplaceNullReplaceStrictVMTest.php</file>
             <file>./test/compliance/SubstrReplaceNullReplaceStrictJITTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorVMTest.php</file>
