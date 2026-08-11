@@ -30,6 +30,14 @@ final class TokenGetAllJITTest extends BaseTest
             __DIR__.'/cases/stdlib/token_get_all_concat_runtime_jit.phpt',
             'token_get_all_concat_runtime_jit.phpt'
         );
+        yield 'token_get_all_null_forward84_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/token_get_all_null_forward84_jit.phpt',
+            'token_get_all_null_forward84_jit.phpt'
+        );
+        yield 'token_get_all_null_strict_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/token_get_all_null_strict_jit.phpt',
+            'token_get_all_null_strict_jit.phpt'
+        );
     }
 
     public function setUp(): void
