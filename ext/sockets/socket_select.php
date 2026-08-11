@@ -49,15 +49,10 @@ final class socket_select extends Internal
             throw new \ValueError('socket_select(): At least one array argument must be passed');
         }
 
-        $seconds = VmSocketArg::requireIntArg($frame->calledArgs[3], 'socket_select', 4, 'seconds');
+        $seconds = VmSocketArg::requireIntArg($frame, 3, 'socket_select', 4, 'seconds');
         $microseconds = 0;
         if ($argc >= 5) {
-            $microseconds = VmSocketArg::requireIntArg(
-                $frame->calledArgs[4],
-                'socket_select',
-                5,
-                'microseconds'
-            );
+            $microseconds = VmSocketArg::requireIntArg($frame, 4, 'socket_select', 5, 'microseconds');
         }
 
         $result = VmSockets::select(

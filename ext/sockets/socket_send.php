@@ -36,8 +36,8 @@ final class socket_send extends Internal
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_send', 1);
         $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_send', 1, 'data');
-        $length = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_send', 3, 'length');
-        $flags = VmSocketArg::requireIntArg($frame->calledArgs[3], 'socket_send', 4, 'flags');
+        $length = VmSocketArg::requireIntArg($frame, 2, 'socket_send', 3, 'length');
+        $flags = VmSocketArg::requireIntArg($frame, 3, 'socket_send', 4, 'flags');
         $n = VmSockets::send($object, $data, $length, $flags, $frame);
         if (false === $n) {
             BuiltinExecute::writeReturn(

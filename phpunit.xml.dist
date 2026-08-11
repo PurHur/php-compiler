@@ -195,6 +195,7 @@
             <file>./test/compliance/ChownNullStrictJITTest.php</file>
             <file>./test/compliance/FscanfNullFormatStrictVMTest.php</file>
             <file>./test/compliance/FscanfNullFormatStrictJITTest.php</file>
+            <file>./test/compliance/SocketCreateListenNullStrictVMTest.php</file>
             <file>./test/compliance/MkdirEmptyRecursiveInvalidPathVMTest.php</file>
             <file>./test/compliance/ChrootEmptyPathWarningVMTest.php</file>
             <file>./test/compliance/DateIntervalCreateFromDateStringEmptyJITTest.php</file>

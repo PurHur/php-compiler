@@ -34,10 +34,10 @@ final class socket_read extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_read', 1);
-        $length = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_read', 2, 'length');
+        $length = VmSocketArg::requireIntArg($frame, 1, 'socket_read', 2, 'length');
         $type = VmSockets::PHP_BINARY_READ;
         if ($argc >= 3) {
-            $type = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_read', 3, 'mode');
+            $type = VmSocketArg::requireIntArg($frame, 2, 'socket_read', 3, 'mode');
         }
         $data = VmSockets::read($object, $length, $type);
         if (false === $data) {

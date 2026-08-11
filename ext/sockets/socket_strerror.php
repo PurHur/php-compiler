@@ -32,7 +32,7 @@ final class socket_strerror extends Internal
                 'socket_strerror() expects exactly 1 argument, '.$argc.' given'
             );
         }
-        $errno = VmSocketArg::requireIntArg($frame->calledArgs[0], 'socket_strerror', 1, 'error_code');
+        $errno = VmSocketArg::requireIntArg($frame, 0, 'socket_strerror', 1, 'error_code');
         $msg = VmSockets::strerror($errno);
         BuiltinExecute::writeReturn(
             $frame,

@@ -36,8 +36,8 @@ class socket_get_option extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], $fn, 1);
-        $level = VmSocketArg::requireIntArg($frame->calledArgs[1], $fn, 2, 'level');
-        $option = VmSocketArg::requireIntArg($frame->calledArgs[2], $fn, 3, 'option');
+        $level = VmSocketArg::requireIntArg($frame, 1, $fn, 2, 'level');
+        $option = VmSocketArg::requireIntArg($frame, 2, $fn, 3, 'option');
         $value = VmSockets::getOption($object, $level, $option, $frame);
         if (false === $value) {
             BuiltinExecute::writeReturn(

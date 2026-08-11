@@ -38,7 +38,7 @@ final class socket_shutdown extends Internal
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_shutdown', 1);
         $how = 2; // SHUT_RDWR default (php-src)
         if ($argc >= 2) {
-            $how = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_shutdown', 2, 'mode');
+            $how = VmSocketArg::requireIntArg($frame, 1, 'socket_shutdown', 2, 'mode');
         }
         $ok = VmSockets::shutdown($object, $how, $frame);
         BuiltinExecute::writeReturn(

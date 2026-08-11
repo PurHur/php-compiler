@@ -44,10 +44,10 @@ final class socket_create_listen extends Internal
             throw new \LogicException('socket_create_listen() requires VM context');
         }
 
-        $port = VmSocketArg::requireIntArg($frame->calledArgs[0], 'socket_create_listen', 1, 'port');
+        $port = VmSocketArg::requireIntArg($frame, 0, 'socket_create_listen', 1, 'port');
         $backlog = self::DEFAULT_BACKLOG;
         if ($argc >= 2) {
-            $backlog = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_create_listen', 2, 'backlog');
+            $backlog = VmSocketArg::requireIntArg($frame, 1, 'socket_create_listen', 2, 'backlog');
         }
         $object = VmSockets::createListen($port, $backlog, $frame->vmContext, $frame);
         if (false === $object) {

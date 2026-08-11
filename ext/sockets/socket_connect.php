@@ -38,7 +38,7 @@ final class socket_connect extends Internal
         $addr = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_connect', 1, 'addr');
         $port = 0;
         if ($argc >= 3) {
-            $port = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_connect', 3, 'port');
+            $port = VmSocketArg::requireIntArg($frame, 2, 'socket_connect', 3, 'port');
         }
         $ok = VmSockets::connect($object, $addr, $port, $frame);
         BuiltinExecute::writeReturn(

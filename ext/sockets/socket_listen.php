@@ -36,7 +36,7 @@ final class socket_listen extends Internal
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_listen', 1);
         $backlog = 0;
         if ($argc >= 2) {
-            $backlog = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_listen', 2, 'backlog');
+            $backlog = VmSocketArg::requireIntArg($frame, 1, 'socket_listen', 2, 'backlog');
         }
         $ok = VmSockets::listen($object, $backlog, $frame);
         BuiltinExecute::writeReturn(

@@ -38,7 +38,7 @@ final class socket_write extends Internal
         $buf = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_write', 1, 'data');
         $length = null;
         if ($argc >= 3) {
-            $length = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_write', 3, 'length');
+            $length = VmSocketArg::requireIntArg($frame, 2, 'socket_write', 3, 'length');
         }
         $n = VmSockets::write($object, $buf, $length);
         if (false === $n) {

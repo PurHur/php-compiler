@@ -37,9 +37,9 @@ final class socket_create_pair extends Internal
             throw new \LogicException('socket_create_pair() requires VM context');
         }
 
-        $domain = VmSocketArg::requireIntArg($frame->calledArgs[0], 'socket_create_pair', 1, 'domain');
-        $type = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_create_pair', 2, 'type');
-        $protocol = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_create_pair', 3, 'protocol');
+        $domain = VmSocketArg::requireIntArg($frame, 0, 'socket_create_pair', 1, 'domain');
+        $type = VmSocketArg::requireIntArg($frame, 1, 'socket_create_pair', 2, 'type');
+        $protocol = VmSocketArg::requireIntArg($frame, 2, 'socket_create_pair', 3, 'protocol');
         $pair = VmSockets::createPair($domain, $type, $protocol, $frame->vmContext);
         if (false === $pair) {
             BuiltinExecute::writeReturn(

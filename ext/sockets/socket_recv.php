@@ -34,8 +34,8 @@ final class socket_recv extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_recv', 1);
-        $length = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_recv', 3, 'length');
-        $flags = VmSocketArg::requireIntArg($frame->calledArgs[3], 'socket_recv', 4, 'flags');
+        $length = VmSocketArg::requireIntArg($frame, 2, 'socket_recv', 3, 'length');
+        $flags = VmSocketArg::requireIntArg($frame, 3, 'socket_recv', 4, 'flags');
         // php-src overflow guard: (len + 1) < 2 → RETURN_FALSE without touching &$data
         if ($length < 1) {
             BuiltinExecute::writeReturn(
