@@ -26,6 +26,11 @@ final class JitMemoryUsageArg
             return $context->constantFromBool($compileTime);
         }
 
+        // Z_PARAM_BOOL — honor caller strict_types; soft-null DEP+coerce (#30346).
+        if (Variable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return JitBoolArg::lowerCoerceZParamBool($context, $arg, $fn, 'real_usage', 1);
+        }
+
         if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
             return $context->helper->loadValue($arg);
         }

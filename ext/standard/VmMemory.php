@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\MemoryAccounting;
 use PHPCompiler\VM\Variable;
@@ -36,14 +37,13 @@ final class VmMemory
         self::$peakReal = 0;
     }
 
-    public static function resolveUsageArg(Variable $var, string $fn): bool
+    /**
+     * Z_PARAM_BOOL $real_usage — MemoryUsage enum first, then frame-aware bool
+     * (strict_types → TypeError on null; soft → DEP+false) (#30346 / #21615).
+     */
+    public static function resolveUsageArg(Frame $frame, int $argIndex, string $fn): bool
     {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_NULL === $var->type) {
-            VmNullNumberParamDeprecation::emit(null, $fn, 1, 'real_usage', 'bool');
-
-            return false;
-        }
+        $var = $frame->calledArgs[$argIndex]->resolveIndirect();
         $fromEnum = self::tryMemoryUsageBool($var);
         if (null !== $fromEnum) {
             return $fromEnum;
@@ -55,18 +55,14 @@ final class VmMemory
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
-        if (Variable::TYPE_BOOLEAN === $var->type) {
-            return $var->toBool();
-        }
-        if (Variable::TYPE_INTEGER === $var->type) {
-            return 0 !== $var->toInt();
-        }
 
-        throw new \TypeError(sprintf(
-            '%s(): Argument #1 ($real_usage) must be of type bool, %s given',
+        return VmMath::parseBoolBuiltinArgForFrame(
+            $frame,
+            $argIndex,
             $fn,
-            EnumCaseSupport::typeNameForVariable($var)
-        ));
+            1,
+            'real_usage'
+        );
     }
 
     public static function tryMemoryUsageBool(Variable $var): ?bool
