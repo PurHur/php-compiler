@@ -12587,6 +12587,11 @@ class JIT {
                             }
                             break;
                         }
+                        if ($op->propertyHookCoalesceRead) {
+                            // ?? / ??= BP_VAR_IS on non-object — silent null (#30120, zend_vm_def.h).
+                            JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                            break;
+                        }
                         if ($op->nullsafeFetchPropertyRead) {
                             // IS-mode (??/isset/empty) or null: silent (#18026).
                             // R-mode nullsafe on scalar: warn like plain -> (#26365).
