@@ -759,6 +759,66 @@ final class Variable {
     }
 
     /**
+     * Zend shift_left/right_function — reject before numeric coerce (#30138, zend_operators.c).
+     */
+    public static function validateShiftOperands(
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
+        self::toNumericForShift($left, $opCode, $left, $right, $vm, $frame);
+        self::toNumericForShift($right, $opCode, $left, $right, $vm, $frame);
+    }
+
+    /**
+     * @return int|float
+     */
+    private static function toNumericForShift(
+        Variable $operand,
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): int|float {
+        $operand = $operand->resolveIndirect();
+        TypedPropertyCheck::assertReadable($operand);
+        switch ($operand->type) {
+            case self::TYPE_NULL:
+                return 0;
+            case self::TYPE_INTEGER:
+                return $operand->integer;
+            case self::TYPE_FLOAT:
+                return $operand->float;
+            case self::TYPE_BOOLEAN:
+                return $operand->bool ? 1 : 0;
+            case self::TYPE_STRING:
+                if (!is_numeric($operand->string)) {
+                    self::throwUnsupportedOperandTypes(
+                        $opCode,
+                        $left->resolveIndirect(),
+                        $right->resolveIndirect()
+                    );
+                }
+                if (self::isIntegralNumericString($operand->string)) {
+                    return (int) $operand->string;
+                }
+
+                return (float) $operand->string;
+            case self::TYPE_OBJECT:
+            case self::TYPE_ENUM_CASE:
+            default:
+                self::throwUnsupportedOperandTypes(
+                    $opCode,
+                    $left->resolveIndirect(),
+                    $right->resolveIndirect()
+                );
+        }
+    }
+
+    /**
      * Zend rejects all assign-op operators on string offsets before operand evaluation (#22897).
      *
      * @see Zend/zend_execute.c zend_binary_assign_op_dim / string offset guard
@@ -2606,8 +2666,16 @@ restart:
             }
             $this->int($this->_bitwiseOp(
                 $opCode,
-                self::coerceBitwiseNumericOperand($left->toNumeric(), $vm, $frame),
-                self::coerceBitwiseNumericOperand($right->toNumeric(), $vm, $frame)
+                self::coerceBitwiseNumericOperand(
+                    self::toNumericForShift($left, $opCode, $left, $right, $vm, $frame),
+                    $vm,
+                    $frame
+                ),
+                self::coerceBitwiseNumericOperand(
+                    self::toNumericForShift($right, $opCode, $left, $right, $vm, $frame),
+                    $vm,
+                    $frame
+                )
             ));
 
             return;

@@ -212,6 +212,9 @@ return_string:
         // builder swaps; reload must not create parentless loads (#26756).
         BasicBlockHelper::ensureOpenInsertBlock($this->context, 'binary_op_load_cont');
         JitEnumNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right);
+        if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
+            JitShiftOperandGuard::guardOperands($this->context, $opcode->type, $left, $right);
+        }
         if (OpCode::TYPE_BITWISE_AND === $opcode->type
             || OpCode::TYPE_BITWISE_OR === $opcode->type
             || OpCode::TYPE_BITWISE_XOR === $opcode->type
