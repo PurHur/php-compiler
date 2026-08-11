@@ -12562,13 +12562,13 @@ class JIT {
                     if (null !== $nonObjectLabel && null !== $propName && !$nullsafeRuntimeObjectReceiver) {
                         $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                         if ($forWrite) {
-                            if (
-                                'null' === $nonObjectLabel
-                                && $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
-                            ) {
+                            // ZEND_PRE/POST_INC/DEC_OBJ: increment/decrement for any non-object
+                            // receiver (null, true, false, …) (#7431 / #30075).
+                            if ($this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)) {
                                 $message = sprintf(
-                                    'Attempt to increment/decrement property "%s" on null',
-                                    $propName
+                                    'Attempt to increment/decrement property "%s" on %s',
+                                    $propName,
+                                    $nonObjectLabel
                                 );
                             } else {
                                 $message = sprintf(

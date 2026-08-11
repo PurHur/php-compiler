@@ -318,6 +318,8 @@
             <file>./test/compliance/ClosureTypeerrorLocation84JITTest.php</file>
             <file>./test/compliance/ClosureMethodScopeTypeerrorNameVMTest.php</file>
             <file>./test/compliance/ClosureMethodScopeTypeerrorNameJITTest.php</file>
+            <file>./test/compliance/BoolPropIncDecTrueFalseLabels30075VMTest.php</file>
+            <file>./test/compliance/BoolPropIncDecTrueFalseLabels30075JITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
