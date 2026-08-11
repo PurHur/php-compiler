@@ -227,6 +227,8 @@ final class DomNodeLiveMutationRuntime
                 // LiveSlots increments the existing childNodes list in place so held
                 // `$list = $node->childNodes` observes +1 (#29048). Do not bump here —
                 // a pre-sync bumpHeld + LiveSlots +1 would double-count.
+                // Note (#30271): thin-AOT LiveSlots still skips NestedJIT Wrong Document /
+                // Hierarchy Request — VmDom path covers VM/JIT; AOT follow-up separately.
                 JitDomAppendChildLiveSlots::sync(
                     $context,
                     self::receiverObject($context, $receiver),
