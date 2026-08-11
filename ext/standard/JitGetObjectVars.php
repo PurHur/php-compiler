@@ -52,7 +52,10 @@ final class JitGetObjectVars
         }
 
         if (JITVariable::TYPE_OBJECT !== $objectArg->type && JITVariable::TYPE_VALUE !== $objectArg->type) {
-            self::emitTypeErrorAndAbort($context, self::scalarTypeError($objectArg->type, $function));
+            self::emitTypeErrorAndAbort(
+                $context,
+                self::formatTypeError($function, \PHPCompiler\JIT\JitOperandTypeLabel::givenLabel($context, $objectArg))
+            );
 
             return self::boxedHashtable($context, HashTableHelper::alloc($context));
         }
@@ -125,24 +128,6 @@ final class JitGetObjectVars
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function scalarTypeError(int $type, string $function): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return self::formatTypeError($function, 'int');
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return self::formatTypeError($function, 'float');
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return self::formatTypeError($function, 'bool');
-            case JITVariable::TYPE_STRING:
-                return self::formatTypeError($function, 'string');
-            case JITVariable::TYPE_NULL:
-                return self::formatTypeError($function, 'null');
-            default:
-                return self::formatTypeError($function, 'mixed');
-        }
     }
 
     private static function formatTypeError(string $function, string $given): string

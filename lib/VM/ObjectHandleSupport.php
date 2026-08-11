@@ -24,7 +24,7 @@ final class ObjectHandleSupport
             throw new \TypeError(\sprintf(
                 '%s(): Argument #1 ($object) must be of type object, %s given',
                 $function,
-                self::vmTypeName($var->type)
+                EnumCaseSupport::typeNameForTypeErrorActual($var)
             ));
         }
 
