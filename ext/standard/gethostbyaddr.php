@@ -13,11 +13,13 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
 /**
- * gethostbyaddr() — reverse DNS for IPv4 (ext/standard/dns.c parity, #5854).
+ * gethostbyaddr() — reverse DNS for IPv4 (ext/standard/dns.c parity, #5854, #29809).
  *
  * VM: VmDns (/etc/hosts then UDP PTR via resolv.conf). JIT/AOT: GethostbyaddrJitHelper PHP (#9474).
+ * Z_PARAM_STR: strict_types → TypeError on null; soft path DEP+coerce (#29809).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(gethostbyaddr)
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php string $ip
  */
 final class gethostbyaddr extends Internal
 {
@@ -31,7 +33,9 @@ final class gethostbyaddr extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('gethostbyaddr() requires exactly one argument in this compiler build');
         }
-        $ip = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gethostbyaddr', 0, 'ip_address');
+        // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29809).
+        // Param name $ip matches php-src basic_functions.stub.php / zend TypeError text.
+        $ip = VmString::stringBuiltinArgForFrame($frame, 0, 'gethostbyaddr', 0, 'ip', false);
         if (null === $frame->returnVar) {
             return;
         }
@@ -66,10 +70,11 @@ final class gethostbyaddr extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('gethostbyaddr() requires exactly one argument in this compiler build');
         }
+        // Soft-null outside strict_types; strict → TypeError (#29809).
+        $ip = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gethostbyaddr', 0, 'ip')
+            : JitStringBuiltinArg::lower($context, $args[0], 'gethostbyaddr', 0, 'ip', 'string', null, false);
 
-        return JitGethostbyaddr::invoke(
-            $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'gethostbyaddr', 0, 'ip_address')
-        );
+        return JitGethostbyaddr::invoke($context, $ip);
     }
 }

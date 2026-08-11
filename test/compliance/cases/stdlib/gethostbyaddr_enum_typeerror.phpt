@@ -9,4 +9,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-gethostbyaddr(): Argument #1 ($ip_address) must be of type string, E given
+gethostbyaddr(): Argument #1 ($ip) must be of type string, E given
