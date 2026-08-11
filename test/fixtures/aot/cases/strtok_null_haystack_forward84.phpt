@@ -1,10 +1,9 @@
 --TEST--
-AOT: strtok(null) — TypeError on 8.4 forward profile (#19242, ext/standard/string.c)
+AOT: strtok(null) soft-null on 8.4 forward profile (#21195 / #29784, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-strtok(null, '.');
+echo false === strtok(null, '.') ? "OK\n" : "BAD\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+OK

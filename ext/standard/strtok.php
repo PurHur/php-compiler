@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringStrtok;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -31,7 +32,12 @@ final class strtok extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $str = VmString::coerceStrtokStringArg($frame->calledArgs[0]);
+        // Z_PARAM_STR $string — caller strict_types → TypeError on null; else soft-null (#29784 / #21195).
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $str = VmString::trimFamilyStringArgForFrame($frame, 0, 'strtok', 0, 'string');
+        } else {
+            $str = VmString::coerceStrtokStringArg($frame->calledArgs[0]);
+        }
         $tok = null;
         if (2 === $argc) {
             $tok = VmString::coerceStrtokTokenArg($frame->calledArgs[1]);
@@ -51,14 +57,28 @@ final class strtok extends Internal
             throw new \LogicException('strtok() accepts one or two arguments in this compiler build');
         }
 
+        // Early TypeError return before StringStrtok::ensureLinked (AOT helper IR gap; #19242 / #29784).
+        if (
+            $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtok', 0, 'string');
+
+            return JitStrtok::deadFalseResult($context);
+        }
 
         if (1 === $argc) {
             StringStrtok::ensureLinked($context);
 
+            // One-arg: stub names the operand $string (Reflection); soft-null outside strict (#29784).
+            $token = $context->callerStrictTypes
+                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtok', 0, 'string')
+                : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strtok', 0, 'string');
+
             return JitStrtok::tokenize(
                 $context,
                 null,
-                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'token', 'string', 'string')
+                $token
             );
         }
 
@@ -72,9 +92,13 @@ final class strtok extends Internal
             'token'
         );
 
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtok', 0, 'string')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strtok', 0, 'string');
+
         return JitStrtok::tokenize(
             $context,
-            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strtok', 0, 'string'),
+            $hay,
             $tok
         );
     }
