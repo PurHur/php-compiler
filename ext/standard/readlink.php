@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -19,7 +18,7 @@ final class readlink extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('readlink() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'readlink', 0, 'path');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'readlink', 0, 'path', $frame);
         if (null === $frame->returnVar) {
             return;
         }
@@ -41,7 +40,7 @@ final class readlink extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('readlink() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'readlink', 0, 'path');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'readlink', 0, 'path');
 
         return JitReadlink::invoke($context, $path);
     }
