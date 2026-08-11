@@ -1,5 +1,6 @@
 <?php
-// #30271 — foreign DOMDocument mutation must be Wrong Document Error (code 4).
+// #30271 / #30274 — foreign DOMDocument mutation must be Wrong Document Error (code 4).
+// Use fwrite(STDOUT) so thin-AOT does not need ValueEcho helper objects.
 $d = new DOMDocument();
 $d->loadXML('<r><a/></r>');
 $other = new DOMDocument();
@@ -13,15 +14,15 @@ foreach (['appendChild', 'insertBefore', 'replaceChild'] as $op) {
         } else {
             $d->documentElement->replaceChild($other, $d->documentElement->firstChild);
         }
-        echo "$op NO_THROW\n";
+        fwrite(STDOUT, $op." NO_THROW\n");
     } catch (DOMException $e) {
-        echo "$op code=", $e->getCode(), ' msg=', $e->getMessage(), "\n";
+        fwrite(STDOUT, $op.' code='.$e->getCode()."\n");
     }
 }
 
 try {
     $d->documentElement->appendChild($d);
-    echo "same NO_THROW\n";
+    fwrite(STDOUT, "same NO_THROW\n");
 } catch (DOMException $e) {
-    echo 'same code=', $e->getCode(), ' msg=', $e->getMessage(), "\n";
+    fwrite(STDOUT, 'same code='.$e->getCode()."\n");
 }

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -70,6 +71,13 @@ final class JitDomReplaceChild
         $parent = self::loadObjectArg($context, $parentVar);
         $newChild = self::loadObjectArg($context, $newChildVar);
         $oldChild = self::loadObjectArg($context, $oldChildVar);
+
+        // Wrong Document / Hierarchy Request before LiveSlots (#30274).
+        DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
+            $context,
+            $parent,
+            $newChild
+        );
 
         $childCount = null;
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
