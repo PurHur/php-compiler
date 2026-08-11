@@ -16,8 +16,11 @@ use PHPLLVM\Value;
 /** JIT/AOT guard for array_push() by-reference array argument (#4881). */
 final class JitArrayPush
 {
-    public const BY_REF_ERROR =
-        'array_push(): Argument #1 ($array) could not be passed by reference';
+    /** Profile-gated by-ref Error text (#29624 / #30230). */
+    public static function byRefErrorMessage(): string
+    {
+        return \PHPCompiler\VM\ReferencableCheck::formatByRefArgumentError('array_push', 0, 'array');
+    }
 
     /**
      * @return bool false when compile-time operand is definitely non-array (caller must not lower push)
@@ -114,6 +117,6 @@ final class JitArrayPush
     {
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, self::BY_REF_ERROR);
+        ErrorRaise::emitRaise($context, self::byRefErrorMessage());
     }
 }

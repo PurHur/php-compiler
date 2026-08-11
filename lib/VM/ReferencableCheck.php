@@ -10,6 +10,7 @@ use PHPCfg\Op\Expr\Cast\Object_ as ObjectCastExpr;
 use PHPCompiler\Block;
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\OpCode;
@@ -29,6 +30,41 @@ final class ReferencableCheck
     private const NON_VARIABLE_ASSIGN_REF_NOTICE = 'Only variables should be assigned by reference';
 
     public const NON_VARIABLE_ASSIGN_REF_NOTICE_MESSAGE = self::NON_VARIABLE_ASSIGN_REF_NOTICE;
+
+    /**
+     * Zend by-ref Error verb for non-referencable actuals (zend_execute.c SEND_REF).
+     *
+     * PHP 8.4+ uses "could not" (#29624 / php-src #10639); ≤8.3 uses "cannot" (#30230).
+     * Unset {@code PHP_COMPILER_PROFILE} on 8.4.0-dev keeps "could not" (forward profile).
+     */
+    public static function byRefArgumentErrorVerb(): string
+    {
+        $profile = CompilerVersion::languageProfileVersion();
+        if (version_compare($profile, '8.4.0', '>=')) {
+            return 'could not';
+        }
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return 'cannot';
+        }
+
+        return CompilerVersion::MAJOR_VERSION > 8
+            || (8 === CompilerVersion::MAJOR_VERSION && CompilerVersion::MINOR_VERSION >= 4)
+            ? 'could not'
+            : 'cannot';
+    }
+
+    /** {@code fn(): Argument #N ($name) {could not|cannot} be passed by reference} */
+    public static function formatByRefArgumentError(string $fn, int $paramIdx, string $paramName): string
+    {
+        return \sprintf(
+            '%s(): Argument #%d ($%s) %s be passed by reference',
+            $fn,
+            $paramIdx + 1,
+            $paramName,
+            self::byRefArgumentErrorVerb()
+        );
+    }
 
     /**
      * @param list<Variable> $calledArgs
@@ -125,12 +161,7 @@ final class ReferencableCheck
 
             return;
         }
-        throw new \Error(\sprintf(
-            '%s(): Argument #%d ($%s) could not be passed by reference',
-            $fn,
-            $paramIdx + 1,
-            $paramName
-        ));
+        throw new \Error(self::formatByRefArgumentError($fn, $paramIdx, $paramName));
     }
 
     public static function variadicByRefParamIndex(Block $calleeBlock): ?int
@@ -339,12 +370,7 @@ final class ReferencableCheck
         if (self::isReferenceable($arg, $caller)) {
             return;
         }
-        throw new \Error(\sprintf(
-            '%s(): Argument #%d ($%s) could not be passed by reference',
-            $fn,
-            $paramIdx + 1,
-            $paramName
-        ));
+        throw new \Error(self::formatByRefArgumentError($fn, $paramIdx, $paramName));
     }
 
     /** True when $arg is (or peels to) a string-offset lvalue — not referenceable (#29523). */
