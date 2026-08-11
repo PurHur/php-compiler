@@ -1189,15 +1189,8 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('__errno_location', $ft);
             $context->registerFunction('__errno_location', $fn);
         }
-        try {
-            $context->lookupFunction('fnmatch');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i32);
-            $fn = $context->module->addFunction('fnmatch', $ft);
-            $context->registerFunction('fnmatch', $fn);
-        }
+        // fnmatch(3) dropped from always-on Module decls (#30383): StringFnmatch
+        // NestedJIT leaf declares fnmatch module-locally (chdir #29219 / rename #29141 shape).
         try {
             $context->lookupFunction('chdir');
         } catch (\Throwable $e) {

@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** fnmatch() — POSIX glob pattern match (VM via VmFnmatchPure; JIT/AOT via JitFnmatch, #3189/#7756/#12075). */
+/** fnmatch() — POSIX glob pattern match (VM via VmFnmatchPure; JIT/AOT via StringFnmatch + FnmatchJitHelper, #3189/#7756/#12075/#30383). */
 final class fnmatch extends Internal
 {
     public function __construct()
