@@ -7,13 +7,18 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * getservbyname() — service port by name+protocol (JIT/AOT via libc, issue #4024).
+ * getservbyname() — service port by name+protocol (JIT/AOT via libc, issue #4024, #30281).
+ *
+ * Z_PARAM_STR: strict_types → TypeError on null; soft path DEP+coerce (#30281).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/network.c PHP_FUNCTION(getservbyname)
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php string $service, string $protocol
  */
 final class getservbyname extends Internal
 {
@@ -30,18 +35,9 @@ final class getservbyname extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $service = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'getservbyname',
-            0,
-            'service'
-        );
-        $protocol = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'getservbyname',
-            1,
-            'protocol'
-        );
+        // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#30281).
+        $service = VmString::stringBuiltinArgForFrame($frame, 0, 'getservbyname', 0, 'service', false);
+        $protocol = VmString::stringBuiltinArgForFrame($frame, 1, 'getservbyname', 1, 'protocol', false);
         $port = VmNetworkServices::getservbyname($service, $protocol);
         if (false === $port) {
             $frame->returnVar->bool(false);
@@ -55,6 +51,22 @@ final class getservbyname extends Internal
     {
         if (2 !== \count($args)) {
             throw new \LogicException('getservbyname() requires exactly two arguments in this compiler build');
+        }
+
+        // Soft-null outside strict_types; strict → TypeError (#30281).
+        // Early return after compile-time null TypeError — no libc call after abort
+        // (AOT module verify: terminator mid-block; peer checkdnsrr #30261 / getmxrr #29810).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'getservbyname', 0, 'service', 'string', null, false);
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'getservbyname', 1, 'protocol', 'string', null, false);
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         return JitNetworkServices::getservbyname($context, $args[0], $args[1]);
