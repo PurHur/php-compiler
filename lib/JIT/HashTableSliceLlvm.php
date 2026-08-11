@@ -46,6 +46,108 @@ final class HashTableSliceLlvm
         return self::sliceFromPairs($context, $pairs, $offset, $hasLength, $length, $preserveFlag);
     }
 
+    /**
+     * LimitIterator(InfiniteIterator, $offset, $count) thin-AOT snapshot (#30273).
+     *
+     * InfiniteIterator's `__spl_ht` is only one cycle of the inner table; a plain
+     * slice cannot expand past that. Tile the ordered pair list for a finite
+     * $count (reindexed — duplicate cycling keys cannot live in one HT).
+     *
+     * @param Value $offset i64
+     * @param Value $length i64 (caller guarantees >= 0)
+     */
+    public static function sliceWrapping(
+        Context $context,
+        Value $srcHt,
+        Value $offset,
+        Value $length
+    ): Value {
+        $pairs = Call\HashTableExportKeyValuePairs::exportPairsForSlice($context, $srcHt);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $tag = (string) self::nextSeq();
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $pairs
+        );
+        $numI64 = JitNestedHelperCoerce::scalarToI64($context, $num, $sizeT);
+
+        $emptyBb = BasicBlockHelper::append($context, 'ht_wrap_empty_'.$tag);
+        $workBb = BasicBlockHelper::append($context, 'ht_wrap_work_'.$tag);
+        $joinBb = BasicBlockHelper::append($context, 'ht_wrap_join_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__hashtable__*')
+        );
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $numI64,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($isEmpty, $emptyBb, $workBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($workBb);
+        // Normalize offset into [0, num) like InfiniteIterator cycling.
+        $offMod = $context->builder->signedRem($offset, $numI64);
+        $offNeg = $context->builder->icmp(Builder::INT_SLT, $offMod, $i64->constInt(0, false));
+        $normOff = $context->builder->select(
+            $offNeg,
+            $context->builder->add($offMod, $numI64),
+            $offMod
+        );
+        $takeNonNeg = $context->builder->select(
+            $context->builder->icmp(Builder::INT_SLT, $length, $i64->constInt(0, false)),
+            $i64->constInt(0, false),
+            $length
+        );
+
+        $dest = HashTableHelper::alloc($context);
+        $outIdxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $outIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'ht_wrap_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'ht_wrap_body_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_wrap_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $outIdx = $context->builder->load($outIdxSlot);
+        $outI64 = JitNestedHelperCoerce::scalarToI64($context, $outIdx, $sizeT);
+        $enough = $context->builder->icmp(Builder::INT_SGE, $outI64, $takeNonNeg);
+        $context->builder->branchIf($enough, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $srcI64 = $context->builder->signedRem(
+            $context->builder->add($normOff, $outI64),
+            $numI64
+        );
+        $srcIdx = JitNestedHelperCoerce::i64ToScalar($context, $srcI64, $sizeT);
+        $pair = HashTableReadLlvm::readIndexedToValueBox($context, $pairs, $srcIdx);
+        $pairHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::valuePtrFromVariable($context, $pair)
+        );
+        $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $one);
+        HashTableHelper::setAtIndex($context, $dest, $outIdx, $valVar);
+        $context->builder->store($context->builder->addNoSignedWrap($outIdx, $one), $outIdxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->store($dest, $resultSlot);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
+
+        return $context->builder->load($resultSlot);
+    }
+
     private static function sliceFromPairs(
         Context $context,
         Value $pairs,

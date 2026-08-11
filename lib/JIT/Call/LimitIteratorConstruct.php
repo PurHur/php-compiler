@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -20,6 +21,9 @@ use PHPLLVM\Value;
  *
  * php-src: ext/spl/spl_iterators.c — spl_dual_it_construct / LimitIterator
  * Keys are preserved (preserve_keys=1) so foreach matches Zend/VM (#27581).
+ *
+ * InfiniteIterator inners tile the backing HT for a finite $count (#30273) —
+ * a plain slice cannot expand past one cycle of the infinite stream.
  *
  * Must be listed in JIT::isVoidJitConstructCall so markObjectConstructed runs
  * after __construct (otherwise constructed=0 aborts get_class / HT reads).
@@ -60,20 +64,60 @@ final class LimitIteratorConstruct implements Call
             $count,
             $i64->constInt(0, false)
         );
-        // preserveKeys=true — LimitIterator forwards inner keys (php-src spl_limit_it_key; #27581).
-        $sliced = HashTableSliceLlvm::slice(
-            $context,
-            $context->helper->loadValue($copy),
-            $offset,
-            $hasLength,
-            $count,
-            $i1->constInt(1, false)
+        $srcHt = $context->helper->loadValue($copy);
+
+        $infId = $context->type->object->lookup('InfiniteIterator');
+        $innerPtr = $context->helper->loadValue($inner);
+        $classId = $context->builder->load(
+            $context->builder->structGep(
+                $innerPtr,
+                $context->structFieldMap['__object__']['class_id']
+            )
         );
+        $isInf = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $classId->typeOf()->constInt($infId, false)
+        );
+        $wrap = $context->builder->and($isInf, $hasLength);
+
+        $resultSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__hashtable__*')
+        );
+        $wrapBb = BasicBlockHelper::append($context, 'limit_it_wrap');
+        $sliceBb = BasicBlockHelper::append($context, 'limit_it_slice');
+        $joinBb = BasicBlockHelper::append($context, 'limit_it_join');
+        $context->builder->branchIf($wrap, $wrapBb, $sliceBb);
+
+        $context->builder->positionAtEnd($wrapBb);
+        $context->builder->store(
+            HashTableSliceLlvm::sliceWrapping($context, $srcHt, $offset, $count),
+            $resultSlot
+        );
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($sliceBb);
+        // preserveKeys=true — LimitIterator forwards inner keys (php-src spl_limit_it_key; #27581).
+        $context->builder->store(
+            HashTableSliceLlvm::slice(
+                $context,
+                $srcHt,
+                $offset,
+                $hasLength,
+                $count,
+                $i1->constInt(1, false)
+            ),
+            $resultSlot
+        );
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
         $slicedVar = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
-            $sliced
+            $context->builder->load($resultSlot)
         );
         $objPtr = $context->helper->loadValue($receiver);
         $slot = $context->type->object->propertySlotFor(
