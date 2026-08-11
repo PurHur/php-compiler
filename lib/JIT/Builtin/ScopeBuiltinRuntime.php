@@ -330,21 +330,27 @@ final class ScopeBuiltinRuntime
         );
     }
 
-    public static function emitCompactInvalidArgumentWarning(Context $context, int $argNum, Value $typeByte): void
-    {
+    public static function emitCompactInvalidArgumentWarning(
+        Context $context,
+        int $argNum,
+        Value $typeByte,
+        ?Value $boolPayload = null
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $payload = $boolPayload ?? $i8->constInt(0, false);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::emitStandaloneCompactInvalidArgumentWarning($context, $argNum, $typeByte);
+            self::emitStandaloneCompactInvalidArgumentWarning($context, $argNum, $typeByte, $payload);
 
             return;
         }
 
         self::ensureJitHelperCompiled($context);
-        $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
         $context->builder->call(
             self::helperFunction($context, self::COMPACT_INVALID_ARG_HELPER),
             $i64->constInt($argNum, false),
-            $context->builder->trunc($typeByte, $i8)
+            $context->builder->trunc($typeByte, $i8),
+            $context->builder->trunc($payload, $i8)
         );
     }
 
@@ -371,7 +377,8 @@ final class ScopeBuiltinRuntime
     private static function emitStandaloneCompactInvalidArgumentWarning(
         Context $context,
         int $argNum,
-        Value $typeByte
+        Value $typeByte,
+        Value $boolPayload
     ): void {
         self::ensureCompactInvalidArgWarnStandaloneLinked($context);
         $i64 = $context->getTypeFromString('int64');
@@ -379,7 +386,8 @@ final class ScopeBuiltinRuntime
         $context->builder->call(
             $context->lookupFunction(self::ABI_COMPACT_INVALID_ARG_WARN),
             $i64->constInt($argNum, false),
-            $context->builder->trunc($typeByte, $i8)
+            $context->builder->trunc($typeByte, $i8),
+            $context->builder->trunc($boolPayload, $i8)
         );
     }
 
@@ -422,7 +430,7 @@ final class ScopeBuiltinRuntime
             $context,
             self::ABI_COMPACT_INVALID_ARG_WARN,
             'scope_compact_invalid_arg_warn_entry',
-            [$i64, $i8],
+            [$i64, $i8, $i8],
             $context->getTypeFromString('void'),
             self::COMPACT_INVALID_ARG_HELPER,
             self::HELPER_PATH,
