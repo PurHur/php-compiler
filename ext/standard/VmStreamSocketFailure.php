@@ -8,17 +8,22 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
 
 /**
- * E_WARNING when stream_socket_client() connect fails (php-src streamsfuncs.c; #10980).
+ * E_WARNING when stream_socket_* / fsockopen connect fails (php-src streamsfuncs.c / fsock.c; #10980, #30313).
  */
 final class VmStreamSocketFailure
 {
-    public static function warnConnectFailed(Frame $frame, string $remote, string $errstr): void
-    {
+    public static function warnConnectFailed(
+        Frame $frame,
+        string $remote,
+        string $errstr,
+        string $function = 'stream_socket_client'
+    ): void {
         if (null === $frame->vmContext) {
             return;
         }
         $message = \sprintf(
-            'stream_socket_client(): Unable to connect to %s (%s)',
+            '%s(): Unable to connect to %s (%s)',
+            $function,
             $remote,
             $errstr
         );

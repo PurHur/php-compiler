@@ -23,5 +23,11 @@ final class FsockopenBuiltinTest extends BaseTest
 
         $udp = __DIR__.'/../compliance/cases/stdlib/fsockopen_udp_scheme.phpt';
         yield 'fsockopen_udp_scheme.phpt' => self::parsePHPT($udp, 'fsockopen_udp_scheme.phpt');
+
+        $soft = __DIR__.'/../compliance/cases/stdlib/fsockopen_null_soft.phpt';
+        yield 'fsockopen_null_soft.phpt' => self::parsePHPT($soft, 'fsockopen_null_soft.phpt');
+
+        $strict = __DIR__.'/../compliance/cases/stdlib/fsockopen_null_strict.phpt';
+        yield 'fsockopen_null_strict.phpt' => self::parsePHPT($strict, 'fsockopen_null_strict.phpt');
     }
 }
