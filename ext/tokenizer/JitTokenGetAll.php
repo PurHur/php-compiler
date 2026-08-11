@@ -39,7 +39,8 @@ final class JitTokenGetAll
             return self::materializeEmptyTokens($context);
         }
 
-        // Soft-null compile-time null → DEP + empty tokens (#21503, reverts #19894 TypeError).
+        // Soft-null compile-time null → DEP + empty tokens when not strict (#21503).
+        // Caller strict_types → TypeError via lowerTrimFamilyString (#30257; php-src Z_PARAM_STR).
         if (
             (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
             && !$context->callerStrictTypes
@@ -48,8 +49,17 @@ final class JitTokenGetAll
 
             return self::materializeEmptyTokens($context);
         }
+        if (
+            $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
+            // Emit TypeError+abort then return a dummy slot — do not lower the helper after terminator (#30257).
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'token_get_all', 0, 'code');
 
-        // php-src Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21503, reverts #19894 TypeError).
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
+        // php-src Z_PARAM_STR — soft-null DEP+coerce outside strict_types (#21503 / #30257).
         $source = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'token_get_all', 0, 'code');
         $flags = self::lowerFlagsRuntime($context, $args, $argc);
         $ht = $context->builder->call(

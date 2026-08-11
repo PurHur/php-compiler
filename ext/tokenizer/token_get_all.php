@@ -29,8 +29,9 @@ final class token_get_all extends Internal
             return;
         }
 
-        // php-src Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21503, reverts #19894 TypeError).
-        $source = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'token_get_all', 0, 'code');
+        // php-src Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null DEP+coerce
+        // (#30257; #21503 soft path without strict_types; tokenizer.stub.php string $code).
+        $source = VmString::trimFamilyStringArgForFrame($frame, 0, 'token_get_all', 0, 'code');
         $flags = 0;
         if ($argc >= 2) {
             $flags = $frame->calledArgs[1]->toInt();
