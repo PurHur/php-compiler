@@ -15985,6 +15985,10 @@ class Compiler {
         );
         $nullsafePropertyFetch->nullsafeFetchPropertyRead = true;
         $nullsafePropertyFetch->nullsafeUninitNullableToNull = $allowUninitNullableShortCircuit;
+        // ?? / isset-empty LHS: BP_VAR_IS quiet fetch (no Undefined property), like $obj->prop ?? (#30030).
+        if ($allowUninitNullableShortCircuit) {
+            $nullsafePropertyFetch->propertyHookCoalesceRead = true;
+        }
         $fetchBlock->addOpCode($nullsafePropertyFetch);
         $fetchJump = new OpCode(OpCode::TYPE_JUMP);
         $fetchJump->block1 = $endBlock;
@@ -16054,6 +16058,8 @@ class Compiler {
             if ($allowUninitNullableShortCircuit) {
                 $receiverFetch->nullsafeFetchPropertyRead = true;
                 $receiverFetch->nullsafeUninitNullableToNull = true;
+                // Intermediate $a->b under $a->b?->v ?? … is also FETCH_OBJ_IS (#30030).
+                $receiverFetch->propertyHookCoalesceRead = true;
             }
             $block->addOpCode($receiverFetch);
 
@@ -16148,6 +16154,7 @@ class Compiler {
             );
             $propFetch->nullsafeFetchPropertyRead = true;
             $propFetch->nullsafeUninitNullableToNull = true;
+            $propFetch->propertyHookCoalesceRead = true;
             $fetchBlock->addOpCode($propFetch);
             $this->compileIssetNullsafeChainLink($chain, $index + 1, $fetchBlock, $resultSlot, $endBlock);
         }
@@ -16217,6 +16224,7 @@ class Compiler {
             );
             $propFetch->nullsafeFetchPropertyRead = true;
             $propFetch->nullsafeUninitNullableToNull = true;
+            $propFetch->propertyHookCoalesceRead = true;
             $fetchBlock->addOpCode($propFetch);
             $this->compileEmptyNullsafeChainLink($chain, $index + 1, $fetchBlock, $resultSlot, $endBlock);
         }
