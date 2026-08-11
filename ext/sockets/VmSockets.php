@@ -280,6 +280,12 @@ final class VmSockets
         int $protocol,
         \PHPCompiler\VM\Context $ctx
     ): array|false {
+        // php-src PHP_FUNCTION(socket_create_pair) — same AF_* gate as socket_create (#30338).
+        if (!\in_array($domain, [self::AF_UNIX, self::AF_INET, self::AF_INET6], true)) {
+            throw new \ValueError(
+                'socket_create_pair(): Argument #1 ($domain) must be one of AF_UNIX, AF_INET6, or AF_INET'
+            );
+        }
         if (!SocketsLibcThinAbi::available()) {
             return false;
         }
