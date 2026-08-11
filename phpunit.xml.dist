@@ -213,6 +213,7 @@
             <file>./test/compliance/SocketConnectSoftNullVMTest.php</file>
             <file>./test/compliance/SocketAddrinfoLookupSoftNullVMTest.php</file>
             <file>./test/compliance/SocketCreatePairNullDomainVMTest.php</file>
+            <file>./test/compliance/SocketConnectNullPortVMTest.php</file>
             <file>./test/compliance/SocketSendtoSoftNullVMTest.php</file>
             <file>./test/compliance/SocketWriteSoftNullVMTest.php</file>
             <file>./test/compliance/SocketSendSoftNullVMTest.php</file>
