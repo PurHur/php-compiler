@@ -2,81 +2,60 @@
 
 declare(strict_types=1);
 
-/**
- * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
- *
- * @copyright 2015 Anthony Ferrara. All rights reserved
- * @license MIT See LICENSE at the root of the project for more info
- */
-
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayFindCallbackPolicy;
-use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\ExceptionBridge;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_any() — true when any element matches a predicate (PHP 8.4; ext/standard/array.c).
+ * array_any() — PHP 8.4: returns true if callback returns true for any element.
  *
- * php-src stub: array_any(array $array, callable $callback): bool — no $strict (#23875).
+ * php-src: ext/standard/array.c — PHP_FUNCTION(array_any).
  */
 final class array_any extends Internal
 {
     public function execute(Frame $frame): void
     {
-        VmArrayValueCallback::requireExactTwoArgs($frame->calledArgs, 'array_any');
-        if (null === $frame->returnVar) {
-            return;
+        $this->requireArgCountRange($frame, 'array_any', 2, 2);
+        $src = VmArray::requireArrayParam($frame->calledArgs[0], 'array_any', 1, 'array');
+        $callbackArg = $frame->calledArgs[1];
+
+        if (null === $frame->vmContext) {
+            throw new \LogicException('array_any() requires VM context');
         }
-        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_any');
-        $callback = $frame->calledArgs[1];
-        VmArrayValueCallback::requireCallback($frame, $callback, 'array_any');
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_any');
-            if (VmArrayValueCallback::isTruthy($result)) {
-                $frame->returnVar->bool(true);
+
+        [$closure, $internal, $userFn, $general] = VmArrayFilterCallback::resolve($frame, $callbackArg);
+
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $result = ArrayCallbackInvoke::invoke(
+                $frame,
+                $closure,
+                $internal,
+                $userFn,
+                $general,
+                $value,
+                $key
+            );
+            if (boolval::isTruthy($result)) {
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->bool(true);
+                }
 
                 return;
             }
         }
-        $frame->returnVar->bool(false);
-    }
 
-    public Context $context;
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(false);
+        }
+    }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if (2 !== $argc) {
-            $slot = JitValueBox::alloc($context);
-            $result = JitValueBox::pointer($context, $slot);
-            ExceptionBridge::emitArgumentCountErrorAndAbort(
-                $context,
-                \sprintf('array_any() expects exactly 2 arguments, %d given', $argc)
-            );
-
-            return $result;
-        }
-        $vacuous = ArrayFindHelper::vacuousAnyAllIfCompileTimeEmpty($context, $args[0], false);
-        if (null !== $vacuous) {
-            return $vacuous;
-        }
-        if ($args[1]->isNullConstant) {
-            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_any'));
-        }
-        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
-            throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
-        }
-        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
-            $this->jitString($context, $args[1], 'array_any() callback');
-        }
-
-        return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1]);
+        throw new \LogicException('array_any() is not supported by the JIT compiler in this build');
     }
 }

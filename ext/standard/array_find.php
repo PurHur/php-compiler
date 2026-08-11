@@ -2,77 +2,60 @@
 
 declare(strict_types=1);
 
-/**
- * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
- *
- * @copyright 2015 Anthony Ferrara. All rights reserved
- * @license MIT See LICENSE at the root of the project for more info
- */
-
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayFindCallbackPolicy;
-use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\ExceptionBridge;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_find() — first element matching a predicate (PHP 8.4; ext/standard/array.c).
+ * array_find() — PHP 8.4: returns first element for which callback returns true.
  *
- * php-src stub: array_find(array $array, callable $callback): mixed — no $strict (#23875).
+ * php-src: ext/standard/array.c — PHP_FUNCTION(array_find).
  */
 final class array_find extends Internal
 {
     public function execute(Frame $frame): void
     {
-        VmArrayValueCallback::requireExactTwoArgs($frame->calledArgs, 'array_find');
-        if (null === $frame->returnVar) {
-            return;
+        $this->requireArgCountRange($frame, 'array_find', 2, 2);
+        $src = VmArray::requireArrayParam($frame->calledArgs[0], 'array_find', 1, 'array');
+        $callbackArg = $frame->calledArgs[1];
+
+        if (null === $frame->vmContext) {
+            throw new \LogicException('array_find() requires VM context');
         }
-        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_find');
-        $callback = $frame->calledArgs[1];
-        VmArrayValueCallback::requireCallback($frame, $callback, 'array_find');
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_find');
-            if (VmArrayValueCallback::isTruthy($result)) {
-                $frame->returnVar->copyFrom($value);
+
+        [$closure, $internal, $userFn, $general] = VmArrayFilterCallback::resolve($frame, $callbackArg);
+
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $result = ArrayCallbackInvoke::invoke(
+                $frame,
+                $closure,
+                $internal,
+                $userFn,
+                $general,
+                $value,
+                $key
+            );
+            if (boolval::isTruthy($result)) {
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->copyFrom($value->resolveIndirect());
+                }
 
                 return;
             }
         }
-        $frame->returnVar->null();
-    }
 
-    public Context $context;
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if (2 !== $argc) {
-            $slot = JitValueBox::alloc($context);
-            $result = JitValueBox::pointer($context, $slot);
-            ExceptionBridge::emitArgumentCountErrorAndAbort(
-                $context,
-                \sprintf('array_find() expects exactly 2 arguments, %d given', $argc)
-            );
-
-            return $result;
-        }
-        if ($args[1]->isNullConstant) {
-            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find'));
-        }
-        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
-            throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
-        }
-        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
-            $this->jitString($context, $args[1], 'array_find() callback');
-        }
-
-        return ArrayFindHelper::buildFindArray($context, $args[0], $args[1]);
+        throw new \LogicException('array_find() is not supported by the JIT compiler in this build');
     }
 }

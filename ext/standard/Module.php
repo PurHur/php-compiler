@@ -100,6 +100,8 @@ class Module extends ModuleAbstract
     {
         return [
             new str_repeat(),
+            new str_increment(),
+            new str_decrement(),
             new decbin(),
             new abs(),
             new ceil(),
@@ -357,6 +359,10 @@ class Module extends ModuleAbstract
             new array_combine(),
             new array_map(),
             new array_filter(),
+            new array_find(),
+            new array_find_key(),
+            new array_any(),
+            new array_all(),
             ...(CompilerVersion::supportsPhp84ArraySearchFunctions() ? [
                 new array_find(),
                 new array_find_key(),
