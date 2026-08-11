@@ -210,6 +210,14 @@ final class InstanceOfHelper
         $context->builder->call($context->lookupFunction('abort'));
     }
 
+    /**
+     * Shared with {@see ClassConstFetchHelper} / dynamic `new` / `$c::` (#30059).
+     */
+    public static function emitInvalidClassOperandError(Context $context): void
+    {
+        self::emitInvalidClassRhsError($context);
+    }
+
     private static function ensureValueBoxBridgeLinked(Context $context): void
     {
         $abiName = '__instanceof__valueBoxRhsKind';
@@ -246,5 +254,21 @@ final class InstanceOfHelper
             $fn,
             $context->builder->trunc($typeByte, $i8)
         );
+    }
+
+    /**
+     * Value-box type tag → instanceof RHS kind (string / object / invalid) (#30059).
+     *
+     * @return Value int32 {@see InstanceOfJitHelper::RHS_KIND_*}
+     */
+    public static function emitValueBoxClassOperandKind(Context $context, Variable $classVar): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $classVar);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+
+        return self::callValueBoxRhsKind($context, $typeByte);
     }
 }

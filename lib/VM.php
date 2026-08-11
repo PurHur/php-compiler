@@ -6314,7 +6314,10 @@ restart:
                             $scopeClassName = $classOperand->toObject()->class->name;
                             $callableName = $scopeClassName.'::'.$staticCallMethodName;
                         } else {
-                            $className = $classOperand->toString();
+                            // String (or Error) — do not stringify bool/int/null/array (#30059).
+                            $className = VM\InstanceOfClassName::resolveClassNamePreservingCase(
+                                $classOperand
+                            );
                             if (!$parentKeywordScope) {
                                 $parentKeywordScope = 'parent' === strtolower($className);
                             }
@@ -6462,10 +6465,18 @@ restart:
                             $frame->scope[$op->arg1]->string($classOperand->toObject()->class->name);
                             break;
                         }
-                        $lcClass = $this->resolveClassScopeName(
-                            $classOperand->toString(),
-                            $frame
+                        // String class name only — reject bool/int/null/array (#30059).
+                        $className = VM\InstanceOfClassName::resolveClassNamePreservingCase(
+                            $classOperand
                         );
+                        $lcClass = $this->resolveClassScopeName($className, $frame);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        return self::EXCEPTION;
                     } catch (\LogicException $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -6474,7 +6485,6 @@ restart:
                         }
                         return self::EXCEPTION;
                     }
-                    $className = $frame->scope[$op->arg2]->resolveIndirect()->toString();
                     if (!isset($this->context->classes[$lcClass])) {
                         if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
                             $this->context->autoloadClass($className);
