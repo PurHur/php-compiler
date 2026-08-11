@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -60,9 +61,11 @@ final class get_loaded_extensions extends Internal
                     $context,
                     'get_loaded_extensions(): Argument #1 ($zend_extensions) must be of type bool, null given'
                 );
+                // Dead resume after catchable throw — empty value box (peer in_array #29866).
                 JitNativeString::ensureInsertBlock($context);
+                $slot = JitValueBox::alloc($context);
 
-                return JitInfo::get_loaded_extensions($context, $context->constantFromBool(false));
+                return JitValueBox::pointer($context, $slot);
             }
             $zendExtensions = JitBoolArg::lowerCoerceZParamBool(
                 $context,

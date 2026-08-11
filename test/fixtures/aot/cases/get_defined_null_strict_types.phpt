@@ -4,13 +4,23 @@ AOT: get_defined_constants/functions/get_loaded_extensions(null) under strict_ty
 <?php
 declare(strict_types=1);
 
-foreach (['get_defined_constants', 'get_defined_functions', 'get_loaded_extensions'] as $fn) {
-    try {
-        var_export($fn(null));
-        echo "\n";
-    } catch (TypeError $e) {
-        echo $e->getMessage(), "\n";
-    }
+try {
+    var_export(get_defined_constants(null));
+    echo "\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    var_export(get_defined_functions(null));
+    echo "\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    var_export(get_loaded_extensions(null));
+    echo "\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
 }
 ?>
 --EXPECT--
