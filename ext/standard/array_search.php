@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\ArraySearchRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -40,9 +41,10 @@ final class array_search extends Internal
             2,
             'haystack'
         );
+        // Z_PARAM_BOOL $strict — strict_types TypeError; else null→false + E_DEPRECATED (#29866).
         $strict = false;
         if (3 === $argc) {
-            $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
+            $strict = VmMath::parseBoolBuiltinArgForFrame($frame, 2, 'array_search', 3, 'strict');
         }
         $vm = null !== $frame->vmContext ? $frame->vmContext->runtime->vm() : null;
         if (null === $frame->returnVar) {
@@ -70,7 +72,17 @@ final class array_search extends Internal
         }
         $strict = $context->constantFromBool(false);
         if (3 === $argc) {
-            $strict = JitBoolArg::lower($context, $args[2], 'array_search() strict');
+            // Compile-time null under strict: catchable TypeError then stop IR (peer substr_compare #29756).
+            if ($context->callerStrictTypes && self::isCompileTimeNull($args[2])) {
+                JitNativeString::ensureInsertBlock($context);
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'array_search(): Argument #3 ($strict) must be of type bool, null given'
+                );
+
+                return $context->constantFromBool(false);
+            }
+            $strict = JitBoolArg::lowerCoerceZParamBool($context, $args[2], 'array_search', 'strict', 3);
         }
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'array_search() needle');
@@ -78,5 +90,10 @@ final class array_search extends Internal
         JitArrayElem::requireArrayParam($context, $args[1], 'array_search', 2, 'haystack');
 
         return ArraySearchRuntime::search($context, $args[0], $args[1], $strict);
+    }
+
+    private static function isCompileTimeNull(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 }

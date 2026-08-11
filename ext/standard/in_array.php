@@ -15,13 +15,17 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\InArrayRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * in_array() for arrays of scalar values (subset of PHP; JIT via InArrayRuntime).
+ *
+ * php-src: ext/standard/array.stub.php / array.c — PHP_FUNCTION(in_array)
  */
 final class in_array extends Internal
 {
@@ -48,9 +52,10 @@ final class in_array extends Internal
             2,
             'haystack'
         );
+        // Z_PARAM_BOOL $strict — strict_types TypeError; else null→false + E_DEPRECATED (#29866).
         $strict = false;
-        if (3 === \count($frame->calledArgs)) {
-            $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
+        if (3 === $argc) {
+            $strict = VmMath::parseBoolBuiltinArgForFrame($frame, 2, 'in_array', 3, 'strict');
         }
         if (null === $frame->returnVar) {
             return;
@@ -81,8 +86,18 @@ final class in_array extends Internal
             ));
         }
         $strict = $context->constantFromBool(false);
-        if (3 === \count($args)) {
-            $strict = JitBoolArg::lower($context, $args[2], 'in_array() strict');
+        if (3 === $argc) {
+            // Compile-time null under strict: catchable TypeError then stop IR (peer substr_compare #29756).
+            if ($context->callerStrictTypes && self::isCompileTimeNull($args[2])) {
+                JitNativeString::ensureInsertBlock($context);
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'in_array(): Argument #3 ($strict) must be of type bool, null given'
+                );
+
+                return $context->constantFromBool(false);
+            }
+            $strict = JitBoolArg::lowerCoerceZParamBool($context, $args[2], 'in_array', 'strict', 3);
         }
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'in_array() needle');
@@ -96,5 +111,10 @@ final class in_array extends Internal
         JitArrayElem::requireArrayParam($context, $args[1], 'in_array', 2, 'haystack');
 
         return InArrayRuntime::inArray($context, $args[0], $args[1], $strict);
+    }
+
+    private static function isCompileTimeNull(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 }
