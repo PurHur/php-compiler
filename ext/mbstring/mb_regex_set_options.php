@@ -35,12 +35,15 @@ final class mb_regex_set_options extends Internal
 
         $options = null;
         if (1 === $argc) {
-            $options = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[0],
-                'mb_regex_set_options',
-                0,
-                'options'
-            );
+            $argVar = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $argVar->type) {
+                $options = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[0],
+                    'mb_regex_set_options',
+                    0,
+                    'options'
+                );
+            }
         }
 
         $previous = MbstringState::regexOptions($options);
