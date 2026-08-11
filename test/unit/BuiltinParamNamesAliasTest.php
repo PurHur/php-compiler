@@ -2135,6 +2135,43 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+
+    /** @covers issue #26096 — bcceil/bcfloor/bcround Reflection arity + Zend stub names */
+    public function testBcceilBcfloorBcroundReflectionNamedParameters(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            foreach (['bcceil', 'bcfloor'] as $fn) {
+                $names = BuiltinParamNames::forFunction($fn);
+                self::assertSame(['num'], $names, $fn);
+                self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn));
+                self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
+                self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+                self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+                self::assertSame('string', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            }
+
+            $round = BuiltinParamNames::forFunction('bcround');
+            self::assertSame(['num', 'precision=', 'mode='], $round);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($round, 'num', 'bcround'));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($round, 'precision', 'bcround'));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($round, 'mode', 'bcround'));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('bcround'));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('bcround'));
+            self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('bcround', 0));
+            self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('bcround', 1));
+            self::assertSame('RoundingMode', BuiltinInternalArgInfo::stubParamTypeOverride('bcround', 2));
+            self::assertSame('string', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('bcround'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #9990 */
     public function testFpowRoundingModeNamedParameters(): void
     {

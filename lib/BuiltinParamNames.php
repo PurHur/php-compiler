@@ -1122,6 +1122,13 @@ final class BuiltinParamNames
             // php-src ext/bcmath/bcmath.stub.php — PHP 8.4; not in php-types InternalArgInfo (#24578)
             case 'bcdivmod':
                 return ['num1', 'num2', 'scale='];
+            // php-src ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096)
+            case 'bcceil':
+            case 'bcfloor':
+                return ['num'];
+            case 'bcround':
+                // php-src — num + optional precision/mode (RoundingMode::HalfAwayFromZero) (#26096, #28566).
+                return ['num', 'precision=', 'mode='];
             case 'bcpow':
                 // php-src — num/exponent/scale; InternalArgInfo still says x/y (#26145).
                 return ['num', 'exponent', 'scale'];
