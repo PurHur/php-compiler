@@ -171,6 +171,8 @@
             <file>./test/compliance/DateTimestampGetTypeerrorDupPrefixVMTest.php</file>
             <file>./test/compliance/DateTimeDiffNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeDiffNullStrictJITTest.php</file>
+            <file>./test/compliance/DateTimeSubclassInterfaceConstDeclaringVMTest.php</file>
+            <file>./test/compliance/DateTimeSubclassInterfaceConstDeclaringJITTest.php</file>
             <file>./test/compliance/DateTimeSetTimezoneNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeSetTimezoneNullStrictJITTest.php</file>
             <file>./test/compliance/TimezoneNameOffsetGetNullGivenVMTest.php</file>
