@@ -49,6 +49,8 @@
             <file>./test/compliance/NullsafeByRefRhsVMTest.php</file>
             <file>./test/compliance/NullsafeCoalesceUndefPropSilent30030VMTest.php</file>
             <file>./test/compliance/NullsafeCoalesceUndefPropSilent30030JITTest.php</file>
+            <file>./test/compliance/UnsetDimNullFalse30099VMTest.php</file>
+            <file>./test/compliance/UnsetDimNullFalse30099JITTest.php</file>
             <file>./test/compliance/CallUnpackNonArrayGiven30023VMTest.php</file>
             <file>./test/compliance/ArraySpreadNonTraversableGiven30055VMTest.php</file>
             <file>./test/compliance/RedundantDnfArmVMTest.php</file>

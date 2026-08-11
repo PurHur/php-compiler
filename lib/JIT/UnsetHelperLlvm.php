@@ -53,6 +53,16 @@ final class UnsetHelperLlvm
 
             return;
         }
+        // ZEND_UNSET_DIM: null silent no-op; false → Deprecated (leave false); other scalars Error
+        // (zend_vm_def.h; #30099).
+        if (Variable::TYPE_NULL === $container->type) {
+            return;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $container->type) {
+            self::compileNativeBoolUnsetDim($context, $block, $op, $container);
+
+            return;
+        }
         if (VmUnset::isScalarJitContainer($container)) {
             self::emitScalarUnsetDimError($context, $container);
 
@@ -67,12 +77,53 @@ final class UnsetHelperLlvm
                 $container,
                 $dim,
                 $op->unsetOnProperty,
+                $op,
                 $jit
             );
 
             return;
         }
         throw new \LogicException('unset() offset only supports arrays and objects in this compiler build');
+    }
+
+    /**
+     * Typed bool container: false → Deprecated only; true → Error (#30099 / zend_vm_def.h).
+     */
+    private static function compileNativeBoolUnsetDim(
+        Context $context,
+        Block $block,
+        OpCode $op,
+        Variable $container
+    ): void {
+        $boolVal = $context->helper->loadValue($container);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolVal,
+            $boolVal->typeOf()->constInt(0, false)
+        );
+        $errBb = BasicBlockHelper::append($context, 'unset_dim_bool_true_err');
+        $falseBb = BasicBlockHelper::append($context, 'unset_dim_bool_false_dep');
+        $doneBb = BasicBlockHelper::append($context, 'unset_dim_bool_done');
+        $context->builder->branchIf($isTrue, $errBb, $falseBb);
+
+        $context->builder->positionAtEnd($errBb);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, VmUnset::ERROR_NON_ARRAY);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $deprecationLine = null !== $op->sourceLocation && $op->sourceLocation->startLine > 0
+            ? $op->sourceLocation->startLine
+            : 0;
+        DynamicPropertyDeprecationGuard::emitFalseToArray(
+            $context,
+            $block->scriptPath(),
+            $deprecationLine
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
     /**
@@ -169,6 +220,7 @@ final class UnsetHelperLlvm
         Variable $container,
         Variable $dim,
         bool $unsetOnProperty,
+        OpCode $op,
         ?\PHPCompiler\JIT $jit = null
     ): void {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
@@ -182,10 +234,14 @@ final class UnsetHelperLlvm
         $arrayBb = BasicBlockHelper::append($context, 'unset_dim_vb_array_'.$tag);
         $objectBb = BasicBlockHelper::append($context, 'unset_dim_vb_object_'.$tag);
         $stringBb = BasicBlockHelper::append($context, 'unset_dim_vb_string_'.$tag);
+        $nullBb = BasicBlockHelper::append($context, 'unset_dim_vb_null_'.$tag);
+        $boolBb = BasicBlockHelper::append($context, 'unset_dim_vb_bool_'.$tag);
         $scalarBb = BasicBlockHelper::append($context, 'unset_dim_vb_scalar_'.$tag);
         $afterArray = BasicBlockHelper::append($context, 'unset_dim_vb_after_array_'.$tag);
         $afterObject = BasicBlockHelper::append($context, 'unset_dim_vb_after_object_'.$tag);
         $afterString = BasicBlockHelper::append($context, 'unset_dim_vb_after_string_'.$tag);
+        $afterNull = BasicBlockHelper::append($context, 'unset_dim_vb_after_null_'.$tag);
+        $afterBool = BasicBlockHelper::append($context, 'unset_dim_vb_after_bool_'.$tag);
         // Continue the caller (main) after a successful unset — returnVoid would end the script (#28051 AOT).
         $doneBb = BasicBlockHelper::append($context, 'unset_dim_vb_done_'.$tag);
 
@@ -269,7 +325,65 @@ final class UnsetHelperLlvm
         ErrorRaise::emitRaise($context, VmUnset::ERROR_STRING_OFFSET);
         $context->builder->branch($doneBb);
 
+        // null / undef — silent no-op (#30099).
         $context->builder->positionAtEnd($afterString);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(VmVariable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBb, $afterNull);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->branch($doneBb);
+
+        // bool: false → Deprecated; true → Error (#30099).
+        $context->builder->positionAtEnd($afterNull);
+        $isVmBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+        );
+        $isJitBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($isVmBool, $isJitBool),
+            $boolBb,
+            $afterBool
+        );
+
+        $context->builder->positionAtEnd($boolBb);
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $i8->constInt(0, false)
+        );
+        $boolErrBb = BasicBlockHelper::append($context, 'unset_dim_vb_bool_true_'.$tag);
+        $boolFalseBb = BasicBlockHelper::append($context, 'unset_dim_vb_bool_false_'.$tag);
+        $context->builder->branchIf($isTrue, $boolErrBb, $boolFalseBb);
+
+        $context->builder->positionAtEnd($boolErrBb);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, VmUnset::ERROR_NON_ARRAY);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($boolFalseBb);
+        $deprecationLine = null !== $op->sourceLocation && $op->sourceLocation->startLine > 0
+            ? $op->sourceLocation->startLine
+            : 0;
+        DynamicPropertyDeprecationGuard::emitFalseToArray(
+            $context,
+            $block->scriptPath(),
+            $deprecationLine
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterBool);
         $context->builder->branch($scalarBb);
 
         $context->builder->positionAtEnd($scalarBb);

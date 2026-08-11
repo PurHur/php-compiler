@@ -7071,6 +7071,20 @@ restart:
                         }
                         break;
                     }
+                    // ZEND_UNSET_DIM: null/undef silent no-op; false → Deprecated only (leaves false)
+                    // — does not promote to array (zend_vm_def.h; #30099).
+                    if (VM\VmUnset::isNullOrUndefUnsetDimNoop($container)) {
+                        break;
+                    }
+                    if (VM\VmUnset::isFalseUnsetDimDeprecated($container)) {
+                        $this->context->errors->internalDeprecated(
+                            TypeCheck::FALSE_TO_ARRAY_DEPRECATED_MESSAGE,
+                            $this->context,
+                            $frame,
+                            '' !== $frame->scriptPath ? $frame->scriptPath : null
+                        );
+                        break;
+                    }
                     $unsetDimMsg = Variable::TYPE_STRING === $container->type
                         ? 'Cannot unset string offsets'
                         : 'Cannot unset offset in a non-array variable';
