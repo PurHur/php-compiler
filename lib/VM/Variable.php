@@ -2742,11 +2742,15 @@ restart:
 
             return;
         }
-        $result = $this->_bitwiseOp(
-            $opCode,
-            self::coerceBitwiseNumericOperand($left->toNumericForArithmetic($vm, $frame), $vm, $frame),
-            self::coerceBitwiseNumericOperand($right->toNumericForArithmetic($vm, $frame), $vm, $frame)
-        );
+        try {
+            $result = $this->_bitwiseOp(
+                $opCode,
+                self::coerceBitwiseNumericOperand($left->toNumericForArithmetic($vm, $frame), $vm, $frame),
+                self::coerceBitwiseNumericOperand($right->toNumericForArithmetic($vm, $frame), $vm, $frame)
+            );
+        } catch (\TypeError) {
+            self::throwUnsupportedOperandTypes($opCode, $left, $right);
+        }
         $this->int($result);
     }
 
