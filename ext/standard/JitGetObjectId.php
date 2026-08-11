@@ -29,7 +29,10 @@ final class JitGetObjectId
             return self::boxed($context, $arg, $function);
         }
 
-        self::emitTypeErrorAndAbort($context, self::scalarTypeError($arg->type, $function));
+        self::emitTypeErrorAndAbort(
+            $context,
+            self::typeErrorMessage($function, \PHPCompiler\JIT\JitOperandTypeLabel::givenLabel($context, $arg))
+        );
 
         return $context->constantFromInteger(0, 'int64');
     }
@@ -68,10 +71,32 @@ final class JitGetObjectId
             $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $okBlock = BasicBlockHelper::append($context, 'get_object_id_ok');
-        $errBlock = BasicBlockHelper::append($context, 'get_object_id_err');
-        $context->builder->branchIf($isObject, $okBlock, $errBlock);
+        $checkBool = BasicBlockHelper::append($context, 'get_object_id_check_bool');
+        $boolBlock = BasicBlockHelper::append($context, 'get_object_id_bool');
+        $mixedErr = BasicBlockHelper::append($context, 'get_object_id_mixed');
+        $context->builder->branchIf($isObject, $okBlock, $checkBool);
 
-        $context->builder->positionAtEnd($errBlock);
+        $context->builder->positionAtEnd($checkBool);
+        // writeBool stores JIT TYPE_NATIVE_BOOL (not VM TYPE_BOOLEAN) (#30100).
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL & 0x7f, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $mixedErr);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolByte = JitValueBox::readBoolByte($context, $loaded);
+        $isTrue = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
+        $trueErr = BasicBlockHelper::append($context, 'get_object_id_true');
+        $falseErr = BasicBlockHelper::append($context, 'get_object_id_false');
+        $context->builder->branchIf($isTrue, $trueErr, $falseErr);
+        $context->builder->positionAtEnd($trueErr);
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'true'));
+        $context->builder->positionAtEnd($falseErr);
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'false'));
+
+        $context->builder->positionAtEnd($mixedErr);
         self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'mixed'));
 
         $context->builder->positionAtEnd($okBlock);
@@ -100,24 +125,6 @@ final class JitGetObjectId
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function scalarTypeError(int $type, string $function): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return self::typeErrorMessage($function, 'int');
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return self::typeErrorMessage($function, 'float');
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return self::typeErrorMessage($function, 'bool');
-            case JITVariable::TYPE_STRING:
-                return self::typeErrorMessage($function, 'string');
-            case JITVariable::TYPE_NULL:
-                return self::typeErrorMessage($function, 'null');
-            default:
-                return self::typeErrorMessage($function, 'mixed');
-        }
     }
 
     private static function typeErrorMessage(string $function, string $given): string

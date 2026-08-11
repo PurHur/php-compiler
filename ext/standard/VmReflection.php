@@ -2614,7 +2614,7 @@ final class VmReflection
         if (Variable::TYPE_OBJECT !== $object->type) {
             throw new \TypeError(\sprintf(
                 'get_object_vars(): Argument #1 ($object) must be of type object, %s given',
-                EnumCaseSupport::typeNameForVariable($object)
+                EnumCaseSupport::typeNameForTypeErrorActual($object)
             ));
         }
         // SimpleXMLElement: same property map as (array) cast (php-src sxe.c; #21666).
@@ -2699,7 +2699,7 @@ final class VmReflection
         if (Variable::TYPE_OBJECT !== $object->type) {
             throw new \TypeError(\sprintf(
                 'get_mangled_object_vars(): Argument #1 ($object) must be of type object, %s given',
-                EnumCaseSupport::typeNameForVariable($object)
+                EnumCaseSupport::typeNameForTypeErrorActual($object)
             ));
         }
         // SimpleXMLElement: same public property map (no mangling; php-src sxe.c; #21666).
