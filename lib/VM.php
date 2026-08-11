@@ -8375,9 +8375,19 @@ restart:
                     break;
                 case OpCode::TYPE_NEW:
                     $result = $frame->scope[$op->arg1];
-                    $rawName = $frame->scope[$op->arg2]->toString();
+                    // Zend ZEND_NEW: classname operand is string or object (Z_OBJCE_P) (#30058).
                     try {
+                        $rawName = VM\InstanceOfClassName::resolveClassNamePreservingCase(
+                            $frame->scope[$op->arg2]
+                        );
                         $lcname = $this->resolveClassScopeName($rawName, $frame);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (\LogicException $e) {
                         throw new \LogicException($e->getMessage());
                     }
@@ -21742,7 +21752,10 @@ restart:
         switch ($op->type) {
             case OpCode::TYPE_NEW:
                 $result = $frame->scope[$op->arg1];
-                $name = $frame->scope[$op->arg2]->toString();
+                // Same classname operand rules as runtime TYPE_NEW (#30058).
+                $name = VM\InstanceOfClassName::resolveClassNamePreservingCase(
+                    $frame->scope[$op->arg2]
+                );
                 $lcname = strtolower($name);
                 if (!isset($this->context->classes[$lcname])) {
                     $this->context->autoloadClass($name);
