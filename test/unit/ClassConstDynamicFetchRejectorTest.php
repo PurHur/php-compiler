@@ -118,6 +118,36 @@ PHP;
         }
     }
 
+    /** Issue #30181: default profile (no PHP_COMPILER_PROFILE) allows dynamic class const fetch. */
+    public function testDefaultProfileAllowsDynamicFetch(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
+            $code = <<<'PHP'
+<?php
+class F { const B = 42; }
+$n = 'B';
+echo F::{$n}, "\n";
+$bad = 'MISSING';
+try { F::{$bad}; } catch (Error $e) { echo get_class($e), ': ', $e->getMessage(), "\n"; }
+PHP;
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'issue_30181.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $this->assertSame("42\nError: Undefined constant F::MISSING\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** Issue #23760 Done-when: ClassName::{$expr}, $obj::{$expr}, undefined → Error. */
     public function testForwardProfileIssue23760ObjectAndUndefined(): void
     {

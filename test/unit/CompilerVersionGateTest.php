@@ -473,10 +473,10 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** Issue #24823 / re-#17863: default + PROFILE=8.2 withhold dynamic Class::{$expr}. */
-    public function testSupportsDynamicClassConstFetchFalseOnReferenceAndProfile82(): void
+    /** Issue #30181: default enables dynamic Class::{$expr}; PROFILE=8.2 withholds it. */
+    public function testSupportsDynamicClassConstFetchDefaultTrueAndProfile82False(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+        $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
 
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.2');
