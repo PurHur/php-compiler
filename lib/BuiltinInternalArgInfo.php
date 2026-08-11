@@ -125,6 +125,8 @@ final class BuiltinInternalArgInfo
             'stream_socket_client' => '',
             // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says resource (#28919)
             'fsockopen', 'pfsockopen' => '',
+            // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says resource (#28520)
+            'tmpfile', 'fopen' => '',
             // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#28857)
             'stream_socket_server' => '',
             // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says resource (#28908)

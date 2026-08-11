@@ -918,6 +918,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_context_create'));
     }
 
+    /** php-src basic_functions.stub.php — no return; InternalArgInfo says resource (#28520). */
+    public function testTmpfileFopenHaveNoReturnType(): void
+    {
+        foreach (['tmpfile', 'fopen'] as $fn) {
+            $this->assertSame('', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+    }
+
     /** php-src file.stub.php — InternalArgInfo omits |false (#25509). */
     public function testFileIoFamilyReflectionReturnUnions(): void
     {
