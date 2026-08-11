@@ -56,12 +56,10 @@ final class JitReferencableCheck
         $paramName = $names[$paramIdx] ?? 'param'.($paramIdx + 1);
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, \sprintf(
-            '%s(): Argument #%d ($%s) could not be passed by reference',
-            $fn,
-            $paramIdx + 1,
-            $paramName
-        ));
+        ErrorRaise::emitRaise(
+            $context,
+            \PHPCompiler\VM\ReferencableCheck::formatByRefArgumentError($fn, $paramIdx, $paramName)
+        );
     }
 
     /**
