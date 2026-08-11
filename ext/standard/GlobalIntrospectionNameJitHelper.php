@@ -14,6 +14,6 @@ final class GlobalIntrospectionNameJitHelper
 {
     public static function normalize(string $name): string
     {
-        return VmReflection::normalizeGlobalIntrospectionName($name);
+        return ltrim($name, '\\');
     }
 }
