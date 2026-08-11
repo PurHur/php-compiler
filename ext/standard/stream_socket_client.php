@@ -16,6 +16,11 @@ use PHPLLVM\Value;
  *
  * Stream context socket options are read from the VM representation; routed through
  * {@see VmStreamSocketNative} (no host Zend stream wrapper delegation).
+ *
+ * Z_PARAM_STR $address — soft-null DEP+coerce outside strict_types / default profile;
+ * TypeError under caller strict_types or 8.4 forward profile (#30314, re-#21446; peer fsockopen #30313).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/streamsfuncs.c PHP_FUNCTION(stream_socket_client)
  */
 final class stream_socket_client extends Internal
 {
@@ -36,12 +41,8 @@ final class stream_socket_client extends Internal
             return;
         }
 
-        $remote = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
-            'stream_socket_client',
-            0,
-            'address'
-        );
+        // Z_PARAM_STR — soft DEP+coerce; strict_types / PROFILE≥8.4 → TypeError (#30314).
+        $remote = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'stream_socket_client', 0, 'address');
 
         $errno = 0;
         $errstr = '';
@@ -92,6 +93,11 @@ final class stream_socket_client extends Internal
             $flags,
             $contextVar
         );
+
+        if (false === $result && 'Unable to parse remote socket path' === $errstr) {
+            // php-src streamsfuncs.c empty-address parse failure text (#30314).
+            $errstr = 'Failed to parse address "'.$remote.'"';
+        }
 
         if (isset($frame->calledArgs[1])) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
