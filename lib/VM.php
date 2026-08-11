@@ -7445,6 +7445,19 @@ restart:
 
                         return self::EXCEPTION;
                     }
+                    if (Variable::TYPE_OBJECT === $receiver->type
+                        && VM\ResourceSupport::isResourceObject($receiver->toObject())) {
+                        $catchFrame = $this->dispatchVmError(
+                            sprintf('Call to a member function %s() on resource', $methodName),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
+                    }
                     $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
                     $catchFrame = $this->initMethodCall(
                         $frame,
@@ -8681,6 +8694,44 @@ restart:
                             break;
                         }
                         VM\IncompleteClassSupport::emitAccessWarning($propertyObject, $this->context, $frame);
+                        $result->null();
+                        break;
+                    }
+                    if (VM\ResourceSupport::isResourceObject($propertyObject)) {
+                        $forWrite = $propertyFetchForWrite
+                            || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op)
+                            || $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
+                        if ($forWrite) {
+                            if ($this->propertyFetchDestUsedAsIncDec($frame, $op)) {
+                                $catchFrame = $this->dispatchVmError(
+                                    sprintf('Attempt to increment/decrement property "%s" on resource', $name),
+                                    $frame
+                                );
+                            } else {
+                                $catchFrame = $this->dispatchVmError(
+                                    sprintf('Attempt to assign property "%s" on resource', $name),
+                                    $frame
+                                );
+                            }
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
+                        if ($op->propertyHookCoalesceRead) {
+                            $result->null();
+                            break;
+                        }
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        $this->context->errors->propertyReadOnNonObject(
+                            $name,
+                            'resource',
+                            $this->context,
+                            $frame,
+                            $scriptFile
+                        );
                         $result->null();
                         break;
                     }
