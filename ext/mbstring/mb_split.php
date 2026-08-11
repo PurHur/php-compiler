@@ -34,12 +34,13 @@ final class mb_split extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR $pattern / $string — caller strict_types → TypeError on null (#29811).
-        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_split', 0, 'pattern');
+        // Z_PARAM_STR $pattern / $string — caller strict_types → TypeError on null (#29811);
+        // non-strict: Deprecated + coerce to '' (soft-null, Zend 8.4 parity #30069).
+        $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_split', 0, 'pattern');
         if (null === $frame->returnVar) {
             return;
         }
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'mb_split', 1, 'string');
+        $string = VmString::trimFamilyStringArgForFrame($frame, 1, 'mb_split', 1, 'string');
         $limit = -1;
         if ($argc >= 3) {
             $limitVar = $frame->calledArgs[2]->resolveIndirect();
