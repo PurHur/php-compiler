@@ -2951,6 +2951,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitMktime.php` | 0 | 1 |
 | `ext/standard/JitMoveUploadedFile.php` | 0 | 1 |
 | `ext/standard/JitMultipartKernel.php` | 0 | 1 |
+| `ext/standard/JitNaturalCompareKernel.php` | 0 | 1 |
 | `ext/standard/JitNetGetInterfaces.php` | 0 | 1 |
 | `ext/standard/JitNetworkServices.php` | 0 | 1 |
 | `ext/standard/JitNlLanginfo.php` | 0 | 1 |
@@ -5862,7 +5863,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringMsg.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNCompare.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNaturalCompare.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringNaturalCompareJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetInterfacesJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetworkServices.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetworkServicesNameLookup.php` | 0 | 1 |
@@ -30504,6 +30504,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 13 class method(s)
 
+### `ext/standard/JitNaturalCompareKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
+
 ### `ext/standard/JitNetGetInterfaces.php`
 
 **Warnings** (review for bootstrap subset):
@@ -37009,7 +37014,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_search.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/array_shift.php`
 
@@ -38916,11 +38921,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/in_array.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
-- new ArgumentCountError (line 38)
-- new ArgumentCountError (line 72)
-- new ArgumentCountError (line 78)
-- 3 class method(s)
+- new ArgumentCountError (line 36)
+- new ArgumentCountError (line 42)
+- new ArgumentCountError (line 77)
+- new ArgumentCountError (line 83)
+- 4 class method(s)
 
 ### `ext/standard/inet_ntop.php`
 
@@ -50212,11 +50217,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
-
-### `lib/JIT/Builtin/StringNaturalCompareJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 14 class method(s)
 
 ### `lib/JIT/Builtin/StringNetInterfacesJit.php`
 
