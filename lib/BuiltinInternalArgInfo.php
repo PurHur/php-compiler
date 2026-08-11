@@ -688,6 +688,8 @@ final class BuiltinInternalArgInfo
             'get_parent_class' => 0 === $index ? 'object|string' : null,
             // Zend/zend_builtin_functions.stub.php — object|string untyped in Reflection (InternalArgInfo object) (#25498)
             'class_parents' => 0 === $index ? '' : null,
+            // Zend/zend_builtin_functions.stub.php — $object_or_class untyped; InternalArgInfo object|string (#30244, re-#23399)
+            'method_exists', 'property_exists' => 0 === $index ? '' : null,
             // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)
             'user_error' => match ($index) {
                 0 => 'string',
