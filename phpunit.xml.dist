@@ -217,6 +217,8 @@
             <file>./test/compliance/DomCreateNullStrictJITTest.php</file>
             <file>./test/compliance/DomLoadXpathNullStrictVMTest.php</file>
             <file>./test/compliance/DomLoadXpathNullStrictJITTest.php</file>
+            <file>./test/compliance/DomSetattrNsNullStrictVMTest.php</file>
+            <file>./test/compliance/DomSetattrNsNullStrictJITTest.php</file>
             <file>./test/compliance/DomXpathNullExpressionDeprecatedVMTest.php</file>
             <file>./test/compliance/PdoConstructPrepareQueryReflectionVMTest.php</file>
             <file>./test/compliance/PhpversionVMTest.php</file>

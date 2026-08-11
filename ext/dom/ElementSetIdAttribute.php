@@ -21,7 +21,14 @@ final class ElementSetIdAttribute extends DomClassMethod
         if (\count($frame->calledArgs) < 3) {
             throw new \LogicException('DOMElement::setIdAttribute() expects at least 2 arguments');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMElement::setIdAttribute()', 0);
+        // Pass $frame so caller strict_types rejects null like Zend (#30091, peer #29985).
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMElement::setIdAttribute()',
+            0,
+            $frame,
+            'qualifiedName'
+        );
         $isIdVar = $frame->calledArgs[2]->resolveIndirect();
         if (Variable::TYPE_BOOLEAN !== $isIdVar->type) {
             throw new \TypeError(

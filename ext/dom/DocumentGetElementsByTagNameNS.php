@@ -20,12 +20,24 @@ final class DocumentGetElementsByTagNameNS extends DomClassMethod
         if (\count($frame->calledArgs) < 3) {
             throw new \LogicException('DOMDocument::getElementsByTagNameNS() expects at least 2 arguments');
         }
-        $namespace = $this->stringArg($frame->calledArgs[1], 'DOMDocument::getElementsByTagNameNS()', 0, $frame, 'namespace');
-        $localName = $this->stringArg($frame->calledArgs[2], 'DOMDocument::getElementsByTagNameNS()', 1, $frame, 'localName');
+        // php-src stub: ?string $namespace — null must not TypeError under strict (#30091).
+        $namespace = $this->nullableStringArg(
+            $frame->calledArgs[1],
+            'DOMDocument::getElementsByTagNameNS()',
+            0
+        );
+        $localName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMDocument::getElementsByTagNameNS()',
+            1,
+            $frame,
+            'localName'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::getElementsByTagNameNS() requires VM context in this compiler build');
         }
-        $list = VmDom::getElementsByTagNameNS($frame->vmContext, $receiver, $namespace, $localName);
+        // Zend treats null namespace like "" for matching (no-namespace elements).
+        $list = VmDom::getElementsByTagNameNS($frame->vmContext, $receiver, $namespace ?? '', $localName);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($list);
         }

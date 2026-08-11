@@ -21,8 +21,21 @@ final class ElementSetIdAttributeNS extends DomClassMethod
         if (\count($frame->calledArgs) < 4) {
             throw new \LogicException('DOMElement::setIdAttributeNS() expects at least 3 arguments');
         }
-        $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::setIdAttributeNS()', 0);
-        $localName = $this->stringArg($frame->calledArgs[2], 'DOMElement::setIdAttributeNS()', 1);
+        // php-src stub: string $namespace, string $qualifiedName — not ?string (#30091).
+        $namespace = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMElement::setIdAttributeNS()',
+            0,
+            $frame,
+            'namespace'
+        );
+        $localName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMElement::setIdAttributeNS()',
+            1,
+            $frame,
+            'qualifiedName'
+        );
         $isIdVar = $frame->calledArgs[3]->resolveIndirect();
         if (Variable::TYPE_BOOLEAN !== $isIdVar->type) {
             throw new \TypeError(

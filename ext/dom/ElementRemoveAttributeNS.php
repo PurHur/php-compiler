@@ -21,7 +21,14 @@ final class ElementRemoveAttributeNS extends DomClassMethod
             throw new \LogicException('DOMElement::removeAttributeNS() expects at least 2 arguments');
         }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::removeAttributeNS()', 0);
-        $localName = $this->stringArg($frame->calledArgs[2], 'DOMElement::removeAttributeNS()', 1);
+        // Pass $frame so caller strict_types rejects null localName (#30091, peer #29985).
+        $localName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMElement::removeAttributeNS()',
+            1,
+            $frame,
+            'localName'
+        );
         VmDom::removeAttributeNS($frame->vmContext, $element, $namespace, $localName);
         if (null !== $frame->returnVar) {
             // php-src dom_element_remove_attribute_ns() returns SUCCESS → null (#15358).
