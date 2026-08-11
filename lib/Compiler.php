@@ -1478,6 +1478,40 @@ class Compiler {
         return false;
     }
 
+    /**
+     * ADD_ARRAY_UNPACK compile-time Fatal message — PHP 8.4+ appends {@code , <type> given} (#30055).
+     */
+    private function arrayUnpackNonTraversableCompileMessage(Operand $operand): string
+    {
+        if ($operand instanceof Operand\Literal) {
+            return VM\ArraySpread::nonTraversableMessageForPhpValue($operand->value);
+        }
+        foreach ($operand->ops as $op) {
+            if (!$op instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = $op->name;
+            while ($name instanceof Operand\Temporary && null !== $name->original) {
+                $name = $name->original;
+            }
+            if (!$name instanceof Operand\Literal || !is_string($name->value)) {
+                continue;
+            }
+            $lc = strtolower($name->value);
+            if ('null' === $lc) {
+                return VM\ArraySpread::nonTraversableMessageForPhpValue(null);
+            }
+            if ('true' === $lc) {
+                return VM\ArraySpread::nonTraversableMessageForPhpValue(true);
+            }
+            if ('false' === $lc) {
+                return VM\ArraySpread::nonTraversableMessageForPhpValue(false);
+            }
+        }
+
+        return VM\ArraySpread::NON_TRAVERSABLE_MESSAGE;
+    }
+
     private function branchCfgAssignsNonNullValue(CfgBlock $branchCfg): bool
     {
         foreach ($branchCfg->children as $child) {
@@ -55626,7 +55660,7 @@ class Compiler {
                     throw new CompileFatal(
                         $sourceFile,
                         max(1, $expr->getLine()),
-                        VM\ArraySpread::NON_TRAVERSABLE_MESSAGE
+                        $this->arrayUnpackNonTraversableCompileMessage($spreadOperand)
                     );
                 }
                 if (!$started) {
