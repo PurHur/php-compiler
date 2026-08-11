@@ -218,6 +218,27 @@ final class VmString
     }
 
     /**
+     * zend_parse_parameters "C" class-name operand (#30060).
+     *
+     * Null converts to "" with no Z_PARAM_STR E_DEPRECATED; class lookup then TypeErrors
+     * "must be a valid class name,  given". Other operands keep Z_PARAM_STR guards.
+     * php-src: Zend/zend_builtin_functions.c — ZEND_FUNCTION(get_class_vars) / "C".
+     */
+    public static function coerceClassNameParamArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'class'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
+
+        return self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * Coerce a typed string builtin operand (php-src IS_STRING; rejects null, #12640).
      *
      * @throws \TypeError when the operand is null or cannot be converted like Zend PHP 8.x

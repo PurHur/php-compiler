@@ -21,7 +21,8 @@ final class GetClassVarsJitHelper
     {
         $frame = VmExecutingFrame::requireFromActiveContext();
         $ctx = VmReflection::requireContext($frame);
-        $className = VmString::coerceStringBuiltinArg($classOperand, 'get_class_vars', 0, 'class');
+        // zend_parse_parameters "C" — null→"" without Z_PARAM_STR DEP (#30060).
+        $className = VmString::coerceClassNameParamArg($classOperand, 'get_class_vars', 0, 'class');
         $entry = VmReflection::fetchClassEntryForGetClassVars($ctx, $className);
 
         return VmReflection::getClassVarsArray($entry, $frame);

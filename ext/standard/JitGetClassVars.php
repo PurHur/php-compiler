@@ -38,6 +38,12 @@ final class JitGetClassVars
         return self::routeThroughPhpHelper($context, $classArg);
     }
 
+    /** NestedJIT / VALUE operand — PHP helper applies "C" soft-null (#30060). */
+    public static function invokeFromValueBox(Context $context, JITVariable $classArg): Value
+    {
+        return self::routeThroughPhpHelper($context, $classArg);
+    }
+
     private static function routeThroughPhpHelper(Context $context, JITVariable $classArg): Value
     {
         $operandPtr = self::operandToValueBox($context, $classArg);
