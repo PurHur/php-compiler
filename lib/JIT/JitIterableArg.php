@@ -275,6 +275,16 @@ final class JitIterableArg
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $arg, null)) {
             return true;
         }
+        // TYPE_VALUE + `__object__*` (nested `new` call args) — re-probe as object (#30273).
+        if (Variable::TYPE_VALUE === $arg->type && Variable::KIND_VALUE === $arg->kind) {
+            $llvmType = $context->getStringFromType($arg->value->typeOf());
+            if ('__object__*' === $llvmType) {
+                $asObj = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $arg->value);
+                if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $asObj, null)) {
+                    return true;
+                }
+            }
+        }
         if (Variable::TYPE_VALUE !== $arg->type) {
             return false;
         }
@@ -302,14 +312,42 @@ final class JitIterableArg
         if (null === $map || !isset($map['type'])) {
             return null;
         }
+        // Nested `new` / NestedJIT call args are often `__value__**` or `__object__*` while
+        // still KIND_VALUE+TYPE_VALUE — never structGep a non-`__value__` receiver (#30273 / #21041).
+        $valuePtr = self::valueBoxPtrIfPresent($context, $arg);
+        if (null === $valuePtr) {
+            return null;
+        }
         $typeByte = $context->builder->load(
-            $context->builder->structGep($arg->value, $map['type'])
+            $context->builder->structGep($valuePtr, $map['type'])
         );
         if (!method_exists($typeByte, 'isConstant') || !$typeByte->isConstant()) {
             return null;
         }
+        if (!method_exists($typeByte, 'getConstantValue')) {
+            return null;
+        }
 
         return (int) $typeByte->getConstantValue();
+    }
+
+    /**
+     * Compile-time peek only — null when {@see Variable::$value} is not a value-box pointer
+     * (nested constructor results are often {@see __object__*}).
+     */
+    private static function valueBoxPtrIfPresent(Context $context, Variable $arg): ?Value
+    {
+        $tyName = $context->getStringFromType($arg->value->typeOf());
+        // Only direct `__value__*` can yield a compile-time constant type tag.
+        // `__value__**` / `__object__*` need a runtime load — return null (#30273).
+        if ('__value__*' === $tyName) {
+            return $arg->value;
+        }
+        if ('__value__' === $tyName) {
+            return JitValueBox::pointer($context, $arg->value);
+        }
+
+        return null;
     }
 
     private static function guardValueBoxOperand(
