@@ -44,7 +44,9 @@ final class socket_addrinfo_lookup extends Internal
             throw new \LogicException('socket_addrinfo_lookup() requires VM context');
         }
 
-        $host = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'socket_addrinfo_lookup', 0, 'host');
+        // Z_PARAM_STR — soft-null outside strict_types; strict → TypeError (#30337).
+        // userArgIndex is 0-based for Argument/parameter #N messages (same as socket_connect).
+        $host = VmString::stringBuiltinArgForFrame($frame, 0, 'socket_addrinfo_lookup', 0, 'host', false);
         $service = null;
         if ($argc >= 2) {
             $service = VmString::coerceNullableStringBuiltinArg(
