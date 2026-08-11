@@ -6,84 +6,80 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringStrIncdec;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
- * str_increment() — PHP 8.3 alphanumeric string increment (issue #3102).
+ * str_increment() — PHP 8.3: alphanumeric string increment.
  *
- * php-src: ext/standard/string.c — PHP_FUNCTION(str_increment) / Z_PARAM_STR
- * Null soft-coerces with E_DEPRECATED on PROFILE≥8.4 then empty → ValueError (#26264, re-#24179;
- * reverts over-strict TypeError from #21005). Caller strict_types still TypeErrors null.
+ * php-src: ext/standard/string.c — PHP_FUNCTION(str_increment).
  */
 final class str_increment extends Internal
 {
-    public function __construct()
-    {
-        parent::__construct('str_increment');
-    }
-
     public function execute(Frame $frame): void
     {
-        // php-src ext/standard/string.c — ArgumentCountError (#28679; peer #28691).
         $this->requireExactArgCount($frame, 'str_increment', 1);
-        $input = self::vmStringArg($frame);
-        $result = VmString::strIncrement($input);
-        if (null === $frame->returnVar) {
-            return;
+        $arg = $frame->calledArgs[0]->resolveIndirect();
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireStringStrict($arg, 'str_increment', 1, 'string');
         }
-        $frame->returnVar->string($result);
+        $str = $arg->toString();
+
+        if ('' === $str) {
+            throw new \ValueError('str_increment(): Argument #1 ($string) must not be empty');
+        }
+        if (!preg_match('/^[a-zA-Z0-9]+$/', $str)) {
+            throw new \ValueError('str_increment(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
+        }
+
+        $result = self::increment($str);
+
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string($result);
+        }
     }
 
-    public Context $context;
+    public static function increment(string $str): string
+    {
+        $chars = str_split($str);
+        $carry = true;
+        for ($i = \count($chars) - 1; $i >= 0 && $carry; $i--) {
+            $c = $chars[$i];
+            if ($c >= '0' && $c <= '8') {
+                $chars[$i] = \chr(\ord($c) + 1);
+                $carry = false;
+            } elseif ('9' === $c) {
+                $chars[$i] = '0';
+            } elseif ($c >= 'a' && $c <= 'y') {
+                $chars[$i] = \chr(\ord($c) + 1);
+                $carry = false;
+            } elseif ('z' === $c) {
+                $chars[$i] = 'a';
+            } elseif ($c >= 'A' && $c <= 'Y') {
+                $chars[$i] = \chr(\ord($c) + 1);
+                $carry = false;
+            } elseif ('Z' === $c) {
+                $chars[$i] = 'A';
+            }
+        }
+        if ($carry) {
+            $first = $chars[0];
+            if ($first >= '0' && $first <= '9') {
+                array_unshift($chars, '1');
+            } elseif ($first >= 'a' && $first <= 'z') {
+                array_unshift($chars, 'a');
+            } else {
+                array_unshift($chars, 'A');
+            }
+        }
+
+        return implode('', $chars);
+    }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $this->context = $context;
-        // Catchable ArgumentCountError (AOT) — peer #28228 / #28679.
-        if (!$this->requireExactJitArgCount($context, $args, 'str_increment', 1)) {
-            return $context->getTypeFromString('__string__*')->constNull();
-        }
-
-        $input = self::jitStringArg($context, $args[0]);
-        // Empty after soft-null (or '') → ValueError before helper (#26264; php-src string.c).
-        JitStringBuiltinArg::rejectEmpty(
-            $context,
-            $args[0],
-            $input,
-            'str_increment(): Argument #1 ($string) must not be empty'
-        );
-
-        return StringStrIncdec::invokeIncrement($context, $input);
-    }
-
-    /** Z_PARAM_STR — soft-null DEP+coerce on PROFILE≥8.4 (#26264; php-src string.c). */
-    private static function vmStringArg(Frame $frame): string
-    {
-        return VmString::trimFamilyStringArgForFrame($frame, 0, 'str_increment', 0, 'string');
-    }
-
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if ($context->callerStrictTypes) {
-            return JitStringBuiltinArg::lowerStrictOrCoercible(
-                $context,
-                $arg,
-                'str_increment',
-                0,
-                'string'
-            );
-        }
-
-        return JitStringBuiltinArg::lowerTrimFamilyString(
-            $context,
-            $arg,
-            'str_increment',
-            0,
-            'string'
-        );
+        throw new \LogicException('str_increment() is not supported by the JIT compiler in this build');
     }
 }

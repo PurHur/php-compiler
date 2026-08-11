@@ -218,7 +218,7 @@ class Module extends ModuleAbstract
             new substr_replace(),
             new strrev(),
             new str_rot13(),
-            ...(CompilerVersion::supportsStrIncrement() ? [new str_increment(), new str_decrement()] : []),
+            // str_increment/str_decrement registered unconditionally above (PHP 8.3; #30177)
             new str_shuffle(),
             new strpos(),
             new strstr(),
