@@ -35,7 +35,8 @@ final class socket_connect extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_connect', 1);
-        $addr = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_connect', 1, 'addr');
+        // Z_PARAM_STR — soft-null outside strict_types; param name $address (php-src stub; #30316).
+        $addr = VmString::stringBuiltinArgForFrame($frame, 1, 'socket_connect', 1, 'address', false);
         $port = 0;
         if ($argc >= 3) {
             $port = VmSocketArg::requireIntArg($frame, 2, 'socket_connect', 3, 'port');
