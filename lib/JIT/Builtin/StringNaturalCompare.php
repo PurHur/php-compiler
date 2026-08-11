@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitNaturalCompareKernel;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for strnatcmp/strnatcasecmp via LLVM bodies (#5517, #26975).
+ * JIT/AOT link for strnatcmp/strnatcasecmp via {@see JitNaturalCompareKernel} (#30088).
  *
- * NestedJIT {@see \PHPCompiler\ext\standard\NaturalCompareJitHelper} returns 0 under thin
- * standalone AOT (strlen/ord/loop lowering holes). Emit the VmString algorithm as LLVM
- * instead — peer MultisortRuntime / NaturalSortRuntime (#26908 / #26975).
+ * Thin orchestrator — LLVM algorithm lives in ext/standard (quarantine peer StreamMode #19794).
+ * NestedJIT {@see \PHPCompiler\ext\standard\NaturalCompareJitHelper} still returns 0 under thin
+ * AOT (#26975); do not route through JitVmHelperLink until NestedJIT string loops are fixed.
  *
  * SSOT (VM): {@see \PHPCompiler\ext\standard\VmString::strnatcmp()} /
  * {@see \PHPCompiler\ext\standard\VmString::strnatcasecmp()}
@@ -21,12 +22,12 @@ final class StringNaturalCompare
 {
     public static function ensureStrnatcmpLinked(Context $context): void
     {
-        StringNaturalCompareJit::implementStrnatcmp($context);
+        JitNaturalCompareKernel::implementStrnatcmp($context);
     }
 
     public static function ensureStrnatcasecmpLinked(Context $context): void
     {
-        StringNaturalCompareJit::implementStrnatcasecmp($context);
+        JitNaturalCompareKernel::implementStrnatcasecmp($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void

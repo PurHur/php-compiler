@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -12,11 +12,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM natural-order string compare (mirrors VmString::strnatcmp / strnatcasecmp).
+ * LLVM natural-order string compare kernel (mirrors VmString::strnatcmp / strnatcasecmp).
  *
+ * Quarantined from {@see \PHPCompiler\JIT\Builtin\StringNaturalCompareJit} (#30088).
+ * Thin AOT cannot NestedJIT {@see NaturalCompareJitHelper} (returns 0 / segfault — #26975);
+ * keep the algorithm as LLVM here; Builtin stays a thin orchestrator.
  * Replaces deleted lib/AOT/runtime/phpc_strnatcmp.c + phpc_strnatcasecmp.c (#5517).
  */
-final class StringNaturalCompareJit
+final class JitNaturalCompareKernel
 {
     public static function implementStrnatcmp(Context $context): void
     {
