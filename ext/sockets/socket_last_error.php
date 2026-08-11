@@ -34,7 +34,7 @@ final class socket_last_error extends Internal
         }
         $object = null;
         if (1 === $argc) {
-            $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_last_error', 1);
+            $object = VmSocketArg::requireSocketObjectOrNull($frame->calledArgs[0], 'socket_last_error', 1);
         }
         $errno = VmSockets::lastError($object);
         BuiltinExecute::writeReturn(

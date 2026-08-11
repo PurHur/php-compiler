@@ -52,6 +52,51 @@ final class VmSocketArg
         return $object;
     }
 
+    /**
+     * Optional Socket — null means process-level errno (php-src O! / ?Socket; #30267).
+     */
+    public static function requireSocketObjectOrNull(Variable $var, string $functionName, int $argNum = 1): ?ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        // Reject with ?Socket in the expected type (Zend zend_verify_arg_type for nullable).
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($socket) must be of type ?Socket, %s given',
+                $functionName,
+                $argNum,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($socket) must be of type ?Socket, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($var)
+            ));
+        }
+        $object = $var->toObject();
+        if (!VmSocket::isSocketObject($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($socket) must be of type ?Socket, %s given',
+                $functionName,
+                $argNum,
+                self::objectTypeName($object)
+            ));
+        }
+        if (!VmSocket::isValidSocketObject($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): supplied resource is not a valid Socket resource',
+                $functionName
+            ));
+        }
+
+        return $object;
+    }
+
     public static function requireHostSocket(Variable $var, string $functionName, int $argNum = 1): \Socket
     {
         $object = self::requireSocketObject($var, $functionName, $argNum);
