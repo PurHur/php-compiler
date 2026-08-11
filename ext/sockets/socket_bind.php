@@ -39,7 +39,7 @@ final class socket_bind extends Internal
         $addr = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_bind', 1, 'address');
         $port = 0;
         if ($argc >= 3) {
-            $port = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_bind', 3, 'port');
+            $port = VmSocketArg::requireIntArg($frame, 2, 'socket_bind', 3, 'port');
         }
         $ok = VmSockets::bind($object, $addr, $port, $frame);
         BuiltinExecute::writeReturn(

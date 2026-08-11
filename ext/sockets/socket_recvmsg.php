@@ -46,7 +46,7 @@ final class socket_recvmsg extends Internal
         }
         $flags = 0;
         if ($argc >= 3) {
-            $flags = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_recvmsg', 3, 'flags');
+            $flags = VmSocketArg::requireIntArg($frame, 2, 'socket_recvmsg', 3, 'flags');
         }
         $parsed = VmSocketMsg::parseRecvMessage($msgVar->toArray(), $frame);
         if (null === $parsed) {

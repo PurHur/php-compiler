@@ -40,8 +40,8 @@ class socket_set_option extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], $fn, 1);
-        $level = VmSocketArg::requireIntArg($frame->calledArgs[1], $fn, 2, 'level');
-        $option = VmSocketArg::requireIntArg($frame->calledArgs[2], $fn, 3, 'option');
+        $level = VmSocketArg::requireIntArg($frame, 1, $fn, 2, 'level');
+        $option = VmSocketArg::requireIntArg($frame, 2, $fn, 3, 'option');
         $valueVar = $frame->calledArgs[3]->resolveIndirect();
         if (
             self::SO_RCVTIMEO === $option

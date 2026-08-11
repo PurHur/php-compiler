@@ -38,12 +38,12 @@ final class socket_sendto extends Internal
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_sendto', 1);
         $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_sendto', 1, 'data');
-        $length = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_sendto', 3, 'length');
-        $flags = VmSocketArg::requireIntArg($frame->calledArgs[3], 'socket_sendto', 4, 'flags');
+        $length = VmSocketArg::requireIntArg($frame, 2, 'socket_sendto', 3, 'length');
+        $flags = VmSocketArg::requireIntArg($frame, 3, 'socket_sendto', 4, 'flags');
         $addr = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[4], 'socket_sendto', 4, 'address');
         $port = 0;
         if ($argc >= 6) {
-            $port = VmSocketArg::requireIntArg($frame->calledArgs[5], 'socket_sendto', 6, 'port');
+            $port = VmSocketArg::requireIntArg($frame, 5, 'socket_sendto', 6, 'port');
         }
         $n = VmSockets::sendto($object, $data, $length, $flags, $addr, $port, $frame);
         if (false === $n) {

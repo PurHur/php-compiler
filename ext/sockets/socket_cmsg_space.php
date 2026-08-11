@@ -32,11 +32,11 @@ final class socket_cmsg_space extends Internal
                     : 'socket_cmsg_space() expects at most 3 arguments, '.$argc.' given'
             );
         }
-        $level = VmSocketArg::requireIntArg($frame->calledArgs[0], 'socket_cmsg_space', 1, 'level');
-        $type = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_cmsg_space', 2, 'type');
+        $level = VmSocketArg::requireIntArg($frame, 0, 'socket_cmsg_space', 1, 'level');
+        $type = VmSocketArg::requireIntArg($frame, 1, 'socket_cmsg_space', 2, 'type');
         $num = 0;
         if ($argc >= 3) {
-            $num = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_cmsg_space', 3, 'num');
+            $num = VmSocketArg::requireIntArg($frame, 2, 'socket_cmsg_space', 3, 'num');
         }
         $space = VmSocketMsg::cmsgSpace($level, $type, $num);
         BuiltinExecute::writeReturn(

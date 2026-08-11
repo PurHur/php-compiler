@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sockets;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamArg;
 
 /** Shared socket argument helpers (php-src ext/sockets/sockets.c Z_PARAM_OBJECT_OF_CLASS; #6544). */
@@ -69,10 +71,23 @@ final class VmSocketArg
         return 'object('.$object->class->name.')';
     }
 
-    public static function requireIntArg(Variable $var, string $functionName, int $argNum, string $paramName): int
-    {
-        return \PHPCompiler\ext\standard\VmMath::parseIntBuiltinArg(
-            $var,
+    /**
+     * Z_PARAM_LONG socket ints — caller strict_types → TypeError on null; soft path DEP+coerce
+     * (php-src ext/sockets/sockets.c; #30264 / #30265 / #30266).
+     *
+     * @param int $argIndex 0-based slot in $frame->calledArgs
+     * @param int $argNum 1-based Argument #N in TypeError text
+     */
+    public static function requireIntArg(
+        Frame $frame,
+        int $argIndex,
+        string $functionName,
+        int $argNum,
+        string $paramName
+    ): int {
+        return VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            $argIndex,
             $functionName,
             $argNum,
             $paramName

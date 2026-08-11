@@ -36,8 +36,8 @@ final class socket_recvfrom extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_recvfrom', 1);
-        $length = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_recvfrom', 3, 'length');
-        $flags = VmSocketArg::requireIntArg($frame->calledArgs[3], 'socket_recvfrom', 4, 'flags');
+        $length = VmSocketArg::requireIntArg($frame, 2, 'socket_recvfrom', 3, 'length');
+        $flags = VmSocketArg::requireIntArg($frame, 3, 'socket_recvfrom', 4, 'flags');
         $got = VmSockets::recvfrom($object, $length, $flags, $frame);
         if (false === $got) {
             BuiltinExecute::writeReturn(

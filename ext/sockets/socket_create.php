@@ -33,9 +33,9 @@ final class socket_create extends Internal
             );
         }
 
-        $domain = VmSocketArg::requireIntArg($frame->calledArgs[0], 'socket_create', 1, 'domain');
-        $type = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_create', 2, 'type');
-        $protocol = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_create', 3, 'protocol');
+        $domain = VmSocketArg::requireIntArg($frame, 0, 'socket_create', 1, 'domain');
+        $type = VmSocketArg::requireIntArg($frame, 1, 'socket_create', 2, 'type');
+        $protocol = VmSocketArg::requireIntArg($frame, 2, 'socket_create', 3, 'protocol');
         $object = VmSockets::create($domain, $type, $protocol, $frame->vmContext);
         if (false === $object) {
             BuiltinExecute::writeReturn(
