@@ -68,24 +68,8 @@ final class VmStreamArg
             return $resourceDebug;
         }
 
-        switch ($v->type) {
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return $v->toObject()->class->name;
-            default:
-                return 'mixed';
-        }
+        // TypeError "… given" — zend_zval_value_name (true/false, not bool) (#30118).
+        return EnumCaseSupport::typeNameForTypeErrorActual($v);
     }
 
     public static function rejectEnumCaseOperand(
