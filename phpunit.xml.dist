@@ -189,6 +189,8 @@
             <file>./test/compliance/XmlrpcServerDispatchVMTest.php</file>
             <file>./test/compliance/RarProceduralApiVMTest.php</file>
             <file>./test/compliance/FilestatEmptyPathSilentFalseVMTest.php</file>
+            <file>./test/compliance/ChownNullStrictVMTest.php</file>
+            <file>./test/compliance/ChownNullStrictJITTest.php</file>
             <file>./test/compliance/MkdirEmptyRecursiveInvalidPathVMTest.php</file>
             <file>./test/compliance/ChrootEmptyPathWarningVMTest.php</file>
             <file>./test/compliance/DateIntervalCreateFromDateStringEmptyJITTest.php</file>

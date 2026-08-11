@@ -24,7 +24,7 @@ final class lchown_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('lchown() requires exactly two arguments in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'lchown');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'lchown');
         $userVar = VmFilestatArg::requireIntOrStringArgForFrame($frame, 1, 'lchown', 'user');
         if (null === $frame->returnVar) {
             return;
