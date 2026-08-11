@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -129,7 +130,11 @@ final class VmArrayPointer
         }
 
         throw new \TypeError(
-            \sprintf('%s(): Argument #1 ($array) must be of type array, %s given', $fn, self::typeLabel($value))
+            \sprintf(
+                '%s(): Argument #1 ($array) must be of type array, %s given',
+                $fn,
+                EnumCaseSupport::typeNameForTypeErrorActual($value)
+            )
         );
     }
 
@@ -153,7 +158,11 @@ final class VmArrayPointer
         }
         if (Variable::TYPE_ARRAY !== $value->type) {
             throw new \TypeError(
-                \sprintf('%s(): Argument #1 ($array) must be of type array, %s given', $fn, self::typeLabel($value))
+                \sprintf(
+                    '%s(): Argument #1 ($array) must be of type array, %s given',
+                    $fn,
+                    EnumCaseSupport::typeNameForTypeErrorActual($value)
+                )
             );
         }
 
@@ -173,21 +182,5 @@ final class VmArrayPointer
             $ctx,
             $frame
         );
-    }
-
-    private static function typeLabel(Variable $value): string
-    {
-        $v = $value->resolveIndirect();
-
-        return match ($v->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
     }
 }
