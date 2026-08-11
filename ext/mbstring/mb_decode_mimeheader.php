@@ -8,11 +8,12 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * mb_decode_mimeheader() — decode RFC 2047 encoded words (php-src ext/mbstring/mbstring.c; #6038).
+ * mb_decode_mimeheader() — decode RFC 2047 encoded words (php-src ext/mbstring/mbstring.c; #6038, #30311).
  */
 final class mb_decode_mimeheader extends Internal
 {
@@ -30,12 +31,9 @@ final class mb_decode_mimeheader extends Internal
                 $argc
             ));
         }
-        $str = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_decode_mimeheader',
-            0,
-            'string'
-        );
+        // Z_PARAM_STR $string — caller strict_types → TypeError on null (#30311);
+        // non-strict: Deprecated + coerce to '' (soft-null, Zend 8.4 parity).
+        $str = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_decode_mimeheader', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,6 +42,15 @@ final class mb_decode_mimeheader extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (isset($args[0])) {
+            $stringIsNull = JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant;
+            if ($stringIsNull && $context->callerStrictTypes) {
+                JitInternalStrictArg::rejectNullString($context, $args[0], 'mb_decode_mimeheader', 'string', 1);
+
+                return $context->builder->load($context->constantStringFromString(''));
+            }
+        }
+
         $folded = JitMbMimeheader::tryDecodeCompileTimeFold($context, $args);
         if (null !== $folded) {
             return $folded;
