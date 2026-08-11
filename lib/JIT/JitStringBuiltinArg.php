@@ -58,7 +58,8 @@ final class JitStringBuiltinArg
                     $function,
                     $argIndex,
                     $paramName,
-                    JitOperandTypeLabel::givenLabel($context, $arg)
+                    JitOperandTypeLabel::givenLabel($context, $arg),
+                    $expectedType
                 );
 
                 return self::unreachableStringPtr($context);

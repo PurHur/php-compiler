@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -34,7 +35,7 @@ final class proc_open extends Internal
             return;
         }
 
-        $command = self::parseCommand($frame->calledArgs[0], 'proc_open', 1);
+        $command = self::parseCommand($frame, 0, 'proc_open', 1);
         $descriptorSpec = self::parseDescriptorSpec($frame->calledArgs[1], 'proc_open', 2);
         $cwd = null;
         if (\array_key_exists(3, $frame->calledArgs)) {
@@ -76,12 +77,19 @@ final class proc_open extends Internal
     }
 
     /** @return string|array */
-    private static function parseCommand(Variable $arg, string $functionName, int $argNum): string|array
+    private static function parseCommand(Frame $frame, int $argIndex, string $functionName, int $argNum): string|array
     {
-        $arg = $arg->resolveIndirect();
-        // php-src Z_PARAM_STR_OR_ARRAY — null soft-deprecates then coerces to "" (ext/standard/proc_open.c; #25113).
-        // Prior #18901/#24481 TypeError was wrong for the 8.2 reference profile (same family as popen).
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        // php-src Z_PARAM_ARRAY_OR_STR — soft null DEP+coerce; strict_types → TypeError (#30247 / #25113).
         if (Variable::TYPE_NULL === $arg->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($command) must be of type array|string, null given',
+                    $functionName,
+                    $argNum
+                ));
+            }
+
             return VmString::coerceStringBuiltinArg(
                 $arg,
                 $functionName,
