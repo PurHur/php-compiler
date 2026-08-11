@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -28,7 +27,7 @@ final class JitAssertOptions
         \PHPCompiler\JIT\Builtin\AssertOptionsRuntime::ensureLinked($context);
 
         $i32 = $context->getTypeFromString('int32');
-        $what = JitLongArg::lower($context, $args[0], 'assert_options() what');
+        $what = JitSleep::zParamLong($context, $args[0], 'assert_options', 1, 'option');
         $hasValue = $i32->constInt(2 === $argc ? 1 : 0, false);
 
         $nullValue = $context->getTypeFromString('__value__*')->constNull();

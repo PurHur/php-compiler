@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -27,7 +26,7 @@ final class ini_restore extends Internal
         if (null === $frame->vmContext) {
             return;
         }
-        $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ini_restore', 0, 'option');
+        $option = IniOptionArg::vmOption($frame, 'ini_restore');
         VmIni::restore($frame->vmContext, $option);
     }
 
@@ -36,7 +35,12 @@ final class ini_restore extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ini_restore() requires exactly one argument');
         }
-        $optionStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_restore', 0, 'option');
+        if (IniOptionArg::jitOptionRejectsWithoutIniCall($context, $args[0])) {
+            IniOptionArg::jitOption($context, $args[0], 'ini_restore');
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
+        }
+        $optionStr = IniOptionArg::jitOption($context, $args[0], 'ini_restore');
         JitIni::restore($context, $optionStr);
 
         return $context->getTypeFromString('int32')->constInt(0, false);

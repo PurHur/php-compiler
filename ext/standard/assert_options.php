@@ -30,7 +30,7 @@ final class assert_options extends Internal
         }
         // #[\Deprecated(since: '8.3')] — E_DEPRECATED under PROFILE≥8.3 (#29209).
         AssertDeprecation::emitAssertOptions($frame);
-        $what = $frame->calledArgs[0]->resolveIndirect()->toInt();
+        $what = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'assert_options', 1, 'option');
         if (1 === $argc) {
             $result = VmAssertState::getOption($what);
         } else {
