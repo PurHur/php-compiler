@@ -8550,6 +8550,7 @@ class JIT {
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
                     $fetchIs = !$forWrite && $op->arrayDimFetchIs;
+                    $warnUndefKeyIncDec = $forWrite && $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1);
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     // Zend: E_NOTICE + continue on non-object __get temp (#29231, re-#4673).
                     if (
@@ -8888,7 +8889,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation);
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } elseif ($forceBranchMerge) {
@@ -8936,7 +8937,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation);
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } elseif ($forceBranchMerge) {
@@ -8980,7 +8981,7 @@ class JIT {
                             Variable::KIND_VALUE,
                             JIT\JitValueBox::alloc($this->context)
                         );
-                        $fetched = $boxed->dimFetch($dim, $resultOp->type, $forWrite);
+                        $fetched = $boxed->dimFetch($dim, $resultOp->type, $forWrite, true, $warnUndefKeyIncDec);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } elseif ($forceBranchMerge) {
@@ -9024,7 +9025,7 @@ class JIT {
                             $this->context->constantFromInteger($value->nextFreeElement)
                         );
                     }
-                    $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
+                    $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, true, $warnUndefKeyIncDec);
                     if ($forceBranchMerge && !$forWrite) {
                         $this->assignOperand($resultOp, $fetched, true);
                     } else {

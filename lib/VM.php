@@ -5385,7 +5385,12 @@ restart:
                         }
                         $table = $container->toArray();
                         try {
-                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3, false, $frame, false)) {
+                            // ++/-- FETCH_DIM_W: warn on missing key then treat as null (#30078, zend_vm_def.h).
+                            $forIncDec = $forWrite && $this->propertyFetchDestUsedAsIncDec($frame, $op);
+                            if (
+                                (!$forWrite && !$fetchIs || $forIncDec)
+                                && !$table->keyExists($arg3, false, $frame, false)
+                            ) {
                                 $this->context->errors->undefinedArrayKey(
                                     $arg3,
                                     $this->context,

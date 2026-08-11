@@ -984,7 +984,8 @@ final class Variable {
         self $dim,
         ?Type $expectedType = null,
         bool $forWrite = false,
-        bool $emitFloatKeyDeprecation = true
+        bool $emitFloatKeyDeprecation = true,
+        bool $warnUndefinedKeyForIncDec = false
     ): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
@@ -1076,6 +1077,10 @@ final class Variable {
                 $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                 if (self::TYPE_VALUE === $dim->type) {
                     if ($forWrite) {
+                        if ($warnUndefinedKeyForIncDec) {
+                            HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
+                        }
+
                         return HashTableHelper::prepareValueBoxKeyWrite($this->context, $ht, $dim);
                     }
 
@@ -1103,6 +1108,10 @@ final class Variable {
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
+                        if ($warnUndefinedKeyForIncDec) {
+                            HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
+                        }
+
                         return HashTableHelper::prepareStringKeyWrite($this->context, $ht, $key);
                     }
                     if ('_FILES' === $container->superglobalName && !$forWrite) {
@@ -1153,6 +1162,10 @@ final class Variable {
                 // must return the live child HT so the inner write persists (#24011; string keys
                 // already branch on TYPE_ARRAY above — zend_execute.c ZEND_FETCH_DIM_W).
                 if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
+                    if ($warnUndefinedKeyForIncDec) {
+                        HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
+                    }
+
                     return HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
                 }
                 if ($forWrite && null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
@@ -1211,7 +1224,7 @@ final class Variable {
                 );
                 $htVar->borrowedHashtable = true;
 
-                return $htVar->dimFetch($dim, $expectedType, $forWrite);
+                return $htVar->dimFetch($dim, $expectedType, $forWrite, $emitFloatKeyDeprecation, $warnUndefinedKeyForIncDec);
             default:
                 if (!($this->type & self::IS_NATIVE_ARRAY)) {
                     throw new \LogicException("Unsupported dim fetch on " . self::getStringType($this->type));
