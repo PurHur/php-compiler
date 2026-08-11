@@ -3765,12 +3765,22 @@ class HashTable extends Type
             $this->context->builder->structGep($ht, $map['numElements'])
         );
         $sizeT = $need->typeOf();
-        // zend_hash: storing at ZEND_LONG_MAX wraps nNextFreeElement to negative (#28762).
+        // php-src: nNextFreeElement = h < ZEND_LONG_MAX ? h + 1 : ZEND_LONG_MAX (#28762 / #30052).
+        // Packed JIT keeps empty nextFree at 0 (length bound); when nextFree is still 0 and
+        // the key is negative, advance like ZEND_LONG_MIN init would (#30052).
+        $i64 = $this->context->getTypeFromString('int64');
         $maxIdx = $sizeT->constInt(\PHP_INT_MAX, false);
-        $overflowSentinel = $sizeT->constInt(\PHP_INT_MIN, true);
+        $maxSentinel = $sizeT->constInt(\PHP_INT_MAX, true);
         $isMax = $this->context->builder->icmp(Builder::INT_EQ, $index, $maxIdx);
-        $advanced = $this->context->builder->select($isMax, $overflowSentinel, $need);
-        $updateNext = $this->context->builder->icmp(Builder::INT_UGE, $index, $nextFree);
+        $advanced = $this->context->builder->select($isMax, $maxSentinel, $need);
+        $indexS = $this->context->builder->truncOrBitCast($index, $i64);
+        $nextS = $this->context->builder->truncOrBitCast($nextFree, $i64);
+        $zeroI64 = $i64->constInt(0, true);
+        $sge = $this->context->builder->icmp(Builder::INT_SGE, $indexS, $nextS);
+        $nextIsZero = $this->context->builder->icmp(Builder::INT_EQ, $nextS, $zeroI64);
+        $indexNeg = $this->context->builder->icmp(Builder::INT_SLT, $indexS, $zeroI64);
+        $negOnEmpty = $this->context->builder->and($nextIsZero, $indexNeg);
+        $updateNext = $this->context->builder->or($sge, $negOnEmpty);
         $newNext = $this->context->builder->select($updateNext, $advanced, $nextFree);
         $this->context->builder->store(
             $newNext,

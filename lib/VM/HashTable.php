@@ -73,7 +73,11 @@ final class HashTable {
      * current by-ref element does not double-advance past the next bucket (#21985).
      */
     private int $foreachPointer = self::INVALID_INDEX;
-    private int $nextFreeElement = 0;
+    /**
+     * php-src nNextFreeElement — empty tables start at ZEND_LONG_MIN so a first
+     * negative int key advances the append cursor (PHP 8.0+ / #30052).
+     */
+    private int $nextFreeElement = \PHP_INT_MIN;
 
 
     public function __construct() {
@@ -2049,7 +2053,7 @@ final class HashTable {
         }
         $this->numUsed = 0;
         $this->numElements = 0;
-        $this->nextFreeElement = 0;
+        $this->nextFreeElement = \PHP_INT_MIN;
         $this->rehash();
         foreach ($pairs as [$key, $value]) {
             $this->copyKeyedEntry($this, $key, $value);
@@ -2373,12 +2377,18 @@ final class HashTable {
     }
 
     public function append(Variable $data): ?Variable {
-        // After an int key of PHP_INT_MAX, nNextFreeElement is negative (zend_long wrap).
-        if ($this->nextFreeElement < 0) {
+        // zend_hash.c: HASH_ADD_NEXT with nNextFreeElement == ZEND_LONG_MIN → index 0.
+        $index = $this->nextFreeElement;
+        if (\PHP_INT_MIN === $index) {
+            $index = 0;
+        }
+        // After PHP_INT_MAX, nNextFreeElement stays at PHP_INT_MAX; HASH_ADD fails when occupied (#28762).
+        $result = $this->addOrUpdate($index, null, $data, self::ADD | self::ADD_NEXT);
+        if (null === $result) {
             throw new \Error(self::NEXT_ELEMENT_OCCUPIED_MESSAGE);
         }
 
-        return $this->addOrUpdate($this->nextFreeElement, null, $data, self::ADD | self::ADD_NEXT);
+        return $result;
     }
 
     /**
@@ -2562,19 +2572,15 @@ final class HashTable {
 
     /**
      * Advance nextFreeElement after storing integer key $index (php-src nNextFreeElement; #9534).
-     * PHP_INT_MAX + 1 is not representable as zend_long — wrap to PHP_INT_MIN so append errors (#28762).
+     * At PHP_INT_MAX, nNextFreeElement stays PHP_INT_MAX so the next `$a[]` HASH_ADD fails (#28762 / #30052).
      */
     private function bumpNextFreeElementForIndex(int $index): void
     {
         if ($index < $this->nextFreeElement) {
             return;
         }
-        if ($index >= \PHP_INT_MAX) {
-            $this->nextFreeElement = \PHP_INT_MIN;
-
-            return;
-        }
-        $this->nextFreeElement = $index + 1;
+        // php-src: nNextFreeElement = h < ZEND_LONG_MAX ? h + 1 : ZEND_LONG_MAX
+        $this->nextFreeElement = $index < \PHP_INT_MAX ? $index + 1 : \PHP_INT_MAX;
     }
 
     private function findBucket(int $hash, ?string $key): ?HashTableBucket
@@ -2707,8 +2713,8 @@ final class HashTable {
     /** Recompute nextFreeElement from int-key buckets (ext/standard/array.c keyed pop/shift/unshift). */
     private function recalcNextFreeElementFromBuckets(): void
     {
-        $next = 0;
-        $overflow = false;
+        $next = \PHP_INT_MIN;
+        $hasMax = false;
         for ($i = 0; $i < $this->numUsed; ++$i) {
             $bucket = $this->buckets->read($i);
             if ($bucket->value->isUndefined()) {
@@ -2718,15 +2724,15 @@ final class HashTable {
                 continue;
             }
             if ($bucket->hash >= \PHP_INT_MAX) {
-                $overflow = true;
+                $hasMax = true;
                 continue;
             }
             if ($bucket->hash >= $next) {
                 $next = $bucket->hash + 1;
             }
         }
-        // Match zend_hash: presence of PHP_INT_MAX leaves nNextFreeElement negative (#28762).
-        $this->nextFreeElement = $overflow ? \PHP_INT_MIN : $next;
+        // Match zend_hash: presence of PHP_INT_MAX leaves nNextFreeElement at ZEND_LONG_MAX (#28762).
+        $this->nextFreeElement = $hasMax ? \PHP_INT_MAX : $next;
     }
 
     private function reset() {

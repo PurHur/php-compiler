@@ -328,6 +328,33 @@ class HashTableTest extends TestCase
         $this->assertSame('tail', $atMax->toString());
     }
 
+    /** Issue #30052 — append after negative-only keys continues nNextFreeElement. */
+    public function testAppendAfterNegativeOnlyKeysContinuesNextFree(): void
+    {
+        $ht = new HashTable();
+        $ht->addIndex(-2, $this->int(1));
+        $tail = new Variable();
+        $tail->int(2);
+        $ht->append($tail);
+        $atNegOne = $ht->findIndex(-1);
+        $this->assertNotNull($atNegOne);
+        $this->assertSame(2, $atNegOne->toInt());
+        $this->assertNull($ht->findIndex(0));
+    }
+
+    /** Issue #30052 — [-1=>1] then append still uses 0 (next free already non-negative). */
+    public function testAppendAfterNegOneLiteralUsesZero(): void
+    {
+        $ht = new HashTable();
+        $ht->addIndex(-1, $this->int(1));
+        $tail = new Variable();
+        $tail->int(2);
+        $ht->append($tail);
+        $atZero = $ht->findIndex(0);
+        $this->assertNotNull($atZero);
+        $this->assertSame(2, $atZero->toInt());
+    }
+
     /** Issue #23485 — array === requires identical element types (no == juggling). */
     public function testCompareIdenticalRejectsJuggledElementTypes(): void
     {
