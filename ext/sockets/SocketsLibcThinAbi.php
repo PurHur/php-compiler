@@ -352,13 +352,14 @@ final class SocketsLibcThinAbi
         if (null === $ffi) {
             return -1;
         }
-        if ($length <= 0) {
-            return 0;
-        }
-        $payload = \substr($buf, 0, $length);
+        // length 0 still invokes write/send — unbound SOCK_STREAM → EPIPE like php-src (#30320).
+        $payload = $length <= 0 ? '' : \substr($buf, 0, $length);
         // Prefer write(2) with PHP string — NestedJIT FFI char[]+send is unreliable (#27423).
         if (0 === $flags) {
             return (int) $ffi->write($fd, $payload, \strlen($payload));
+        }
+        if ('' === $payload) {
+            return (int) $ffi->send($fd, '', 0, $flags);
         }
         $c = $ffi->new('char['.\strlen($payload).']');
         \FFI::memcpy($c, $payload, \strlen($payload));

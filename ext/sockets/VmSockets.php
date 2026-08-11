@@ -701,7 +701,7 @@ final class VmSockets
     /**
      * @return int|false bytes written
      */
-    public static function write(ObjectEntry $object, string $buf, ?int $length): int|false
+    public static function write(ObjectEntry $object, string $buf, ?int $length, Frame $frame): int|false
     {
         $fd = VmSocket::fdForObject($object);
         if (null === $fd) {
@@ -716,7 +716,16 @@ final class VmSockets
         }
         $n = SocketsLibcThinAbi::send($fd, $buf, $len, 0);
         if ($n < 0) {
-            self::recordError($object, SocketsLibcThinAbi::readErrno());
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_write(): unable to write to socket [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
 
             return false;
         }
