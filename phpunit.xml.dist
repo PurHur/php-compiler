@@ -178,6 +178,8 @@
             <file>./test/compliance/TimezoneNameOffsetGetNullGivenVMTest.php</file>
             <file>./test/compliance/DateTimeCreateFromFormatNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeCreateFromFormatNullStrictJITTest.php</file>
+            <file>./test/compliance/DateParseFromFormatNullStrictVMTest.php</file>
+            <file>./test/compliance/DateParseFromFormatNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimeSetISODateNullStrictVMTest.php</file>
