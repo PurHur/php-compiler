@@ -7,14 +7,20 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * stream_socket_server() — libc TCP/UDP listen sockets via {@see VmStreamSocketNative} (#4993).
+ * stream_socket_server() — libc TCP/UDP listen sockets via {@see VmStreamSocketNative} (#4993, #30374).
+ *
+ * Z_PARAM_STR $address: caller strict_types → TypeError on null; soft path DEP+coerce (#30374).
  *
  * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_server)
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php stream_socket_server(string $address, …)
  */
 final class stream_socket_server extends Internal
 {
@@ -35,11 +41,14 @@ final class stream_socket_server extends Internal
             return;
         }
 
-        $local = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#30374).
+        $local = VmString::stringBuiltinArgForFrame(
+            $frame,
+            0,
             'stream_socket_server',
             0,
-            'address'
+            'address',
+            false
         );
 
         $flags = VmStreamSocketNative::STREAM_SERVER_BIND | VmStreamSocketNative::STREAM_SERVER_LISTEN;
@@ -91,6 +100,31 @@ final class stream_socket_server extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (\count($args) < 1 || \count($args) > 5) {
+            throw new \LogicException(
+                'stream_socket_server() accepts between 1 and 5 arguments in this compiler build'
+            );
+        }
+
+        // Soft-null outside strict_types; strict → TypeError (#30374).
+        // Early return after compile-time null TypeError — no listen path after abort
+        // (AOT module verify: terminator mid-block; peer getprotobyname #30282).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+            JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                'stream_socket_server',
+                0,
+                'address',
+                'string',
+                null,
+                false
+            );
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
         throw new \LogicException(
             'stream_socket_server() is not supported for JIT/AOT in this compiler build (issue #4993)'
         );
