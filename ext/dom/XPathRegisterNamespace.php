@@ -20,8 +20,21 @@ final class XPathRegisterNamespace extends DomClassMethod
         if (\count($frame->calledArgs) < 3) {
             throw new \LogicException('DOMXPath::registerNamespace() expects at least 2 arguments');
         }
-        $prefix = $this->stringArg($frame->calledArgs[1], 'DOMXPath::registerNamespace()', 0);
-        $namespaceUri = $this->stringArg($frame->calledArgs[2], 'DOMXPath::registerNamespace()', 1);
+        // Z_PARAM_STR: pass $frame so caller strict_types rejects null like Zend (#30301).
+        $prefix = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMXPath::registerNamespace()',
+            0,
+            $frame,
+            'prefix'
+        );
+        $namespaceUri = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMXPath::registerNamespace()',
+            1,
+            $frame,
+            'namespace'
+        );
         if (null === $frame->returnVar) {
             return;
         }

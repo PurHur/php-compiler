@@ -1174,8 +1174,19 @@ final class VmDomJitDispatch
      */
     public static function xpathRegisterNamespace(ObjectEntry $xpath, array $extra): Variable
     {
-        $prefix = self::stringArg($extra[0] ?? self::missingArg('registerNamespace', 0), 'registerNamespace', 0);
-        $namespaceUri = self::stringArg($extra[1] ?? self::missingArg('registerNamespace', 1), 'registerNamespace', 1);
+        // Z_PARAM_STR param names from php_dom.stub.php (#30301, sibling #30041).
+        $prefix = self::stringArg(
+            $extra[0] ?? self::missingArg('registerNamespace', 0),
+            'DOMXPath::registerNamespace',
+            0,
+            'prefix'
+        );
+        $namespaceUri = self::stringArg(
+            $extra[1] ?? self::missingArg('registerNamespace', 1),
+            'DOMXPath::registerNamespace',
+            1,
+            'namespace'
+        );
         $result = new Variable();
         $result->bool(VmDomXPath::registerNamespace($xpath, $prefix, $namespaceUri));
 
