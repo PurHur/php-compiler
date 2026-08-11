@@ -934,10 +934,10 @@ final class HashTableWriteLlvm
             // writing the same baked index (generator foreach → only last yield kept, #24145;
             // same shape as spread loops #23971).
             $map = $context->structFieldMap['__hashtable__'];
-            $index = $context->builder->load(
+            $nextFree = $context->builder->load(
                 $context->builder->structGep($ht, $map['nextFreeElement'])
             );
-            self::emitAppendOccupiedIfNextFreeOverflowed($context, $index);
+            $index = self::emitAppendResolveIndexOrOccupiedError($context, $nextFree);
             self::setAtIndex($context, $ht, $index, $element);
             $array->nextFreeElementFromRuntime = true;
             // Track compile-time scalars for folds (preg_filter #27181 / str_replace peers).
@@ -1564,30 +1564,33 @@ final class HashTableWriteLlvm
         $sizeT = $context->getTypeFromString('size_t');
         // Runtime nextFreeElement — a compile-time counter is one index for the whole
         // `$x[] =` call site; inside foreach/while that overwrites slot 0 (#24145, #23971).
-        $index = $context->builder->load(
+        $nextFree = $context->builder->load(
             $context->builder->structGep($ht, $map['nextFreeElement'])
         );
-        self::emitAppendOccupiedIfNextFreeOverflowed($context, $index);
+        $index = self::emitAppendResolveIndexOrOccupiedError($context, $nextFree);
         $array->nextFreeElementFromRuntime = true;
         ++$array->nextFreeElement;
         $one = $sizeT->constInt(1, false);
+        $i64 = $context->getTypeFromString('int64');
         $maxIdx = $sizeT->constInt(\PHP_INT_MAX, false);
-        $overflowSentinel = $sizeT->constInt(\PHP_INT_MIN, true);
+        $maxSentinel = $sizeT->constInt(\PHP_INT_MAX, true);
         $isMax = $context->builder->icmp(Builder::INT_EQ, $index, $maxIdx);
         $need = $context->builder->addNoSignedWrap($index, $one);
-        $advanced = $context->builder->select($isMax, $overflowSentinel, $need);
+        $advanced = $context->builder->select($isMax, $maxSentinel, $need);
         $context->builder->call($context->lookupFunction('__hashtable__grow'), $ht, $advanced);
         $entry = HashTableReadLlvm::listEntryPointer($context, $ht, $index);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $entry);
 
-        $nextFree = $context->builder->load(
+        $nextFreeNow = $context->builder->load(
             $context->builder->structGep($ht, $map['nextFreeElement'])
         );
         $numElements = $context->builder->load(
             $context->builder->structGep($ht, $map['numElements'])
         );
-        $updateNext = $context->builder->icmp(Builder::INT_UGE, $index, $nextFree);
-        $newNext = $context->builder->select($updateNext, $advanced, $nextFree);
+        $indexS = $context->builder->truncOrBitCast($index, $i64);
+        $nextS = $context->builder->truncOrBitCast($nextFreeNow, $i64);
+        $updateNext = $context->builder->icmp(Builder::INT_SGE, $indexS, $nextS);
+        $newNext = $context->builder->select($updateNext, $advanced, $nextFreeNow);
         $context->builder->store(
             $newNext,
             $context->builder->structGep($ht, $map['nextFreeElement'])
@@ -1603,27 +1606,38 @@ final class HashTableWriteLlvm
     }
 
     /**
-     * zend_hash_next_index_insert: nNextFreeElement < 0 → Error (#28762).
-     * Continues on the ok block when nextFree is still valid.
+     * zend_hash_next_index_insert (#28762 / #30052):
+     * - nNextFreeElement == ZEND_LONG_MIN → append at 0 (empty table; VM-parity path)
+     * - nNextFreeElement < 0 (after negative keys) → use that index (PHP 8.0+)
+     * - nNextFreeElement == ZEND_LONG_MAX → Error (occupied after PHP_INT_MAX)
+     * Returns the resolved append index; continues on the ok block.
      */
-    private static function emitAppendOccupiedIfNextFreeOverflowed(Context $context, Value $nextFree): void
+    private static function emitAppendResolveIndexOrOccupiedError(Context $context, Value $nextFree): Value
     {
         $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
         $asSigned = $nextFree->typeOf() === $i64
             ? $nextFree
             : $context->builder->truncOrBitCast($nextFree, $i64);
-        $overflowed = $context->builder->icmp(
-            Builder::INT_SLT,
-            $asSigned,
-            $i64->constInt(0, true)
-        );
+        $intMin = $i64->constInt(\PHP_INT_MIN, true);
+        $intMax = $i64->constInt(\PHP_INT_MAX, true);
+        $zero = $sizeT->constInt(0, false);
+        $isMin = $context->builder->icmp(Builder::INT_EQ, $asSigned, $intMin);
+        $isMax = $context->builder->icmp(Builder::INT_EQ, $asSigned, $intMax);
         $tag = (string) self::nextSeq();
-        $errBb = BasicBlockHelper::append($context, 'ht_append_occupied_'.$tag);
+        $maxBb = BasicBlockHelper::append($context, 'ht_append_max_'.$tag);
         $okBb = BasicBlockHelper::append($context, 'ht_append_ok_'.$tag);
-        $context->builder->branchIf($overflowed, $errBb, $okBb);
-        $context->builder->positionAtEnd($errBb);
+        $context->builder->branchIf($isMax, $maxBb, $okBb);
+
+        $context->builder->positionAtEnd($maxBb);
         self::emitNextElementOccupiedError($context);
         $context->builder->positionAtEnd($okBb);
+
+        $asSizeT = $nextFree->typeOf() === $sizeT
+            ? $nextFree
+            : $context->builder->truncOrBitCast($nextFree, $sizeT);
+
+        return $context->builder->select($isMin, $zero, $asSizeT);
     }
 
     private static function emitNextElementOccupiedError(Context $context): void
