@@ -15,6 +15,12 @@ final class CallUnpackSupport
 
     public const STRING_KEYS_MESSAGE = CallUnpack::STRING_KEYS_MESSAGE;
 
+    /** @see CallUnpack::nonArrayTypeErrorMessage() */
+    public static function nonArrayTypeErrorMessage(Variable $value): string
+    {
+        return CallUnpack::nonArrayTypeErrorMessage($value);
+    }
+
     /**
      * @param list<string> $paramNames
      *

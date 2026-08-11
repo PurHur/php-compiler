@@ -31,8 +31,21 @@ final class ListUnpackHelper
             $context,
             self::isArrayValue($context, $operand),
             'call_unpack_non_array',
-            self::CALL_UNPACK_NON_ARRAY_MESSAGE
+            self::callUnpackNonArrayMessage($context, $operand)
         );
+    }
+
+    /**
+     * ZEND_SEND_UNPACK TypeError text — PHP 8.4+ appends {@code , <type> given} (#30023).
+     */
+    public static function callUnpackNonArrayMessage(Context $context, Variable $operand): string
+    {
+        $message = self::CALL_UNPACK_NON_ARRAY_MESSAGE;
+        if (!\PHPCompiler\CompilerVersion::supportsUnpackTypeErrorGivenSuffix()) {
+            return $message;
+        }
+
+        return $message.', '.JitOperandTypeLabel::givenLabel($context, $operand).' given';
     }
 
     public static function emitCheck(Context $context, Variable $array): void
