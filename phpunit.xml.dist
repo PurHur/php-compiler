@@ -372,6 +372,8 @@
             <file>./test/compliance/MemoryGetUsageNullStrictJITTest.php</file>
             <file>./test/compliance/GetoptNullStrictVMTest.php</file>
             <file>./test/compliance/GetoptNullStrictJITTest.php</file>
+            <file>./test/compliance/StreamSocketServerNullStrictVMTest.php</file>
+            <file>./test/compliance/StreamSocketServerNullStrictJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
