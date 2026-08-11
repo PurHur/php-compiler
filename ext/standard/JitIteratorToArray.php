@@ -12,7 +12,6 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\IteratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitIterableArg;
-use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -188,12 +187,12 @@ final class JitIteratorToArray
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($badBb);
-        JitIterableArg::emitIterableTypeErrorAndAbort(
+        JitIterableArg::emitIterableTypeErrorFromValueBoxAndAbort(
             $context,
             'iterator_to_array',
             0,
             'iterator',
-            JitOperandTypeLabel::givenLabel($context, $arg)
+            $valuePtr
         );
         $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
         $context->builder->branch($done);

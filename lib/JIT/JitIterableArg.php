@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
 /**
  * Iterable builtin operand guards — TypeError before backing coercion (#6232, php-src-strict).
@@ -46,6 +47,147 @@ final class JitIterableArg
             self::iterableTypeErrorMessage($function, $argIndex, $paramName, $given, $allowArray)
         );
         BasicBlockHelper::ensureOpenInsertBlock($context, 'iterable_arg_te_cont');
+    }
+
+    /**
+     * Runtime TypeError actual label from a boxed `__value__` (true/false not bool) (#30117).
+     */
+    public static function emitIterableTypeErrorFromValueBoxAndAbort(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        Value $valuePtr,
+        bool $allowArray = true
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+
+        $nullBb = BasicBlockHelper::append($context, 'iterable_te_null');
+        $afterNull = BasicBlockHelper::append($context, 'iterable_te_after_null');
+        $intBb = BasicBlockHelper::append($context, 'iterable_te_int');
+        $afterInt = BasicBlockHelper::append($context, 'iterable_te_after_int');
+        $floatBb = BasicBlockHelper::append($context, 'iterable_te_float');
+        $afterFloat = BasicBlockHelper::append($context, 'iterable_te_after_float');
+        $boolBb = BasicBlockHelper::append($context, 'iterable_te_bool');
+        $afterBool = BasicBlockHelper::append($context, 'iterable_te_after_bool');
+        $stringBb = BasicBlockHelper::append($context, 'iterable_te_string');
+        $mixedBb = BasicBlockHelper::append($context, 'iterable_te_mixed');
+
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_NULL & 0x7f, false)
+        );
+        $context->builder->branchIf($isNull, $nullBb, $afterNull);
+        $context->builder->positionAtEnd($nullBb);
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $allowArray);
+
+        $context->builder->positionAtEnd($afterNull);
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_INTEGER & 0x7f, false)
+        );
+        $context->builder->branchIf($isInt, $intBb, $afterInt);
+        $context->builder->positionAtEnd($intBb);
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'int', $allowArray);
+
+        $context->builder->positionAtEnd($afterInt);
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_FLOAT & 0x7f, false)
+        );
+        $context->builder->branchIf($isFloat, $floatBb, $afterFloat);
+        $context->builder->positionAtEnd($floatBb);
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float', $allowArray);
+
+        $context->builder->positionAtEnd($afterFloat);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN & 0x7f, false)
+        );
+        $context->builder->branchIf($isBool, $boolBb, $afterBool);
+        // zend_execute.c — bool actuals print true/false (#30117 / #29097).
+        $context->builder->positionAtEnd($boolBb);
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+        $isTrue = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
+        $trueBb = BasicBlockHelper::append($context, 'iterable_te_true');
+        $falseBb = BasicBlockHelper::append($context, 'iterable_te_false');
+        $context->builder->branchIf($isTrue, $trueBb, $falseBb);
+        $context->builder->positionAtEnd($trueBb);
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'true', $allowArray);
+        $context->builder->positionAtEnd($falseBb);
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'false', $allowArray);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_STRING & 0x7f, false)
+        );
+        $context->builder->branchIf($isString, $stringBb, $mixedBb);
+        $context->builder->positionAtEnd($stringBb);
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string', $allowArray);
+
+        $context->builder->positionAtEnd($mixedBb);
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed', $allowArray);
+    }
+
+    /**
+     * Compile-time operand TypeError — native bools print true/false via IR (#30117).
+     */
+    public static function emitIterableTypeErrorForOperandAndAbort(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        Variable $arg,
+        bool $allowArray = true
+    ): void {
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            $boolVal = $arg->value;
+            $isTrue = $context->builder->icmp(
+                Builder::INT_NE,
+                $boolVal,
+                $boolVal->typeOf()->constInt(0, false)
+            );
+            $trueBb = BasicBlockHelper::append($context, 'iterable_native_true');
+            $falseBb = BasicBlockHelper::append($context, 'iterable_native_false');
+            $context->builder->branchIf($isTrue, $trueBb, $falseBb);
+            $context->builder->positionAtEnd($trueBb);
+            self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'true', $allowArray);
+            $context->builder->positionAtEnd($falseBb);
+            self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'false', $allowArray);
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type || JitValueBox::isValueOperand($arg)) {
+            self::emitIterableTypeErrorFromValueBoxAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                JitValueBox::valuePtrFromVariable($context, $arg),
+                $allowArray
+            );
+
+            return;
+        }
+        self::emitIterableTypeErrorAndAbort(
+            $context,
+            $function,
+            $argIndex,
+            $paramName,
+            JitOperandTypeLabel::givenLabel($context, $arg),
+            $allowArray
+        );
     }
 
     /**
@@ -99,24 +241,23 @@ final class JitIterableArg
             return self::guardValueBoxOperand($context, $arg, $function, $argIndex, $paramName, $allowArray);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            self::emitIterableTypeErrorAndAbort(
+            self::emitIterableTypeErrorForOperandAndAbort(
                 $context,
                 $function,
                 $argIndex,
                 $paramName,
-                JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)
-                    ?? JitOperandTypeLabel::givenLabel($context, $arg),
+                $arg,
                 $allowArray
             );
 
             return false;
         }
-        self::emitIterableTypeErrorAndAbort(
+        self::emitIterableTypeErrorForOperandAndAbort(
             $context,
             $function,
             $argIndex,
             $paramName,
-            JitOperandTypeLabel::givenLabel($context, $arg),
+            $arg,
             $allowArray
         );
 
@@ -186,13 +327,13 @@ final class JitIterableArg
                     return true;
                 }
                 self::emitIterableTypeErrorAndAbort(
-                    $context,
-                    $function,
-                    $argIndex,
-                    $paramName,
-                    'array',
-                    false
-                );
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                'array',
+                false
+            );
 
                 return false;
             }
@@ -204,12 +345,12 @@ final class JitIterableArg
 
                 return false;
             }
-            self::emitIterableTypeErrorAndAbort(
+            self::emitIterableTypeErrorForOperandAndAbort(
                 $context,
                 $function,
                 $argIndex,
                 $paramName,
-                JitOperandTypeLabel::givenLabel($context, $arg),
+                $arg,
                 $allowArray
             );
 

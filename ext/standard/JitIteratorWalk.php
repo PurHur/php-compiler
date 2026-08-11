@@ -13,7 +13,6 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitIterableArg;
-use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\SplOuterIteratorHt;
@@ -69,12 +68,12 @@ final class JitIteratorWalk
             return self::countObject($context, $iterable);
         }
 
-        JitIterableArg::emitIterableTypeErrorAndAbort(
+        JitIterableArg::emitIterableTypeErrorForOperandAndAbort(
             $context,
             'iterator_count',
             0,
             'iterator',
-            JitOperandTypeLabel::givenLabel($context, $iterable)
+            $iterable
         );
 
         return $zero;
@@ -107,12 +106,12 @@ final class JitIteratorWalk
             }
         }
 
-        JitIterableArg::emitIterableTypeErrorAndAbort(
+        JitIterableArg::emitIterableTypeErrorForOperandAndAbort(
             $context,
             'iterator_apply',
             0,
             'iterator',
-            JitOperandTypeLabel::givenLabel($context, $iterable),
+            $iterable,
             false
         );
 
@@ -189,12 +188,12 @@ final class JitIteratorWalk
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($badBb);
-        JitIterableArg::emitIterableTypeErrorAndAbort(
+        JitIterableArg::emitIterableTypeErrorFromValueBoxAndAbort(
             $context,
             'iterator_count',
             0,
             'iterator',
-            JitOperandTypeLabel::givenLabel($context, $arg)
+            $valuePtr
         );
         $context->builder->store($i64->constInt(0, false), $resultSlot);
         $context->builder->branch($done);
@@ -253,12 +252,12 @@ final class JitIteratorWalk
             return $context->builder->load($resultSlot);
         }
 
-        JitIterableArg::emitIterableTypeErrorAndAbort(
+        JitIterableArg::emitIterableTypeErrorForOperandAndAbort(
             $context,
             'iterator_count',
             0,
             'iterator',
-            JitOperandTypeLabel::givenLabel($context, $iterable)
+            $iterable
         );
         $context->builder->store($i64->constInt(0, false), $resultSlot);
         $context->builder->branch($done);

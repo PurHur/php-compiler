@@ -52,7 +52,8 @@ final class IterableCheck
 
     public static function valueTypeName(Variable $value): string
     {
-        return EnumCaseSupport::typeNameForVariable($value);
+        // TypeError "… given" uses zend_zval_value_name (true/false, not bool) (#30117).
+        return EnumCaseSupport::typeNameForTypeErrorActual($value);
     }
 
     public static function assertParameter(Variable $value, Context $context, string $kind = 'Argument'): void
