@@ -396,6 +396,20 @@ final class VmSockets
 
             return true;
         }
+        $hostErr = SocketsLibcThinAbi::consumeHostLookupError();
+        if (null !== $hostErr) {
+            self::recordError($object, $hostErr);
+            VmSockets::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_connect(): Host lookup failed [%d]: %s',
+                    $hostErr,
+                    SocketsLibcThinAbi::strerror($hostErr)
+                )
+            );
+
+            return false;
+        }
         $errno = SocketsLibcThinAbi::readErrno();
         self::recordError($object, $errno);
         VmSockets::triggerWarning(
@@ -441,6 +455,21 @@ final class VmSockets
             self::$socketErrors[$object->id] = 0;
 
             return true;
+        }
+        // php_set_inet_addr failure → PHP_SOCKET_ERROR(..., "Host lookup failed", ...) (#30315).
+        $hostErr = SocketsLibcThinAbi::consumeHostLookupError();
+        if (null !== $hostErr) {
+            self::recordError($object, $hostErr);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_bind(): Host lookup failed [%d]: %s',
+                    $hostErr,
+                    SocketsLibcThinAbi::strerror($hostErr)
+                )
+            );
+
+            return false;
         }
         $errno = SocketsLibcThinAbi::readErrno();
         self::recordError($object, $errno);

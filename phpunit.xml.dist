@@ -206,6 +206,7 @@
             <file>./test/compliance/SocketGetOptionNullStrictVMTest.php</file>
             <file>./test/compliance/SocketStrerrorNullStrictVMTest.php</file>
             <file>./test/compliance/SocketErrorNullOptionalVMTest.php</file>
+            <file>./test/compliance/SocketBindSoftNullVMTest.php</file>
             <file>./test/compliance/MkdirEmptyRecursiveInvalidPathVMTest.php</file>
             <file>./test/compliance/ChrootEmptyPathWarningVMTest.php</file>
             <file>./test/compliance/DateIntervalCreateFromDateStringEmptyJITTest.php</file>

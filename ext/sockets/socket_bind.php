@@ -35,8 +35,8 @@ final class socket_bind extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_bind', 1);
-        // VmString::coerceTypedStringBuiltinArg uses 0-based argIndex (+1 in message).
-        $addr = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_bind', 1, 'address');
+        // Z_PARAM_STR — soft-null outside strict_types (Deprecated+coerce); strict → TypeError (#30315).
+        $addr = VmString::stringBuiltinArgForFrame($frame, 1, 'socket_bind', 1, 'address', false);
         $port = 0;
         if ($argc >= 3) {
             $port = VmSocketArg::requireIntArg($frame, 2, 'socket_bind', 3, 'port');
