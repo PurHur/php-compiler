@@ -215,7 +215,10 @@ final class substr_count extends Internal
                 return null;
             }
         }
-        if ($hayNull && !$context->callerStrictTypes) {
+        if ($hayNull) {
+            if ($context->callerStrictTypes) {
+                return null; // strict_types TypeError — do not fold (#29808)
+            }
             JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr_count', 0, 'haystack');
         }
         if ($offsetNull) {
@@ -234,16 +237,11 @@ final class substr_count extends Internal
     }
 
     /**
-     * php-src Z_PARAM_STR haystack — soft-null on forward profile (#21196; sibling #21189, string.c).
+     * php-src Z_PARAM_STR haystack — strict TypeError or soft-null (#21196, #29808; sibling #21189).
      */
     private static function vmHaystackArg(Frame $frame): string
     {
-        return VmString::coerceTrimFamilyStringArg(
-            $frame->calledArgs[0],
-            'substr_count',
-            0,
-            'haystack'
-        );
+        return VmString::trimFamilyStringArgForFrame($frame, 0, 'substr_count', 0, 'haystack');
     }
 
     private static function jitHaystackArg(Context $context, JITVariable $arg): Value
