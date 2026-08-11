@@ -2699,16 +2699,9 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        // VERSION '8.4.0-dev' fails version_compare(..., '8.4.0', '>=') due to -dev suffix.
+        // mb_str_pad is a PHP 8.3 feature; any VERSION >= 8.3 has it unconditionally.
+        return true;
     }
 
     /**
