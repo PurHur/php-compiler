@@ -59,6 +59,10 @@ final class DateTimeInterfaceSupport
      * php-src copies DateTimeInterface format constants onto DateTime / DateTimeImmutable
      * class entries (ext/date/php_date.c / php_date.stub.php) so defined() and
      * ReflectionClass::getConstants() see them on the concrete classes (#22271).
+     *
+     * Declaring class must stay DateTimeInterface (ReflectionClassConstant + zend_inheritance.c
+     * do_inherit_iface_constant). Without that, subclasses of DateTime look like they inherit
+     * both DateTime::ATOM and DateTimeInterface::ATOM and fatal (#30229).
      */
     public static function registerClassConstants(ClassEntry $entry): void
     {
@@ -69,6 +73,7 @@ final class DateTimeInterfaceSupport
             $canonical = strtoupper($name);
             $entry->constants[$canonical] = $const;
             $entry->constNames[$canonical] = $canonical;
+            $entry->constDeclaringClassLc[$canonical] = self::INTERFACE_LC;
         }
         self::registerRfc7231Deprecation($entry);
     }
