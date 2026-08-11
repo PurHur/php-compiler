@@ -67,10 +67,11 @@ final class JitNetworkServices
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
+        // Z_PARAM_STR — honor caller strict_types; soft-null DEP+coerce (#30281).
         $context->builder->call(
             $context->lookupFunction('__phpc_getservbyname'),
-            JitStringBuiltinArg::lower($context, $service, 'getservbyname', 0, 'service'),
-            JitStringBuiltinArg::lower($context, $protocol, 'getservbyname', 1, 'protocol'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $service, 'getservbyname', 0, 'service', 'string', null, false),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $protocol, 'getservbyname', 1, 'protocol', 'string', null, false),
             $ptr
         );
 
