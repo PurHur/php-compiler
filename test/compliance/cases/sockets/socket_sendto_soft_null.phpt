@@ -19,6 +19,6 @@ try {
 --EXPECTF--
 PHP Deprecated:  socket_sendto(): Passing null to parameter #5 ($address) of type string is deprecated in %s on line %d
 PHP Warning:  socket_sendto(): Host lookup failed [-10004]: No address associated with name in %s on line %d
-false
 PHP Deprecated:  socket_sendto(): Passing null to parameter #2 ($data) of type string is deprecated in %s on line %d
+false
 0
