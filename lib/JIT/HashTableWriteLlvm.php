@@ -1701,11 +1701,20 @@ final class HashTableWriteLlvm
         if (GeneratorHelper::isGeneratorVariable($source)) {
             return false;
         }
-        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $source, $source->userType ?? null)) {
+        $userType = $source->userType
+            ?? $source->classUserType
+            ?? $source->compileTimeString
+            ?? $source->objectPropertyClassName
+            ?? null;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $source, $userType)) {
+            return false;
+        }
+        // HT-backed SPL (ArrayIterator / ArrayObject / …) must not take the TypeError arm.
+        if (\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($userType)) {
             return false;
         }
         if (Variable::TYPE_OBJECT === $source->type) {
-            // Known non-Traversable object → catchable TypeError with ", <type> given" (#30055).
+            // Concrete non-Traversable object → catchable TypeError with ", <type> given" (#30055).
             self::emitArraySpreadCatchableError(
                 $context,
                 ListUnpackHelper::arraySpreadNonTraversableMessage($context, $source),
