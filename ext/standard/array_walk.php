@@ -10,6 +10,7 @@ use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Builtin\ArrayWalkRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -42,7 +43,7 @@ final class array_walk extends Internal
         if (Variable::TYPE_ARRAY !== $subject->type && Variable::TYPE_OBJECT !== $subject->type) {
             throw new \TypeError(
                 'array_walk(): Argument #1 ($array) must be of type array, '
-                .self::valueTypeName($subject).' given'
+                .EnumCaseSupport::typeNameForTypeErrorActual($subject).' given'
             );
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
@@ -283,26 +284,17 @@ final class array_walk extends Internal
         return true;
     }
 
-    private static function valueTypeName(Variable $value): string
+    /** zend_zval_value_name — bool actuals print true/false (#30144). */
+    private static function jitNativeBoolLiteralLabel(JITVariable $subject): string
     {
-        switch ($value->type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
+        $value = $subject->value;
+        if (\method_exists($value, 'isConstant') && $value->isConstant()
+            && \method_exists($value, 'getConstantValue')
+        ) {
+            return 0 !== (int) $value->getConstantValue() ? 'true' : 'false';
         }
+
+        return 'bool';
     }
 
     /**
@@ -320,7 +312,7 @@ final class array_walk extends Internal
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return 'float';
             case JITVariable::TYPE_NATIVE_BOOL:
-                return 'bool';
+                return self::jitNativeBoolLiteralLabel($subject);
             case JITVariable::TYPE_STRING:
                 return 'string';
             default:
