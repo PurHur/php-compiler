@@ -30323,26 +30323,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIteratorToArray.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 138)
-- new Variable (line 154)
-- new Variable (line 169)
-- new Variable (line 265)
-- new Variable (line 301)
-- new Variable (line 368)
-- new Variable (line 415)
-- new Variable (line 459)
-- new Variable (line 474)
-- new Variable (line 489)
-- new Variable (line 562)
-- new Variable (line 564)
-- new Variable (line 578)
+- new Variable (line 137)
+- new Variable (line 153)
+- new Variable (line 168)
+- new Variable (line 264)
+- new Variable (line 300)
+- new Variable (line 367)
+- new Variable (line 414)
+- new Variable (line 458)
+- new Variable (line 473)
+- new Variable (line 488)
+- new Variable (line 561)
+- new Variable (line 563)
+- new Variable (line 577)
 - 17 class method(s)
 
 ### `ext/standard/JitIteratorWalk.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 167)
-- new Variable (line 179)
+- new Variable (line 166)
+- new Variable (line 178)
 - 10 class method(s)
 
 ### `ext/standard/JitJsonDecode.php`
@@ -53553,7 +53553,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitIterableArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/JitLongArg.php`
 
