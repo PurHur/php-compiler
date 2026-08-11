@@ -12,9 +12,14 @@ namespace PHPCompiler\VM;
  */
 final class CastJitHelper
 {
-    /** Zend convert_to_array: false bool yields empty array, true wraps at index 0. */
+    /**
+     * Whether convert_to_array on a bool should yield [].
+     *
+     * Always false: Zend wraps both true and false as a one-element array (#30097).
+     * Kept as a callable ABI so older linked modules resolve the symbol.
+     */
     public static function boolYieldsEmptyArray(bool $value): bool
     {
-        return !$value;
+        return false;
     }
 }

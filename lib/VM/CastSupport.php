@@ -78,12 +78,8 @@ final class CastSupport
             return $result;
         }
 
-        if (Variable::TYPE_BOOLEAN === $src->type && !$src->toBool()) {
-            $result->newArray();
-
-            return $result;
-        }
-
+        // Zend convert_to_array: IS_FALSE / IS_TRUE / scalars wrap as [0 => value];
+        // only IS_NULL yields empty (#30097 — false must not share null's empty path).
         $result->newArray();
         $copy = new Variable();
         $copy->copyFrom($src);
