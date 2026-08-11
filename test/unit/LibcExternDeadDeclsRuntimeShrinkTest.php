@@ -39,6 +39,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'strtok_r',
             'rename',
             'chdir',
+            'time',
         ];
     }
 
@@ -49,11 +50,12 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
         $this->assertStringContainsString('#29050', $source);
+        $this->assertStringContainsString('#30332', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -78,6 +80,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'LibcExtern must not declare libc chdir (#29219)'
         );
         $this->assertStringContainsString('#29219', $source);
+        $this->assertStringNotContainsString(
+            "'time' =>",
+            $source,
+            'LibcExtern must not declare libc time (#30332)'
+        );
     }
 
     public function testChownRuntimeDoesNotLookupLibcChown(): void

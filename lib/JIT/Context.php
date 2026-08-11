@@ -997,6 +997,9 @@ class Context {
             // microtime NestedJIT leaf (#29405) — whitelist microtime → microtime::call →
             // StringMicrotime::invokeFloat/invokeString thin gettimeofday leaf.
             'microtime',
+            // time NestedJIT leaf (#30332) — whitelist time → time::call →
+            // StringTime::invoke / JitTimeKernel thin libc time(2) leaf.
+            'time',
             // putenv(3) NestedJIT leaf (#29334) — whitelist putenv → putenv_::call →
             // JitEnv::putenvNestedLeaf / StringGetenv::invokePutenvNestedLeaf (kernel removed).
             'putenv',
