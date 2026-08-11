@@ -2299,6 +2299,7 @@ require_once __DIR__.'/../../../ext/standard/AcosJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AcoshJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AddslashesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ApacheNoteJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ArrayCallbackInvoke.php';
 require_once __DIR__.'/../../../ext/standard/ArrayChangeKeyCaseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayChunkJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayColumnJitHelper.php';
