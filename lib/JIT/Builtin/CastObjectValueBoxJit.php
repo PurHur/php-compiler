@@ -49,9 +49,16 @@ final class CastObjectValueBoxJit
             $i8->constInt(VmVariable::TYPE_ARRAY, false)
         );
 
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_NULL, false)
+        );
+
         $objectBlock = BasicBlockHelper::append($context, 'cast_object_vb_obj');
         $arrayBlock = BasicBlockHelper::append($context, 'cast_object_vb_ht');
-        $emptyBlock = BasicBlockHelper::append($context, 'cast_object_vb_empty');
+        $nullBlock = BasicBlockHelper::append($context, 'cast_object_vb_null');
+        $scalarBlock = BasicBlockHelper::append($context, 'cast_object_vb_scalar');
         $mergeBlock = BasicBlockHelper::append($context, 'cast_object_vb_merge');
         $doneBlock = BasicBlockHelper::append($context, 'cast_object_vb_done');
 
@@ -60,7 +67,9 @@ final class CastObjectValueBoxJit
         $context->builder->positionAtEnd($checkEnum);
         $context->builder->branchIf($isEnumCase, $objectBlock, $checkArray = BasicBlockHelper::append($context, 'cast_object_vb_chk_ht'));
         $context->builder->positionAtEnd($checkArray);
-        $context->builder->branchIf($isArray, $arrayBlock, $emptyBlock);
+        $context->builder->branchIf($isArray, $arrayBlock, $checkNull = BasicBlockHelper::append($context, 'cast_object_vb_chk_null'));
+        $context->builder->positionAtEnd($checkNull);
+        $context->builder->branchIf($isNull, $nullBlock, $scalarBlock);
 
         $context->builder->positionAtEnd($objectBlock);
         $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
@@ -77,15 +86,20 @@ final class CastObjectValueBoxJit
         $arrayResult = CastObjectFromHashtableJit::emit($context, $htVar, $block, $op);
         $context->builder->branch($mergeBlock);
 
-        $context->builder->positionAtEnd($emptyBlock);
-        $emptyResult = CastObjectFromHashtableJit::emitEmptyStdClass($context);
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = CastObjectFromHashtableJit::emitEmptyStdClass($context);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($scalarBlock);
+        $scalarResult = CastObjectFromHashtableJit::emitScalarStdClass($context, $src);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($objectResult->value->typeOf());
         $phi->addIncoming($objectResult->value, $objectBlock);
         $phi->addIncoming($arrayResult->value, $arrayBlock);
-        $phi->addIncoming($emptyResult->value, $emptyBlock);
+        $phi->addIncoming($nullResult->value, $nullBlock);
+        $phi->addIncoming($scalarResult->value, $scalarBlock);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $result = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $phi);

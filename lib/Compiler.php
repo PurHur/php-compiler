@@ -10432,19 +10432,30 @@ class Compiler {
 
             return ClassConstMaterializer::detachConstantValue($copy);
         }
-        if (!$operand->is(Variable::TYPE_ARRAY)) {
-            return null;
-        }
         $class = new ClassEntry('stdClass');
         $class->allowsDynamicProperties = true;
         $object = new ObjectEntry($class);
         $object->constructed = true;
-        foreach ($operand->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            $propName = $keyVar->is(Variable::TYPE_INTEGER)
-                ? (string) $keyVar->toInt()
-                : $keyVar->toString();
-            $object->allocateProperty($propName)->copyFrom(
-                ClassConstMaterializer::detachConstantValue($valueVar)
+        if ($operand->is(Variable::TYPE_ARRAY)) {
+            foreach ($operand->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                $propName = $keyVar->is(Variable::TYPE_INTEGER)
+                    ? (string) $keyVar->toInt()
+                    : $keyVar->toString();
+                $object->allocateProperty($propName)->copyFrom(
+                    ClassConstMaterializer::detachConstantValue($valueVar)
+                );
+            }
+        } elseif (!$operand->is(Variable::TYPE_NULL)) {
+            if (!$operand->is(
+                Variable::TYPE_BOOLEAN,
+                Variable::TYPE_INTEGER,
+                Variable::TYPE_FLOAT,
+                Variable::TYPE_STRING
+            )) {
+                return null;
+            }
+            $object->allocateProperty('scalar')->copyFrom(
+                ClassConstMaterializer::detachConstantValue($operand)
             );
         }
         $result = new Variable(Variable::TYPE_OBJECT);

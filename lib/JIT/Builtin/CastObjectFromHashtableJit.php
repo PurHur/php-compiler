@@ -84,6 +84,26 @@ final class CastObjectFromHashtableJit
         return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objVal);
     }
 
+    /** Zend convert_to_object on scalars — stdClass with public scalar property (#30098). */
+    public static function emitScalarStdClass(Context $context, Variable $src): Variable
+    {
+        CastArrayShared::ensureInsertBlock($context, 'cast_object_scalar_stdclass');
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $classId = $object->lookup('stdClass');
+        if (!$object->hasProperty($classId, 'scalar')) {
+            $object->defineProperty($classId, 'scalar', Variable::TYPE_VALUE);
+        }
+        $objVal = $object->allocate($classId);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'cast_object_scalar_after_alloc');
+        $object->markObjectConstructed($objVal);
+        $slot = $object->propertySlotFor($objVal, 'stdClass', 'scalar');
+        $object->propertyStore($slot, $src, Variable::TYPE_VALUE);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'cast_object_scalar_done');
+
+        return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objVal);
+    }
+
     /**
      * @return list<string>
      */
