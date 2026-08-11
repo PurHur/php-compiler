@@ -136,6 +136,8 @@ final class VmIteratorWalk
             return $count;
         }
 
+        // php-src PHP_FUNCTION(iterator_apply) — walk while valid(); no current-equality
+        // early exit (that undercounted LimitIterator(InfiniteIterator), #30237).
         $object = ForeachIterator::resolveTraversableObject($vm, $frame, $iterable);
         $vm->invokeForeachInstanceMethod($frame, $object, 'rewind');
         while ($vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
@@ -143,15 +145,7 @@ final class VmIteratorWalk
             if (!self::invokeApplyCallback($frame, $callback, $params)) {
                 break;
             }
-            $before = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             $vm->invokeForeachInstanceMethod($frame, $object, 'next');
-            if (!$vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
-                break;
-            }
-            $after = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
-            if (self::vmValuesEqual($before, $after) && $count > 0) {
-                break;
-            }
         }
 
         return $count;
@@ -251,40 +245,18 @@ final class VmIteratorWalk
 
     private static function countIteratorObject(VM $vm, Frame $frame, Variable $iterable): int
     {
+        // php-src PHP_FUNCTION(iterator_count) — while (valid) { count++; next; }.
+        // Do not break when current() is unchanged: InfiniteIterator yields the same
+        // value forever, and LimitIterator still terminates via valid() (#30237).
         $object = ForeachIterator::resolveTraversableObject($vm, $frame, $iterable);
         $vm->invokeForeachInstanceMethod($frame, $object, 'rewind');
         $count = 0;
         while ($vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
-            $before = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             ++$count;
             $vm->invokeForeachInstanceMethod($frame, $object, 'next');
-            if (!$vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
-                break;
-            }
-            $after = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
-            if (self::vmValuesEqual($before, $after) && $count > 0) {
-                break;
-            }
         }
 
         return $count;
-    }
-
-    private static function vmValuesEqual(Variable $a, Variable $b): bool
-    {
-        $a = $a->resolveIndirect();
-        $b = $b->resolveIndirect();
-        if ($a->type !== $b->type) {
-            return false;
-        }
-        if (Variable::TYPE_INTEGER === $a->type) {
-            return $a->toInt() === $b->toInt();
-        }
-        if (Variable::TYPE_STRING === $a->type) {
-            return $a->toString() === $b->toString();
-        }
-
-        return false;
     }
 
 }
