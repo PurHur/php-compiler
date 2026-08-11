@@ -1147,6 +1147,8 @@ final class BuiltinInternalArgInfo
                 3 => '?string',
                 default => null,
             },
+            // ext/mbstring/php_mbregex.c — ?string $options = null (null = getter) (#30070)
+            'mb_regex_set_options' => 0 === $index ? '?string' : null,
             // ext/mbstring/mbstring.stub.php — ?string $encoding = null (InternalArgInfo string) (#28583)
             'mb_strpos', 'mb_strrpos', 'mb_stripos', 'mb_strripos' => 3 === $index ? '?string' : null,
             // ext/mbstring/mbstring.stub.php — ?string $encoding = null (InternalArgInfo string) (#28584)
