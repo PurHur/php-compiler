@@ -8,9 +8,9 @@ use PHPCompiler\ext\standard\FilePutContentsJitHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * __compiler_file_put_contents shrink guards (#15310, #19966, #20266, #20290).
+ * __compiler_file_put_contents shrink guards (#15310, #19966, #20266, #20290, #30127).
  *
- * Always-helper via JitVmHelperLink; libc leaf only from phpc_*_kernel (JitFilePutContentsLibc emitBody).
+ * Always-helper via JitVmHelperLink; libc leaf only from NestedJIT JitFilePutContentsLibc.
  */
 final class FilePutContentsRuntimeShrinkTest extends TestCase
 {
@@ -26,27 +26,55 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitFilePutContentsLibc', $bridge);
         $this->assertStringNotContainsString('JitFilePutContentsKernel', $bridge);
         $this->assertStringNotContainsString('StringFilePutContentsLibc', $bridge);
+        $this->assertStringNotContainsString('phpc_file_put_contents_kernel', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFilePutContentsLibc.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitFilePutContentsKernel.php');
-        // Kernel emitBody still owns thin libc IR (#20290).
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
+        // NestedJIT libc leaf still owns thin fopen/fwrite IR (#30127).
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitFilePutContentsLibc.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
     }
 
-    public function testFilePutContentsJitHelperUsesPhpcKernel(): void
+    /** Thin libc remains only behind NestedJIT leaf JitFilePutContentsLibc (#19966 / #30127). */
+    public function testLibcEmitLivesOnlyInNestedJitLeafNotBridge(): void
+    {
+        $libc = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFilePutContentsLibc.php');
+        $this->assertStringContainsString('public static function emitBody', $libc);
+        $this->assertStringContainsString('public static function call', $libc);
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/FilePutContentsJitHelper.php');
+        $this->assertStringNotContainsString('phpc_file_put_contents_kernel', $helper);
+        $this->assertStringContainsString('file_put_contents', $helper);
+    }
+
+    /** NestedJIT must resolve file_put_contents — else helper re-enters bridge (#30127). */
+    public function testNestedJitWhitelistIncludesFilePutContentsNotKernel(): void
+    {
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertMatchesRegularExpression(
+            "/'file_put_contents'/",
+            $context
+        );
+        $this->assertStringNotContainsString("'phpc_file_put_contents_kernel'", $context);
+        $this->assertStringNotContainsString("'phpc_readfile_kernel'", $context);
+        $this->assertStringNotContainsString("'phpc_file_get_contents_kernel'", $context);
+        $this->assertMatchesRegularExpression("/'readfile'/", $context);
+        $this->assertMatchesRegularExpression("/'file_get_contents'/", $context);
+    }
+
+    public function testFilePutContentsJitHelperUsesBuiltinNotKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FilePutContentsJitHelper.php');
-        $this->assertMatchesRegularExpression('/return\s+\\\\phpc_file_put_contents_kernel\s*\(/', $source);
-        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
-        $this->assertStringContainsString('JitLongArg::lower', $kernel);
-        $this->assertStringNotContainsString('truncOrBitCast', $kernel);
+        $this->assertMatchesRegularExpression('/@\\\\file_put_contents\s*\(/', $source);
+        $this->assertStringNotContainsString('phpc_file_put_contents_kernel', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitFilePutContentsLibc.php');
+
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFilePutContents.php');
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $jit);
+        $this->assertStringContainsString('JitFilePutContentsLibc::call', $jit);
     }
 
-    public function testFilePutContentsJitHelperWritesViaKernel(): void
+    public function testFilePutContentsJitHelperDelegatesToHostBuiltin(): void
     {
-        if (!\function_exists('phpc_file_put_contents_kernel')) {
-            $this->markTestSkipped('phpc_file_put_contents_kernel requires compiler runtime');
-        }
         $path = tempnam(sys_get_temp_dir(), 'phpc-fpc-');
         $this->assertNotFalse($path);
         $written = FilePutContentsJitHelper::writePathArgv($path, 'put-ok', 0);
@@ -61,8 +89,8 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('FilePutContentsJitHelper.php', $spine);
         $this->assertStringContainsString('StringFilePutContents.php', $spine);
-        $this->assertStringContainsString('phpc_file_put_contents_kernel.php', $spine);
         $this->assertStringContainsString('JitFilePutContentsLibc.php', $spine);
+        $this->assertStringNotContainsString('phpc_file_put_contents_kernel.php', $spine);
         $this->assertStringNotContainsString('JitFilePutContentsKernel.php', $spine);
     }
 
@@ -81,11 +109,12 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testContextResolvesFpcKernelsFromRuntimeModulesBeforeRegister(): void
+    public function testContextResolvesFpcBuiltinFromRuntimeModulesBeforeRegister(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
-        $this->assertStringContainsString('phpc_file_put_contents_kernel', $source);
+        $this->assertStringContainsString("'file_put_contents'", $source);
+        $this->assertStringNotContainsString('phpc_file_put_contents_kernel', $source);
         $this->assertStringNotContainsString('phpc_readfile_kernel', $source);
         $this->assertStringContainsString("'readfile'", $source);
         $this->assertStringContainsString('runtime->modules', $source);

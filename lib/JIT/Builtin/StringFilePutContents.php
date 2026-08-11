@@ -11,10 +11,11 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310, #19966, #20290).
+ * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310, #19966, #30127).
  *
- * Always {@see JitVmHelperLink} → helper → {@see phpc_file_put_contents_kernel} (Internal::call libc).
- * Pre-registerModule NestedJIT resolves kernels via Runtime modules (#15417 / #20290).
+ * Always {@see JitVmHelperLink} → helper → `@file_put_contents` NestedJIT leaf
+ * (libc fopen/fwrite leaf via file_put_contents::call; no kernel Internal).
+ * Pre-registerModule NestedJIT resolves builtins via Runtime modules (#15417 / #29833).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::filePutContents()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
  */
