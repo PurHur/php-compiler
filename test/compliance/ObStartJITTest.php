@@ -22,6 +22,10 @@ final class ObStartJITTest extends BaseTest
             __DIR__.'/cases/stdlib/ob_start_jit.phpt',
             'ob_start_jit.phpt'
         );
+        yield 'ob_start_null_callback.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/ob_start_null_callback.phpt',
+            'ob_start_null_callback.phpt'
+        );
     }
 
     public function setUp(): void

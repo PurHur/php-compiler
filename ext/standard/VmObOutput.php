@@ -45,6 +45,10 @@ final class VmObOutput
             return null;
         }
         $callback = $frame->calledArgs[0]->resolveIndirect();
+        // php-src `?callable $callback = null` — null means no user filter (output.c / #30121).
+        if (Variable::TYPE_NULL === $callback->type) {
+            return null;
+        }
         if (EnumCaseSupport::isEnumCaseVariable($callback)) {
             throw new \TypeError('ob_start(): Argument #1 ($callback) must be a valid callback');
         }
