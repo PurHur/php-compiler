@@ -7,6 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\MemoryAccounting;
 use PHPLLVM\Value;
@@ -45,6 +48,20 @@ final class memory_get_peak_usage extends Internal
                 'memory_get_peak_usage() expects at most 1 argument, '.\count($args).' given'
             );
         }
+        // Compile-time null under strict: catchable TypeError then stop IR (#30346 peer).
+        if (isset($args[0]) && $context->callerStrictTypes && (
+            JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)
+        )) {
+            JitNativeString::ensureInsertBlock($context);
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'memory_get_peak_usage(): Argument #1 ($real_usage) must be of type bool, null given'
+            );
+            JitNativeString::ensureInsertBlock($context);
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
 
         return JitMemory::getPeakUsage($context, $args[0] ?? null);
     }
@@ -60,6 +77,7 @@ final class memory_get_peak_usage extends Internal
         if (0 === $argc) {
             return false;
         }
-        return VmMemory::resolveUsageArg($frame->calledArgs[0], 'memory_get_peak_usage');
+        // Z_PARAM_BOOL — caller strict_types → TypeError on null (#30346 peer).
+        return VmMemory::resolveUsageArg($frame, 0, 'memory_get_peak_usage');
     }
 }
