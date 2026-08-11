@@ -8,7 +8,7 @@ use PHPCompiler\ext\simplexml\SimpleXmlJsonExport;
 use PHPCompiler\ext\spl\SplArrayStorage;
 
 /**
- * (array) cast lowering for VM (issue #3328, Zend cast_object / convert_to_array).
+ * (array)/(object) cast lowering for VM (issue #3328, #30098, Zend cast_object / convert_to_array).
  */
 final class CastSupport
 {
@@ -84,6 +84,55 @@ final class CastSupport
         $copy = new Variable();
         $copy->copyFrom($src);
         $result->toArray()->append($copy);
+
+        return $result;
+    }
+
+    /**
+     * (object) cast — Zend convert_to_object / cast_object (zend_operators.c, #30098).
+     *
+     * @param array<string, ClassEntry>|null $classesByLc
+     */
+    public static function toObject(Variable $src, ?array $classesByLc = null): Variable
+    {
+        $src = $src->resolveIndirect();
+        $result = new Variable();
+
+        if (Variable::TYPE_OBJECT === $src->type) {
+            $result->copyFrom($src);
+
+            return $result;
+        }
+
+        if (Variable::TYPE_ENUM_CASE === $src->type) {
+            $result->copyFrom(EnumCaseSupport::receiverForInstanceMethod($src));
+
+            return $result;
+        }
+
+        $classes = $classesByLc ?? [];
+        if (!isset($classes['stdclass'])) {
+            throw new \LogicException('stdClass is not registered');
+        }
+
+        $object = new ObjectEntry($classes['stdclass']);
+        $object->constructed = true;
+
+        if (Variable::TYPE_ARRAY === $src->type) {
+            foreach ($src->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                $propName = $keyVar->is(Variable::TYPE_INTEGER)
+                    ? (string) $keyVar->toInt()
+                    : $keyVar->toString();
+                $object->allocateProperty($propName)->copyFrom(
+                    ClassConstMaterializer::detachConstantValue($valueVar)
+                );
+            }
+        } elseif (Variable::TYPE_NULL !== $src->type) {
+            // IS_FALSE/IS_TRUE/IS_LONG/IS_DOUBLE/IS_STRING → stdClass.scalar; IS_NULL stays empty.
+            $object->allocateProperty('scalar')->copyFrom($src);
+        }
+
+        $result->object($object);
 
         return $result;
     }

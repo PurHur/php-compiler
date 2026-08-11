@@ -5673,32 +5673,9 @@ restart:
                     );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
-                    $src = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2)->resolveIndirect();
+                    $src = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
                     $dst = $frame->scope[$op->arg1];
-                    if (Variable::TYPE_OBJECT === $src->type) {
-                        $dst->copyFrom($src);
-                        break;
-                    }
-                    if (Variable::TYPE_ENUM_CASE === $src->type) {
-                        $dst->copyFrom(VM\EnumCaseSupport::receiverForInstanceMethod($src));
-                        break;
-                    }
-                    if (!isset($this->context->classes['stdclass'])) {
-                        throw new \LogicException('stdClass is not registered');
-                    }
-                    $object = new VM\ObjectEntry($this->context->classes['stdclass']);
-                    $object->constructed = true;
-                    $dst->object($object);
-                    if (Variable::TYPE_ARRAY === $src->type) {
-                        foreach ($src->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
-                            $propName = $keyVar->is(Variable::TYPE_INTEGER)
-                                ? (string) $keyVar->toInt()
-                                : $keyVar->toString();
-                            $object->allocateProperty($propName)->copyFrom(
-                                VM\ClassConstMaterializer::detachConstantValue($valueVar)
-                            );
-                        }
-                    }
+                    $dst->copyFrom(VM\CastSupport::toObject($src, $this->context->classes));
                     $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_CAST_UNSET:
