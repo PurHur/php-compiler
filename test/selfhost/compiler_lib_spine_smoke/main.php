@@ -7459,6 +7459,7 @@ require_once __DIR__.'/../../../ext/dom/DomAttrIsIdJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomAttrIsIdRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomAttrIsId.php';
 require_once __DIR__.'/../../../lib/JIT/TypedParamCoerce.php';
+require_once __DIR__.'/../../../lib/JIT/StaticPropertyAsNonStaticJitGuard.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
