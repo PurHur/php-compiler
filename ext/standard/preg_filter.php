@@ -45,7 +45,13 @@ final class preg_filter extends Internal
             }
             VmNullStringParamDeprecation::emit($frame, 'preg_filter', 0, 'pattern', 'array|string');
             VmPregFailure::warnEmptyRegularExpression($frame, 'preg_filter');
-            $frame->returnVar->null();
+            // php-src php_pcre.c: array subject → empty array; string subject → null (#30068).
+            $subjectVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $subjectVar->type) {
+                $frame->returnVar->array(new HashTable());
+            } else {
+                $frame->returnVar->null();
+            }
 
             return;
         }
