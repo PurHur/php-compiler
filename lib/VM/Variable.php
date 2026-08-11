@@ -3411,7 +3411,18 @@ restart:
                 if ($resolved->type === self::TYPE_BOOLEAN || $resolved->type === self::TYPE_NULL) {
                     throw new \TypeError(sprintf(
                         'Cannot perform bitwise not on %s',
-                        self::TYPE_BOOLEAN === $resolved->type ? 'bool' : 'null'
+                        self::TYPE_BOOLEAN === $resolved->type
+                            ? ($resolved->bool ? 'true' : 'false')
+                            : 'null'
+                    ));
+                }
+                if ($resolved->type === self::TYPE_ARRAY) {
+                    throw new \TypeError('Cannot perform bitwise not on array');
+                }
+                if ($resolved->type === self::TYPE_OBJECT) {
+                    throw new \TypeError(sprintf(
+                        'Cannot perform bitwise not on %s',
+                        $resolved->toObject()->class->name
                     ));
                 }
                 $this->castFrom(self::CAST_NUMERIC, $resolved);
