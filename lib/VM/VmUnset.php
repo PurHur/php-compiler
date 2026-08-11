@@ -27,7 +27,32 @@ final class VmUnset
     }
 
     /**
-     * Scalar JIT containers always raise on unset offset (Zend zend_unset_dim).
+     * ZEND_UNSET_DIM on null/undef — silent no-op (zend_vm_def.h; #30099).
+     *
+     * Zend: type <= IS_FALSE and not IS_FALSE falls through without convert or Error.
+     */
+    public static function isNullOrUndefUnsetDimNoop(Variable $container): bool
+    {
+        $resolved = $container->resolveIndirect();
+
+        return Variable::TYPE_NULL === $resolved->type
+            || Variable::TYPE_UNDEFINED === $resolved->type;
+    }
+
+    /**
+     * ZEND_UNSET_DIM on false — E_DEPRECATED only; leaves false (zend_vm_def.h; #30099).
+     *
+     * Unlike FETCH_DIM_W, unset does **not** promote false→array.
+     */
+    public static function isFalseUnsetDimDeprecated(Variable $container): bool
+    {
+        return TypeCheck::isFalseContainerForDimAutovivify($container);
+    }
+
+    /**
+     * Scalar JIT containers that may need unset-dim handling (Zend zend_unset_dim).
+     *
+     * Null/false are handled as no-op / Deprecated before {@see scalarUnsetDimErrorMessage()}.
      */
     public static function isScalarJitContainer(JitVariable $container): bool
     {
