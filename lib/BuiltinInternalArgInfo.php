@@ -229,6 +229,8 @@ final class BuiltinInternalArgInfo
             'xmlwriter_open_memory', 'xmlwriter_open_uri' => 'XMLWriter|false',
             // pecl-networking-uuid uuid.stub.php — absent from InternalArgInfo (#27836)
             'uuid_generate_md5', 'uuid_generate_sha1' => 'string',
+            // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096)
+            'bcceil', 'bcfloor', 'bcround' => 'string',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => 'bool',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits / untyped (#25469)
@@ -599,10 +601,14 @@ final class BuiltinInternalArgInfo
             'round' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
                 ? 'RoundingMode|int'
                 : null,
-            // ext/bcmath/bcmath.stub.php — RoundingMode $mode = HalfAwayFromZero (#28566)
-            'bcround' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
-                ? 'RoundingMode'
-                : null,
+            // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096, #28566)
+            'bcceil', 'bcfloor' => 0 === $index ? 'string' : null,
+            'bcround' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                2 => CompilerVersion::supportsRoundingModeEnum() ? 'RoundingMode' : null,
+                default => null,
+            },
             // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int) (#25440)
             'idate' => 1 === $index ? '?int' : null,
             'getdate' => 0 === $index ? '?int' : null,
