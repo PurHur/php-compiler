@@ -32,7 +32,7 @@ final class finfo_set_flags extends Internal
             ));
         }
         $finfo = VmFinfo::requireFinfoArg($frame->calledArgs[0], 'finfo_set_flags', 0);
-        $flags = VmFinfo::coerceFlagsArg($frame->calledArgs[1]);
+        $flags = VmFinfo::coerceFlagsArg($frame, 1, 'finfo_set_flags', 2, 'flags');
         $ok = VmFinfo::setFlags($finfo, $flags);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);

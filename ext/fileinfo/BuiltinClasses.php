@@ -75,7 +75,7 @@ final class FinfoConstruct extends VmClassMethod
             throw new \TypeError('finfo::__construct(): Argument #1 ($object) must be of type object');
         }
         $object = $receiver->toObject();
-        $flags = VmFinfo::coerceFlagsArg($frame->calledArgs[1] ?? null);
+        $flags = VmFinfo::coerceFlagsArg($frame, 1, 'finfo::__construct', 1, 'flags');
         // magic_database path accepted for signature parity; ignored (PHP sniff).
         if (isset($frame->calledArgs[2])) {
             VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'finfo::__construct', 1, 'magic_database');
@@ -111,7 +111,7 @@ final class FinfoFileMethod extends VmClassMethod
         }
         $object = $frame->calledArgs[0]->resolveIndirect()->toObject();
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'finfo::file', 0, 'filename');
-        $flags = VmFinfo::coerceFlagsArg($frame->calledArgs[2] ?? null);
+        $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo::file', 2, 'flags');
         $result = VmFinfo::file($object, $path, $flags, $frame, 'finfo::file');
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -148,7 +148,7 @@ final class FinfoBufferMethod extends VmClassMethod
         }
         $object = $frame->calledArgs[0]->resolveIndirect()->toObject();
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'finfo::buffer', 0, 'string');
-        $flags = VmFinfo::coerceFlagsArg($frame->calledArgs[2] ?? null);
+        $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo::buffer', 2, 'flags');
         $result = VmFinfo::buffer($object, $string, $flags, 'finfo::buffer');
         $frame->returnVar->string($result);
     }
@@ -176,7 +176,7 @@ final class FinfoSetFlagsMethod extends VmClassMethod
             ));
         }
         $object = $frame->calledArgs[0]->resolveIndirect()->toObject();
-        $flags = VmFinfo::coerceFlagsArg($frame->calledArgs[1]);
+        $flags = VmFinfo::coerceFlagsArg($frame, 1, 'finfo::set_flags', 1, 'flags');
         $ok = VmFinfo::setFlags($object, $flags);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);

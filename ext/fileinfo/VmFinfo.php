@@ -9,6 +9,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmMime;
 use PHPCompiler\ext\standard\VmStreamOpenFailure;
 
@@ -128,17 +129,31 @@ final class VmFinfo
         return self::format($string, $effective);
     }
 
-    public static function coerceFlagsArg(?Variable $operand): int
-    {
-        if (null === $operand) {
-            return FileinfoConstants::FILEINFO_NONE;
-        }
-        $operand = $operand->resolveIndirect();
-        if (Variable::TYPE_NULL === $operand->type) {
+    /**
+     * Z_PARAM_LONG `$flags` — omitted → FILEINFO_NONE; caller strict_types → TypeError on null;
+     * soft path DEP+coerce to 0 (php-src ext/fileinfo/fileinfo.c; #30258).
+     *
+     * @param int $argIndex 0-based slot in $frame->calledArgs
+     * @param int $userArgIndex 1-based Argument #N in TypeError text (methods skip $this)
+     */
+    public static function coerceFlagsArg(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex = 1,
+        string $paramName = 'flags'
+    ): int {
+        if (!isset($frame->calledArgs[$argIndex])) {
             return FileinfoConstants::FILEINFO_NONE;
         }
 
-        return $operand->toInt();
+        return VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            $function,
+            $userArgIndex,
+            $paramName
+        );
     }
 
     private static function format(string $data, int $flags): string

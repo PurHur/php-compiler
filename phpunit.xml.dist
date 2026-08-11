@@ -196,6 +196,7 @@
             <file>./test/compliance/FscanfNullFormatStrictVMTest.php</file>
             <file>./test/compliance/FscanfNullFormatStrictJITTest.php</file>
             <file>./test/compliance/SocketCreateListenNullStrictVMTest.php</file>
+            <file>./test/compliance/FinfoOpenNullStrictVMTest.php</file>
             <file>./test/compliance/SocketGetOptionNullStrictVMTest.php</file>
             <file>./test/compliance/SocketStrerrorNullStrictVMTest.php</file>
             <file>./test/compliance/SocketErrorNullOptionalVMTest.php</file>
