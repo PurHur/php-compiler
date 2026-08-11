@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\JitEnvironMirrorKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -15,11 +14,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __superglobals__mirror_process_environ (#18984, #21579).
+ * JIT/AOT link for __superglobals__mirror_process_environ (#18984, #21579, #30225).
  *
- * Embed: NestedJIT {@see EnvironMirrorNativeJitHelper} via helper-runtime (#19157).
- * Thin standalone / user-script AOT: libc environ walk via {@see JitEnvironMirrorKernel}
- * in this ABI (NestedJIT helper returns empty under thin AOT — #20758 / #21580).
+ * Embed + thin standalone AOT: NestedJIT {@see EnvironMirrorNativeJitHelper} via
+ * {@see JitVmHelperLink} (Rename #20603 / getenv #20758 shape — no thin libc fork).
  * Callers ({@see StringGetenvAll}, {@see \PHPCompiler\ext\standard\JitSuperglobalRefreshKernel})
  * share this ABI — no duplicate inline kernel in getenv_all.
  * SSOT: {@see \PHPCompiler\Web\Superglobals::applyProcessEnvironMirror()}
@@ -40,8 +38,6 @@ final class EnvironMirrorRuntime
 
     private const BRIDGE_ENTRY = 'environ_mirror_bridge_entry';
 
-    private const THIN_BRIDGE_ENTRY = 'environ_mirror_thin_kernel_entry';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -60,71 +56,13 @@ final class EnvironMirrorRuntime
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && (
-            JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
-            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::THIN_BRIDGE_ENTRY)
-        )) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementThinKernelBridge($context, $probe);
-
-            return;
-        }
-
         self::implementEmbedBridge($context, $probe);
-    }
-
-    /**
-     * Thin standalone AOT: emit libc environ walk into the ABI body (#21579).
-     * NestedJIT EnvironMirrorNativeJitHelper is empty under thin AOT (#20758 / #21580).
-     */
-    private static function implementThinKernelBridge(Context $context, ?LlvmFunction $probe): void
-    {
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $void = $context->getTypeFromString('void');
-        $fn = null !== $probe && $probe->countBasicBlocks() > 0
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($void, false, $htPtr)
-            );
-
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::THIN_BRIDGE_ENTRY);
-        $early = $fn->appendBasicBlock('environ_mirror_thin_early');
-        $work = $fn->appendBasicBlock('environ_mirror_thin_work');
-        $context->builder->positionAtEnd($entry);
-
-        $dest = $fn->getParam(0);
-        $nullDest = $context->builder->icmp(Builder::INT_EQ, $dest, $htPtr->constNull());
-        $context->builder->branchIf($nullDest, $early, $work);
-
-        $context->builder->positionAtEnd($early);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($work);
-        $prevActive = $context->activeFunction;
-        $context->functions[self::ABI] = $fn;
-        $context->activeFunction = self::ABI;
-        try {
-            JitEnvironMirrorKernel::mirrorIntoHashtablePtr($context, $dest);
-        } finally {
-            $context->activeFunction = $prevActive;
-        }
-        $context->builder->returnVoid();
-
-        $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 
     private static function implementEmbedBridge(Context $context, ?LlvmFunction $probe): void
@@ -186,7 +124,7 @@ final class EnvironMirrorRuntime
     private static function ensureNativeHtInternalProxies(Context $context): void
     {
         $internals = [
-            new \PHPCompiler\ext\standard\phpc_native_environ_mirror_into_ht(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
         ];
         foreach ($internals as $internal) {
             $lc = strtolower($internal->getName());
