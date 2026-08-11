@@ -231,6 +231,18 @@ class Block {
      */
     public array $deferredArrayLiteralKeepSlots = [];
 
+    /**
+     * PHP 8.4+ Zend closure display name {@code {closure:…:line}} for this body (#30076).
+     *
+     * Set at compile time on anonymous/arrow Func blocks; used by TypeError / Reflection / debugInfo.
+     */
+    public ?string $closureRichDisplayName = null;
+
+    /**
+     * Declaring class for method-scoped closures (TypeError {@code Class::{closure…}}, #30076 / #29953).
+     */
+    public ?string $closureDeclaringClass = null;
+
     /** Absolute entry script path when CFG filename attribute is missing (issue #707). */
     private string $scriptPathOverride = '';
 
@@ -967,6 +979,8 @@ class Block {
             $this->returnTypeStatic = $parent->returnTypeStatic;
             $this->returnTypeMixed = $parent->returnTypeMixed;
             $this->returnDeclaredType = $parent->returnDeclaredType;
+            $this->closureRichDisplayName = $parent->closureRichDisplayName;
+            $this->closureDeclaringClass = $parent->closureDeclaringClass;
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
             $this->paramClassConstraints = $parent->paramClassConstraints;

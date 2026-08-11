@@ -116,9 +116,10 @@ final class ParamArgumentCountError
     }
 
     /**
-     * Zend TypeError / ArgumentCountError callable label for a user call frame (#19526, #29953).
+     * Zend TypeError / ArgumentCountError callable label for a user call frame (#19526, #29953, #30076).
      *
-     * Method-scoped closures/arrows → {@code Class::{closure}}; free closures → {@code {closure}}.
+     * Method-scoped closures/arrows → {@code Class::{closure…}}; free closures → {@code {closure…}}.
+     * On PROFILE≥8.4, `{closure…}` includes defining function/file + line (zend_compile.c).
      */
     public static function resolveFunctionName(Frame $frame): string
     {
@@ -139,6 +140,19 @@ final class ParamArgumentCountError
             }
 
             return \PHPCompiler\SourcePreprocessor\PropertyHooks::zendTypeErrorCallableName($state->methodName);
+        }
+
+        $rich = null !== $state ? $state->richDisplayName : null;
+        if ((null === $rich || '' === $rich) && null !== $frame->block) {
+            $rich = $frame->block->closureRichDisplayName;
+        }
+        if (null !== $rich && '' !== $rich) {
+            $scope = self::closureScopeClass($frame, $call instanceof \PHPCompiler\Func\PHP ? $call : null);
+            if ((null === $scope || '' === $scope) && null !== $frame->block) {
+                $scope = $frame->block->closureDeclaringClass;
+            }
+
+            return self::qualifyClosureDisplayName($rich, $scope);
         }
 
         if ($call instanceof \PHPCompiler\Func\PHP) {
@@ -180,10 +194,30 @@ final class ParamArgumentCountError
     }
 
     /**
-     * Zend TypeError callable label for a CFG func (return checks / JIT Native framing) (#29953).
+     * Zend TypeError callable label for a CFG func (return checks / JIT Native framing) (#29953, #30076).
      */
-    public static function typeErrorDisplayNameForCfgFunc(?\PHPCfg\Func $func, ?string $fallbackName = null): string
-    {
+    public static function typeErrorDisplayNameForCfgFunc(
+        ?\PHPCfg\Func $func,
+        ?string $fallbackName = null,
+        ?\PHPCompiler\Block $block = null
+    ): string {
+        $rich = ClosureRichDisplayName::preferFromBlock($block);
+        if (null !== $rich && '' !== $rich) {
+            $scope = null;
+            if (null !== $block && null !== $block->closureDeclaringClass && '' !== $block->closureDeclaringClass) {
+                $scope = $block->closureDeclaringClass;
+            } elseif (null !== $func && null !== $func->class) {
+                $className = $func->class->value ?? null;
+                if (\is_string($className) && '' !== $className) {
+                    $scope = $className;
+                }
+            }
+            if (null !== $scope && '' !== $scope) {
+                return self::formatUserFunctionName($scope.'::'.$rich);
+            }
+
+            return self::formatUserFunctionName($rich);
+        }
         $name = $fallbackName ?? '';
         if (null !== $func && \is_string($func->name) && '' !== $func->name) {
             $name = $func->name;
@@ -219,6 +253,13 @@ final class ParamArgumentCountError
 
     public static function formatUserFunctionName(string $name): string
     {
+        // Already Zend 8.4+ rich closure / Class::{rich — keep intact (#30076).
+        // Class prefix cannot contain `{` so nested `{closure:{closure:…}:N}` stays in group 2.
+        if (preg_match('/^(?:([^{]+)::)?(\{closure:.+\})$/', $name, $m)) {
+            $prefix = isset($m[1]) && '' !== $m[1] ? $m[1].'::' : '';
+
+            return $prefix.$m[2];
+        }
         // php-cfg `{anonymous}#N` / `{closure}_N` → Zend `{closure}`; with class scope →
         // `Class::{closure}` (#29095, #29025, #29953).
         if (preg_match('/^(?:(.*)::)?(\{anonymous\}(?:#\d+)?|\{closure\}(?:_\d*)?)$/', $name, $m)) {
@@ -235,7 +276,9 @@ final class ParamArgumentCountError
 
     public static function isBareClosureLabel(string $name): bool
     {
-        return str_starts_with($name, '{anonymous}') || str_starts_with($name, '{closure}');
+        // `{closure}`, `{closure}_N`, and PHP 8.4+ `{closure:…}` (#30076) — prefix is `{closure`
+        // without requiring an immediate closing brace (rich names use `{closure:`).
+        return str_starts_with($name, '{anonymous}') || str_starts_with($name, '{closure');
     }
 
     private static function qualifyClosureDisplayName(string $name, ?string $scope): string
