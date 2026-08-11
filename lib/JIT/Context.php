@@ -1003,9 +1003,6 @@ class Context {
             // Stat path always-helper NestedJIT leaves (#20742) — peer rename (#20603).
             'phpc_stat_mode_kernel',
             'phpc_access_kernel',
-            // Openssl methods always-helper NestedJIT leaves (#21103).
-            'phpc_openssl_cipher_methods_kernel',
-            'phpc_openssl_md_methods_kernel',
             // Hash crypto always-helper NestedJIT EVP leaves (#21026).
             'phpc_hash_crypto_hash',
             'phpc_hash_crypto_hmac',

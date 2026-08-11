@@ -47,8 +47,6 @@ class Module extends ModuleAbstract
             new openssl_public_decrypt(),
             new openssl_get_cipher_methods(),
             new openssl_get_md_methods(),
-            new phpc_openssl_cipher_methods_kernel(),
-            new phpc_openssl_md_methods_kernel(),
             new openssl_get_cert_locations(),
             new openssl_get_curve_names(),
             new openssl_pkey_new(),

@@ -1716,7 +1716,6 @@
         "ext/openssl/JitOpensslDigest.php",
         "ext/openssl/JitOpensslEncrypt.php",
         "ext/openssl/JitOpensslMethods.php",
-        "ext/openssl/JitOpensslMethodsKernel.php",
         "ext/openssl/JitOpensslSign.php",
         "ext/openssl/Module.php",
         "ext/openssl/OpensslCipherRegistry.php",
@@ -1808,8 +1807,6 @@
         "ext/openssl/openssl_x509_verify.php",
         "ext/openssl/phpc_openssl_cipher_decrypt.php",
         "ext/openssl/phpc_openssl_cipher_encrypt.php",
-        "ext/openssl/phpc_openssl_cipher_methods_kernel.php",
-        "ext/openssl/phpc_openssl_md_methods_kernel.php",
         "ext/pcntl/Module.php",
         "ext/pcntl/PcntlConstants.php",
         "ext/pcntl/PcntlHostBridge.php",
@@ -7598,9 +7595,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7364,
+        "inventory_files": 7361,
         "excluded": 0,
-        "eligible": 7364,
+        "eligible": 7361,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
