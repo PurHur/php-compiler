@@ -43,10 +43,17 @@ final class JitReferencableCheck
         return Variable::TYPE_VALUE === $arg->type || JitValueBox::isValueOperand($arg);
     }
 
-    public static function emitByRefError(Context $context, string $fn, int $paramIdx): void
-    {
-        $paramNames = BuiltinParamNames::forFunction($fn) ?? [];
-        $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+    /**
+     * @param array<int, string>|null $paramNames LLVM/param index => name (user Native calls, #30027)
+     */
+    public static function emitByRefError(
+        Context $context,
+        string $fn,
+        int $paramIdx,
+        ?array $paramNames = null
+    ): void {
+        $names = $paramNames ?? BuiltinParamNames::forFunction($fn) ?? [];
+        $paramName = $names[$paramIdx] ?? 'param'.($paramIdx + 1);
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, \sprintf(

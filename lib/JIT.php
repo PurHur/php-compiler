@@ -11608,7 +11608,7 @@ class JIT {
                             $nativeCall,
                             $callOperands
                         );
-                        $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
+                        $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands, $block);
                     }
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->adaptByRefCallArgsForInternal(
@@ -11742,7 +11742,7 @@ class JIT {
                             $nativeCall,
                             $callOperands
                         );
-                        $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
+                        $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands, $block);
                     }
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->adaptByRefCallArgsForInternal(
@@ -21987,8 +21987,12 @@ class JIT {
      *
      * @return list<Variable>
      */
-    private function adaptByRefCallArgs(JIT\Call\Native $call, array $args, array $operands): array
-    {
+    private function adaptByRefCallArgs(
+        JIT\Call\Native $call,
+        array $args,
+        array $operands,
+        Block $block
+    ): array {
         if ([] === $call->paramByRefByArg) {
             return $args;
         }
@@ -22003,7 +22007,7 @@ class JIT {
             if (null === $operand) {
                 continue;
             }
-            $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+            $args[$idx] = $this->adaptNativeByRefCallArg($call, $block, $idx, $operand, $args[$idx]);
         }
         if (
             null !== $call->variadicArgIndex
@@ -22025,11 +22029,51 @@ class JIT {
                 if (null === $operand) {
                     continue;
                 }
-                $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+                $args[$idx] = $this->adaptNativeByRefCallArg($call, $block, $idx, $operand, $args[$idx]);
             }
         }
 
         return $args;
+    }
+
+    /**
+     * User/method by-ref actual: named lvalue → alias; call/new return temp → Notice + temp box;
+     * other non-variables → Error (#30027, zend_execute.c ZEND_SEND_VAR_NO_REF).
+     */
+    private function adaptNativeByRefCallArg(
+        JIT\Call\Native $call,
+        Block $block,
+        int $idx,
+        Operand $operand,
+        Variable $arg
+    ): Variable {
+        $namedLocalSlot = $block->slotForOperand($operand);
+        if (null !== $namedLocalSlot && $block->isNamedVariableSlot((int) $namedLocalSlot)) {
+            return $this->ensureValueBoxLvalueForByRefPass($operand, $arg);
+        }
+        if (JIT\JitReferencableCheck::isOperandReferenceable($operand, $arg)) {
+            return $this->ensureValueBoxLvalueForByRefPass($operand, $arg);
+        }
+        if (VM\ReferencableCheck::operandIsFuncCallReturn($operand, $block)) {
+            JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+            $arg->nonVariableByRefTempAllowed = true;
+
+            return $this->ensureValueBoxLvalueForByRefPass($operand, $arg);
+        }
+        // Match Call\Native::receiverPrefix — Argument #N skips implicit $this (#30027).
+        $receiverPrefix = (
+            [] !== $call->paramNames
+            && \count($call->argTypes) === \count($call->paramNames) + 1
+        ) ? 1 : 0;
+        $phpParamIdx = max(0, $idx - $receiverPrefix);
+        JIT\JitReferencableCheck::emitByRefError(
+            $this->context,
+            $call->name,
+            $phpParamIdx,
+            $call->paramNames
+        );
+
+        return $arg;
     }
 
     private function adaptByRefCallArgsForInternal(string $name, array $args, array $operands, Block $block): array
