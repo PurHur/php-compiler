@@ -8567,12 +8567,15 @@ restart:
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                         $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         if ($forWrite) {
-                            if (
-                                Variable::TYPE_NULL === $resolved->type
-                                && $this->propertyFetchDestUsedAsIncDec($frame, $op)
-                            ) {
+                            // ZEND_PRE/POST_INC/DEC_OBJ: verb is increment/decrement for any
+                            // non-object (null and true/false), not only null (#7431 / #30075).
+                            if ($this->propertyFetchDestUsedAsIncDec($frame, $op)) {
                                 $catchFrame = $this->dispatchVmError(
-                                    sprintf('Attempt to increment/decrement property "%s" on null', $name),
+                                    sprintf(
+                                        'Attempt to increment/decrement property "%s" on %s',
+                                        $name,
+                                        $typeName
+                                    ),
                                     $frame
                                 );
                             } else {
