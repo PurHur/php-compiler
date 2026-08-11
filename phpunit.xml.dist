@@ -265,6 +265,8 @@
             <file>./test/compliance/MathBinaryFloatNullSoftJITTest.php</file>
             <file>./test/compliance/MathFloatNullStrictTypesVMTest.php</file>
             <file>./test/compliance/MathFloatNullStrictTypesJITTest.php</file>
+            <file>./test/compliance/MathFpowNullStrictTypesVMTest.php</file>
+            <file>./test/compliance/MathFpowNullStrictTypesJITTest.php</file>
             <file>./test/compliance/StristrStrchrStrrchrNullHaystackStrictVMTest.php</file>
             <file>./test/compliance/StristrStrchrStrrchrNullHaystackStrictJITTest.php</file>
             <file>./test/compliance/StrpbrkStrtokNullStrictVMTest.php</file>

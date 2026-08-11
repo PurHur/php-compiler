@@ -54,7 +54,8 @@ final class VmMath
 
     /**
      * Z_PARAM_DOUBLE null rejection on PHP 8.4 forward profile (fadd/fsub/fmul only; #19182).
-     * fpow/sqrt use Z_PARAM_DOUBLE soft-null (#24177); pow() uses operator path — silent null (#29322).
+     * fpow/sqrt use soft-null outside strict_types (#24177); under strict_types → TypeError (#30021 / #29782).
+     * pow() uses operator path — silent null (#29322).
      */
     public static function requiresForwardProfileStrictDoubleNull(): bool
     {
@@ -704,7 +705,8 @@ final class VmMath
     /**
      * Z_PARAM_DOUBLE null → TypeError on PHP 8.4 forward profile
      * (fadd/fsub/fmul and nextafter $toward only; #19182, #20432).
-     * fdiv/fmod/hypot/atan2 use {@see parseDoubleBuiltinArg} soft-null (#29319, re-#24198).
+     * fdiv/fmod/hypot/atan2/fpow use {@see parseStrictFloatBuiltinArgForFrame} (strict TypeError;
+     * else soft-null via {@see parseDoubleBuiltinArg}) (#29319, #30021).
      *
      * @throws \TypeError when operand is null on PROFILE=8.4+
      */

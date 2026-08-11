@@ -34,25 +34,19 @@ final class fpow extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if (2 !== $argc) {
-            throw new \ArgumentCountError(
-                \sprintf('%s() expects exactly 2 arguments, %d given', self::FUNCTION, $argc)
-            );
-        }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $this->requireExactArgCount($frame, self::FUNCTION, 2);
+        // Z_PARAM_DOUBLE: strict_types TypeError; else soft-null DEP+coerce (#30021, peers #29782).
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             self::FUNCTION,
             1,
-            'num',
-            $frame
+            'num'
         );
-        $exponent = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[1]->resolveIndirect(),
+        $exponent = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             self::FUNCTION,
             2,
-            'exponent',
-            $frame
+            'exponent'
         );
         if (null === $frame->returnVar) {
             return;
@@ -62,13 +56,19 @@ final class fpow extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if (2 !== $argc) {
-            throw new \ArgumentCountError(
-                \sprintf('%s() expects exactly 2 arguments, %d given', self::FUNCTION, $argc)
-            );
+        if (!$this->requireExactJitArgCount($context, $args, self::FUNCTION, 2)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
-        [$base, $exp] = JitFdiv::lowerOperands($context, $args[0], $args[1], self::FUNCTION, 'num', 'exponent', 'float');
+        [$base, $exp] = JitFdiv::lowerOperands(
+            $context,
+            $args[0],
+            $args[1],
+            self::FUNCTION,
+            'num',
+            'exponent',
+            'float',
+            false
+        );
 
         return MathFpow::invoke($context, $base, $exp);
     }
