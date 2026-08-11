@@ -7048,6 +7048,12 @@ restart:
                         }
                         break;
                     }
+                    // ZEND_UNSET_OBJ on non-object (array/scalar/null/…) — silent no-op
+                    // (zend_vm_def.h; #30065). Must run before ARRAY / UNSET_DIM paths so
+                    // unset($arr->prop) does not delete an array key and false stays silent.
+                    if (VM\VmUnset::isNonObjectUnsetPropNoop($op->unsetOnProperty, $container->type)) {
+                        break;
+                    }
                     if (Variable::TYPE_ARRAY === $container->type) {
                         $keyResolved = $key->resolveIndirect();
                         if (
