@@ -4793,6 +4793,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #28898 — php-src ext/pcntl/pcntl.stub.php: $handler untyped; restart_syscalls=true */
+    public function testPcntlSignalHandlerUntypedAndRestartSyscallsDefaultTrue(): void
+    {
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('pcntl_signal', 1));
+        // InternalArgInfo still names the arg "handle"; BuiltinParamNames maps Reflection → handler (#24551).
+        $handler = BuiltinInternalArgInfo::paramInfoForFunction('pcntl_signal', 1);
+        self::assertNotNull($handler);
+        self::assertSame('', $handler['type']);
+        $restart = BuiltinInternalArgInfo::paramInfoForFunction('pcntl_signal', 2);
+        self::assertNotNull($restart);
+        self::assertSame('restart_syscalls', $restart['name']);
+        self::assertSame('bool', $restart['type']);
+        self::assertTrue($restart['isOptional']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('pcntl_signal', 2, $restart, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'pcntl_signal', 2, $restart));
+        self::assertSame(Variable::TYPE_BOOLEAN, $dest->type);
+        self::assertTrue($dest->toBool());
+    }
+
     /** @covers issue #27849 — php-src ext/pcntl/pcntl.stub.php */
     public function testPcntlWaitpidNamedParamsResolve(): void
     {
