@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -82,7 +83,7 @@ final class JitArrayKey
             $errBlock = BasicBlockHelper::append($context, 'array_key_req_err');
             $context->builder->branchIf($isArray, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
-            self::emitBoxedNonArrayTypeError($context, $fn, $typeByte);
+            self::emitBoxedNonArrayTypeError($context, $fn, $typeByte, $loaded);
             $context->builder->positionAtEnd($okBlock);
 
             return;
@@ -90,12 +91,16 @@ final class JitArrayKey
 
         self::emitErrorAndAbort(
             $context,
-            \sprintf(self::TYPE_ERROR, $fn, self::jitGivenTypeName($array->type))
+            \sprintf(self::TYPE_ERROR, $fn, JitOperandTypeLabel::givenLabel($context, $array))
         );
     }
 
-    private static function emitBoxedNonArrayTypeError(Context $context, string $fn, Value $typeByte): void
-    {
+    private static function emitBoxedNonArrayTypeError(
+        Context $context,
+        string $fn,
+        Value $typeByte,
+        Value $valuePtr
+    ): void {
         $i8 = $context->getTypeFromString('int8');
         $nullBlock = BasicBlockHelper::append($context, 'array_key_req_null');
         $stringBlock = BasicBlockHelper::append($context, 'array_key_req_string');
@@ -166,31 +171,24 @@ final class JitArrayKey
             $i8->constInt(Variable::TYPE_BOOLEAN, false)
         );
         $context->builder->branchIf($isBool, $boolBlock, $mixedBlock);
+        // zend_execute.c — bool actuals print true/false, not bool (#30114 / #29097).
         $context->builder->positionAtEnd($boolBlock);
-        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'bool'));
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $i8->constInt(0, false)
+        );
+        $trueBlock = BasicBlockHelper::append($context, 'array_key_req_true');
+        $falseBlock = BasicBlockHelper::append($context, 'array_key_req_false');
+        $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
+        $context->builder->positionAtEnd($trueBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'true'));
+        $context->builder->positionAtEnd($falseBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'false'));
 
         $context->builder->positionAtEnd($mixedBlock);
         self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'mixed'));
-    }
-
-    private static function jitGivenTypeName(int $type): string
-    {
-        switch ($type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return 'int';
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return 'float';
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return 'bool';
-            case JITVariable::TYPE_STRING:
-                return 'string';
-            case JITVariable::TYPE_OBJECT:
-                return 'object';
-            case JITVariable::TYPE_NULL:
-                return 'null';
-            default:
-                return 'mixed';
-        }
     }
 
     /**
