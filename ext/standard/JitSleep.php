@@ -62,7 +62,7 @@ final class JitSleep
     {
         TimeSleepRuntime::ensureLinked($context);
 
-        $target = self::lowerDouble($context, $arg, 'time_sleep_until', 1, 'timestamp');
+        $target = JitFdiv::lowerSingleOperand($context, $arg, 1, 'timestamp', 'time_sleep_until', 'float');
         $ok = $context->builder->call(
             $context->lookupFunction('__compiler_time_sleep_until'),
             $target

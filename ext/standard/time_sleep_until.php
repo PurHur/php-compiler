@@ -29,8 +29,8 @@ final class time_sleep_until extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $timestamp = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0],
+        $timestamp = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'time_sleep_until',
             1,
             'timestamp'
