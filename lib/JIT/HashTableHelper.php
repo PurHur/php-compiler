@@ -125,6 +125,12 @@ final class HashTableHelper
         return HashTableReadLlvm::offsetIsSetDim($context, $ht, $dim);
     }
 
+    /** ++/-- FETCH_DIM_W: warn when key missing (#30078). */
+    public static function emitUndefinedArrayKeyWarningIfMissing(Context $context, Value $ht, Variable $dim): void
+    {
+        HashTableReadLlvm::emitUndefinedArrayKeyWarningIfMissing($context, $ht, $dim);
+    }
+
     /**
      * Read an element into a stack {@see __value__} slot (string/int/object/boxed keys; issue #86).
      *

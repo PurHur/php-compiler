@@ -622,6 +622,130 @@ final class HashTableReadLlvm
     }
 
     /**
+     * Zend E_WARNING when ++/-- FETCH_DIM_W reads a missing key (#30078, zend_vm_def.h).
+     */
+    public static function emitUndefinedArrayKeyWarningIfMissing(Context $context, Value $ht, Variable $dim): void
+    {
+        $exists = self::offsetIsSetDim($context, $ht, $dim);
+        $tag = 'diuw'.(string) self::nextSeq();
+        $hasKey = BasicBlockHelper::append($context, 'dim_inc_ukey_has_'.$tag);
+        $missKey = BasicBlockHelper::append($context, 'dim_inc_ukey_miss_'.$tag);
+        $done = BasicBlockHelper::append($context, 'dim_inc_ukey_done_'.$tag);
+        $context->builder->branchIf($exists, $hasKey, $missKey);
+        $context->builder->positionAtEnd($missKey);
+        self::emitUndefinedArrayKeyWarningForDim($context, $dim);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($hasKey);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    /** Emit {@see __compiler_undefined_array_key_warning_*} for a dim operand (#30078). */
+    private static function emitUndefinedArrayKeyWarningForDim(Context $context, Variable $dim): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\ext\standard\StringTriggerErrorJit::implement($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dim_inc_ukey_warn_setup');
+        }
+
+        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+            $context->builder->call(
+                $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
+                $context->helper->loadValue($dim)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $dim->type) {
+            $keyStr = $context->helper->loadValue($dim);
+            $strMap = $context->structFieldMap['__string__'];
+            $i8p = $context->getTypeFromString('int8*');
+            $keyLen = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
+            $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
+            $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
+            $context->builder->call(
+                $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
+                $keyCStr,
+                $keyLen
+            );
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            $valPtr = self::valuePtrFromDim($context, $dim);
+            $valueMap = $context->structFieldMap['__value__'];
+            $i8 = $context->getTypeFromString('int8');
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($valPtr, $valueMap['type'])
+            );
+            $fn = $context->builder->getInsertBlock()->getParent();
+            $strBb = $fn->appendBasicBlock('dim_inc_ukey_str');
+            $longBb = $fn->appendBasicBlock('dim_inc_ukey_long');
+            $doneBb = $fn->appendBasicBlock('dim_inc_ukey_warn_done');
+            $afterStr = $fn->appendBasicBlock('dim_inc_ukey_after_str');
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(Variable::TYPE_STRING, false)
+                ),
+                $strBb,
+                $afterStr
+            );
+            $context->builder->positionAtEnd($strBb);
+            $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
+            $strMap = $context->structFieldMap['__string__'];
+            $keyLen = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
+            $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
+            $i8p = $context->getTypeFromString('int8*');
+            $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
+            $context->builder->call(
+                $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
+                $keyCStr,
+                $keyLen
+            );
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($afterStr);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+                ),
+                $longBb,
+                $doneBb
+            );
+            $context->builder->positionAtEnd($longBb);
+            $longKey = $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr);
+            $context->builder->call(
+                $context->lookupFunction('__compiler_undefined_array_key_warning_long'),
+                $longKey
+            );
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($doneBb);
+
+            return;
+        }
+        if (Variable::TYPE_NULL === $dim->type) {
+            DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
+            $emptyKey = $context->builder->load($context->constantStringFromString(''));
+            $strMap = $context->structFieldMap['__string__'];
+            $i8p = $context->getTypeFromString('int8*');
+            $keyLen = $context->builder->load($context->builder->structGep($emptyKey, $strMap['length']));
+            $keyBytes = $context->builder->structGep($emptyKey, $strMap['value']);
+            $keyCStr = $context->builder->pointerCast($keyBytes, $i8p);
+            $context->builder->call(
+                $context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
+                $keyCStr,
+                $keyLen
+            );
+        }
+    }
+
+    /**
      * Read an element into a stack {@see __value__} slot (string/int/object/boxed keys; #10031 v4).
      *
      * @param string|null $superglobalName When set, string keys use superglobal-safe read (issue #273).
