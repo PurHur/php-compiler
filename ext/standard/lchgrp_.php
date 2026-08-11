@@ -24,7 +24,7 @@ final class lchgrp_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('lchgrp() requires exactly two arguments in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'lchgrp');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'lchgrp');
         $groupVar = VmFilestatArg::requireIntOrStringArgForFrame($frame, 1, 'lchgrp', 'group');
         if (null === $frame->returnVar) {
             return;
