@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -25,11 +24,13 @@ final class ob_get_status extends Internal
     {
         $full = false;
         if (\count($frame->calledArgs) > 0) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $arg->type && Variable::TYPE_INTEGER !== $arg->type) {
-                throw new \LogicException('ob_get_status() expects bool full_status');
-            }
-            $full = $arg->toBool();
+            $full = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                0,
+                'ob_get_status',
+                1,
+                'full_status'
+            );
         }
         if (null === $frame->returnVar) {
             return;
