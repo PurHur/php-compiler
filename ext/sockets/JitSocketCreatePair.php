@@ -35,6 +35,7 @@ final class JitSocketCreatePair
             JitLongArg::lower($context, $domainArg, 'socket_create_pair() domain'),
             $i64
         );
+        self::guardDomain($context, $domain);
         $type = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $typeArg, 'socket_create_pair() type'),
             $i64
@@ -106,6 +107,41 @@ final class JitSocketCreatePair
         $result->addIncoming($ptr, $okTail);
 
         return $result;
+    }
+
+    private static function guardDomain(Context $context, Value $domain): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $isUnix = $context->builder->icmp(
+            Builder::INT_EQ,
+            $domain,
+            $i64->constInt(VmSockets::AF_UNIX, false)
+        );
+        $isInet = $context->builder->icmp(
+            Builder::INT_EQ,
+            $domain,
+            $i64->constInt(VmSockets::AF_INET, false)
+        );
+        $isInet6 = $context->builder->icmp(
+            Builder::INT_EQ,
+            $domain,
+            $i64->constInt(VmSockets::AF_INET6, false)
+        );
+        $ok = $context->builder->or($isUnix, $context->builder->or($isInet, $isInet6));
+
+        $okBb = BasicBlockHelper::append($context, 'socket_create_pair_domain_ok');
+        $errBb = BasicBlockHelper::append($context, 'socket_create_pair_domain_err');
+        $context->builder->branchIf($ok, $okBb, $errBb);
+
+        $context->builder->positionAtEnd($errBb);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError(
+            $context,
+            'socket_create_pair(): Argument #1 ($domain) must be one of AF_UNIX, AF_INET6, or AF_INET'
+        );
+        $context->builder->call($context->lookupFunction('abort'));
+
+        $context->builder->positionAtEnd($okBb);
     }
 
     private static function allocateSocketObject(Context $context): Value
