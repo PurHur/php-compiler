@@ -275,6 +275,10 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'int', 'value' => 0],
             3 => ['kind' => 'array'],
         ],
+        // php-src ext/pcntl/pcntl.stub.php — bool $restart_syscalls = true (bool infer → false) (#28898)
+        'pcntl_signal' => [
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
         'preg_filter' => [
             3 => ['kind' => 'int', 'value' => -1],
             4 => ['kind' => 'null'],

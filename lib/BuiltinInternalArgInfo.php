@@ -1103,6 +1103,8 @@ final class BuiltinInternalArgInfo
                 1, 3 => '',
                 default => null,
             },
+            // ext/pcntl/pcntl.stub.php — $handler untyped (callable|int at runtime; InternalArgInfo callable) (#28898)
+            'pcntl_signal' => 1 === $index ? '' : null,
             // ext/standard/streamsfuncs.stub.php — ?int $crypto_method = null (#27684)
             'stream_socket_enable_crypto' => 2 === $index ? '?int' : null,
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)
