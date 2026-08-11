@@ -42,12 +42,12 @@ try {
     echo 'object: Error: ', $e->getMessage(), "\n";
 }
 --EXPECT--
-W:Trying to access array offset on value of type int
+W:Trying to access array offset on int
 int: NULL
-W:Trying to access array offset on value of type null
+W:Trying to access array offset on null
 null: NULL
-W:Trying to access array offset on value of type bool
+W:Trying to access array offset on true
 bool: NULL
-W:Trying to access array offset on value of type float
+W:Trying to access array offset on float
 float: NULL
 object: Error: Cannot use object of type C as array

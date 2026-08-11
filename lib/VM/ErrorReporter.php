@@ -318,11 +318,47 @@ final class ErrorReporter
     }
 
     /**
-     * Zend E_WARNING text for ZEND_FETCH_DIM_R on scalars (zend_execute.c, #4867).
+     * PHP 8.3+ shortens dim-read Warnings: {@code on T} not {@code on value of type T} (#30053).
+     *
+     * Same gate as {@see arrayOffsetOnResourceMessage} — {@code languageProfileVersion()≥8.3}
+     * (explicit {@code PHP_COMPILER_PROFILE=8.3}/{@code 8.4}, or default {@code 8.4.0-dev}).
+     */
+    public static function usesShortArrayOffsetTypeWarning(): bool
+    {
+        return version_compare(
+            \PHPCompiler\CompilerVersion::languageProfileVersion(),
+            '8.3.0',
+            '>='
+        );
+    }
+
+    /**
+     * Zend E_WARNING text for ZEND_FETCH_DIM_R on scalars (zend_execute.c, #4867 / #30053).
+     *
+     * PROFILE≥8.3: {@code Trying to access array offset on {$typeName}}
+     * (pass {@code true}/{@code false} for booleans — zend_zval_value_name).
+     * Older profiles: {@code … on value of type {$typeName}} ({@code bool} for booleans).
      */
     public static function arrayOffsetOnNonContainerMessage(string $typeName): string
     {
+        if (self::usesShortArrayOffsetTypeWarning()) {
+            return "Trying to access array offset on {$typeName}";
+        }
+
         return "Trying to access array offset on value of type {$typeName}";
+    }
+
+    /**
+     * Type label for scalar dim-read Warnings (zend_execute.c / zend_zval_value_name, #30053).
+     */
+    public static function arrayOffsetTypeLabel(Variable $value): string
+    {
+        $value = $value->resolveIndirect();
+        if (self::usesShortArrayOffsetTypeWarning() && Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? 'true' : 'false';
+        }
+
+        return TypeCheck::typeNameForConstraint($value->type);
     }
 
     /**
@@ -332,10 +368,6 @@ final class ErrorReporter
      */
     public static function arrayOffsetOnResourceMessage(): string
     {
-        if (version_compare(\PHPCompiler\CompilerVersion::languageProfileVersion(), '8.3.0', '>=')) {
-            return 'Trying to access array offset on resource';
-        }
-
         return self::arrayOffsetOnNonContainerMessage('resource');
     }
 

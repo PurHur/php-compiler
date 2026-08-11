@@ -25,7 +25,7 @@ read_scalar('read_false', function () {
     $x[0];
 });
 --EXPECT--
-W:Trying to access array offset on value of type null
+W:Trying to access array offset on null
 read_null: NULL
-W:Trying to access array offset on value of type bool
+W:Trying to access array offset on false
 read_false: NULL

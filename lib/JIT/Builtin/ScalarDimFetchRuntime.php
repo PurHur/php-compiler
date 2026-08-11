@@ -72,6 +72,21 @@ final class ScalarDimFetchRuntime
         );
     }
 
+    /**
+     * Runtime bool dim-read: select true/false synthetic type codes (#30053).
+     */
+    public static function emitWarningForNativeBool(Context $context, \PHPCompiler\JIT\Variable $boolVar): void
+    {
+        self::ensureLinked($context);
+        $fn = $context->lookupFunction(self::ABI_EMIT_WARNING);
+        $i8 = $context->getTypeFromString('int8');
+        $loaded = $context->helper->loadValue($boolVar);
+        $trueCode = $i8->constInt(\PHPCompiler\VM\ScalarDimFetchJitHelper::JIT_BOOL_TRUE, false);
+        $falseCode = $i8->constInt(\PHPCompiler\VM\ScalarDimFetchJitHelper::JIT_BOOL_FALSE, false);
+        $code = $context->builder->select($loaded, $trueCode, $falseCode);
+        $context->builder->call($fn, $code);
+    }
+
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction(self::ABI_EMIT_WARNING);
