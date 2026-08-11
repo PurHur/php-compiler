@@ -11,8 +11,11 @@ echo '<h1>FileUploadWeb</h1>';
 
 if ('POST' === $method && isset($_FILES['doc'])) {
     $name = (string) ($_FILES['doc']['name'] ?? '');
+    // Escape before reading other $_FILES dims — AOT nested FILES reads can invalidate
+    // a prior name string when htmlspecialchars runs afterward in the same echo (#29001 / 006).
+    $escaped = htmlspecialchars($name);
     $size = (int) ($_FILES['doc']['size'] ?? 0);
-    echo '<p class="upload">Uploaded: ', htmlspecialchars($name), ' (', $size, " bytes)</p>\n";
+    echo '<p class="upload">Uploaded: ', $escaped, ' (', $size, " bytes)</p>\n";
 } else {
     echo "<p>No upload yet. POST multipart with field <code>doc</code>.</p>\n";
 }
