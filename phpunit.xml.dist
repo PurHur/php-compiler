@@ -120,6 +120,7 @@
             <file>./test/compliance/ProcOpenReflectionVMTest.php</file>
             <file>./test/compliance/ExecFamilyReflectionReturnsVMTest.php</file>
             <file>./test/compliance/FsockopenReflectionVMTest.php</file>
+            <file>./test/compliance/FstatReflectionReturnVMTest.php</file>
             <file>./test/compliance/IconvStrlenReflectionVMTest.php</file>
             <file>./test/compliance/MbCaseInvalidUtf8SubstVMTest.php</file>
             <file>./test/compliance/StreamCopyToStreamReflectionVMTest.php</file>

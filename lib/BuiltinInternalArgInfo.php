@@ -166,6 +166,8 @@ final class BuiltinInternalArgInfo
             'stream_get_line' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo return int (missing |false) (#26322)
             'ftell' => 'int|false',
+            // ext/standard/file.stub.php — InternalArgInfo return array (missing |false) (#28483)
+            'fstat' => 'array|false',
             // ext/standard/dir.stub.php — InternalArgInfo return string (missing |false) (#26320)
             'readdir' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo return string (missing |false) (#26320)
