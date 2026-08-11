@@ -1036,6 +1036,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         );
     }
 
+    /** php-src iconv.stub.php — InternalArgInfo return string (missing |false) (#28424). */
+    public function testIconvReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv'));
+    }
+
     /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#27629). */
     public function testIconvStrlenReflectionStubTypes(): void
     {
