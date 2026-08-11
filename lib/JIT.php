@@ -8387,6 +8387,18 @@ class JIT {
                     if (null === $destName) {
                         throw new \LogicException('Reference assignment requires named destination variable');
                     }
+                    // Zend: `$a =& f()` / non-variable RHS → Notice + value assign (#30015).
+                    if (
+                        $this->context->hasVariableOp($srcOp)
+                        && !JIT\JitReferencableCheck::isOperandReferenceable(
+                            $srcOp,
+                            $this->context->getVariableFromOp($srcOp)
+                        )
+                    ) {
+                        JIT\JitReferencableCheck::emitNonVariableAssignRefNotice($this->context);
+                        $this->assignOperand($destOp, $this->context->getVariableFromOp($srcOp));
+                        break;
+                    }
                     if (null === $srcName) {
                         $this->context->foreachByRefLocalNames[$this->context->resolveRefAliasName($destName)] = true;
                     }
