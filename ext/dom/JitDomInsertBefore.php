@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -77,6 +78,12 @@ final class JitDomInsertBefore
         $parent = self::loadObjectArg($context, $parentVar);
         $newChild = self::loadObjectArg($context, $newChildVar);
         $refChild = self::loadObjectArg($context, $refChildVar);
+        // Wrong Document / Hierarchy Request before LiveSlots (#30274).
+        DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
+            $context,
+            $parent,
+            $newChild
+        );
         $objectType = $context->type->object;
         $objPtrTy = $context->getTypeFromString('__object__*');
         $voidPtr = $context->getTypeFromString('void*');
