@@ -565,8 +565,9 @@ final class VmDomJitDispatch
         );
         $localName = self::stringArg(
             $extra[1] ?? self::missingArg('hasAttributeNS', 1),
-            'hasAttributeNS',
-            1
+            'DOMElement::hasAttributeNS',
+            1,
+            'localName'
         );
         $var = new Variable();
         $var->bool(VmDom::hasAttributeNS($element, $namespace, $localName));
@@ -602,7 +603,12 @@ final class VmDomJitDispatch
     public static function getAttributeNS(ObjectEntry $element, array $extra): Variable
     {
         $namespace = self::nullableStringArg($extra[0] ?? self::missingArg('getAttributeNS', 0), 'getAttributeNS', 0);
-        $localName = self::stringArg($extra[1] ?? self::missingArg('getAttributeNS', 1), 'getAttributeNS', 1);
+        $localName = self::stringArg(
+            $extra[1] ?? self::missingArg('getAttributeNS', 1),
+            'DOMElement::getAttributeNS',
+            1,
+            'localName'
+        );
         $value = VmDom::getAttributeNS($element, $namespace, $localName);
         $var = new Variable();
         if (null === $value) {
@@ -670,7 +676,12 @@ final class VmDomJitDispatch
     public static function getAttributeNodeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
         $namespace = self::nullableStringArg($extra[0] ?? self::missingArg('getAttributeNodeNS', 0), 'getAttributeNodeNS', 0);
-        $localName = self::stringArg($extra[1] ?? self::missingArg('getAttributeNodeNS', 1), 'getAttributeNodeNS', 1);
+        $localName = self::stringArg(
+            $extra[1] ?? self::missingArg('getAttributeNodeNS', 1),
+            'DOMElement::getAttributeNodeNS',
+            1,
+            'localName'
+        );
 
         return VmDom::getAttributeNodeNS($ctx, $element, $namespace, $localName);
     }
@@ -699,7 +710,12 @@ final class VmDomJitDispatch
      */
     public static function setIdAttribute(ObjectEntry $element, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('setIdAttribute', 0), 'setIdAttribute', 0);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('setIdAttribute', 0),
+            'DOMElement::setIdAttribute',
+            0,
+            'qualifiedName'
+        );
         $isId = self::optionalBoolArg(
             $extra[1] ?? self::missingArg('setIdAttribute', 1),
             'setIdAttribute',
@@ -719,15 +735,18 @@ final class VmDomJitDispatch
      */
     public static function setIdAttributeNS(ObjectEntry $element, array $extra): Variable
     {
-        $namespace = self::nullableStringArg(
+        // php-src stub: string $namespace (not ?string) + string $qualifiedName (#30091).
+        $namespace = self::stringArg(
             $extra[0] ?? self::missingArg('setIdAttributeNS', 0),
-            'setIdAttributeNS',
-            0
+            'DOMElement::setIdAttributeNS',
+            0,
+            'namespace'
         );
         $localName = self::stringArg(
             $extra[1] ?? self::missingArg('setIdAttributeNS', 1),
-            'setIdAttributeNS',
-            1
+            'DOMElement::setIdAttributeNS',
+            1,
+            'qualifiedName'
         );
         $isId = self::optionalBoolArg(
             $extra[2] ?? self::missingArg('setIdAttributeNS', 2),

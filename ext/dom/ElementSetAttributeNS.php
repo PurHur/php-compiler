@@ -21,8 +21,21 @@ final class ElementSetAttributeNS extends DomClassMethod
             throw new \LogicException('DOMElement::setAttributeNS() expects at least 3 arguments');
         }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::setAttributeNS()', 0);
-        $qualifiedName = $this->stringArg($frame->calledArgs[2], 'DOMElement::setAttributeNS()', 1);
-        $value = $this->stringArg($frame->calledArgs[3], 'DOMElement::setAttributeNS()', 2);
+        // Pass $frame so caller strict_types rejects null before empty ValueError (#30091).
+        $qualifiedName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMElement::setAttributeNS()',
+            1,
+            $frame,
+            'qualifiedName'
+        );
+        $value = $this->stringArg(
+            $frame->calledArgs[3],
+            'DOMElement::setAttributeNS()',
+            2,
+            $frame,
+            'value'
+        );
         // php-src element.c — name_len == 0 → ValueError on arg #2 (#24480).
         VmDom::rejectEmptyQualifiedName($qualifiedName, 'DOMElement::setAttributeNS', 2);
         VmDom::setAttributeNS($frame->vmContext, $element, $namespace, $qualifiedName, $value);

@@ -21,7 +21,14 @@ final class ElementHasAttributeNS extends DomClassMethod
             throw new \LogicException('DOMElement::hasAttributeNS() expects at least 2 arguments');
         }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::hasAttributeNS()', 0);
-        $localName = $this->stringArg($frame->calledArgs[2], 'DOMElement::hasAttributeNS()', 1);
+        // Pass $frame so caller strict_types rejects null localName (#30091, peer #29985).
+        $localName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMElement::hasAttributeNS()',
+            1,
+            $frame,
+            'localName'
+        );
         if (null === $frame->returnVar) {
             return;
         }
