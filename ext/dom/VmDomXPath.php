@@ -318,6 +318,24 @@ final class VmDomXPath
     }
 
     /**
+     * Reject XPath expressions with obvious syntax errors that the hand-rolled
+     * evaluator would silently swallow as empty results (#22721 regression).
+     * libxml/php-src would report xmlXPathEval failure → E_WARNING + false.
+     */
+    private static function validateXPathSyntax(string $expression): void
+    {
+        if (substr_count($expression, '[') !== substr_count($expression, ']')) {
+            throw new \DOMException('Invalid expression');
+        }
+        if (substr_count($expression, '(') !== substr_count($expression, ')')) {
+            throw new \DOMException('Invalid expression');
+        }
+        if (str_contains($expression, '///')) {
+            throw new \DOMException('Invalid expression');
+        }
+    }
+
+    /**
      * @return list<int>
      */
     private static function evaluateNodeSet(
@@ -397,6 +415,8 @@ final class VmDomXPath
         bool $registerNodeNS,
         DomNodeState $state
     ): array {
+        self::validateXPathSyntax($expression);
+
         // Union: a|b — document order, unique (#20257; C14N nodeset + attrs).
         if (str_contains($expression, '|')) {
             return self::evaluateUnionNodeSet($ctx, $xpath, $expression, $context, $registerNodeNS);
