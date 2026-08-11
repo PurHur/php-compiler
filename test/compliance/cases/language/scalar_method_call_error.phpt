@@ -19,5 +19,5 @@ try {
 }
 --EXPECT--
 Error: Call to a member function m() on int
-Error: Call to a member function x() on bool
+Error: Call to a member function x() on true
 Error: Call to a member function foo() on null

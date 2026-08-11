@@ -12514,6 +12514,20 @@ class JIT {
                     $nonObjectLabel = Variable::propertyFetchNonObjectTypeLabel(
                         Variable::getTypeFromType($obj->type)
                     );
+                    // zend_zval_value_name — constant bool prints true/false (#30054 / #30066).
+                    if ('bool' === $nonObjectLabel) {
+                        if ($obj instanceof Operand\Literal && \is_bool($obj->value)) {
+                            $nonObjectLabel = $obj->value ? 'true' : 'false';
+                        } elseif ($this->context->hasVariableOp($obj)) {
+                            $recvLabel = JIT\JitOperandTypeLabel::givenLabel(
+                                $this->context,
+                                $this->context->getVariableFromOp($obj)
+                            );
+                            if ('true' === $recvLabel || 'false' === $recvLabel) {
+                                $nonObjectLabel = $recvLabel;
+                            }
+                        }
+                    }
                     // XMLReader::XML() result is CFG-typed bool (InternalArgInfo) but the JIT
                     // variable is a live VALUE box tagged classUserType=XMLReader (#28670).
                     if (
@@ -19570,6 +19584,48 @@ class JIT {
             // Some bootstrap paths produce a receiver operand whose inferred PHPCfg type
             // is not yet marked as object (but is still an object at runtime).
             if ($this->shouldUseSelfHostJitStubs()) {
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+
+                return;
+            }
+            // Known non-object: Error with zend_zval_value_name (#30054, zend_execute.c).
+            // Nullsafe ?-> call arms keep a null-typed slot for a runtime object (#26364) —
+            // skip early Error when this block is a synthetic nullsafe branch.
+            $scalarLabel = Variable::propertyFetchNonObjectTypeLabel(
+                Variable::getTypeFromType($receiverOp->type)
+            );
+            if (
+                null !== $scalarLabel
+                && !('null' === $scalarLabel && $block->syntheticCfgBranch)
+            ) {
+                if ('bool' === $scalarLabel) {
+                    if ($receiverOp instanceof Operand\Literal && \is_bool($receiverOp->value)) {
+                        $scalarLabel = $receiverOp->value ? 'true' : 'false';
+                    } elseif ($this->context->hasVariableOp($receiverOp)) {
+                        $recvLabel = JIT\JitOperandTypeLabel::givenLabel(
+                            $this->context,
+                            $this->context->getVariableFromOp($receiverOp)
+                        );
+                        if ('true' === $recvLabel || 'false' === $recvLabel) {
+                            $scalarLabel = $recvLabel;
+                        }
+                    }
+                }
+                $message = sprintf(
+                    'Call to a member function %s() on %s',
+                    $methodName,
+                    $scalarLabel
+                );
+                if ([] !== $this->context->tryCatch->handlerStack) {
+                    JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                } else {
+                    JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                    JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                    JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                    $this->context->builder->call($this->context->lookupFunction('abort'));
+                    $this->context->builder->clearInsertionPosition();
+                }
                 $this->context->scope->toCall = null;
                 $this->context->scope->args = [];
 

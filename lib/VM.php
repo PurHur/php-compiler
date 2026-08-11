@@ -7405,6 +7405,7 @@ restart:
 
                             return self::EXCEPTION;
                         }
+                        // zend_zval_value_name — bool prints true/false, not bool (#30054).
                         $catchFrame = $this->dispatchVmError(
                             sprintf(
                                 'Call to a member function %s() on %s',
@@ -8539,7 +8540,8 @@ restart:
                     }
                     if (TypeCheck::isNonObjectPropertyFetchReceiver($var)) {
                         $resolved = $var->resolveIndirect();
-                        $typeName = TypeCheck::typeNameForConstraint($resolved->type);
+                        // zend_zval_value_name — bool prints true/false, not bool (#30054 / #30066).
+                        $typeName = VM\EnumCaseSupport::typeNameForTypeErrorActual($resolved);
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                         $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         if ($forWrite) {
@@ -11210,22 +11212,18 @@ restart:
         return null;
     }
 
-    /** Zend get_debug_type() labels for TypeError messages (#4241). */
+    /**
+     * Zend {@code zend_zval_value_name()} labels for method-on-non-object Errors (#4241, #30054).
+     *
+     * Booleans use {@code true}/{@code false}, not {@code bool}.
+     */
     private function valueDebugTypeLabel(Variable $value): string
     {
         if (Variable::TYPE_OBJECT === $value->type || Variable::TYPE_ENUM_CASE === $value->type) {
             return 'object';
         }
 
-        return match ($value->type) {
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            default => 'mixed',
-        };
+        return VM\EnumCaseSupport::typeNameForTypeErrorActual($value);
     }
 
     /**
