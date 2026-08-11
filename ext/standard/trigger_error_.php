@@ -38,8 +38,8 @@ final class trigger_error_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('trigger_error() requires VM context');
         }
-        // Soft-null DEP+coerce on 8.4 (php-src Z_PARAM_STR; #21480, reverts #21035 TypeError).
-        $message = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'trigger_error', 0, 'message');
+        // Caller strict_types → TypeError on null; else soft-null DEP+coerce (#21480 / #30018).
+        $message = VmString::trimFamilyStringArgForFrame($frame, 0, 'trigger_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
             $level = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'trigger_error', 2, 'error_level');
@@ -79,8 +79,8 @@ final class trigger_error_ extends Internal
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $argc = \count($args);
-        // Soft-null DEP+coerce on 8.4 (#21480, reverts #21035 TypeError).
-        $msgStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'trigger_error', 0, 'message');
+        // Caller strict_types → TypeError on null; else soft-null DEP+coerce (#21480 / #30018).
+        $msgStr = self::jitLowerMessage($context, $args[0], 'trigger_error');
         $levelVal = 2 === $argc
             ? $this->jitLowerUserErrorLevel($context, $args[1])
             : $context->getTypeFromString('int32')->constInt(ErrorReporter::E_USER_NOTICE, false);
@@ -113,6 +113,24 @@ final class trigger_error_ extends Internal
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(1, false);
+    }
+
+    /** @internal Shared with {@see user_error}. */
+    public static function jitLowerMessage(Context $context, JITVariable $arg, string $function): Value
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, $function, 0, 'message');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, $function, 0, 'message');
+        }
+
+        return $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, $function, 0, 'message')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, $function, 0, 'message');
     }
 
     /** @internal Shared with {@see user_error}. */

@@ -10,7 +10,6 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
@@ -42,8 +41,8 @@ final class user_error extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('user_error() requires VM context');
         }
-        // Soft-null DEP+coerce on 8.4 (php-src Z_PARAM_STR; #21480, reverts #21035 TypeError).
-        $message = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'user_error', 0, 'message');
+        // Caller strict_types → TypeError on null; else soft-null DEP+coerce (#21480 / #30018).
+        $message = VmString::trimFamilyStringArgForFrame($frame, 0, 'user_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
             $levelVar = $frame->calledArgs[1]->resolveIndirect();
@@ -89,8 +88,7 @@ final class user_error extends Internal
                 \sprintf('user_error() expects at least 1 argument, %d given', $argc)
             );
         }
-        // Soft-null DEP+coerce on 8.4 (#21480, reverts #21035 TypeError).
-        $msgStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'user_error', 0, 'message');
+        $msgStr = trigger_error_::jitLowerMessage($context, $args[0], 'user_error');
         $levelVal = 2 === $argc
             ? self::jitLowerUserErrorLevel($context, $args[1])
             : $context->getTypeFromString('int32')->constInt(ErrorReporter::E_USER_NOTICE, false);
