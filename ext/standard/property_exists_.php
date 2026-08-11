@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -108,7 +109,7 @@ final class property_exists_ extends Internal
             || Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
             return;
         }
-        throw new \TypeError(\sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, self::vmTypeName($objectOrClass->type)));
+        throw new \TypeError(\sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, EnumCaseSupport::typeNameForTypeErrorActual($objectOrClass)));
     }
 
     private static function emitJitTypeErrorAndAbort(Context $context, string $message): void
@@ -135,27 +136,4 @@ final class property_exists_ extends Internal
         }
     }
 
-    private static function vmTypeName(int $type): string
-    {
-        switch ($type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return 'object';
-            case Variable::TYPE_ENUM_CASE:
-                return 'object';
-            default:
-                return 'mixed';
-        }
-    }
 }
