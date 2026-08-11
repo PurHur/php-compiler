@@ -45,7 +45,7 @@ try {
 --EXPECT--
 gethostbynamel: gethostbynamel(): Argument #1 ($hostname) must be of type string, E given
 gethostbyname: gethostbyname(): Argument #1 ($hostname) must be of type string, E given
-gethostbyaddr: gethostbyaddr(): Argument #1 ($ip_address) must be of type string, E given
+gethostbyaddr: gethostbyaddr(): Argument #1 ($ip) must be of type string, E given
 checkdnsrr: checkdnsrr(): Argument #1 ($hostname) must be of type string, E given
 dns_get_record: dns_get_record(): Argument #1 ($hostname) must be of type string, E given
 getmxrr: getmxrr(): Argument #1 ($hostname) must be of type string, E given

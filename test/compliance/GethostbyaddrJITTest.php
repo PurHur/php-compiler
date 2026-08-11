@@ -22,6 +22,14 @@ final class GethostbyaddrJITTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostbyaddr_loopback_jit.phpt',
             'gethostbyaddr_loopback_jit.phpt'
         );
+        yield 'gethostbyaddr_enum_typeerror_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbyaddr_enum_typeerror_jit.phpt',
+            'gethostbyaddr_enum_typeerror_jit.phpt'
+        );
+        yield 'gethostbyaddr_null_strict_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbyaddr_null_strict_jit.phpt',
+            'gethostbyaddr_null_strict_jit.phpt'
+        );
     }
 
     public function setUp(): void
