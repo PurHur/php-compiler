@@ -334,6 +334,8 @@
             <file>./test/compliance/ArrayPointerBoolTypeErrorActual30114JITTest.php</file>
             <file>./test/compliance/IteratorBoolTypeErrorActual30117VMTest.php</file>
             <file>./test/compliance/IteratorBoolTypeErrorActual30117JITTest.php</file>
+            <file>./test/compliance/ResourceBoolTypeErrorActual30118VMTest.php</file>
+            <file>./test/compliance/ResourceBoolTypeErrorActual30118JITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

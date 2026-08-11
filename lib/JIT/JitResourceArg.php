@@ -48,6 +48,142 @@ final class JitResourceArg
     }
 
     /**
+     * Resource TypeError actual from operand — true/false not bool (#30118).
+     */
+    public static function emitResourceTypeErrorForOperandAndAbort(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        Variable $arg
+    ): void {
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            $boolVal = $arg->value;
+            $isTrue = $context->builder->icmp(
+                Builder::INT_NE,
+                $boolVal,
+                $boolVal->typeOf()->constInt(0, false)
+            );
+            $trueBb = BasicBlockHelper::append($context, 'resource_native_true');
+            $falseBb = BasicBlockHelper::append($context, 'resource_native_false');
+            $context->builder->branchIf($isTrue, $trueBb, $falseBb);
+            $context->builder->positionAtEnd($trueBb);
+            self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'true');
+            $context->builder->positionAtEnd($falseBb);
+            self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'false');
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type || JitValueBox::isValueOperand($arg)) {
+            self::emitResourceTypeErrorFromValueBoxAndAbort(
+                $context,
+                $function,
+                $argIndex,
+                $paramName,
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+
+            return;
+        }
+        self::emitResourceTypeErrorAndAbort(
+            $context,
+            $function,
+            $argIndex,
+            $paramName,
+            JitOperandTypeLabel::givenLabel($context, $arg)
+        );
+    }
+
+    /**
+     * Runtime TypeError actual from boxed `__value__` (true/false not bool) (#30118).
+     */
+    public static function emitResourceTypeErrorFromValueBoxAndAbort(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        Value $valuePtr
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+
+        $nullBb = BasicBlockHelper::append($context, 'resource_te_null');
+        $afterNull = BasicBlockHelper::append($context, 'resource_te_after_null');
+        $intBb = BasicBlockHelper::append($context, 'resource_te_int');
+        $afterInt = BasicBlockHelper::append($context, 'resource_te_after_int');
+        $floatBb = BasicBlockHelper::append($context, 'resource_te_float');
+        $afterFloat = BasicBlockHelper::append($context, 'resource_te_after_float');
+        $boolBb = BasicBlockHelper::append($context, 'resource_te_bool');
+        $afterBool = BasicBlockHelper::append($context, 'resource_te_after_bool');
+        $stringBb = BasicBlockHelper::append($context, 'resource_te_string');
+        $mixedBb = BasicBlockHelper::append($context, 'resource_te_mixed');
+
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_NULL & 0x7f, false)
+        );
+        $context->builder->branchIf($isNull, $nullBb, $afterNull);
+        $context->builder->positionAtEnd($nullBb);
+        self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null');
+
+        $context->builder->positionAtEnd($afterNull);
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_INTEGER & 0x7f, false)
+        );
+        $context->builder->branchIf($isInt, $intBb, $afterInt);
+        $context->builder->positionAtEnd($intBb);
+        self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'int');
+
+        $context->builder->positionAtEnd($afterInt);
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_FLOAT & 0x7f, false)
+        );
+        $context->builder->branchIf($isFloat, $floatBb, $afterFloat);
+        $context->builder->positionAtEnd($floatBb);
+        self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+
+        $context->builder->positionAtEnd($afterFloat);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN & 0x7f, false)
+        );
+        $context->builder->branchIf($isBool, $boolBb, $afterBool);
+        $context->builder->positionAtEnd($boolBb);
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+        $isTrue = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
+        $trueBb = BasicBlockHelper::append($context, 'resource_te_true');
+        $falseBb = BasicBlockHelper::append($context, 'resource_te_false');
+        $context->builder->branchIf($isTrue, $trueBb, $falseBb);
+        $context->builder->positionAtEnd($trueBb);
+        self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'true');
+        $context->builder->positionAtEnd($falseBb);
+        self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'false');
+
+        $context->builder->positionAtEnd($afterBool);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_STRING & 0x7f, false)
+        );
+        $context->builder->branchIf($isString, $stringBb, $mixedBb);
+        $context->builder->positionAtEnd($stringBb);
+        self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string');
+
+        $context->builder->positionAtEnd($mixedBb);
+        self::emitResourceTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed');
+    }
+
+    /**
      * Reject enum case operands before JitLongArg reads backing scalars (#5845).
      */
     public static function rejectEnumCaseOperand(

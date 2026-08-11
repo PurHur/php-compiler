@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -72,12 +71,12 @@ final class JitGetResourceId
         $context->builder->branchIf($isRes, $okBlock, $errBlock);
 
         $context->builder->positionAtEnd($errBlock);
-        JitResourceArg::emitResourceTypeErrorAndAbort(
+        JitResourceArg::emitResourceTypeErrorForOperandAndAbort(
             $context,
             'get_resource_id',
             0,
             'resource',
-            JitOperandTypeLabel::givenLabel($context, $arg)
+            $arg
         );
 
         $context->builder->positionAtEnd($okBlock);
