@@ -3802,7 +3802,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gcv, 'class_name', 'get_class_vars'));
     }
 
-    /** @covers issue #23399 */
+    /** @covers issue #23399, #30244 */
     public function testMethodExistsAndPropertyExistsZendStubNamedParams(): void
     {
         $me = BuiltinParamNames::forFunction('method_exists');
@@ -3811,6 +3811,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($me, 'method', 'method_exists'));
         // Legacy InternalArgInfo name must not resolve (Zend rejects $object)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($me, 'object', 'method_exists'));
+        // php-src leaves $object_or_class untyped in Reflection (#30244)
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('method_exists', 0));
+        $me0 = BuiltinInternalArgInfo::paramInfoForFunction('method_exists', 0);
+        self::assertNotNull($me0);
+        self::assertSame('', $me0['type']);
 
         $pe = BuiltinParamNames::forFunction('property_exists');
         self::assertSame(['object_or_class', 'property'], $pe);
@@ -3818,6 +3823,10 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pe, 'property', 'property_exists'));
         // Legacy InternalArgInfo name must not resolve (Zend rejects $property_name)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($pe, 'property_name', 'property_exists'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('property_exists', 0));
+        $pe0 = BuiltinInternalArgInfo::paramInfoForFunction('property_exists', 0);
+        self::assertNotNull($pe0);
+        self::assertSame('', $pe0['type']);
     }
 
     /** @covers issue #23435 */

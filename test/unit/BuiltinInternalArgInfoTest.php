@@ -1359,6 +1359,30 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('class_implements', 0));
     }
 
+    /** Zend/zend_builtin_functions.stub.php — untyped $object_or_class (InternalArgInfo object|string) (#30244). */
+    public function testMethodExistsPropertyExistsObjectOrClassUntyped(): void
+    {
+        foreach (['method_exists', 'property_exists'] as $f) {
+            $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0), $f);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $this->assertNotNull($info, $f);
+            $this->assertSame('', $info['type'], $f);
+            $this->assertFalse($info['isOptional'], $f);
+            $second = BuiltinInternalArgInfo::paramInfoForFunction($f, 1);
+            $this->assertNotNull($second, $f);
+            $this->assertSame('string', $second['type'], $f);
+        }
+        $this->assertSame(
+            ['object_or_class', 'method'],
+            BuiltinParamNames::forFunction('method_exists')
+        );
+        $this->assertSame(
+            ['object_or_class', 'property'],
+            BuiltinParamNames::forFunction('property_exists')
+        );
+    }
+
     /** php-src ext/filter/filter.stub.php — filter_var_array / filter_input Reflection (#26184). */
     public function testFilterVarArrayAndFilterInputReflectionStubs(): void
     {
