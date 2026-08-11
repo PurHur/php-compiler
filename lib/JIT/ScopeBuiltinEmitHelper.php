@@ -428,7 +428,12 @@ final class ScopeBuiltinEmitHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($invalidBlock);
-        ScopeBuiltinRuntime::emitCompactInvalidArgumentWarning($context, $argNum, $typeByte);
+        ScopeBuiltinRuntime::emitCompactInvalidArgumentWarning(
+            $context,
+            $argNum,
+            $typeByte,
+            JitValueBox::readBoolByte($context, $valuePtr)
+        );
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);

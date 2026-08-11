@@ -33313,12 +33313,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ScopeBuiltinJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 204)
-- new HashTable (line 261)
-- new HashTable (line 315)
-- new Variable (line 324)
-- new Variable (line 334)
-- new Variable (line 366)
+- new Variable (line 205)
+- new HashTable (line 262)
+- new HashTable (line 316)
+- new Variable (line 325)
+- new Variable (line 335)
+- new Variable (line 368)
 - 19 class method(s)
 
 ### `ext/standard/SerializeJitHelper.php`
@@ -35865,7 +35865,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 275)
 - new Variable (line 285)
 - new Variable (line 307)
-- new Variable (line 446)
+- new Variable (line 447)
 - 25 class method(s)
 - 1 closure(s)
 

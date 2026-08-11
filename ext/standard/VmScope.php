@@ -361,7 +361,8 @@ final class VmScope
 
     private static function compactInvalidArgTypeName(Variable $var): string
     {
-        return EnumCaseSupport::typeNameForVariable($var);
+        // Zend compact() Warning uses zend_zval_value_name — false|true, not bool (#30119).
+        return EnumCaseSupport::typeNameForTypeErrorActual($var);
     }
 
     private static function compactUndefinedVariableWarning(Frame $frame, string $name): void

@@ -50,13 +50,14 @@ final class ScopeBuiltinJitHelper
         compiler_language_warning(self::compactUndefinedVariableMessage($name));
     }
 
-    public static function jitTypeLabel(int $jitTypeByte): string
+    public static function jitTypeLabel(int $jitTypeByte, int $boolPayload = 0): string
     {
         return match ($jitTypeByte) {
             JitVariable::TYPE_NULL => 'null',
             JitVariable::TYPE_NATIVE_LONG => 'int',
             JitVariable::TYPE_NATIVE_DOUBLE => 'float',
-            JitVariable::TYPE_NATIVE_BOOL => 'bool',
+            // Zend compact() Warning: zend_zval_value_name → false|true (#30119).
+            JitVariable::TYPE_NATIVE_BOOL => 0 !== $boolPayload ? 'true' : 'false',
             JitVariable::TYPE_STRING => 'string',
             JitVariable::TYPE_HASHTABLE => 'array',
             JitVariable::TYPE_OBJECT => 'object',
@@ -69,10 +70,10 @@ final class ScopeBuiltinJitHelper
         return "compact(): Argument #{$argNum} must be string or array of strings, {$typeName} given";
     }
 
-    public static function emitCompactInvalidArgumentWarning(int $argNum, int $jitTypeByte): void
+    public static function emitCompactInvalidArgumentWarning(int $argNum, int $jitTypeByte, int $boolPayload = 0): void
     {
         compiler_language_warning(
-            self::compactInvalidArgumentMessage($argNum, self::jitTypeLabel($jitTypeByte))
+            self::compactInvalidArgumentMessage($argNum, self::jitTypeLabel($jitTypeByte, $boolPayload))
         );
     }
 
@@ -349,7 +350,8 @@ final class ScopeBuiltinJitHelper
 
     private static function vmTypeLabel(Variable $var): string
     {
-        return EnumCaseSupport::typeNameForVariable($var);
+        // Match Zend compact() Warning actuals (false|true) (#30119).
+        return EnumCaseSupport::typeNameForTypeErrorActual($var);
     }
 
     /**
