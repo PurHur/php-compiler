@@ -12560,7 +12560,9 @@ class JIT {
                         );
                     }
                     if (null !== $nonObjectLabel && null !== $propName && !$nullsafeRuntimeObjectReceiver) {
-                        $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                        $destSlot = (int) $op->arg1;
+                        $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsCompoundAssignRead($block, $i, $destSlot);
                         if ($forWrite) {
                             // ZEND_PRE/POST_INC/DEC_OBJ: increment/decrement for any non-object
                             // receiver (null, true, false, …) (#7431 / #30075).
@@ -23143,6 +23145,17 @@ class JIT {
         }
 
         return OpCode::destSlotUsedAsAssignLvalue($next, $destSlot);
+    }
+
+    /** True when fetch dest is lhs of a following compound read ($prop += …, #30077). */
+    private function varFetchDestUsedAsCompoundAssignRead(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot);
     }
 
     /**

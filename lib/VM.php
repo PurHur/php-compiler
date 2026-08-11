@@ -8595,7 +8595,9 @@ restart:
                         // zend_zval_value_name — bool prints true/false, not bool (#30054 / #30066).
                         $typeName = VM\EnumCaseSupport::typeNameForTypeErrorActual($resolved);
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                        $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                        $forWrite = $propertyFetchForWrite
+                            || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op)
+                            || $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
                         if ($forWrite) {
                             // ZEND_PRE/POST_INC/DEC_OBJ: verb is increment/decrement for any
                             // non-object (null and true/false), not only null (#7431 / #30075).
