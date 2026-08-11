@@ -7,7 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -32,6 +35,26 @@ final class JitGetDefinedConstants
         }
 
         if (null === $arg0) {
+            return self::wrapHashTable(
+                $context,
+                self::emitHashTablePtr(
+                    $context,
+                    VmConstants::getDefinedConstants($context->runtime->vmContext, false)
+                )
+            );
+        }
+
+        // Z_PARAM_BOOL compile-time null under strict — catchable TypeError, then stop (#30169).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $arg0->type || ($arg0->isNullConstant ?? false))
+        ) {
+            JitNativeString::ensureInsertBlock($context);
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'get_defined_constants(): Argument #1 ($categorize) must be of type bool, null given'
+            );
+            JitNativeString::ensureInsertBlock($context);
+
             return self::wrapHashTable(
                 $context,
                 self::emitHashTablePtr(
@@ -93,8 +116,15 @@ final class JitGetDefinedConstants
                 $zero
             );
         }
+        // Soft null — Z_PARAM_BOOL null→false + E_DEPRECATED (#30169 / #21702).
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-            return $context->getTypeFromString('int1')->constInt(0, false);
+            return JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $arg,
+                'get_defined_constants',
+                'categorize',
+                1
+            );
         }
         if (JITVariable::TYPE_HASHTABLE === $arg->type || ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
             self::emitCategorizeTypeError($context, 'array');

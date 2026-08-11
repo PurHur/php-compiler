@@ -186,7 +186,14 @@ final class VmReflection
             return false;
         }
 
-        return $frame->calledArgs[0]->resolveIndirect()->toBool();
+        // Z_PARAM_BOOL — strict_types TypeError on null; else null→false + E_DEPRECATED (#30169).
+        return VmMath::parseBoolBuiltinArgForFrame(
+            $frame,
+            0,
+            $function,
+            1,
+            'exclude_disabled'
+        );
     }
 
     public static function isDeprecatedClassEntry(ClassEntry $entry): bool
