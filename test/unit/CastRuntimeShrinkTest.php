@@ -13,8 +13,8 @@ final class CastRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CastArrayRuntime.php');
         $this->assertStringContainsString('JitVmHelperLink', $source);
-        $this->assertStringContainsString('CastJitHelper', $source);
-        $this->assertStringContainsString('boolYieldsEmptyArray', $source);
+        $this->assertStringContainsString('SplArrayCastJitHelper', $source);
+        $this->assertStringNotContainsString('boolYieldsEmptyArray', $source);
     }
 
     public function testCastHelperIsThinDispatcher(): void
@@ -29,17 +29,37 @@ final class CastRuntimeShrinkTest extends TestCase
 
     public function testCastJitHelperAlignsWithCastSupport(): void
     {
-        $this->assertTrue(\PHPCompiler\VM\CastJitHelper::boolYieldsEmptyArray(false));
+        // Zend convert_to_array wraps both bools (#30097); helper always declines empty.
+        $this->assertFalse(\PHPCompiler\VM\CastJitHelper::boolYieldsEmptyArray(false));
         $this->assertFalse(\PHPCompiler\VM\CastJitHelper::boolYieldsEmptyArray(true));
-        $cast = \PHPCompiler\VM\CastSupport::vmResourceArrayCast();
-        $this->assertSame(1, $cast->toArray()->getNumElements());
+
+        $false = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_BOOLEAN);
+        $false->bool(false);
+        $fromFalse = \PHPCompiler\VM\CastSupport::toArray($false);
+        $this->assertSame(1, $fromFalse->toArray()->getNumElements());
+        $falsePairs = iterator_to_array($fromFalse->toArray()->iterateKeyed(true), false);
+        $this->assertCount(1, $falsePairs);
+        $this->assertFalse($falsePairs[0][1]->toBool());
+
+        $true = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_BOOLEAN);
+        $true->bool(true);
+        $fromTrue = \PHPCompiler\VM\CastSupport::toArray($true);
+        $this->assertSame(1, $fromTrue->toArray()->getNumElements());
+        $truePairs = iterator_to_array($fromTrue->toArray()->iterateKeyed(true), false);
+        $this->assertCount(1, $truePairs);
+        $this->assertTrue($truePairs[0][1]->toBool());
+
+        $null = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_NULL);
+        $fromNull = \PHPCompiler\VM\CastSupport::toArray($null);
+        $this->assertSame(0, $fromNull->toArray()->getNumElements());
     }
 
     public function testCastArraySharedUsesWrapNullForResourceObjectCast(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/CastArrayShared.php');
-        $this->assertStringContainsString('wrapNullInArray', $source);
+        $this->assertStringContainsString('wrapResourceInArray', $source);
         $this->assertStringContainsString('emitObjectOperandToArray', $source);
+        $this->assertStringContainsString('wrapScalarInArray', $source);
     }
 
     public function testCastArrayCowDuplicateUsesHashTableDuplicateRuntime(): void

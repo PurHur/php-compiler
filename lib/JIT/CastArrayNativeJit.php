@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\CastArrayRuntime;
 use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\CastArrayShared;
 
 /**
  * Native-type (array) cast lowering — extracted from CastHelper (#10244).
  *
- * SSOT: {@see \PHPCompiler\VM\CastSupport}, {@see \PHPCompiler\VM\CastJitHelper}
+ * SSOT: {@see \PHPCompiler\VM\CastSupport}
  */
 final class CastArrayNativeJit
 {
@@ -49,26 +48,7 @@ final class CastArrayNativeJit
 
     private static function emitBool(Context $context, Variable $src): Variable
     {
-        CastArrayRuntime::ensureLinked($context);
-        $boolVal = $context->helper->loadValue($src);
-        $yieldsEmpty = CastArrayRuntime::callBoolYieldsEmptyArray($context, $boolVal);
-        $emptyBlock = BasicBlockHelper::append($context, 'cast_array_empty_bool');
-        $wrapBlock = BasicBlockHelper::append($context, 'cast_array_wrap_bool');
-        $mergeBlock = BasicBlockHelper::append($context, 'cast_array_bool_merge');
-        $context->builder->branchIf($yieldsEmpty, $emptyBlock, $wrapBlock);
-        $context->builder->positionAtEnd($emptyBlock);
-        $empty = HashTableHelper::emptyVariable($context);
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($wrapBlock);
-        $wrapped = CastArrayShared::wrapScalarInArray($context, $src);
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($empty->value->typeOf());
-        $phi->addIncoming($empty->value, $emptyBlock);
-        $phi->addIncoming($wrapped->value, $wrapBlock);
-        $result = HashTableHelper::emptyVariable($context);
-        $result->value = $phi;
-
-        return $result;
+        // Zend convert_to_array(IS_FALSE|IS_TRUE) — both wrap at index 0 (#30097).
+        return CastArrayShared::wrapScalarInArray($context, $src);
     }
 }
