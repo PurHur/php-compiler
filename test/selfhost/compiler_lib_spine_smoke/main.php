@@ -6784,6 +6784,7 @@ require_once __DIR__.'/../../../lib/VM/CloneMagicCatchRedirect.php';
 require_once __DIR__.'/../../../lib/VM/CloneSupport.php';
 require_once __DIR__.'/../../../lib/VM/CloneWithSupport.php';
 require_once __DIR__.'/../../../lib/VM/ClosureBindJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/ClosureRichDisplayName.php';
 require_once __DIR__.'/../../../lib/VM/ClosureState.php';
 require_once __DIR__.'/../../../lib/VM/ClosureSupport.php';
 require_once __DIR__.'/../../../lib/VM/CoalesceJitHelper.php';
