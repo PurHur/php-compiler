@@ -9195,7 +9195,8 @@ final class VmDom
     ): string {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
-        $attrPart = self::serializeAttributes($state, $htmlEscapeMode);
+        // Include nsDef xmlns / xmlns:* like saveXML — libxml htmlNodeDump (#30350).
+        $attrPart = self::serializeElementAttributes($entry, false, $htmlEscapeMode);
         $childIds = self::elementSerializationChildIds($entry);
         if ([] === $childIds) {
             if ($emptySelfClosing) {
@@ -9610,12 +9611,17 @@ final class VmDom
     }
 
     /**
-     * Emit attributes plus synthetic xmlns from createElementNS nsDef (php-src/libxml; #19397).
+     * Emit attributes plus synthetic xmlns from createElementNS / loadXML nsDef (php-src/libxml; #19397).
+     *
+     * Shared by saveXML and saveHTML — libxml htmlNodeDump also dumps nsDef (#30350).
      *
      * @return non-empty-string|''
      */
-    private static function serializeElementAttributes(ObjectEntry $entry, bool $redeclarableNsRoot = false): string
-    {
+    private static function serializeElementAttributes(
+        ObjectEntry $entry,
+        bool $redeclarableNsRoot = false,
+        int $htmlEscapeMode = self::HTML_ESCAPE_UTF8
+    ): string {
         $state = DomRegistry::state($entry);
         $parts = [];
         $decls = $state->namespaceDeclarations;
@@ -9637,30 +9643,14 @@ final class VmDom
             if (!$redeclarableNsRoot && self::parentNamespaceUri($entry, $prefix) === $uri) {
                 continue;
             }
-            $parts[] = self::escapeName($attrName).'="'.self::escapeAttr($uri).'"';
+            $parts[] = self::escapeName($attrName).'="'.self::escapeHtmlAttrForMode($uri, $htmlEscapeMode).'"';
         }
         foreach ($state->attributes as $aname => $avalue) {
-            $parts[] = self::escapeName($aname).'="'.self::serializeAttributeValue($state, $aname, $avalue).'"';
+            $parts[] = self::escapeName($aname).'="'
+                .self::serializeAttributeValue($state, $aname, $avalue, $htmlEscapeMode).'"';
         }
         if ([] === $parts) {
             return '';
-        }
-
-        return ' '.implode(' ', $parts);
-    }
-
-    /** @return non-empty-string|string */
-    private static function serializeAttributes(
-        DomNodeState $state,
-        int $htmlEscapeMode = self::HTML_ESCAPE_UTF8
-    ): string {
-        if ([] === $state->attributes) {
-            return '';
-        }
-        $parts = [];
-        foreach ($state->attributes as $aname => $avalue) {
-            $serialized = self::serializeAttributeValue($state, $aname, $avalue, $htmlEscapeMode);
-            $parts[] = self::escapeName($aname).'="'.$serialized.'"';
         }
 
         return ' '.implode(' ', $parts);
