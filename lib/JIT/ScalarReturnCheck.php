@@ -44,7 +44,7 @@ final class ScalarReturnCheck
         if ($return->type === $expectedJit) {
             return true;
         }
-        $callableName = self::callableName($block->func);
+        $callableName = self::callableName($block);
         $expectedLabel = self::expectedLabel($constraint, $block->returnLiteralBoolType);
         $givenLabel = self::givenLabel($return);
         // Boxed cells: zend_verify_return_type inspects the runtime tag (#29001 MiniWebApp).
@@ -523,12 +523,13 @@ final class ScalarReturnCheck
         }
     }
 
-    private static function callableName(?Func $func): ?string
+    private static function callableName(Block $block): ?string
     {
-        if (null === $func) {
+        $func = $block->func;
+        if (null === $func && (null === $block->closureRichDisplayName || '' === $block->closureRichDisplayName)) {
             return null;
         }
 
-        return \PHPCompiler\VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func);
+        return \PHPCompiler\VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func, null, $block);
     }
 }

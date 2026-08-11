@@ -2509,7 +2509,7 @@ class JIT {
                 }
                 $this->context->functionProxies[$lcname] = new JIT\Call\Native(
                     $func,
-                    VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($block->func, $funcName),
+                    VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($block->func, $funcName, $block),
                     $args,
                     $defaultArgs,
                     $variadicArgIndex,
@@ -13185,13 +13185,14 @@ class JIT {
         return null !== $block->returnTypeConstraint;
     }
 
-    private function jitReturnTypeCallableName(?\PHPCfg\Func $func): ?string
+    private function jitReturnTypeCallableName(Block $block): ?string
     {
-        if (null === $func) {
+        $func = $block->func;
+        if (null === $func && (null === $block->closureRichDisplayName || '' === $block->closureRichDisplayName)) {
             return null;
         }
 
-        return VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func);
+        return VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func, null, $block);
     }
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value

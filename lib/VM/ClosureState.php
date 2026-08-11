@@ -52,6 +52,12 @@ final class ClosureState
 
     public int $definitionLine = 0;
 
+    /**
+     * PHP 8.4+ Zend {@code {closure:…:line}} for TypeError / Reflection / debugInfo (#30076).
+     * Empty when PROFILE&lt;8.4 or unset.
+     */
+    public string $richDisplayName = '';
+
     /** Owning Closure object for Closure::getCurrent() (#13981, Zend/zend_closures.c). */
     public ?ObjectEntry $ownerObject = null;
 
@@ -200,6 +206,7 @@ final class ClosureState
         $clone->staticInitialized = $this->staticInitialized;
         $clone->definitionFile = $this->definitionFile;
         $clone->definitionLine = $this->definitionLine;
+        $clone->richDisplayName = $this->richDisplayName;
 
         return $clone;
     }
@@ -309,6 +316,9 @@ final class ClosureState
 
     private function debugDisplayName(): string
     {
+        if ('' !== $this->richDisplayName) {
+            return $this->richDisplayName;
+        }
         $name = $this->func->getName();
         if (preg_match('/^\{anonymous\}#\d+$/', $name)) {
             return '{closure}';

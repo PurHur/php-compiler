@@ -39,13 +39,20 @@ final class ClosureMethodScopeTypeerrorNameTest extends TestCase
         ob_start();
         $runtime->run($block);
         $out = (string) ob_get_clean();
-        self::assertStringContainsString('C::{closure}(): Argument #1 ($x) must be of type int, null given', $out);
-        self::assertStringContainsString('C::{closure}(): Argument #1 ($x) must be of type C, null given', $out);
+        // PROFILE≥8.4: C::{closure:C::m():N}; older profiles: C::{closure} (#29953 / #30076).
         self::assertMatchesRegularExpression(
-            '/^\{closure\}\(\): Argument #1 \(\$x\) must be of type int, null given/m',
+            '/C::\{closure(?::C::m\(\):\d+)?\}\(\): Argument #1 \(\$x\) must be of type int, null given/',
             $out
         );
-        self::assertSame(3, substr_count($out, 'C::{closure}():'));
-        self::assertSame(1, preg_match_all('/^\{closure\}\(\):/m', $out));
+        self::assertMatchesRegularExpression(
+            '/C::\{closure(?::C::s\(\):\d+)?\}\(\): Argument #1 \(\$x\) must be of type C, null given/',
+            $out
+        );
+        self::assertMatchesRegularExpression(
+            '/^\{closure(?::[^:]+:\d+)?\}\(\): Argument #1 \(\$x\) must be of type int, null given/m',
+            $out
+        );
+        self::assertSame(3, preg_match_all('/C::\{closure/', $out));
+        self::assertSame(1, preg_match_all('/^\{closure(?::[^:]+:\d+)?\}\(\):/m', $out));
     }
 }

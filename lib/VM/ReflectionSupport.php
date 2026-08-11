@@ -5007,7 +5007,7 @@ final class ReflectionSupport
      * ReflectionFunction::getName() for Closure objects (zend_closures.c / php_reflection.c).
      *
      * fromCallable wrappers keep the underlying function or method short name (#22330);
-     * plain user closures stay `{closure}` / `{anonymous}#N`.
+     * plain user closures stay `{closure}` / `{anonymous}#N`, or PHP 8.4+ rich names (#30076).
      */
     public static function displayNameForClosureState(ClosureState $state): string
     {
@@ -5017,6 +5017,9 @@ final class ReflectionSupport
         }
         if (null !== $state->wrappedFunc) {
             return $state->wrappedFunc->getName();
+        }
+        if ('' !== $state->richDisplayName) {
+            return $state->richDisplayName;
         }
         $name = $state->func->getName();
         if (preg_match('/^\{anonymous\}#\d+$/', $name)) {

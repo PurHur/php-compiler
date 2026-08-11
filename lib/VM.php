@@ -31,6 +31,7 @@ use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\ClosureRichDisplayName;
 use PHPCompiler\VM\CycleCollector;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DatePeriodSupport;
@@ -7123,6 +7124,17 @@ restart:
                     $captures = $this->bindClosureCaptures($frame, $op->closureCaptures);
                     $state = new ClosureState($closureFunc, $captures);
                     $state->applyDefinitionSite($op->sourceLocation, $op->block1);
+                    $rich = ClosureRichDisplayName::preferFromOp($op, $op->block1);
+                    if (null !== $rich && '' !== $rich) {
+                        $state->richDisplayName = $rich;
+                    }
+                    if (
+                        (null === $state->boundScopeClass || '' === $state->boundScopeClass)
+                        && null !== $op->closureDeclaringClass
+                        && '' !== $op->closureDeclaringClass
+                    ) {
+                        $state->boundScopeClass = $op->closureDeclaringClass;
+                    }
                     if (
                         null !== $frame->block->func
                         && null !== $frame->block->func->class
@@ -21861,6 +21873,17 @@ restart:
                 $captures = $this->bindClosureCaptures($frame, $op->closureCaptures);
                 $state = new ClosureState($closureFunc, $captures);
                 $state->applyDefinitionSite($op->sourceLocation, $op->block1);
+                $rich = ClosureRichDisplayName::preferFromOp($op, $op->block1);
+                if (null !== $rich && '' !== $rich) {
+                    $state->richDisplayName = $rich;
+                }
+                if (
+                    (null === $state->boundScopeClass || '' === $state->boundScopeClass)
+                    && null !== $op->closureDeclaringClass
+                    && '' !== $op->closureDeclaringClass
+                ) {
+                    $state->boundScopeClass = $op->closureDeclaringClass;
+                }
                 if (
                     null !== $frame->block->func
                     && null !== $frame->block->func->class
@@ -22004,7 +22027,7 @@ restart:
         }
         if ($block->returnTypeNever) {
             // Zend-shaped callable label ({closure}), not php-cfg {anonymous}#N (#30020).
-            TypeCheck::assertNeverReturn($this->returnTypeCallableName($block->func));
+            TypeCheck::assertNeverReturn($this->returnTypeCallableName($frame));
 
             return;
         }
@@ -22023,7 +22046,7 @@ restart:
                 }
             }
             TypeCheck::assertNoneReturned(
-                $this->returnTypeCallableName($block->func),
+                $this->returnTypeCallableName($frame),
                 $expected
             );
         }
@@ -22032,7 +22055,7 @@ restart:
                 $value,
                 $this->lateStaticClassLc($frame),
                 $this->context,
-                $this->returnTypeCallableName($block->func)
+                $this->returnTypeCallableName($frame)
             );
 
             return;
@@ -22049,7 +22072,7 @@ restart:
                 'Return value',
                 null,
                 $block->strictTypes,
-                $this->returnTypeCallableName($block->func)
+                $this->returnTypeCallableName($frame)
             );
 
             return;
@@ -22063,7 +22086,7 @@ restart:
                 $value,
                 $block->returnClassConstraint,
                 $block->returnDeclaredTypeLabel ?? $block->returnClassConstraint,
-                $this->returnTypeCallableName($block->func)
+                $this->returnTypeCallableName($frame)
             );
 
             return;
@@ -22082,7 +22105,7 @@ restart:
             $block->strictTypes,
             $block->returnTypeConstraint,
             $block->returnLiteralBoolType,
-            $this->returnTypeCallableName($block->func)
+            $this->returnTypeCallableName($frame)
         );
     }
 
@@ -22128,13 +22151,23 @@ restart:
         return false;
     }
 
-    private function returnTypeCallableName(?\PHPCfg\Func $func): ?string
+    private function returnTypeCallableName(Frame $frame): ?string
     {
+        $block = $frame->block;
+        // Prefer ClosureState / rich Block name so return TypeErrors match Zend 8.4 (#30076).
+        if (null !== $frame->closureCall || null !== $frame->pendingClosureInvoke
+            || (null !== $block && null !== $block->closureRichDisplayName && '' !== $block->closureRichDisplayName)
+        ) {
+            return VM\ParamArgumentCountError::formatUserFunctionName(
+                VM\ParamArgumentCountError::resolveFunctionName($frame)
+            );
+        }
+        $func = $block->func ?? null;
         if (null === $func) {
             return null;
         }
 
-        return VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func);
+        return VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func, null, $block);
     }
 
     private function emitCallDeprecationNotice(Frame $frame): void

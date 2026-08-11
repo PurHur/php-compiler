@@ -312,6 +312,10 @@
             <file>./test/compliance/FloatDimCoalesceDepJITTest.php</file>
             <file>./test/compliance/AbstractParentMethodCiteEval30022VMTest.php</file>
             <file>./test/compliance/AbstractParentMethodCiteEval30022JITTest.php</file>
+            <file>./test/compliance/ClosureTypeerrorLocation84VMTest.php</file>
+            <file>./test/compliance/ClosureTypeerrorLocation84JITTest.php</file>
+            <file>./test/compliance/ClosureMethodScopeTypeerrorNameVMTest.php</file>
+            <file>./test/compliance/ClosureMethodScopeTypeerrorNameJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

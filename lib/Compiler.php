@@ -40,6 +40,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VariableFunctionCall;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\VM\ClassFinal;
+use PHPCompiler\VM\ClosureRichDisplayName;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\FinalPromotedPropertyRewriter;
@@ -203,6 +204,14 @@ class Compiler {
 
     /** Display class name while compiling a class body (#4286). */
     private ?string $compilingClassDisplayName = null;
+
+    /**
+     * PHP 8.4+ rich closure names keyed by CFG Func — set before body compile so nested
+     * closures can nest parent names (zend_compile.c, #30076).
+     *
+     * @var ?SplObjectStorage<\PHPCfg\Func, string>
+     */
+    private ?SplObjectStorage $closureRichNameByFunc = null;
 
     /** True while compiling a `readonly class` body (#29186). */
     private bool $compilingClassIsReadonly = false;
@@ -573,6 +582,7 @@ class Compiler {
         $this->ternaryMergePhiRhsSlots = new SplObjectStorage;
         $this->rewrittenNeNullReturnJumpIf = new SplObjectStorage;
         $this->earlyBoundFunctionOps = new SplObjectStorage;
+        $this->closureRichNameByFunc = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
         Compiler\InheritanceVariance::validateScript(
@@ -671,6 +681,7 @@ class Compiler {
         $this->ternaryMergePhiRhsSlots = new SplObjectStorage;
         $this->rewrittenNeNullReturnJumpIf = new SplObjectStorage;
         $this->earlyBoundFunctionOps = new SplObjectStorage;
+        $this->closureRichNameByFunc = new SplObjectStorage;
         $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         $this->seen = null;
         if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
@@ -11715,8 +11726,11 @@ class Compiler {
             return '{closure}';
         }
         $name = $func->name;
-        if (str_starts_with($name, '{anonymous}') || str_starts_with($name, '{closure}')) {
+        if (str_starts_with($name, '{anonymous}') || str_starts_with($name, '{closure')) {
             if (CompilerVersion::supportsClosureRichDebugInfo()) {
+                if (null !== $block->closureRichDisplayName && '' !== $block->closureRichDisplayName) {
+                    return $block->closureRichDisplayName;
+                }
                 $callable = $func->callableOp ?? null;
                 if ($callable instanceof Op) {
                     $file = $callable->getFile();
@@ -11740,6 +11754,104 @@ class Compiler {
         }
 
         return $name;
+    }
+
+    /**
+     * PHP 8.4+ {@code {closure:…:line}} for anonymous/arrow (zend_compile.c, #30076).
+     *
+     * @param Op\Expr\ArrowFunction|Op\Expr\Closure $expr
+     */
+    private function computeClosureRichDisplayName(Block $enclosing, $expr): ?string
+    {
+        if (!CompilerVersion::supportsClosureRichDebugInfo()) {
+            return null;
+        }
+        $line = max(0, (int) $expr->getLine());
+        $file = $expr->getFile();
+        if (!\is_string($file) || '' === $file) {
+            $file = $enclosing->scriptPath();
+        }
+        $parentRich = null;
+        $enclosingFunc = $enclosing->func;
+        if (null !== $enclosingFunc && null !== $this->closureRichNameByFunc
+            && isset($this->closureRichNameByFunc[$enclosingFunc])
+        ) {
+            $parentRich = (string) $this->closureRichNameByFunc[$enclosingFunc];
+        } elseif (null !== $enclosing->closureRichDisplayName && '' !== $enclosing->closureRichDisplayName) {
+            $parentRich = $enclosing->closureRichDisplayName;
+        }
+
+        return ClosureRichDisplayName::fromEnclosingBlock(
+            $enclosing,
+            $line,
+            $parentRich,
+            \is_string($file) ? $file : null,
+            $this->compilingClassDisplayName
+        );
+    }
+
+    /** Declaring class while compiling a method body (null at free function / top-level). */
+    private function closureDeclaringClassFromEnclosing(Block $enclosing): ?string
+    {
+        $func = $enclosing->func;
+        if (null !== $func && null !== $func->class) {
+            $classVal = $func->class->value ?? null;
+            if (\is_string($classVal) && '' !== $classVal) {
+                return ltrim($classVal, '\\');
+            }
+        }
+        if (null !== $enclosing->closureDeclaringClass && '' !== $enclosing->closureDeclaringClass) {
+            // Nested in a method-scoped closure: keep the outer method's class (#30076).
+            return $enclosing->closureDeclaringClass;
+        }
+        if (null !== $this->compilingClassDisplayName && '' !== $this->compilingClassDisplayName) {
+            $name = null !== $func && \is_string($func->name) ? $func->name : '';
+            if ('' !== $name && '{main}' !== $name && !ClosureRichDisplayName::isClosureCfgName($name)) {
+                return ltrim($this->compilingClassDisplayName, '\\');
+            }
+        }
+
+        return null;
+    }
+
+    /** Stamp PHP 8.4 rich name onto every block in a closure body (#30076). */
+    private function propagateClosureRichDisplayName(
+        Block $entry,
+        ?string $richDisplayName,
+        ?string $declaringClass = null
+    ): void {
+        $queue = [$entry];
+        $seen = new SplObjectStorage();
+        while ([] !== $queue) {
+            $block = array_pop($queue);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen[$block] = true;
+            if (null !== $richDisplayName) {
+                $block->closureRichDisplayName = $richDisplayName;
+            }
+            if (null !== $declaringClass) {
+                $block->closureDeclaringClass = $declaringClass;
+            }
+            foreach ($block->blocks as $child) {
+                if ($child instanceof Block) {
+                    $queue[] = $child;
+                }
+            }
+            foreach ($block->opCodes as $op) {
+                if (null !== $op->block1 && !$seen->contains($op->block1)) {
+                    // Stay inside this closure — do not descend into nested TYPE_CLOSURE bodies.
+                    if (OpCode::TYPE_CLOSURE === $op->type) {
+                        continue;
+                    }
+                    $queue[] = $op->block1;
+                }
+                if (null !== $op->block2 && !$seen->contains($op->block2)) {
+                    $queue[] = $op->block2;
+                }
+            }
+        }
     }
 
     private function displayParamName(Op\Expr\Param $param): string
@@ -13992,6 +14104,15 @@ class Compiler {
         $savedCatchVarRoots = $this->activeCatchVarRoots;
         $this->activeCatchVarSlotsByName = [];
         $this->activeCatchVarRoots = [];
+        // PHP 8.4+: compute Zend rich name before body compile so nested closures nest (#30076).
+        $richDisplayName = $this->computeClosureRichDisplayName($block, $expr);
+        $declaringClass = $this->closureDeclaringClassFromEnclosing($block);
+        if (null !== $richDisplayName) {
+            if (null === $this->closureRichNameByFunc) {
+                $this->closureRichNameByFunc = new SplObjectStorage();
+            }
+            $this->closureRichNameByFunc[$func] = $richDisplayName;
+        }
         if ($expr instanceof Op\Expr\ArrowFunction) {
             $this->compilingArrowAutoCapture = true;
         }
@@ -14011,12 +14132,25 @@ class Compiler {
             $this->activeCatchVarSlotsByName = $savedCatchVarSlots;
             $this->activeCatchVarRoots = $savedCatchVarRoots;
         }
+        if (null !== $richDisplayName) {
+            $funcBlock->closureRichDisplayName = $richDisplayName;
+            $this->propagateClosureRichDisplayName($funcBlock, $richDisplayName, $declaringClass);
+        } elseif (null !== $declaringClass) {
+            $funcBlock->closureDeclaringClass = $declaringClass;
+            $this->propagateClosureRichDisplayName($funcBlock, null, $declaringClass);
+        }
         $this->markGeneratorIfNeeded($expr, $funcBlock);
         $op = new OpCode(
             OpCode::TYPE_CLOSURE,
             $this->compileOperand($expr->result, $block, false),
         );
         $op->block1 = $funcBlock;
+        if (null !== $richDisplayName) {
+            $op->closureRichDisplayName = $richDisplayName;
+        }
+        if (null !== $declaringClass) {
+            $op->closureDeclaringClass = $declaringClass;
+        }
         $op->parameterMetadata = $this->parameterMetadataFromParams($func->params, $func);
         $this->assignAttributeMetadata($op, $expr);
         $this->assignSourceMetadata($op, $expr);

@@ -39,7 +39,7 @@ final class ClassReturnCheck
             return true;
         }
         $expected = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
-        $callableName = self::callableName($block->func);
+        $callableName = self::callableName($block);
         if (self::isVmHashTableClass($expected)
             || self::isVmHashTableClass($block->returnClassConstraint)
         ) {
@@ -330,13 +330,14 @@ final class ClassReturnCheck
         return self::generatorHasTraversableReturnTypeLabel($block);
     }
 
-    private static function callableName(?Func $func): ?string
+    private static function callableName(Block $block): ?string
     {
-        if (null === $func) {
+        $func = $block->func;
+        if (null === $func && (null === $block->closureRichDisplayName || '' === $block->closureRichDisplayName)) {
             return null;
         }
 
-        return \PHPCompiler\VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func);
+        return \PHPCompiler\VM\ParamArgumentCountError::typeErrorDisplayNameForCfgFunc($func, null, $block);
     }
 
     private static function scalarGivenLabel(Variable $arg): ?string

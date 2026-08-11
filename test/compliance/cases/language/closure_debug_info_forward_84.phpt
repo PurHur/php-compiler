@@ -12,7 +12,7 @@ var_dump($c);
 method_exists=0
 object(Closure)#%d (3) {
   ["name"]=>
-  string(9) "{closure}"
+  string(%d) "{closure:%s:%d}"
   ["file"]=>
   string(%d) "%s"
   ["line"]=>

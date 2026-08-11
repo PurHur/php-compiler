@@ -321,6 +321,12 @@ class OpCode {
      */
     public array $closureCaptures = [];
 
+    /** PHP 8.4+ Zend {@code {closure:…:line}} for TYPE_CLOSURE (#30076). */
+    public ?string $closureRichDisplayName = null;
+
+    /** Declaring class for method-scoped TYPE_CLOSURE (#30076 / #29953). */
+    public ?string $closureDeclaringClass = null;
+
     /** Lowered from ++/-- (issue #3469); enables Zend increment_string on strings. */
     public bool $isIncDec = false;
     /** isset()/empty() on PropertyFetch, not ArrayDimFetch (issue #5117, zend_hash.c). */
