@@ -1044,6 +1044,20 @@ final class VmSockets
         }
         $n = SocketsLibcThinAbi::sendtoInet($fd, $data, $length, $flags, $addr, $port);
         if ($n < 0) {
+            $hostErr = SocketsLibcThinAbi::consumeHostLookupError();
+            if (null !== $hostErr) {
+                self::recordError($object, $hostErr);
+                self::triggerWarning(
+                    $frame,
+                    \sprintf(
+                        'socket_sendto(): Host lookup failed [%d]: %s',
+                        $hostErr,
+                        SocketsLibcThinAbi::strerror($hostErr)
+                    )
+                );
+
+                return false;
+            }
             $errno = SocketsLibcThinAbi::readErrno();
             self::recordError($object, $errno);
             self::triggerWarning(
