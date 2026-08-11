@@ -1,7 +1,6 @@
 <?php
 
-declare(strict_types=1);
-
+// Soft-null continuation (no strict_types) — #5515; strict null is #29784.
 $s = 'a,b,c';
 echo strtok($s, ','), '|';
 echo strtok(null, ',') === false ? '' : 'bad', "\n";
