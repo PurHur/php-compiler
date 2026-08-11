@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\ProcessIdentityJit;
 use PHPCompiler\JIT\Builtin\StringDateTime;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
+use PHPCompiler\JIT\Builtin\StringTime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -26,16 +27,7 @@ final class JitDate
 {
     public static function time(Context $context): Value
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $timeT = $context->getTypeFromString('int64');
-        $raw = $context->builder->call(
-            $context->lookupFunction('time'),
-            $i8p->constNull()
-        );
-
-        return $raw->typeOf() === $timeT
-            ? $raw
-            : $context->builder->zExt($raw, $timeT);
+        return StringTime::invoke($context);
     }
 
     public static function getmypid(Context $context): Value

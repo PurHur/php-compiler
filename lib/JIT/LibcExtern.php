@@ -75,7 +75,8 @@ final class LibcExtern
             'setenv' => [$i32, false, [$i8p, $i8p, $i32]],
             'unsetenv' => [$i32, false, [$i8p]],
             'realpath' => [$i8p, false, [$i8p, $i8p]],
-            'time' => [$i64, false, [$i8p]],
+            // time dropped (#30332): StringTime NestedJIT leaf + TouchLibcRuntime declare
+            // time(2) module-locally; TimeJitHelper SSOT is @time (microtime #29405 shape).
             'printf' => [$i32, true, [$i8p]],
             'snprintf' => [$i32, true, [$i8p, $sizeT, $i8p]],
             'popen' => [$i8p, false, [$i8p, $i8p]],
