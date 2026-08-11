@@ -9589,17 +9589,25 @@ restart:
 
                     $resolved = $this->resolveIncludeFilename($file, $frame);
                     if (null === $resolved) {
+                        // Zend two-step: stream Warning, then Failed opening Warning (include)
+                        // or Error (require) with include_path (#30029; fopen_wrappers.c).
+                        $keyword = VM\VmInclude::kindKeyword($kind);
+                        $includePath = \PHPCompiler\ext\standard\VmIncludePath::get();
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        $this->context->errors->triggerError(
+                            VM\VmInclude::failedToOpenStreamMessage($keyword, $file),
+                            VM\ErrorReporter::E_WARNING,
+                            $scriptFile,
+                            $this->context,
+                            $frame
+                        );
                         if ($isRequire) {
-                            $this->context->errors->triggerError(
-                                'Failed opening required \''.$file.'\' for inclusion',
-                                VM\ErrorReporter::E_WARNING,
-                                '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                                $this->context,
-                                $frame
-                            );
                             $catchFrame = $this->dispatchEngineThrow(
                                 $frame,
-                                $this->makeEngineError('Failed opening required \''.$file.'\' for inclusion', 'Error')
+                                $this->makeEngineError(
+                                    VM\VmInclude::failedOpeningRequiredMessage($file, $includePath),
+                                    'Error'
+                                )
                             );
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
@@ -9608,9 +9616,9 @@ restart:
                             break;
                         }
                         $this->context->errors->triggerError(
-                            'Failed opening \''.$file.'\' for inclusion',
+                            VM\VmInclude::failedOpeningForInclusionMessage($keyword, $file, $includePath),
                             VM\ErrorReporter::E_WARNING,
-                            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                            $scriptFile,
                             $this->context,
                             $frame
                         );

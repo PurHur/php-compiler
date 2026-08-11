@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\VmInclude;
 use PHPUnit\Framework\TestCase;
 
-/** VmInclude SSOT for self-host spine include guards (#10063). */
+/** VmInclude SSOT for self-host spine include guards (#10063) + missing-file diagnostics (#30029). */
 final class VmIncludeTest extends TestCase
 {
     public function testPathMatchesSelfHostSpineSkipSuffix(): void
@@ -15,6 +16,24 @@ final class VmIncludeTest extends TestCase
         self::assertTrue(VmInclude::pathMatchesSelfHostSpineSkipSuffix('vendor/autoload.php'));
         self::assertTrue(VmInclude::pathMatchesSelfHostSpineSkipSuffix('/repo/vendor/autoload.php'));
         self::assertFalse(VmInclude::pathMatchesSelfHostSpineSkipSuffix('lib/VM.php'));
+    }
+
+    public function testMissingIncludeDiagnosticsMatchZend(): void
+    {
+        self::assertSame('include', VmInclude::kindKeyword(OpCode::INCLUDE_KIND_INCLUDE));
+        self::assertSame('require_once', VmInclude::kindKeyword(OpCode::INCLUDE_KIND_REQUIRE_ONCE));
+        self::assertSame(
+            'include(/tmp/x.php): Failed to open stream: No such file or directory',
+            VmInclude::failedToOpenStreamMessage('include', '/tmp/x.php')
+        );
+        self::assertSame(
+            "include(): Failed opening '/tmp/x.php' for inclusion (include_path='.')",
+            VmInclude::failedOpeningForInclusionMessage('include', '/tmp/x.php', '.')
+        );
+        self::assertSame(
+            "Failed opening required '/tmp/x.php' (include_path='.')",
+            VmInclude::failedOpeningRequiredMessage('/tmp/x.php', '.')
+        );
     }
 
     public function testShouldSkipSelfHostSpineCliIncludeWhenSelfHostAot(): void

@@ -4,15 +4,72 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\OpCode;
+
 /**
  * Include/require semantics SSOT for VM and compiled JIT/AOT (#10063, php-in-PHP).
  *
  * php-src: Zend/zend_execute.c — ZEND_INCLUDE_OR_EVAL, once-guard, return value
+ * php-src: main/fopen_wrappers.c — missing-file stream + Failed opening diagnostics (#30029)
  */
 final class VmInclude
 {
     /** Zend: skipped include_once on already-included file returns true; self-host stubs use int 1. */
     public const SKIPPED_SELFHOST_INCLUDE_RETURN = 1;
+
+    /**
+     * Opcode keyword for include/require diagnostics (zend_execute.c / fopen_wrappers.c).
+     */
+    public static function kindKeyword(int $kind): string
+    {
+        return match ($kind) {
+            OpCode::INCLUDE_KIND_INCLUDE => 'include',
+            OpCode::INCLUDE_KIND_INCLUDE_ONCE => 'include_once',
+            OpCode::INCLUDE_KIND_REQUIRE => 'require',
+            OpCode::INCLUDE_KIND_REQUIRE_ONCE => 'require_once',
+            default => 'include',
+        };
+    }
+
+    /**
+     * First-step Warning when the include/require target cannot be opened (fopen_wrappers.c).
+     */
+    public static function failedToOpenStreamMessage(string $keyword, string $path): string
+    {
+        return \sprintf(
+            '%s(%s): Failed to open stream: No such file or directory',
+            $keyword,
+            $path
+        );
+    }
+
+    /**
+     * Second-step Warning for include/include_once (zend_execute.c).
+     */
+    public static function failedOpeningForInclusionMessage(
+        string $keyword,
+        string $path,
+        string $includePath
+    ): string {
+        return \sprintf(
+            '%s(): Failed opening \'%s\' for inclusion (include_path=\'%s\')',
+            $keyword,
+            $path,
+            $includePath
+        );
+    }
+
+    /**
+     * Fatal Error message for require/require_once after the stream Warning (zend_execute.c).
+     */
+    public static function failedOpeningRequiredMessage(string $path, string $includePath): string
+    {
+        return \sprintf(
+            'Failed opening required \'%s\' (include_path=\'%s\')',
+            $path,
+            $includePath
+        );
+    }
 
     /**
      * Paths omitted from self-host spine bundles (argv driver, vendor autoload).
