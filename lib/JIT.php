@@ -12932,13 +12932,21 @@ class JIT {
                                 && [] !== $this->context->type->object->registeredEnumClassIds()
                             );
                             if (!$skipDynamicUndef) {
-                                // Non-null receiver: nullsafe still warns like plain -> (#23705).
-                                JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
-                                    $this->context,
-                                    $result,
-                                    $declaringClass,
-                                    $name->value
-                                );
+                                if ($op->propertyHookCoalesceRead) {
+                                    // BP_VAR_IS / ?? LHS: silent null (FETCH_OBJ_IS, #30030).
+                                    JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest(
+                                        $this->context,
+                                        $result
+                                    );
+                                } else {
+                                    // Non-null receiver: nullsafe still warns like plain -> (#23705).
+                                    JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
+                                        $this->context,
+                                        $result,
+                                        $declaringClass,
+                                        $name->value
+                                    );
+                                }
                                 break;
                             }
                         }
