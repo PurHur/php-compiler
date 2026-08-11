@@ -34,7 +34,7 @@ final class socket_clear_error extends Internal
         }
         $object = null;
         if (1 === $argc) {
-            $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_clear_error', 1);
+            $object = VmSocketArg::requireSocketObjectOrNull($frame->calledArgs[0], 'socket_clear_error', 1);
         }
         VmSockets::clearError($object);
         BuiltinExecute::writeReturn(
