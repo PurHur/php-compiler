@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** fnmatch() — POSIX glob pattern match (VM via VmFnmatchPure; JIT/AOT via JitFnmatch, #3189/#7756/#12075). */
@@ -30,10 +29,11 @@ final class fnmatch extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // php-src fnmatch.c — pattern null DEP+coerce on 8.4 (#20554, #21366, #29660).
+        // php-src fnmatch.c / basic_functions.stub.php — Z_PARAM_STR pattern+filename:
+        // caller strict_types → TypeError on null (#30123); else DEP+coerce (#20554, #21366, #29660).
         // VmString argIndex is 0-based (helpers add +1 for the user-facing parameter number).
-        $pattern = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fnmatch', 0, 'pattern', 'string', false);
-        $filename = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'fnmatch', 1, 'filename');
+        $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'fnmatch', 0, 'pattern');
+        $filename = VmString::trimFamilyStringArgForFrame($frame, 1, 'fnmatch', 1, 'filename');
         $flags = 0;
         if (3 === $argc) {
             // VmMath userArgIndex is already 1-based (no +1 in intBuiltinTypeError).
@@ -57,11 +57,34 @@ final class fnmatch extends Internal
             );
         }
 
-        return JitFnmatch::invoke(
-            $context,
-            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'fnmatch', 0, 'pattern'),
-            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'fnmatch', 1, 'filename'),
-            $flags
-        );
+        // Soft-null outside strict_types — Zend 8.4 deprecate+coerce; strict → TypeError (#30123).
+        // Early return after compile-time null TypeError — no helper IR after abort (peer strrchr #29889).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'fnmatch', 0, 'pattern');
+
+                return $context->getTypeFromString('int1')->constInt(0, false);
+            }
+            $pattern = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'fnmatch', 0, 'pattern');
+        } else {
+            $pattern = $context->callerStrictTypes
+                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'fnmatch', 0, 'pattern')
+                : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'fnmatch', 0, 'pattern');
+        }
+
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'fnmatch', 1, 'filename');
+
+                return $context->getTypeFromString('int1')->constInt(0, false);
+            }
+            $filename = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'fnmatch', 1, 'filename');
+        } else {
+            $filename = $context->callerStrictTypes
+                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'fnmatch', 1, 'filename')
+                : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'fnmatch', 1, 'filename');
+        }
+
+        return JitFnmatch::invoke($context, $pattern, $filename, $flags);
     }
 }
