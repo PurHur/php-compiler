@@ -9,6 +9,7 @@ use PHPCompiler\VM\HashTable as VmHashTable;
 use PHPCompiler\VM\HashTableJitHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -1658,7 +1659,7 @@ final class HashTableWriteLlvm
 
     /**
      * Array-literal spread: append packed list then string keys (issue #141, #1361, #4453).
-     * Non-array / non-Traversable at runtime → catchable Error (#27952).
+     * Non-array / non-Traversable at runtime → catchable Error/TypeError (#27952, #30055).
      */
     public static function spreadInto(Context $context, Variable $dest, Variable $source): void
     {
@@ -1687,7 +1688,8 @@ final class HashTableWriteLlvm
 
     /**
      * Guard `[...$x]` when $x is known non-array at compile time, or boxed and not
-     * array/object at runtime. Scalars → catchable Error (zend_vm_def.h / #27952).
+     * array/object at runtime. Scalars → catchable Error; non-Traversable objects → TypeError
+     * (zend_vm_def.h / #27952 / #30055).
      *
      * @return bool true when the fail path already terminated this block
      */
@@ -1703,11 +1705,21 @@ final class HashTableWriteLlvm
             return false;
         }
         if (Variable::TYPE_OBJECT === $source->type) {
-            // Traversable materialization path handles objects; non-Traversable → TypeError there.
-            return false;
+            // Known non-Traversable object → catchable TypeError with ", <type> given" (#30055).
+            self::emitArraySpreadCatchableError(
+                $context,
+                ListUnpackHelper::arraySpreadNonTraversableMessage($context, $source),
+                true
+            );
+
+            return true;
         }
         if (ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($context, $source)) {
-            self::emitArraySpreadCatchableError($context);
+            self::emitArraySpreadCatchableError(
+                $context,
+                ListUnpackHelper::arraySpreadNonTraversableMessage($context, $source),
+                false
+            );
 
             return true;
         }
@@ -1730,7 +1742,11 @@ final class HashTableWriteLlvm
             $okBb = BasicBlockHelper::append($context, 'array_spread_ok');
             $context->builder->branchIf($ok, $okBb, $failBb);
             $context->builder->positionAtEnd($failBb);
-            self::emitArraySpreadCatchableError($context);
+            self::emitArraySpreadCatchableError(
+                $context,
+                ListUnpackHelper::arraySpreadNonTraversableMessage($context, $source),
+                false
+            );
             $context->builder->positionAtEnd($okBb);
 
             return false;
@@ -1739,22 +1755,31 @@ final class HashTableWriteLlvm
         return false;
     }
 
-    private static function emitArraySpreadCatchableError(Context $context): void
-    {
+    private static function emitArraySpreadCatchableError(
+        Context $context,
+        string $message,
+        bool $asTypeError
+    ): void {
+        $className = $asTypeError ? 'TypeError' : 'Error';
         if ([] !== $context->tryCatch->handlerStack) {
             TryCatchHelper::emitCatchableClassError(
                 $context,
-                'Error',
-                ArraySpread::NON_TRAVERSABLE_MESSAGE,
+                $className,
+                $message,
                 null
             );
+
+            return;
+        }
+        if ($asTypeError) {
+            ExceptionBridge::emitTypeErrorAndAbort($context, $message);
 
             return;
         }
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
         ErrorRaise::ensureStandaloneBodies($context);
-        ErrorRaise::emitRaise($context, ArraySpread::NON_TRAVERSABLE_MESSAGE);
+        ErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 
@@ -13,10 +14,57 @@ use PHPCompiler\VM;
  * Runtime non-array / non-Traversable unpack throws catchable {@see \Error} (scalars) or
  * {@see \TypeError} (objects) — #27952. Compile-time literal unpack stays an uncatchable
  * compile fatal via {@see \PHPCompiler\Compiler}.
+ *
+ * PHP 8.4+ appends {@code , <type> given} (#30055; sibling call unpack #30023).
  */
 final class ArraySpread
 {
     public const NON_TRAVERSABLE_MESSAGE = 'Only arrays and Traversables can be unpacked';
+
+    /**
+     * Error/TypeError/Fatal text for non-array / non-Traversable array unpack (zend_vm_def.h ADD_ARRAY_UNPACK).
+     *
+     * PHP 8.4+ appends {@code , <type> given} via {@see EnumCaseSupport::typeNameForTypeErrorActual()} (#30055).
+     */
+    public static function nonTraversableMessage(Variable $value): string
+    {
+        $message = self::NON_TRAVERSABLE_MESSAGE;
+        if (!CompilerVersion::supportsUnpackTypeErrorGivenSuffix()) {
+            return $message;
+        }
+
+        return $message.', '.EnumCaseSupport::typeNameForTypeErrorActual($value).' given';
+    }
+
+    /**
+     * Same message for compile-time PHP literals / const fetches (IS_CONST unpack → CompileFatal).
+     */
+    public static function nonTraversableMessageForPhpValue(mixed $value): string
+    {
+        $message = self::NON_TRAVERSABLE_MESSAGE;
+        if (!CompilerVersion::supportsUnpackTypeErrorGivenSuffix()) {
+            return $message;
+        }
+        if (true === $value) {
+            $label = 'true';
+        } elseif (false === $value) {
+            $label = 'false';
+        } elseif (null === $value) {
+            $label = 'null';
+        } elseif (\is_int($value)) {
+            $label = 'int';
+        } elseif (\is_float($value)) {
+            $label = 'float';
+        } elseif (\is_string($value)) {
+            $label = 'string';
+        } elseif (\is_object($value)) {
+            $label = $value::class;
+        } else {
+            $label = get_debug_type($value);
+        }
+
+        return $message.', '.$label.' given';
+    }
 
     public static function spreadInto(
         VM $vm,
@@ -45,7 +93,7 @@ final class ArraySpread
                 $iterable = ForeachIterator::resolveTraversableObject($vm, $frame, $source);
             } catch (\TypeError) {
                 // Zend: non-Traversable object → catchable TypeError (zend_vm_def.h ADD_ARRAY_UNPACK).
-                throw new \TypeError(self::NON_TRAVERSABLE_MESSAGE);
+                throw new \TypeError(self::nonTraversableMessage($source));
             }
             if (null !== $iterable->toObject()->generatorState) {
                 self::spreadFromGenerator($vm, $iterable, $dest);
@@ -58,7 +106,7 @@ final class ArraySpread
         }
 
         // Scalars / null — catchable Error (not E_ERROR fatal) (#27952, re-#4812).
-        throw new \Error(self::NON_TRAVERSABLE_MESSAGE);
+        throw new \Error(self::nonTraversableMessage($source));
     }
 
     private static function spreadFromGenerator(VM $vm, Variable $genVar, HashTable $dest): void

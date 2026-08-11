@@ -76,4 +76,46 @@ PHP;
             ob_get_clean()
         );
     }
+
+    public function testVmProfile84AppendsGivenType(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+$out = [];
+foreach ([1, 1.5, 'ab', true, false, null, new stdClass] as $v) {
+    try {
+        $b = [...$v];
+    } catch (Throwable $e) {
+        $out[] = get_class($e).':'.$e->getMessage();
+    }
+}
+echo implode("\n", $out), "\n";
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'array_spread_non_traversable_given_84.php'));
+            self::assertSame(
+                "Error:Only arrays and Traversables can be unpacked, int given\n"
+                ."Error:Only arrays and Traversables can be unpacked, float given\n"
+                ."Error:Only arrays and Traversables can be unpacked, string given\n"
+                ."Error:Only arrays and Traversables can be unpacked, true given\n"
+                ."Error:Only arrays and Traversables can be unpacked, false given\n"
+                ."Error:Only arrays and Traversables can be unpacked, null given\n"
+                ."TypeError:Only arrays and Traversables can be unpacked, stdClass given\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
 }

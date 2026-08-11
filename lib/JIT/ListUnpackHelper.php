@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\ArraySpread;
 use PHPCompiler\VM\VmUnset;
 use PHPTypes\Type;
 use PHPLLVM\Builder;
@@ -41,6 +42,19 @@ final class ListUnpackHelper
     public static function callUnpackNonArrayMessage(Context $context, Variable $operand): string
     {
         $message = self::CALL_UNPACK_NON_ARRAY_MESSAGE;
+        if (!\PHPCompiler\CompilerVersion::supportsUnpackTypeErrorGivenSuffix()) {
+            return $message;
+        }
+
+        return $message.', '.JitOperandTypeLabel::givenLabel($context, $operand).' given';
+    }
+
+    /**
+     * ADD_ARRAY_UNPACK Error/TypeError text — PHP 8.4+ appends {@code , <type> given} (#30055).
+     */
+    public static function arraySpreadNonTraversableMessage(Context $context, Variable $operand): string
+    {
+        $message = ArraySpread::NON_TRAVERSABLE_MESSAGE;
         if (!\PHPCompiler\CompilerVersion::supportsUnpackTypeErrorGivenSuffix()) {
             return $message;
         }
