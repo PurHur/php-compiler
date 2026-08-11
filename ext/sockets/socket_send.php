@@ -35,7 +35,8 @@ final class socket_send extends Internal
         }
 
         $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_send', 1);
-        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'socket_send', 1, 'data');
+        // Z_PARAM_STR soft-null outside strict_types (#30321).
+        $data = VmString::stringBuiltinArgForFrame($frame, 1, 'socket_send', 1, 'data', false);
         $length = VmSocketArg::requireIntArg($frame, 2, 'socket_send', 3, 'length');
         $flags = VmSocketArg::requireIntArg($frame, 3, 'socket_send', 4, 'flags');
         $n = VmSockets::send($object, $data, $length, $flags, $frame);
