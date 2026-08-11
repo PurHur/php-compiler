@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\VmDom;
+use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\standard\JitStringConcat;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -17,9 +19,11 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -227,12 +231,14 @@ final class DomNodeLiveMutationRuntime
                 // LiveSlots increments the existing childNodes list in place so held
                 // `$list = $node->childNodes` observes +1 (#29048). Do not bump here —
                 // a pre-sync bumpHeld + LiveSlots +1 would double-count.
-                // Note (#30271): thin-AOT LiveSlots still skips NestedJIT Wrong Document /
-                // Hierarchy Request — VmDom path covers VM/JIT; AOT follow-up separately.
+                // php-src Wrong Document / Hierarchy Request before LiveSlots (#30274).
+                $parentObj = self::receiverObject($context, $receiver);
+                $childObj = self::mutationArgObject($context, $extraArgs[0]);
+                self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
                 JitDomAppendChildLiveSlots::sync(
                     $context,
-                    self::receiverObject($context, $receiver),
-                    self::mutationArgObject($context, $extraArgs[0])
+                    $parentObj,
+                    $childObj
                 );
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
                 self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
@@ -866,6 +872,92 @@ final class DomNodeLiveMutationRuntime
         }
 
         throw new \LogicException('DOM object live-mutation arg must be object or value box');
+    }
+
+    /**
+     * Thin-AOT LiveSlots preflight (#30274): reject Document-class children before slot sync.
+     *
+     * LiveSlots objects use thin {@see __object__} layout (class_id only) — NestedJIT
+     * {@see ObjectEntry::$class} access segfaults. Compare class_id in LLVM and throw
+     * catchable {@see \DOMException} (Wrong Document vs Hierarchy Request via parentNode).
+     */
+    public static function assertTreeMutationChildBeforeLiveSlots(
+        Context $context,
+        Value $parent,
+        Value $child
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_assert_tree_mut');
+        $objectType = $context->type->object;
+        $map = $context->structFieldMap['__object__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $classId = $context->builder->load($context->builder->structGep($child, $map['class_id']));
+        $isDoc = $i1->constInt(0, false);
+        foreach (['DOMDocument', 'Dom\\Document', 'Dom\\XMLDocument', 'Dom\\HTMLDocument'] as $className) {
+            try {
+                $expected = $objectType->lookup($className);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($expected, false)
+            );
+            $isDoc = $context->builder->or($isDoc, $match);
+        }
+
+        $bbDoc = BasicBlockHelper::append($context, 'dom_assert_tree_mut_doc');
+        $bbOk = BasicBlockHelper::append($context, 'dom_assert_tree_mut_ok');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbOk);
+
+        $context->builder->positionAtEnd($bbDoc);
+        // Same-document: element.parentNode === document (#30274 / loadXML parentNode wire).
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
+        }
+        $parentNodeSlot = $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_PARENT_NODE);
+        $parentNodePtr = $context->builder->load($parentNodeSlot);
+        $voidPtr = $context->getTypeFromString('void*');
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $parentNodePtr, $voidPtr->constNull());
+        $bbHierarchy = BasicBlockHelper::append($context, 'dom_assert_tree_mut_hier');
+        $bbWrong = BasicBlockHelper::append($context, 'dom_assert_tree_mut_wrong');
+        $bbCompare = BasicBlockHelper::append($context, 'dom_assert_tree_mut_cmp');
+        $context->builder->branchIf($slotNull, $bbWrong, $bbCompare);
+
+        $context->builder->positionAtEnd($bbCompare);
+        $ownerDoc = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($parentNodePtr, $context->getTypeFromString('__value__*'))
+        );
+        $sameDoc = $context->builder->icmp(Builder::INT_EQ, $ownerDoc, $child);
+        $context->builder->branchIf($sameDoc, $bbHierarchy, $bbWrong);
+
+        $context->builder->positionAtEnd($bbHierarchy);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Hierarchy Request Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::HIERARCHY_REQUEST_ERR
+        );
+        // emitCatchableClassError terminates the block when a catch handler exists.
+
+        $context->builder->positionAtEnd($bbWrong);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Wrong Document Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::WRONG_DOCUMENT_ERR
+        );
+
+        $context->builder->positionAtEnd($bbOk);
     }
 
     private static function objectAbiFor(string $kind, int $extraArgCount): string
