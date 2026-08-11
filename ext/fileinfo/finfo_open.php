@@ -35,7 +35,7 @@ final class finfo_open extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $flags = VmFinfo::coerceFlagsArg($frame->calledArgs[0] ?? null);
+        $flags = VmFinfo::coerceFlagsArg($frame, 0, 'finfo_open', 1, 'flags');
         if (isset($frame->calledArgs[1])) {
             VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[1],
