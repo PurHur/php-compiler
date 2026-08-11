@@ -1636,6 +1636,9 @@ final class BuiltinParamNames
             // php-src ext/spl/spl.stub.php — preserve_keys = true (#25066)
             case 'iterator_to_array':
                 return ['iterator', 'preserve_keys='];
+            // php-src ext/standard/basic_functions.stub.php — $iterator not $it (#23423)
+            case 'iterator_count':
+                return ['iterator'];
             case 'generator_to_array':
                 return ['generator', 'preserve_keys'];
             case 'hrtime':
