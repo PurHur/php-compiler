@@ -13,10 +13,10 @@ foreach ([null, false, 0, '', [], true, 1] as $i => $x) {
 }
 --EXPECT--
 0:NULL=>NULL
-1:false=>Error:Call to a member function foo() on bool
+1:false=>Error:Call to a member function foo() on false
 2:0=>Error:Call to a member function foo() on int
 3:''=>Error:Call to a member function foo() on string
 4:array (
 )=>Error:Call to a member function foo() on array
-5:true=>Error:Call to a member function foo() on bool
+5:true=>Error:Call to a member function foo() on true
 6:1=>Error:Call to a member function foo() on int

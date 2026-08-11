@@ -119,15 +119,17 @@ final class EnumCaseTypeNameTest extends TestCase
                 'Cannot use "::class" on string',
                 EnumCaseSupport::classPseudoConstTypeErrorMessage($s)
             );
-            // #29592 — bool uses concrete true/false, not "bool"
+            // #29592 / #30054 — bool uses concrete true/false, not "bool"
             $t = new Variable(Variable::TYPE_BOOLEAN);
             $t->bool(true);
+            $this->assertSame('true', EnumCaseSupport::typeNameForTypeErrorActual($t));
             $this->assertSame(
                 'Cannot use "::class" on true',
                 EnumCaseSupport::classPseudoConstTypeErrorMessage($t)
             );
             $f = new Variable(Variable::TYPE_BOOLEAN);
             $f->bool(false);
+            $this->assertSame('false', EnumCaseSupport::typeNameForTypeErrorActual($f));
             $this->assertSame(
                 'Cannot use "::class" on false',
                 EnumCaseSupport::classPseudoConstTypeErrorMessage($f)

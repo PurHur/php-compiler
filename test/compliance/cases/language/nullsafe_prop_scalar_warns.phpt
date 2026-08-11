@@ -19,7 +19,7 @@ $n = null;
 $y = $n?->foo;
 echo 'null=', var_export($y, true), "\n";
 --EXPECT--
-W:Attempt to read property "foo" on bool
+W:Attempt to read property "foo" on false
 bool=NULL
 W:Attempt to read property "foo" on int
 int=NULL
