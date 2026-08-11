@@ -71,16 +71,24 @@ final class VmArray
      */
     private static function coerceArrayFoldNumericString(string $s): array
     {
-        if (!is_numeric($s)) {
-            return [0, false];
-        }
-        if (((string) (int) $s) === $s
-            && !str_contains($s, '.')
-            && !str_contains(strtolower($s), 'e')) {
-            return [(int) $s, false];
+        if (is_numeric($s)) {
+            if (((string) (int) $s) === $s
+                && !str_contains($s, '.')
+                && !str_contains(strtolower($s), 'e')) {
+                return [(int) $s, false];
+            }
+
+            return [(float) $s, true];
         }
 
-        return [(float) $s, true];
+        // Zend zval_get_long/zval_get_double: leading-numeric strings like "3a" coerce
+        // to their numeric prefix via (int)/(float) cast; fully non-numeric → 0.
+        $intVal = (int) $s;
+        if (0 !== $intVal || '0' === ($s[0] ?? '')) {
+            return [$intVal, false];
+        }
+
+        return [0, false];
     }
 
     /**
