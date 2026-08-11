@@ -167,7 +167,6 @@ final class StringGetenv
     {
         $internals = [
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
-            new \PHPCompiler\ext\standard\phpc_native_environ_mirror_into_ht(),
         ];
         foreach ($internals as $internal) {
             $lc = strtolower($internal->getName());

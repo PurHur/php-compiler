@@ -2597,7 +2597,6 @@ require_once __DIR__.'/../../../ext/standard/JitDnsGetRecordMaterializer.php';
 require_once __DIR__.'/../../../ext/standard/JitEnumExists.php';
 require_once __DIR__.'/../../../ext/standard/JitEnv.php';
 require_once __DIR__.'/../../../ext/standard/JitEnvLocalKernel.php';
-require_once __DIR__.'/../../../ext/standard/JitEnvironMirrorKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorGetLast.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorHandler.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorLog.php';
@@ -4140,7 +4139,6 @@ require_once __DIR__.'/../../../ext/standard/phpc_match_unhandled_operand_is_obj
 require_once __DIR__.'/../../../ext/standard/phpc_match_unhandled_operand_message.php';
 require_once __DIR__.'/../../../ext/standard/phpc_match_unhandled_format_scalar.php';
 require_once __DIR__.'/../../../ext/standard/phpc_mm_free_native.php';
-require_once __DIR__.'/../../../ext/standard/phpc_native_environ_mirror_into_ht.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_alloc.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_hashtable_at.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_long_at.php';

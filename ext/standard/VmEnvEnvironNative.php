@@ -25,13 +25,15 @@ final class VmEnvEnvironNative
         return [];
     }
 
-    /** Init-safe native hashtable mirror for JIT/AOT superglobal refresh (#19157). */
+    /** Init-safe native hashtable mirror for JIT/AOT superglobal refresh (#19157, #21580, #30225). */
     public static function mirrorIntoNativeHashtable(int $destPtr): void
     {
         if ($destPtr <= 0) {
             return;
         }
-        phpc_native_environ_mirror_into_ht($destPtr);
+        foreach (self::enumerate() as $name => $value) {
+            phpc_native_ht_set_string_key($destPtr, $name, $value);
+        }
     }
 
     /**
