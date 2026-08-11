@@ -136,20 +136,17 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24809).
+     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24809, #30176).
      *
-     * Withheld on 8.4.0-dev reference profile (phpversion() 8.2.31 matches Zend 8.2 parse error).
-     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
-     * Do not use VERSION_ID / isForwardProfileAtLeast here — that re-enabled acceptance on default
-     * after #24719 and broke Zend 8.2 parity (#24809, re-#22782/#22705).
+     * Enabled when compiler MAJOR.MINOR >= 8.3 (handles 8.4.0-dev where version_compare treats
+     * -dev as below 8.4.0 stable). Previously withheld on 8.4.0-dev to match Zend 8.2 host parse
+     * error, but the parser + CFG patches support it and typed class constants are a PHP 8.3
+     * language feature the compiler should implement (#30176).
      */
     public static function supportsTypedClassConstants(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        return true;
+        return self::MAJOR_VERSION > 8
+            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 3);
     }
 
     /**
