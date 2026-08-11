@@ -1040,7 +1040,7 @@ class JIT {
                 $return,
                 $cfgBlock->returnDnfConstraints,
                 'Return value',
-                $this->jitReturnTypeCallableName($cfgBlock->func)
+                $this->jitReturnTypeCallableName($cfgBlock)
             );
         }
         if (!$this->emitJitClassReturnTypeCheck($cfgBlock, $return)) {
@@ -11123,7 +11123,7 @@ class JIT {
                                     $expected = $className;
                                 }
                             }
-                            $callableName = $this->jitReturnTypeCallableName($block->func);
+                            $callableName = $this->jitReturnTypeCallableName($block);
                             $message = "Return value must be of type {$expected}, none returned";
                             if (null !== $callableName && '' !== $callableName) {
                                 $message = "{$callableName}(): {$message}";
@@ -11228,7 +11228,7 @@ class JIT {
                                 $objectType,
                                 $block,
                                 $return,
-                                $this->jitReturnTypeCallableName($block->func)
+                                $this->jitReturnTypeCallableName($block)
                             );
                         }
                         if (null !== $block->returnDnfConstraints
@@ -11239,7 +11239,7 @@ class JIT {
                                 $return,
                                 $block->returnDnfConstraints,
                                 'Return value',
-                                $this->jitReturnTypeCallableName($block->func)
+                                $this->jitReturnTypeCallableName($block)
                             );
                         }
                         if (!$this->emitJitClassReturnTypeCheck($block, $return)) {
@@ -13135,7 +13135,7 @@ class JIT {
                 $value,
                 $block->returnDnfConstraints,
                 'Return value',
-                $this->jitReturnTypeCallableName($block->func)
+                $this->jitReturnTypeCallableName($block)
             );
         }
         if (!$this->emitJitClassReturnTypeCheck($block, $value)) {
