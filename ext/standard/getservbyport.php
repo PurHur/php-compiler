@@ -7,13 +7,17 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * getservbyport() — service name by port (VM host; JIT/AOT via libc, issue #3650).
+ * getservbyport() — service name by port (VM host; JIT/AOT via libc, issue #3650, #30283).
+ *
+ * Z_PARAM_LONG port: strict_types → TypeError on null; soft path DEP+coerce to 0 (#30283).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/network.c PHP_FUNCTION(getservbyport)
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php int $port, string $protocol
  */
 final class getservbyport extends Internal
 {
@@ -30,18 +34,15 @@ final class getservbyport extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $port = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_LONG — caller strict_types → TypeError on null; else soft-null → 0 (#30283).
+        $port = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            0,
             'getservbyport',
             1,
             'port'
         );
-        $protocol = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'getservbyport',
-            1,
-            'protocol'
-        );
+        $protocol = VmString::stringBuiltinArgForFrame($frame, 1, 'getservbyport', 1, 'protocol', false);
         $name = VmNetworkServices::getservbyport($port, $protocol);
         if (false === $name) {
             $frame->returnVar->bool(false);
@@ -54,6 +55,16 @@ final class getservbyport extends Internal
     {
         if (2 !== \count($args)) {
             throw new \LogicException('getservbyport() requires exactly two arguments in this compiler build');
+        }
+
+        // Soft-null outside strict_types; strict → TypeError (#30283).
+        // Early return after compile-time null TypeError — no libc call after abort
+        // (AOT module verify: terminator mid-block; peer getprotobyname #30282).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[0], 'getservbyport', 1, 'port');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         return JitNetworkServices::getservbyport($context, $args[0], $args[1]);

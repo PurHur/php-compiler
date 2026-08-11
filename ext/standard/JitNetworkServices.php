@@ -8,13 +8,12 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringNetworkServices;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for getprotobynumber()/getservbyport()/getprotobyname()/getservbyname() (JIT/AOT, issues #3650, #4024). */
+/** LLVM lowering for getprotobynumber()/getservbyport()/getprotobyname()/getservbyname() (JIT/AOT, issues #3650, #4024, #30283). */
 final class JitNetworkServices
 {
     private static int $blockSerial = 0;
@@ -23,11 +22,12 @@ final class JitNetworkServices
     {
         StringNetworkServices::ensureStringReturnLinked($context);
 
+        // Z_PARAM_LONG — honor caller strict_types; soft-null DEP+coerce (#30283).
         return self::boxedString(
             $context,
             $context->builder->call(
                 $context->lookupFunction('__compiler_getprotobynumber'),
-                self::jitIntArg($context, $number, 'getprotobynumber() protocol number')
+                JitIntdiv::lowerIntBuiltinArgForCaller($context, $number, 'getprotobynumber', 1, 'protocol')
             )
         );
     }
@@ -52,12 +52,13 @@ final class JitNetworkServices
     {
         StringNetworkServices::ensureStringReturnLinked($context);
 
+        // Z_PARAM_LONG port — honor caller strict_types; soft-null DEP+coerce (#30283).
         return self::boxedString(
             $context,
             $context->builder->call(
                 $context->lookupFunction('__compiler_getservbyport'),
-                self::jitIntArg($context, $port, 'getservbyport() port'),
-                JitStringBuiltinArg::lower($context, $protocol, 'getservbyport', 1, 'protocol')
+                JitIntdiv::lowerIntBuiltinArgForCaller($context, $port, 'getservbyport', 1, 'port'),
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $protocol, 'getservbyport', 1, 'protocol', 'string', null, false)
             )
         );
     }
@@ -77,21 +78,6 @@ final class JitNetworkServices
         );
 
         return $ptr;
-    }
-
-    private static function jitIntArg(Context $context, JITVariable $arg, string $label): Value
-    {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException($label.' must be an integer in this compiler build');
     }
 
     private static function boxedString(Context $context, Value $nameStr): Value
