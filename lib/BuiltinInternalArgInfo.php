@@ -98,6 +98,8 @@ final class BuiltinInternalArgInfo
             'date_create_from_format' => 'DateTime|false',
             'date_create_immutable_from_format' => 'DateTimeImmutable|false',
             'date_modify' => 'DateTime|false',
+            // ext/date/php_date.stub.php — string (InternalArgInfo DateTime) (#30245)
+            'date_format' => 'string',
             // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#25440)
             'idate' => 'int|false',
             // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#26325)
@@ -274,8 +276,6 @@ final class BuiltinInternalArgInfo
             // ext/session/session.stub.php — InternalArgInfo empty / absent return; Zend bool / void (#28464)
             'session_write_close', 'session_commit', 'session_abort', 'session_reset', 'session_unset' => 'bool',
             'session_register_shutdown' => 'void',
-            // ext/iconv/iconv.stub.php — InternalArgInfo return string (missing |false) (#28424)
-            'iconv' => 'string|false',
             // ext/iconv/iconv.stub.php — InternalArgInfo return int (missing |false) (#27629)
             'iconv_strlen' => 'int|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
@@ -635,6 +635,9 @@ final class BuiltinInternalArgInfo
                 1 => 'string',
                 default => null,
             },
+            // ext/date/php_date.stub.php — DateTimeInterface $object / $baseObject/$targetObject (#30245)
+            'date_format' => 0 === $index ? 'DateTimeInterface' : null,
+            'date_diff' => ($index === 0 || $index === 1) ? 'DateTimeInterface' : null,
             // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string required) (#25173)
             'timezone_identifiers_list' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $extension = null (InternalArgInfo string) (#25276)

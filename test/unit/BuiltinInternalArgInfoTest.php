@@ -290,6 +290,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertFalse($info['isOptional']);
     }
 
+    /** php-src php_date.stub.php — date_format/date_diff DateTimeInterface + string return (#30245). */
+    public function testDateFormatDateDiffReflectionStubTypes(): void
+    {
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('date_format'));
+        $this->assertSame('DateInterval', BuiltinInternalArgInfo::returnTypeLabelForFunction('date_diff'));
+        $this->assertSame(
+            'DateTimeInterface',
+            BuiltinInternalArgInfo::paramInfoForFunction('date_format', 0)['type']
+        );
+        $this->assertSame(
+            'DateTimeInterface',
+            BuiltinInternalArgInfo::paramInfoForFunction('date_diff', 0)['type']
+        );
+        $this->assertSame(
+            'DateTimeInterface',
+            BuiltinInternalArgInfo::paramInfoForFunction('date_diff', 1)['type']
+        );
+    }
+
     /** php-src php_date.stub.php — DateTime(Immutable)::createFromInterface (#28896). */
     public function testDateTimeCreateFromInterfaceReflectionStubs(): void
     {
@@ -1034,12 +1053,6 @@ final class BuiltinInternalArgInfoTest extends TestCase
                 'isOptional' => true,
             ], false)
         );
-    }
-
-    /** php-src iconv.stub.php — InternalArgInfo return string (missing |false) (#28424). */
-    public function testIconvReflectionReturnUnion(): void
-    {
-        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv'));
     }
 
     /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#27629). */
