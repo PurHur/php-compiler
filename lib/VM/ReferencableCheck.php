@@ -25,6 +25,11 @@ final class ReferencableCheck
 
     public const NON_VARIABLE_BY_REF_NOTICE_MESSAGE = self::NON_VARIABLE_BY_REF_NOTICE;
 
+    /** Zend zend_assign_to_variable_reference — `$a =& non_variable` (#30015). */
+    private const NON_VARIABLE_ASSIGN_REF_NOTICE = 'Only variables should be assigned by reference';
+
+    public const NON_VARIABLE_ASSIGN_REF_NOTICE_MESSAGE = self::NON_VARIABLE_ASSIGN_REF_NOTICE;
+
     /**
      * @param list<Variable> $calledArgs
      */
@@ -592,6 +597,26 @@ final class ReferencableCheck
         }
         $ctx->errors->triggerError(
             self::NON_VARIABLE_BY_REF_NOTICE,
+            ErrorReporter::E_NOTICE,
+            '' !== $caller->scriptPath ? $caller->scriptPath : null,
+            $ctx,
+            $caller,
+            $caller->callSiteLine
+        );
+    }
+
+    /**
+     * Zend: `$a =& f()` / `$a =& $obj->m()` when the RHS is not a variable — E_NOTICE then
+     * value-assign (zend_assign_to_variable_reference, #30015).
+     */
+    public static function emitNonVariableAssignRefNotice(Frame $caller): void
+    {
+        $ctx = self::resolveVmContext($caller);
+        if (null === $ctx) {
+            return;
+        }
+        $ctx->errors->triggerError(
+            self::NON_VARIABLE_ASSIGN_REF_NOTICE,
             ErrorReporter::E_NOTICE,
             '' !== $caller->scriptPath ? $caller->scriptPath : null,
             $ctx,

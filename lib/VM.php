@@ -4798,6 +4798,16 @@ restart:
                         }
                         break;
                     }
+                    // Zend zend_assign_to_variable_reference: non-variable RHS → Notice + value assign (#30015).
+                    if (!VM\ReferencableCheck::isReferenceable($rhsSlot, $frame)) {
+                        VM\ReferencableCheck::emitNonVariableAssignRefNotice($frame);
+                        $catchFrame = $this->assignCopyFrom($lhs, $rhsSlot, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if (null !== $lhsPeel->objectPropertyOwner) {
                         // $obj->prop =& $v — bind into declared property storage (#5370).
                         $writeTarget = $lhsPeel;
