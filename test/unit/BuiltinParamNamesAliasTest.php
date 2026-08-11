@@ -5450,6 +5450,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('fstat'));
     }
 
+    /** @covers issue #28520 */
+    public function testTmpfileFopenStubHaveNoReturnType(): void
+    {
+        foreach (['tmpfile', 'fopen'] as $fn) {
+            self::assertSame('', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            self::assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {
