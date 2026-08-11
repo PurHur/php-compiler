@@ -99,6 +99,45 @@ final class JitDomXPathRegisterUserScript
         if (\count($args) < 3) {
             return null;
         }
+        // Weak null → '' (Z_PARAM_STR); keep UserScript fold off DomInstanceMethodRuntime (#30301).
+        $prefixNull = JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant;
+        $uriNull = JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant;
+        if ($prefixNull || $uriNull) {
+            if ($context->callerStrictTypes) {
+                return null; // Call site emits TypeError
+            }
+            if ($prefixNull) {
+                JitStringBuiltinArg::emitNullStringParamDeprecation(
+                    $context,
+                    'DOMXPath::registerNamespace',
+                    0,
+                    'prefix'
+                );
+            }
+            if ($uriNull) {
+                JitStringBuiltinArg::emitNullStringParamDeprecation(
+                    $context,
+                    'DOMXPath::registerNamespace',
+                    1,
+                    'namespace'
+                );
+            }
+            $prefix = $prefixNull
+                ? ''
+                : (JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString);
+            $uri = $uriNull
+                ? ''
+                : (JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString);
+            if (null === $prefix || null === $uri) {
+                return null;
+            }
+            if ('' === $prefix) {
+                return self::boxBool($context, false);
+            }
+            self::$namespaces[$prefix] = $uri;
+
+            return self::boxBool($context, true);
+        }
         $prefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         $uri = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
         if (null === $prefix || null === $uri) {
