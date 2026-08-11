@@ -1000,6 +1000,9 @@ class Context {
             // time NestedJIT leaf (#30332) — whitelist time → time::call →
             // StringTime::invoke / JitTimeKernel thin libc time(2) leaf.
             'time',
+            // fnmatch(3) NestedJIT leaf (#30383) — whitelist fnmatch → fnmatch::call →
+            // StringFnmatch::invokeNestedLeaf (module-local fnmatch(3); always-on Module decl removed).
+            'fnmatch',
             // putenv(3) NestedJIT leaf (#29334) — whitelist putenv → putenv_::call →
             // JitEnv::putenvNestedLeaf / StringGetenv::invokePutenvNestedLeaf (kernel removed).
             'putenv',
