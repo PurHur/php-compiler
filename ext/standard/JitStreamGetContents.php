@@ -88,12 +88,27 @@ final class JitStreamGetContents
         return JitLongArg::lower($context, $arg, 'stream_get_contents() length');
     }
 
-    /** Z_PARAM_LONG parity for $offset (#6008). */
+    /** Z_PARAM_LONG parity for $offset (#6008, #30249). */
     public static function lowerOffsetArg(Context $context, JITVariable $arg): Value
     {
         $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
         if (null !== $enumLabel) {
             self::emitOffsetTypeErrorAndAbort($context, $enumLabel);
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                self::emitOffsetTypeErrorAndAbort($context, 'null');
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+            \PHPCompiler\ext\standard\JitIntdiv::emitNullIntDeprecation(
+                $context,
+                'stream_get_contents',
+                3,
+                'offset'
+            );
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -188,7 +203,30 @@ final class JitStreamGetContents
         $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
 
+        $nullBlock = BasicBlockHelper::append($context, 'stream_gc_off_null');
+        $afterNull = BasicBlockHelper::append($context, 'stream_gc_off_after_null');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        if ($context->callerStrictTypes) {
+            self::emitOffsetTypeErrorAndAbort($context, 'null');
+        } else {
+            \PHPCompiler\ext\standard\JitIntdiv::emitNullIntDeprecation(
+                $context,
+                'stream_get_contents',
+                3,
+                'offset'
+            );
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $nullEnd = $context->builder->getInsertBlock();
+        $mergeBlock = BasicBlockHelper::append($context, 'stream_gc_off_merge');
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterNull);
         $arrayBlock = BasicBlockHelper::append($context, 'stream_gc_off_array');
         $rejectBlock = BasicBlockHelper::append($context, 'stream_gc_off_reject');
         $coerceBlock = BasicBlockHelper::append($context, 'stream_gc_off_coerce');
@@ -210,11 +248,19 @@ final class JitStreamGetContents
         self::emitOffsetTypeErrorAndAbort($context, self::compileTimeObjectLabel($context, $arg));
 
         $context->builder->positionAtEnd($coerceBlock);
-
-        return $context->builder->call(
+        $longVal = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
+        $coerceEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($i64->constInt(0, false), $nullEnd);
+        $phi->addIncoming($longVal, $coerceEnd);
+
+        return $phi;
     }
 
     private static function compileTimeObjectLabel(Context $context, JITVariable $arg): string

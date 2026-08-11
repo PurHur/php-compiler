@@ -49,8 +49,9 @@ final class stream_get_contents extends Internal
             }
         }
         if (isset($frame->calledArgs[2])) {
-            $offset = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[2]->resolveIndirect(),
+            $offset = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
                 'stream_get_contents',
                 3,
                 'offset'
