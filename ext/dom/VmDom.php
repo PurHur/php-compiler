@@ -6543,11 +6543,8 @@ final class VmDom
             return self::appendOrInsertAttribute($ctx, $parent, $child);
         }
 
-        if (!self::isTreeMutationChild($child)) {
-            // Document/DocumentType/etc. are typed as DOMNode then rejected here
-            // (php-src ext/dom/node.c; #22698 Hierarchy Request Error code 3).
-            DomExceptionConstants::raiseHierarchyRequest();
-        }
+        // php-src ext/dom/node.c — WRONG_DOCUMENT_ERR before hierarchy type rejection (#30271).
+        self::assertCanReceiveTreeMutationChild($parent, $child);
 
         $parentState = DomRegistry::state($parent);
         if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
@@ -6570,7 +6567,6 @@ final class VmDom
             DomExceptionConstants::raiseHierarchyRequest();
         }
 
-        self::assertSameDocument($parent, $child);
         self::assertNotAncestorOfParent($parent, $child);
         self::detachNodeIfAttached($ctx, $child);
         $parentState->childIds[] = $child->id;
@@ -6636,17 +6632,9 @@ final class VmDom
 
             return $oldChild;
         }
-        // Same child kinds as appendChild/insertBefore (Element, Text, CDATA, Comment, …).
-        // Previously Element-only — createTextNode replacements threw Hierarchy request error (#21976).
-        if (!self::isTreeMutationChild($newChild)) {
-            throw new \DOMException(
-                'Hierarchy Request Error',
-                DomExceptionConstants::HIERARCHY_REQUEST_ERR
-            );
-        }
+        // php-src ext/dom/node.c — WRONG_DOCUMENT_ERR before hierarchy type rejection (#30271).
+        self::assertCanReceiveTreeMutationChild($parent, $newChild);
         self::assertAttrMutationChild($parent, $newChild);
-        self::assertSameDocument($parent, $newChild);
-        self::assertNotAncestorOfParent($parent, $newChild);
         // Keep oldChild IDs in the document table (libxml; #25274) — only destroy paths clear.
         self::detachNodeIfAttached($ctx, $newChild);
         $parentState = DomRegistry::state($parent);
@@ -6702,12 +6690,9 @@ final class VmDom
 
             return self::appendOrInsertAttribute($ctx, $parent, $newChild);
         }
-        if (!self::isTreeMutationChild($newChild)) {
-            throw new \DOMException('Hierarchy request error');
-        }
+        // php-src ext/dom/node.c — WRONG_DOCUMENT_ERR before hierarchy type rejection (#30271).
+        self::assertCanReceiveTreeMutationChild($parent, $newChild);
         self::assertAttrMutationChild($parent, $newChild);
-        self::assertSameDocument($parent, $newChild);
-        self::assertNotAncestorOfParent($parent, $newChild);
         if (null !== $refChild) {
             self::assertChildOfParent($parent, $refChild, 'DOMNode::insertBefore()');
             // php-src ext/dom/node.c — xmlAddPrevSibling fails when new == ref → Error, not NOT_FOUND (#22686).
@@ -12184,6 +12169,35 @@ final class VmDom
     {
         return DomRegistry::has($entry)
             && DomConstants::XML_ATTRIBUTE_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    /**
+     * Wrong-document + hierarchy type guards shared by appendChild/insertBefore/replaceChild (#30271).
+     * Validation only — does not mutate the tree (thin-AOT LiveSlots still owns linking).
+     */
+    public static function assertCanReceiveTreeMutationChild(ObjectEntry $parent, ObjectEntry $child): void
+    {
+        if (self::isDocumentFragment($child)) {
+            if (self::isAttr($parent)) {
+                DomExceptionConstants::raiseHierarchyRequest();
+            }
+
+            return;
+        }
+        if (self::isAttr($child)) {
+            if (!self::isElement($parent)) {
+                throw new \DOMException('Hierarchy request error');
+            }
+            self::assertSameDocument($parent, $child);
+
+            return;
+        }
+        // php-src ext/dom/node.c — WRONG_DOCUMENT_ERR before hierarchy type rejection (#30271).
+        self::assertSameDocument($parent, $child);
+        if (!self::isTreeMutationChild($child)) {
+            DomExceptionConstants::raiseHierarchyRequest();
+        }
+        self::assertNotAncestorOfParent($parent, $child);
     }
 
     public static function isDocument(ObjectEntry $entry): bool
