@@ -920,6 +920,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ unpack TypeError/Error appends {@code , <type> given} (zend_vm_def.h SEND_UNPACK /
+     * ADD_ARRAY_UNPACK; #30023).
+     *
+     * Zend 8.2/8.3 stop at {@code Only arrays and Traversables can be unpacked}. Withheld on the
+     * 8.4.0-dev reference profile (matches Zend 8.2); enable via stable 8.4.0+ or explicit
+     * {@code PHP_COMPILER_PROFILE=8.4}/{@code 8.5}.
+     */
+    public static function supportsUnpackTypeErrorGivenSuffix(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ TENTATIVE_RETURN Core constant (Zend/zend_attributes.h, issue #18060).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+ or

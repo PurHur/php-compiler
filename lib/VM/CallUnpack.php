@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\ext\standard\VmArray;
@@ -15,6 +16,21 @@ final class CallUnpack
     public const NON_ARRAY_MESSAGE = 'Only arrays and Traversables can be unpacked';
 
     public const STRING_KEYS_MESSAGE = 'Cannot unpack array with string keys';
+
+    /**
+     * TypeError message for non-array / non-Traversable call unpack (zend_vm_def.h ZEND_SEND_UNPACK).
+     *
+     * PHP 8.4+ appends {@code , <type> given} via {@see EnumCaseSupport::typeNameForTypeErrorActual()} (#30023).
+     */
+    public static function nonArrayTypeErrorMessage(Variable $value): string
+    {
+        $message = self::NON_ARRAY_MESSAGE;
+        if (!CompilerVersion::supportsUnpackTypeErrorGivenSuffix()) {
+            return $message;
+        }
+
+        return $message.', '.EnumCaseSupport::typeNameForTypeErrorActual($value).' given';
+    }
 
     /**
      * Expand call-time ...$spread into callArgEntries (positional / named) for NamedArgs::resolve().
@@ -66,7 +82,7 @@ final class CallUnpack
             try {
                 $iterable = ForeachIterator::resolveTraversableObject($vm, $frame, $spread);
             } catch (\TypeError) {
-                throw new \TypeError(self::NON_ARRAY_MESSAGE);
+                throw new \TypeError(self::nonArrayTypeErrorMessage($spread));
             }
             if (null !== $iterable->toObject()->generatorState) {
                 return self::fromGenerator($vm, $iterable, $paramNames, $variadicParamIndex, $functionName);
@@ -75,7 +91,7 @@ final class CallUnpack
             return self::fromIteratorObject($vm, $frame, $iterable, $paramNames, $variadicParamIndex, $functionName);
         }
 
-        throw new \TypeError(self::NON_ARRAY_MESSAGE);
+        throw new \TypeError(self::nonArrayTypeErrorMessage($spread));
     }
 
     /**

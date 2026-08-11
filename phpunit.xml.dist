@@ -47,6 +47,7 @@
             <file>./test/compliance/ObjectClassUnionRedundantVMTest.php</file>
             <file>./test/compliance/DnfSubsetArmRedundantVMTest.php</file>
             <file>./test/compliance/NullsafeByRefRhsVMTest.php</file>
+            <file>./test/compliance/CallUnpackNonArrayGiven30023VMTest.php</file>
             <file>./test/compliance/RedundantDnfArmVMTest.php</file>
             <file>./test/compliance/PropertyDefaultClassPseudoConstVMTest.php</file>
             <file>./test/compliance/TraitSelfClassStaticComposingVMTest.php</file>
