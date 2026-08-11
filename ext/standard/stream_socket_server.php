@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * stream_socket_server() — libc TCP/UDP listen sockets via {@see VmStreamSocketNative} (#4993, #30374).
  *
  * Z_PARAM_STR $address: caller strict_types → TypeError on null; soft path DEP+coerce (#30374).
+ * Soft empty-address failure emits Unable-to-connect Warning like Zend (#30391).
  *
  * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_server)
  *
@@ -78,6 +79,11 @@ final class stream_socket_server extends Internal
 
         [$result, $errno, $errstr, $socketFd] = VmStreamSocketNative::server($local, $flags, $contextVar);
 
+        if (false === $result && 'Unable to parse local socket path' === $errstr) {
+            // php-src streamsfuncs.c empty-address parse failure text (#30391).
+            $errstr = 'Failed to parse address "'.$local.'"';
+        }
+
         if ($argc >= 2) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
             $errnoOut->int($errno);
@@ -90,6 +96,8 @@ final class stream_socket_server extends Internal
         }
 
         if (false === $result) {
+            // Zend soft-null empty address: "Unable to connect to  (Failed to parse address "")".
+            VmStreamSocketFailure::warnConnectFailed($frame, $local, $errstr, 'stream_socket_server');
             $frame->returnVar->bool(false);
 
             return;
