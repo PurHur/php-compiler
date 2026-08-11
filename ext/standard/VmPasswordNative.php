@@ -23,7 +23,10 @@ final class VmPasswordNative
 
     private const PASSWORD_ARGON2ID = 3;
 
-    private const BCRYPT_DEFAULT_COST = 10;
+    private static function bcryptDefaultCost(): int
+    {
+        return VmPassword::bcryptDefaultCost();
+    }
 
     private const BCRYPT_MIN_COST = 4;
 
@@ -286,7 +289,7 @@ final class VmPasswordNative
      */
     private static function resolveBcryptCost(array $options): ?int
     {
-        $cost = self::BCRYPT_DEFAULT_COST;
+        $cost = self::bcryptDefaultCost();
         if (isset($options['cost'])) {
             $costVal = $options['cost'];
             if (\is_int($costVal)) {

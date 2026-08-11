@@ -101,7 +101,7 @@ final class GetDefinedConstantsParity
             'FILE_TEXT' => 0,
             'FILE_BINARY' => 0,
             'PSFS_ERR_FATAL' => 0,
-            'PASSWORD_BCRYPT_DEFAULT_COST' => 10,
+            'PASSWORD_BCRYPT_DEFAULT_COST' => VmPassword::bcryptDefaultCost(),
             'PASSWORD_ARGON2_DEFAULT_MEMORY_COST' => 65536,
             'PASSWORD_ARGON2_DEFAULT_TIME_COST' => 4,
             'PASSWORD_ARGON2_DEFAULT_THREADS' => 1,

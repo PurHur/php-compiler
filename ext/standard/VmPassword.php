@@ -33,7 +33,13 @@ final class VmPassword
         'argon2id' => self::PASSWORD_ARGON2ID,
     ];
 
-    private const BCRYPT_DEFAULT_COST = 10;
+    /**
+     * php-src ext/standard/password.c — PHP 8.4 raised the default from 10 to 12.
+     */
+    public static function bcryptDefaultCost(): int
+    {
+        return version_compare(\PHPCompiler\CompilerVersion::languageProfileVersion(), '8.4.0', '>=') ? 12 : 10;
+    }
 
     /** crypt() salt generation flags (ext/standard/crypt.c — all CRYPT_* are bitmask 1). */
     public const CRYPT_STD_DES = 1;
@@ -152,7 +158,7 @@ final class VmPassword
                 $newCost = $options['cost'];
             }
             if ($newCost <= 0) {
-                $newCost = self::BCRYPT_DEFAULT_COST;
+                $newCost = self::bcryptDefaultCost();
             }
 
             return self::bcryptCostFromHash($hash) !== $newCost;
@@ -254,7 +260,7 @@ final class VmPassword
     /** @return array<string, mixed> */
     private static function passwordInfoBcrypt(string $hash): array
     {
-        $cost = self::BCRYPT_DEFAULT_COST;
+        $cost = self::bcryptDefaultCost();
         if (1 === sscanf($hash, '$2y$%d$', $parsed)) {
             $cost = $parsed;
         }
@@ -289,18 +295,18 @@ final class VmPassword
     private static function bcryptCostFromHash(string $hash): int
     {
         if (!self::bcryptValid($hash)) {
-            return self::BCRYPT_DEFAULT_COST;
+            return self::bcryptDefaultCost();
         }
         if (\strlen($hash) >= 7 && str_starts_with($hash, '$2y$')) {
             $cost = (int) substr($hash, 4, 2);
             if ($cost < 4) {
-                return self::BCRYPT_DEFAULT_COST;
+                return self::bcryptDefaultCost();
             }
 
             return $cost;
         }
 
-        return self::BCRYPT_DEFAULT_COST;
+        return self::bcryptDefaultCost();
     }
 
     /** password_algos() — native list (ext/standard/password.c, issue #6195, #4794). */
