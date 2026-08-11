@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Dynamic class operand for instanceof / `new $expr` — Zend string or object (#4339, #30058).
+ * Dynamic class operand for instanceof / `new $expr` / `$c::method()` / `$c::CONST`.
  *
- * php-src: Zend/zend_execute.c — ZEND_INSTANCEOF / ZEND_NEW class fetch (Z_OBJCE_P).
+ * Zend requires string or object; other types Error (not stringify → Class "…" not found).
+ *
+ * php-src: Zend/zend_execute.c — ZEND_INSTANCEOF / ZEND_NEW / ZEND_FETCH_CLASS /
+ * ZEND_INIT_STATIC_METHOD_CALL (Z_OBJCE_P / class name fetch).
+ *
+ * @see #4339 instanceof · #30058 new $object · #30059 static call / class const
  */
 final class InstanceOfClassName
 {

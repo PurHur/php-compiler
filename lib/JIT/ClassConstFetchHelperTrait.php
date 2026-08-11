@@ -278,6 +278,12 @@ trait ClassConstFetchHelperTrait
                 $context->builder->structGep($classVar->value, $objMap['class_id'])
             );
         }
+        // Zend: class operand must be string or object — not bool/int/float/null/array (#30059).
+        if (\PHPCompiler\VM\InstanceOfJitHelper::jitRhsTypeIsInvalidClass($classVar->type)) {
+            InstanceOfHelper::emitInvalidClassOperandError($objectType->jitContext());
+
+            return $objectType->jitContext()->constantFromInteger(-1, 'int64');
+        }
         $literal = JitStringArg::compileTimeLiteral($classVar);
         if (null !== $literal) {
             $lcLiteral = strtolower(ltrim($literal, '\\'));
@@ -304,10 +310,87 @@ trait ClassConstFetchHelperTrait
             return $objectType->jitContext()->constantFromInteger($id, 'int64');
         }
         $context = $objectType->jitContext();
+        if (Variable::TYPE_VALUE === $classVar->type) {
+            return self::emitResolveClassIdFromValueBox($objectType, $block, $classVar);
+        }
         $nameStr = JitStringArg::lowerDominating($context, $classVar, 'class constant class operand');
         $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
 
         return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
+    }
+
+    /**
+     * Boxed `__value__` class operand — string/object only (#30059 / zend_execute.c).
+     *
+     * @return Value int64 class id
+     */
+    private static function emitResolveClassIdFromValueBox(
+        Object_ $objectType,
+        Block $block,
+        Variable $classVar
+    ): Value {
+        $context = $objectType->jitContext();
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $classVar);
+        $rhsKind = InstanceOfHelper::emitValueBoxClassOperandKind($context, $classVar);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+
+        $stringBlock = BasicBlockHelper::append($context, 'class_op_box_str');
+        $afterString = BasicBlockHelper::append($context, 'class_op_box_after_str');
+        $objectBlock = BasicBlockHelper::append($context, 'class_op_box_obj');
+        $invalidBlock = BasicBlockHelper::append($context, 'class_op_box_invalid');
+        $doneBlock = BasicBlockHelper::append($context, 'class_op_box_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $rhsKind,
+            $i32->constInt(\PHPCompiler\VM\InstanceOfJitHelper::RHS_KIND_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $strPtr);
+        $stringId = self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $rhsKind,
+            $i32->constInt(\PHPCompiler\VM\InstanceOfJitHelper::RHS_KIND_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $objectBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objMap = $context->structFieldMap['__object__'];
+        $objectId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $objectEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        InstanceOfHelper::emitInvalidClassOperandError($context);
+        $invalidId = $i64->constInt(-1, false);
+        $invalidEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'class_op_box_id');
+        $phi->addIncoming($stringId, $stringEnd);
+        $phi->addIncoming($objectId, $objectEnd);
+        $phi->addIncoming($invalidId, $invalidEnd);
+
+        return $phi;
     }
 
     /**

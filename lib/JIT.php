@@ -21003,7 +21003,20 @@ class JIT {
         // Scope can lose Literal operands while slot constants remain (sockets/vm spine
         // chunks under SPINE_CHUNK — getOperand null for both class+name, #24429).
         if (!$classOp instanceof Operand\Literal && isset($block->constants[$classOpIdx])) {
-            $classOp = new Operand\Literal($block->constants[$classOpIdx]->toString());
+            $const = $block->constants[$classOpIdx];
+            // Promote string/object only — bool/int/null/array must Error (#30059).
+            if (\PHPCompiler\VM\Variable::TYPE_STRING === $const->type) {
+                $classOp = new Operand\Literal($const->toString());
+            } elseif (\PHPCompiler\VM\Variable::TYPE_OBJECT === $const->type) {
+                $classOp = new Operand\Literal($const->toObject()->class->name);
+            } else {
+                JIT\InstanceOfHelper::emitInvalidClassOperandError($this->context);
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+                $this->context->scope->argOperands = [];
+
+                return;
+            }
         }
         if (!$nameOp instanceof Operand\Literal && isset($block->constants[$nameOpIdx])) {
             $nameOp = new Operand\Literal($block->constants[$nameOpIdx]->toString());
@@ -21028,6 +21041,21 @@ class JIT {
                 $proxyName = 'object::'.strtolower((string) $nameOp->value);
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                 $this->context->scope->args = [];
+
+                return;
+            }
+            // Runtime variable classname: resolve via emitResolveClassId guards (#30059).
+            $classVar = $this->context->getVariableFromOp($classOp);
+            if (
+                JIT\Variable::TYPE_OBJECT !== $classVar->type
+                && JIT\Variable::TYPE_STRING !== $classVar->type
+                && JIT\Variable::TYPE_VALUE !== $classVar->type
+                && \PHPCompiler\VM\InstanceOfJitHelper::jitRhsTypeIsInvalidClass($classVar->type)
+            ) {
+                JIT\InstanceOfHelper::emitInvalidClassOperandError($this->context);
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+                $this->context->scope->argOperands = [];
 
                 return;
             }
