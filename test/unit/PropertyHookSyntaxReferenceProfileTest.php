@@ -67,22 +67,18 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         }
     }
 
-    /** Default / unset PROFILE rejects hook blocks like Zend 8.2 (#24818, re-#22781). */
-    public function testRuntimeRejectsHookBlockOnDefaultProfile(): void
+    /** Default profile accepts hook blocks on VERSION_ID >= 80400 (#30204). */
+    public function testRuntimeAcceptsHookBlockOnDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
             $runtime = new Runtime();
-            try {
-                $runtime->parseAndCompile(
-                    file_get_contents(dirname(__DIR__).'/repro/property_hooks_default_profile_parity.php'),
-                    'property_hooks_default_profile_parity.php'
-                );
-                $this->fail('Expected compile failure on default reference profile');
-            } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-                $this->assertStringContainsString(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE, $e->getMessage());
-            }
+            $block = $runtime->parseAndCompile(
+                file_get_contents(dirname(__DIR__).'/repro/property_hooks_default_profile_parity.php'),
+                'property_hooks_default_profile_parity.php'
+            );
+            $this->assertNotNull($block);
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
