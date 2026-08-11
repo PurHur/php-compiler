@@ -97,25 +97,14 @@ final class strtr extends Internal
 
     /**
      * php-src ext/standard/string.c — two-arg strtr() expects array replace_pairs; Zend
-     * labels arg #2 $from and reports coercible scalars as "string given" (#16772).
+     * reports "must be of type array, <actual> given" with zend_zval_value_name (#16772, #29307).
      */
     private static function twoArgSecondTypeError(Frame $frame, Variable $value): \TypeError
     {
-        $value = $value->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $value->type) {
-            return new \TypeError(\sprintf(
-                'strtr(): Argument #2 ($from) must be of type array|string, %s given',
-                $value->toObject()->class->name
-            ));
-        }
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return new \TypeError(\sprintf(
-                'strtr(): Argument #2 ($from) must be of type array|string, %s given',
-                VmParseStr::zendTypeLabel($value)
-            ));
-        }
-
-        return new \TypeError('strtr(): Argument #2 ($from) must be of type array, string given');
+        return new \TypeError(\sprintf(
+            'strtr(): Argument #2 ($from) must be of type array, %s given',
+            \PHPCompiler\VM\EnumCaseSupport::typeNameForTypeErrorActual($value)
+        ));
     }
 
     /** Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21207, ext/standard/string.c). */
