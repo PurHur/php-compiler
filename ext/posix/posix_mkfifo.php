@@ -10,6 +10,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** posix_mkfifo() — create FIFO special file (php-src ext/posix/posix.c; #6667). */
@@ -31,8 +32,9 @@ final class posix_mkfifo extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        InternalStrictArg::requireString($frame, 0, 'posix_mkfifo', 'filename');
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'posix_mkfifo', 0, 'filename');
-        $mode = VmPosix::coerceIntArg($frame->calledArgs[1], 'posix_mkfifo', 1, 'mode');
+        $mode = InternalStrictArg::requireInt($frame, 1, 'posix_mkfifo', 'permissions')->toInt();
         if (0 !== ($mode & ~07777) && null !== $frame->vmContext) {
             $frame->vmContext->errors->triggerError(
                 'posix_mkfifo(): Invalid mode specified '.$mode,

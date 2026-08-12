@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\ext\standard\VmJson;
 use PHPLLVM\Value;
 
@@ -33,10 +34,10 @@ final class pcntl_waitpid extends Internal
         if (!VmPcntl::processAvailable()) {
             throw new \Error('pcntl_waitpid() is not available in this compiler build');
         }
-        $pid = VmPcntlArg::coerceIntArg($frame->calledArgs[0], 'pcntl_waitpid', 0, 'process_id');
+        $pid = InternalStrictArg::requireInt($frame, 0, 'pcntl_waitpid', 'process_id')->toInt();
         $flags = 0;
         if ($argc >= 3) {
-            $flags = VmPcntlArg::coerceIntArg($frame->calledArgs[2], 'pcntl_waitpid', 2, 'flags');
+            $flags = InternalStrictArg::requireInt($frame, 2, 'pcntl_waitpid', 'flags')->toInt();
         }
         $status = 0;
         $resourceUsage = null;

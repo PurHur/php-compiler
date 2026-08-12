@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 final class pcntl_wexitstatus extends Internal
@@ -29,7 +30,7 @@ final class pcntl_wexitstatus extends Internal
         if (!VmPcntl::processAvailable()) {
             throw new \Error('pcntl_wexitstatus() is not available in this compiler build');
         }
-        $status = VmPcntlArg::coerceIntArg($frame->calledArgs[0], 'pcntl_wexitstatus', 0, 'status');
+        $status = InternalStrictArg::requireInt($frame, 0, 'pcntl_wexitstatus', 'status')->toInt();
         $frame->returnVar->int(VmPcntl::wexitstatus($status));
     }
 

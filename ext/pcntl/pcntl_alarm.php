@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** php-src ext/pcntl/pcntl.c PHP_FUNCTION(pcntl_alarm) — issue #19565. */
@@ -27,7 +28,7 @@ final class pcntl_alarm extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $seconds = VmPcntlArg::coerceIntArg($frame->calledArgs[0], 'pcntl_alarm', 0, 'seconds');
+        $seconds = InternalStrictArg::requireInt($frame, 0, 'pcntl_alarm', 'seconds')->toInt();
         $frame->returnVar->int(VmPcntl::alarm($seconds));
     }
 

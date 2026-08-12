@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** posix_setuid() — set real user ID (php-src ext/posix/posix.c; #7376). */
@@ -29,7 +30,7 @@ final class posix_setuid extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $uid = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_setuid', 0, 'uid');
+        $uid = InternalStrictArg::requireInt($frame, 0, 'posix_setuid', 'user_id')->toInt();
         $frame->returnVar->bool(VmPosix::setuid($uid));
     }
 
