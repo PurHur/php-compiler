@@ -43,6 +43,7 @@ final class finfo_file extends Internal
         }
         $finfo = VmFinfo::requireFinfoArg($frame->calledArgs[0], 'finfo_file', 0);
         $path = VmString::stringBuiltinArgForFrame($frame, 1, 'finfo_file', 1, 'filename');
+        VmString::rejectEmptyBuiltinStringArg($path, 'finfo_file', 1, 'filename', true);
         $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo_file', 3, 'flags');
         $result = VmFinfo::file($finfo, $path, $flags, $frame, 'finfo_file');
         if (false === $result) {
