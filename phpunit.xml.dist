@@ -381,6 +381,7 @@
             <file>./test/compliance/StreamSocketServerNullStrictVMTest.php</file>
             <file>./test/compliance/StreamSocketServerNullStrictJITTest.php</file>
             <file>./test/compliance/StreamSocketServerNullSoftVMTest.php</file>
+            <file>./test/compliance/StreamSocketServerBindfailWarningVMTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

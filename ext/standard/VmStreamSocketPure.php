@@ -102,7 +102,8 @@ final class VmStreamSocketPure
         $beforeSockets = VmSockets::enumerateSocketFds();
         $sock = @\stream_socket_server($local, $errno, $errstr, $flags);
         if (false === $sock) {
-            return [false, $errno, '' !== $errstr ? $errstr : 'Unable to create socket', null];
+            // Keep empty errstr (Zend out-param); warn path uses "Unknown error" (#30395).
+            return [false, $errno, $errstr, null];
         }
 
         $socketFd = VmSockets::discoverNewSocketFd($beforeSockets);
