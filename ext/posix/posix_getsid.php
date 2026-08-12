@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** posix_getsid() — session ID for process (php-src ext/posix/posix.c; #6505). */
@@ -29,7 +30,7 @@ final class posix_getsid extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pid = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_getsid', 0, 'pid');
+        $pid = InternalStrictArg::requireInt($frame, 0, 'posix_getsid', 'process_id')->toInt();
         $sid = VmPosix::getsid($pid);
         if (false === $sid) {
             $frame->returnVar->bool(false);

@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -36,17 +37,17 @@ final class pcntl_setpriority extends Internal
             throw new \Error('pcntl_setpriority() is not available in this compiler build');
         }
 
-        $priority = VmPcntlArg::coerceIntArg($frame->calledArgs[0], 'pcntl_setpriority', 0, 'priority');
+        $priority = InternalStrictArg::requireInt($frame, 0, 'pcntl_setpriority', 'priority')->toInt();
         $pid = null;
         $who = PcntlConstants::PRIO_PROCESS;
         if ($argc >= 2) {
             $pidArg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $pidArg->type) {
-                $pid = VmPcntlArg::coerceIntArg($frame->calledArgs[1], 'pcntl_setpriority', 1, 'process_id');
+                $pid = InternalStrictArg::requireInt($frame, 1, 'pcntl_setpriority', 'process_id')->toInt();
             }
         }
         if ($argc >= 3) {
-            $who = VmPcntlArg::coerceIntArg($frame->calledArgs[2], 'pcntl_setpriority', 2, 'mode');
+            $who = InternalStrictArg::requireInt($frame, 2, 'pcntl_setpriority', 'mode')->toInt();
         }
 
         $frame->returnVar->bool(VmPcntl::setpriority($priority, $pid, $who));

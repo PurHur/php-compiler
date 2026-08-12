@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** posix_getpwuid() — passwd entry by uid (php-src ext/posix/posix.c; #6489). */
@@ -29,7 +30,7 @@ final class posix_getpwuid extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $uid = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_getpwuid', 0, 'user_id');
+        $uid = InternalStrictArg::requireInt($frame, 0, 'posix_getpwuid', 'user_id')->toInt();
         $entry = VmPosix::getpwuid($uid);
         if (false === $entry) {
             $frame->returnVar->bool(false);

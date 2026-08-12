@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** posix_getpgid() — process group ID (php-src ext/posix/posix.c; #6505). */
@@ -29,7 +30,7 @@ final class posix_getpgid extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pid = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_getpgid', 0, 'pid');
+        $pid = InternalStrictArg::requireInt($frame, 0, 'posix_getpgid', 'process_id')->toInt();
         $pgid = VmPosix::getpgid($pid);
         if (false === $pgid) {
             $frame->returnVar->bool(false);

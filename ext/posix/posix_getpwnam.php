@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
@@ -30,6 +31,7 @@ final class posix_getpwnam extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        InternalStrictArg::requireString($frame, 0, 'posix_getpwnam', 'username');
         $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'posix_getpwnam', 0, 'username');
         $entry = VmPosix::getpwnam($name);
         if (false === $entry) {

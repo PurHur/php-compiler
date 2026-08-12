@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** posix_getgrgid() — group entry by gid (php-src ext/posix/posix.c; #6489). */
@@ -29,7 +30,7 @@ final class posix_getgrgid extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $gid = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_getgrgid', 0, 'group_id');
+        $gid = InternalStrictArg::requireInt($frame, 0, 'posix_getgrgid', 'group_id')->toInt();
         $entry = VmPosix::getgrgid($gid);
         if (false === $entry) {
             $frame->returnVar->bool(false);

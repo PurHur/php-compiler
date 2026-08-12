@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** posix_kill() — send signal to process (php-src ext/posix/posix.c; issue #6680). */
@@ -27,8 +28,8 @@ final class posix_kill extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pid = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_kill', 0, 'process_id');
-        $sig = VmPosix::coerceIntArg($frame->calledArgs[1], 'posix_kill', 1, 'sig');
+        $pid = InternalStrictArg::requireInt($frame, 0, 'posix_kill', 'process_id')->toInt();
+        $sig = InternalStrictArg::requireInt($frame, 1, 'posix_kill', 'signal')->toInt();
         $frame->returnVar->bool(VmPosix::kill($pid, $sig));
     }
 
