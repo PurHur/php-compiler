@@ -383,6 +383,9 @@ patch_already_applied() {
         && grep -q 'lowerUnhandledMatchError' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -q 'phpc_match_unhandled_operand_message' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-match-multi-cond-block.patch)
+      grep -q 'not after the JumpIf terminator' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-incdec-expr.patch)
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostInc.php" ]]
@@ -6896,6 +6899,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
+  apply_patch "$PATCH_DIR/php-cfg-match-multi-cond-block.patch"
   apply_patch "$PATCH_DIR/php-cfg-halt-compiler.patch"
   apply_php_cfg_compiler_halt_offset_overlay
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"

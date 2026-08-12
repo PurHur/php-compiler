@@ -50,6 +50,7 @@
                 $matchBlock->addParent($testBlock);
                 $nextBlock->addParent($testBlock);
                 $testBlock = $nextBlock;
+                $this->block = $nextBlock;
             }
             $this->block = $matchBlock;
             $this->lowerMatchArmBody($arm->body, $result, $attrs, $endBlock);

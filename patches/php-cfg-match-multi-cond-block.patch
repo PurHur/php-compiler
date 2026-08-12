@@ -1,0 +1,13 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-08-12 00:00:00.000000000 +0000
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-08-12 00:00:01.000000000 +0000
+@@ -2001,6 +2001,9 @@
+                 $testBlock->children[] = new JumpIf($cmp->result, $matchBlock, $nextBlock, $attrs);
+                 $matchBlock->addParent($testBlock);
+                 $nextBlock->addParent($testBlock);
+                 $testBlock = $nextBlock;
++                // Advance $this->block so the next condition's pattern ops land in $nextBlock,
++                // not after the JumpIf terminator in the previous block (#30442).
++                $this->block = $nextBlock;
+             }
+             $this->block = $matchBlock;
+             $this->lowerMatchArmBody($arm->body, $result, $attrs, $endBlock);
