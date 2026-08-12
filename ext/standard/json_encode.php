@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -75,6 +77,11 @@ final class json_encode extends Internal
             return $context->builder->load($context->constantStringFromString(''));
         }
 
+        // Resolve depth before compile-time folds so null under strict_types TypeErrors (#30486).
+        if (self::lowerDepthJitOrTypeError($context, $args)) {
+            // Catchable throw terminates the block — keep insert open for the call return (#22827).
+            return $context->builder->load($context->constantStringFromString(''));
+        }
         // Resolve compile-time flags before lowerIntBuiltinArg mutates the arg shape.
         $knownFlags = self::tryCompileTimeFlags($context, $args);
         $flagsVal = self::lowerFlagsJitValue($context, $args);
@@ -158,11 +165,13 @@ final class json_encode extends Internal
         if (!isset($frame->calledArgs[2])) {
             return 512;
         }
-        // php-src ext/json/json.c PHP_FUNCTION(json_encode): no ValueError on depth≤0 —
-        // encoder.max_depth is set and arrays/objects hit PHP_JSON_ERROR_DEPTH (#29345).
-        // Contrast json_decode()/json_validate() which do reject depth≤0.
-        return VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[2]->resolveIndirect(),
+        // php-src ext/json/json.c PHP_FUNCTION(json_encode): Z_PARAM_LONG on $depth —
+        // strict_types null → TypeError; non-strict DEP+coerce 0 (#30486).
+        // No ValueError on depth≤0 — encoder.max_depth is set and arrays/objects hit
+        // PHP_JSON_ERROR_DEPTH (#29345). Contrast json_decode()/json_validate().
+        return VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            2,
             'json_encode',
             3,
             'depth'
@@ -179,6 +188,43 @@ final class json_encode extends Internal
         }
 
         return JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'json_encode', 2, 'flags');
+    }
+
+    /**
+     * Validate $depth (Z_PARAM_LONG) on JIT/AOT before folds — php-src ext/json/json.c (#30486).
+     *
+     * Depth is not yet plumbed into `__compiler_json_encode_*`; this still must run so
+     * `null` under `declare(strict_types=1)` TypeErrors instead of folding past the arg.
+     *
+     * @param list<JITVariable> $args
+     *
+     * @return bool true when a TypeError abort was emitted (caller must return a dummy)
+     */
+    private static function lowerDepthJitOrTypeError(Context $context, array $args): bool
+    {
+        if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            return false;
+        }
+        $depthArg = $args[2];
+        $isNull = JITVariable::TYPE_NULL === $depthArg->type
+            || ($depthArg->isNullConstant ?? false)
+            || (
+                null !== ($depthArg->compileTimeConstantName ?? null)
+                && 'null' === strtolower((string) $depthArg->compileTimeConstantName)
+            );
+        if ($isNull && $context->callerStrictTypes) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'json_encode(): Argument #3 ($depth) must be of type int, null given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'json_encode_depth_te_cont');
+
+            return true;
+        }
+        // Non-strict null → DEP+0 via Z_PARAM_LONG lowering; other types as usual.
+        JitIntdiv::lowerIntBuiltinArgForCaller($context, $depthArg, 'json_encode', 3, 'depth');
+
+        return false;
     }
 
     /**
