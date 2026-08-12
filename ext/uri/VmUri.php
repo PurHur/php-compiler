@@ -63,6 +63,8 @@ final class VmUri
             $path = '/';
         }
 
+        $rawHost = isset($parts['host']) ? (string) $parts['host'] : null;
+
         return [
             'scheme' => isset($parts['scheme']) ? strtolower((string) $parts['scheme']) : null,
             'username' => isset($parts['user']) ? (string) $parts['user'] : null,
@@ -71,12 +73,43 @@ final class VmUri
                 isset($parts['user']) ? (string) $parts['user'] : null,
                 isset($parts['pass']) ? (string) $parts['pass'] : null
             ),
-            'host' => isset($parts['host']) ? (string) $parts['host'] : null,
+            'host' => self::normalizeAsciiHost($rawHost),
+            'rawHost' => $rawHost,
             'port' => isset($parts['port']) ? (int) $parts['port'] : null,
             'path' => (string) $path,
             'query' => isset($parts['query']) ? (string) $parts['query'] : null,
             'fragment' => isset($parts['fragment']) ? (string) $parts['fragment'] : null,
         ];
+    }
+
+    /**
+     * WHATWG URL / RFC 3986 ASCII registered-name lowercasing (php-src ext/uri; #28197).
+     *
+     * IPv6 literals and non-ASCII IDNA hosts are left unchanged.
+     */
+    public static function normalizeAsciiHost(?string $host): ?string
+    {
+        if (null === $host || '' === $host) {
+            return $host;
+        }
+
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            return $host;
+        }
+
+        if (1 !== preg_match('/^[\x20-\x7E]*$/', $host)) {
+            return $host;
+        }
+
+        return strtolower($host);
+    }
+
+    private static function applyHostOverride(array $state, ?string $rawHost): array
+    {
+        $state['host'] = self::normalizeAsciiHost($rawHost);
+        $state['rawHost'] = $rawHost;
+
+        return $state;
     }
 
     public static function composeUserinfo(?string $username, ?string $password): ?string
@@ -140,6 +173,10 @@ final class VmUri
                 isset($state['password']) && \is_string($state['password']) ? $state['password'] : null
             );
         }
+        if (\array_key_exists('host', $overrides)) {
+            $rawHost = $overrides['host'];
+            $state = self::applyHostOverride($state, \is_string($rawHost) ? $rawHost : null);
+        }
 
         return self::newWhatWgUrlVariable($ctx, $state);
     }
@@ -180,6 +217,10 @@ final class VmUri
         }
         if (\array_key_exists('scheme', $overrides) && \is_string($state['scheme'])) {
             $state['scheme'] = strtolower($state['scheme']);
+        }
+        if (\array_key_exists('host', $overrides)) {
+            $rawHost = $overrides['host'];
+            $state = self::applyHostOverride($state, \is_string($rawHost) ? $rawHost : null);
         }
 
         return self::newRfc3986UriVariable($ctx, $state);
@@ -499,6 +540,10 @@ final class VmUri
         }
         if (\array_key_exists('scheme', $overrides) && \is_string($state['scheme'])) {
             $state['scheme'] = strtolower($state['scheme']);
+        }
+        if (\array_key_exists('host', $overrides)) {
+            $rawHost = $overrides['host'];
+            $state = self::applyHostOverride($state, \is_string($rawHost) ? $rawHost : null);
         }
         self::$builderState[$object->id] = $state;
     }
