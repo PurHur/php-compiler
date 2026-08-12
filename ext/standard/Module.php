@@ -974,17 +974,7 @@ class Module extends ModuleAbstract
             $context->registerFunction('strcmp', $fn);
         }
         // nl_langinfo(3): NestedJIT leaf declares module-locally (#30404 / fnmatch #30383).
-        if (CompilerVersion::supportsStrxfrm()) {
-            try {
-                $context->lookupFunction('strxfrm');
-            } catch (\Throwable $e) {
-                $i8p = $context->getTypeFromString('int8*');
-                $sizeT = $context->getTypeFromString('size_t');
-                $ft = $context->context->functionType($sizeT, false, $i8p, $i8p, $sizeT);
-                $fn = $context->module->addFunction('strxfrm', $ft);
-                $context->registerFunction('strxfrm', $fn);
-            }
-        }
+        // strxfrm(3): NestedJIT leaf declares module-locally (#30420 / nl_langinfo #30404).
         try {
             $context->lookupFunction('memcmp');
         } catch (\Throwable $e) {
