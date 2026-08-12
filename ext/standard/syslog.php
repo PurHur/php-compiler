@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** syslog() — generate a system log message (ext/standard/syslog.c; #3676). */
@@ -29,6 +30,9 @@ final class syslog extends Internal
         }
 
         $priority = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'syslog', 0, 'priority');
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'syslog', 'message', 1, $frame);
+        }
         $message = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'syslog', 1, 'message');
         $frame->returnVar->bool(VmSyslog::syslog($priority, $message));
     }
