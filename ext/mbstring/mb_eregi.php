@@ -32,7 +32,7 @@ final class mb_eregi extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR $pattern — empty ValueError; null TypeError on PROFILE=8.4 (#20261).
+        // Z_PARAM_STR $pattern — soft-null DEP then empty ValueError (#30067; php_mbregex.c).
         $pattern = VmMbstring::coerceMbEregPatternArg($frame, 'mb_eregi', 0);
         if (null === $frame->returnVar) {
             return;
