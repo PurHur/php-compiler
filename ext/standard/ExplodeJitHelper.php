@@ -24,8 +24,8 @@ final class ExplodeJitHelper
     public static function explodeArgv(string $delimiter, string $haystack, int $limit): HashTable
     {
         if ('' === $delimiter) {
-            // NestedJIT-safe: do not call VmString (unbound → writeNull). Wording SSOT: #29275.
-            throw new \ValueError('explode(): Argument #1 ($separator) must not be empty');
+            // NestedJIT-safe: do not call VmString (unbound → writeNull). Wording SSOT: #30505.
+            throw new \ValueError('explode(): Argument #1 ($separator) cannot be empty');
         }
         if ('' === $haystack) {
             if ($limit >= 0) {

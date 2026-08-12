@@ -593,14 +593,16 @@ final class VmString
     }
 
     /**
-     * Zend empty-string ValueError wording (php-src zend_argument_error / string.c; #29275/#29276).
+     * Zend empty-string ValueError wording (php-src zend_argument_error / string.c).
      *
-     * Prefer this over ad-hoc "cannot be empty" so explode / substr_count / wordwrap / Z_PARAM non-empty
-     * guards cannot drift from php-src.
+     * Use {@see EMPTY_STRING_ARG_VALUE_ERROR_CANNOT} for builtins whose php-src path is
+     * `zend_argument_must_not_be_empty_error` / current Zend text "cannot be empty"
+     * (explode / substr_count — #30505/#30522; hash_hkdf, checkdnsrr, …).
+     * Keep MUST_NOT only where Zend still prints that suffix (e.g. some mbstring paths).
      */
     public const EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT = 'must not be empty';
 
-    /** php-src zend_argument_value_error_empty — hash_hkdf, checkdnsrr, … (#29760) */
+    /** php-src zend_argument_must_not_be_empty_error — current Zend text (#30505/#30522/#29760) */
     public const EMPTY_STRING_ARG_VALUE_ERROR_CANNOT = 'cannot be empty';
 
     /**
@@ -3819,7 +3821,7 @@ final class VmString
     public static function explode(string $delimiter, string $string, int $limit = \PHP_INT_MAX): array
     {
         if ('' === $delimiter) {
-            self::rejectEmptyBuiltinStringArg($delimiter, 'explode', 0, 'separator');
+            self::rejectEmptyBuiltinStringArg($delimiter, 'explode', 0, 'separator', true);
         }
         if ('' === $string) {
             if ($limit >= 0) {
@@ -5313,7 +5315,7 @@ final class VmString
         ?int $length = null
     ): int {
         if ('' === $needle) {
-            self::rejectEmptyBuiltinStringArg($needle, 'substr_count', 1, 'needle');
+            self::rejectEmptyBuiltinStringArg($needle, 'substr_count', 1, 'needle', true);
         }
         $hayLen = self::byteLength($haystack);
         $needleLen = self::byteLength($needle);

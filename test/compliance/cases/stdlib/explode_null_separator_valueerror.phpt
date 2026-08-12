@@ -23,5 +23,5 @@ try {
 ?>
 --EXPECT--
 WARN:explode(): Passing null to parameter #1 ($separator) of type string is deprecated
-ValueError:explode(): Argument #1 ($separator) must not be empty
-ValueError:explode(): Argument #1 ($separator) must not be empty
+ValueError:explode(): Argument #1 ($separator) cannot be empty
+ValueError:explode(): Argument #1 ($separator) cannot be empty

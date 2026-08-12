@@ -73,7 +73,7 @@ final class substr_count extends Internal
             $context,
             $args[1],
             $needle,
-            VmString::emptyStringArgValueErrorMessage('substr_count', 1, 'needle')
+            VmString::emptyStringArgValueErrorMessageCannot('substr_count', 1, 'needle')
         );
         // Z_PARAM_LONG $offset — soft-null DEP+coerce on 8.4 (#21657; peer chr/mktime).
         $offset = $argc >= 3

@@ -118,7 +118,7 @@ final class explode extends Internal
             $after = BasicBlockHelper::append($context, 'explode_empty_sep_after');
             $context->builder->branch($err);
             $context->builder->positionAtEnd($err);
-            TypeErrorRaise::emitValueError($context, 'explode(): Argument #1 ($separator) must not be empty');
+            TypeErrorRaise::emitValueError($context, 'explode(): Argument #1 ($separator) cannot be empty');
             $context->builder->call($context->lookupFunction('abort'));
             $context->builder->positionAtEnd($after);
 
@@ -138,6 +138,13 @@ final class explode extends Internal
 
         StringExplode::ensureLinked($context);
         $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
+        // Runtime empty separator (non-literal): ValueError then abort — peer substr_count (#30505).
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $delimiter,
+            VmString::emptyStringArgValueErrorMessageCannot('explode', 0, 'separator')
+        );
         $haystack = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'explode', 1, 'string')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'explode', 1, 'string');

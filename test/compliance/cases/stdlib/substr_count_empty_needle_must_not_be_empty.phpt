@@ -1,5 +1,5 @@
 --TEST--
-stdlib substr_count() empty needle ValueError — must not be empty (#29276, php-src string.c)
+stdlib substr_count() empty needle ValueError — cannot be empty (#30522, was #29276, php-src string.c)
 --FILE--
 <?php
 try {
@@ -10,4 +10,4 @@ try {
 }
 ?>
 --EXPECT--
-substr_count(): Argument #2 ($needle) must not be empty
+substr_count(): Argument #2 ($needle) cannot be empty

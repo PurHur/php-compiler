@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM: explode('') ValueError "must not be empty" (#29275, php-src string.c). */
+/** VM: explode('') ValueError "cannot be empty" (#29275, php-src string.c). */
 final class ExplodeEmptySeparatorMessageVMTest extends BaseTest
 {
     protected static string $DIR = __DIR__;

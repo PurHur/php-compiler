@@ -1,5 +1,5 @@
 --TEST--
-stdlib explode() empty separator ValueError — must not be empty (#29275, php-src string.c)
+stdlib explode() empty separator ValueError — cannot be empty (#30505, was #29275, php-src string.c)
 --FILE--
 <?php
 try {
@@ -10,4 +10,4 @@ try {
 }
 ?>
 --EXPECT--
-explode(): Argument #1 ($separator) must not be empty
+explode(): Argument #1 ($separator) cannot be empty
