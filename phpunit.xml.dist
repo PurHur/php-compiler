@@ -129,6 +129,7 @@
             <file>./test/compliance/FsockopenNullSoftVMTest.php</file>
             <file>./test/compliance/PfsockopenNullSoftVMTest.php</file>
             <file>./test/compliance/PfsockopenNullStrictVMTest.php</file>
+            <file>./test/compliance/SessionCacheLimiterNullGetterVMTest.php</file>
             <file>./test/compliance/FsockopenNullStrictVMTest.php</file>
             <file>./test/compliance/FstatReflectionReturnVMTest.php</file>
             <file>./test/compliance/FileReflectionReturnVMTest.php</file>

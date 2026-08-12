@@ -8,10 +8,13 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * session_cache_limiter() — session cache control header mode (php-src ext/session/session.c; #11095).
+ *
+ * Stub `?string $value = null`: omitted or null → getter; non-null → setter (#30396).
  */
 class session_cache_limiter_ extends Internal
 {
@@ -29,7 +32,7 @@ class session_cache_limiter_ extends Internal
             );
         }
         if (null === $frame->returnVar) {
-            if (1 === $argc) {
+            if (1 === $argc && !$this->isNullArg($frame)) {
                 $newLimiter = VmString::coerceStringBuiltinArg(
                     $frame->calledArgs[0],
                     'session_cache_limiter',
@@ -42,6 +45,12 @@ class session_cache_limiter_ extends Internal
             return;
         }
         if (1 === $argc) {
+            // php-src ZEND_PARSE_PARAMETERS optional string: null/absent → get (#30396).
+            if ($this->isNullArg($frame)) {
+                $frame->returnVar->string(VmSession::getCacheLimiter());
+
+                return;
+            }
             $newLimiter = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[0],
                 'session_cache_limiter',
@@ -59,6 +68,11 @@ class session_cache_limiter_ extends Internal
             return;
         }
         $frame->returnVar->string(VmSession::getCacheLimiter());
+    }
+
+    private function isNullArg(Frame $frame): bool
+    {
+        return Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type;
     }
 
     public function call(Context $context, JITVariable ...$args): Value
