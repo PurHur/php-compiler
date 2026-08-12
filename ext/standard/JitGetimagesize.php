@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\PathSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Type;
 use PHPLLVM\Value;
@@ -45,7 +46,14 @@ final class JitGetimagesize
             throw new \LogicException('getimagesize() imageinfo by-ref is VM-only in this compiler build (#3271)');
         }
         StringFileGetContents::implement($context);
-        $path = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'getimagesize', 0, 'filename');
+        $path = JitStreamPath::lowerNonEmptyPath(
+            $context,
+            $args[0],
+            'getimagesize',
+            0,
+            'filename',
+            PathSupport::EMPTY_PATH_CANNOT_BE_EMPTY_MESSAGE
+        );
         $data = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $path

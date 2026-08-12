@@ -22,7 +22,8 @@ final class VmStreamPath
         Frame $frame,
         int $argIndex,
         string $function,
-        string $paramName = 'filename'
+        string $paramName = 'filename',
+        string $emptyPathMessage = PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE
     ): string {
         if (InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::rejectNullString(
@@ -38,7 +39,8 @@ final class VmStreamPath
             $frame->calledArgs[$argIndex],
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            $emptyPathMessage
         );
     }
 
@@ -55,12 +57,13 @@ final class VmStreamPath
         Variable $var,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'filename'
+        string $paramName = 'filename',
+        string $emptyPathMessage = PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE
     ): string {
         // Z_PARAM_PATH soft-null DEP+coerce on 8.4 (#20362 / #19146).
         $path = VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
         if ('' === $path) {
-            throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
+            throw new \ValueError($emptyPathMessage);
         }
 
         return $path;

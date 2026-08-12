@@ -13,6 +13,15 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
     public function test_shared_formatter_matches_zend(): void
     {
         self::assertSame('must not be empty', VmString::EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT);
+        self::assertSame('cannot be empty', VmString::EMPTY_STRING_ARG_VALUE_ERROR_CANNOT);
+        self::assertSame(
+            'hash_hkdf(): Argument #2 ($key) cannot be empty',
+            VmString::emptyStringArgValueErrorMessageCannot('hash_hkdf', 1, 'key')
+        );
+        self::assertSame(
+            'checkdnsrr(): Argument #1 ($hostname) cannot be empty',
+            VmString::emptyStringArgValueErrorMessageCannot('checkdnsrr', 0, 'hostname')
+        );
         self::assertSame(
             'explode(): Argument #1 ($separator) must not be empty',
             VmString::emptyStringArgValueErrorMessage('explode', 0, 'separator')

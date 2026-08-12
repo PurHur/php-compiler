@@ -11,5 +11,5 @@ foreach ([null, ''] as $k) {
     }
 }
 --EXPECT--
-NULL hash_hkdf(): Argument #2 ($key) must not be empty
-'' hash_hkdf(): Argument #2 ($key) must not be empty
+NULL hash_hkdf(): Argument #2 ($key) cannot be empty
+'' hash_hkdf(): Argument #2 ($key) cannot be empty
