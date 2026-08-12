@@ -600,6 +600,9 @@ final class VmString
      */
     public const EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT = 'must not be empty';
 
+    /** php-src zend_argument_value_error_empty — hash_hkdf, checkdnsrr, … (#29760) */
+    public const EMPTY_STRING_ARG_VALUE_ERROR_CANNOT = 'cannot be empty';
+
     /**
      * Format `fn(): Argument #N ($name) must not be empty` (1-based $argIndex).
      */
@@ -608,12 +611,42 @@ final class VmString
         int $argIndex,
         string $paramName
     ): string {
+        return self::emptyStringArgValueErrorMessageWithSuffix(
+            $function,
+            $argIndex,
+            $paramName,
+            self::EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT
+        );
+    }
+
+    /**
+     * Format `fn(): Argument #N ($name) cannot be empty` (1-based $argIndex).
+     */
+    public static function emptyStringArgValueErrorMessageCannot(
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): string {
+        return self::emptyStringArgValueErrorMessageWithSuffix(
+            $function,
+            $argIndex,
+            $paramName,
+            self::EMPTY_STRING_ARG_VALUE_ERROR_CANNOT
+        );
+    }
+
+    private static function emptyStringArgValueErrorMessageWithSuffix(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $suffix
+    ): string {
         return \sprintf(
             '%s(): Argument #%d ($%s) %s',
             $function,
             $argIndex + 1,
             $paramName,
-            self::EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT
+            $suffix
         );
     }
 
@@ -626,10 +659,15 @@ final class VmString
         string $str,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        bool $cannotWording = false
     ): void {
         if ('' === $str) {
-            throw new \ValueError(self::emptyStringArgValueErrorMessage($function, $argIndex, $paramName));
+            throw new \ValueError(
+                $cannotWording
+                    ? self::emptyStringArgValueErrorMessageCannot($function, $argIndex, $paramName)
+                    : self::emptyStringArgValueErrorMessage($function, $argIndex, $paramName)
+            );
         }
     }
 

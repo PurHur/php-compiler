@@ -40,7 +40,7 @@ final class checkdnsrr extends Internal
         }
         // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#30261).
         $hostname = VmString::stringBuiltinArgForFrame($frame, 0, $fn, 0, 'hostname', false);
-        VmString::rejectEmptyBuiltinStringArg($hostname, $fn, 0, 'hostname');
+        VmString::rejectEmptyBuiltinStringArg($hostname, $fn, 0, 'hostname', true);
         $type = 'MX';
         if ($argc >= 2) {
             $typeVar = $frame->calledArgs[1]->resolveIndirect();
@@ -80,7 +80,7 @@ final class checkdnsrr extends Internal
             $context,
             $args[0],
             $hostname,
-            $fn.'(): Argument #1 ($hostname) must not be empty'
+            VmString::emptyStringArgValueErrorMessageCannot($fn, 0, 'hostname')
         );
         if ($argc >= 2) {
             if (JITVariable::TYPE_HASHTABLE === $args[1]->type) {

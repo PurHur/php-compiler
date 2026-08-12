@@ -31,6 +31,6 @@ fopen:VALUEERROR:Path must not be empty
 DEP
 file_get_contents:VALUEERROR:Path must not be empty
 DEP
-getimagesize:VALUEERROR:Path must not be empty
+getimagesize:VALUEERROR:Path cannot be empty
 DEP
 hash_file:VALUEERROR:Path must not be empty

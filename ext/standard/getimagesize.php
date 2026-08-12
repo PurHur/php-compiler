@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\PathSupport;
 use PHPLLVM\Value;
 
 /**
@@ -40,7 +41,13 @@ final class getimagesize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'getimagesize', 'filename');
+        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
+            0,
+            'getimagesize',
+            'filename',
+            PathSupport::EMPTY_PATH_CANNOT_BE_EMPTY_MESSAGE
+        );
         $imageinfo = null;
         if (2 === $argc) {
             $imageinfo = [];

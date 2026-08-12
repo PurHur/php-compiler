@@ -10,4 +10,4 @@ try {
 }
 ?>
 --EXPECT--
-checkdnsrr(): Argument #1 ($hostname) must not be empty
+checkdnsrr(): Argument #1 ($hostname) cannot be empty

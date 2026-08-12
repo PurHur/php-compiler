@@ -18,7 +18,8 @@ final class JitStreamPath
         JITVariable $arg,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'filename'
+        string $paramName = 'filename',
+        string $emptyPathMessage = PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE
     ): Value {
         // Z_PARAM_PATH soft-null DEP+coerce on 8.4, then empty-path ValueError (#20362, #21235).
         $path = JitStringBuiltinArg::lowerPath(
@@ -28,7 +29,7 @@ final class JitStreamPath
             $argIndex,
             $paramName
         );
-        JitStringBuiltinArg::rejectEmpty($context, $arg, $path, PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
+        JitStringBuiltinArg::rejectEmpty($context, $arg, $path, $emptyPathMessage);
 
         return $path;
     }

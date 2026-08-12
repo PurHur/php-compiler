@@ -32,7 +32,7 @@ final class hash_hkdf extends Internal
         // Soft-null then empty-key ValueError (#21319 / #19341).
         $algo = self::vmZparamStrArg($frame, 0, 'algo');
         $key = self::vmZparamStrArg($frame, 1, 'key');
-        VmString::rejectEmptyBuiltinStringArg($key, 'hash_hkdf', 1, 'key');
+        VmString::rejectEmptyBuiltinStringArg($key, 'hash_hkdf', 1, 'key', true);
         $length = 0;
         if ($argc >= 3) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'hash_hkdf', 3, 'length');
@@ -97,7 +97,7 @@ final class hash_hkdf extends Internal
             $context,
             $args[1],
             $key,
-            'hash_hkdf(): Argument #2 ($key) must not be empty'
+            VmString::emptyStringArgValueErrorMessageCannot('hash_hkdf', 1, 'key')
         );
 
         return JitHash::hashHkdf(

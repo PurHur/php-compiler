@@ -1,5 +1,5 @@
 --TEST--
-stdlib getimagesize(null) without strict_types — ValueError Path must not be empty (#18235, ext/standard/image.c)
+stdlib getimagesize(null) without strict_types — ValueError Path cannot be empty (#18235 / #29760, ext/standard/image.c)
 --FILE--
 <?php
 foreach ([null, ''] as $path) {
@@ -12,5 +12,5 @@ foreach ([null, ''] as $path) {
 }
 ?>
 --EXPECT--
-Path must not be empty
-Path must not be empty
+Path cannot be empty
+Path cannot be empty
