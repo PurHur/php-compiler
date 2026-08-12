@@ -23,9 +23,8 @@ final class is_writable extends Internal
     public function execute(Frame $frame): void
     {
         $fn = $this->getName();
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException($fn.'() requires exactly one argument in this compiler build');
-        }
+        // php-src filestat.c / file.stub.php — exactly 1 (#30544).
+        $this->requireExactArgCount($frame, $fn, 1);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, $fn);
         if (null === $frame->returnVar) {
             return;
@@ -36,8 +35,9 @@ final class is_writable extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        if (1 !== \count($args)) {
-            throw new \LogicException($fn.'() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30544 / peer #30523).
+        if (!$this->requireExactJitArgCount($context, $args, $fn, 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $path = JitStringBuiltinArg::lowerPath($context, $args[0], $fn, 0, 'filename');
 

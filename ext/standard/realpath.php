@@ -15,9 +15,8 @@ final class realpath extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('realpath() requires exactly one argument');
-        }
+        // php-src filestat.c / file.stub.php — exactly 1 (#30544).
+        $this->requireExactArgCount($frame, 'realpath', 1);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'realpath', 'path');
         if (null === $frame->returnVar) {
             return;
@@ -34,8 +33,16 @@ final class realpath extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('realpath() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30544 / peer #30523).
+        if (!$this->requireExactJitArgCount($context, $args, 'realpath', 1)) {
+            $i64 = $context->getTypeFromString('int64');
+            $i8p = $context->getTypeFromString('int8*');
+
+            return $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $i64->constInt(0, false),
+                $context->builder->pointerCast($context->constantFromString(''), $i8p)
+            );
         }
 
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'realpath');
