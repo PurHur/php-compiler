@@ -562,6 +562,23 @@ PHP;
         AsymmetricVisibilityRewriter::rewrite($source);
     }
 
+    public function testPromotedParamsMultipleAsymmetricVisibilityNotFalsePositive(): void
+    {
+        $this->requireParenthesizedAsymmetricSetModifier();
+        $source = <<<'PHP'
+<?php
+class Dto {
+    public function __construct(
+        public private(set) string $name,
+        public private(set) int $age,
+    ) {}
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString('phpc-asymmetric-set:private', $rewritten);
+        self::assertStringNotContainsString('Multiple', $rewritten);
+    }
+
     public function testRewriterSourceFileDoesNotFalsePositiveOnDocblockExamples(): void
     {
         $source = file_get_contents(__DIR__.'/../../lib/Ast/AsymmetricVisibilityRewriter.php');
