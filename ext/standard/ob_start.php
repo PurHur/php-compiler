@@ -6,13 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
  * ob_start() — begin output buffering (VM; JIT scaffold {@see JitObStart}, #118, #1056).
+ *
+ * Excess argc → Zend ArgumentCountError (#30508; php-src ext/standard/output.c).
  */
 final class ob_start extends Internal
 {
@@ -23,10 +27,9 @@ final class ob_start extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: at most 3 (callback, chunk_size, flags) — #30508.
+        $this->requireAtMostArgCount($frame, 'ob_start', 3);
         $argc = \count($frame->calledArgs);
-        if ($argc > 3) {
-            throw new \LogicException('ob_start() accepts at most three arguments in this compiler build');
-        }
         $handler = null;
         if ($argc >= 1) {
             $handler = VmObOutput::resolveHandler($frame);
@@ -39,6 +42,18 @@ final class ob_start extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc > 3) {
+            // Catchable ArgumentCountError under AOT try/catch (#30508 / peer #28229).
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('ob_start() expects at most 3 arguments, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'ob_start_argc_cont');
+
+            return $context->constantFromBool(false);
+        }
+
         return JitObStart::invoke($context, ...$args);
     }
 }
