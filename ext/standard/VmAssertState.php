@@ -122,9 +122,11 @@ final class VmAssertState
             StdlibConstants::ASSERT_ACTIVE => AssertOptionsJitHelper::getActiveInt(),
             StdlibConstants::ASSERT_CALLBACK => AssertOptionsJitHelper::getCallbackForOptions(),
             StdlibConstants::ASSERT_BAIL => AssertOptionsJitHelper::getBailInt(),
+            // ASSERT_WARNING remains a recognized selector (php-src switch case); value is always false here.
             StdlibConstants::ASSERT_WARNING => false,
             StdlibConstants::ASSERT_EXCEPTION => AssertOptionsJitHelper::getExceptionInt(),
-            default => false,
+            // php-src assert.c default → zend_argument_value_error (#30524).
+            default => throw new \ValueError(AssertOptionsJitHelper::MSG_INVALID_OPTION),
         };
     }
 
@@ -133,10 +135,8 @@ final class VmAssertState
      */
     public static function setOption(int $what, Variable $value)
     {
+        // Validates $what (throws ValueError for non-ASSERT_*) before mutating (#30524).
         $old = self::getOption($what);
-        if (false === $old && StdlibConstants::ASSERT_WARNING !== $what) {
-            return false;
-        }
 
         switch ($what) {
             case StdlibConstants::ASSERT_ACTIVE:
@@ -158,7 +158,7 @@ final class VmAssertState
             case StdlibConstants::ASSERT_WARNING:
                 return false;
             default:
-                return false;
+                throw new \ValueError(AssertOptionsJitHelper::MSG_INVALID_OPTION);
         }
 
         return $old;
