@@ -12,5 +12,5 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-UnhandledMatchError: Unhandled match case 'x'
+UnhandledMatchError: Unhandled match case '...'
 extends Error
