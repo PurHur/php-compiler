@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringNlLanginfo;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -36,8 +35,8 @@ final class nl_langinfo extends Internal
             return;
         }
 
-        $itemVar = $frame->calledArgs[0]->resolveIndirect();
-        $result = VmLocale::nlLanginfo(self::parseItemArg($itemVar), $frame);
+        $item = VmMath::parseZParamLongBuiltinArgForFrame($frame, 0, 'nl_langinfo', 1, 'item');
+        $result = VmLocale::nlLanginfo($item, $frame);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
@@ -54,8 +53,4 @@ final class nl_langinfo extends Internal
         return StringNlLanginfo::invoke($context, $args[0]);
     }
 
-    private static function parseItemArg(Variable $var): int
-    {
-        return VmMath::parseZParamLongBuiltinArg($var, 'nl_langinfo', 1, 'item');
-    }
 }
