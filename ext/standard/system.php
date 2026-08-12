@@ -30,7 +30,8 @@ final class system extends Internal
             throw new \LogicException('system() accepts one or two arguments in this compiler build');
         }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'system', 'command', false);
-        VmString::rejectEmptyBuiltinStringArg($command, 'system', 0, 'command');
+        // php-src exec.c — Zend "cannot be empty" (#30340)
+        VmString::rejectEmptyBuiltinStringArg($command, 'system', 0, 'command', true);
         $result = VmExecNative::run($command);
         if (false !== $result) {
             if (!VmExecNative::linesToStdout($result['lines'])) {

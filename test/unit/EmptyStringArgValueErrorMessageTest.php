@@ -31,6 +31,14 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             VmString::emptyStringArgValueErrorMessageCannot('substr_count', 1, 'needle')
         );
         self::assertSame(
+            'exec(): Argument #1 ($command) cannot be empty',
+            VmString::emptyStringArgValueErrorMessageCannot('exec', 0, 'command')
+        );
+        self::assertSame(
+            'shell_exec(): Argument #1 ($command) cannot be empty',
+            VmString::emptyStringArgValueErrorMessageCannot('shell_exec', 0, 'command')
+        );
+        self::assertSame(
             'wordwrap(): Argument #3 ($break) must not be empty',
             VmString::emptyStringArgValueErrorMessage('wordwrap', 2, 'break')
         );
@@ -51,6 +59,7 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
         $cases = [
             'issue29275_explode_empty_separator_message.php' => 'cannot be empty',
             'issue29276_substr_count_empty_needle_message.php' => 'cannot be empty',
+            'issue_30340_exec_empty_cannot_be_empty.php' => 'cannot be empty',
             'issue29291_wordwrap_empty_break_message.php' => 'must not be empty',
             'issue29292_str_pad_empty_pad_message.php' => 'must not be empty',
             'issue29422_mb_str_pad_empty_pad_message.php' => 'must not be empty',

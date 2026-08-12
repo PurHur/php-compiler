@@ -324,6 +324,8 @@
             <file>./test/compliance/WordwrapEmptyBreakMessageJITTest.php</file>
             <file>./test/compliance/ExplodeEmptySeparatorMessageVMTest.php</file>
             <file>./test/compliance/ExplodeEmptySeparatorMessageJITTest.php</file>
+            <file>./test/compliance/ExecFamilyEmptyCommandMessageVMTest.php</file>
+            <file>./test/compliance/ExecFamilyEmptyCommandMessageJITTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageVMTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>

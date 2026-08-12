@@ -29,7 +29,8 @@ final class shell_exec extends Internal
             return;
         }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'shell_exec', 'command', false);
-        VmString::rejectEmptyBuiltinStringArg($command, 'shell_exec', 0, 'command');
+        // php-src exec.c — Zend "cannot be empty" (#30340)
+        VmString::rejectEmptyBuiltinStringArg($command, 'shell_exec', 0, 'command', true);
         $result = VmShellExecNative::shellExec($command);
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -51,7 +52,7 @@ final class shell_exec extends Internal
             $context,
             $args[0],
             $command,
-            'shell_exec(): Argument #1 ($command) must not be empty'
+            VmString::emptyStringArgValueErrorMessageCannot('shell_exec', 0, 'command')
         );
 
         return JitShellExec::invoke($context, $command);
