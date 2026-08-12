@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Variable;
 
 /** DOMDocumentFragment::appendChild() — VM (#6317, php-src ext/dom/node.c). */
 final class FragmentAppendChild extends DomClassMethod
@@ -21,7 +20,8 @@ final class FragmentAppendChild extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocumentFragment::appendChild() expects exactly 1 argument');
         }
-        $child = $this->nodeChildArg($frame->calledArgs[1], 'DOMDocumentFragment::appendChild()', 0);
+        // Declaring class is DOMNode — Zend TypeError cites DOMNode::appendChild (#30410).
+        $child = $this->requireDomNodeArg($frame->calledArgs[1], 'DOMNode::appendChild', 1, 'node');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocumentFragment::appendChild() requires VM context in this compiler build');
         }
@@ -29,30 +29,5 @@ final class FragmentAppendChild extends DomClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->object($appended);
         }
-    }
-
-    private function nodeChildArg(Variable $var, string $label, int $index): \PHPCompiler\VM\ObjectEntry
-    {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError(sprintf(
-                '%s expects argument #%d to be of type DOMNode, %s given',
-                $label,
-                $index + 1,
-                VmDom::typeLabel($var)
-            ));
-        }
-        $object = $var->toObject();
-        // php-src stub: DOMNode $node — accept Document; hierarchy rejects later (#22698).
-        if (!VmDom::isDomNode($object)) {
-            throw new \TypeError(sprintf(
-                '%s expects argument #%d to be of type DOMNode, %s given',
-                $label,
-                $index + 1,
-                $object->class->name
-            ));
-        }
-
-        return $object;
     }
 }

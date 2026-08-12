@@ -20,46 +20,48 @@ final class DocumentImportNode extends DomClassMethod
     {
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::importNode()');
         $living = VmDomLiving::isLivingDocument($document);
-        $label = $living ? 'Dom\\Document::importNode()' : 'DOMDocument::importNode()';
+        $label = $living ? 'Dom\\Document::importNode' : 'DOMDocument::importNode';
         if (\count($frame->calledArgs) < 2) {
             throw new \ArgumentCountError(sprintf(
-                '%s expects at least 1 argument, %d given',
+                '%s() expects at least 1 argument, %d given',
                 $label,
                 \count($frame->calledArgs) - 1
             ));
         }
         $nodeVar = $frame->calledArgs[1]->resolveIndirect();
         $typeLabel = $living ? 'Dom\\Node' : 'DOMNode';
-        $argName = $living ? 'node' : 'importedNode';
+        // php-src stub: importNode(DOMNode|Dom\Node $node, …) — always $node (#30410).
         if (Variable::TYPE_OBJECT !== $nodeVar->type) {
             throw new \TypeError(sprintf(
-                '%s: Argument #1 ($%s) must be of type %s',
+                '%s(): Argument #1 ($node) must be of type %s, %s given',
                 $label,
-                $argName,
-                $typeLabel
+                $typeLabel,
+                VmDom::typeLabel($nodeVar)
             ));
         }
         $node = $nodeVar->toObject();
         if (null === $frame->vmContext) {
-            throw new \LogicException($label.' requires VM context in this compiler build');
+            throw new \LogicException($label.'() requires VM context in this compiler build');
         }
         if ($living) {
             if (!VmDomLiving::isLivingNodeInstance($node, $frame->vmContext)) {
                 throw new \TypeError(sprintf(
-                    '%s: Argument #1 ($node) must be of type Dom\\Node',
-                    $label
+                    '%s(): Argument #1 ($node) must be of type Dom\\Node, %s given',
+                    $label,
+                    $node->class->name
                 ));
             }
         } elseif (!VmDom::isDomNode($node)) {
             throw new \TypeError(sprintf(
-                '%s: Argument #1 ($importedNode) must be of type DOMNode',
-                $label
+                '%s(): Argument #1 ($node) must be of type DOMNode, %s given',
+                $label,
+                $node->class->name
             ));
         }
         $deep = isset($frame->calledArgs[2])
             ? VmMath::parseBoolBuiltinArg(
                 $frame->calledArgs[2],
-                $living ? 'Dom\\Document::importNode' : 'DOMDocument::importNode',
+                $label,
                 2,
                 'deep'
             )

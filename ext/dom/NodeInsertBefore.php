@@ -21,12 +21,13 @@ final class NodeInsertBefore extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMNode::insertBefore() expects at least 1 argument');
         }
-        $newChild = $this->nodeArg($frame->calledArgs[1], 'DOMNode::insertBefore()', 0);
+        $newChild = $this->requireDomNodeArg($frame->calledArgs[1], 'DOMNode::insertBefore', 1, 'node');
         $refChild = null;
         if (isset($frame->calledArgs[2])) {
             $refVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $refVar->type) {
-                $refChild = $this->nodeArg($frame->calledArgs[2], 'DOMNode::insertBefore()', 1);
+                // php-src stub: ?DOMNode $child
+                $refChild = $this->requireDomNodeArg($frame->calledArgs[2], 'DOMNode::insertBefore', 2, 'child');
             }
         }
         if (null === $frame->vmContext) {
@@ -36,29 +37,5 @@ final class NodeInsertBefore extends DomClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->object($inserted);
         }
-    }
-
-    private function nodeArg(Variable $var, string $label, int $index): \PHPCompiler\VM\ObjectEntry
-    {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError(sprintf(
-                '%s expects argument #%d to be of type DOMNode, %s given',
-                $label,
-                $index + 1,
-                VmDom::typeLabel($var)
-            ));
-        }
-        $object = $var->toObject();
-        if (!VmDom::isDomNode($object)) {
-            throw new \TypeError(sprintf(
-                '%s expects argument #%d to be of type DOMNode, %s given',
-                $label,
-                $index + 1,
-                $object->class->name
-            ));
-        }
-
-        return $object;
     }
 }
