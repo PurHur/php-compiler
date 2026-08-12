@@ -38,6 +38,9 @@ declare(strict_types=1);
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink'
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --migrate-deps'
  *     # rewrite legacy manifests to v2 deps[] without re-emitting .o (#23458)
+ *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --refresh-global-fingerprints'
+ *     # recompute v2 unit + arch fingerprints when global material changed (patches/lock)
+ *     # but helper sources/deps are unchanged — no .o re-emit (#24302)
  */
 
 use PHPCompiler\AOT\HelperRuntimeCache;
@@ -54,6 +57,53 @@ $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
 
 $force = in_array('--force', $argv, true);
 $migrateDeps = in_array('--migrate-deps', $argv, true);
+$refreshGlobal = in_array('--refresh-global-fingerprints', $argv, true);
+
+if ($refreshGlobal) {
+    $unitsRoot = HelperRuntimeCache::prelinkedUnitsDir();
+    $refreshed = 0;
+    $skipped = 0;
+    if (!is_dir($unitsRoot)) {
+        fwrite(STDERR, "helper-runtime-refresh-global: no prelinked units dir for ".HelperRuntimeCache::archKey()."\n");
+        exit(1);
+    }
+    foreach (glob($unitsRoot.'/*/manifest.json') ?: [] as $manifestPath) {
+        $unitDir = dirname($manifestPath);
+        $slug = basename($unitDir);
+        if (!is_file($unitDir.'/unit.o') || !is_file($unitDir.'/unit.bc')) {
+            ++$skipped;
+            continue;
+        }
+        $manifest = HelperRuntimeCache::unitManifest($slug, $unitDir);
+        if (null === $manifest) {
+            ++$skipped;
+            continue;
+        }
+        $sourceAbs = HelperRuntimeCache::resolveUnitSource($root, (string) $manifest['unit']);
+        if (null === $sourceAbs) {
+            ++$skipped;
+            continue;
+        }
+        $deps = isset($manifest['deps']) && \is_array($manifest['deps']) ? $manifest['deps'] : [];
+        $manifest['deps'] = $deps;
+        $manifest['fingerprint'] = HelperRuntimeCache::fingerprintV2($sourceAbs, $deps);
+        $manifest['fingerprint_version'] = 2;
+        file_put_contents($manifestPath, json_encode($manifest, JSON_UNESCAPED_SLASHES)."\n");
+        ++$refreshed;
+    }
+    $archManifestPath = \dirname($unitsRoot).'/manifest.json';
+    if (is_file($archManifestPath)) {
+        $arch = json_decode((string) file_get_contents($archManifestPath), true);
+        if (\is_array($arch)) {
+            $arch['core_fingerprint'] = HelperRuntimeCache::coreFingerprint();
+            $arch['llvm_identity_token'] = HelperRuntimeCache::llvmIdentityToken();
+            $arch['global_refreshed_at'] = gmdate('c');
+            file_put_contents($archManifestPath, json_encode($arch, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+        }
+    }
+    fwrite(STDOUT, "helper-runtime-refresh-global: {$refreshed} rewritten, {$skipped} skipped (#24302)\n");
+    exit($refreshed > 0 ? 0 : 1);
+}
 
 if ($migrateDeps) {
     $roots = [HelperRuntimeCache::unitsDir(), HelperRuntimeCache::prelinkedUnitsDir()];
