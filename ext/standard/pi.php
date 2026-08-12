@@ -24,9 +24,8 @@ final class pi extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (0 !== count($frame->calledArgs)) {
-            throw new \LogicException('pi() takes no arguments');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#30534).
+        $this->requireExactArgCount($frame, 'pi', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -35,8 +34,9 @@ final class pi extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (0 !== count($args)) {
-            throw new \LogicException('pi() takes no arguments');
+        // Catchable ArgumentCountError (AOT/JIT) — #30534.
+        if (!$this->requireExactJitArgCount($context, $args, 'pi', 0)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
         $double = $context->getTypeFromString('double');
 
