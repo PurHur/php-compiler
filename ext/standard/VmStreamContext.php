@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -160,6 +161,17 @@ final class VmStreamContext
         return $idVar->toInt();
     }
 
+    /** Zend stub parameter label for stream/context builtins (#24584, #30418). */
+    public static function paramNameForArg(string $functionName, int $argNum, string $fallback = 'context'): string
+    {
+        $names = BuiltinParamNames::paramNamesForInternalFunction($functionName);
+        if (null === $names || !isset($names[$argNum - 1])) {
+            return $fallback;
+        }
+
+        return rtrim(ltrim($names[$argNum - 1], '&'), '=');
+    }
+
     /**
      * php-src ext/standard/streams.c — stream_context_set_options/get_options context arg.
      */
@@ -170,10 +182,12 @@ final class VmStreamContext
     ): Variable {
         $resolved = $var->resolveIndirect();
         if (!self::isRepresentation($resolved)) {
+            $paramName = self::paramNameForArg($functionName, $argNum);
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($context) must be of type resource, %s given',
+                '%s(): Argument #%d ($%s) must be of type resource, %s given',
                 $functionName,
                 $argNum,
+                $paramName,
                 VmStreamArg::debugTypeName($resolved)
             ));
         }
@@ -192,10 +206,12 @@ final class VmStreamContext
             return;
         }
         if (!self::isRepresentation($resolved)) {
+            $paramName = self::paramNameForArg($functionName, $argNum);
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($context) must be of type resource or null, %s given',
+                '%s(): Argument #%d ($%s) must be of type resource or null, %s given',
                 $functionName,
                 $argNum,
+                $paramName,
                 VmStreamArg::debugTypeName($resolved)
             ));
         }

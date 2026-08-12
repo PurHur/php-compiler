@@ -28,10 +28,13 @@ final class JitStreamContextRequiredArg
 
     public static function typeErrorMessage(string $function, int $argNum, string $given): string
     {
+        $paramName = VmStreamContext::paramNameForArg($function, $argNum);
+
         return \sprintf(
-            '%s(): Argument #%d ($context) must be of type resource, %s given',
+            '%s(): Argument #%d ($%s) must be of type resource, %s given',
             $function,
             $argNum,
+            $paramName,
             $given
         );
     }
