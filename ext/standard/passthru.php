@@ -30,7 +30,8 @@ final class passthru extends Internal
             throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
         }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'passthru', 'command', false);
-        VmString::rejectEmptyBuiltinStringArg($command, 'passthru', 0, 'command');
+        // php-src exec.c — Zend "cannot be empty" (#30340)
+        VmString::rejectEmptyBuiltinStringArg($command, 'passthru', 0, 'command', true);
         $result = VmExecNative::run($command);
         if (false !== $result) {
             if (!VmExecNative::linesToStdout($result['lines'])) {

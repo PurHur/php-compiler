@@ -302,11 +302,12 @@ final class JitExec
         Value $lowered,
         string $function
     ): void {
+        // php-src exec.c — Zend "cannot be empty" (#30340)
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $arg,
             $lowered,
-            \sprintf('%s(): Argument #1 ($command) must not be empty', $function)
+            VmString::emptyStringArgValueErrorMessageCannot($function, 0, 'command')
         );
     }
 }
