@@ -18,9 +18,8 @@ final class rad2deg extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('rad2deg() requires exactly one argument');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#30534).
+        $this->requireExactArgCount($frame, 'rad2deg', 1);
         $num = VmMath::parseStrictFloatBuiltinArgForFrame(
             $frame,
             'rad2deg',
@@ -38,8 +37,9 @@ final class rad2deg extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('rad2deg() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #30534.
+        if (!$this->requireExactJitArgCount($context, $args, 'rad2deg', 1)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'rad2deg', 'float');
 
