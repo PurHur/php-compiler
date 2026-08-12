@@ -68,6 +68,8 @@ final class LibcExtern
             // module-locally; RenameJitHelper SSOT is VmFs::rename (Unlink #19186 shape).
             // chdir dropped (#29219): StringChdir NestedJIT leaf declares chdir(2)
             // module-locally; ChdirJitHelper uses @chdir (Rename #29141 shape).
+            // chroot dropped (#30558): StringChroot NestedJIT leaf declares chroot(2)
+            // module-locally; ChrootJitHelper uses @chroot (chdir #29219 shape).
             // getcwd NestedJIT leaf (#29429): GetcwdJit declares getcwd(2) module-locally;
             // GetcwdJitHelper uses @getcwd (never lived in this table — always-on realpath LLVM removed).
             'getenv' => [$i8p, false, [$i8p]],

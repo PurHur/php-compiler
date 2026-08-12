@@ -959,6 +959,9 @@ class Context {
             // chdir(2) NestedJIT leaf (#29219) — whitelist chdir → chdir_::call →
             // StringChdir::invokeNestedLeaf (module-local chdir(2); kernel removed).
             'chdir',
+            // chroot(2) NestedJIT leaf (#30558) — whitelist chroot → chroot_::call →
+            // StringChroot::invokeNestedLeaf (module-local chroot(2); always-on Module decl removed).
+            'chroot',
             // getcwd(2) NestedJIT leaf (#29429) — whitelist getcwd → getcwd_::call →
             // GetcwdJit::invokeNestedLeaf (module-local getcwd(2); always-on realpath LLVM removed).
             'getcwd',

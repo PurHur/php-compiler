@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** chroot() — VM via VmChrootNative (libc); JIT/AOT via JitChroot (#3500). */
+/** chroot() — VM via VmChrootNative; JIT/AOT via ChrootJitHelper (#3500, #30558). */
 final class chroot_ extends Internal
 {
     public function __construct()

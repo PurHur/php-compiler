@@ -1127,15 +1127,8 @@ class Module extends ModuleAbstract
         // NestedJIT leaf declares fnmatch module-locally (chdir #29219 / rename #29141 shape).
         // chdir(2) dropped (#30530 / #29219): StringChdir NestedJIT leaf declares module-locally;
         // LibcExtern already dropped its chdir row.
-        try {
-            $context->lookupFunction('chroot');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p);
-            $fn = $context->module->addFunction('chroot', $ft);
-            $context->registerFunction('chroot', $fn);
-        }
+        // chroot(2) dropped (#30558 / chdir #29219): StringChroot NestedJIT leaf declares
+        // module-locally; ChrootJitHelper uses @chroot (Module always-on removed).
         $double = $context->getTypeFromString('double');
         try {
             $context->lookupFunction('fabs');
