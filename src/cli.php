@@ -149,8 +149,9 @@ if (!function_exists('php_compiler_cli_sync_host_error_reporting')) {
      * Guest {@see \PHPCompiler\VM\ErrorReporter::defaultStartupReporting()} clears
      * {@code E_DEPRECATED} on unset profiles (#4842); explicit {@code PHP_COMPILER_PROFILE}
      * matches Zend {@see \PHPCompiler\VM\ErrorReporter::eAll()} (#29195, #26083).
-     * Compliance uses host {@code -d error_reporting=0} (#2055) and must keep that guest default —
-     * only sync when the host level enables deprecations (e.g. {@code E_ALL}).
+     * Compliance uses host {@code -d error_reporting=0} (#2055) and must keep that guest default.
+     * Any other captured host mask (including default {@code 22527} without {@code E_DEPRECATED})
+     * is mirrored so null-weak builtin deprecations match Zend (#30474).
      *
      * @param array<string, mixed> $options
      */
@@ -165,7 +166,7 @@ if (!function_exists('php_compiler_cli_sync_host_error_reporting')) {
             return;
         }
         $hostLevel = (int) $raw;
-        if (0 === ($hostLevel & \PHPCompiler\VM\ErrorReporter::E_DEPRECATED)) {
+        if (0 === $hostLevel) {
             return;
         }
         \PHPCompiler\ext\standard\VmIni::set($ctx, 'error_reporting', (string) $hostLevel);

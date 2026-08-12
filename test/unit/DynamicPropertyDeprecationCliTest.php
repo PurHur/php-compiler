@@ -202,6 +202,45 @@ final class DynamicPropertyDeprecationCliTest extends TestCase
     }
 
     /**
+     * Host {@code -d error_reporting=22527} (E_ALL without E_DEPRECATED) must suppress guest
+     * null-string builtin deprecations like Zend (#30474).
+     */
+    public function testHostDashDErrorReportingWithoutDeprecatedSuppressesNullStringDeprecation(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        if (false === $vm) {
+            $this->markTestSkipped('bin/vm.php missing');
+        }
+
+        $script = tempnam(sys_get_temp_dir(), 'domnull');
+        $this->assertNotFalse($script);
+        file_put_contents(
+            $script,
+            "<?php\n\$d = new DOMDocument();\n\$d->loadXML('<r id=\"x\"/>');\n"
+            . "var_export(\$d->getElementById(null));\necho \"\\n\";\n"
+        );
+
+        try {
+            $cmd = [
+                PHP_BINARY,
+                '-d',
+                'error_reporting=22527',
+                '-d',
+                'display_errors=0',
+                $vm,
+                $script,
+            ];
+            $result = $this->runCommand($cmd, $repoRoot);
+            $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+            $this->assertStringNotContainsString('deprecated', strtolower($result['stderr']));
+            $this->assertStringContainsString("NULL\n", $result['stdout']);
+        } finally {
+            @unlink($script);
+        }
+    }
+
+    /**
      * @param list<string> $cmd
      *
      * @return array{code: int, stdout: string, stderr: string}
