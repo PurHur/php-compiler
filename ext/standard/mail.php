@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -34,6 +35,11 @@ final class mail extends Internal
         }
         if (null === $frame->returnVar) {
             return;
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullString($frame->calledArgs[0], 'mail', 'to', 0, $frame);
+            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'mail', 'subject', 1, $frame);
+            InternalStrictArg::rejectNullString($frame->calledArgs[2], 'mail', 'message', 2, $frame);
         }
         $to = VmString::coercePathBuiltinArg($frame->calledArgs[0], 'mail', 0, 'to');
         $subject = VmString::coercePathBuiltinArg($frame->calledArgs[1], 'mail', 1, 'subject');
