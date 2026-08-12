@@ -1,28 +1,20 @@
 --TEST--
-stdlib dns_get_record() empty hostname DNS_ALL — root delegation records (#19078, ext/standard/dns.c)
---SKIPIF--
-<?php
-if (!function_exists('dns_get_record')) {
-    echo 'skip';
-}
-$r = @dns_get_record('', DNS_ALL);
-if (!is_array($r) || [] === $r) {
-    echo 'skip no root DNS in environment';
-}
-?>
+stdlib dns_get_record() empty hostname DNS_ALL/DNS_ANY — empty array (#30322, ext/standard/dns.c)
 --FILE--
 <?php
+error_reporting(E_ALL);
+set_error_handler(function ($n, $m) { return true; });
 $result = dns_get_record('', DNS_ALL);
 $nullResult = dns_get_record(null, DNS_ALL);
-echo count($result) > 0 ? "records\n" : "empty\n";
-echo (count($result) > 0 && count($nullResult) > 0) ? "null-match\n" : "null-mismatch\n";
-$type = $result[0]['type'] ?? '';
-echo ('NS' === $type || 'SOA' === $type) ? "type-ok\n" : "type-bad\n";
+$anyResult = dns_get_record('');
+echo ($result === []) ? "all-empty\n" : "all-nonempty\n";
+echo ($nullResult === []) ? "null-empty\n" : "null-nonempty\n";
+echo ($anyResult === []) ? "any-empty\n" : "any-nonempty\n";
 $aOnly = dns_get_record('', DNS_A);
 echo ($aOnly === []) ? "a-empty\n" : "a-nonempty\n";
 ?>
 --EXPECT--
-records
-null-match
-type-ok
+all-empty
+null-empty
+any-empty
 a-empty

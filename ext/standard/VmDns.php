@@ -348,6 +348,11 @@ final class VmDns
             return false;
         }
 
+        // php-src ext/standard/dns.c — empty hostname short-circuit (re-#19078, #30322)
+        if ('' === $hostname) {
+            return new HashTable();
+        }
+
         $records = [];
         foreach ($requested as $flag => $meta) {
             $chunk = match ($flag) {
