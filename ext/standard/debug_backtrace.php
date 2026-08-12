@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -60,9 +62,13 @@ final class debug_backtrace extends Internal
     {
         $argc = \count($args);
         if ($argc > 2) {
-            throw new \ArgumentCountError(
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
                 'debug_backtrace() expects at most 2 arguments, '.$argc.' given'
             );
+
+            return $slot;
         }
 
         $optionsArg = null;

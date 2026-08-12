@@ -1,7 +1,7 @@
+--TEST--
+debug_backtrace/debug_print_backtrace excess argc → ArgumentCountError (#30462)
+--FILE--
 <?php
-
-declare(strict_types=1);
-
 foreach (['debug_backtrace', 'debug_print_backtrace'] as $fn) {
     try {
         $fn(0, 0, 0);
@@ -12,3 +12,7 @@ foreach (['debug_backtrace', 'debug_print_backtrace'] as $fn) {
         echo get_class($e), ': ', $e->getMessage(), "\n";
     }
 }
+?>
+--EXPECT--
+debug_backtrace() expects at most 2 arguments, 3 given
+debug_print_backtrace() expects at most 2 arguments, 3 given
