@@ -16,6 +16,8 @@ use PHPLLVM\Value;
  *
  * VM: Fisher–Yates via CSPRNG; associative arrays reindex to 0..n-1.
  * JIT/AOT: {@see ShuffleRuntime::shufflePacked()}.
+ *
+ * Excess argc → Zend ArgumentCountError (#30523; php-src ext/standard/array.c).
  */
 final class shuffle_ extends Internal
 {
@@ -26,9 +28,8 @@ final class shuffle_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('shuffle() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 — #30523.
+        $this->requireExactArgCount($frame, 'shuffle', 1);
         $ht = VmArray::requireArray($frame->calledArgs[0], 'shuffle');
         VmArray::shufflePacked($ht);
         if (null !== $frame->returnVar) {
@@ -38,8 +39,9 @@ final class shuffle_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('shuffle() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30523 / peer #28229).
+        if (!$this->requireExactJitArgCount($context, $args, 'shuffle', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         JitArrayElem::requireArrayArg($context, $args[0], 'shuffle');
         ShuffleRuntime::shufflePacked($context, $args[0]);
