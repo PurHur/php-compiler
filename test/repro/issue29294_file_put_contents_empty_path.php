@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 /**
  * #29294 — file_put_contents('') empty-path ValueError must match Zend:
- * "Path must not be empty" (php-src ext/standard/file.c / zend_parse_arg_path).
+ * "Path cannot be empty" (php-src ext/standard/file.c / zend_parse_arg_path).
  *
  * Residual of #29268: fopen/file_get_contents/hash_file were fixed; write path still
  * leaked host PHP's "Path cannot be empty" via VmFsWritePure → host fopen.
  */
-$expected = 'Path must not be empty';
+$expected = 'Path cannot be empty';
 try {
     file_put_contents('', 'x');
     fwrite(STDERR, "fail: file_put_contents(\"\") expected ValueError\n");

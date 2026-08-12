@@ -1,5 +1,5 @@
 --TEST--
-stdlib empty path ValueError — Path must not be empty (#29268, php-src fopen_wrappers.c)
+stdlib empty path ValueError — Path cannot be empty (#29268, php-src fopen_wrappers.c)
 --FILE--
 <?php
 foreach ([
@@ -16,6 +16,6 @@ foreach ([
 }
 ?>
 --EXPECT--
-fopen:Path must not be empty
-file_get_contents:Path must not be empty
-hash_file:Path must not be empty
+fopen:Path cannot be empty
+file_get_contents:Path cannot be empty
+hash_file:Path cannot be empty

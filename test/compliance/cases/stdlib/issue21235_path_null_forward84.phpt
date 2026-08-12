@@ -26,10 +26,10 @@ foreach ([
 ?>
 --EXPECT--
 DEP
-fopen:VALUEERROR:Path must not be empty
+fopen:VALUEERROR:Path cannot be empty
 DEP
-file_get_contents:VALUEERROR:Path must not be empty
+file_get_contents:VALUEERROR:Path cannot be empty
 DEP
 getimagesize:VALUEERROR:Path cannot be empty
 DEP
-hash_file:VALUEERROR:Path must not be empty
+hash_file:VALUEERROR:Path cannot be empty

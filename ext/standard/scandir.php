@@ -25,7 +25,7 @@ final class scandir extends Internal
             throw new \LogicException('scandir() requires one or two arguments in this compiler build');
         }
         $path = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'scandir', 'directory', false);
-        VmString::rejectEmptyBuiltinStringArg($path, 'scandir', 0, 'directory');
+        VmString::rejectEmptyBuiltinStringArg($path, 'scandir', 0, 'directory', true);
         $sortingOrder = \SCANDIR_SORT_ASCENDING;
         if (2 === $argc) {
             $sortingOrder = VmMath::parseIntBuiltinArg(
@@ -67,7 +67,7 @@ final class scandir extends Internal
             $context,
             $args[0],
             $path,
-            'scandir(): Argument #1 ($directory) must not be empty'
+            VmString::emptyStringArgValueErrorMessageCannot('scandir', 0, 'directory')
         );
         StringFsGlob::ensureLinked($context);
 

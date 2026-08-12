@@ -22,10 +22,10 @@ foreach (['md5_file', 'sha1_file', 'file_get_contents', 'fopen', 'copy', 'readfi
 }
 ?>
 --EXPECT--
-md5_file:VALUEERROR:Path must not be empty
-sha1_file:VALUEERROR:Path must not be empty
-file_get_contents:VALUEERROR:Path must not be empty
-fopen:VALUEERROR:Path must not be empty
-copy:VALUEERROR:Path must not be empty
-readfile:VALUEERROR:Path must not be empty
-file:VALUEERROR:Path must not be empty
+md5_file:VALUEERROR:Path cannot be empty
+sha1_file:VALUEERROR:Path cannot be empty
+file_get_contents:VALUEERROR:Path cannot be empty
+fopen:VALUEERROR:Path cannot be empty
+copy:VALUEERROR:Path cannot be empty
+readfile:VALUEERROR:Path cannot be empty
+file:VALUEERROR:Path cannot be empty

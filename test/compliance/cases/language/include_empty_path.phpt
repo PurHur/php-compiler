@@ -18,5 +18,5 @@ try {
     echo 'require: ', $e->getMessage(), "\n";
 }
 --EXPECT--
-include: Path must not be empty
-require: Path must not be empty
+include: Path cannot be empty
+require: Path cannot be empty
