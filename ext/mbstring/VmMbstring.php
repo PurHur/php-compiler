@@ -3815,14 +3815,15 @@ final class VmMbstring
     }
 
     /**
-     * Z_PARAM_STR $pattern for mb_ereg / mb_eregi (php-src php_mbregex.c; #20261).
+     * Z_PARAM_STR $pattern for mb_ereg / mb_eregi (php-src php_mbregex.c; #30067).
      *
-     * Null: TypeError on PROFILE=8.4; deprecate+coerce to "" on default profile.
-     * Empty string (after coerce): ValueError — must not be empty.
+     * Soft-null on PROFILE=8.4 (Deprecated + coerce to "") then empty ValueError — Zend parity.
+     * Do not use {@see VmString::zparamStrBuiltinArgForFrame} (forward-profile TypeError).
+     * Caller strict_types still TypeErrors via trimFamily / InternalStrictArg.
      */
     public static function coerceMbEregPatternArg(Frame $frame, string $function, int $argIndex = 0): string
     {
-        $pattern = VmString::zparamStrBuiltinArgForFrame(
+        $pattern = VmString::trimFamilyStringArgForFrame(
             $frame,
             $argIndex,
             $function,
