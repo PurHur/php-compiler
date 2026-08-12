@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** locale_accept_from_http() — HTTP Accept-Language negotiate (#20036, AOT #28656). */
+/**
+ * locale_accept_from_http() — HTTP Accept-Language negotiate (#20036, AOT #28656).
+ *
+ * Z_PARAM_STR $header — null TypeError under caller strict_types (#29914, locale.stub.php).
+ */
 final class locale_accept_from_http extends Internal
 {
     public function execute(Frame $frame): void
@@ -22,8 +26,10 @@ final class locale_accept_from_http extends Internal
                 \count($frame->calledArgs)
             ));
         }
-        $header = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — strict null/non-string TypeError (#29914); soft-coerce otherwise.
+        $header = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'locale_accept_from_http',
             0,
             'header'
