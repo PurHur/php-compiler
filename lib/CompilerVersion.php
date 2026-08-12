@@ -3110,6 +3110,30 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ clarified libxml null entity-loader warning (ext/libxml/libxml.c; php-src #11952).
+     *
+     * Withheld on 8.4.0-dev reference / PROFILE=8.2 (Zend 8.2: Failed to load external entity "NULL").
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#30424).
+     */
+    public static function supportsLibxmlNullEntityLoaderClarifiedMessage(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ XML_OPTION_PARSE_HUGE (ext/xml/xml.stub.php; PHP_XML_OPTION_PARSE_HUGE; #28171).
      *
      * Withheld on 8.4.0-dev reference / PROFILE≤8.3 (Zend 8.2/8.3 defined() false). Enable via

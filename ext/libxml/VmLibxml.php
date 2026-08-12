@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\libxml;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmFs;
@@ -174,11 +175,15 @@ final class VmLibxml
             }
             $content = self::materializeExternalEntityLoaderResult($ctx, $result);
             if (null === $content) {
-                // php-src ext/libxml/libxml.c — php_libxml_external_entity_loader (#29596):
-                // public ID NULL → "because the resolver function returned null"; else quote the ID.
-                $message = null === $publicId
-                    ? 'Failed to load external entity because the resolver function returned null'
-                    : sprintf('Failed to load external entity "%s"', $publicId);
+                // php-src ext/libxml/libxml.c — php_libxml_external_entity_loader (#29596, #30424):
+                // PHP 8.3+ clarifies null resolver; 8.2 quotes "NULL" for null public ID.
+                if (null === $publicId) {
+                    $message = CompilerVersion::supportsLibxmlNullEntityLoaderClarifiedMessage()
+                        ? 'Failed to load external entity because the resolver function returned null'
+                        : 'Failed to load external entity "NULL"';
+                } else {
+                    $message = sprintf('Failed to load external entity "%s"', $publicId);
+                }
                 self::handleError(
                     $ctx,
                     [
