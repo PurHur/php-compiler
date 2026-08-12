@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -20,6 +21,10 @@ final class filter_id extends Internal
     {
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('filter_id() requires exactly one argument');
+        }
+        // php-src filter_id(string $name) — null rejected under strict_types (#30309).
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 0, 'filter_id', 'name');
         }
         if (null === $frame->returnVar) {
             return;
