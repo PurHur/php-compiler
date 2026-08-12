@@ -109,6 +109,10 @@ final class AssertOptionsJitHelper
     public const MSG_ZEND_ASSERTIONS_PHP_INI_ONLY =
         'zend.assertions may be completely enabled or disabled only in php.ini';
 
+    /** php-src ext/standard/assert.c — assert_options() unknown $option (#30524). */
+    public const MSG_INVALID_OPTION =
+        'assert_options(): Argument #1 ($option) must be an ASSERT_* constant';
+
     public static function iniGetZendAssertions(): string
     {
         return (string) self::$zendAssertions;

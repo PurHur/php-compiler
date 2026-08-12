@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPCompiler\ext\standard\AssertOptionsJitHelper;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -256,9 +258,15 @@ final class AssertOptionsRuntime
         self::writeBoolFalse($context, $out);
         $context->builder->returnVoid();
 
+        // php-src assert.c default → zend_argument_value_error (#30524).
+        // Do not use ExceptionBridge here: this body is a separate LLVM function from user
+        // try/catch; catchable emit would branch to another function's BB (module verify).
+        // Caller-side guard in JitAssertOptions::invoke owns the catchable path.
         $context->builder->positionAtEnd($failBb);
-        self::writeBoolFalse($context, $out);
-        $context->builder->returnVoid();
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, AssertOptionsJitHelper::MSG_INVALID_OPTION);
+        $context->builder->call($context->lookupFunction('abort'));
         $context->builder->clearInsertionPosition();
     }
 

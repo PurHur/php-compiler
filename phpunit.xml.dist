@@ -155,6 +155,8 @@
             <file>./test/compliance/TriggerErrorUserErrorHandledJITTest.php</file>
             <file>./test/compliance/AssertOptionsDeprecatedVMTest.php</file>
             <file>./test/compliance/AssertOptionsDeprecatedJITTest.php</file>
+            <file>./test/compliance/AssertOptionsInvalidOptionValueErrorVMTest.php</file>
+            <file>./test/compliance/AssertOptionsInvalidOptionValueErrorJITTest.php</file>
             <file>./test/compliance/EStrictConstantDeprecatedVMTest.php</file>
             <file>./test/compliance/EStrictConstantDeprecatedJITTest.php</file>
             <file>./test/compliance/DeprecatedInheritedConstFetchVMTest.php</file>
