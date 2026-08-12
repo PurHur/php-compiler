@@ -23,7 +23,9 @@ final class JitHttpResponseCode
     {
         $argc = count($args);
         if ($argc > 1) {
-            throw new \LogicException('http_response_code() accepts at most one argument');
+            throw new \ArgumentCountError(
+                'http_response_code() expects at most 1 argument, '.$argc.' given'
+            );
         }
 
         $slot = JitValueBox::alloc($context);

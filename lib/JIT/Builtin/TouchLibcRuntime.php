@@ -16,7 +16,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * NestedJIT {@see FsDirJitHelper::touch} cannot set times under thin AOT: host
  * \\touch() re-enters __compiler_touch, and FFI is unavailable in the native
- * binary. Platform utime is the justified thin ABI (php-src VCWD_UTIME).
+ * binary. Platform utime is the justified thin ABI (php-src VCWD_UTIME). Current time
+ * for omitted mtime/atime routes through {@see StringTime} (#30472).
  *
  * Omit sentinel: {@see FsDirJitHelper::TOUCH_TIME_OMIT} (PHP_INT_MIN) — not
  * “any negative”, so explicit -1 mtime/atime works (#11587).
@@ -93,10 +94,8 @@ final class TouchLibcRuntime
         $context->builder->returnValue($context->builder->select($utNowOk, $one, $zero));
 
         $context->builder->positionAtEnd($custom);
-        $now = $context->builder->call(
-            $context->lookupFunction('time'),
-            $context->getTypeFromString('int8*')->constNull()
-        );
+        StringTime::ensureLinked($context);
+        $now = StringTime::invoke($context);
         $mtimeEff = $context->builder->select($mtimeOmit, $now, $mtime);
         // php-src: omitted atime uses effective mtime (2-arg touch).
         $atimeEff = $context->builder->select($atimeOmit, $mtimeEff, $atime);
@@ -133,7 +132,6 @@ final class TouchLibcRuntime
                 ['open', $i32, [$i8p, $i32, $i32]],
                 ['close', $i32, [$i32]],
                 ['utime', $i32, [$i8p, $i8p]],
-                ['time', $i64, [$i8p]],
             ] as [$name, $ret, $params]
         ) {
             try {

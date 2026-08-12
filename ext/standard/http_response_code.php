@@ -28,7 +28,9 @@ final class http_response_code extends Internal
         $ctx = $frame->vmContext;
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('http_response_code() accepts at most one argument');
+            throw new \ArgumentCountError(
+                'http_response_code() expects at most 1 argument, '.$argc.' given'
+            );
         }
         if (null === $frame->returnVar) {
             if (0 === $argc) {

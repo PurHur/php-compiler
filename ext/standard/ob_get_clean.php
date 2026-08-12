@@ -23,8 +23,11 @@ final class ob_get_clean extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('ob_get_clean() takes no arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError(
+                'ob_get_clean() expects exactly 0 arguments, '.$argc.' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;

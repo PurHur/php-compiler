@@ -29,7 +29,7 @@ final class debug_backtrace extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc > 2) {
             throw new \ArgumentCountError(
-                \sprintf('debug_backtrace() expects at most 2 arguments, %d given', $argc)
+                'debug_backtrace() expects at most 2 arguments, '.$argc.' given'
             );
         }
         if (null === $frame->returnVar) {
@@ -65,7 +65,7 @@ final class debug_backtrace extends Internal
             $slot = JitValueBox::alloc($context);
             ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
-                \sprintf('debug_backtrace() expects at most 2 arguments, %d given', $argc)
+                'debug_backtrace() expects at most 2 arguments, '.$argc.' given'
             );
 
             return $slot;
