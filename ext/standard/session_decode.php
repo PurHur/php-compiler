@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** session_decode() — hydrate $_SESSION from php handler blob (php-src ext/session/session.c; #6086, #21952). */
@@ -24,6 +25,7 @@ class session_decode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('session_decode() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
+        InternalStrictArg::requireString($frame, 0, 'session_decode', 'data');
         $data = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'session_decode',

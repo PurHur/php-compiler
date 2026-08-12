@@ -21,7 +21,9 @@ class session_write_close extends Internal
     public function execute(Frame $frame): void
     {
         if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('session_write_close() takes no arguments in this compiler build');
+            throw new \ArgumentCountError(
+                'session_write_close() expects exactly 0 arguments, '.\count($frame->calledArgs).' given'
+            );
         }
         $ctx = VmReflection::requireContext($frame);
         $result = VmSession::writeClose($ctx);

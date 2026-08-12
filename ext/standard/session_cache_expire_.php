@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -28,7 +29,7 @@ class session_cache_expire_ extends Internal
                 'session_cache_expire() expects at most 1 argument, '.$argc.' given'
             );
         }
-        if (1 === $argc) {
+        if (1 === $argc && Variable::TYPE_NULL !== $frame->calledArgs[0]->resolveIndirect()->type) {
             $minutes = VmMath::parseIntBuiltinArgForFrame(
                 $frame,
                 0,
