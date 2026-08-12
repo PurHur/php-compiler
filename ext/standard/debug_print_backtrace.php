@@ -26,7 +26,9 @@ final class debug_print_backtrace extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 2) {
-            throw new \LogicException('debug_print_backtrace() accepts at most two arguments');
+            throw new \ArgumentCountError(
+                'debug_print_backtrace() expects at most 2 arguments, '.$argc.' given'
+            );
         }
         $options = 0;
         $limit = 0;
@@ -43,7 +45,9 @@ final class debug_print_backtrace extends Internal
     {
         $argc = \count($args);
         if ($argc > 2) {
-            throw new \LogicException('debug_print_backtrace() accepts at most two arguments');
+            throw new \ArgumentCountError(
+                'debug_print_backtrace() expects at most 2 arguments, '.$argc.' given'
+            );
         }
 
         return JitDebugPrintBacktrace::invoke(

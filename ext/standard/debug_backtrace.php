@@ -26,7 +26,9 @@ final class debug_backtrace extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 2) {
-            throw new \LogicException('debug_backtrace() accepts at most two arguments');
+            throw new \ArgumentCountError(
+                'debug_backtrace() expects at most 2 arguments, '.$argc.' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -58,7 +60,9 @@ final class debug_backtrace extends Internal
     {
         $argc = \count($args);
         if ($argc > 2) {
-            throw new \LogicException('debug_backtrace() accepts at most two arguments');
+            throw new \ArgumentCountError(
+                'debug_backtrace() expects at most 2 arguments, '.$argc.' given'
+            );
         }
 
         $optionsArg = null;
