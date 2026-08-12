@@ -1343,6 +1343,42 @@ final class VmDomXPath
                 'fnPredValue' => $matches[3],
             ];
         }
+        // [@attr] — attribute existence; XPath 1.0 node-set truth (#30439).
+        if (preg_match(
+            '~^(.+?)\[@([a-zA-Z_][\w:.\\-]*)\]$~',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => $matches[2],
+                'attrValue' => '',
+                'attrNumeric' => false,
+                'attrExists' => true,
+                'attrOp' => null,
+                'positionPred' => null,
+                'fnPred' => null,
+                'fnPredValue' => '',
+            ];
+        }
+        // [@attr op N] — numeric comparison (>, >=, <, <=, !=); XPath 1.0 (#30439).
+        if (preg_match(
+            '~^(.+?)\[@([^\]=><!]+?)\s*(!=|<=|>=|<|>)\s*([+-]?(?:\d+\.?\d*|\.\d+))\]$~',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => $matches[2],
+                'attrValue' => $matches[4],
+                'attrNumeric' => true,
+                'attrExists' => false,
+                'attrOp' => $matches[3],
+                'positionPred' => null,
+                'fnPred' => null,
+                'fnPredValue' => '',
+            ];
+        }
         // [@attr=N] — unquoted numeric literal; XPath 1.0 number equality (#24333).
         if (preg_match(
             '~^(.+?)\[@([^\]=]+)=([+-]?(?:\d+\.?\d*|\.\d+))\]$~',
@@ -1354,6 +1390,8 @@ final class VmDomXPath
                 'attr' => $matches[2],
                 'attrValue' => $matches[3],
                 'attrNumeric' => true,
+                'attrExists' => false,
+                'attrOp' => null,
                 'positionPred' => null,
                 'fnPred' => null,
                 'fnPredValue' => '',
@@ -1507,19 +1545,43 @@ final class VmDomXPath
         array $namespaces,
         ?string $fnPred = null,
         string $fnPredValue = '',
-        bool $attrNumeric = false
+        bool $attrNumeric = false,
+        bool $attrExists = false,
+        ?string $attrOp = null
     ): array {
         if (null !== $attr) {
-            $nodeIds = array_values(array_filter(
-                $nodeIds,
-                static fn (int $id): bool => self::elementAttributeEquals(
-                    DomRegistry::entry($id),
-                    $attr,
-                    $attrValue,
-                    $namespaces,
-                    $attrNumeric
-                )
-            ));
+            if ($attrExists) {
+                $nodeIds = array_values(array_filter(
+                    $nodeIds,
+                    static fn (int $id): bool => self::elementHasAttribute(
+                        DomRegistry::entry($id),
+                        $attr,
+                        $namespaces
+                    )
+                ));
+            } elseif (null !== $attrOp) {
+                $nodeIds = array_values(array_filter(
+                    $nodeIds,
+                    static fn (int $id): bool => self::elementAttributeCompare(
+                        DomRegistry::entry($id),
+                        $attr,
+                        $attrOp,
+                        $attrValue,
+                        $namespaces
+                    )
+                ));
+            } else {
+                $nodeIds = array_values(array_filter(
+                    $nodeIds,
+                    static fn (int $id): bool => self::elementAttributeEquals(
+                        DomRegistry::entry($id),
+                        $attr,
+                        $attrValue,
+                        $namespaces,
+                        $attrNumeric
+                    )
+                ));
+            }
         }
         if (null !== $fnPred) {
             $nodeIds = array_values(array_filter(
@@ -1681,7 +1743,9 @@ final class VmDomXPath
             $namespaces,
             $parsed['fnPred'],
             $parsed['fnPredValue'],
-            $parsed['attrNumeric']
+            $parsed['attrNumeric'],
+            $parsed['attrExists'] ?? false,
+            $parsed['attrOp'] ?? null
         );
     }
 
@@ -1712,7 +1776,9 @@ final class VmDomXPath
                 $namespaces,
                 $parsed['fnPred'],
                 $parsed['fnPredValue'],
-                $parsed['attrNumeric']
+                $parsed['attrNumeric'],
+                $parsed['attrExists'] ?? false,
+                $parsed['attrOp'] ?? null
             );
         }
         $ids = [];
@@ -1726,7 +1792,9 @@ final class VmDomXPath
             $namespaces,
             $parsed['fnPred'],
             $parsed['fnPredValue'],
-            $parsed['attrNumeric']
+            $parsed['attrNumeric'],
+            $parsed['attrExists'] ?? false,
+            $parsed['attrOp'] ?? null
         );
     }
 
@@ -1813,6 +1881,64 @@ final class VmDomXPath
         // match unless the caller registers that NS (or parses with HTML_NO_DEFAULT_NS).
         // getElementsByTagName remains HTML-aware separately — this is not that API.
         return '' === $ns;
+    }
+
+    /**
+     * [@attr] existence predicate — true when the element carries the named attribute (#30439).
+     *
+     * @param array<string, string> $namespaces
+     */
+    private static function elementHasAttribute(
+        ?ObjectEntry $element,
+        string $attrName,
+        array $namespaces
+    ): bool {
+        if (null === $element || !VmDom::isElement($element)) {
+            return false;
+        }
+        if (str_contains($attrName, ':')) {
+            [$prefix, $local] = explode(':', $attrName, 2);
+            $namespace = $namespaces[$prefix] ?? null;
+            if (null === $namespace) {
+                return false;
+            }
+
+            return VmDom::hasAttributeNS($element, $namespace, $local);
+        }
+
+        return VmDom::hasAttribute($element, $attrName);
+    }
+
+    /**
+     * [@attr op N] numeric comparison predicate — XPath 1.0 >, >=, <, <=, != (#30439).
+     *
+     * @param array<string, string> $namespaces
+     */
+    private static function elementAttributeCompare(
+        ?ObjectEntry $element,
+        string $attrName,
+        string $op,
+        string $rhs,
+        array $namespaces
+    ): bool {
+        if (null === $element || !VmDom::isElement($element)) {
+            return false;
+        }
+        if (!self::elementHasAttribute($element, $attrName, $namespaces)) {
+            return false;
+        }
+        if (str_contains($attrName, ':')) {
+            [$prefix, $local] = explode(':', $attrName, 2);
+            $namespace = $namespaces[$prefix] ?? null;
+            if (null === $namespace) {
+                return false;
+            }
+            $actual = VmDom::getAttributeNS($element, $namespace, $local);
+        } else {
+            $actual = VmDom::getAttributeNS($element, null, $attrName);
+        }
+
+        return self::compareNumbers(self::numberize($actual), $op, self::numberize($rhs));
     }
 
     /**
