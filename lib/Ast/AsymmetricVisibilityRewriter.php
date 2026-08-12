@@ -623,7 +623,23 @@ final class AsymmetricVisibilityRewriter
 
     private static function paramsViolateMultipleSetModifierRules(string $paramsText): bool
     {
-        return self::lineViolatesMultipleSetModifierRules($paramsText);
+        $offset = 0;
+        $len = strlen($paramsText);
+        while ($offset < $len) {
+            $nextComma = self::findTopLevelComma($paramsText, $offset);
+            $segment = false === $nextComma
+                ? substr($paramsText, $offset)
+                : substr($paramsText, $offset, $nextComma - $offset);
+            if (self::lineViolatesMultipleSetModifierRules($segment)) {
+                return true;
+            }
+            if (false === $nextComma) {
+                break;
+            }
+            $offset = $nextComma + 1;
+        }
+
+        return false;
     }
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
@@ -702,7 +718,23 @@ final class AsymmetricVisibilityRewriter
 
     private static function paramsViolateMultipleSetModifierRulesForReferenceProfile(string $paramsText): bool
     {
-        return self::lineViolatesMultipleSetModifierRulesForReferenceProfile($paramsText);
+        $offset = 0;
+        $len = strlen($paramsText);
+        while ($offset < $len) {
+            $nextComma = self::findTopLevelComma($paramsText, $offset);
+            $segment = false === $nextComma
+                ? substr($paramsText, $offset)
+                : substr($paramsText, $offset, $nextComma - $offset);
+            if (self::lineViolatesMultipleSetModifierRulesForReferenceProfile($segment)) {
+                return true;
+            }
+            if (false === $nextComma) {
+                break;
+            }
+            $offset = $nextComma + 1;
+        }
+
+        return false;
     }
 
     private static function lineViolatesStaticAsymmetricSetRules(string $line): bool
