@@ -17,8 +17,8 @@ use PHPLLVM\Value;
  * VM connects via {@see VmStreamSocketNative} + {@see VmPersistentSocket} registry — no host
  * {@see \pfsockopen()} delegation (PHP-in-PHP; no runtime/*.c socket table).
  *
- * Z_PARAM_STR $hostname — null TypeError under caller strict_types or 8.4 forward profile
- * (#23858, reverts #21446 soft-null; php-src ext/standard/fsock.c).
+ * Z_PARAM_STR $hostname — soft-null DEP+coerce outside strict_types / default profile;
+ * TypeError under caller strict_types or 8.4 forward profile (#30393, peer fsockopen #30313 / #23858).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/fsock.c PHP_FUNCTION(pfsockopen)
  */
@@ -41,6 +41,7 @@ final class pfsockopen extends Internal
             return;
         }
 
+        // Z_PARAM_STR — soft DEP+coerce; strict_types / PROFILE≥8.4 → TypeError (#30393).
         $hostname = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'pfsockopen', 0, 'hostname');
 
         $port = -1;
@@ -76,6 +77,11 @@ final class pfsockopen extends Internal
 
         [$result, $errno, $errstr, $socketFd] = VmPersistentSocket::open($hostname, $port, $timeout);
 
+        if (false === $result && 'Unable to parse remote socket path' === $errstr) {
+            // php-src network.c / fsock.c empty-address parse failure text (#30393).
+            $errstr = 'Failed to parse address "'.$hostname.'"';
+        }
+
         if ($argc >= 3) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
             $errnoOut->int($errno);
@@ -88,6 +94,8 @@ final class pfsockopen extends Internal
         }
 
         if (false === $result) {
+            // php-src fsock.c: Unable to connect to host:port (errstr) — empty soft-null → ":-1".
+            VmStreamSocketFailure::warnConnectFailed($frame, $hostname.':'.$port, $errstr, 'pfsockopen');
             $frame->returnVar->bool(false);
 
             return;
