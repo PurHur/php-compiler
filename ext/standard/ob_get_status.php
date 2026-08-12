@@ -22,8 +22,14 @@ final class ob_get_status extends Internal
 
     public function execute(Frame $frame): void
     {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                'ob_get_status() expects at most 1 argument, '.$argc.' given'
+            );
+        }
         $full = false;
-        if (\count($frame->calledArgs) > 0) {
+        if ($argc > 0) {
             $full = VmMath::parseBoolBuiltinArgForFrame(
                 $frame,
                 0,

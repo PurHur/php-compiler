@@ -17,8 +17,11 @@ final class JitObGetStatus
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('ob_get_status() accepts at most one argument');
+        $argc = \count($args);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                'ob_get_status() expects at most 1 argument, '.$argc.' given'
+            );
         }
         ObStatusRuntime::ensureLinked($context);
 
