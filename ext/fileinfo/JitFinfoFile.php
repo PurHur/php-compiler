@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\FinfoFileRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -78,6 +79,12 @@ final class JitFinfoFile
     ): Value {
         $id = (string) (++self::$blockSerial);
         $pathStr = JitStringBuiltinArg::lower($context, $pathArg, $function, $argIndex, $paramName);
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $pathArg,
+            $pathStr,
+            VmString::emptyStringArgValueErrorMessageCannot($function, $argIndex, $paramName)
+        );
         $raw = FinfoFileRuntime::invoke($context, $pathStr);
         $null = $context->getTypeFromString('__string__*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $null);
