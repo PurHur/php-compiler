@@ -1604,20 +1604,16 @@ final class CompilerVersion
     /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
-     * Enabled by default when VERSION_ID >= 80400 (#30204). The compiler IS version 8.4 and should
-     * support 8.4 language features. Explicit `PHP_COMPILER_PROFILE` overrides: PROFILE < 8.4
-     * disables; PROFILE >= 8.4 enables.
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (#30483, re-#24818 / #22781 / #22371 / #18531). `version_compare` treats `8.4.0-dev` as below
+     * `8.4.0`, so unset `PHP_COMPILER_PROFILE` keeps this false. Forward profile via
+     * `PHP_COMPILER_PROFILE=8.4` (or stable 8.4.0+) enables hook syntax.
+     * Do not use VERSION_ID / isForwardProfileAtLeast here — that re-enabled acceptance on default
+     * after #30204/#30221 and broke Zend 8.2 parity (#30483).
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool
     {
-        if (self::VERSION_ID >= 80400) {
-            $raw = getenv('PHP_COMPILER_PROFILE');
-            if (!\is_string($raw) || '' === trim($raw)) {
-                return true;
-            }
-        }
-
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
@@ -1926,18 +1922,12 @@ final class CompilerVersion
      * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization,isFinal,isAbstract,isVirtual},
      * ext/reflection/php_reflection.c, #17493, #20511, #22309).
      *
-     * Enabled by default when VERSION_ID >= 80400 (#30204). Aligns with
-     * {@see supportsPropertyHooks()}. Explicit `PHP_COMPILER_PROFILE` overrides.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
+     * Zend 8.2 (methods absent). Aligns with {@see supportsPropertyHooks()} (#30483, #24818, #24672).
+     * Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionPropertyHookProbes(): bool
     {
-        if (self::VERSION_ID >= 80400) {
-            $raw = getenv('PHP_COMPILER_PROFILE');
-            if (!\is_string($raw) || '' === trim($raw)) {
-                return true;
-            }
-        }
-
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 

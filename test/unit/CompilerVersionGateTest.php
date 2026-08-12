@@ -1628,12 +1628,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsReflectionPropertyHookProbesTrueOnDefaultProfile(): void
+    public function testSupportsReflectionPropertyHookProbesFalseOnDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsReflectionPropertyHookProbes());
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyHookProbes());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2458,13 +2458,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** Property hooks enabled on default 8.4.0-dev profile (#30204). */
-    public function testSupportsPropertyHooksTrueOnDefaultProfile(): void
+    /** Property hooks withheld on 8.4.0-dev reference profile — Zend 8.2 parity (#30483). */
+    public function testSupportsPropertyHooksFalseOnDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsPropertyHooks());
+            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -3687,7 +3687,7 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersReflectionPropertyHookProbesOnDefaultProfile(): void
+    public function testVmDoesNotRegisterReflectionPropertyHookProbesOnDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
@@ -3695,9 +3695,9 @@ final class CompilerVersionGateTest extends TestCase
             $runtime = new Runtime();
             $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
             $this->assertNotNull($rp);
-            $this->assertTrue(isset($rp->methods['isabstract']));
-            $this->assertTrue(isset($rp->methods['isvirtual']));
-            $this->assertTrue(isset($rp->methods['gethooks']));
+            $this->assertFalse(isset($rp->methods['isabstract']));
+            $this->assertFalse(isset($rp->methods['isvirtual']));
+            $this->assertFalse(isset($rp->methods['gethooks']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
