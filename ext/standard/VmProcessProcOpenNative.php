@@ -197,9 +197,9 @@ final class VmProcessProcOpenNative
                 'pipeHandles' => array_values($pipeHandles),
                 'childPaused' => true,
             ];
-            // Resume before return — a SIGSTOP'd fork child still holds the parent's
-            // stdout/stderr FDs; PHPUnit's harness blocks forever on EOF (#24481).
-            self::resumeChildIfPaused($ffi, self::$slots[$slot]);
+            // Child stays SIGSTOP'd until pipe I/O or proc_close — resumeChildForPipeHandle /
+            // onPipeHandleClosed / close() SIGCONT. Early resume let short commands exit before
+            // the first proc_get_status() (#13079); blocking reads SIGCONT via resumeChildForPipeHandle (#24481).
 
             return [$slot, $pipeHandles];
         } catch (\Throwable) {
@@ -340,9 +340,6 @@ final class VmProcessProcOpenNative
                 'pipeHandles' => array_values($pipeHandles),
                 'childPaused' => true,
             ];
-            // Resume before return — a SIGSTOP'd fork child still holds the parent's
-            // stdout/stderr FDs; PHPUnit's harness blocks forever on EOF (#24481).
-            self::resumeChildIfPaused($ffi, self::$slots[$slot]);
 
             return [$slot, $pipeHandles];
         } catch (\Throwable) {
@@ -413,11 +410,24 @@ final class VmProcessProcOpenNative
             return false;
         }
 
-        // php-src 8.2: waitpid already reaped → ECHILD path: running=false, exitcode=-1 (#23722).
-        // Only the first post-exit proc_get_status() returns the real exitcode.
+        $status = self::computeProcGetStatusFromActiveSlot($slot, $ffi);
+        self::$slots[$handle] = $slot;
+
+        return $status;
+    }
+
+    /**
+     * php-src PHP_FUNCTION(proc_get_status) + waitpid_cached (ext/standard/proc_open.c; #13079, #15647).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     *
+     * @return array<string, mixed>
+     */
+    public static function computeProcGetStatusFromActiveSlot(array &$slot, \FFI $ffi): array
+    {
+        // php-src 8.2: waitpid already reaped → subsequent proc_get_status: running=false, exitcode=-1 (#23722).
         if ($slot['statusKnown']) {
             $pendingSignals = self::resolvePendingSignals($slot, false, false, 0);
-            self::$slots[$handle] = $slot;
 
             return self::buildProcStatusArray(
                 $slot['command'],
@@ -434,29 +444,35 @@ final class VmProcessProcOpenNative
         }
 
         $running = true;
-        $statusVal = 0;
-        self::pollChildExitStatus($ffi, $slot);
-        self::$slots[$handle] = $slot;
-        if ($slot['statusKnown']) {
-            $statusVal = $slot['status'];
-            $running = false;
-        } else {
-            // php-src: waitpid(WNOHANG) in proc_get_status; reap only when child already exited (#13079, #15647).
-            try {
-                $running = 0 === (int) $ffi->kill($slot['pid'], 0);
-            } catch (\Throwable) {
-                return false;
+        $signaled = false;
+        $stopped = false;
+        $exitcode = -1;
+        $termsig = 0;
+        $stopsig = 0;
+
+        $waitStatus = 0;
+        $waitPid = self::waitpidCached($ffi, $slot, $waitStatus, self::WNOHANG | self::WUNTRACED);
+        $cached = $slot['statusKnown'];
+
+        if ($waitPid === $slot['pid']) {
+            if (self::wifExited($waitStatus)) {
+                $running = false;
+                $exitcode = self::wexitStatus($waitStatus);
             }
+            if (self::wifSignaled($waitStatus)) {
+                $running = false;
+                $signaled = true;
+                $termsig = self::wtermsig($waitStatus);
+            }
+            if (self::wifStopped($waitStatus)) {
+                $stopped = true;
+                $stopsig = self::wstopsig($waitStatus);
+            }
+        } elseif (-1 === $waitPid) {
+            $running = false;
         }
 
-        $lowByte = $statusVal & 0xff;
-        $exited = 0 === $lowByte;
-        $stopped = 0x7f === $lowByte;
-        $signaled = $lowByte > 0 && !$stopped;
-        $signals = self::termsigStopsigFromWaitStatus($statusVal);
-
-        $pendingSignals = self::resolvePendingSignals($slot, $signaled, $stopped, $signals['termsig']);
-        self::$slots[$handle] = $slot;
+        $pendingSignals = self::resolvePendingSignals($slot, $signaled, $stopped, $termsig);
 
         return self::buildProcStatusArray(
             $slot['command'],
@@ -464,12 +480,72 @@ final class VmProcessProcOpenNative
             $running,
             $signaled,
             $stopped,
-            $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
-            $signals['termsig'],
-            $signals['stopsig'],
+            $exitcode,
+            $termsig,
+            $stopsig,
             $pendingSignals,
-            $slot['statusKnown'],
+            $cached,
         );
+    }
+
+    private static function wifExited(int $status): bool
+    {
+        return 0 === ($status & 0xff);
+    }
+
+    private static function wifSignaled(int $status): bool
+    {
+        $lowByte = $status & 0xff;
+
+        return $lowByte > 0 && 0x7f !== $lowByte;
+    }
+
+    private static function wifStopped(int $status): bool
+    {
+        return 0x7f === ($status & 0xff);
+    }
+
+    private static function wexitStatus(int $status): int
+    {
+        return ($status >> 8) & 0xff;
+    }
+
+    private static function wtermsig(int $status): int
+    {
+        return $status & 0x7f;
+    }
+
+    private static function wstopsig(int $status): int
+    {
+        return ($status >> 8) & 0xff;
+    }
+
+    /**
+     * php-src waitpid_cached — cache only WIFEXITED statuses (ext/standard/proc_open.c).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool, pendingSignals?: list<int>} $slot
+     */
+    private static function waitpidCached(\FFI $ffi, array &$slot, int &$waitStatus, int $options): int
+    {
+        if ($slot['statusKnown']) {
+            $waitStatus = $slot['status'];
+
+            return $slot['pid'];
+        }
+
+        try {
+            $status = $ffi->new('int');
+            $waitPid = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), $options);
+            $waitStatus = (int) $status->cdata;
+            if ($waitPid > 0 && self::wifExited($waitStatus)) {
+                $slot['statusKnown'] = true;
+                $slot['status'] = $waitStatus;
+            }
+
+            return $waitPid;
+        } catch (\Throwable) {
+            return -1;
+        }
     }
 
     /**
@@ -781,27 +857,6 @@ final class VmProcessProcOpenNative
             self::resumeChildIfPaused($ffi, $slot);
 
             return;
-        }
-    }
-
-    /**
-     * Non-blocking waitpid — reap exited child and cache status for proc_close() (#15647).
-     *
-     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool} $slot
-     */
-    private static function pollChildExitStatus(\FFI $ffi, array &$slot): void
-    {
-        if ($slot['statusKnown']) {
-            return;
-        }
-        try {
-            $status = $ffi->new('int');
-            $waitRc = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), self::WNOHANG);
-            if ($waitRc === $slot['pid']) {
-                $slot['statusKnown'] = true;
-                $slot['status'] = (int) $status->cdata;
-            }
-        } catch (\Throwable) {
         }
     }
 

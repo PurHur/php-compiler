@@ -123,46 +123,10 @@ final class ProcessSlotJitHelper
             );
         }
 
-        $running = true;
-        $statusVal = 0;
-        self::pollChildExitStatus($ffi, $entry);
-        self::$slots[$slot] = $entry;
-        if ($entry['statusKnown']) {
-            $statusVal = $entry['status'];
-            $running = false;
-        } else {
-            try {
-                $running = 0 === (int) $ffi->kill($entry['pid'], 0);
-            } catch (\Throwable) {
-                return false;
-            }
-        }
-
-        $lowByte = $statusVal & 0xff;
-        $exited = 0 === $lowByte;
-        $stopped = 0x7f === $lowByte;
-        $signaled = $lowByte > 0 && !$stopped;
-        $signals = VmProcessProcOpenNative::termsigStopsigFromWaitStatus($statusVal);
-        $pendingSignals = VmProcessProcOpenNative::resolvePendingSignals(
-            $entry,
-            $signaled,
-            $stopped,
-            $signals['termsig'],
-        );
+        $status = VmProcessProcOpenNative::computeProcGetStatusFromActiveSlot($entry, $ffi);
         self::$slots[$slot] = $entry;
 
-        return VmProcessProcOpenNative::buildProcStatusArray(
-            $entry['command'],
-            $entry['pid'],
-            $running,
-            $signaled,
-            $stopped,
-            $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
-            $signals['termsig'],
-            $signals['stopsig'],
-            $pendingSignals,
-            $entry['statusKnown'],
-        );
+        return $status;
     }
 
     public static function terminate(int $slot, int $signal = 15): bool
@@ -210,25 +174,6 @@ final class ProcessSlotJitHelper
         }
 
         return $lowByte;
-    }
-
-    /**
-     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool} $entry
-     */
-    private static function pollChildExitStatus(\FFI $ffi, array &$entry): void
-    {
-        if ($entry['statusKnown']) {
-            return;
-        }
-        try {
-            $status = $ffi->new('int');
-            $waitRc = (int) $ffi->waitpid($entry['pid'], \FFI::addr($status), self::WNOHANG);
-            if ($waitRc === $entry['pid']) {
-                $entry['statusKnown'] = true;
-                $entry['status'] = (int) $status->cdata;
-            }
-        } catch (\Throwable) {
-        }
     }
 
     private static function ffi(): ?\FFI
