@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -16,9 +17,8 @@ final class filesize extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('filesize() requires exactly one argument in this compiler build');
-        }
+        // php-src filestat.c / file.stub.php — exactly 1 (#30545).
+        $this->requireExactArgCount($frame, 'filesize', 1);
         $filenameArg = $frame->calledArgs[0];
         if (null === $frame->returnVar) {
             return;
@@ -35,8 +35,16 @@ final class filesize extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('filesize() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30545 / peer #30544).
+        if (!$this->requireExactJitArgCount($context, $args, 'filesize', 1)) {
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool(
+                $context,
+                $slot,
+                $context->getTypeFromString('int1')->constInt(0, false)
+            );
+
+            return JitValueBox::pointer($context, $slot);
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'filesize');
 
