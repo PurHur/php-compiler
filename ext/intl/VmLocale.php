@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmString;
+
 /**
  * Process default BCP-47 locale id (php-src ext/intl/php_intl.c / locale_methods.c).
  *
@@ -87,6 +90,26 @@ final class VmLocale
     public static function resetDefaultForTests(): void
     {
         self::$default = null;
+    }
+
+    /**
+     * Z_PARAM_STR $locale for setDefault — null always TypeError (#29932, locale.stub.php).
+     *
+     * php-src locale_set_default / Locale::setDefault use Z_PARAM_STR. Do not soft-coerce via
+     * {@see VmString::coerceStringBuiltinArg} (null→"" then ValueError on invalid locale).
+     */
+    public static function coerceLocaleArg(Variable $var, string $function, int $position): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($locale) must be of type string, null given',
+                $function,
+                $position + 1
+            ));
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $function, $position, 'locale', 'string', false);
     }
 
     /**
