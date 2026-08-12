@@ -16,8 +16,11 @@ final class JitObGetClean
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('ob_get_clean() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            throw new \ArgumentCountError(
+                'ob_get_clean() expects exactly 0 arguments, '.$argc.' given'
+            );
         }
         ObOutputRuntime::ensureObStackLinked($context);
         $slot = JitValueBox::alloc($context);
