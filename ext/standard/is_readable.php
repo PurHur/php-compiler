@@ -17,9 +17,8 @@ final class is_readable extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('is_readable() requires exactly one argument in this compiler build');
-        }
+        // php-src filestat.c / file.stub.php — exactly 1 (#30544).
+        $this->requireExactArgCount($frame, 'is_readable', 1);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'is_readable');
         if (null === $frame->returnVar) {
             return;
@@ -29,8 +28,9 @@ final class is_readable extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('is_readable() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30544 / peer #30523).
+        if (!$this->requireExactJitArgCount($context, $args, 'is_readable', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $path = JitStringBuiltinArg::lowerPath($context, $args[0], 'is_readable', 0, 'filename');
 

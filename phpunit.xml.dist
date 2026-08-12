@@ -326,6 +326,8 @@
             <file>./test/compliance/ExplodeEmptySeparatorMessageJITTest.php</file>
             <file>./test/compliance/ExecFamilyEmptyCommandMessageVMTest.php</file>
             <file>./test/compliance/ExecFamilyEmptyCommandMessageJITTest.php</file>
+            <file>./test/compliance/FilestatPredicatesExcessArgc30544VMTest.php</file>
+            <file>./test/compliance/FilestatPredicatesExcessArgc30544JITTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageVMTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>

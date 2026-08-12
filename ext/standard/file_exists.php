@@ -15,9 +15,8 @@ final class file_exists extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('file_exists() requires exactly one argument');
-        }
+        // php-src filestat.c / file.stub.php — exactly 1 (#30544).
+        $this->requireExactArgCount($frame, 'file_exists', 1);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'file_exists');
         if (null === $frame->returnVar) {
             return;
@@ -32,8 +31,9 @@ final class file_exists extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('file_exists() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30544 / peer #30523).
+        if (!$this->requireExactJitArgCount($context, $args, 'file_exists', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'file_exists');
 
