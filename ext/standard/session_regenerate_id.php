@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -23,16 +24,13 @@ class session_regenerate_id extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('session_regenerate_id() accepts at most one argument in this compiler build');
+            throw new \ArgumentCountError(
+                'session_regenerate_id() expects at most 1 argument, '.$argc.' given'
+            );
         }
         $deleteOld = false;
         if (1 === $argc) {
-            $flag = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException(
-                    'session_regenerate_id() argument must be a boolean in this compiler build'
-                );
-            }
+            $flag = InternalStrictArg::requireBool($frame, 0, 'session_regenerate_id', 'delete_old_session');
             $deleteOld = $flag->toBool();
         }
         $ctx = VmReflection::requireContext($frame);
