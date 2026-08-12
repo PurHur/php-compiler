@@ -1683,8 +1683,10 @@ final class VmArray
 
     private static function valueTypeLabel(Variable $value): string
     {
-        // zend_execute.c — bool actuals print true/false (#29097).
-        return EnumCaseSupport::typeNameForTypeErrorActual($value);
+        // php-src zend_argument_type_error / Z_PARAM_* — zend_zval_type_name ("bool"), not
+        // zend_zval_value_name ("true") (#30480; re-#30227). User-function TypeErrors keep
+        // typeNameForTypeErrorActual via lib/VM/TypeCheck.php (#29097).
+        return EnumCaseSupport::typeNameForVariable($value);
     }
 
     /**

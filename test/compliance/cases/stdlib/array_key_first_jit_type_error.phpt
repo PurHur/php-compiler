@@ -8,4 +8,4 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-TypeError: array_key_first(): Argument #1 ($array) must be of type array, true given
+TypeError: array_key_first(): Argument #1 ($array) must be of type array, bool given

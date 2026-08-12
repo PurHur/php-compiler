@@ -10,4 +10,4 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-TypeError: array_diff(): Argument #3 must be of type array, true given
+TypeError: array_diff(): Argument #3 must be of type array, bool given
