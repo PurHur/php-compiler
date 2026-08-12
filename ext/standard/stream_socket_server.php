@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  *
  * Z_PARAM_STR $address: caller strict_types → TypeError on null; soft path DEP+coerce (#30374).
  * Soft empty-address failure emits Unable-to-connect Warning like Zend (#30391).
+ * Non-empty bind/listen failures also warn (getaddrinfo dual Warning + in-use) (#30395).
  *
  * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_server)
  *
@@ -80,8 +81,12 @@ final class stream_socket_server extends Internal
         [$result, $errno, $errstr, $socketFd] = VmStreamSocketNative::server($local, $flags, $contextVar);
 
         if (false === $result && 'Unable to parse local socket path' === $errstr) {
-            // php-src streamsfuncs.c empty-address parse failure text (#30391).
-            $errstr = 'Failed to parse address "'.$local.'"';
+            // php-src streamsfuncs.c: bare "tcp://" → Failed to parse address "" (#30391/#30395).
+            $display = $local;
+            if (1 === \preg_match('#^[a-z][a-z0-9+.-]*://$#i', $local)) {
+                $display = '';
+            }
+            $errstr = 'Failed to parse address "'.$display.'"';
         }
 
         if ($argc >= 2) {
@@ -96,8 +101,9 @@ final class stream_socket_server extends Internal
         }
 
         if (false === $result) {
-            // Zend soft-null empty address: "Unable to connect to  (Failed to parse address "")".
-            VmStreamSocketFailure::warnConnectFailed($frame, $local, $errstr, 'stream_socket_server');
+            // Empty host errstr → Zend warning text "Unknown error" (unix ENOENT etc.) (#30395).
+            $warnErrstr = '' !== $errstr ? $errstr : 'Unknown error';
+            VmStreamSocketFailure::warnConnectFailed($frame, $local, $warnErrstr, 'stream_socket_server');
             $frame->returnVar->bool(false);
 
             return;
