@@ -16,7 +16,10 @@ use PHPLLVM\Value;
 /**
  * set_include_path() — replace include_path (ext/standard/basic_functions.c; #3223).
  *
- * Z_PARAM_PATH $include_path — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ * Z_PARAM_PATH $include_path — soft-null DEP+coerce; caller strict_types → TypeError (#30359, #20254).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.c PHP_FUNCTION(set_include_path)
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php
  */
 final class set_include_path extends Internal
 {
@@ -32,11 +35,11 @@ final class set_include_path extends Internal
                 'set_include_path() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
-        // Z_PARAM_PATH — null TypeError on PROFILE=8.4 (#20254; shared path guard).
-        $newPath = VmString::coercePathBuiltinArg(
-            $frame->calledArgs[0],
-            'set_include_path',
+        // Z_PARAM_PATH — caller strict_types → TypeError on null; else soft-null (#30359).
+        $newPath = VmFilestatArg::filenameArgForFrame(
+            $frame,
             0,
+            'set_include_path',
             'include_path'
         );
         $old = VmIncludePath::push($newPath);
@@ -62,6 +65,20 @@ final class set_include_path extends Internal
             VmString::rejectNullByteBuiltinStringArg($lit, 'set_include_path', 0, 'include_path');
         }
         $nullPath = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        // Soft-null outside strict_types; strict → TypeError (#30359).
+        // Early return after compile-time null TypeError — no setValidated after abort
+        // (AOT module verify: terminator mid-block; peer getopt #30358).
+        if ($nullPath && $context->callerStrictTypes) {
+            JitStringBuiltinArg::lowerPath(
+                $context,
+                $args[0],
+                'set_include_path',
+                0,
+                'include_path'
+            );
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
         $newPath = JitStringBuiltinArg::lowerPath(
             $context,
             $args[0],
@@ -69,20 +86,6 @@ final class set_include_path extends Internal
             0,
             'include_path'
         );
-        if (
-            $nullPath
-            && (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
-        ) {
-            // lowerPath already emitted TypeError+abort; skip setValidated after terminator (#20254).
-            $slot = JitValueBox::alloc($context);
-            $ptr = JitValueBox::pointer($context, $slot);
-            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
-
-            return $ptr;
-        }
 
         return JitIncludePath::setValidated($context, $newPath);
     }
