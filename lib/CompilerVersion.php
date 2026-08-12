@@ -116,10 +116,15 @@ final class CompilerVersion
         return self::EXTRA_VERSION;
     }
 
-    /** PHP 8.3+ typed class constants in traits (Zend/zend_compile.c, issue #5212). */
+    /**
+     * PHP 8.3+ typed constants on traits (Zend/zend_compile.c, issue #5212, #30512).
+     *
+     * Delegates to {@see supportsTypedClassConstants()} so explicit PROFILE < 8.3 rejects
+     * typed trait constants like Zend 8.2.
+     */
     public static function supportsTypedTraitConstants(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=');
+        return self::supportsTypedClassConstants();
     }
 
     /** PHP 8.3+ typed constants on interfaces (Zend/zend_compile.c, issue #5980, #7042, #24917). */
@@ -129,17 +134,26 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24809, #30176).
+     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24809, #30176, #30512).
      *
-     * Enabled when compiler MAJOR.MINOR >= 8.3 (handles 8.4.0-dev where version_compare treats
-     * -dev as below 8.4.0 stable). Previously withheld on 8.4.0-dev to match Zend 8.2 host parse
-     * error, but the parser + CFG patches support it and typed class constants are a PHP 8.3
-     * language feature the compiler should implement (#30176).
+     * Enabled by default when compiler MAJOR.MINOR >= 8.3 (handles 8.4.0-dev where
+     * version_compare treats -dev as below 8.4.0 stable) — PHP 8.3 language feature (#30176).
+     * Explicit `PHP_COMPILER_PROFILE` overrides: PROFILE < 8.3 disables (Zend 8.2 parse error);
+     * PROFILE >= 8.3 enables (#30512). Same override shape as {@see supportsDynamicClassConstFetch()}.
      */
     public static function supportsTypedClassConstants(): bool
     {
-        return self::MAJOR_VERSION > 8
-            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 3);
+        if (self::MAJOR_VERSION < 8
+            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION < 3)) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        }
+
+        return true;
     }
 
     /**
@@ -845,7 +859,7 @@ final class CompilerVersion
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 "Illegal offset type"). Enable via
      * stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.3} / {@code 8.4} forward profile.
-     * Same withhold shape as {@see supportsTypedClassConstants()} — do not use bare
+     * Same withhold shape as {@see supportsGlobalTypedConstants()} — do not use bare
      * languageProfileVersion() alone (VERSION is 8.4.0-dev).
      */
     public static function supportsTypedIllegalContainerOffset(): bool
