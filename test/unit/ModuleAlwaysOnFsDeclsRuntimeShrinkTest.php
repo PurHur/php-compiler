@@ -24,6 +24,7 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
             'rmdir',
             'nice',
             'chdir',
+            'chroot', // #30558 — StringChroot NestedJIT leaf
         ];
     }
 
@@ -37,7 +38,6 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
             'lstat',
             'mkdir',
             'chmod',
-            'chroot',
             '__errno_location',
         ];
     }
