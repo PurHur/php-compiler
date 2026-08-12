@@ -16,6 +16,8 @@ use PHPLLVM\Value;
  *
  * VM: homogeneous string or integer values; keys preserved on packed and assoc arrays (#9600).
  * JIT/AOT: packed list via rebuild preserve-keys; string-key via __hashtable__sortStringKeyValuesNaturalCase.
+ *
+ * Excess argc → Zend ArgumentCountError (#30523; php-src ext/standard/array.c).
  */
 final class natcasesort_ extends Internal
 {
@@ -26,9 +28,8 @@ final class natcasesort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('natcasesort() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 — #30523.
+        $this->requireExactArgCount($frame, 'natcasesort', 1);
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'natcasesort');
         if ($ht->getNumElements() < 2) {
@@ -46,8 +47,9 @@ final class natcasesort_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('natcasesort() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30523 / peer #28229).
+        if (!$this->requireExactJitArgCount($context, $args, 'natcasesort', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'natcasesort');
         NaturalSortRuntime::natcasesortByValue($context, $args[0]);
