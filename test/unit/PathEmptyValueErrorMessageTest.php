@@ -7,12 +7,12 @@ namespace PHPCompiler;
 use PHPCompiler\VM\PathSupport;
 use PHPUnit\Framework\TestCase;
 
-/** Empty-path ValueError wording must match Zend (#29268). */
+/** Empty-path ValueError wording must match Zend (#29268, #30457). */
 final class PathEmptyValueErrorMessageTest extends TestCase
 {
     public function test_shared_constant_matches_zend(): void
     {
-        self::assertSame('Path must not be empty', PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
+        self::assertSame('Path cannot be empty', PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
     }
 
     public function test_vm_fopen_empty_path_message(): void
@@ -47,10 +47,10 @@ final class PathEmptyValueErrorMessageTest extends TestCase
         fclose($pipes[2]);
         $code = proc_close($proc);
         self::assertSame(0, $code, $stderr.$stdout);
-        self::assertStringContainsString('fopen:Path must not be empty', $stdout);
-        self::assertStringContainsString('file_get_contents:Path must not be empty', $stdout);
-        self::assertStringContainsString('hash_file:Path must not be empty', $stdout);
-        self::assertStringContainsString('file_put_contents:Path must not be empty', $stdout);
+        self::assertStringContainsString('fopen:Path cannot be empty', $stdout);
+        self::assertStringContainsString('file_get_contents:Path cannot be empty', $stdout);
+        self::assertStringContainsString('hash_file:Path cannot be empty', $stdout);
+        self::assertStringContainsString('file_put_contents:Path cannot be empty', $stdout);
         self::assertStringContainsString("ok\n", $stdout);
     }
 
@@ -86,7 +86,7 @@ final class PathEmptyValueErrorMessageTest extends TestCase
         fclose($pipes[2]);
         $code = proc_close($proc);
         self::assertSame(0, $code, $stderr.$stdout);
-        self::assertStringContainsString('file_put_contents:Path must not be empty', $stdout);
+        self::assertStringContainsString('file_put_contents:Path cannot be empty', $stdout);
         self::assertStringContainsString("ok\n", $stdout);
     }
 }

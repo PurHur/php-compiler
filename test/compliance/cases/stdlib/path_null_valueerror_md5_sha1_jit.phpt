@@ -29,8 +29,8 @@ try {
 }
 ?>
 --EXPECT--
-md5_file:VALUEERROR:Path must not be empty
-sha1_file:VALUEERROR:Path must not be empty
-hash_file:VALUEERROR:Path must not be empty
-hash_hmac_file:VALUEERROR:Path must not be empty
-empty:Path must not be empty
+md5_file:VALUEERROR:Path cannot be empty
+sha1_file:VALUEERROR:Path cannot be empty
+hash_file:VALUEERROR:Path cannot be empty
+hash_hmac_file:VALUEERROR:Path cannot be empty
+empty:Path cannot be empty

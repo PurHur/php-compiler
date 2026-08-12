@@ -26,8 +26,8 @@ foreach ([
 ?>
 --EXPECT--
 DEP
-gzopen:VALUEERROR:Path must not be empty
+gzopen:VALUEERROR:Path cannot be empty
 DEP
-gzfile:VALUEERROR:Path must not be empty
+gzfile:VALUEERROR:Path cannot be empty
 DEP
-readgzfile:VALUEERROR:Path must not be empty
+readgzfile:VALUEERROR:Path cannot be empty

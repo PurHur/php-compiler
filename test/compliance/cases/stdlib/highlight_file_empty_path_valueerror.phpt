@@ -1,5 +1,5 @@
 --TEST--
-stdlib highlight_file()/show_source() empty path — ValueError Path must not be empty (#14075, ext/standard/url.c)
+stdlib highlight_file()/show_source() empty path — ValueError Path cannot be empty (#14075, ext/standard/url.c)
 --FILE--
 <?php
 foreach (['highlight_file', 'show_source'] as $fn) {
@@ -12,5 +12,5 @@ foreach (['highlight_file', 'show_source'] as $fn) {
 }
 ?>
 --EXPECT--
-highlight_file:Path must not be empty
-show_source:Path must not be empty
+highlight_file:Path cannot be empty
+show_source:Path cannot be empty

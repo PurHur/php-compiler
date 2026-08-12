@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM: file_put_contents('') ValueError "Path must not be empty" (#29294, php-src file.c). */
+/** VM: file_put_contents('') ValueError "Path cannot be empty" (#29294, php-src file.c). */
 final class FilePutContentsEmptyPathValueErrorVMTest extends BaseTest
 {
     protected static string $DIR = __DIR__;

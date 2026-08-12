@@ -74,7 +74,7 @@ final class SimpleXmlElementAsXml extends VmClassMethod
     /**
      * Optional filename operand — null / absent means return the XML string (php-src Z_PARAM_PATH_OPTIONAL).
      *
-     * Empty path → ValueError "Path must not be empty" (php-src zend_parse_arg_path; #29268).
+     * Empty path → ValueError "Path cannot be empty" (php-src zend_parse_arg_path; #29268, #30457).
      */
     private static function optionalFilename(Frame $frame, string $label): ?string
     {

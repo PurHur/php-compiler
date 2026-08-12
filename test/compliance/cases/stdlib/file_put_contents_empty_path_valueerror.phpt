@@ -1,8 +1,8 @@
 --TEST--
-stdlib file_put_contents() empty path — ValueError Path must not be empty (#29294, ext/standard/file.c)
+stdlib file_put_contents() empty path — ValueError Path cannot be empty (#29294, ext/standard/file.c)
 --FILE--
 <?php
-$expected = 'Path must not be empty';
+$expected = 'Path cannot be empty';
 try {
     file_put_contents('', 'x');
     echo "FAIL: no throw\n";
@@ -18,6 +18,6 @@ try {
 }
 echo "ok\n";
 --EXPECT--
-empty:Path must not be empty
-nonlit:Path must not be empty
+empty:Path cannot be empty
+nonlit:Path cannot be empty
 ok

@@ -36,10 +36,10 @@ unlink:false
 mkdir:false
 touch:false
 rename:false
-copy:ValueError:Path must not be empty
+copy:ValueError:Path cannot be empty
 chmod:false
 rmdir:false
 is_writable:false
-readfile:ValueError:Path must not be empty
+readfile:ValueError:Path cannot be empty
 filesize:false
 opendir:false

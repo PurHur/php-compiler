@@ -22,7 +22,7 @@ foreach ([
 }
 ?>
 --EXPECT--
-fopen:VALUEERROR:Path must not be empty
-copy:VALUEERROR:Path must not be empty
-readfile:VALUEERROR:Path must not be empty
-file:VALUEERROR:Path must not be empty
+fopen:VALUEERROR:Path cannot be empty
+copy:VALUEERROR:Path cannot be empty
+readfile:VALUEERROR:Path cannot be empty
+file:VALUEERROR:Path cannot be empty
