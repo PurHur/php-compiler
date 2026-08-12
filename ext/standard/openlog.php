@@ -10,7 +10,13 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** openlog() — open connection to system logger (ext/standard/syslog.c; #3676). */
+/**
+ * openlog() — open connection to system logger (ext/standard/syslog.c; #3676).
+ *
+ * Z_PARAM_STRING $prefix — soft-null DEP+coerce; caller strict_types → TypeError (#30372).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/syslog.c PHP_FUNCTION(openlog)
+ */
 final class openlog extends Internal
 {
     public function __construct()
@@ -28,7 +34,14 @@ final class openlog extends Internal
             return;
         }
 
-        $ident = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openlog', 0, 'ident');
+        $ident = VmString::stringBuiltinArgForFrame(
+            $frame,
+            0,
+            'openlog',
+            0,
+            'prefix',
+            false
+        );
         $option = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'openlog', 1, 'option');
         $facility = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'openlog', 2, 'facility');
         $frame->returnVar->bool(VmSyslog::openlog($ident, $option, $facility));
