@@ -494,6 +494,27 @@ echo is_string($flat[\'display_errors\'] ?? null) ? "flat string\n" : "flat not 
         );
     }
 
+    /** Issue #30435: ??= on array elements with following echo-concat must assign, not skip. */
+    public function testNullCoalesceAssignArrayEchoConcat(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$arr = [];
+$arr["x"] ??= "new";
+echo "1: " . $arr["x"] . "\n";
+
+$arr2 = ["y" => null];
+$arr2["y"] ??= "override";
+echo "2: " . $arr2["y"] . "\n";
+
+$arr3 = ["z" => "existing"];
+$arr3["z"] ??= "nope";
+echo "3: " . $arr3["z"] . "\n";
+',
+            "1: new\n2: override\n3: existing\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();

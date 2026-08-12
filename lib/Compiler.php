@@ -5451,6 +5451,16 @@ class Compiler {
      */
     private function isCoalesceLoweredByFollowingEchoConcat(array $ops, int $index): bool
     {
+        // ??= (coalesce + tail assign) must compile with ISSET/COALESCE branches — the echo reads
+        // the array element via a separate dim fetch, not the coalesce result (#30435).
+        if (
+            $ops[$index] instanceof Op\Expr\BinaryOp\Coalesce
+            && $index + 1 < \count($ops)
+            && $ops[$index + 1] instanceof Op\Expr\Assign
+            && $this->isCoalesceAssignTail($ops[$index + 1], $ops[$index])
+        ) {
+            return false;
+        }
         for ($j = $index + 1; $j < \count($ops); ++$j) {
             if ($ops[$j] instanceof Op\Terminal\Echo_) {
                 if (null !== $this->flattenBinaryConcatToConcatList($ops[$j]->expr)) {
