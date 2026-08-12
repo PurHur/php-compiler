@@ -23,7 +23,35 @@ final class JitSyslog
     ): Value {
         StringSyslog::ensureLinked($context);
 
-        $identStr = JitStringBuiltinArg::lower($context, $ident, 'openlog', 0, 'ident');
+        // Soft-null outside strict_types; strict → TypeError (#30372).
+        // Early return after compile-time null TypeError — no syslog helper after abort
+        // (AOT module verify: terminator mid-block; peer getopt #30358).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $ident->type || ($ident->isNullConstant ?? false))) {
+            JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $ident,
+                'openlog',
+                0,
+                'prefix',
+                'string',
+                null,
+                false
+            );
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
+        $identStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $ident,
+            'openlog',
+            0,
+            'prefix',
+            'string',
+            null,
+            false
+        );
         $opt = self::lowerI32($context, $option, 'openlog', 1, 'option');
         $fac = self::lowerI32($context, $facility, 'openlog', 2, 'facility');
 
