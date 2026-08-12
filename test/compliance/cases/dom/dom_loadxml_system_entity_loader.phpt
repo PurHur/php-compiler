@@ -47,5 +47,5 @@ libxml_set_external_entity_loader(null);
 --EXPECT--
 no_noent=DOMEntityReference|x
 default=DOMText|HELLO|<r>HELLO</r>
-null_loader=1|<r/>|1|Failed to load external entity because the resolver function returned null|1|2
+null_loader=1|<r/>|1|Failed to load external entity "NULL"|1|2
 path_loader=HELLO

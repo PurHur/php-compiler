@@ -107,7 +107,7 @@ libxml_set_external_entity_loader(null);
 --EXPECTF--
 xsd_dtd_calls=1 ok=0 errs=%d last=Failed to parse the XML resource '%s/ok.xsd'. code=3067
 xsd_missing_ok_calls=1 ok=1
-xsd_null_calls=1 ok=0 errs=2 e0=Failed to load external entity because the resolver function returned null code=1 e1=Failed to parse the XML resource '%s/ok.xsd'. code=3067
+xsd_null_calls=1 ok=0 errs=2 e0=Failed to load external entity "NULL" code=1 e1=Failed to parse the XML resource '%s/ok.xsd'. code=3067
 rng_dtd_calls=1 ok=0 errs=%d last=xmlRelaxNGParse: could not load %s/ok.rng code=1065
 rng_missing_ok_calls=1 ok=1
-rng_null_calls=1 ok=0 errs=2 e0=Failed to load external entity because the resolver function returned null code=1 e1=xmlRelaxNGParse: could not load %s/ok.rng code=1065
+rng_null_calls=1 ok=0 errs=2 e0=Failed to load external entity "NULL" code=1 e1=xmlRelaxNGParse: could not load %s/ok.rng code=1065
