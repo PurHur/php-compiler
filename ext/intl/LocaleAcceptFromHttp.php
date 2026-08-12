@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
-/** Locale::acceptFromHttp() — php-src locale_methods.c (#20036, AOT #28656). */
+/**
+ * Locale::acceptFromHttp() — php-src locale_methods.c (#20036, AOT #28656).
+ *
+ * Z_PARAM_STR $header — null TypeError under caller strict_types (#29914, locale.stub.php).
+ */
 final class LocaleAcceptFromHttp extends VmClassMethod
 {
     public function __construct()
@@ -28,8 +32,10 @@ final class LocaleAcceptFromHttp extends VmClassMethod
                 $argc
             ));
         }
-        $header = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — strict null/non-string TypeError (#29914); soft-coerce otherwise.
+        $header = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'Locale::acceptFromHttp',
             0,
             'header'

@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\JIT\Builtin\LocaleParser;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -95,10 +97,30 @@ final class JitLocaleParser
      *
      * Compile-time: `__string__*` or `__value__*` false. Runtime: NestedJIT `__string__*`
      * (empty when negotiation fails — same empty-on-fail shape as canonicalize null).
+     *
+     * Z_PARAM_STR $header — null TypeError under caller strict_types (#29914). Do not fold
+     * typed/constant null to "" before the strict guard (that path returned false).
      */
     public static function acceptFromHttp(Context $context, JITVariable $header, string $function = 'locale_accept_from_http'): Value
     {
-        $literal = $header->compileTimeString ?? JitStringArg::compileTimeLiteral($header);
+        $nullConst = JITVariable::TYPE_NULL === $header->type || ($header->isNullConstant ?? false);
+        if ($nullConst && $context->callerStrictTypes) {
+            JitNativeString::ensureInsertBlock($context);
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                \sprintf('%s(): Argument #1 ($header) must be of type string, null given', $function)
+            );
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $slot;
+        }
+
+        // Only fold real string literals — null may stash compileTimeString '' (#29914).
+        $literal = null;
+        if (!$nullConst && JITVariable::TYPE_STRING === $header->type) {
+            $literal = $header->compileTimeString ?? JitStringArg::compileTimeLiteral($header);
+        }
         if (null !== $literal) {
             $result = VmLocale::acceptFromHttp($literal);
             if (false === $result) {
@@ -115,7 +137,7 @@ final class JitLocaleParser
 
         return LocaleParser::invokeAcceptFromHttp(
             $context,
-            JitStringBuiltinArg::lowerZparamStr($context, $header, $function, 0, 'header')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $header, $function, 0, 'header')
         );
     }
 
