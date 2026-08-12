@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -13,20 +14,30 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for nl_langinfo() via libc nl_langinfo(3) (#3382, #29459).
+ * LLVM NestedJIT leaf for nl_langinfo() — thin libc nl_langinfo(3) (#3382, #29459, #30404).
  *
+ * Used while NestedJIT compiles {@see NlLanginfoJitHelper} `\nl_langinfo` via
+ * {@see \PHPCompiler\JIT\Builtin\StringNlLanginfo} (fnmatch #30383 / time #30332 shape).
  * Invalid items warn then return false (php-src ext/standard/nl_langinfo.c).
  */
 final class JitNlLanginfo
 {
-    public static function invoke(Context $context, JITVariable $item): Value
+    /** @return Value `__value__*` — string or bool false */
+    public static function invokeLibcLeaf(Context $context, JITVariable $item): Value
     {
+        // StringTriggerErrorJit::implement clears insert position after linking bridges —
+        // restore so leaf IR stays in the NestedJIT helper body (#30404 / peer #27926).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StringTriggerErrorJit::implement($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'nl_langinfo_leaf_setup');
+        }
         self::ensureSnprintf($context);
+        self::ensureLibcNlLanginfo($context);
 
-        $itemVal = self::jitIntArg($context, $item);
-        $i1 = $context->getTypeFromString('int1');
-        $i32 = $context->getTypeFromString('int32');
+        $itemVal = self::jitIntArgI32($context, $item);
 
         $isValid = self::emitIsValidItem($context, $itemVal);
         $invalidBb = BasicBlockHelper::append($context, 'nl_langinfo_invalid');
@@ -104,6 +115,12 @@ final class JitNlLanginfo
         return $result;
     }
 
+    /** @return Value int64 — zval long for helper ABI */
+    public static function jitIntArgI64(Context $context, JITVariable $arg): Value
+    {
+        return JitSleep::zParamLong($context, $arg, 'nl_langinfo', 1, 'item');
+    }
+
     /** OR of (item == each registered nl_langinfo constant) at emit time. */
     private static function emitIsValidItem(Context $context, Value $itemVal): Value
     {
@@ -152,6 +169,21 @@ final class JitNlLanginfo
         );
     }
 
+    private static function ensureLibcNlLanginfo(Context $context): void
+    {
+        try {
+            $context->lookupFunction('nl_langinfo');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $fn = $context->module->addFunction(
+                'nl_langinfo',
+                $context->context->functionType($i8p, false, $i32)
+            );
+            $context->registerFunction('nl_langinfo', $fn);
+        }
+    }
+
     private static function ensureSnprintf(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
@@ -168,14 +200,11 @@ final class JitNlLanginfo
         }
     }
 
-    private static function jitIntArg(Context $context, JITVariable $arg): Value
+    private static function jitIntArgI32(Context $context, JITVariable $arg): Value
     {
         $i32 = $context->getTypeFromString('int32');
 
-        return $context->builder->trunc(
-            JitSleep::zParamLong($context, $arg, 'nl_langinfo', 1, 'item'),
-            $i32
-        );
+        return $context->builder->trunc(self::jitIntArgI64($context, $arg), $i32);
     }
 
     private static function writeBool(Context $context, bool $value): Value

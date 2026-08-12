@@ -973,15 +973,7 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('strcmp', $ft);
             $context->registerFunction('strcmp', $fn);
         }
-        try {
-            $context->lookupFunction('nl_langinfo');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i8p, false, $i32);
-            $fn = $context->module->addFunction('nl_langinfo', $ft);
-            $context->registerFunction('nl_langinfo', $fn);
-        }
+        // nl_langinfo(3): NestedJIT leaf declares module-locally (#30404 / fnmatch #30383).
         if (CompilerVersion::supportsStrxfrm()) {
             try {
                 $context->lookupFunction('strxfrm');

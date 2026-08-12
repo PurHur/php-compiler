@@ -1003,6 +1003,9 @@ class Context {
             // fnmatch(3) NestedJIT leaf (#30383) — whitelist fnmatch → fnmatch::call →
             // StringFnmatch::invokeNestedLeaf (module-local fnmatch(3); always-on Module decl removed).
             'fnmatch',
+            // nl_langinfo(3) NestedJIT leaf (#30404) — whitelist nl_langinfo → nl_langinfo::call →
+            // StringNlLanginfo / JitNlLanginfo libc leaf (always-on Module decl removed; peer fnmatch #30383).
+            'nl_langinfo',
             // putenv(3) NestedJIT leaf (#29334) — whitelist putenv → putenv_::call →
             // JitEnv::putenvNestedLeaf / StringGetenv::invokePutenvNestedLeaf (kernel removed).
             'putenv',
