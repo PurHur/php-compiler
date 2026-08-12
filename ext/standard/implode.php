@@ -100,13 +100,13 @@ final class implode extends Internal
                     return;
                 }
             } elseif (Variable::TYPE_NULL === $second->type) {
-                self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
+                self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName(), true);
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
                 // Soft-null separator then null-pieces TypeError (#26278 / #19566 / #21210).
                 self::coerceSeparatorSoftNull($frame->calledArgs[0], $this->getName());
                 throw new \TypeError(self::nullPiecesStringFirstTypeErrorMessage($this->getName()));
             } else {
-                self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
+                self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName(), true);
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
                 $glue = self::coerceSeparatorSoftNull($frame->calledArgs[0], $this->getName());
                 $ht = VmArray::requireArrayParam(
@@ -161,7 +161,7 @@ final class implode extends Internal
                     // Boxed first + null pieces: array → empty glue (or #26277 TypeError); else Arg #1 ($array).
                     return $this->jitTwoArgNullPiecesBoxedFirst($context, $args[0], $this->getName());
                 }
-                self::rejectNullSeparatorJit($context, $args[0], $this->getName());
+                self::rejectNullSeparatorJit($context, $args[0], $this->getName(), true);
                 self::lowerSeparatorSoftNull($context, $args[0], $this->getName());
                 self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $this->getName());
 
@@ -178,7 +178,7 @@ final class implode extends Internal
             if (JITVariable::TYPE_VALUE === $args[0]->type) {
                 return $this->jitTwoArgBoxedFirstDispatch($context, $args[0], $args[1], $this->getName());
             }
-            self::rejectNullSeparatorJit($context, $args[0], $this->getName());
+            self::rejectNullSeparatorJit($context, $args[0], $this->getName(), true);
             $glue = self::lowerSeparatorSoftNull($context, $args[0], $this->getName());
             self::jitRejectNullPiecesModernForm($context, $args[1], $this->getName());
             $haystack = $this->loadHaystack($context, $args[1], true);
@@ -372,15 +372,17 @@ final class implode extends Internal
      * php-src Z_PARAM_ARRAY_HT_OR_STR — null TypeError only under declare(strict_types=1)
      * (#11013, #18632). PROFILE=8.4 soft-null DEP+coerce (#21210, reverts #19894).
      */
-    private static function rejectNullSeparator(Frame $frame, Variable $var, string $function): void
+    private static function rejectNullSeparator(Frame $frame, Variable $var, string $function, bool $twoArgForm = false): void
     {
         if (!InternalStrictArg::isCallerStrict($frame)) {
             return;
         }
         if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            $type = ($twoArgForm && self::rejectsArrayFirstAsSeparator($function)) ? 'string' : 'array|string';
             throw new \TypeError(sprintf(
-                '%s(): Argument #1 ($separator) must be of type array|string, null given',
-                $function
+                '%s(): Argument #1 ($separator) must be of type %s, null given',
+                $function,
+                $type
             ));
         }
     }
@@ -545,7 +547,7 @@ final class implode extends Internal
             $stringBlock
         );
         $context->builder->positionAtEnd($stringBlock);
-        self::rejectNullSeparatorJit($context, $firstArg, $function);
+        self::rejectNullSeparatorJit($context, $firstArg, $function, true);
         self::lowerSeparatorSoftNull($context, $firstArg, $function);
         self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
         $context->builder->positionAtEnd($arrayBlock);
@@ -730,13 +732,13 @@ final class implode extends Internal
         return JitImplode::implode($context, $glue, $haystack);
     }
 
-    private static function rejectNullSeparatorJit(Context $context, JITVariable $arg, string $function): void
+    private static function rejectNullSeparatorJit(Context $context, JITVariable $arg, string $function, bool $twoArgForm = false): void
     {
         if (!$context->callerStrictTypes) {
             return;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            self::emitNullSeparatorTypeErrorAndAbort($context, $function);
+            self::emitNullSeparatorTypeErrorAndAbort($context, $function, $twoArgForm);
 
             return;
         }
@@ -764,16 +766,17 @@ final class implode extends Internal
             $okBlock
         );
         $context->builder->positionAtEnd($failBlock);
-        self::emitNullSeparatorTypeErrorAndAbort($context, $function);
+        self::emitNullSeparatorTypeErrorAndAbort($context, $function, $twoArgForm);
         $context->builder->positionAtEnd($okBlock);
     }
 
-    private static function emitNullSeparatorTypeErrorAndAbort(Context $context, string $function): void
+    private static function emitNullSeparatorTypeErrorAndAbort(Context $context, string $function, bool $twoArgForm = false): void
     {
-        // ExceptionBridge — TypeErrorRaise+abort SIGABRTs on AOT without PHP fatal (#19894, #19276).
+        $type = ($twoArgForm && self::rejectsArrayFirstAsSeparator($function)) ? 'string' : 'array|string';
         ExceptionBridge::emitTypeErrorAndAbort($context, sprintf(
-            '%s(): Argument #1 ($separator) must be of type array|string, null given',
-            $function
+            '%s(): Argument #1 ($separator) must be of type %s, null given',
+            $function,
+            $type
         ));
     }
 
