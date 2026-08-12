@@ -24,6 +24,8 @@ final class JitStreamContextGetOptions
 
         StreamContextRuntime::ensureLinked($context);
 
+        JitStreamContextRequiredArg::validate($context, $args[0], 'stream_context_get_options', 1);
+
         $ctxHt = self::loadContextArray($context, $args[0]);
         $optionsHt = $context->builder->call(
             $context->lookupFunction('__phpc_stream_context_get_options'),
