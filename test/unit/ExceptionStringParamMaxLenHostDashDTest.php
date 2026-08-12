@@ -196,7 +196,7 @@ final class ExceptionStringParamMaxLenHostDashDTest extends TestCase
         $result = $this->runCommand($cmd, $repoRoot);
         $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
         $this->assertMatchesRegularExpression(
-            "/^#0 .+g\\('hello'\\)\\n15\\n\\z/",
+            "/^#0 .+g\\('\\.\\.\\.'\\)\\n0\\n\\z/",
             $result['stdout']
         );
     }

@@ -153,8 +153,8 @@ final class VmIni
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
-    /** php-src EG(exception_string_param_max_len) compiled default (Zend/zend_exceptions.c, #21999). */
-    private const CFG_EXCEPTION_STRING_PARAM_MAX_LEN = 15;
+    /** php-src EG(exception_string_param_max_len) compiled default — 0 since PHP 8.2 (Zend/zend_exceptions.c, #21999). */
+    private const CFG_EXCEPTION_STRING_PARAM_MAX_LEN = 0;
 
     /** php-src hard ceiling for zend.exception_string_param_max_len. */
     private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;
