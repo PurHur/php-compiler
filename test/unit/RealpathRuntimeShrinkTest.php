@@ -42,4 +42,12 @@ final class RealpathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('RealpathJitHelper.php', $spine);
         $this->assertStringContainsString('StringRealpath.php', $spine);
     }
+
+    public function testModuleDropsAlwaysOnRealpathDecl(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringNotContainsString("lookupFunction('realpath')", $source);
+        $this->assertStringNotContainsString("addFunction('realpath'", $source);
+        $this->assertStringContainsString('#30530', $source);
+    }
 }

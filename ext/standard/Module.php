@@ -1063,14 +1063,8 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('strlen', $ft);
             $context->registerFunction('strlen', $fn);
         }
-        try {
-            $context->lookupFunction('realpath');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('realpath', $ft);
-            $context->registerFunction('realpath', $fn);
-        }
+        // realpath(3) dropped from always-on Module decls (#30530): SysGetTempDirRuntime
+        // NestedJIT leaf declares realpath module-locally (#29433); StringRealpath is PHP helper.
         try {
             $context->lookupFunction('stat');
         } catch (\Throwable $e) {
@@ -1098,34 +1092,9 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('lstat', $ft);
             $context->registerFunction('lstat', $fn);
         }
-        try {
-            $context->lookupFunction('statvfs');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('statvfs', $ft);
-            $context->registerFunction('statvfs', $fn);
-        }
-        try {
-            $context->lookupFunction('readlink');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $i64 = $context->getTypeFromString('int64');
-            $ft = $context->context->functionType($i64, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('readlink', $ft);
-            $context->registerFunction('readlink', $fn);
-        }
-        try {
-            $context->lookupFunction('unlink');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p);
-            $fn = $context->module->addFunction('unlink', $ft);
-            $context->registerFunction('unlink', $fn);
-        }
+        // statvfs(3) dropped (#30530): disk_free_space/disk_total_space use VmFsDiskPure (#8989).
+        // readlink(2)/unlink(2)/rmdir(2) dropped (#30530): StringReadlink / StringUnlink /
+        // StringRmdir → *JitHelper PHP; no remaining libc lookupFunction consumers.
         try {
             $context->lookupFunction('mkdir');
         } catch (\Throwable $e) {
@@ -1136,15 +1105,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('mkdir', $fn);
         }
         try {
-            $context->lookupFunction('rmdir');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p);
-            $fn = $context->module->addFunction('rmdir', $ft);
-            $context->registerFunction('rmdir', $fn);
-        }
-        try {
             $context->lookupFunction('chmod');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
@@ -1153,14 +1113,7 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('chmod', $ft);
             $context->registerFunction('chmod', $fn);
         }
-        try {
-            $context->lookupFunction('nice');
-        } catch (\Throwable $e) {
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i32);
-            $fn = $context->module->addFunction('nice', $ft);
-            $context->registerFunction('nice', $fn);
-        }
+        // nice(3) dropped (#30530): JitProcNice::ensureLibcNice declares module-locally.
         try {
             $context->lookupFunction('__errno_location');
         } catch (\Throwable $e) {
@@ -1172,15 +1125,8 @@ class Module extends ModuleAbstract
         }
         // fnmatch(3) dropped from always-on Module decls (#30383): StringFnmatch
         // NestedJIT leaf declares fnmatch module-locally (chdir #29219 / rename #29141 shape).
-        try {
-            $context->lookupFunction('chdir');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p);
-            $fn = $context->module->addFunction('chdir', $ft);
-            $context->registerFunction('chdir', $fn);
-        }
+        // chdir(2) dropped (#30530 / #29219): StringChdir NestedJIT leaf declares module-locally;
+        // LibcExtern already dropped its chdir row.
         try {
             $context->lookupFunction('chroot');
         } catch (\Throwable $e) {

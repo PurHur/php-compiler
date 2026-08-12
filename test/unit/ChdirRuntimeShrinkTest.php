@@ -73,6 +73,14 @@ final class ChdirRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#29219', $source);
     }
 
+    public function testModuleDropsAlwaysOnChdirDecl(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringNotContainsString("lookupFunction('chdir')", $source);
+        $this->assertStringNotContainsString("addFunction('chdir'", $source);
+        $this->assertStringContainsString('#30530', $source);
+    }
+
     public function testKernelFilesDeleted(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/phpc_chdir_kernel.php');
