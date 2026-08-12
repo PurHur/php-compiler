@@ -38,10 +38,18 @@ final class header_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        $argc = \count($frame->calledArgs);
         foreach (\array_keys($frame->calledArgs) as $idx) {
             if ($idx < 0 || $idx > 2) {
-                throw new \LogicException('header() requires one to three arguments');
+                throw new \ArgumentCountError(
+                    'header() expects at most 3 arguments, '.$argc.' given'
+                );
             }
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'header() expects at most 3 arguments, '.$argc.' given'
+            );
         }
         if (!isset($frame->calledArgs[0])) {
             throw new \LogicException('header() requires one to three arguments');
@@ -85,7 +93,13 @@ final class header_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if ([] === $args || \count($args) > 3) {
+        $argc = \count($args);
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'header() expects at most 3 arguments, '.$argc.' given'
+            );
+        }
+        if ([] === $args) {
             throw new \LogicException('header() requires one to three arguments');
         }
         $line = self::jitHeaderArg($context, $args[0]);
