@@ -1006,6 +1006,9 @@ class Context {
             // nl_langinfo(3) NestedJIT leaf (#30404) — whitelist nl_langinfo → nl_langinfo::call →
             // StringNlLanginfo / JitNlLanginfo libc leaf (always-on Module decl removed; peer fnmatch #30383).
             'nl_langinfo',
+            // strxfrm(3) NestedJIT leaf (#30420) — whitelist strxfrm → strxfrm::call →
+            // StringStrxfrm / JitStrxfrm libc leaf (always-on Module decl removed; peer nl_langinfo #30404).
+            'strxfrm',
             // putenv(3) NestedJIT leaf (#29334) — whitelist putenv → putenv_::call →
             // JitEnv::putenvNestedLeaf / StringGetenv::invokePutenvNestedLeaf (kernel removed).
             'putenv',
