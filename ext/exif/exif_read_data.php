@@ -13,6 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmImage;
 use PHPCompiler\ext\standard\VmStreamOpenFailure;
 use PHPCompiler\ext\standard\VmStreamPath;
+use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
@@ -46,7 +47,13 @@ final class exif_read_data extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'exif_read_data', 'file');
+        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame(
+            $frame,
+            0,
+            'exif_read_data',
+            'file',
+            VmString::emptyStringArgValueErrorMessageCannot('exif_read_data', 0, 'file')
+        );
         $data = VmExifRead::readData($filename);
         if (false === $data) {
             if (!VmImage::pathPayloadReadable($filename)) {
