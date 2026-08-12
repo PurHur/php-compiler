@@ -399,7 +399,8 @@ final class Rfc3986UriGetRawHost extends Rfc3986UriGetter
 
     public function execute(Frame $frame): void
     {
-        $host = $this->receiverState($frame)['host'] ?? null;
+        $state = $this->receiverState($frame);
+        $host = $state['rawHost'] ?? $state['host'] ?? null;
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($host): void {
             if (null === $host) {
                 $ret->null();
