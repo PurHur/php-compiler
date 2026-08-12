@@ -76,8 +76,11 @@ final class ErrorReporter
         if (\is_string($raw) && '' !== trim($raw)) {
             return self::eAll();
         }
-        // Stable 8.4.0+ VERSION (no PROFILE): Zend E_ALL without E_STRICT (#26083).
-        if (\PHPCompiler\CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
+        // VERSION 8.2+ (including 8.4.0-dev): Zend E_ALL includes E_DEPRECATED (#26083, #30443).
+        // version_compare treats -dev as below stable, so use MAJOR/MINOR directly.
+        if (\PHPCompiler\CompilerVersion::MAJOR_VERSION > 8
+            || (\PHPCompiler\CompilerVersion::MAJOR_VERSION === 8
+                && \PHPCompiler\CompilerVersion::MINOR_VERSION >= 2)) {
             return self::eAll();
         }
 
