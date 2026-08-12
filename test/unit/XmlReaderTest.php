@@ -146,6 +146,40 @@ PHP;
         );
     }
 
+    /** @covers \PHPCompiler\ext\xmlreader\XmlReaderXML */
+    /** @covers \PHPCompiler\ext\xmlreader\XmlReaderOpen */
+    public function test_xmlreader_null_source_deprecated_then_value_error(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/issue_30563_xmlreader_null_weak.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_null_weak.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "DEP:XMLReader::XML(): Passing null to parameter #1 (\$source) of type string is deprecated\n"
+            ."ValueError:XMLReader::XML(): Argument #1 (\$source) cannot be empty\n"
+            ."DEP:XMLReader::open(): Passing null to parameter #1 (\$uri) of type string is deprecated\n"
+            ."ValueError:XMLReader::open(): Argument #1 (\$uri) cannot be empty\n",
+            ob_get_clean()
+        );
+    }
+
+    /** @covers \PHPCompiler\ext\xmlreader\XmlReaderXML */
+    /** @covers \PHPCompiler\ext\xmlreader\XmlReaderOpen */
+    public function test_xmlreader_null_source_strict_type_error(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/issue_30563_xmlreader_null_strict.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_null_strict.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "TypeError:XMLReader::XML(): Argument #1 (\$source) must be of type string, null given\n"
+            ."TypeError:XMLReader::open(): Argument #1 (\$uri) must be of type string, null given\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_xmlreader_from_factories_withheld_on_reference_profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

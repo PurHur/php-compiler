@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlreader;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /**
- * XMLReader::XML() — in-memory open (php-src ext/xmlreader/php_xmlreader.c; #19308).
+ * XMLReader::XML() — in-memory open (php-src ext/xmlreader/php_xmlreader.c; #19308, #30563).
  *
  * Static call returns XMLReader|false; instance call mutates $this and returns bool.
+ * Z_PARAM_STR: weak null → E_DEPRECATED then '' → ValueError; strict null → TypeError.
  */
 final class XmlReaderXML extends VmClassMethod
 {
@@ -36,11 +38,14 @@ final class XmlReaderXML extends VmClassMethod
             if (\count($frame->calledArgs) < 2) {
                 throw new \ArgumentCountError('XMLReader::XML() expects at least 1 argument, 0 given');
             }
-            $sourceVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $sourceVar->type) {
-                throw new \TypeError('XMLReader::XML(): Argument #1 ($source) must be of type string');
-            }
-            $source = $sourceVar->toString();
+            // Z_PARAM_STR $source — frame index includes $this (#30563).
+            $source = VmString::internalMethodStringArgForFrame(
+                $frame,
+                1,
+                'XMLReader::XML',
+                0,
+                'source'
+            );
             if ('' === $source) {
                 throw new \ValueError('XMLReader::XML(): Argument #1 ($source) cannot be empty');
             }
@@ -52,10 +57,13 @@ final class XmlReaderXML extends VmClassMethod
             return;
         }
 
-        if (Variable::TYPE_STRING !== $first->type) {
-            throw new \TypeError('XMLReader::XML(): Argument #1 ($source) must be of type string');
-        }
-        $source = $first->toString();
+        $source = VmString::internalMethodStringArgForFrame(
+            $frame,
+            0,
+            'XMLReader::XML',
+            0,
+            'source'
+        );
         if ('' === $source) {
             throw new \ValueError('XMLReader::XML(): Argument #1 ($source) cannot be empty');
         }
