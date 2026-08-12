@@ -80,7 +80,7 @@ final class setrawcookie extends Internal
             $context,
             $args[0],
             $namePtr,
-            'setrawcookie(): Argument #1 ($name) must not be empty'
+            'setrawcookie(): Argument #1 ($name) cannot be empty'
         );
         $valuePtr = $context->builder->load($context->constantStringFromString(''));
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {

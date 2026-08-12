@@ -273,7 +273,11 @@ final class SetcookieOptions
         string $samesite,
         bool $partitioned
     ): array {
-        VmString::rejectEmptyBuiltinStringArg($name, $function, 0, 'name');
+        if ('' === $name) {
+            throw new \ValueError(
+                $function.'(): Argument #1 ($name) cannot be empty'
+            );
+        }
 
         return [
             'name' => $name,
