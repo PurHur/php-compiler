@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlreader;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /**
- * XMLReader::open() — file open (php-src ext/xmlreader/php_xmlreader.c; #6135, #19330).
+ * XMLReader::open() — file open (php-src ext/xmlreader/php_xmlreader.c; #6135, #19330, #30563).
  *
  * Static call returns XMLReader|false; instance call mutates $this and returns bool.
+ * Z_PARAM_STR: weak null → E_DEPRECATED then '' → ValueError; strict null → TypeError.
  */
 final class XmlReaderOpen extends VmClassMethod
 {
@@ -36,11 +38,14 @@ final class XmlReaderOpen extends VmClassMethod
             if (\count($frame->calledArgs) < 2) {
                 throw new \ArgumentCountError('XMLReader::open() expects at least 1 argument, 0 given');
             }
-            $uriVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $uriVar->type) {
-                throw new \TypeError('XMLReader::open(): Argument #1 ($uri) must be of type string');
-            }
-            $uri = $uriVar->toString();
+            // Z_PARAM_STR $uri — frame index includes $this (#30563).
+            $uri = VmString::internalMethodStringArgForFrame(
+                $frame,
+                1,
+                'XMLReader::open',
+                0,
+                'uri'
+            );
             // Before VmFsReadPure/fopen — host fopen('') throws generic "Path must not be empty" (#24810).
             if ('' === $uri) {
                 throw new \ValueError('XMLReader::open(): Argument #1 ($uri) cannot be empty');
@@ -53,10 +58,13 @@ final class XmlReaderOpen extends VmClassMethod
             return;
         }
 
-        if (Variable::TYPE_STRING !== $first->type) {
-            throw new \TypeError('XMLReader::open(): Argument #1 ($uri) must be of type string');
-        }
-        $uri = $first->toString();
+        $uri = VmString::internalMethodStringArgForFrame(
+            $frame,
+            0,
+            'XMLReader::open',
+            0,
+            'uri'
+        );
         if ('' === $uri) {
             throw new \ValueError('XMLReader::open(): Argument #1 ($uri) cannot be empty');
         }
