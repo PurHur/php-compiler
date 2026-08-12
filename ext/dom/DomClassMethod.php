@@ -316,4 +316,41 @@ abstract class DomClassMethod extends VmClassMethod
         return $object;
     }
 
+    /**
+     * Z_PARAM_OBJECT_OF_CLASS(DOMNode) — Zend TypeError shape (php_dom.stub.php; #30410).
+     *
+     * $function is Class::method without trailing "()". Mutations are declared on DOMNode
+     * even when invoked on DOMElement/Document/Fragment.
+     */
+    protected function requireDomNodeArg(
+        Variable $var,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ObjectEntry {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type DOMNode, %s given',
+                $function,
+                $userArgIndex,
+                $paramName,
+                VmDom::typeLabel($var)
+            ));
+        }
+        $object = $var->toObject();
+        // php-src stub: DOMNode $node — accept Document/etc.; hierarchy rejects later (#22698).
+        if (!VmDom::isDomNode($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type DOMNode, %s given',
+                $function,
+                $userArgIndex,
+                $paramName,
+                $object->class->name
+            ));
+        }
+
+        return $object;
+    }
+
 }
