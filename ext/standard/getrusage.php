@@ -26,7 +26,8 @@ final class getrusage extends Internal
         }
         $who = 0;
         if (1 === $argc) {
-            $who = VmGetrusageArg::parseMode($frame->calledArgs[0]);
+            // Z_PARAM_LONG $mode — caller strict_types → TypeError on null (#30361).
+            $who = VmGetrusageArg::parseMode($frame, 0);
         }
         if (null === $frame->returnVar) {
             return;

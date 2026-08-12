@@ -377,6 +377,8 @@
             <file>./test/compliance/ObjectBoolTypeErrorActual30100JITTest.php</file>
             <file>./test/compliance/MemoryGetUsageNullStrictVMTest.php</file>
             <file>./test/compliance/MemoryGetUsageNullStrictJITTest.php</file>
+            <file>./test/compliance/GetrusageNullStrictVMTest.php</file>
+            <file>./test/compliance/GetrusageNullStrictJITTest.php</file>
             <file>./test/compliance/GetoptNullStrictVMTest.php</file>
             <file>./test/compliance/GetoptNullStrictJITTest.php</file>
             <file>./test/compliance/SetIncludePathNullStrictVMTest.php</file>
