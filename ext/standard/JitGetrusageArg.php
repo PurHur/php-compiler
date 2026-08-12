@@ -7,19 +7,23 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for getrusage() $mode — typed int, no bool→int (php-src basic_functions.c; #11686). */
+/**
+ * LLVM lowering for getrusage() $mode — typed int, no bool→int (php-src basic_functions.c; #11686).
+ * Z_PARAM_LONG via JitSleep::zParamLong honors caller strict_types (null TypeError, #30361).
+ */
 final class JitGetrusageArg
 {
     public static function lowerMode(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
-            self::emitBoolTypeErrorAndAbort($context);
+            self::emitBoolTypeErrorAndAbort($context, JitOperandTypeLabel::givenLabel($context, $arg));
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -27,6 +31,7 @@ final class JitGetrusageArg
             return self::lowerBoxedMode($context, $arg);
         }
 
+        // Soft null → 0; strict_types null → TypeError (#30361).
         return JitSleep::zParamLong($context, $arg, 'getrusage', 1, 'mode');
     }
 
@@ -49,19 +54,20 @@ final class JitGetrusageArg
             $okBlock
         );
         $context->builder->positionAtEnd($boolBlock);
-        self::emitBoolTypeErrorAndAbort($context);
+        // Runtime boxed bool has no compile-time true/false; Zend still says true/false for constants only.
+        self::emitBoolTypeErrorAndAbort($context, 'bool');
         $context->builder->positionAtEnd($okBlock);
 
         return JitSleep::zParamLong($context, $arg, 'getrusage', 1, 'mode');
     }
 
-    private static function emitBoolTypeErrorAndAbort(Context $context): void
+    private static function emitBoolTypeErrorAndAbort(Context $context, string $given): void
     {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise(
             $context,
-            'getrusage(): Argument #1 ($mode) must be of type int, bool given'
+            \sprintf('getrusage(): Argument #1 ($mode) must be of type int, %s given', $given)
         );
         $context->builder->call($context->lookupFunction('abort'));
     }
