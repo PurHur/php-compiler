@@ -15,8 +15,11 @@ final class JitObEndFlush
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('ob_end_flush() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            throw new \ArgumentCountError(
+                'ob_end_flush() expects exactly 0 arguments, '.$argc.' given'
+            );
         }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

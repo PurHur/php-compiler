@@ -26,8 +26,11 @@ final class ob_end_flush extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('ob_end_flush() takes no arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError(
+                'ob_end_flush() expects exactly 0 arguments, '.$argc.' given'
+            );
         }
         if (0 === OutputBuffer::getLevel()) {
             self::emitNoBufferNotice($frame);
