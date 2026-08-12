@@ -161,9 +161,10 @@ final class DynamicPropertyDeprecationCliTest extends TestCase
     }
 
     /**
-     * Compliance host {@code -d error_reporting=0} must not clear guest DEFAULT startup mask (#2055).
+     * Host {@code -d error_reporting=0} must not clear guest default (#2055); VERSION 8.2+ guest
+     * default is Zend E_ALL including E_DEPRECATED even without PROFILE env var (#30443).
      */
-    public function testHostErrorReportingZeroKeepsGuestDefaultWithoutDeprecationNoise(): void
+    public function testHostErrorReportingZeroKeepsGuestDefaultWithDeprecationOn82(): void
     {
         $repoRoot = dirname(__DIR__, 2);
         $vm = realpath($repoRoot.'/bin/vm.php');
@@ -171,23 +172,33 @@ final class DynamicPropertyDeprecationCliTest extends TestCase
             $this->markTestSkipped('bin/vm.php missing');
         }
 
-        $cmd = [
-            PHP_BINARY,
-            '-d',
-            'error_reporting=0',
-            '-d',
-            'display_errors=0',
-            $vm,
-            '-r',
-            'class C{}; $c=new C; $c->x=1; echo $c->x, "\n";',
-        ];
-        $result = $this->runCommand($cmd, $repoRoot);
-        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
-        $this->assertStringNotContainsString(
-            'Creation of dynamic property C::$x is deprecated',
-            $result['stderr']
-        );
-        $this->assertStringContainsString("1\n", $result['stdout']);
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $cmd = [
+                PHP_BINARY,
+                '-d',
+                'error_reporting=0',
+                '-d',
+                'display_errors=0',
+                $vm,
+                '-r',
+                'class C{}; $c=new C; $c->x=1; echo $c->x, "\n";',
+            ];
+            $result = $this->runCommand($cmd, $repoRoot);
+            $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+            $this->assertStringContainsString(
+                'Creation of dynamic property C::$x is deprecated',
+                $result['stderr']
+            );
+            $this->assertStringContainsString("1\n", $result['stdout']);
+        } finally {
+            if (false === $prev || '' === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     /**
