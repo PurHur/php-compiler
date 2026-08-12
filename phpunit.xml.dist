@@ -127,6 +127,8 @@
             <file>./test/compliance/ExecFamilyReflectionReturnsVMTest.php</file>
             <file>./test/compliance/FsockopenReflectionVMTest.php</file>
             <file>./test/compliance/FsockopenNullSoftVMTest.php</file>
+            <file>./test/compliance/PfsockopenNullSoftVMTest.php</file>
+            <file>./test/compliance/PfsockopenNullStrictVMTest.php</file>
             <file>./test/compliance/FsockopenNullStrictVMTest.php</file>
             <file>./test/compliance/FstatReflectionReturnVMTest.php</file>
             <file>./test/compliance/FileReflectionReturnVMTest.php</file>
