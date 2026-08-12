@@ -100,8 +100,6 @@ class Module extends ModuleAbstract
     {
         return [
             new str_repeat(),
-            new str_increment(),
-            new str_decrement(),
             new decbin(),
             new abs(),
             new ceil(),
@@ -218,7 +216,8 @@ class Module extends ModuleAbstract
             new substr_replace(),
             new strrev(),
             new str_rot13(),
-            // str_increment/str_decrement registered unconditionally above (PHP 8.3; #30177)
+            // PHP 8.3+ only — withhold on unset PROFILE / 8.2 so callability matches function_exists (#30511, re-#18614/#24820; undoes #30188 unconditional reg)
+            ...(CompilerVersion::supportsStrIncrement() ? [new str_increment(), new str_decrement()] : []),
             new str_shuffle(),
             new strpos(),
             new strstr(),
