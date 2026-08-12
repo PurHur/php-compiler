@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** Empty-string builtin ValueError wording must match Zend (#29275 / #29276 / #29291 / #29292 / #29422). */
+/** Empty-string builtin ValueError wording must match Zend (#30505 / #30522 / #29291 / #29292 / #29422). */
 final class EmptyStringArgValueErrorMessageTest extends TestCase
 {
     public function test_shared_formatter_matches_zend(): void
@@ -23,12 +23,12 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             VmString::emptyStringArgValueErrorMessageCannot('checkdnsrr', 0, 'hostname')
         );
         self::assertSame(
-            'explode(): Argument #1 ($separator) must not be empty',
-            VmString::emptyStringArgValueErrorMessage('explode', 0, 'separator')
+            'explode(): Argument #1 ($separator) cannot be empty',
+            VmString::emptyStringArgValueErrorMessageCannot('explode', 0, 'separator')
         );
         self::assertSame(
-            'substr_count(): Argument #2 ($needle) must not be empty',
-            VmString::emptyStringArgValueErrorMessage('substr_count', 1, 'needle')
+            'substr_count(): Argument #2 ($needle) cannot be empty',
+            VmString::emptyStringArgValueErrorMessageCannot('substr_count', 1, 'needle')
         );
         self::assertSame(
             'wordwrap(): Argument #3 ($break) must not be empty',
@@ -48,13 +48,14 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
     {
         $bin = realpath(__DIR__.'/../../bin/vm.php');
         self::assertNotFalse($bin);
-        foreach ([
-            'issue29275_explode_empty_separator_message.php',
-            'issue29276_substr_count_empty_needle_message.php',
-            'issue29291_wordwrap_empty_break_message.php',
-            'issue29292_str_pad_empty_pad_message.php',
-            'issue29422_mb_str_pad_empty_pad_message.php',
-        ] as $name) {
+        $cases = [
+            'issue29275_explode_empty_separator_message.php' => 'cannot be empty',
+            'issue29276_substr_count_empty_needle_message.php' => 'cannot be empty',
+            'issue29291_wordwrap_empty_break_message.php' => 'must not be empty',
+            'issue29292_str_pad_empty_pad_message.php' => 'must not be empty',
+            'issue29422_mb_str_pad_empty_pad_message.php' => 'must not be empty',
+        ];
+        foreach ($cases as $name => $needle) {
             $repro = realpath(__DIR__.'/../repro/'.$name);
             self::assertNotFalse($repro, $name);
             $cmd = [
@@ -83,7 +84,7 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             fclose($pipes[2]);
             $code = proc_close($proc);
             self::assertSame(0, $code, $name."\n".$stderr.$stdout);
-            self::assertStringContainsString('must not be empty', $stdout);
+            self::assertStringContainsString($needle, $stdout, $name);
             self::assertStringContainsString("ok\n", $stdout);
         }
     }

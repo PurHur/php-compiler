@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * #29275 — explode() empty separator ValueError must match Zend: "must not be empty"
+ * #29275 — explode() empty separator ValueError must match Zend: "cannot be empty"
  * (php-src ext/standard/string.c PHP_FUNCTION(explode)).
  */
-$expected = 'explode(): Argument #1 ($separator) must not be empty';
+$expected = 'explode(): Argument #1 ($separator) cannot be empty';
 
 try {
     explode('', 'a,b');

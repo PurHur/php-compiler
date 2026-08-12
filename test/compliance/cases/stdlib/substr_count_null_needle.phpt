@@ -19,4 +19,4 @@ try {
 ?>
 --EXPECT--
 substr_count(): Argument #2 ($needle) must be of type string, null given
-substr_count(): Argument #2 ($needle) must not be empty
+substr_count(): Argument #2 ($needle) cannot be empty

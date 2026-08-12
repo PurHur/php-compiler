@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * #29276 — substr_count() empty needle ValueError must match Zend: "must not be empty"
+ * #29276 — substr_count() empty needle ValueError must match Zend: "cannot be empty"
  * (php-src ext/standard/string.c PHP_FUNCTION(substr_count)).
  */
-$expected = 'substr_count(): Argument #2 ($needle) must not be empty';
+$expected = 'substr_count(): Argument #2 ($needle) cannot be empty';
 
 try {
     substr_count('abc', '');

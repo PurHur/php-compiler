@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** JIT: substr_count empty needle ValueError "must not be empty" (#29276, php-src string.c). */
+/** JIT: substr_count empty needle ValueError "cannot be empty" (#29276, php-src string.c). */
 final class SubstrCountEmptyNeedleMessageJITTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
