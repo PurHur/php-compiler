@@ -63,6 +63,8 @@ final class NestedJitCompileScope
         // Nested helper method entry also overwrites jitEnclosingBlock; leaking it makes
         // asymmetric set Errors report the helper class instead of global scope (#26873).
         $savedJitEnclosingBlock = $context->jitEnclosingBlock;
+        // get_defined_vars() reads jitCurrentBlock for {main} auto-globals (#30779).
+        $savedJitCurrentBlock = $context->jitCurrentBlock;
         $savedJitPropertyHookRawProperty = $context->jitPropertyHookRawProperty;
         // Mid-call NestedJIT (e.g. CallUnpackRuntime → ListUnpackJitHelper) mutates toCall/args.
         // FUNCCALL_EXEC re-reads scope->toCall after resolveJitOutgoingCall; without restore the
@@ -119,6 +121,7 @@ final class NestedJitCompileScope
             $context->namedVariableBindings = $savedNamedBindings;
             $context->scope->className = $savedClassName;
             $context->jitEnclosingBlock = $savedJitEnclosingBlock;
+            $context->jitCurrentBlock = $savedJitCurrentBlock;
             $context->jitPropertyHookRawProperty = $savedJitPropertyHookRawProperty;
             $context->scope->toCall = $savedToCall;
             $context->scope->args = $savedArgs;

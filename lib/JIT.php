@@ -16304,6 +16304,7 @@ class JIT {
                     $globalTarget
                 );
             }
+            $this->markScopeVariableAssignedIfTracked($resultOp, $globalTarget);
 
             return;
         }
@@ -16654,6 +16655,7 @@ class JIT {
                         $globalTarget
                     );
                 }
+                $this->markScopeVariableAssignedIfTracked($resultOp, $globalTarget);
 
                 return;
             }

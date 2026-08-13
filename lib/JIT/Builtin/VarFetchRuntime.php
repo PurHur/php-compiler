@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -44,10 +45,16 @@ final class VarFetchRuntime
             return;
         }
 
+        // Mid-block link from get_defined_vars() must restore the caller's insert BB (#30779).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementSuperglobalBridge($context, $probe);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function callIsSuperglobalName(Context $context, Value $namePtr): Value
@@ -72,7 +79,9 @@ final class VarFetchRuntime
             return;
         }
 
-        $strPtr = $context->getTypeFromString('string*');
+        // C-string ABI for cstrToString → NestedJIT helper (not PHP `__string__*`; #30779).
+        // `string*` strips to unsupported native type `string` under getTypeFromString.
+        $strPtr = $context->getTypeFromString('int8*');
         $i1 = $context->getTypeFromString('int1');
         $ft = $context->context->functionType($i1, false, $strPtr);
         $fn = null !== $probe
