@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFormat;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
@@ -60,15 +60,19 @@ final class JitNumberFormat
         $argc = \count($args);
 
         // strict_types only — PROFILE=8.4 still soft-nulls like Zend Z_PARAM_DOUBLE (#21429).
-        self::rejectNullNum($context, $args[0]);
+        if (self::rejectNullNum($context, $args[0])) {
+            // Catchable TypeError terminated the block — dummy return for IR (#29976).
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
 
+        // TypeError cites int|float (stub); weak null DEP stays "float" via JitFdiv (#29976).
         $number = JitFdiv::lowerSingleOperand(
             $context,
             $args[0],
             1,
             'num',
             'number_format',
-            'float',
+            'int|float',
             false
         );
         $i64 = $context->getTypeFromString('int64');
@@ -247,22 +251,26 @@ final class JitNumberFormat
         return $result;
     }
 
-    private static function rejectNullNum(Context $context, JITVariable $arg): void
+    /**
+     * Reject null $num under declare(strict_types=1).
+     *
+     * @return bool true when compile-time null emitted a catchable/fatal TypeError —
+     *              caller must return a dummy value and stop IR emission
+     */
+    private static function rejectNullNum(Context $context, JITVariable $arg): bool
     {
         // Only declare(strict_types=1) rejects null; forward profile soft-nulls (#21429).
         if (!$context->callerStrictTypes) {
-            return;
+            return false;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::emitNullNumTypeErrorAndAbort($context);
 
-            return;
+            return true;
         }
         if (JITVariable::TYPE_VALUE !== $arg->type) {
-            return;
+            return false;
         }
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -283,14 +291,17 @@ final class JitNumberFormat
         $context->builder->positionAtEnd($failBlock);
         self::emitNullNumTypeErrorAndAbort($context);
         $context->builder->positionAtEnd($okBlock);
+
+        return false;
     }
 
     private static function emitNullNumTypeErrorAndAbort(Context $context): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, 'number_format(): Argument #1 ($num) must be of type float, null given');
-        $context->builder->call($context->lookupFunction('abort'));
+        // Catchable under try/catch (AOT standalone uses pending-handler path; #29976).
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            'number_format(): Argument #1 ($num) must be of type int|float, null given'
+        );
     }
 
 }

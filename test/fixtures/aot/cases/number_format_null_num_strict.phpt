@@ -1,5 +1,5 @@
 --TEST--
-stdlib number_format() — null $num TypeError cites int|float under strict_types (#29976, #11017, ext/standard/basic_functions.stub.php)
+AOT: number_format() null $num TypeError cites int|float under strict_types (#29976, ext/standard/basic_functions.stub.php)
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,5 +1,5 @@
 --TEST--
-stdlib number_format() JIT — null $num TypeError under strict_types (#11017, ext/standard/number_format.c)
+stdlib number_format() JIT — null $num TypeError cites int|float under strict_types (#29976, #11017, ext/standard/basic_functions.stub.php)
 --JIT--
 --FILE--
 <?php
@@ -12,4 +12,4 @@ try {
 }
 --EXPECT--
 TypeError
-number_format(): Argument #1 ($num) must be of type float, null given
+number_format(): Argument #1 ($num) must be of type int|float, null given

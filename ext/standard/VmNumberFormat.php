@@ -87,7 +87,9 @@ final class VmNumberFormat
     private static function numTypeError(string $given): string
     {
         return \sprintf(
-            'number_format(): Argument #1 ($num) must be of type float, %s given',
+            // php-src basic_functions.stub.php — int|float $num; TypeError cites union (#29976).
+            // Weak null DEP still says "float" (Zend ReflectionArgInfo); keep emit(..., 'float').
+            'number_format(): Argument #1 ($num) must be of type int|float, %s given',
             $given
         );
     }
