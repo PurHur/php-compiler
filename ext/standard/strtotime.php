@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -15,6 +16,7 @@ use PHPLLVM\Value;
  * strtotime() — parse natural-language date strings to Unix timestamps (#10742).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(strtotime)
+ * Under/over arity → Zend at-least / at-most ArgumentCountError (#30714).
  */
 final class strtotime extends Internal
 {
@@ -25,13 +27,9 @@ final class strtotime extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30714; ext/date/php_date.stub.php).
+        $this->requireArgCountRange($frame, 'strtotime', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \ArgumentCountError(\sprintf(
-                'strtotime() expects 1 or 2 arguments, %d given',
-                $argc
-            ));
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -54,6 +52,13 @@ final class strtotime extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError under AOT try/catch (#30714).
+        if (!$this->requireArgCountRangeJit($context, $args, 'strtotime', 1, 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
         return JitStrtotime::invoke($context, ...$args);
     }
 }

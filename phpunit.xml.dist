@@ -370,6 +370,8 @@
             <file>./test/compliance/SessionExcessArgc30684JITTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681VMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681JITTest.php</file>
+            <file>./test/compliance/GetdateStrtotimeArgc30714VMTest.php</file>
+            <file>./test/compliance/GetdateStrtotimeArgc30714JITTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647VMTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647JITTest.php</file>
             <file>./test/compliance/DefineExcessArgc30573VMTest.php</file>
