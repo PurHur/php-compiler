@@ -32,12 +32,9 @@ final class user_error extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src Zend/zend_builtin_functions.c — same 1..2 arity as trigger_error (#30690).
+        $this->requireArgCountRange($frame, 'user_error', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \ArgumentCountError(
-                \sprintf('user_error() expects at least 1 argument, %d given', $argc)
-            );
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('user_error() requires VM context');
         }
@@ -82,12 +79,11 @@ final class user_error extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \ArgumentCountError(
-                \sprintf('user_error() expects at least 1 argument, %d given', $argc)
-            );
+        // Catchable ArgumentCountError (AOT/JIT) — #30690 (sibling trigger_error #28690).
+        if (!$this->requireArgCountRangeJit($context, $args, 'user_error', 1, 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        $argc = \count($args);
         $msgStr = trigger_error_::jitLowerMessage($context, $args[0], 'user_error');
         $levelVal = 2 === $argc
             ? self::jitLowerUserErrorLevel($context, $args[1])
