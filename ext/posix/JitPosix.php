@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\posix;
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
+use PHPCompiler\JIT\Builtin\PosixGetpidJit;
 use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\Builtin\PosixTerminalRuntime;
@@ -19,25 +20,24 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for posix v1 builtins (#7271). */
+/** LLVM lowering for posix v1 builtins (#7271, #30696). */
 final class JitPosix
 {
     private static int $blockSerial = 0;
 
+    /**
+     * posix_getpid() — PHP helper bridge (#30696); NestedJIT reuses getmypid libc leaf.
+     *
+     * @return Value int64 process id
+     */
     public static function getpid(Context $context): Value
     {
-        self::ensureLibcPid($context);
-        $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction('getpid'));
-
-        return $raw->typeOf() === $i64
-            ? $raw
-            : $context->builder->zExt($raw, $i64);
+        return PosixGetpidJit::invoke($context);
     }
 
     public static function getppid(Context $context): Value
     {
-        self::ensureLibcPid($context);
+        self::ensureLibcGetppid($context);
         $i64 = $context->getTypeFromString('int64');
         $raw = $context->builder->call($context->lookupFunction('getppid'));
 
@@ -327,17 +327,16 @@ final class JitPosix
         }
     }
 
-    private static function ensureLibcPid(Context $context): void
+    /** NestedJIT / getppid user path — getpid(2) leaf lives in JitGetmypidKernel (#30696). */
+    private static function ensureLibcGetppid(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');
-        foreach (['getpid', 'getppid'] as $name) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable $e) {
-                $ft = $context->context->functionType($i32, false);
-                $fn = $context->module->addFunction($name, $ft);
-                $context->registerFunction($name, $fn);
-            }
+        try {
+            $context->lookupFunction('getppid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('getppid', $ft);
+            $context->registerFunction('getppid', $fn);
         }
     }
 
