@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\posix;
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
+use PHPCompiler\JIT\Builtin\PosixGeteuidJit;
 use PHPCompiler\JIT\Builtin\PosixGetpidJit;
 use PHPCompiler\JIT\Builtin\PosixGetppidJit;
 use PHPCompiler\JIT\Builtin\PosixGetuidJit;
@@ -22,7 +23,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744). */
+/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744, #30767). */
 final class JitPosix
 {
     private static int $blockSerial = 0;
@@ -47,15 +48,14 @@ final class JitPosix
         return PosixGetppidJit::invoke($context);
     }
 
+    /**
+     * posix_geteuid() — PHP helper bridge (#30767); NestedJIT thin geteuid(2) leaf.
+     *
+     * @return Value int64 effective user id
+     */
     public static function geteuid(Context $context): Value
     {
-        self::ensureLibcEuid($context);
-        $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction('geteuid'));
-
-        return $raw->typeOf() === $i64
-            ? $raw
-            : $context->builder->zExt($raw, $i64);
+        return PosixGeteuidJit::invoke($context);
     }
 
     /**
@@ -324,18 +324,6 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false);
             $fn = $context->module->addFunction('setsid', $ft);
             $context->registerFunction('setsid', $fn);
-        }
-    }
-
-    private static function ensureLibcEuid(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        try {
-            $context->lookupFunction('geteuid');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i32, false);
-            $fn = $context->module->addFunction('geteuid', $ft);
-            $context->registerFunction('geteuid', $fn);
         }
     }
 
