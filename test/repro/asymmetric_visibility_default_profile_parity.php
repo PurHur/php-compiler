@@ -1,5 +1,5 @@
 <?php
-// Issue #24819 — asymmetric visibility must fatal on default / Zend 8.2 reference profile.
+// Issue #30856 / #24819 — asymmetric visibility must fatal on default / Zend 8.2 reference profile.
 class C {
     public private(set) string $name = 'Alice';
 }
