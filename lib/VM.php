@@ -1057,7 +1057,8 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586, #25668).
-     * Hooked properties: when a get hook exists, always invoke get (zend_std_has_property; #29214, #11262).
+     * Hooked properties: invoke get when zend_should_call_hook (virtual / initialized backing);
+     * uninitialized same-name backed skips get (#30739, #11617).
      * Incomplete objects: E_WARNING + false (zend_object_handlers.c, #19632).
      * Inaccessible declared props skip the slot and route through __isset (zend_object_handlers.c).
      */
@@ -1435,9 +1436,9 @@ class VM {
     }
 
     /**
-     * isset($obj->hooked) — php-src zend_std_has_property: when a get hook exists, always
-     * invoke it (virtual and non-virtual / expression-bodied set included) (#29214, #11262).
-     * Write-only (no get): probe backing, or Error for virtual write-only (#6484).
+     * isset($obj->hooked) — php-src zend_std_has_property + zend_should_call_hook (#30739, #29214).
+     * Virtual / distinct-backing / initialized same-name: invoke get. Uninitialized same-name
+     * backed: false without get (Zend/zend_property_hooks.c). Write-only: probe backing (#6484).
      *
      * @return bool|null null when the property is not hook-backed
      */
@@ -1456,6 +1457,10 @@ class VM {
         // (zend_should_call_hook) — uninitialized typed slots are unset, not Error (#29688).
         if ($this->isPropertyHookRawWrite($frame, $propName)) {
             return $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        }
+        // External isset: uninitialized same-name backing must not invoke get (#30739).
+        if ($this->skipHookedGetForUninitializedSameNameBacking($object, $propName)) {
+            return false;
         }
         try {
             $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
@@ -1494,6 +1499,12 @@ class VM {
             } else {
                 $dst->undefined();
             }
+
+            return null;
+        }
+        // External ?? : uninitialized same-name backing is unset without get (#30739).
+        if ($this->skipHookedGetForUninitializedSameNameBacking($object, $propName)) {
+            $dst->undefined();
 
             return null;
         }
@@ -2028,8 +2039,8 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) — php-src zend_std_has_property(ZEND_PROPERTY_NOT_EMPTY): when a get
-     * hook exists, always invoke it then zend_is_true (#29214, #16935, zend_property_hooks.c).
+     * empty($obj->hooked) — zend_std_has_property(ZEND_PROPERTY_NOT_EMPTY) + zend_should_call_hook
+     * (#30739, #29214, #16935). Uninitialized same-name backed is empty without get.
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
@@ -2064,6 +2075,11 @@ class VM {
                 return true;
             }
             $dst->bool(!ext\standard\boolval::isTruthy($backing));
+
+            return true;
+        }
+        if ($this->skipHookedGetForUninitializedSameNameBacking($object, $propName)) {
+            $dst->bool(true);
 
             return true;
         }
@@ -15847,6 +15863,29 @@ restart:
             ?? null;
 
         return is_array($propMeta) && !empty($propMeta['virtual']);
+    }
+
+    /**
+     * zend_should_call_hook is false for uninitialized same-name backed hooks (#30739).
+     * Virtual / distinct-backing properties still invoke get.
+     */
+    private function skipHookedGetForUninitializedSameNameBacking(ObjectEntry $object, string $propName): bool
+    {
+        if (!$this->instancePropertyHasGetHook($object, $propName)) {
+            return false;
+        }
+        if ($this->instancePropertyIsVirtualHook($object, $propName)) {
+            return false;
+        }
+        if ($this->hookedPropertyUsesDistinctBacking($object, $propName)) {
+            return false;
+        }
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false === $backing) {
+            return false;
+        }
+
+        return $backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing);
     }
 
     /** Set-only hook with short `set =>` backing or explicit virtual — external reads forbidden (#6484, #12941, #19163). */

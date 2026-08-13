@@ -168,9 +168,9 @@ final class PropertyHookDispatchLlvm
     }
 
     /**
-     * isset($obj->prop) on hooked properties (#9671, #29214, zend_std_has_property).
-     * When a get hook exists, always invoke it (same-name / expression-bodied set included);
-     * write-only (no get) probes the backing slot.
+     * isset($obj->prop) on hooked properties (#9671, #29214, #30739, zend_std_has_property).
+     * Virtual / distinct-backing / initialized same-name: invoke get. Uninitialized same-name
+     * backed: false without get (zend_should_call_hook). Write-only probes the backing slot.
      */
     public static function tryEmitPropertyIsSet(
         Context $context,
@@ -191,6 +191,18 @@ final class PropertyHookDispatchLlvm
             && !self::proxyIsStatic($context, $getProxy)
             && !PropertyHookJitHelper::isRawHookWrite($context, $propertyName, $enclosingBlock);
         if ($canCallGet) {
+            $registry = $context->runtime->vmContext->propertyHookRegistry ?? [];
+            if (PropertyHookJitHelper::sameNameBackedGetHook($registry, $declaringClass, $propertyName)) {
+                return self::emitIssetViaGetHookIfBackingInitialized(
+                    $context,
+                    $receiver,
+                    $declaringClass,
+                    $propertyName,
+                    $backingName,
+                    $enclosingBlock
+                );
+            }
+
             return self::emitIssetViaGetHook(
                 $context,
                 $receiver,
@@ -229,6 +241,89 @@ final class PropertyHookDispatchLlvm
         return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
     }
 
+    private static int $hookedIssetBlockSerial = 0;
+
+    /**
+     * Same-name backed isset: skip get while the slot is UNDEF (#30739).
+     */
+    private static function emitIssetViaGetHookIfBackingInitialized(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        string $backingName,
+        ?Block $enclosingBlock
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $initialized = self::emitBackingSlotIsInitialized($context, $receiver, $declaringClass, $backingName);
+        $id = (string) (++self::$hookedIssetBlockSerial);
+        $getBb = BasicBlockHelper::append($context, 'hooked_isset_get_'.$id);
+        $uninitBb = BasicBlockHelper::append($context, 'hooked_isset_uninit_'.$id);
+        $mergeBb = BasicBlockHelper::append($context, 'hooked_isset_merge_'.$id);
+        $context->builder->branchIf($initialized, $getBb, $uninitBb);
+
+        $context->builder->positionAtEnd($getBb);
+        $getResult = self::emitIssetViaGetHook(
+            $context,
+            $receiver,
+            $declaringClass,
+            $propertyName,
+            $enclosingBlock
+        );
+        $getEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($uninitBb);
+        $falseVal = $i1->constInt(0, false);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($getResult, $getEnd ?? $getBb);
+        $phi->addIncoming($falseVal, $uninitBb);
+
+        return $phi;
+    }
+
+    /**
+     * Backing slot is past UNDEF (null counts as initialized so get may run) (#30739).
+     */
+    public static function emitBackingSlotIsInitialized(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        string $backingName
+    ): Value {
+        $object = $context->type->object;
+        assert($object instanceof Builtin\Type\Object_);
+        $fetched = $object->propertyFetch($receiver, $declaringClass, $backingName);
+        if (Variable::TYPE_VALUE === $fetched->type) {
+            $valueMap = $context->structFieldMap['__value__'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($fetched->value, $valueMap['type'])
+            );
+            $undefType = $context->getTypeFromString('int8')->constInt(
+                \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
+                false
+            );
+
+            return $context->builder->icmp(Builder::INT_NE, $typeByte, $undefType);
+        }
+        $savedClass = $fetched->objectPropertyClassName;
+        $savedName = $fetched->objectPropertyName;
+        $fetched->objectPropertyClassName = null;
+        $fetched->objectPropertyName = null;
+        try {
+            $loaded = $context->helper->loadValue($fetched);
+        } finally {
+            $fetched->objectPropertyClassName = $savedClass;
+            $fetched->objectPropertyName = $savedName;
+        }
+        $nullPtr = $context->getTypeFromString('void*')->constNull();
+
+        return $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
+    }
+
     /**
      * isset via get hook — result is non-null (#29214, zend_std_has_property).
      */
@@ -249,6 +344,17 @@ final class PropertyHookDispatchLlvm
         );
         if (null === $hookValue) {
             return $i1->constInt(0, false);
+        }
+        // JIT call() yields Variable; AOT standalone may yield a raw %__value__ instruction (#30739).
+        if (!$hookValue instanceof Variable) {
+            $ty = $hookValue->typeOf();
+            if ($ty instanceof \PHPLLVM\Type\Pointer) {
+                $hookValue = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $hookValue);
+            } else {
+                $slot = $context->builder->alloca($ty);
+                $context->builder->store($hookValue, $slot);
+                $hookValue = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+            }
         }
         if (Variable::TYPE_VALUE === $hookValue->type) {
             $valueMap = $context->structFieldMap['__value__'];

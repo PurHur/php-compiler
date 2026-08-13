@@ -68,24 +68,30 @@ PHP;
         self::assertSame("hello\nrhs\n", ob_get_clean());
     }
 
-    /** Inside get: $this->prop ?? default on uninitialized same-name backing (#29688). */
-    public function testVmCoalesceInsideGetOnUninitializedSameNameBacking(): void
+    /** External ?? on uninitialized same-name backing skips get (#30739). */
+    public function testVmCoalesceOnUninitializedSameNameBackingSkipsGet(): void
     {
         $code = <<<'PHP'
 <?php
 class C {
-    public string $prop {
-        get => $this->prop ?? "default";
-        set => $this->prop = $value;
+    public string $name {
+        get { echo "GET\n"; return $this->name; }
+        set(string $v) => $this->name = $v;
     }
 }
 $c = new C;
-echo $c->prop, "\n";
+try {
+    echo ($c->name ?? 'd'), "\n";
+} catch (Error $e) {
+    echo "err\n";
+}
+$c->name = 'x';
+echo ($c->name ?? 'd'), "\n";
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("default\n", ob_get_clean());
+        self::assertSame("d\nGET\nx\n", ob_get_clean());
     }
 }

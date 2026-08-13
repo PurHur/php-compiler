@@ -45,6 +45,35 @@ final class PropertyHookJitHelper
     }
 
     /**
+     * Same-name backed (non-virtual) get hook — zend_should_call_hook is false while the
+     * slot is UNDEF, so isset/empty/?? must not invoke get (#30739, #11617, zend_property_hooks.c).
+     *
+     * Virtual and distinct-backing hooks still invoke get (#29214, #23339).
+     *
+     * @param array<string, array<string, mixed>> $registry propertyHookRegistry
+     */
+    public static function sameNameBackedGetHook(
+        array $registry,
+        string $declaringClass,
+        string $propertyName
+    ): bool {
+        $lcClass = strtolower(ltrim($declaringClass, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $registry[$lcClass][$propertyName]
+            ?? $registry[$lcClass][$propLc]
+            ?? null;
+        if (!is_array($meta) || !isset($meta['get'])) {
+            return false;
+        }
+        if (!empty($meta['virtual'])) {
+            return false;
+        }
+        $backing = $meta['setBacking'] ?? $meta['getBacking'] ?? $propertyName;
+
+        return is_string($backing) && '' !== $backing && 0 === strcasecmp($backing, $propertyName);
+    }
+
+    /**
      * Dim/append/unset-dim on hooked props requires `&get` (zend_object_handlers, #28590 / #29748).
      *
      * @param array<string, array<string, mixed>> $registry propertyHookRegistry
