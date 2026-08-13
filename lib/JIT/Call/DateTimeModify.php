@@ -33,3 +33,57 @@ final class DateTimeModify implements Call
         return JitDateMutation::invokeObjectModify($context, $this->immutable, $label, ...$args);
     }
 }
+
+/**
+ * DateTime::add() / DateTimeImmutable::add() — JIT/AOT (#30760).
+ *
+ * Defined here because DateTimeModify is always registered (all profiles).
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeObjectAdd}
+ *
+ * php-src: ext/date/php_date.c — zim_DateTime_add / zim_DateTimeImmutable_add
+ */
+final class DateTimeAdd implements Call
+{
+    /** Qualified name for BuiltinParamNames / named-arg resolve. */
+    public string $name;
+
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['interval'];
+
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+        $this->name = $immutable ? 'DateTimeImmutable::add' : 'DateTime::add';
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeObjectAdd($context, $this->immutable, ...$args);
+    }
+}
+
+/**
+ * DateTime::sub() / DateTimeImmutable::sub() — JIT/AOT (#30760).
+ *
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeObjectSub}
+ * php-src: ext/date/php_date.c — zim_DateTime_sub / zim_DateTimeImmutable_sub
+ */
+final class DateTimeSub implements Call
+{
+    /** Qualified name for BuiltinParamNames / named-arg resolve. */
+    public string $name;
+
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['interval'];
+
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+        $this->name = $immutable ? 'DateTimeImmutable::sub' : 'DateTime::sub';
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeObjectSub($context, $this->immutable, ...$args);
+    }
+}

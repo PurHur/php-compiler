@@ -28,9 +28,6 @@ final class JitDateMutation
     private const DATETIME_TYPE_ERROR =
         '%s(): Argument #1 ($object) must be of type DateTime, %s given';
 
-    private const INTERVAL_TYPE_ERROR =
-        '%s(): Argument #2 ($interval) must be of type DateInterval, %s given';
-
     private const TARGET_TYPE_ERROR =
         'date_diff(): Argument #2 ($targetObject) must be of type DateTimeInterface, %s given';
 
@@ -57,6 +54,25 @@ final class JitDateMutation
     public static function invokeSub(Context $context, JITVariable ...$args): Value
     {
         return self::invokeIntervalMutation($context, 'date_sub', false, ...$args);
+    }
+
+    /**
+     * DateTime::add() / DateTimeImmutable::add() — JIT/AOT (#30760).
+     *
+     * Mutable: in-place via {@see __phpc_date_apply_interval} (same as date_add).
+     * Immutable: allocate+copy then apply so the original stays unchanged
+     * (php-src zim_DateTimeImmutable_add). Avoid ExternalMethod null stub
+     * segfault / silent no-op on thin AOT.
+     */
+    public static function invokeObjectAdd(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        return self::invokeObjectIntervalMutation($context, $immutable, true, ...$args);
+    }
+
+    /** DateTime::sub() / DateTimeImmutable::sub() — JIT/AOT (#30760). */
+    public static function invokeObjectSub(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        return self::invokeObjectIntervalMutation($context, $immutable, false, ...$args);
     }
 
     public static function invokeModify(Context $context, JITVariable ...$args): Value
@@ -445,13 +461,181 @@ final class JitDateMutation
         DateMutationRuntime::ensureLinked($context);
 
         $dtObj = self::requireDateTimeObject($context, $args[0], $function.'()');
-        $intervalObj = self::requireDateIntervalObject($context, $args[1], $function.'()');
+        $intervalObj = self::requireDateIntervalObject($context, $args[1], $function);
 
+        self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, 'DateTime', $add);
+
+        return self::returnObjectArg($context, $args[0]);
+    }
+
+    /**
+     * OOP DateTime{,Immutable}::add/sub (#30760).
+     *
+     * Thin user-script AOT cannot NestedJIT {@see DateMutationRuntime}
+     * (`__nativearray__boundscheck` missing, peer #27159 / modify()). Prefer
+     * compile-time {@see VmDateTimeNative::applyIntervalState} when both the
+     * receiver instant and DateInterval spec are known; otherwise LLVM-add a
+     * fixed-length (no year/month) compile-time interval. Full JIT/MCJIT still
+     * falls back to {@see __phpc_date_apply_interval}.
+     */
+    private static function invokeObjectIntervalMutation(
+        Context $context,
+        bool $immutable,
+        bool $add,
+        JITVariable ...$args
+    ): Value {
+        $function = $immutable
+            ? ($add ? 'DateTimeImmutable::add' : 'DateTimeImmutable::sub')
+            : ($add ? 'DateTime::add' : 'DateTime::sub');
+        $argc = \count($args);
+        if ($argc !== 2) {
+            throw new \ArgumentCountError(
+                \sprintf('%s() expects exactly 1 argument, %d given', $function, max(0, $argc - 1))
+            );
+        }
+
+        $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
-        $ts = self::readLongProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::TS_PROPERTY);
-        $micro = self::readLongProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::MICROSECOND_PROPERTY);
-        $tz = self::readStringProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::TZ_PROPERTY);
+        $receiver = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        $intervalState = $args[1]->compileTimeDateInterval;
+        $instant = self::resolveCompileTimeInstant($context, $args[0]);
+
+        if (null !== $instant && null !== $intervalState) {
+            $updated = VmDateTimeNative::applyIntervalState(
+                $instant['timestamp'],
+                $instant['microsecond'],
+                $intervalState,
+                $instant['timezone'],
+                $add
+            );
+            if ($immutable) {
+                $dtObj = self::allocateDateTimeLike(
+                    $context,
+                    $layout,
+                    $updated['timestamp'],
+                    $updated['microsecond'],
+                    $instant['timezone']
+                );
+            } else {
+                $dtObj = $receiver;
+                $i64 = $context->getTypeFromString('int64');
+                self::writeLongProp(
+                    $context,
+                    $object,
+                    $dtObj,
+                    $layout,
+                    DateTimeSupport::TS_PROPERTY,
+                    $i64->constInt($updated['timestamp'], true)
+                );
+                self::writeLongProp(
+                    $context,
+                    $object,
+                    $dtObj,
+                    $layout,
+                    DateTimeSupport::MICROSECOND_PROPERTY,
+                    $i64->constInt($updated['microsecond'], true)
+                );
+            }
+
+            return self::boxObjectPtr($context, $dtObj);
+        }
+
+        if ($immutable) {
+            $classId = $object->lookup($layout);
+            $target = $object->allocate($classId);
+            ReflectionSetup::markConstructed($context, $target);
+            foreach ([
+                DateTimeSupport::TS_PROPERTY,
+                DateTimeSupport::MICROSECOND_PROPERTY,
+                DateTimeSupport::TZ_PROPERTY,
+            ] as $prop) {
+                $val = $object->propertyFetch($receiver, $layout, $prop);
+                $object->propertyStore(
+                    $object->propertySlotFor($target, $layout, $prop),
+                    $val,
+                    $val->type
+                );
+            }
+            $dtObj = $target;
+        } else {
+            $dtObj = $receiver;
+        }
+
+        if (null !== $intervalState && 0 === (int) $intervalState['y'] && 0 === (int) $intervalState['m']) {
+            $invert = 0 !== (int) $intervalState['invert'];
+            $subtract = $add ? $invert : !$invert;
+            $sign = $subtract ? -1 : 1;
+            $deltaSec = $sign * (
+                ((int) $intervalState['d'] * 86400)
+                + ((int) $intervalState['h'] * 3600)
+                + ((int) $intervalState['i'] * 60)
+                + (int) $intervalState['s']
+            );
+            $deltaMicro = (int) \round($sign * (float) $intervalState['f'] * 1_000_000);
+            $i64 = $context->getTypeFromString('int64');
+            $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
+            $newTs = $context->builder->add($ts, $i64->constInt($deltaSec, true));
+            if (0 !== $deltaMicro) {
+                $micro = self::readLongProp(
+                    $context,
+                    $object,
+                    $dtObj,
+                    $layout,
+                    DateTimeSupport::MICROSECOND_PROPERTY
+                );
+                $newMicro = $context->builder->add($micro, $i64->constInt($deltaMicro, true));
+                self::writeLongProp(
+                    $context,
+                    $object,
+                    $dtObj,
+                    $layout,
+                    DateTimeSupport::MICROSECOND_PROPERTY,
+                    $newMicro
+                );
+            }
+            self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+
+            return self::boxObjectPtr($context, $dtObj);
+        }
+
+        if ($context->isUserScriptAot()) {
+            throw new \LogicException(
+                $function.'() requires a compile-time DateInterval in this compiler build (#30760)'
+            );
+        }
+
+        DateMutationRuntime::ensureLinked($context);
+        $intervalObj = self::requireDateIntervalObject($context, $args[1], $function, 1);
+        self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, $layout, $add);
+
+        return self::boxObjectPtr($context, $dtObj);
+    }
+
+    private static function boxObjectPtr(Context $context, Value $dtObj): Value
+    {
+        $ret = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $ret),
+            $dtObj
+        );
+
+        return $ret;
+    }
+
+    private static function applyIntervalToDateTimeObject(
+        Context $context,
+        Value $dtObj,
+        Value $intervalObj,
+        string $layout,
+        bool $add
+    ): void {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
+        $micro = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY);
+        $tz = self::readStringProp($context, $object, $dtObj, $layout, DateTimeSupport::TZ_PROPERTY);
         $tzCstr = self::stringData($context, $tz);
 
         $iy = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'y');
@@ -465,7 +649,6 @@ final class JitDateMutation
 
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
-        $i64p = $context->getTypeFromString('int64*');
         $outTs = $context->builder->alloca($i64, 1, 'date_ai_out_ts');
         $outMicro = $context->builder->alloca($i64, 1, 'date_ai_out_micro');
         $context->builder->call(
@@ -488,10 +671,8 @@ final class JitDateMutation
 
         $newTs = $context->builder->load($outTs);
         $newMicro = $context->builder->load($outMicro);
-        self::writeLongProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::TS_PROPERTY, $newTs);
-        self::writeLongProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::MICROSECOND_PROPERTY, $newMicro);
-
-        return self::returnObjectArg($context, $args[0]);
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY, $newMicro);
     }
 
     /**
@@ -621,9 +802,18 @@ final class JitDateMutation
         return $objPtr;
     }
 
-    private static function requireDateIntervalObject(Context $context, JITVariable $arg, string $label): Value
-    {
-        $template = \sprintf(self::INTERVAL_TYPE_ERROR, $label, '%s');
+    private static function requireDateIntervalObject(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argumentIndex = 2
+    ): Value {
+        $template = \sprintf(
+            '%s(): Argument #%d ($interval) must be of type DateInterval, %s given',
+            $function,
+            $argumentIndex,
+            '%s'
+        );
         $objPtr = self::requireObjectValue($context, $arg, $template, 'array');
         self::assertClassOneOf($context, $objPtr, ['DateInterval'], $template, 'object');
 

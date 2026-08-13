@@ -69,4 +69,36 @@ PHP;
         );
         $this->addToAssertionCount(1);
     }
+
+    public function testDateTimeAddSubMethodModuleVerify(): void
+    {
+        $code = <<<'PHP'
+<?php
+$dt = new DateTime('2020-01-15', new DateTimeZone('UTC'));
+$dt->add(new DateInterval('P1D'));
+$dt->sub(new DateInterval('P1D'));
+$imm = new DateTimeImmutable('2020-01-15', new DateTimeZone('UTC'));
+$imm2 = $imm->add(new DateInterval('P1D'));
+echo $dt->format('Y-m-d'), ',', $imm->format('Y-m-d'), ',', $imm2->format('Y-m-d'), "\n";
+PHP;
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'datetime_add_sub_jit.php');
+        $this->assertNotNull($block);
+        $runtime->jitCompileBlock($block);
+
+        $context = $runtime->loadJitContext();
+        $bc = $context->module->printToString();
+        $this->assertStringNotContainsString(
+            'not implemented for JIT',
+            $bc,
+            'DateTime::add/sub should lower without JIT stubs (#30760)'
+        );
+        $this->assertStringNotContainsString(
+            'Unable to lookup non-existing function',
+            $bc,
+            'DateTime::add/sub must not emit missing-helper lookups (#30760)'
+        );
+        $this->addToAssertionCount(1);
+    }
 }

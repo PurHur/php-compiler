@@ -1569,6 +1569,12 @@ class Context {
         // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772).
         $this->functionProxies['datetime::modify'] = new Call\DateTimeModify(false);
         $this->functionProxies['datetimeimmutable::modify'] = new Call\DateTimeModify(true);
+        // add()/sub() — avoid ExternalMethod null stub segfault / silent no-op (#30760).
+        // DateTimeAdd/DateTimeSub live in DateTimeModify.php (always loaded above).
+        $this->functionProxies['datetime::add'] = new Call\DateTimeAdd(false);
+        $this->functionProxies['datetimeimmutable::add'] = new Call\DateTimeAdd(true);
+        $this->functionProxies['datetime::sub'] = new Call\DateTimeSub(false);
+        $this->functionProxies['datetimeimmutable::sub'] = new Call\DateTimeSub(true);
         // DateTime::diff — compile-time DateInterval materialize (#27309).
         $this->functionProxies['datetime::diff'] = new Call\DateTimeDiff();
         $this->functionProxies['datetimeimmutable::diff'] = new Call\DateTimeDiff();
