@@ -985,6 +985,7 @@ language/encapsed_rvalue_object
 language/encapsed_string
 language/encapsed_string_jit
 language/engine_throwable_getcode_default
+language/enum/foreach_byref_enum
 language/enum_abstract_method_compile_error
 language/enum_abstract_method_fatal
 language/enum_arithmetic_try_catch
@@ -1147,6 +1148,7 @@ language/exception_ctor_string_coerce
 language/exception_ignore_args
 language/exception_ignore_args_sensitive_wrap
 language/exception_string_param_max_len
+language/exception_string_param_max_len_default_30626
 language/exception_subclass_parent_construct
 language/exception_throw_catch_finally
 language/exception_throw_catch_nested_try
@@ -1263,7 +1265,6 @@ language/foreach_by_ref_assoc
 language/foreach_by_ref_jit
 language/foreach_by_ref_unset
 language/foreach_byref_arrayiterator
-language/enum/foreach_byref_enum
 language/foreach_byref_object_property
 language/foreach_byref_string_assign
 language/foreach_byref_unset_residual
