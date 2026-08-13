@@ -6,14 +6,18 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * get_called_class() — late-static call-site class name (issue #3218).
  *
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_called_class)
+ * Excess argc → Zend ArgumentCountError (#30648; php-src Zend/zend_builtin_functions.c).
+ *
+ * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(get_called_class)
  */
 final class get_called_class_ extends Internal
 {
@@ -24,8 +28,11 @@ final class get_called_class_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('get_called_class() takes no arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError(
+                'get_called_class() expects exactly 0 arguments, '.$argc.' given'
+            );
         }
         $calledClass = VmReflection::getCalledClass($frame);
         if (null === $frame->returnVar) {
@@ -36,8 +43,17 @@ final class get_called_class_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('get_called_class() takes no arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc > 0) {
+            // Catchable ArgumentCountError under AOT try/catch (#30648).
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'get_called_class() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitGetCalledClass::invoke($context);
