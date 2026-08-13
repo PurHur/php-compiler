@@ -20,6 +20,8 @@ use PHPLLVM\Value;
  *
  * VM: all formats via {@see VmString::str_word_count()}.
  * JIT/AOT: {@see StringStrWordCount} → StrWordCountJitHelper PHP (#14651).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30720; php-src ext/standard/string.c).
  */
 final class str_word_count extends Internal
 {
@@ -30,10 +32,9 @@ final class str_word_count extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..3 (#30720; ext/standard/string.stub.php).
+        $this->requireArgCountRange($frame, 'str_word_count', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('str_word_count() accepts one to three arguments in this compiler build');
-        }
         $string = self::vmStringArg($frame, 0, 'string');
         $format = 0;
         if ($argc >= 2) {
@@ -75,10 +76,11 @@ final class str_word_count extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('str_word_count() accepts one to three arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30720).
+        if (!$this->requireArgCountRangeJit($context, $args, 'str_word_count', 1, 3)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
 
         $literal = $args[0]->compileTimeString ?? null;
         $formatCt = null;

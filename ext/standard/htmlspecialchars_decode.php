@@ -18,6 +18,8 @@ use PHPLLVM\Value;
  * htmlspecialchars_decode() — decode HTML entities (subset of PHP; issue #2454).
  *
  * VM: {@see VmString::htmlspecialchars_decode()}; JIT/AOT: {@see HtmlspecialcharsDecodeJitHelper} (#14820).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30720; php-src ext/standard/html.c).
  */
 final class htmlspecialchars_decode extends Internal
 {
@@ -28,10 +30,9 @@ final class htmlspecialchars_decode extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30720; ext/standard/html.stub.php).
+        $this->requireArgCountRange($frame, 'htmlspecialchars_decode', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('htmlspecialchars_decode() requires one or two arguments in this compiler build');
-        }
         $string = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
@@ -54,10 +55,11 @@ final class htmlspecialchars_decode extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('htmlspecialchars_decode() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30720).
+        if (!$this->requireArgCountRangeJit($context, $args, 'htmlspecialchars_decode', 1, 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
 
         // Fold proven compile-time strings: KIND_VALUE immediates and TYPE_STRING
         // stack slots (literal args / assigned locals keep KIND_VARIABLE with
