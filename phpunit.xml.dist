@@ -332,6 +332,8 @@
             <file>./test/compliance/FilestatMetaExcessArgc30545JITTest.php</file>
             <file>./test/compliance/ChmodTouchTempnamExcessArgc30551VMTest.php</file>
             <file>./test/compliance/ChmodTouchTempnamExcessArgc30551JITTest.php</file>
+            <file>./test/compliance/DiskSpaceExcessArgc30552VMTest.php</file>
+            <file>./test/compliance/DiskSpaceExcessArgc30552JITTest.php</file>
             <file>./test/compliance/ArrayChangeKeyCaseCountValuesExcessArgc30536VMTest.php</file>
             <file>./test/compliance/ArrayChangeKeyCaseCountValuesExcessArgc30536JITTest.php</file>
             <file>./test/compliance/InfoUnameExtensionsGetrusageExcessArgc30537VMTest.php</file>
