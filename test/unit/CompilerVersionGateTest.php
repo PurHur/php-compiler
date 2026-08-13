@@ -2410,7 +2410,7 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** @covers issue #24819 — must stay false on unset PROFILE (not isForwardProfileAtLeast) */
+    /** @covers issue #30856 / #24819 — must stay false on unset PROFILE (not isForwardProfileAtLeast) */
     public function testSupportsAsymmetricVisibilityFalseOn84DevReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
