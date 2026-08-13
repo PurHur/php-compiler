@@ -21,6 +21,7 @@ use PHPLLVM\Value;
  *
  * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080),
  * `json_encode(mb_str_split(lit…))` (#27242),
+ * `json_encode(mb_encoding_aliases(lit))` / `json_encode(mb_list_encodings())` (#30795),
  * `json_encode(preg_filter(lit…))` / string-subject (#27181),
  * `json_encode(array_replace_recursive(lit…))` (#26977),
  * `json_encode(array_flip(lit…))` (#27072),
@@ -58,6 +59,12 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromMbStrSplit($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromMbEncodingAliases($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromMbListEncodings($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromPregFilter($block, $operand);
@@ -377,6 +384,43 @@ final class JitJsonEncodeCompileTime
         if (null === $parts) {
             return null;
         }
+
+        return self::vmArrayFromStringList($parts);
+    }
+
+    /**
+     * Resolve `json_encode(mb_encoding_aliases(lit))` (#30795).
+     *
+     * Peer {@see tryCompileTimeArrayFromMbStrSplit}: thin AOT cannot export the folded HT.
+     */
+    private static function tryCompileTimeArrayFromMbEncodingAliases(Block $block, Operand $operand): ?VmVariable
+    {
+        $parts = self::evalCompileTimeMbEncodingAliases($block, $operand);
+        if (null === $parts) {
+            return null;
+        }
+
+        return self::vmArrayFromStringList($parts);
+    }
+
+    /**
+     * Resolve `json_encode(mb_list_encodings())` (#30795).
+     *
+     * Peer {@see tryCompileTimeArrayFromMbStrSplit}: thin AOT cannot export the folded HT.
+     */
+    private static function tryCompileTimeArrayFromMbListEncodings(Block $block, Operand $operand): ?VmVariable
+    {
+        $parts = self::evalCompileTimeMbListEncodings($block, $operand);
+        if (null === $parts) {
+            return null;
+        }
+
+        return self::vmArrayFromStringList($parts);
+    }
+
+    /** @param list<string> $parts */
+    private static function vmArrayFromStringList(array $parts): VmVariable
+    {
         $ht = new HashTable();
         foreach ($parts as $piece) {
             $value = new VmVariable();
@@ -430,6 +474,45 @@ final class JitJsonEncodeCompileTime
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * @return list<string>|null null = not a foldable mb_encoding_aliases result
+     */
+    private static function evalCompileTimeMbEncodingAliases(Block $block, Operand $operand): ?array
+    {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'mb_encoding_aliases');
+        if (null === $args || 1 !== \count($args)) {
+            return null;
+        }
+        if (VmVariable::TYPE_STRING !== $args[0]->type) {
+            return null;
+        }
+        $encoding = $args[0]->toString();
+        $canonical = \PHPCompiler\ext\mbstring\MbstringEncodingRegistry::resolve($encoding);
+        if (null === $canonical) {
+            // Invalid encoding → runtime ValueError from {@see JitMbEncodingRegistry}; do not fold.
+            return null;
+        }
+
+        return \PHPCompiler\ext\mbstring\MbstringEncodingRegistry::aliases($canonical);
+    }
+
+    /**
+     * @return list<string>|null null = not a foldable mb_list_encodings result
+     */
+    private static function evalCompileTimeMbListEncodings(Block $block, Operand $operand): ?array
+    {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'mb_list_encodings');
+        if (null === $args || [] !== $args) {
+            return null;
+        }
+
+        return \PHPCompiler\ext\mbstring\MbstringEncodingRegistry::listEncodings();
     }
 
     /**
