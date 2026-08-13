@@ -75,7 +75,7 @@ final class JitFdiv
     ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
             if ($context->callerStrictTypes) {
-                if ('number' === $expectedType) {
+                if ('number' === $expectedType || 'int|float' === $expectedType) {
                     JitInternalStrictArg::requireNumber($context, $arg, $function, $paramName, $argIndex);
                 } elseif ('float' === $expectedType) {
                     JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
@@ -85,18 +85,19 @@ final class JitFdiv
                 BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_null_strict_te_cont');
             } elseif ('number' === $expectedType) {
                 self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
-            } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull() && $forwardProfileStrictDoubleNull) {
+            } elseif (self::isFloatLikeExpectedType($expectedType) && VmMath::requiresForwardProfileStrictDoubleNull() && $forwardProfileStrictDoubleNull) {
                 self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
                 BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_null_fwd_te_cont');
-            } elseif ('float' === $expectedType) {
-                // Z_PARAM_DOUBLE null coerce (sqrt/sin; #19756, #20432).
+            } elseif (self::isFloatLikeExpectedType($expectedType)) {
+                // Z_PARAM_DOUBLE null coerce (sqrt/sin; #19756, #20432). DEP cites "float"
+                // even when TypeError label is int|float (number_format; #29976).
                 self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'float');
             }
 
             return $double->constReal(0.0);
         }
-        if ($context->callerStrictTypes && 'number' === $expectedType) {
-            // Z_PARAM_NUMBER: reject string/bool under strict_types before numeric-string coerce (#4189).
+        if ($context->callerStrictTypes && ('number' === $expectedType || 'int|float' === $expectedType)) {
+            // Z_PARAM_NUMBER / stub int|float: reject string/bool under strict_types (#4189, #29976).
             JitInternalStrictArg::requireNumber($context, $arg, $function, $paramName, $argIndex);
         }
         if ($context->callerStrictTypes && 'float' === $expectedType) {
@@ -223,15 +224,15 @@ final class JitFdiv
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
 
         $context->builder->positionAtEnd($nullBlock);
-        if ($context->callerStrictTypes && 'number' === $expectedType) {
+        if ($context->callerStrictTypes && ('number' === $expectedType || 'int|float' === $expectedType)) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif ($context->callerStrictTypes && 'float' === $expectedType) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif (!$context->callerStrictTypes && 'number' === $expectedType) {
             self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
-        } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull() && $forwardProfileStrictDoubleNull) {
+        } elseif (self::isFloatLikeExpectedType($expectedType) && VmMath::requiresForwardProfileStrictDoubleNull() && $forwardProfileStrictDoubleNull) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
-        } elseif ('float' === $expectedType) {
+        } elseif (self::isFloatLikeExpectedType($expectedType)) {
             self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'float');
         }
         $context->builder->branch($mergeBlock);
@@ -427,7 +428,8 @@ final class JitFdiv
         string $function = self::FUNCTION,
         string $expectedType = 'float'
     ): string {
-        $expected = 'number' === $expectedType ? 'int|float' : 'float';
+        // 'number' and stub int|float both print the Zend union; plain float stays float (#29976).
+        $expected = self::isIntFloatExpectedType($expectedType) ? 'int|float' : 'float';
 
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type %s, %s given',
@@ -437,6 +439,18 @@ final class JitFdiv
             $expected,
             $given
         );
+    }
+
+    /** Z_PARAM_DOUBLE-style expectedType that still soft-nulls with a "float" DEP. */
+    private static function isFloatLikeExpectedType(string $expectedType): bool
+    {
+        return 'float' === $expectedType || 'int|float' === $expectedType;
+    }
+
+    /** TypeError / Z_PARAM_NUMBER union label. */
+    private static function isIntFloatExpectedType(string $expectedType): bool
+    {
+        return 'number' === $expectedType || 'int|float' === $expectedType;
     }
 
     private static function emitNumericTypeErrorAndAbort(

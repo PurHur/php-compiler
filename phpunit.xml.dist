@@ -121,6 +121,8 @@
             <file>./test/compliance/HashHmacFileNullAlgoStrictJITTest.php</file>
             <file>./test/compliance/Utf8EncodeDecodeNullStrictVMTest.php</file>
             <file>./test/compliance/Utf8EncodeDecodeNullStrictJITTest.php</file>
+            <file>./test/compliance/NumberFormatNullNumStrict29976VMTest.php</file>
+            <file>./test/compliance/NumberFormatNullNumStrict29976JITTest.php</file>
             <file>./test/compliance/OpensslErrorStringReflectionVMTest.php</file>
             <file>./test/compliance/OpensslEncryptDecryptReflectionVMTest.php</file>
             <file>./test/compliance/ProcOpenReflectionVMTest.php</file>

@@ -8,4 +8,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-number_format(): Argument #1 ($num) must be of type float, array given
+number_format(): Argument #1 ($num) must be of type int|float, array given
