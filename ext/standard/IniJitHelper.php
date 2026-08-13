@@ -136,7 +136,7 @@ final class IniJitHelper
 
     private const CFG_PCRE_RECURSION_LIMIT = '100000';
 
-    /** php-src EG(exception_string_param_max_len) compiled default (#21999). */
+    /** php-src EG(exception_string_param_max_len) compiled default 15 (#21999 / #30626). */
     private const CFG_EXCEPTION_STRING_PARAM_MAX_LEN = 15;
 
     private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;

@@ -174,7 +174,7 @@ final class ExceptionStringParamMaxLenHostDashDTest extends TestCase
         );
     }
 
-    /** Distro php.ini max_len=0 must not override guest compiled default 15 (#28061). */
+    /** Distro php.ini max_len=0 must not override guest compiled default 15 (#28061 / #30626). */
     public function testHostPhpIniAloneKeepsCompiledDefaultMaxLen(): void
     {
         $repoRoot = dirname(__DIR__, 2);
@@ -195,10 +195,33 @@ final class ExceptionStringParamMaxLenHostDashDTest extends TestCase
         ];
         $result = $this->runCommand($cmd, $repoRoot);
         $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        // php-src compiled default is 15; "hello" fits without truncation (#30626).
         $this->assertMatchesRegularExpression(
-            "/^#0 .+g\\('\\.\\.\\.'\\)\\n0\\n\\z/",
+            "/^#0 .+g\\('hello'\\)\\n15\\n\\z/",
             $result['stdout']
         );
+    }
+
+    /** Bare VM (no host/guest -d) reports ini_get=15 and shows UnhandledMatchError subject (#30626). */
+    public function testCompiledDefaultShowsUnhandledMatchSubject(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        $script = realpath($repoRoot.'/test/repro/issue_30626_exception_string_param_max_len_default.php');
+        if (false === $vm || false === $script) {
+            $this->markTestSkipped('vm or repro missing');
+        }
+
+        $cmd = [
+            PHP_BINARY,
+            '-d',
+            'display_errors=0',
+            $vm,
+            $script,
+        ];
+        $result = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        $this->assertSame("max=15\nUnhandled match case 'hello'\n", $result['stdout']);
     }
 
     /**
