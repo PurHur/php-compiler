@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mb_list_encodings() — supported encoding names (php-src ext/mbstring/mbstring.c; #15448). */
+/**
+ * mb_list_encodings() — supported encoding names (php-src ext/mbstring/mbstring.c; #15448, #30795).
+ *
+ * JIT/AOT: compile-time constant HT via {@see JitMbEncodingRegistry} (peer pdo_drivers).
+ */
 final class mb_list_encodings extends Internal
 {
     public function __construct()
@@ -20,6 +24,13 @@ final class mb_list_encodings extends Internal
 
     public function execute(Frame $frame): void
     {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_list_encodings() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -30,8 +41,6 @@ final class mb_list_encodings extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_list_encodings() JIT is not supported in this compiler build'
-        );
+        return JitMbEncodingRegistry::foldListEncodings($context, ...$args);
     }
 }
