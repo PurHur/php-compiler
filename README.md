@@ -22,8 +22,8 @@
 | **VM (`phpc run`)** | ✅ Production-shaped for dev/CI | Broadest language coverage; reference executor and JIT/AOT fallback |
 | **AOT (`phpc build`)** | ✅ For curated subset | Standalone binaries for examples **000–009** and small CGI apps; not arbitrary Composer stacks |
 | **JIT (`bin/jit.php`)** | 🚧 Partial | LLVM IR for many constructs; **MCJIT execute** still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98)); EH scripts VM-fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
-| **Language wave 3** | ✅ Closed batch | **7410/7410** language + **7410/7410** stdlib tracker items ([#1380](https://github.com/PurHur/php-compiler/issues/1380)); closures, try/catch, generators (VM), `parent::class`, backed enums (VM), intersection AOT checks |
-| **Self-host north star** | 🚧 ~65% | M3/M4 emit paths are blob copies ([#21860](https://github.com/PurHur/php-compiler/issues/21860)); `--strict` red; spine **7409** / **7411** (2 deferred: #24115, #27103); vendor prelink **7410/7410** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| **Language wave 3** | ✅ Closed batch | **7410/7412** language + **7410/7412** stdlib tracker items ([#1380](https://github.com/PurHur/php-compiler/issues/1380)); closures, try/catch, generators (VM), `parent::class`, backed enums (VM), intersection AOT checks |
+| **Self-host north star** | 🚧 ~65% | M3/M4 emit paths are blob copies ([#21860](https://github.com/PurHur/php-compiler/issues/21860)); `--strict` red; spine **7409** / **7411** (2 deferred: #24115, #27103); vendor prelink **7410/7412** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 ### What you can rely on today
 
@@ -43,7 +43,7 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 | **M2** | ✅ **7409** / **7411** (2 deferred: #24115, #27103) | Full Phase A inventory in spine smoke; native link + lint ✅ |
 | **M3** | 🚧 | HelloWorld probe output is a prelinked blob **COPY**, not a native emit ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) |
 | **M4** | 🚧 | ladder runs, but gen-1→gen-2 is a sidecar **COPY** ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) — gen-0/gen-2/gen-3 being byte-identical follows from that, and is not fixpoint evidence |
-| **M5** | 🚧 | `make north-star5-verify-fast` (daily) ✅; vendor **7410/7410** ✅; gen-0 sidecars refreshed; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) |
+| **M5** | 🚧 | `make north-star5-verify-fast` (daily) ✅; vendor **7410/7412** ✅; gen-0 sidecars refreshed; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) |
 
 **Reproduce M0 smoke on a clean clone (verified Jul 2026):**
 
@@ -226,7 +226,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 - v1.1.0 batch: **`preg_match` / `preg_match_all` JIT**, **`spl_autoload*`** stack, enum-aware strict builtins, php-in-PHP `proc_open` paths
 - Core VM additions: `class_uses`, `class_alias`, `get_debug_type`, `iterator_to_array`, `array_chunk` (preserve keys), `settype`, `array_replace_recursive`, `json_validate`, `preg_last_error_msg`, `fdiv`, **DateTime** / **DateTimeZone** OOP ([#3104](https://github.com/PurHur/php-compiler/pull/3104))
 - **`array_map` / `array_filter` / `usort`** accept **closure** callbacks on VM ([#3086](https://github.com/PurHur/php-compiler/pull/3086))
-- Wave 3 tracked batch: **7410/7410** language + **7410/7410** stdlib items closed; ongoing parity work tracked in [#1380](https://github.com/PurHur/php-compiler/issues/1380) follow-ups
+- Wave 3 tracked batch: **7410/7412** language + **7410/7412** stdlib items closed; ongoing parity work tracked in [#1380](https://github.com/PurHur/php-compiler/issues/1380) follow-ups
 
 **Tooling**
 

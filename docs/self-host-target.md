@@ -34,11 +34,11 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Prelinked gen-0 refreshed via honest inventory argv emit; native `build/bin-compile-aot-inventory` for M4/M5 | Compiled `bin/compile.php` only |
-| **Bundle size** | **7410/7410** literal Phase A inventory in spine smoke | Full vm.php closure |
+| **Bundle size** | **7410/7412** literal Phase A inventory in spine smoke | Full vm.php closure |
 | **Inventory coverage** | **7409** / **7411** ✅ | Full closure |
 | **HelloWorld** | ✅ `emit_path=native` via gen-0 argv emit helper (`DRIVER -o OUT SOURCE`; [#22178](https://github.com/PurHur/php-compiler/issues/22178)) | Native compile for arbitrary PHP |
 | **Bootstrap loop (M4)** | `make bootstrap-loop-probe` full ladder ✅ — gen-1→gen-2, gen-2→gen-3 full spine, full-revision argv | Native full revision rebuild |
-| **Vendor** | **7410/7410** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily ✅; `--strict` ❌ **red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) | No Zend `vendor/autoload.php` at bootstrap |
+| **Vendor** | **7410/7412** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily ✅; `--strict` ❌ **red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) | No Zend `vendor/autoload.php` at bootstrap |
 
 ### Gates (run after `script/apply-patches.sh`)
 
@@ -56,8 +56,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv → gen-3 + fixture smoke ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
 | M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 full spine native argv |
 | M4 `make bootstrap-loop-probe` | 🚧 **DEGRADED** — gen-1→gen-2 is a prelinked sidecar COPY, not a native compile ([#21860](https://github.com/PurHur/php-compiler/issues/21860)); gen-2→gen-3 + full-revision then run on that copy, so byte-comparing gen-0/gen-2/gen-3 proves nothing. Require a real emit: `BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1` ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
-| `make bootstrap-aot-link` | ✅ **7410/7410** |
-| `make bootstrap-inventory-check` | ✅ **7410/7410** Phase A files, **0** source blockers |
+| `make bootstrap-aot-link` | ✅ **7410/7412** |
+| `make bootstrap-inventory-check` | ✅ **7410/7412** Phase A files, **0** source blockers |
 | `make north-star5-verify-fast` | ✅ daily M5 PR gate (~1–2 min) |
 | `make north-star5-verify ARGS=--strict` | ❌ **red on master** — step 4a2 `bootstrap-selfhost-driver-smoke`: standalone AOT emit leaves the LLVM builder detached ([#21417](https://github.com/PurHur/php-compiler/issues/21417)). Steps 1–4a pass. Was masked by a 4096M OOM ([#21104](https://github.com/PurHur/php-compiler/issues/21104)) and a `trigger_error` `ValueError` ([#21400](https://github.com/PurHur/php-compiler/issues/21400)), both now fixed |
 
@@ -134,7 +134,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 | Entry | Units | Role |
 |-------|------:|------|
 | `test/selfhost/compiler_minimal/main.php` | **108** | M0 core |
-| `test/selfhost/compiler_lib_spine_smoke/main.php` | **7410/7410** Phase A | M2 complete ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
+| `test/selfhost/compiler_lib_spine_smoke/main.php` | **7410/7412** Phase A | M2 complete ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
 | `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2→gen-3 loop; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 

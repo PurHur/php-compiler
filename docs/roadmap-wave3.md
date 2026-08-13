@@ -1,6 +1,6 @@
 # Roadmap wave 3 tracker (#1354–#1379)
 
-> **Wave 3 complete on master (May 2026):** language **7410/7410** + stdlib **7410/7410** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)). Phase-2 / JIT-only deferrals: [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
+> **Wave 3 complete on master (May 2026):** language **7410/7412** + stdlib **7410/7412** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)). Phase-2 / JIT-only deferrals: [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
 
 Living status for the **25 issues** filed May 2026 toward full PHP language + stdlib coverage. Umbrella: [#1380](https://github.com/PurHur/php-compiler/issues/1380). North stars: [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (self-host; was [#1056](https://github.com/PurHur/php-compiler/issues/1056)).
 
@@ -69,4 +69,4 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 
 ---
 
-**Wave 3 close-out (May 2026):** language **7410/7410**, stdlib **7410/7410** on master. Do not reopen [#1354](https://github.com/PurHur/php-compiler/issues/1354)–[#1379](https://github.com/PurHur/php-compiler/issues/1379) for phase-1 gaps — use phase-2 trackers [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
+**Wave 3 close-out (May 2026):** language **7410/7412**, stdlib **7410/7412** on master. Do not reopen [#1354](https://github.com/PurHur/php-compiler/issues/1354)–[#1379](https://github.com/PurHur/php-compiler/issues/1379) for phase-1 gaps — use phase-2 trackers [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
