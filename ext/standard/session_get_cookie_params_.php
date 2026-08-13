@@ -35,6 +35,6 @@ class session_get_cookie_params_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('session_get_cookie_params() is VM-only in this compiler build');
+        return JitSessionCookieAndPath::invokeGetCookieParams($context, ...$args);
     }
 }

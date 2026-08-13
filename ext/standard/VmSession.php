@@ -193,14 +193,36 @@ final class VmSession
         if (!self::canChangeCookieParams($frame)) {
             return false;
         }
+        self::forceApplyCookieParams($params);
+
+        return true;
+    }
+
+    /**
+     * Compile-time / thin-AOT apply — skips SAPI headersSent of the compiler process (#30758).
+     *
+     * @param array{
+     *     lifetime: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     * } $params
+     */
+    public static function forceApplyCookieParams(array $params): void
+    {
+        if ($params['lifetime'] < 0) {
+            throw new \ValueError(
+                'session_set_cookie_params(): Argument #1 ($lifetime_or_options) must be greater than or equal to 0'
+            );
+        }
         self::$cookieLifetime = $params['lifetime'];
         self::$cookiePath = $params['path'];
         self::$cookieDomain = $params['domain'];
         self::$cookieSecure = $params['secure'];
         self::$cookieHttponly = $params['httponly'];
         self::$cookieSamesite = $params['samesite'];
-
-        return true;
     }
 
     public static function canChangeCookieParams(?Frame $frame): bool
@@ -247,6 +269,13 @@ final class VmSession
         if (!self::canChangeCacheLimiter($frame)) {
             return false;
         }
+
+        return self::forceSetCacheLimiter($newLimiter);
+    }
+
+    /** Compile-time / thin-AOT set — skips compiler-process headersSent (#30758). */
+    public static function forceSetCacheLimiter(string $newLimiter): string
+    {
         $previous = self::$cacheLimiter;
         self::$cacheLimiter = $newLimiter;
 
@@ -347,6 +376,12 @@ final class VmSession
             return false;
         }
 
+        return self::forceSetSavePath($newPath);
+    }
+
+    /** Compile-time / thin-AOT set — skips compiler-process headersSent (#30758). */
+    public static function forceSetSavePath(string $newPath): string
+    {
         return VmIni::setSessionSavePathValue($newPath);
     }
 
