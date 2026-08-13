@@ -23,6 +23,14 @@ final class DateTimeConstruct extends VmClassMethod
         if ($argc < 1) {
             throw new \LogicException('DateTime::__construct() called without $this');
         }
+        // User arity excludes $this — php-src zim_DateTime___construct (#30600).
+        $userArgc = $argc - 1;
+        if ($userArgc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'DateTime::__construct() expects at most 2 arguments, %d given',
+                $userArgc
+            ));
+        }
         $receiver = DateTimeSupport::requireDateTime(
             $frame->calledArgs[0],
             'DateTime::__construct()',

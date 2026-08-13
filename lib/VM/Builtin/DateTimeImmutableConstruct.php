@@ -23,6 +23,14 @@ final class DateTimeImmutableConstruct extends VmClassMethod
         if ($argc < 1) {
             throw new \LogicException('DateTimeImmutable::__construct() called without $this');
         }
+        // User arity excludes $this — php-src zim_DateTimeImmutable___construct (#30600).
+        $userArgc = $argc - 1;
+        if ($userArgc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'DateTimeImmutable::__construct() expects at most 2 arguments, %d given',
+                $userArgc
+            ));
+        }
         $receiver = DateTimeSupport::requireDateTimeImmutable(
             $frame->calledArgs[0],
             'DateTimeImmutable::__construct()',

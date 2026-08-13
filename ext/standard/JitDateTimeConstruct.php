@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -29,12 +31,20 @@ final class JitDateTimeConstruct
             throw new \LogicException($function.'() called without $this');
         }
         $argc = \count($args);
+        // User arity excludes $this — emit catchable AOT/JIT ArgumentCountError (#30600).
         if ($argc > 3) {
-            throw new \ArgumentCountError(\sprintf(
-                '%s() expects at most 2 arguments, %d given',
-                $function,
-                $argc - 1
-            ));
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    '%s() expects at most 2 arguments, %d given',
+                    $function,
+                    $argc - 1
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_ctor_argc_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         $timeLit = 'now';
