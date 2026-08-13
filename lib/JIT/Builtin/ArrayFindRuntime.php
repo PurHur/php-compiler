@@ -8,7 +8,9 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayFindCallbackPolicy;
 use PHPCompiler\JIT\ArrayFindLlvm;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedClosureInvokeLlvm;
@@ -49,8 +51,15 @@ final class ArrayFindRuntime
         Value $strictI1,
         bool $unaryInternalUsesKey = false,
     ): Value {
-        if ($callback->isNullConstant) {
-            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find'));
+        if (ArrayFindCallbackPolicy::isJitNullCallback($callback)) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find')
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'array_find_null_cb_te_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         if (!self::isStringCallback($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
@@ -83,8 +92,15 @@ final class ArrayFindRuntime
         Value $strictI1,
         bool $unaryInternalUsesKey = false,
     ): Value {
-        if ($callback->isNullConstant) {
-            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find'));
+        if (ArrayFindCallbackPolicy::isJitNullCallback($callback)) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find')
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'array_find_closure_null_cb_te_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         if (!ArrayFindCallbackPolicy::isClosureJitLowerable($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());

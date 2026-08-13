@@ -131,8 +131,16 @@ final class ArrayFindHelper
             }
         }
         $function = self::functionNameForMode($mode);
-        if ($callback->isNullConstant) {
-            throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError($function));
+        // Catchable TypeError under AOT try/catch (#17133 / #30624) — do not throw PHP TypeError at compile time.
+        if (ArrayFindCallbackPolicy::isJitNullCallback($callback)) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                ArrayFindCallbackPolicy::invalidCallbackTypeError($function)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_null_cb_te_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         if (!ArrayFindCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());

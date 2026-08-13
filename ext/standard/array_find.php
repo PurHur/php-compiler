@@ -2,60 +2,86 @@
 
 declare(strict_types=1);
 
+/**
+ * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
+ *
+ * @copyright 2015 Anthony Ferrara. All rights reserved
+ * @license MIT See LICENSE at the root of the project for more info
+ */
+
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayFindCallbackPolicy;
+use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_find() — PHP 8.4: returns first element for which callback returns true.
+ * array_find() — first element matching a predicate (PHP 8.4; ext/standard/array.c).
  *
- * php-src: ext/standard/array.c — PHP_FUNCTION(array_find).
+ * php-src stub: array_find(array $array, callable $callback): mixed — no $strict (#23875).
  */
 final class array_find extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $this->requireArgCountRange($frame, 'array_find', 2, 2);
-        $src = VmArray::requireArrayParam($frame->calledArgs[0], 'array_find', 1, 'array');
-        $callbackArg = $frame->calledArgs[1];
-
-        if (null === $frame->vmContext) {
-            throw new \LogicException('array_find() requires VM context');
+        VmArrayValueCallback::requireExactTwoArgs($frame->calledArgs, 'array_find');
+        if (null === $frame->returnVar) {
+            return;
         }
-
-        [$closure, $internal, $userFn, $general] = VmArrayFilterCallback::resolve($frame, $callbackArg);
-
-        foreach ($src->iterateKeyed(true) as [$key, $value]) {
-            $result = ArrayCallbackInvoke::invoke(
-                $frame,
-                $closure,
-                $internal,
-                $userFn,
-                $general,
-                $value,
-                $key
-            );
-            if (boolval::isTruthy($result)) {
-                if (null !== $frame->returnVar) {
-                    $frame->returnVar->copyFrom($value->resolveIndirect());
-                }
+        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_find');
+        $callback = $frame->calledArgs[1];
+        VmArrayValueCallback::requireCallback($frame, $callback, 'array_find');
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_find');
+            if (VmArrayValueCallback::isTruthy($result)) {
+                $frame->returnVar->copyFrom($value);
 
                 return;
             }
         }
-
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
+        $frame->returnVar->null();
     }
+
+    public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_find() is not supported by the JIT compiler in this build');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            $slot = JitValueBox::alloc($context);
+            $result = JitValueBox::pointer($context, $slot);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('array_find() expects exactly 2 arguments, %d given', $argc)
+            );
+
+            return $result;
+        }
+        if (ArrayFindCallbackPolicy::isJitNullCallback($args[1])) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find')
+            );
+            // Catchable throw closed the block — resume with a dummy return (#30624 / peer memory_get_usage).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'array_find_null_cb_te_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+            throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
+        }
+        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
+            $this->jitString($context, $args[1], 'array_find() callback');
+        }
+
+        return ArrayFindHelper::buildFindArray($context, $args[0], $args[1]);
     }
 }
