@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,9 +22,8 @@ final class tempnam extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('tempnam() requires exactly two arguments in this compiler build');
-        }
+        // php-src filestat.c / file.stub.php — exactly 2 (#30551).
+        $this->requireExactArgCount($frame, 'tempnam', 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,8 +39,11 @@ final class tempnam extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('tempnam() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30551 / peer #30544).
+        if (!$this->requireExactJitArgCount($context, $args, 'tempnam', 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitTempnam::invoke(

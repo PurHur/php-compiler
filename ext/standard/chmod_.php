@@ -21,9 +21,8 @@ final class chmod_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
-        }
+        // php-src filestat.c / file.stub.php — exactly 2 (#30551).
+        $this->requireExactArgCount($frame, 'chmod', 2);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'chmod');
         $mode = VmFilestatArg::parseChmodModeArgForFrame($frame, 1, 'chmod', 'permissions');
         if (null === $frame->returnVar) {
@@ -38,8 +37,9 @@ final class chmod_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30551 / peer #30544).
+        if (!$this->requireExactJitArgCount($context, $args, 'chmod', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $modeI64 = JitFilestatArg::lowerChmodMode($context, $args[1], 'chmod', 1, 'permissions');
         $i32 = $context->getTypeFromString('int32');

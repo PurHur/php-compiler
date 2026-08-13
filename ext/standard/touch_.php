@@ -27,10 +27,9 @@ final class touch_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src filestat.c / file.stub.php — 1..3 (#30551).
+        $this->requireArgCountRange($frame, self::FUNCTION, 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('touch() requires one to three arguments in this compiler build');
-        }
         $path = VmFilestatArg::coerceFilenameArg(
             $frame->calledArgs[0],
             self::FUNCTION,
@@ -59,10 +58,11 @@ final class touch_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('touch() requires one to three arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30551 / peer #30544).
+        if (!$this->requireArgCountRangeJit($context, $args, self::FUNCTION, 1, 3)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        $argc = \count($args);
         $path = JitFilestatArg::lowerFilename($context, $args[0], self::FUNCTION, 0, 'filename');
         $i64 = $context->getTypeFromString('int64');
         $omit = $i64->constInt(self::TOUCH_TIME_OMIT, true);
