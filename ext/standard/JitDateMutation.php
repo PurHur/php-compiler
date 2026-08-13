@@ -46,6 +46,12 @@ final class JitDateMutation
     private const TIMEZONE_SET_ZONE_TYPE_ERROR =
         'date_timezone_set(): Argument #2 ($timezone) must be of type DateTimeZone, %s given';
 
+    private const DATE_SET_TYPE_ERROR =
+        'date_date_set(): Argument #1 ($object) must be of type DateTime, %s given';
+
+    private const TIME_SET_TYPE_ERROR =
+        'date_time_set(): Argument #1 ($object) must be of type DateTime, %s given';
+
     public static function invokeAdd(Context $context, JITVariable ...$args): Value
     {
         return self::invokeIntervalMutation($context, 'date_add', true, ...$args);
@@ -1217,6 +1223,222 @@ final class JitDateMutation
             $context->lookupFunction('__value__writeObject'),
             JitValueBox::pointer($context, $ret),
             $zone
+        );
+
+        return $ret;
+    }
+
+    /** Procedural date_date_set() — JIT/AOT (#30747). php-src PHP_FUNCTION(date_date_set). */
+    public static function invokeDateSet(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if (4 !== $argc) {
+            throw new \ArgumentCountError(
+                \sprintf('date_date_set() expects exactly 4 arguments, %d given', $argc)
+            );
+        }
+        self::rejectNonObjectTimestampArg($context, $args[0], self::DATE_SET_TYPE_ERROR);
+        $year = JitSleep::zParamLong($context, $args[1], 'date_date_set', 2, 'year');
+        $month = JitSleep::zParamLong($context, $args[2], 'date_date_set', 3, 'month');
+        $day = JitSleep::zParamLong($context, $args[3], 'date_date_set', 4, 'day');
+
+        return self::applyCivilDateReplace($context, false, 'DateTime', $args[0], $year, $month, $day);
+    }
+
+    /** DateTime(Immutable)::setDate() — JIT/AOT (#30747). php-src zim_DateTime_setDate. */
+    public static function invokeObjectDateSet(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        $function = $immutable ? 'DateTimeImmutable::setDate' : 'DateTime::setDate';
+        if (\count($args) < 4) {
+            throw new \LogicException($function.'() expects exactly 3 arguments');
+        }
+        $year = JitSleep::zParamLong($context, $args[1], $function, 1, 'year');
+        $month = JitSleep::zParamLong($context, $args[2], $function, 2, 'month');
+        $day = JitSleep::zParamLong($context, $args[3], $function, 3, 'day');
+        $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
+
+        return self::applyCivilDateReplace($context, $immutable, $layout, $args[0], $year, $month, $day);
+    }
+
+    /** Procedural date_time_set() — JIT/AOT (#30747). php-src PHP_FUNCTION(date_time_set). */
+    public static function invokeTimeSet(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 5) {
+            throw new \ArgumentCountError(
+                \sprintf('date_time_set() expects at least 3 arguments, %d given', $argc)
+            );
+        }
+        self::rejectNonObjectTimestampArg($context, $args[0], self::TIME_SET_TYPE_ERROR);
+        $hour = JitSleep::zParamLong($context, $args[1], 'date_time_set', 2, 'hour');
+        $minute = JitSleep::zParamLong($context, $args[2], 'date_time_set', 3, 'minute');
+        $i64 = $context->getTypeFromString('int64');
+        $second = $argc >= 4
+            ? JitSleep::zParamLong($context, $args[3], 'date_time_set', 4, 'second')
+            : $i64->constInt(0, false);
+        $microsecond = $argc >= 5
+            ? JitSleep::zParamLong($context, $args[4], 'date_time_set', 5, 'microsecond')
+            : $i64->constInt(0, false);
+
+        return self::applyCivilTimeReplace($context, false, 'DateTime', $args[0], $hour, $minute, $second, $microsecond);
+    }
+
+    /** DateTime(Immutable)::setTime() — JIT/AOT (#30747). php-src zim_DateTime_setTime. */
+    public static function invokeObjectTimeSet(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        $function = $immutable ? 'DateTimeImmutable::setTime' : 'DateTime::setTime';
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 5) {
+            throw new \LogicException($function.'() expects two to four arguments');
+        }
+        $hour = JitSleep::zParamLong($context, $args[1], $function, 1, 'hour');
+        $minute = JitSleep::zParamLong($context, $args[2], $function, 2, 'minute');
+        $i64 = $context->getTypeFromString('int64');
+        $second = $argc >= 4
+            ? JitSleep::zParamLong($context, $args[3], $function, 3, 'second')
+            : $i64->constInt(0, false);
+        $microsecond = 5 === $argc
+            ? JitSleep::zParamLong($context, $args[4], $function, 4, 'microsecond')
+            : $i64->constInt(0, false);
+        $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
+
+        return self::applyCivilTimeReplace($context, $immutable, $layout, $args[0], $hour, $minute, $second, $microsecond);
+    }
+
+    /**
+     * Replace Y-M-D, keep H:i:s.u — UTC civil IR like DateTime::modify month/year (#27262 / #30747).
+     *
+     * DateTime layout only (same as date_format / date_timestamp_get). Do not class_id-branch
+     * against lookup('DateTime') — date_create() AOT class_id can abort (#30745).
+     */
+    private static function applyCivilDateReplace(
+        Context $context,
+        bool $immutable,
+        string $layout,
+        JITVariable $receiverArg,
+        Value $year,
+        Value $month,
+        Value $day
+    ): Value {
+        $dtObj = self::civilMutationTarget($context, $immutable, $layout, $receiverArg);
+        $ts = self::readDateTimeTimestamp($context, $dtObj, $layout);
+        $parts = JitGetdate::civilPartsPublic($context, $ts);
+        $newTs = JitGetdate::timestampFromCivilPublic(
+            $context,
+            $year,
+            $month,
+            $day,
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second']
+        );
+        self::writeDateTimeLong($context, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+
+        return self::returnCivilMutation($context, $immutable, $receiverArg, $dtObj);
+    }
+
+    /**
+     * Replace H:i:s.u, keep Y-M-D — UTC civil IR (#30747).
+     */
+    private static function applyCivilTimeReplace(
+        Context $context,
+        bool $immutable,
+        string $layout,
+        JITVariable $receiverArg,
+        Value $hour,
+        Value $minute,
+        Value $second,
+        Value $microsecond
+    ): Value {
+        $dtObj = self::civilMutationTarget($context, $immutable, $layout, $receiverArg);
+        $ts = self::readDateTimeTimestamp($context, $dtObj, $layout);
+        $parts = JitGetdate::civilPartsPublic($context, $ts);
+        $newTs = JitGetdate::timestampFromCivilPublic(
+            $context,
+            $parts['year'],
+            $parts['month'],
+            $parts['day'],
+            $hour,
+            $minute,
+            $second
+        );
+        self::writeDateTimeLong($context, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+        self::writeDateTimeLong($context, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY, $microsecond);
+
+        return self::returnCivilMutation($context, $immutable, $receiverArg, $dtObj);
+    }
+
+    /**
+     * Mutable: in-place receiver. Immutable: allocate+copy then mutate the copy.
+     * Property layout is DateTime / DateTimeImmutable; no class_id assert on the receiver (#30745).
+     */
+    private static function civilMutationTarget(
+        Context $context,
+        bool $immutable,
+        string $layout,
+        JITVariable $receiverArg
+    ): Value {
+        $receiver = ReflectionSetup::loadObjectFromArg($context, $receiverArg);
+        if (!$immutable) {
+            return $receiver;
+        }
+        /** @var ObjectBuiltin $objectType */
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup($layout);
+        $target = $objectType->allocate($classId);
+        ReflectionSetup::markConstructed($context, $target);
+        foreach ([
+            DateTimeSupport::TS_PROPERTY,
+            DateTimeSupport::MICROSECOND_PROPERTY,
+            DateTimeSupport::TZ_PROPERTY,
+        ] as $prop) {
+            $val = $objectType->propertyFetch($receiver, $layout, $prop);
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($target, $layout, $prop),
+                $val,
+                $val->type
+            );
+        }
+
+        return $target;
+    }
+
+    private static function readDateTimeTimestamp(Context $context, Value $dtObj, string $layout): Value
+    {
+        return ReflectionSetup::integerPropertyAsI64(
+            $context,
+            $dtObj,
+            $layout,
+            DateTimeSupport::TS_PROPERTY
+        );
+    }
+
+    private static function writeDateTimeLong(
+        Context $context,
+        Value $dtObj,
+        string $layout,
+        string $prop,
+        Value $value
+    ): void {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        self::writeLongProp($context, $object, $dtObj, $layout, $prop, $value);
+    }
+
+    private static function returnCivilMutation(
+        Context $context,
+        bool $immutable,
+        JITVariable $receiverArg,
+        Value $dtObj
+    ): Value {
+        if (!$immutable) {
+            return self::returnObjectArg($context, $receiverArg);
+        }
+        $ret = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $ret),
+            $dtObj
         );
 
         return $ret;
