@@ -3994,6 +3994,19 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('directory' === $lcname) {
+            // Thin AOT: path + entry snapshot for dir() factory (#30757).
+            // php-src ext/standard/dir.c — Directory class (path / read / rewind / close).
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryJitHelper::PROP_PATH, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryJitHelper::PROP_POS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryJitHelper::PROP_CLOSED, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['__construct', 'read', 'rewind', 'close'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('splfileinfo' === $lcname) {
             // Thin AOT: pathname/filename for getFilename (#27289 / #27422).
             $this->ensureTraversableBuiltinInterfaces();

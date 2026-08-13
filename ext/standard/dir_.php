@@ -34,7 +34,7 @@ final class dir_ extends Internal
         $handle = VmDir::opendir($path);
         if (false === $handle) {
             if ('' !== $path) {
-                VmFilestatFailure::warnOpendirFailed($frame, $path);
+                VmFilestatFailure::warnPathOpenDirFailed($frame, 'dir', $path);
             }
             $frame->returnVar->bool(false);
 
@@ -46,6 +46,13 @@ final class dir_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('dir() is not lowered for JIT/AOT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('dir() requires exactly one argument in this compiler build');
+        }
+
+        return JitDir::invoke(
+            $context,
+            JitFilestatArg::lowerFilename($context, $args[0], 'dir', 0, 'directory')
+        );
     }
 }

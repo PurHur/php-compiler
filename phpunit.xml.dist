@@ -204,6 +204,7 @@
             <file>./test/compliance/DateGetLastErrorsJITTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListJITTest.php</file>
             <file>./test/compliance/SessionCookieCachePathJITTest.php</file>
+            <file>./test/compliance/DirFactoryJITTest.php</file>
             <file>./test/compliance/DateIsodateSetJITTest.php</file>
             <file>./test/compliance/DateTimeGetOffsetJITTest.php</file>
             <file>./test/compliance/DateTimeCreateFromInterfaceJITTest.php</file>
@@ -502,6 +503,7 @@
             <file>./test/aot/DateGetLastErrorsAotTest.php</file>
             <file>./test/aot/TimezoneAbbreviationsListAotTest.php</file>
             <file>./test/aot/SessionCookieCachePathAotTest.php</file>
+            <file>./test/aot/DirFactoryAotTest.php</file>
             <file>./test/aot/DateIsodateSetAotTest.php</file>
             <file>./test/aot/DateTimeGetOffsetAotTest.php</file>
             <file>./test/aot/DateTimeCreateFromInterfaceAotTest.php</file>
