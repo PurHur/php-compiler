@@ -47,13 +47,20 @@ final class BackedEnumFromJit
         $fn = $context->module->addFunction($funcName, $fnType);
         $lc = strtolower($funcName);
         $context->functions[$lc] = $fn;
-        $context->functionProxies[$lc] = new Call\Native($fn, $funcName, [$valuePtrTy]);
+        // Exact 1 user arg — Native alone would ignore excess SEND ops (#30864).
+        $displayMethod = $isTry ? 'tryFrom' : 'from';
+        $display = $object->classNameForId($classId).'::'.$displayMethod;
+        $context->functionProxies[$lc] = new Call\EnumSyntheticStatic(
+            new Call\Native($fn, $funcName, [$valuePtrTy]),
+            $display,
+            1
+        );
 
         $object->defineMethodVisibility(
             $classId,
             $method,
             \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC,
-            $isTry ? 'tryFrom' : 'from'
+            $displayMethod
         );
 
         $restore = $context->builder->getInsertBlock();

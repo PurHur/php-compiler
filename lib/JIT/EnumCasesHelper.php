@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\EnumCasesRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\JIT\Call\EnumSyntheticStatic;
 use PHPCompiler\JIT\Call\Native as NativeCall;
 use PHPCompiler\VM\EnumCasesJitHelper;
 use PHPCompiler\VM\EnumSupport;
@@ -39,7 +40,13 @@ final class EnumCasesHelper
         $fn = $context->module->addFunction($funcName, $fnType);
         $lc = strtolower($funcName);
         $context->functions[$lc] = $fn;
-        $context->functionProxies[$lc] = new NativeCall($fn, $funcName, []);
+        // Exact 0 user args — Native alone would ignore excess SEND ops (#30864).
+        $display = $object->classNameForId($classId).'::cases';
+        $context->functionProxies[$lc] = new EnumSyntheticStatic(
+            new NativeCall($fn, $funcName, []),
+            $display,
+            0
+        );
 
         $restore = $context->builder->getInsertBlock();
         $savedActive = $context->activeFunction;
