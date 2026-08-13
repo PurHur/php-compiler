@@ -1527,4 +1527,118 @@ final class JitDateMutation
 
         return $ret;
     }
+
+    /**
+     * DateTime::createFromInterface() / DateTimeImmutable::createFromInterface() — JIT/AOT (#30762).
+     *
+     * php-src: ext/date/php_date.c — zim_DateTime_createFromInterface / Immutable sibling.
+     * Thin AOT previously hit ExternalMethod null stub (empty stdout) (#27308 class).
+     */
+    public static function invokeCreateFromInterface(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        $function = $immutable
+            ? 'DateTimeImmutable::createFromInterface'
+            : 'DateTime::createFromInterface';
+        $target = $immutable ? 'DateTimeImmutable' : 'DateTime';
+
+        return self::cloneDateTimeLikeInto(
+            $context,
+            $function,
+            'DateTimeInterface',
+            $target,
+            ...$args
+        );
+    }
+
+    /**
+     * DateTime::createFromImmutable() — JIT/AOT (#30762).
+     *
+     * php-src: ext/date/php_date.c — zim_DateTime_createFromImmutable
+     */
+    public static function invokeCreateFromImmutable(Context $context, JITVariable ...$args): Value
+    {
+        return self::cloneDateTimeLikeInto(
+            $context,
+            'DateTime::createFromImmutable',
+            'DateTimeImmutable',
+            'DateTime',
+            ...$args
+        );
+    }
+
+    /**
+     * DateTimeImmutable::createFromMutable() — JIT/AOT (#30762).
+     *
+     * php-src: ext/date/php_date.c — zim_DateTimeImmutable_createFromMutable
+     * Thin AOT previously segfaulted after ExternalMethod null + chained format().
+     */
+    public static function invokeCreateFromMutable(Context $context, JITVariable ...$args): Value
+    {
+        return self::cloneDateTimeLikeInto(
+            $context,
+            'DateTimeImmutable::createFromMutable',
+            'DateTime',
+            'DateTimeImmutable',
+            ...$args
+        );
+    }
+
+    /**
+     * Allocate target DateTime(Immutable) and copy ts/µs/tz (DateTimeSupport::copyDateTimeState).
+     *
+     * Source properties are read via the DateTime layout — same backing slots as
+     * DateTimeImmutable (date_format layout; peer allocateZoneFromDateTimeTzProp).
+     */
+    private static function cloneDateTimeLikeInto(
+        Context $context,
+        string $function,
+        string $expectedType,
+        string $targetClass,
+        JITVariable ...$args
+    ): Value {
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects exactly 1 argument, %d given',
+                $function,
+                $argc
+            ));
+        }
+        self::rejectNonObjectTimestampArg(
+            $context,
+            $args[0],
+            $function.'(): Argument #1 ($object) must be of type '.$expectedType.', %s given'
+        );
+
+        /** @var ObjectBuiltin $objectType */
+        $objectType = $context->type->object;
+        $source = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        $classId = $objectType->lookup($targetClass);
+        $target = $objectType->allocate($classId);
+        ReflectionSetup::markConstructed($context, $target);
+
+        foreach ([DateTimeSupport::TS_PROPERTY, DateTimeSupport::MICROSECOND_PROPERTY] as $prop) {
+            $val = $objectType->propertyFetch($source, 'DateTime', $prop);
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($target, $targetClass, $prop),
+                $val,
+                JITVariable::TYPE_NATIVE_LONG
+            );
+        }
+        $tz = $objectType->propertyFetch($source, 'DateTime', DateTimeSupport::TZ_PROPERTY);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($target, $targetClass, DateTimeSupport::TZ_PROPERTY),
+            $tz,
+            JITVariable::TYPE_STRING
+        );
+
+        $ret = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $ret),
+            $target
+        );
+
+        return $ret;
+    }
 }
