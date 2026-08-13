@@ -7,13 +7,16 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * get_resource_type() — stream handle introspection (#3142).
  *
- * php-src: ext/standard/file.c — PHP_FUNCTION(get_resource_type)
+ * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(get_resource_type)
+ *
+ * Excess argc → Zend ArgumentCountError (#30707).
  */
 final class get_resource_type extends Internal
 {
@@ -21,9 +24,8 @@ final class get_resource_type extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('get_resource_type() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 (#30707; Zend/zend_builtin_functions.c).
+        $this->requireExactArgCount($frame, 'get_resource_type', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -98,8 +100,11 @@ final class get_resource_type extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('get_resource_type() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30707 / peer #30687).
+        if (!$this->requireExactJitArgCount($context, $args, 'get_resource_type', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitGetResourceType::invoke($context, $args[0]);
