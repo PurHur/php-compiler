@@ -8,7 +8,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
-/** isset()/empty() on property hooks — get hook always consulted when present (#29214, #11262, #11617, zend_std_has_property). */
+/** isset()/empty() on property hooks — zend_should_call_hook (#30739, #29214, #11617). */
 final class PropertyHookIssetTest extends TestCase
 {
         use PropertyHookTestSkip;
@@ -21,49 +21,49 @@ final class PropertyHookIssetTest extends TestCase
     }
 
 
-    /** Uninitialized same-name backing still invokes get (Zend fatals inside get on typed uninit). */
-    public function testVmIssetOnUninitializedHookedBackingInvokesGet(): void
+    /** External isset on uninitialized same-name backing does not invoke get (#30739, #11617). */
+    public function testVmIssetOnUninitializedHookedBackingSkipsGet(): void
     {
         $code = <<<'PHP'
 <?php
 class C {
-    public int $x {
-        get { echo "GET\n"; return $this->x; }
-        set => $this->x = $value;
+    public string $name {
+        get { echo "GET\n"; return $this->name; }
+        set(string $v) => $this->name = $v;
     }
 }
 $c = new C();
 try {
-    var_dump(isset($c->x));
+    var_export(isset($c->name));
+    echo "\n";
 } catch (Error $e) {
     echo "err=", $e->getMessage(), "\n";
 }
+$c->name = 'x';
+var_export(isset($c->name));
+echo "\n";
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        $out = (string) ob_get_clean();
-        self::assertStringContainsString("GET\n", $out);
-        self::assertTrue(
-            str_contains($out, 'err=') || str_contains($out, 'bool('),
-            'isset must reach get hook: '.$out
-        );
+        self::assertSame("false\nGET\ntrue\n", ob_get_clean());
     }
 
-    public function testVmEmptyOnUninitializedHookedBackingInvokesGet(): void
+    public function testVmEmptyOnUninitializedHookedBackingSkipsGet(): void
     {
         $code = <<<'PHP'
 <?php
 class C {
-    public int $x {
-        get { echo "GET\n"; return $this->x; }
-        set => $this->x = $value;
+    public string $name {
+        get { echo "GET\n"; return $this->name; }
+        set(string $v) => $this->name = $v;
     }
 }
 $c = new C();
 try {
-    var_dump(empty($c->x));
+    var_export(empty($c->name));
+    echo "\n";
 } catch (Error $e) {
     echo "err=", $e->getMessage(), "\n";
 }
@@ -72,8 +72,7 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        $out = (string) ob_get_clean();
-        self::assertStringContainsString("GET\n", $out);
+        self::assertSame("true\n", ob_get_clean());
     }
 
     public function testVmIssetOnVirtualGetHookInvokesGet(): void
@@ -160,10 +159,10 @@ PHP;
     }
 
     /**
-     * Issue #29214 — non-virtual expression-bodied set keeps backing (isVirtual=false) but
-     * isset/empty still invoke get (zend_std_has_property).
+     * Issue #29214 / #30739 — short `set =>` is non-virtual (ZEND_ACC_VIRTUAL clear) so
+     * uninitialized same-name backing skips get for isset/empty (zend_should_call_hook).
      */
-    public function testVmIssetEmptyOnExprSetHookInvokesGet(): void
+    public function testVmIssetEmptyOnExprSetHookSkipsGetWhenUninitialized(): void
     {
         $code = <<<'PHP'
 <?php
@@ -183,7 +182,7 @@ PHP;
         $block = $rt->parseAndCompile($code, 'issue29214.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("isset=GET\nY\nempty=GET\nNE\nvirtual=N\n", ob_get_clean());
+        self::assertSame("isset=N\nempty=E\nvirtual=N\n", ob_get_clean());
     }
 
     /** Issue #23339 / re-#17260 — initialized null distinct backing still invokes get for isset/empty. */

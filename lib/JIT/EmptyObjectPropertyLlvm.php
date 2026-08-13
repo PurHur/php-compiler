@@ -8,6 +8,7 @@ use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\VM\PropertyHookJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\VM\VmEmpty;
 use PHPCompiler\VM\VmIsset;
@@ -19,6 +20,8 @@ use PHPLLVM\Value;
  */
 final class EmptyObjectPropertyLlvm
 {
+    private static int $hookedEmptyBlockSerial = 0;
+
     public static function compile(
         Context $context,
         Variable $container,
@@ -51,6 +54,51 @@ final class EmptyObjectPropertyLlvm
             $objPtr = Variable::KIND_VALUE === $container->kind
                 ? $container->value
                 : $context->builder->load($container->value);
+            $registry = $context->runtime->vmContext->propertyHookRegistry ?? [];
+            if (
+                PropertyHookJitHelper::sameNameBackedGetHook($registry, $class, $propName)
+                && !PropertyHookJitHelper::isRawHookWrite($context, $propName, $context->jitCurrentBlock)
+            ) {
+                $backingName = PropertyHookDispatch::hookedPropertyBackingName($context, $class, $propName)
+                    ?? $propName;
+                $initialized = PropertyHookDispatchLlvm::emitBackingSlotIsInitialized(
+                    $context,
+                    $objPtr,
+                    $class,
+                    $backingName
+                );
+                $id = (string) (++self::$hookedEmptyBlockSerial);
+                $getBb = BasicBlockHelper::append($context, 'hooked_empty_get_'.$id);
+                $uninitBb = BasicBlockHelper::append($context, 'hooked_empty_uninit_'.$id);
+                $mergeBb = BasicBlockHelper::append($context, 'hooked_empty_merge_'.$id);
+                $context->builder->branchIf($initialized, $getBb, $uninitBb);
+
+                $i1 = $context->getTypeFromString('int1');
+                $context->builder->positionAtEnd($uninitBb);
+                $uninitEmpty = $i1->constInt(1, false);
+                $context->builder->branch($mergeBb);
+
+                $context->builder->positionAtEnd($getBb);
+                $hookValue = PropertyHookDispatch::tryEmitPropertyGet(
+                    $context,
+                    $objPtr,
+                    $class,
+                    $propName,
+                    $context->jitCurrentBlock
+                );
+                $emptyFromGet = null !== $hookValue
+                    ? self::compileEmptyFromFetchedValue($context, $hookValue)
+                    : $i1->constInt(0, false);
+                $getEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($mergeBb);
+
+                $context->builder->positionAtEnd($mergeBb);
+                $phi = $context->builder->phi($i1);
+                $phi->addIncoming($emptyFromGet, $getEnd ?? $getBb);
+                $phi->addIncoming($uninitEmpty, $uninitBb);
+
+                return $phi;
+            }
             $hookValue = PropertyHookDispatch::tryEmitPropertyGet(
                 $context,
                 $objPtr,
