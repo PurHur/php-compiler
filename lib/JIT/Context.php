@@ -1545,6 +1545,8 @@ class Context {
         $this->functionProxies['dateinterval::createfromdatestring'] = new Call\DateIntervalCreateFromDateString();
         // Mutable setTimezone — thin user-script AOT property write (#22824).
         $this->functionProxies['datetime::settimezone'] = new Call\DateTimeSetTimezone(false);
+        $this->functionProxies['datetime::gettimezone'] = new Call\DateTimeGetTimezone();
+        $this->functionProxies['datetimeimmutable::gettimezone'] = new Call\DateTimeGetTimezone();
         // Immutable: allocate+copy (not cloneObject) for MCJIT. Thin user-script AOT still
         // hits "basic block has no parent" inside Object_::allocate / NestedJIT ensureLinked
         // (same as `new DateTimeImmutable` under HELPER_RUNTIME_O=0). VM Builtin covers

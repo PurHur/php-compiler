@@ -198,6 +198,7 @@
             <file>./test/compliance/DateTimeSetTimestampNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimestampGetSetJITTest.php</file>
+            <file>./test/compliance/DateTimezoneGetSetJITTest.php</file>
             <file>./test/compliance/DateTimeSetISODateNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeSetISODateNullStrictJITTest.php</file>
             <file>./test/compliance/DateDiffParamShapeVMTest.php</file>
@@ -481,6 +482,7 @@
             <file>./test/aot/MiniWebAppDeployLayoutTest.php</file>
             <file>./test/aot/AotTest.php</file>
             <file>./test/aot/DateTimestampGetSetAotTest.php</file>
+            <file>./test/aot/DateTimezoneGetSetAotTest.php</file>
             <file>./test/aot/ExampleWebAotTest.php</file>
             <file>./test/aot/StdlibWebBuiltinsTest.php</file>
             <file>./test/aot/RuntimeSuperglobalRefreshTest.php</file>

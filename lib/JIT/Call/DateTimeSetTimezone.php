@@ -141,3 +141,17 @@ final class DateTimeSetTimestamp implements Call
         );
     }
 }
+
+/**
+ * DateTime::getTimezone() / DateTimeImmutable::getTimezone() — JIT/AOT (#30746).
+ *
+ * Defined here because DateTimeSetTimezone is always registered (all profiles).
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeTimezoneObjectGet}
+ */
+final class DateTimeGetTimezone implements Call
+{
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeTimezoneObjectGet($context, ...$args);
+    }
+}
