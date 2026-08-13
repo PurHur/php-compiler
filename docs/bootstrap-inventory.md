@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7381 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23913 |
+| Source constructs flagged (warnings) | 23914 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2741,7 +2741,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateCreate.php` | 0 | 5 |
 | `ext/standard/JitDateCreateFromFormat.php` | 0 | 5 |
 | `ext/standard/JitDateCreateFromTimestamp.php` | 0 | 5 |
-| `ext/standard/JitDateIntervalConstruct.php` | 0 | 5 |
+| `ext/standard/JitDateIntervalConstruct.php` | 0 | 4 |
 | `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 6 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateMicrosecond.php` | 0 | 3 |
@@ -2754,7 +2754,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateSunFunc.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfo.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfoMaterializer.php` | 0 | 1 |
-| `ext/standard/JitDateTimeConstruct.php` | 0 | 6 |
+| `ext/standard/JitDateTimeConstruct.php` | 0 | 5 |
 | `ext/standard/JitDateTimeZoneConstruct.php` | 0 | 3 |
 | `ext/standard/JitDateTimestampArg.php` | 0 | 1 |
 | `ext/standard/JitDebugBacktrace.php` | 0 | 8 |
@@ -6589,7 +6589,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/ClosureFromStatic.php` | 0 | 2 |
 | `lib/VM/Builtin/ClosureGetCurrent.php` | 0 | 2 |
 | `lib/VM/Builtin/ClosureGetUsedVariables.php` | 0 | 1 |
-| `lib/VM/Builtin/DateIntervalConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/DateIntervalConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/DateIntervalCreateFromDateString.php` | 0 | 4 |
 | `lib/VM/Builtin/DateIntervalFormat.php` | 0 | 1 |
 | `lib/VM/Builtin/DateIntervalSetState.php` | 0 | 4 |
@@ -6609,7 +6609,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/DatePeriodValid.php` | 0 | 1 |
 | `lib/VM/Builtin/DateSerializeMethods.php` | 0 | 35 |
 | `lib/VM/Builtin/DateTimeAdd.php` | 0 | 1 |
-| `lib/VM/Builtin/DateTimeConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/DateTimeConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/DateTimeCreateFromFormat.php` | 0 | 2 |
 | `lib/VM/Builtin/DateTimeCreateFromImmutable.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeCreateFromInterface.php` | 0 | 1 |
@@ -6621,7 +6621,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/DateTimeGetOffset.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeGetTimestamp.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeGetTimezone.php` | 0 | 1 |
-| `lib/VM/Builtin/DateTimeImmutableConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/DateTimeImmutableConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/DateTimeImmutableCreateFromFormat.php` | 0 | 2 |
 | `lib/VM/Builtin/DateTimeImmutableCreateFromInterface.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeImmutableCreateFromMutable.php` | 0 | 1 |
@@ -29360,10 +29360,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateIntervalConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new JITVariable (line 49)
-- new JITVariable (line 66)
-- new JITVariable (line 77)
+- new JITVariable (line 63)
+- new JITVariable (line 80)
+- new JITVariable (line 91)
 - 2 class method(s)
 
 ### `ext/standard/JitDateIntervalCreateFromDateString.php`
@@ -29459,11 +29458,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateTimeConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- new NativeDateMalformedStringException (line 121)
-- new JITVariable (line 147)
+- new NativeDateMalformedStringException (line 131)
 - new JITVariable (line 157)
-- new JITVariable (line 165)
+- new JITVariable (line 167)
+- new JITVariable (line 175)
 - 5 class method(s)
 
 ### `ext/standard/JitDateTimeZoneConstruct.php`
@@ -55192,6 +55190,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/DateIntervalConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/DateIntervalCreateFromDateString.php`
@@ -55339,6 +55338,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/DateTimeConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/DateTimeCreateFromFormat.php`
@@ -55402,6 +55402,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/DateTimeImmutableConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/DateTimeImmutableCreateFromFormat.php`
