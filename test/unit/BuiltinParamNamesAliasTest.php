@@ -4354,6 +4354,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('SimpleXMLElement', $classDef->toString());
     }
 
+    /** @covers issue #30651 */
+    public function testXmlErrorStringStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('xml_error_string');
+        self::assertSame(['error_code'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'error_code', 'xml_error_string'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'code', 'xml_error_string'));
+        self::assertSame(
+            ['error_code'],
+            BuiltinParamNames::paramNamesForInternalFunction('xml_error_string')
+        );
+    }
+
     /** @covers issue #23624 */
     public function testXmlSetElementHandlerStubNamedParamsResolve(): void
     {
