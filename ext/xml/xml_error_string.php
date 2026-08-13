@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** xml_error_string() — map parser/libxml error code to message (php-src ext/xml/xml.c; #18120). */
+/**
+ * xml_error_string() — map parser/libxml error code to message (php-src ext/xml/xml.c; #18120, #30651).
+ *
+ * php-src: ext/xml/xml.stub.php — xml_error_string(int $error_code): ?string
+ * Z_PARAM_LONG: soft-null deprecate+coerce outside strict_types; TypeError under strict_types.
+ */
 final class xml_error_string extends Internal
 {
     public function __construct()
@@ -29,12 +34,15 @@ final class xml_error_string extends Internal
             return;
         }
 
-        $codeArg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $codeArg->type) {
-            throw new \TypeError('xml_error_string(): Argument #1 ($code) must be of type int');
-        }
+        $code = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            0,
+            'xml_error_string',
+            1,
+            'error_code'
+        );
 
-        $frame->returnVar->string(VmXml::errorString($codeArg->toInt()));
+        $frame->returnVar->string(VmXml::errorString($code));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

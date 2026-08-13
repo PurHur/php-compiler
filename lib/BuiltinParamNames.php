@@ -2026,6 +2026,9 @@ final class BuiltinParamNames
                 return ['writer', 'name', 'isParam'];
             case 'xmlwriter_write_dtd_entity':
                 return ['writer', 'name', 'content', 'isParam=', 'publicId=', 'systemId=', 'notationData='];
+            // php-src ext/xml/xml.stub.php — InternalArgInfo still says code (#30651)
+            case 'xml_error_string':
+                return ['error_code'];
             // php-src ext/xml/xml.stub.php — InternalArgInfo still has shdl/ehdl (#23624)
             case 'xml_set_element_handler':
                 return ['parser', 'start_handler', 'end_handler'];
