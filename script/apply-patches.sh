@@ -3162,6 +3162,80 @@ PY
   echo "Applied php-types-incdec-type.patch (overlay): ${target}"
 }
 
+# #30793 / #30807: (object) on CFG userType resource must not preserve Resource —
+# Zend convert_to_object always yields stdClass::$scalar. Line numbers drift between
+# vendor/ and prelinked/, so use a text overlay (the .patch file is documentation +
+# git-apply fallback for fresh vendor only).
+apply_php_types_cast_object_resource_stdclass_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-cast-object-resource-stdclass.patch (target missing): ${target}"
+    return 0
+  fi
+  if grep -q 'VM Resource wrappers are TYPE_OBJECT but Zend IS_RESOURCE' "$target" 2>/dev/null; then
+    echo "Skip php-types-cast-object-resource-stdclass.patch (already applied): ${target}"
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+# PHP source needs '\\' (two chars) as ltrim charset for one backslash.
+bs = "\\"
+old = (
+    "            if ($exprType instanceof Type && $exprType->type === Type::TYPE_OBJECT) {\n"
+    "                return [$resolved[$op->expr]];\n"
+    "            }\n"
+    "\n"
+    "            return [new Type(Type::TYPE_OBJECT, [], 'stdClass')];\n"
+)
+new = (
+    "            if ($exprType instanceof Type && $exprType->type === Type::TYPE_OBJECT) {\n"
+    "                // VM Resource wrappers are TYPE_OBJECT but Zend IS_RESOURCE - (object) still\n"
+    "                // yields stdClass::$scalar (#30793, zend_operators.c convert_to_object).\n"
+    "                $user = strtolower(ltrim((string) ($exprType->userType ?? ''), '" + bs + bs + "'));\n"
+    "                if ('resource' !== $user) {\n"
+    "                    return [$resolved[$op->expr]];\n"
+    "                }\n"
+    "            }\n"
+    "\n"
+    "            return [new Type(Type::TYPE_OBJECT, [], 'stdClass')];\n"
+)
+idx = text.find('function resolveOp_Expr_Cast_Object')
+if idx < 0:
+    sys.stderr.write("php-types-cast-object-resource-stdclass: Cast_Object missing\n")
+    raise SystemExit(1)
+end = text.find('function resolveOp_Expr_', idx + 10)
+region = text[idx:end] if end > 0 else text[idx:]
+if old not in region:
+    sys.stderr.write("php-types-cast-object-resource-stdclass: Cast_Object TYPE_OBJECT arm not found\n")
+    raise SystemExit(1)
+region2 = region.replace(old, new, 1)
+path.write_text(text[:idx] + region2 + (text[end:] if end > 0 else ''))
+PY
+  then
+    echo "ERROR: php-types-cast-object-resource-stdclass overlay failed for ${target}" >&2
+    return 1
+  fi
+  echo "Applied php-types-cast-object-resource-stdclass.patch (overlay): ${target}"
+}
+
+apply_php_types_cast_object_resource_stdclass_overlay() {
+  local rc=0
+  if ! apply_php_types_cast_object_resource_stdclass_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_cast_object_resource_stdclass_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    record_patch_failure "php-types-cast-object-resource-stdclass.patch" "Cast_Object resource->stdClass arm missing (#30793)"
+  fi
+  return "$rc"
+}
+
 apply_php_types_incdec_type_overlay() {
   local rc=0
   if ! apply_php_types_incdec_type_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
@@ -6617,6 +6691,10 @@ PY
   fi
   if [[ "$(basename "$patch")" == "php-types-remove-type-empty-union.patch" ]]; then
     apply_php_types_remove_type_empty_union_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-cast-object-resource-stdclass.patch" ]]; then
+    apply_php_types_cast_object_resource_stdclass_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-incdec-type.patch" ]]; then

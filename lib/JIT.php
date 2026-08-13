@@ -11979,6 +11979,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateDirectoryFactoryResultType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->attachBoundClosureInvokeMetadata($block, $op);
                     $this->propagateDomCreateElementCompileTimeTag(
                         $block->getOperand($op->arg1),
@@ -14190,6 +14194,32 @@ class JIT {
                 $resolved = $this->context->resolveRefAliasName($name);
                 if (isset($this->context->namedVariableBindings[$resolved])) {
                     $this->context->namedVariableBindings[$resolved]->classUserType = 'XMLReader';
+                }
+                $this->context->bindVariableByName($resolved, $var);
+            }
+        }
+    }
+
+    /**
+     * dir() — Internal returns object|false; tag Directory so `$d->read()` is not stolen
+     * by the XMLReader::read :object shortcut (#30757 / #27299).
+     */
+    private function propagateDirectoryFactoryResultType(Operand $result, mixed $toCall): void
+    {
+        if (!($toCall instanceof CoreFunc\Internal)) {
+            return;
+        }
+        if ('dir' !== strtolower($toCall->getName())) {
+            return;
+        }
+        if ($this->context->hasVariableOp($result)) {
+            $var = $this->context->getVariableFromOp($result);
+            $var->classUserType = 'Directory';
+            $name = JIT\OperandName::resolve($result);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    $this->context->namedVariableBindings[$resolved]->classUserType = 'Directory';
                 }
                 $this->context->bindVariableByName($resolved, $var);
             }
@@ -20135,13 +20165,30 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\tokenlist::item');
                 }
                 // while ($r->read()) widens XMLReader receivers to :object (#27299).
+                // Directory::read from dir() shares the method name — bind by classUserType
+                // or prefer Directory when XMLReader is not tagged (#30757).
                 if (
                     'read' === $methodLc
                     && JIT\XmlReaderInstanceMethodJit::isUserScriptAot()
                 ) {
-                    JIT\XmlReaderInstanceMethodJit::ensureProxy($this->context, 'xmlreader::read');
-                    if ($this->context->functionIsRegistered('xmlreader::read')) {
-                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('xmlreader::read');
+                    $recvHintLc = strtolower(ltrim(
+                        (string) ($receiverVar->classUserType ?? ''),
+                        '\\'
+                    ));
+                    if ('xmlreader' === $recvHintLc) {
+                        JIT\XmlReaderInstanceMethodJit::ensureProxy($this->context, 'xmlreader::read');
+                        if ($this->context->functionIsRegistered('xmlreader::read')) {
+                            $this->context->scope->toCall = $this->context->resolveFunctionProxy('xmlreader::read');
+                            $this->context->scope->args = [$receiverVar];
+
+                            return;
+                        }
+                    }
+                    if (
+                        $this->context->functionIsRegistered('directory::read')
+                        && 'xmlreader' !== $recvHintLc
+                    ) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('directory::read');
                         $this->context->scope->args = [$receiverVar];
 
                         return;
