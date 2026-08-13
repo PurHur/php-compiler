@@ -9,10 +9,16 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** fwrite() / fputs() — VM via VmFs; JIT/AOT via __compiler_fwrite (issue #1070, #6162). */
+/**
+ * fwrite() / fputs() — VM via VmFs; JIT/AOT via __compiler_fwrite (issue #1070, #6162).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30721; php-src ext/standard/file.c).
+ * Alias name (fputs) is preserved in the ACE message via getName().
+ */
 final class fwrite extends Internal
 {
     public function __construct(string $name = 'fwrite')
@@ -23,10 +29,9 @@ final class fwrite extends Internal
     public function execute(Frame $frame): void
     {
         $fn = $this->getName();
+        // php-src stub arity: 2..3 (#30721; ext/standard/file.c / file.stub.php).
+        $this->requireArgCountRange($frame, $fn, 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException($fn.'() requires two or three arguments in this compiler build');
-        }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, $fn);
         if (null === $frame->returnVar) {
@@ -49,10 +54,13 @@ final class fwrite extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException($fn.'() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30721).
+        if (!$this->requireArgCountRangeJit($context, $args, $fn, 2, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $args[0], $fn.'() handle'),

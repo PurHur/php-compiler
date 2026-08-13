@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  * stream_get_contents() — drain stream from current or given offset (#3142).
  *
  * php-src: ext/standard/file.c — PHP_FUNCTION(stream_get_contents)
+ * Excess/missing argc → Zend ArgumentCountError (#30721).
  */
 final class stream_get_contents extends Internal
 {
@@ -28,12 +29,8 @@ final class stream_get_contents extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0])) {
-            throw new \LogicException('stream_get_contents() requires one to three arguments in this compiler build');
-        }
-        if (isset($frame->calledArgs[3])) {
-            throw new \LogicException('stream_get_contents() requires one to three arguments in this compiler build');
-        }
+        // php-src stub arity: 1..3 (#30721; ext/standard/file.c / file.stub.php).
+        $this->requireArgCountRange($frame, 'stream_get_contents', 1, 3);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -68,10 +65,13 @@ final class stream_get_contents extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('stream_get_contents() requires one to three arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30721).
+        if (!$this->requireArgCountRangeJit($context, $args, 'stream_get_contents', 1, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         JitResourceArg::rejectEnumCaseOperand($context, $args[0], 'stream_get_contents', 0, 'stream');
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             JitResourceArg::emitResourceTypeErrorAndAbort($context, 'stream_get_contents', 0, 'stream', 'null');
