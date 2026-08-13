@@ -13,7 +13,7 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Value;
 
 /**
- * date_isodate_set() — procedural DateTime::setISODate wrapper (ext/date/php_date.c, #20016).
+ * date_isodate_set() — procedural DateTime::setISODate wrapper (ext/date/php_date.c, #20016, JIT/AOT #30748).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_isodate_set)
  */
@@ -57,6 +57,6 @@ final class date_isodate_set extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_isodate_set() is VM-only in this compiler build');
+        return JitDateMutation::invokeISODateSet($context, ...$args);
     }
 }

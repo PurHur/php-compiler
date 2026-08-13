@@ -52,6 +52,9 @@ final class JitDateMutation
     private const TIME_SET_TYPE_ERROR =
         'date_time_set(): Argument #1 ($object) must be of type DateTime, %s given';
 
+    private const ISODATE_SET_TYPE_ERROR =
+        'date_isodate_set(): Argument #1 ($object) must be of type DateTime, %s given';
+
     public static function invokeAdd(Context $context, JITVariable ...$args): Value
     {
         return self::invokeIntervalMutation($context, 'date_add', true, ...$args);
@@ -1258,6 +1261,87 @@ final class JitDateMutation
         $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
 
         return self::applyCivilDateReplace($context, $immutable, $layout, $args[0], $year, $month, $day);
+    }
+
+    /** Procedural date_isodate_set() — JIT/AOT (#30748). php-src PHP_FUNCTION(date_isodate_set). */
+    public static function invokeISODateSet(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                \sprintf('date_isodate_set() expects at least 3 arguments, %d given', $argc)
+            );
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(
+                \sprintf('date_isodate_set() expects at most 4 arguments, %d given', $argc)
+            );
+        }
+        self::rejectNonObjectTimestampArg($context, $args[0], self::ISODATE_SET_TYPE_ERROR);
+        JitSleep::zParamLong($context, $args[1], 'date_isodate_set', 2, 'year');
+        JitSleep::zParamLong($context, $args[2], 'date_isodate_set', 3, 'week');
+        if (4 === $argc) {
+            JitSleep::zParamLong($context, $args[3], 'date_isodate_set', 4, 'dayOfWeek');
+        }
+        [$year, $month, $day] = self::isoWeekToCivilLlvm($context, $args, false);
+
+        return self::applyCivilDateReplace($context, false, 'DateTime', $args[0], $year, $month, $day);
+    }
+
+    /** DateTime(Immutable)::setISODate() — JIT/AOT (#30748). php-src zim_DateTime_setISODate. */
+    public static function invokeObjectISODateSet(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        $function = $immutable ? 'DateTimeImmutable::setISODate' : 'DateTime::setISODate';
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \LogicException($function.'() expects two to three arguments');
+        }
+        JitSleep::zParamLong($context, $args[1], $function, 1, 'year');
+        JitSleep::zParamLong($context, $args[2], $function, 2, 'week');
+        if (4 === $argc) {
+            JitSleep::zParamLong($context, $args[3], $function, 3, 'dayOfWeek');
+        }
+        $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
+        [$year, $month, $day] = self::isoWeekToCivilLlvm($context, $args, true);
+
+        return self::applyCivilDateReplace($context, $immutable, $layout, $args[0], $year, $month, $day);
+    }
+
+    /**
+     * php-src timelib_date_from_isodate — compile-time ISO week → Y-M-D then civil IR (#30748).
+     *
+     * @param list<JITVariable> $args
+     *
+     * @return array{0: Value, 1: Value, 2: Value}
+     */
+    private static function isoWeekToCivilLlvm(Context $context, array $args, bool $method): array
+    {
+        $yearLit = self::compileTimeLongArg($args[1]);
+        $weekLit = self::compileTimeLongArg($args[2]);
+        $dowLit = isset($args[3]) ? self::compileTimeLongArg($args[3]) : 1;
+        if (null === $yearLit || null === $weekLit || null === $dowLit) {
+            $label = $method ? 'DateTime::setISODate' : 'date_isodate_set';
+            throw new \LogicException(
+                $label.'() requires compile-time int year/week/dayOfWeek in this compiler build (#30748)'
+            );
+        }
+        [$y, $m, $d] = VmDateTimeNative::ymdFromIsoDate($yearLit, $weekLit, $dowLit);
+        $i64 = $context->getTypeFromString('int64');
+
+        return [
+            $i64->constInt($y, true),
+            $i64->constInt($m, true),
+            $i64->constInt($d, true),
+        ];
+    }
+
+    private static function compileTimeLongArg(JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return 0;
+        }
+
+        return $arg->compileTimeLong;
     }
 
     /** Procedural date_time_set() — JIT/AOT (#30747). php-src PHP_FUNCTION(date_time_set). */

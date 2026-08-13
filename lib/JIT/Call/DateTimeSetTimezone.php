@@ -224,3 +224,30 @@ final class DateTimeGetOffset implements Call
         return JitDateOffsetGet::invokeMethod($context, ...$args);
     }
 }
+
+/**
+ * DateTime::setISODate() / DateTimeImmutable::setISODate() — JIT/AOT (#30748).
+ *
+ * Defined here because DateTimeSetTimezone is always registered (all profiles).
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeObjectISODateSet}
+ * php-src stub: setISODate(int $year, int $week, int $dayOfWeek = 1): static
+ */
+final class DateTimeSetISODate implements Call
+{
+    /** Qualified name for BuiltinParamNames / named-arg resolve. */
+    public string $name;
+
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['year', 'week', 'dayOfWeek='];
+
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+        $this->name = $immutable ? 'DateTimeImmutable::setISODate' : 'DateTime::setISODate';
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeObjectISODateSet($context, $this->immutable, ...$args);
+    }
+}
