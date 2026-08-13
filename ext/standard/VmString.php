@@ -4823,49 +4823,14 @@ final class VmString
         return $string;
     }
 
+    /**
+     * nl2br() — insert HTML line breaks before newlines.
+     *
+     * SSOT: {@see VmNl2br::nl2br} (NestedJIT-safe strlen/substr; #30813).
+     */
     public static function nl2br(string $string, bool $useXhtml = true): string
     {
-        $br = $useXhtml ? '<br />' : '<br>';
-        $len = self::byteLength($string);
-        $replCount = 0;
-        for ($i = 0; $i < $len; ++$i) {
-            $ch = $string[$i];
-            if ("\r" === $ch) {
-                if ($i + 1 < $len && "\n" === $string[$i + 1]) {
-                    ++$i;
-                }
-                ++$replCount;
-            } elseif ("\n" === $ch) {
-                if ($i + 1 < $len && "\r" === $string[$i + 1]) {
-                    ++$i;
-                }
-                ++$replCount;
-            }
-        }
-        if (0 === $replCount) {
-            return $string;
-        }
-
-        $out = '';
-        for ($i = 0; $i < $len; ++$i) {
-            $ch = $string[$i];
-            if ("\r" === $ch || "\n" === $ch) {
-                $out .= $br;
-                if ($i + 1 < $len && (
-                    ("\r" === $ch && "\n" === $string[$i + 1])
-                    || ("\n" === $ch && "\r" === $string[$i + 1])
-                )) {
-                    $out .= $ch;
-                    ++$i;
-                    $ch = $string[$i];
-                }
-                $out .= $ch;
-            } else {
-                $out .= $ch;
-            }
-        }
-
-        return $out;
+        return VmNl2br::nl2br($string, $useXhtml ? 1 : 0);
     }
 
     /**

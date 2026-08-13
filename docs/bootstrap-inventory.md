@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7418 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24009 |
+| Source constructs flagged (warnings) | 23984 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3649,6 +3649,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmNetInterfacesNative.php` | 0 | 1 |
 | `ext/standard/VmNetInterfacesPure.php` | 0 | 1 |
 | `ext/standard/VmNetworkServices.php` | 0 | 1 |
+| `ext/standard/VmNl2br.php` | 0 | 1 |
 | `ext/standard/VmNullNumberParamDeprecation.php` | 0 | 1 |
 | `ext/standard/VmNullStringParamDeprecation.php` | 0 | 1 |
 | `ext/standard/VmNumberFormat.php` | 0 | 3 |
@@ -4970,54 +4971,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/JitXmlWriterUserScript.php` | 0 | 5 |
 | `ext/xmlwriter/Module.php` | 0 | 43 |
 | `ext/xmlwriter/VmXmlWriter.php` | 0 | 53 |
-| `ext/xmlwriter/XmlWriterClassMethod.php` | 0 | 1 |
-| `ext/xmlwriter/XmlWriterEndAttribute.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterClassMethod.php` | 0 | 5 |
+| `ext/xmlwriter/XmlWriterEndAttribute.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndCData.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndComment.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndDocument.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndDtd.php` | 0 | 2 |
-| `ext/xmlwriter/XmlWriterEndDtdAttlist.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterEndDtdElement.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterEndDtdAttlist.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterEndDtdElement.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndDtdEntity.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndElement.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndPI.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterFlush.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterFullEndElement.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterOpenMemory.php` | 0 | 2 |
-| `ext/xmlwriter/XmlWriterOpenURI.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterOpenURI.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterOutputMemory.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterProceduralFunction.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterRegistry.php` | 0 | 1 |
-| `ext/xmlwriter/XmlWriterSetIndent.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterSetIndentString.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartAttribute.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartAttributeNS.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterSetIndent.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterSetIndentString.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartAttribute.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartAttributeNS.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterStartCData.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterStartComment.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterStartDocument.php` | 0 | 2 |
-| `ext/xmlwriter/XmlWriterStartDtd.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartDtdAttlist.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartDtdElement.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartDtdEntity.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartElement.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartElementNS.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterStartPI.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterText.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterStartDtd.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartDtdAttlist.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartDtdElement.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartDtdEntity.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartElement.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartElementNS.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterStartPI.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterText.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterToMemory.php` | 0 | 2 |
-| `ext/xmlwriter/XmlWriterToStream.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterToUri.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteAttribute.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteAttributeNS.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteCData.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteComment.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteDtd.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteDtdAttlist.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteDtdElement.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteDtdEntity.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteElement.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteElementNS.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWritePI.php` | 0 | 3 |
-| `ext/xmlwriter/XmlWriterWriteRaw.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterToStream.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterToUri.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteAttribute.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteAttributeNS.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteCData.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteComment.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteDtd.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteDtdAttlist.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteDtdElement.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteDtdEntity.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteElement.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteElementNS.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWritePI.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterWriteRaw.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_end_attribute.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_end_cdata.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_end_comment.php` | 0 | 2 |
@@ -35517,6 +35518,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `ext/standard/VmNl2br.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/VmNullNumberParamDeprecation.php`
 
 **Warnings** (review for bootstrap subset):
@@ -44314,12 +44320,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/XmlWriterClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new ArgumentCountError (line 48)
+- new ArgumentCountError (line 60)
+- new ArgumentCountError (line 73)
+- new ArgumentCountError (line 76)
+- 10 class method(s)
 
 ### `ext/xmlwriter/XmlWriterEndAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -44350,14 +44359,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/XmlWriterEndDtdAttlist.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterEndDtdElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -44400,7 +44407,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/XmlWriterOpenURI.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -44424,28 +44430,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/XmlWriterSetIndent.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterSetIndentString.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartAttributeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -44470,56 +44472,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/XmlWriterStartDtd.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartDtdAttlist.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartDtdElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartDtdEntity.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartElementNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterStartPI.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterText.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -44532,98 +44526,84 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/XmlWriterToStream.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterToUri.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteAttributeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteCData.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteComment.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteDtd.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteDtdAttlist.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteDtdElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteDtdEntity.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteElementNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWritePI.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterWriteRaw.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -50520,7 +50500,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringNl2br.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringNlLanginfo.php`
 
