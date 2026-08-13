@@ -34,6 +34,12 @@ final class JitDateMutation
     private const TARGET_TYPE_ERROR =
         'date_diff(): Argument #2 ($targetObject) must be of type DateTimeInterface, %s given';
 
+    private const TIMESTAMP_GET_TYPE_ERROR =
+        'date_timestamp_get(): Argument #1 ($object) must be of type DateTimeInterface, %s given';
+
+    private const TIMESTAMP_SET_TYPE_ERROR =
+        'date_timestamp_set(): Argument #1 ($object) must be of type DateTime, %s given';
+
     public static function invokeAdd(Context $context, JITVariable ...$args): Value
     {
         return self::invokeIntervalMutation($context, 'date_add', true, ...$args);
@@ -795,5 +801,142 @@ final class JitDateMutation
             JITVariable::TYPE_NULL => 'null',
             default => 'mixed',
         };
+    }
+
+    /** Procedural date_timestamp_get() — JIT/AOT (#30745). */
+    public static function invokeTimestampGet(Context $context, JITVariable ...$args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                \sprintf('date_timestamp_get() expects exactly 1 argument, %d given', \count($args))
+            );
+        }
+        self::rejectNonObjectTimestampArg($context, $args[0], self::TIMESTAMP_GET_TYPE_ERROR);
+
+        // Same layout as date_format() — DateTime/DateTimeImmutable share __dt_timestamp
+        // (#4043). Avoid class_id branching: date_create() AOT class_id can disagree with
+        // lookup('DateTime') and abort (#30745).
+        $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        $timestamp = ReflectionSetup::integerPropertyAsI64(
+            $context,
+            $obj,
+            'DateTime',
+            DateTimeSupport::TS_PROPERTY
+        );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $timestamp);
+
+        return $slot;
+    }
+
+    /** Procedural date_timestamp_set() — JIT/AOT (#30745). */
+    public static function invokeTimestampSet(Context $context, JITVariable ...$args): Value
+    {
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                \sprintf('date_timestamp_set() expects exactly 2 arguments, %d given', \count($args))
+            );
+        }
+        self::rejectNonObjectTimestampArg($context, $args[0], self::TIMESTAMP_SET_TYPE_ERROR);
+
+        $timestamp = JitSleep::zParamLong($context, $args[1], 'date_timestamp_set', 2, 'timestamp');
+        $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        self::writeTimestampAndClearMicro($context, $obj, 'DateTime', $timestamp);
+
+        return self::returnObjectArg($context, $args[0]);
+    }
+
+    /** DateTime(Immutable)::getTimestamp() — JIT/AOT (#30745). */
+    public static function invokeTimestampObjectGet(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        $function = $immutable ? 'DateTimeImmutable::getTimestamp' : 'DateTime::getTimestamp';
+        if ([] === $args) {
+            throw new \LogicException($function.'() requires $this');
+        }
+        $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
+        $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        $timestamp = ReflectionSetup::integerPropertyAsI64(
+            $context,
+            $obj,
+            $layout,
+            DateTimeSupport::TS_PROPERTY
+        );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $timestamp);
+
+        return $slot;
+    }
+
+    /** DateTime(Immutable)::setTimestamp() — JIT/AOT (#30745). */
+    public static function invokeTimestampObjectSet(Context $context, bool $immutable, JITVariable ...$args): Value
+    {
+        $function = $immutable ? 'DateTimeImmutable::setTimestamp' : 'DateTime::setTimestamp';
+        if (\count($args) < 2) {
+            throw new \LogicException($function.'() expects exactly 1 argument');
+        }
+
+        $timestamp = JitSleep::zParamLong($context, $args[1], $function, 1, 'timestamp');
+        $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
+        /** @var ObjectBuiltin $objectType */
+        $objectType = $context->type->object;
+        $receiver = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+
+        if ($immutable) {
+            $classId = $objectType->lookup($layout);
+            $target = $objectType->allocate($classId);
+            ReflectionSetup::markConstructed($context, $target);
+            $tz = $objectType->propertyFetch($receiver, $layout, DateTimeSupport::TZ_PROPERTY);
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($target, $layout, DateTimeSupport::TZ_PROPERTY),
+                $tz,
+                JITVariable::TYPE_STRING
+            );
+            self::writeTimestampAndClearMicro($context, $target, $layout, $timestamp);
+            $retObj = $target;
+        } else {
+            self::writeTimestampAndClearMicro($context, $receiver, $layout, $timestamp);
+            $retObj = $receiver;
+        }
+
+        $ret = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $ret),
+            $retObj
+        );
+
+        return $ret;
+    }
+
+    private static function rejectNonObjectTimestampArg(
+        Context $context,
+        JITVariable $arg,
+        string $typeErrorTemplate
+    ): void {
+        if (JITVariable::TYPE_OBJECT === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+            return;
+        }
+        $given = self::typeLabel($arg->type);
+        self::emitTypeErrorAndAbort($context, \sprintf($typeErrorTemplate, $given));
+    }
+
+    private static function writeTimestampAndClearMicro(
+        Context $context,
+        Value $objPtr,
+        string $layout,
+        Value $timestamp
+    ): void {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        self::writeLongProp($context, $object, $objPtr, $layout, DateTimeSupport::TS_PROPERTY, $timestamp);
+        $i64 = $context->getTypeFromString('int64');
+        self::writeLongProp(
+            $context,
+            $object,
+            $objPtr,
+            $layout,
+            DateTimeSupport::MICROSECOND_PROPERTY,
+            $i64->constInt(0, false)
+        );
     }
 }

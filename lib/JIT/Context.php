@@ -1552,6 +1552,13 @@ class Context {
         if (!UserScriptAotEnv::isActive()) {
             $this->functionProxies['datetimeimmutable::settimezone'] = new Call\DateTimeSetTimezone(true);
         }
+        // getTimestamp / setTimestamp live in DateTimeSetTimezone.php (always loaded above).
+        // Avoid ExternalMethod null stub on thin AOT (#30745).
+        $this->functionProxies['datetime::gettimestamp'] = new Call\DateTimeGetTimestamp(false);
+        $this->functionProxies['datetimeimmutable::gettimestamp'] = new Call\DateTimeGetTimestamp(true);
+        $this->functionProxies['datetime::settimestamp'] = new Call\DateTimeSetTimestamp(false);
+        // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772 / modify).
+        $this->functionProxies['datetimeimmutable::settimestamp'] = new Call\DateTimeSetTimestamp(true);
         // modify() — avoid ExternalMethod null stub segfault after chained format() (#26789).
         // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772).
         $this->functionProxies['datetime::modify'] = new Call\DateTimeModify(false);

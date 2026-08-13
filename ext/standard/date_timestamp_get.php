@@ -13,7 +13,7 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Value;
 
 /**
- * date_timestamp_get() — procedural DateTimeInterface::getTimestamp wrapper (ext/date/php_date.c, #9219).
+ * date_timestamp_get() — procedural DateTimeInterface::getTimestamp wrapper (ext/date/php_date.c, #9219, JIT/AOT #30745).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_timestamp_get)
  */
@@ -48,6 +48,6 @@ final class date_timestamp_get extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_timestamp_get() is VM-only in this compiler build (issue #9219)');
+        return JitDateMutation::invokeTimestampGet($context, ...$args);
     }
 }
