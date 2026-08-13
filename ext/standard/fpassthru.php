@@ -8,11 +8,16 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fpassthru() — VM via VmFs; JIT/AOT via __compiler_fpassthru (issue #1194). */
+/**
+ * fpassthru() — VM via VmFs; JIT/AOT via __compiler_fpassthru (issue #1194).
+ *
+ * Excess argc → Zend ArgumentCountError (#30584; php-src ext/standard/file.c).
+ */
 final class fpassthru extends Internal
 {
     public function __construct()
@@ -22,9 +27,8 @@ final class fpassthru extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('fpassthru() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 — #30584.
+        $this->requireExactArgCount($frame, 'fpassthru', 1);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fpassthru');
         if (null === $frame->returnVar) {
@@ -40,8 +44,11 @@ final class fpassthru extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('fpassthru() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30584).
+        if (!$this->requireExactJitArgCount($context, $args, 'fpassthru', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitFpassthru::invoke(
