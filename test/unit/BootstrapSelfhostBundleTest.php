@@ -164,6 +164,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/ProcNiceJitHelper.php',
         'ext/standard/JitProcNice.php',
         'ext/standard/GetmypidJitHelper.php',
+        'ext/posix/PosixGetpidJitHelper.php',
+        'lib/JIT/Builtin/PosixGetpidJit.php',
         'ext/standard/JitGetmypidKernel.php',
         'ext/standard/GethostnameJitHelper.php',
         'ext/standard/JitGethostname.php',
@@ -547,7 +549,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
         // Spine ratio 7381/7381 — 2 deferred still listed in coverage sync (#24115, #27103).
-        $this->assertSame(7381, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550); coverage sync defers PregJitHelperThinAot (#24115) + NetworkServicesNameLookupThinAot (#27103)');
+        $this->assertSame(7383, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550); coverage sync defers PregJitHelperThinAot (#24115) + NetworkServicesNameLookupThinAot (#27103)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
