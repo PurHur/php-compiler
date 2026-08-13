@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** posix_geteuid() — effective user ID (php-src ext/posix/posix.c; #6123). */
+/** posix_geteuid() — effective user ID (VM VmPosix; JIT/AOT PosixGeteuidJitHelper via PosixGeteuidJit, #30767/#6123). */
 final class posix_geteuid extends Internal
 {
     public function __construct()
