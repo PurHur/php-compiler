@@ -1509,6 +1509,7 @@ class Type extends Builtin {
         StreamSocketAccept::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringTime::ensureLinked($this->context);
+        ProcessIdentityJit::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
         StringNetInterfacesJit::ensureLinked($this->context);

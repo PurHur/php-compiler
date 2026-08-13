@@ -7,7 +7,8 @@ namespace PHPCompiler\ext\standard;
 /**
  * JIT/AOT runtime helpers for process identity builtins (#9017, php-in-PHP).
  *
- * SSOT: {@see VmProcessIdentity}, {@see VmDate::getmypid}, {@see VmProcessIdentityPure}.
+ * getmypid AOT peel lives in {@see GetmypidJitHelper} (#30623); resolveGetmypid remains
+ * for VM/tests. SSOT: {@see VmProcessIdentity}, {@see VmDate::getmypid}, {@see VmProcessIdentityPure}.
  * php-src: ext/standard/basic_functions.c — getmypid, getmyuid, getmygid, get_current_user
  */
 final class ProcessIdentityJitHelper
