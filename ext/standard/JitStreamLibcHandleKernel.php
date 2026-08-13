@@ -90,14 +90,19 @@ final class JitStreamLibcHandleKernel
         );
     }
 
+    /**
+     * Null {@see StreamGlobalsJit::GLOBAL_HANDLES}[handle] after fclose/pclose (#30792).
+     *
+     * Thin standalone AOT {@see StreamGlobalsJit::implementThinIsResource} probes these
+     * LLVM slots — NestedJIT fclose alone does not clear them (#27186). Must run for
+     * LOAD_TYPE_STANDALONE as well as embed.
+     */
     public static function emitClearLlvmHandleSlot(Context $context, Value $handle): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $zero = $i64->constInt(0, false);
+        StreamGlobalsJit::ensureGlobals($context);
         $global = $context->module->getNamedGlobal(StreamGlobalsJit::GLOBAL_HANDLES);
         if (null === $global) {
             return;

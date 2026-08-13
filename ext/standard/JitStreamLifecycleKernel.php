@@ -181,10 +181,16 @@ final class JitStreamLifecycleKernel
     private static function implementCloseBridge(Context $context, string $abiName, string $helperLogical): void
     {
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
+        if (null !== $probe && $probe->countBasicBlocks() > 0
+            && !\PHPCompiler\JIT\Builtin\StreamIoRuntime::isDeferStub($probe)) {
+            // Rebuild so thin AOT always clears LLVM handle slots after NestedJIT fclose (#30792).
+            foreach (\array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+        } elseif (null !== $probe && \PHPCompiler\JIT\Builtin\StreamIoRuntime::isDeferStub($probe)) {
+            foreach (\array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
         }
 
         $i32 = $context->getTypeFromString('int32');
