@@ -14,7 +14,11 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** get_loaded_extensions() — registered extension list (ext/standard/info.c parity, #3204). */
+/**
+ * get_loaded_extensions() — registered extension list (ext/standard/info.c parity, #3204).
+ *
+ * Excess argc → Zend ArgumentCountError (#30537; php-src ext/standard/basic_functions.c).
+ */
 final class get_loaded_extensions extends Internal
 {
     public function __construct()
@@ -24,10 +28,9 @@ final class get_loaded_extensions extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 0..1 — #30537.
+        $this->requireArgCountRange($frame, 'get_loaded_extensions', 0, 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('get_loaded_extensions() accepts at most one argument');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,8 +50,11 @@ final class get_loaded_extensions extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('get_loaded_extensions() accepts at most one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30537 / peer #30536).
+        if (!$this->requireArgCountRangeJit($context, $args, 'get_loaded_extensions', 0, 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $zendExtensions = $context->constantFromBool(false);
         if (isset($args[0])) {

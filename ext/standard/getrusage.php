@@ -7,10 +7,15 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** getrusage() — process resource usage (VM VmProcess; JIT/AOT GetrusageJitHelper, #5388/#9184). */
+/**
+ * getrusage() — process resource usage (VM VmProcess; JIT/AOT GetrusageJitHelper, #5388/#9184).
+ *
+ * Excess argc → Zend ArgumentCountError (#30537; php-src ext/standard/basic_functions.c).
+ */
 final class getrusage extends Internal
 {
     public function __construct()
@@ -20,10 +25,9 @@ final class getrusage extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 0..1 — #30537.
+        $this->requireArgCountRange($frame, 'getrusage', 0, 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('getrusage() accepts at most one argument in this compiler build');
-        }
         $who = 0;
         if (1 === $argc) {
             // Z_PARAM_LONG $mode — caller strict_types → TypeError on null (#30361).
@@ -42,8 +46,11 @@ final class getrusage extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('getrusage() accepts at most one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30537 / peer #30536).
+        if (!$this->requireArgCountRangeJit($context, $args, 'getrusage', 0, 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitGetrusage::invoke($context, $args[0] ?? null);
