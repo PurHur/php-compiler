@@ -120,12 +120,7 @@ final class gettype extends Internal
             JitLongArg::lower($context, $arg, 'gettype() argument #1'),
             $context->getTypeFromString('int64')
         );
-        $isResource = JitIsResource::invoke($context, $handle);
 
-        return $context->builder->select(
-            $isResource,
-            $context->builder->load($context->constantStringFromString('resource')),
-            $context->builder->load($context->constantStringFromString('integer'))
-        );
+        return JitGettype::labelForHandle($context, $handle);
     }
 }
