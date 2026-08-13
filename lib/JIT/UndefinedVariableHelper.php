@@ -80,8 +80,8 @@ final class UndefinedVariableHelper
     /** Nested php-in-PHP helper compiles set PHP_COMPILER_SELFHOST_AOT=0 (#10524). */
     private static function shouldSkipGuards(): bool
     {
-        $flag = \getenv('PHP_COMPILER_SELFHOST_AOT');
-
-        return '0' === $flag;
+        // Skip only while NestedJIT is actively compiling a helper (#10524).
+        // Do not key off PHP_COMPILER_SELFHOST_AOT=0 leftovers from JitVmHelperLink (#30779).
+        return NestedJitCompileScope::isActive();
     }
 }

@@ -33,6 +33,16 @@ final class VarFetchRuntimeShrinkTest extends TestCase
         $this->assertLessThan(210, \substr_count($source, "\n") + 1);
     }
 
+    /** Bridge ABI is C-string (int8*), not PHP `string*` (#30779). */
+    public function testVarFetchSuperglobalBridgeUsesInt8PtrNotStringStar(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/VarFetchRuntime.php');
+        $this->assertStringContainsString("getTypeFromString('int8*')", $source);
+        $this->assertStringNotContainsString("getTypeFromString('string*')", $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
+    }
+
     public function testVarFetchRuntimeLazyLinkedFromHelper(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');

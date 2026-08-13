@@ -101,19 +101,21 @@ final class ScopeBuiltinDefinedLlvm
         foreach ($names as $i => $name) {
             $dest = $named[$name];
             $context->builder->positionAtEnd($blocks[$i]);
-            // Match VM initializedSlots — omit compile-allocated unassigned CVs (#24660).
-            $assignedBlock = BasicBlockHelper::append($context, $tag.'_assigned_'.$i);
+            // Match VM initializedSlots — omit unassigned CVs (#24660). Null CVs are defined
+            // (#23567) so do not use IssetHelper. Auto-globals skip the assigned gate (#30779).
             $storeBlock = BasicBlockHelper::append($context, $tag.'_store_'.$i);
             $nextBlock = ($i < $n - 1) ? $blocks[$i + 1] : $done;
-            $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition(
-                $context,
-                ScopeVariableAssignedFlags::flagKey($context, $name)
-            );
-            $context->builder->branchIf($isAssigned, $assignedBlock, $nextBlock);
-
-            $context->builder->positionAtEnd($assignedBlock);
-            $isSet = IssetHelper::compile($context, $dest, null);
-            $context->builder->branchIf($isSet, $storeBlock, $nextBlock);
+            $needsAssignedGate = Variable::TYPE_VALUE === $dest->type
+                && !\in_array($name, \PHPCompiler\ext\standard\VmScope::FILE_SCOPE_DEFINED_VAR_AUTO_NAMES, true);
+            if ($needsAssignedGate) {
+                $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition(
+                    $context,
+                    ScopeVariableAssignedFlags::flagKey($context, $name)
+                );
+                $context->builder->branchIf($isAssigned, $storeBlock, $nextBlock);
+            } else {
+                $context->builder->branch($storeBlock);
+            }
 
             $context->builder->positionAtEnd($storeBlock);
             $onSet($context, $dest, $name, $ht);
