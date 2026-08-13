@@ -338,6 +338,8 @@
             <file>./test/compliance/StreamFileExcessArgc30584JITTest.php</file>
             <file>./test/compliance/DomExcessArgc30616VMTest.php</file>
             <file>./test/compliance/DomExcessArgc30616JITTest.php</file>
+            <file>./test/compliance/XmlReaderExcessArgc30641VMTest.php</file>
+            <file>./test/compliance/XmlReaderExcessArgc30641JITTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583VMTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
             <file>./test/compliance/StripTagsExcessArgc30592VMTest.php</file>

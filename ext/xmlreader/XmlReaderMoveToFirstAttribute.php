@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::moveToFirstAttribute() — attribute cursor to first attr (#19395). */
-final class XmlReaderMoveToFirstAttribute extends VmClassMethod
+final class XmlReaderMoveToFirstAttribute extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,9 +18,7 @@ final class XmlReaderMoveToFirstAttribute extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('XMLReader::moveToFirstAttribute() expects exactly 0 arguments, 0 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::moveToFirstAttribute', 0);
         $entry = VmXmlReader::requireReader(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'XMLReader::moveToFirstAttribute()'

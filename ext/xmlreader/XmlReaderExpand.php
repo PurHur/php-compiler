@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -13,7 +12,7 @@ use PHPCompiler\VM\Variable;
 /**
  * XMLReader::expand() — materialize current node (+ descendants) as DOM (php-src zim_XMLReader_expand; #19394).
  */
-final class XmlReaderExpand extends VmClassMethod
+final class XmlReaderExpand extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -22,9 +21,7 @@ final class XmlReaderExpand extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('XMLReader::expand() expects at least 1 argument, 0 given');
-        }
+        $this->requireUserArgCountRange($frame, 'XMLReader::expand', 0, 1);
         $entry = $frame->calledArgs[0]->resolveIndirect()->toObject();
         $baseNode = null;
         if (\count($frame->calledArgs) >= 2) {

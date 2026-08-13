@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::lookupNamespace() — resolve prefix in current ns scope (#19396). */
-final class XmlReaderLookupNamespace extends VmClassMethod
+final class XmlReaderLookupNamespace extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,9 +18,7 @@ final class XmlReaderLookupNamespace extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('XMLReader::lookupNamespace() expects exactly 1 argument, 0 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::lookupNamespace', 1);
         $entry = VmXmlReader::requireReader(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'XMLReader::lookupNamespace()'

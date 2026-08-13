@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7380 |
-| Phase A inventory files (M2 ratio SSOT) | 7380 |
+| PHP files on vm.php path | 7381 |
+| Phase A inventory files (M2 ratio SSOT) | 7381 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23936 |
+| Source constructs flagged (warnings) | 23913 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4882,39 +4882,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlreader/JitXmlReaderUserScript.php` | 0 | 6 |
 | `ext/xmlreader/Module.php` | 0 | 1 |
 | `ext/xmlreader/VmXmlReader.php` | 0 | 42 |
-| `ext/xmlreader/XmlReaderClose.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderClassMethod.php` | 0 | 5 |
+| `ext/xmlreader/XmlReaderClose.php` | 0 | 2 |
 | `ext/xmlreader/XmlReaderConstants.php` | 0 | 2 |
-| `ext/xmlreader/XmlReaderExpand.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderExpand.php` | 0 | 2 |
 | `ext/xmlreader/XmlReaderExpandHelper.php` | 0 | 1 |
-| `ext/xmlreader/XmlReaderFromStream.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderFromString.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderFromUri.php` | 0 | 4 |
-| `ext/xmlreader/XmlReaderGetAttribute.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderGetAttributeNo.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderGetAttributeNs.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderGetParserProperty.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderIsValid.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderLookupNamespace.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderMoveToAttribute.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderMoveToAttributeNo.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderMoveToAttributeNs.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderMoveToElement.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderMoveToFirstAttribute.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderMoveToNextAttribute.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderNext.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderOpen.php` | 0 | 4 |
+| `ext/xmlreader/XmlReaderFromStream.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderFromString.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderFromUri.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderGetAttribute.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderGetAttributeNo.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderGetAttributeNs.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderGetParserProperty.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderIsValid.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderLookupNamespace.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderMoveToAttribute.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderMoveToAttributeNo.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderMoveToAttributeNs.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderMoveToElement.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderMoveToFirstAttribute.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderMoveToNextAttribute.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderNext.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderOpen.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderPropertySupport.php` | 0 | 2 |
-| `ext/xmlreader/XmlReaderRead.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderReadInnerXml.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderReadOuterXml.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderReadString.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderRead.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderReadInnerXml.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderReadOuterXml.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderReadString.php` | 0 | 2 |
 | `ext/xmlreader/XmlReaderRegistry.php` | 0 | 1 |
-| `ext/xmlreader/XmlReaderSetParserProperty.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderSetRelaxNGSchema.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderSetRelaxNGSchemaSource.php` | 0 | 3 |
-| `ext/xmlreader/XmlReaderSetSchema.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderSetParserProperty.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderSetRelaxNGSchema.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderSetRelaxNGSchemaSource.php` | 0 | 2 |
+| `ext/xmlreader/XmlReaderSetSchema.php` | 0 | 2 |
 | `ext/xmlreader/XmlReaderSubtreeXmlHelper.php` | 0 | 1 |
-| `ext/xmlreader/XmlReaderXML.php` | 0 | 4 |
+| `ext/xmlreader/XmlReaderXML.php` | 0 | 3 |
 | `ext/xmlrpc/JitXmlrpc.php` | 0 | 1 |
 | `ext/xmlrpc/JitXmlrpcCompileTime.php` | 0 | 5 |
 | `ext/xmlrpc/Module.php` | 0 | 15 |
@@ -43651,10 +43652,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XmlReaderEvent (line 1350)
 - 61 class method(s)
 
+### `ext/xmlreader/XmlReaderClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 45)
+- new ArgumentCountError (line 58)
+- new ArgumentCountError (line 61)
+- 7 class method(s)
+
 ### `ext/xmlreader/XmlReaderClose.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -43667,7 +43676,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlreader/XmlReaderExpand.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -43679,113 +43687,97 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlreader/XmlReaderFromStream.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderFromString.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderFromUri.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- new Error (line 42)
+- new Error (line 39)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderGetAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderGetAttributeNo.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 2 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderGetAttributeNs.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderGetParserProperty.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 2 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderIsValid.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderLookupNamespace.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderMoveToAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderMoveToAttributeNo.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 2 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderMoveToAttributeNs.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderMoveToElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderMoveToFirstAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderMoveToNextAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderNext.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -43793,7 +43785,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
-- new ArgumentCountError (line 39)
 - 1 class method(s)
 - 2 closure(s)
 
@@ -43806,28 +43797,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlreader/XmlReaderRead.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderReadInnerXml.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderReadOuterXml.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
 - 1 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderReadString.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -43839,28 +43826,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlreader/XmlReaderSetParserProperty.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 3 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderSetRelaxNGSchema.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 2 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderSetRelaxNGSchemaSource.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 2 class method(s)
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderSetSchema.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -43873,7 +43856,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
-- new ArgumentCountError (line 39)
 - 1 class method(s)
 - 2 closure(s)
 

@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::close() — release reader (php-src ext/xmlreader/php_xmlreader.c; #6135). */
-final class XmlReaderClose extends VmClassMethod
+final class XmlReaderClose extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,9 +18,7 @@ final class XmlReaderClose extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('XMLReader::close() expects at least 1 argument, 0 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::close', 0);
         $entry = VmXmlReader::requireReader(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'XMLReader::close()'

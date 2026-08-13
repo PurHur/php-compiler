@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::getAttributeNs() — namespaced attribute lookup (#19412). */
-final class XmlReaderGetAttributeNs extends VmClassMethod
+final class XmlReaderGetAttributeNs extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,16 +18,7 @@ final class XmlReaderGetAttributeNs extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
-            $got = \count($frame->calledArgs) - 1;
-            if ($got < 0) {
-                $got = 0;
-            }
-            throw new \ArgumentCountError(sprintf(
-                'XMLReader::getAttributeNs() expects exactly 2 arguments, %d given',
-                $got
-            ));
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::getAttributeNs', 2);
         $entry = VmXmlReader::requireReader(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'XMLReader::getAttributeNs()'

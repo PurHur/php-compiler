@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::setRelaxNGSchema() — php-src zim_XMLReader_setRelaxNGSchema (#19553). */
-final class XmlReaderSetRelaxNGSchema extends VmClassMethod
+final class XmlReaderSetRelaxNGSchema extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,9 +18,7 @@ final class XmlReaderSetRelaxNGSchema extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('XMLReader::setRelaxNGSchema() expects exactly 1 argument, 0 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::setRelaxNGSchema', 1);
         $entry = $frame->calledArgs[0]->resolveIndirect()->toObject();
         if (VmXmlReader::CLASS_LC !== strtolower($entry->class->name)) {
             throw new \TypeError('XMLReader::setRelaxNGSchema(): Argument must be XMLReader, '.$entry->class->name.' given');
