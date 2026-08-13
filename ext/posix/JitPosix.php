@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
 use PHPCompiler\JIT\Builtin\PosixGetpidJit;
+use PHPCompiler\JIT\Builtin\PosixGetppidJit;
 use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\Builtin\PosixTerminalRuntime;
@@ -20,7 +21,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for posix v1 builtins (#7271, #30696). */
+/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728). */
 final class JitPosix
 {
     private static int $blockSerial = 0;
@@ -35,15 +36,14 @@ final class JitPosix
         return PosixGetpidJit::invoke($context);
     }
 
+    /**
+     * posix_getppid() — PHP helper bridge (#30728); NestedJIT thin getppid(2) leaf.
+     *
+     * @return Value int64 parent process id
+     */
     public static function getppid(Context $context): Value
     {
-        self::ensureLibcGetppid($context);
-        $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction('getppid'));
-
-        return $raw->typeOf() === $i64
-            ? $raw
-            : $context->builder->zExt($raw, $i64);
+        return PosixGetppidJit::invoke($context);
     }
 
     public static function geteuid(Context $context): Value
@@ -324,19 +324,6 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false);
             $fn = $context->module->addFunction('setsid', $ft);
             $context->registerFunction('setsid', $fn);
-        }
-    }
-
-    /** NestedJIT / getppid user path — getpid(2) leaf lives in JitGetmypidKernel (#30696). */
-    private static function ensureLibcGetppid(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        try {
-            $context->lookupFunction('getppid');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i32, false);
-            $fn = $context->module->addFunction('getppid', $ft);
-            $context->registerFunction('getppid', $fn);
         }
     }
 
