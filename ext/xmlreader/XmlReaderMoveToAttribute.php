@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::moveToAttribute() — attribute cursor by name (#19395). */
-final class XmlReaderMoveToAttribute extends VmClassMethod
+final class XmlReaderMoveToAttribute extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,9 +18,7 @@ final class XmlReaderMoveToAttribute extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('XMLReader::moveToAttribute() expects exactly 1 argument, 0 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::moveToAttribute', 1);
         $entry = VmXmlReader::requireReader(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'XMLReader::moveToAttribute()'

@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::setSchema() — php-src zim_XMLReader_setSchema (#19553). */
-final class XmlReaderSetSchema extends VmClassMethod
+final class XmlReaderSetSchema extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,9 +18,7 @@ final class XmlReaderSetSchema extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('XMLReader::setSchema() expects exactly 1 argument, 0 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::setSchema', 1);
         $entry = $frame->calledArgs[0]->resolveIndirect()->toObject();
         if (VmXmlReader::CLASS_LC !== strtolower($entry->class->name)) {
             throw new \TypeError('XMLReader::setSchema(): Argument must be XMLReader, '.$entry->class->name.' given');

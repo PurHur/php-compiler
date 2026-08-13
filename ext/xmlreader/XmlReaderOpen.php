@@ -6,17 +6,17 @@ namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /**
- * XMLReader::open() — file open (php-src ext/xmlreader/php_xmlreader.c; #6135, #19330, #30563).
+ * XMLReader::open() — file open (php-src ext/xmlreader/php_xmlreader.c; #6135, #19330, #30563, #30641).
  *
  * Static call returns XMLReader|false; instance call mutates $this and returns bool.
  * Z_PARAM_STR: weak null → E_DEPRECATED then '' → ValueError; strict null → TypeError.
+ * Arity: 1–3 user args (uri [, encoding [, flags]]) — Zend ArgumentCountError (#30641).
  */
-final class XmlReaderOpen extends VmClassMethod
+final class XmlReaderOpen extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -27,7 +27,9 @@ final class XmlReaderOpen extends VmClassMethod
     {
         $ctx = $frame->vmContext ?? throw new \LogicException('XMLReader::open() requires VM context');
         if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('XMLReader::open() expects at least 1 argument, 0 given');
+            throw new \ArgumentCountError(
+                XmlReaderClassMethod::atLeastUserArgCountMessage('XMLReader::open', 1, 0)
+            );
         }
 
         $first = $frame->calledArgs[0]->resolveIndirect();
@@ -35,9 +37,7 @@ final class XmlReaderOpen extends VmClassMethod
             && VmXmlReader::CLASS_LC === strtolower($first->toObject()->class->name);
 
         if ($instanceCall) {
-            if (\count($frame->calledArgs) < 2) {
-                throw new \ArgumentCountError('XMLReader::open() expects at least 1 argument, 0 given');
-            }
+            $this->requireUserArgCountRange($frame, 'XMLReader::open', 1, 3, true);
             // Z_PARAM_STR $uri — frame index includes $this (#30563).
             $uri = VmString::internalMethodStringArgForFrame(
                 $frame,
@@ -58,6 +58,7 @@ final class XmlReaderOpen extends VmClassMethod
             return;
         }
 
+        $this->requireUserArgCountRange($frame, 'XMLReader::open', 1, 3, false);
         $uri = VmString::internalMethodStringArgForFrame(
             $frame,
             0,

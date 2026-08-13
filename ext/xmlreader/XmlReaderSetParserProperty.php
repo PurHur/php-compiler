@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::setParserProperty() — php-src zim_XMLReader_setParserProperty (#19553). */
-final class XmlReaderSetParserProperty extends VmClassMethod
+final class XmlReaderSetParserProperty extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,12 +18,7 @@ final class XmlReaderSetParserProperty extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
-            $got = max(0, \count($frame->calledArgs) - 1);
-            throw new \ArgumentCountError(
-                sprintf('XMLReader::setParserProperty() expects exactly 2 arguments, %d given', $got)
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::setParserProperty', 2);
         $entry = $frame->calledArgs[0]->resolveIndirect()->toObject();
         if (VmXmlReader::CLASS_LC !== strtolower($entry->class->name)) {
             throw new \TypeError('XMLReader::setParserProperty(): Argument must be XMLReader, '.$entry->class->name.' given');

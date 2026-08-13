@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
@@ -15,7 +14,7 @@ use PHPCompiler\VM\Variable;
  *
  * PHP 8.4+ only — gated by {@see \PHPCompiler\CompilerVersion::supportsXmlReaderFactories()}.
  */
-final class XmlReaderFromStream extends VmClassMethod
+final class XmlReaderFromStream extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -25,9 +24,7 @@ final class XmlReaderFromStream extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $ctx = $frame->vmContext ?? throw new \LogicException('XMLReader::fromStream() requires VM context');
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('XMLReader::fromStream() expects at least 1 argument, 0 given');
-        }
+        $this->requireUserArgCountRange($frame, 'XMLReader::fromStream', 1, 4, false);
         $streamVar = $frame->calledArgs[0]->resolveIndirect();
         if (!$streamVar->isStreamResource()) {
             throw new \TypeError(

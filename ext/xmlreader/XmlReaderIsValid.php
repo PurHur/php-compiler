@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /** XMLReader::isValid() — well-formedness flag (#6135). */
-final class XmlReaderIsValid extends VmClassMethod
+final class XmlReaderIsValid extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -19,9 +18,7 @@ final class XmlReaderIsValid extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('XMLReader::isValid() expects at least 1 argument, 0 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLReader::isValid', 0);
         $entry = VmXmlReader::requireReader(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'XMLReader::isValid()'

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
@@ -14,7 +13,7 @@ use PHPCompiler\VM\Variable;
  *
  * PHP 8.4+ only — gated by {@see \PHPCompiler\CompilerVersion::supportsXmlReaderFactories()}.
  */
-final class XmlReaderFromString extends VmClassMethod
+final class XmlReaderFromString extends XmlReaderClassMethod
 {
     public function __construct()
     {
@@ -24,9 +23,7 @@ final class XmlReaderFromString extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $ctx = $frame->vmContext ?? throw new \LogicException('XMLReader::fromString() requires VM context');
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('XMLReader::fromString() expects at least 1 argument, 0 given');
-        }
+        $this->requireUserArgCountRange($frame, 'XMLReader::fromString', 1, 3, false);
         $sourceVar = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_STRING !== $sourceVar->type) {
             throw new \TypeError('XMLReader::fromString(): Argument #1 ($source) must be of type string');
