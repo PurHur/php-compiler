@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -22,8 +24,20 @@ final class GeneratorThrow implements Call
         if ([] === $args) {
             throw new \LogicException('Generator::throw() called without $this');
         }
-        if (count($args) < 2) {
-            throw new \LogicException('Generator::throw() requires an exception argument');
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (1 arg); $args[0] is $this (#30866)
+        $userArgCount = \count($args) - 1;
+        if (1 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'Generator::throw() expects exactly 1 argument, %d given',
+                    $userArgCount
+                )
+            );
+            $unreachable = BasicBlockHelper::append($context, 'gen_throw_argc_unreach');
+            $context->builder->positionAtEnd($unreachable);
+
+            return JitValueBox::alloc($context);
         }
         $genVar = $args[0];
         $statePtr = GeneratorHelper::loadStateFromGeneratorObject($context, $genVar);
