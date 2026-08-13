@@ -147,6 +147,10 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::listheaderstable' => true,
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::flushresponseheaders' => true,
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::addsetcookie' => true,
+        // #30790 — prelinked Soundex/Levenshtein unit.o SIGSEGVs under thin AOT; NestedJIT
+        // VmSoundex / VmLevenshtein (recursive substr / CSV rows) into the user module.
+        'phpcompiler\\ext\\standard\\soundexjithelper::soundexargv' => true,
+        'phpcompiler\\ext\\standard\\levenshteinjithelper::computeargv' => true,
     ];
 
     private static bool $loggedHit = false;

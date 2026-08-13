@@ -13,16 +13,23 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_levenshtein via LevenshteinJitHelper PHP (#14648, #26830).
+ * JIT/AOT link for phpc_levenshtein via LevenshteinJitHelper + VmLevenshtein (#14648, #30790).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathRound #26800).
- * Replaces ~196-line LLVM DP in ext/standard/JitLevenshtein.php.
- * SSOT: {@see \PHPCompiler\ext\standard\LevenshteinJitHelper} (same-class NestedJIT).
+ * NestedJIT bundle peer {@see StringMetaphone} / #26794 — solo helper NestedJIT SIGSEGVs on
+ * PHP arrays under thin user-script AOT (#30790).
  * php-src: ext/standard/levenshtein.c — PHP_FUNCTION(levenshtein)
  */
 final class StringLevenshtein
 {
     private const HELPER_PATH = '/ext/standard/LevenshteinJitHelper.php';
+
+    /**
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/VmLevenshtein.php',
+        '/ext/standard/LevenshteinJitHelper.php',
+    ];
 
     private const COMPUTE_HELPER = 'PHPCompiler\\ext\\standard\\LevenshteinJitHelper::computeArgv';
 
@@ -125,16 +132,16 @@ final class StringLevenshtein
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#26830');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#30790');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
-            '#26830'
+            '#30790'
         );
     }
 }
