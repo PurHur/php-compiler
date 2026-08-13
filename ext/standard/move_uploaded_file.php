@@ -21,9 +21,8 @@ final class move_uploaded_file extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('move_uploaded_file() requires exactly two arguments in this compiler build');
-        }
+        // php-src file.c / basic_functions.stub.php — exactly 2 (#30553).
+        $this->requireExactArgCount($frame, 'move_uploaded_file', 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -34,8 +33,9 @@ final class move_uploaded_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('move_uploaded_file() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30553 / peer #30551).
+        if (!$this->requireExactJitArgCount($context, $args, 'move_uploaded_file', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $a = JitStringBuiltinArg::lower($context, $args[0], 'move_uploaded_file', 0, 'from');
         $b = JitStringBuiltinArg::lower($context, $args[1], 'move_uploaded_file', 1, 'to');

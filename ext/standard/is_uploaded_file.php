@@ -20,9 +20,8 @@ final class is_uploaded_file extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('is_uploaded_file() requires exactly one argument in this compiler build');
-        }
+        // php-src file.c / basic_functions.stub.php — exactly 1 (#30553).
+        $this->requireExactArgCount($frame, 'is_uploaded_file', 1);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'is_uploaded_file');
         if (null === $frame->returnVar) {
             return;
@@ -32,8 +31,9 @@ final class is_uploaded_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('is_uploaded_file() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30553 / peer #30551).
+        if (!$this->requireExactJitArgCount($context, $args, 'is_uploaded_file', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'is_uploaded_file');
 

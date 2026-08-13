@@ -21,9 +21,8 @@ final class symlink_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('symlink() requires exactly two arguments in this compiler build');
-        }
+        // php-src link.c / basic_functions.stub.php — exactly 2 (#30553).
+        $this->requireExactArgCount($frame, 'symlink', 2);
         $target = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'symlink', 0, 'target', $frame);
         $linkPath = VmFilestatArg::coerceFilenameArg($frame->calledArgs[1], 'symlink', 1, 'link', $frame);
         $ok = VmFs::symlink($target, $linkPath);
@@ -37,8 +36,9 @@ final class symlink_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('symlink() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30553 / peer #30551).
+        if (!$this->requireExactJitArgCount($context, $args, 'symlink', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $target = JitStringBuiltinArg::lowerPath($context, $args[0], 'symlink', 0, 'target');
         $linkPath = JitStringBuiltinArg::lowerPath($context, $args[1], 'symlink', 1, 'link');
