@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMNodeList::item() — VM (php-src ext/dom/nodelist.c; issue #14336). */
+/**
+ * DOMNodeList::item() — VM (php-src ext/dom/nodelist.c; issue #14336).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#30835; missed by #30616).
+ */
 final class NodeListItem extends DomClassMethod
 {
     public function __construct()
@@ -17,10 +21,8 @@ final class NodeListItem extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNodeList::item', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_NODE_LIST, 'DOMNodeList::item()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMNodeList::item() expects at least 1 argument');
-        }
         $indexVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_INTEGER !== $indexVar->type && Variable::TYPE_FLOAT !== $indexVar->type) {
             throw new \TypeError(sprintf(

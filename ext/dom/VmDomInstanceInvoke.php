@@ -66,6 +66,7 @@ final class VmDomInstanceInvoke
             'createattribute' => VmDomJitDispatch::createAttribute($ctx, $self, $extra),
             'createattributens' => VmDomJitDispatch::createAttributeNS($ctx, $self, $extra),
             'loadhtml' => VmDomJitDispatch::loadHTML($ctx, $self, $extra),
+            'loadhtmlfile' => VmDomJitDispatch::loadHTMLFile($ctx, $self, $extra),
             'loadxml' => VmDomJitDispatch::loadXML($ctx, $self, $extra),
             'load' => VmDomJitDispatch::load($ctx, $self, $extra),
             'savexml' => VmDomJitDispatch::saveXML($self, $extra),

@@ -22,6 +22,7 @@ final class VmDomJitDispatch
      */
     public static function loadHTML(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExtraArgCountRange('DOMDocument::loadHTML', $extra, 1, 2);
         // Z_PARAM_STR: strict null → TypeError; weak → DEP + '' → ValueError (#30041 / #22680).
         $html = self::stringArg(
             $extra[0] ?? self::missingArg('loadHTML', 0),
@@ -40,6 +41,36 @@ final class VmDomJitDispatch
             );
         }
         $ok = VmDom::loadHTML($ctx, $document, $html, $options);
+        $var = new Variable();
+        $var->bool($ok);
+
+        return $var;
+    }
+
+    /**
+     * DOMDocument::loadHTMLFile() — user arity 1–2 (#30835; php-src document.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function loadHTMLFile(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExtraArgCountRange('DOMDocument::loadHTMLFile', $extra, 1, 2);
+        $filename = self::stringArg(
+            $extra[0] ?? self::missingArg('loadHTMLFile', 0),
+            'DOMDocument::loadHTMLFile',
+            0,
+            'filename'
+        );
+        $options = 0;
+        if (isset($extra[1])) {
+            $options = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::loadHTMLFile',
+                2,
+                'options'
+            );
+        }
+        $ok = VmDom::loadHTMLFile($ctx, $document, $filename, $options);
         $var = new Variable();
         $var->bool($ok);
 
@@ -864,8 +895,44 @@ final class VmDomJitDispatch
         return match (strtolower($receiver->class->name)) {
             'domtokenlist', 'dom\\tokenlist' => self::tokenListItem($receiver, $extra),
             'domnodelist' => self::nodeListItem($ctx, $receiver, $extra),
+            'domnamednodemap', 'dom\\namednodemap' => self::namedNodeMapItem($receiver, $extra),
             default => throw new \Error('Call to undefined method '.$receiver->class->name.'::item()'),
         };
+    }
+
+    /**
+     * DOMNamedNodeMap::item() — index Attr lookup (#30835; php-src namednodemap.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function namedNodeMapItem(ObjectEntry $namedNodeMap, array $extra): Variable
+    {
+        if (!VmDom::isNamedNodeMap($namedNodeMap)) {
+            throw new \Error('Call to undefined method '.$namedNodeMap->class->name.'::item()');
+        }
+        self::requireExactExtraArgCount('DOMNamedNodeMap::item', $extra, 1);
+        $indexVar = ($extra[0] ?? self::missingArg('item', 0))->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $indexVar->type && Variable::TYPE_FLOAT !== $indexVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMNamedNodeMap::item(): Argument #1 ($index) must be of type int, %s given',
+                VmDom::typeLabel($indexVar)
+            ));
+        }
+        $index = $indexVar->toInt();
+        $result = new Variable();
+        if ($index < 0) {
+            $result->null();
+
+            return $result;
+        }
+        $node = VmDom::namedNodeMapItem($namedNodeMap, $index);
+        if (null === $node) {
+            $result->null();
+        } else {
+            $result->object($node);
+        }
+
+        return $result;
     }
 
     /**
@@ -878,6 +945,7 @@ final class VmDomJitDispatch
         if (!VmDom::isNamedNodeMap($namedNodeMap)) {
             throw new \Error('Call to undefined method '.$namedNodeMap->class->name.'::getNamedItem()');
         }
+        self::requireExactExtraArgCount('DOMNamedNodeMap::getNamedItem', $extra, 1);
         $name = self::stringArg($extra[0] ?? self::missingArg('getNamedItem', 0), 'DOMNamedNodeMap::getNamedItem', 0);
         $result = new Variable();
         $node = VmDom::namedNodeMapGetNamedItem($namedNodeMap, $name);
@@ -953,6 +1021,7 @@ final class VmDomJitDispatch
      */
     public static function nodeListItem(VmContext $ctx, ObjectEntry $nodeList, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMNodeList::item', $extra, 1);
         $indexVar = ($extra[0] ?? self::missingArg('item', 0))->resolveIndirect();
         if (Variable::TYPE_INTEGER !== $indexVar->type && Variable::TYPE_FLOAT !== $indexVar->type) {
             throw new \TypeError(sprintf(
