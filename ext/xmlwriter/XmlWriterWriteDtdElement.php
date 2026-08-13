@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::writeDtdElement() — ELEMENT decl (php-src ext/xmlwriter/php_xmlwriter.c; #19468). */
+/** XMLWriter::writeDtdElement() — ELEMENT decl (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19468). */
 final class XmlWriterWriteDtdElement extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,12 +19,7 @@ final class XmlWriterWriteDtdElement extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeDtdElement()');
-        $argc = \count($frame->calledArgs);
-        if ($argc < 3) {
-            throw new \ArgumentCountError(
-                'XMLWriter::writeDtdElement() expects exactly 2 arguments, '.($argc - 1).' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::writeDtdElement', 2);
         $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtdElement()', 0, 'name');
         $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeDtdElement()', 1, 'content');
         $ok = VmXmlWriter::writeDtdElement($entry, $name, $content);

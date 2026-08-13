@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::openUri() — file target (php-src ext/xmlwriter/php_xmlwriter.c; #6065). */
+/** XMLWriter::openUri() — file target (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #6065). */
 final class XmlWriterOpenURI extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,9 +19,7 @@ final class XmlWriterOpenURI extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::openUri()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('XMLWriter::openUri() expects at least 2 arguments, 1 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::openUri', 1);
         $uri = $this->stringArg($frame->calledArgs[1], 'XMLWriter::openUri()', 0, 'uri');
         $ok = VmXmlWriter::openURI($entry, $uri);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

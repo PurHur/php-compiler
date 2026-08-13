@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::writeDtdEntity() — one-shot ENTITY (php-src ext/xmlwriter/php_xmlwriter.c; #19468). */
+/** XMLWriter::writeDtdEntity() — one-shot ENTITY (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19468). */
 final class XmlWriterWriteDtdEntity extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,12 +19,8 @@ final class XmlWriterWriteDtdEntity extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeDtdEntity()');
+        $this->requireUserArgCountRange($frame, 'XMLWriter::writeDtdEntity', 2, 6);
         $argc = \count($frame->calledArgs);
-        if ($argc < 3) {
-            throw new \ArgumentCountError(
-                'XMLWriter::writeDtdEntity() expects at least 2 arguments, '.($argc - 1).' given'
-            );
-        }
         $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtdEntity()', 0, 'name');
         $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeDtdEntity()', 1, 'content');
         $isParam = false;

@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::text() — text node content (php-src ext/xmlwriter/php_xmlwriter.c; #6065). */
+/** XMLWriter::text() — text node content (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #6065). */
 final class XmlWriterText extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,9 +19,7 @@ final class XmlWriterText extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::text()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('XMLWriter::text() expects at least 2 arguments, 1 given');
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::text', 1);
         $var = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT === $var->type) {
             throw new \TypeError(sprintf(

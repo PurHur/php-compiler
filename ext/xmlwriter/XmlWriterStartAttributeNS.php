@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::startAttributeNs() — open namespaced streaming attribute (php-src ext/xmlwriter/php_xmlwriter.c; #19446). */
+/** XMLWriter::startAttributeNs() — open namespaced streaming attribute (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19446). */
 final class XmlWriterStartAttributeNS extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,12 +19,7 @@ final class XmlWriterStartAttributeNS extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::startAttributeNs()');
-        $argc = \count($frame->calledArgs);
-        if ($argc < 4) {
-            throw new \ArgumentCountError(
-                'XMLWriter::startAttributeNs() expects at least 4 arguments, '.$argc.' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::startAttributeNs', 3);
         $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::startAttributeNs()', 0, 'prefix');
         $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::startAttributeNs()', 1, 'name');
         $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::startAttributeNs()', 2, 'uri');

@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::endAttribute() — close streaming attribute (php-src ext/xmlwriter/php_xmlwriter.c; #19820). */
+/** XMLWriter::endAttribute() — close streaming attribute (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19820). */
 final class XmlWriterEndAttribute extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,13 +19,7 @@ final class XmlWriterEndAttribute extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::endAttribute()');
-        $argc = \count($frame->calledArgs) - 1;
-        if (0 !== $argc) {
-            throw new \ArgumentCountError(sprintf(
-                'XMLWriter::endAttribute() expects exactly 0 arguments, %d given',
-                $argc
-            ));
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::endAttribute', 0);
         $ok = VmXmlWriter::endAttribute($entry);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

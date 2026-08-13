@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::endCdata() — close CDATA section (php-src ext/xmlwriter/php_xmlwriter.c; #19457). */
+/** XMLWriter::endCdata() — close CDATA section (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19457). */
 final class XmlWriterEndCData extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,6 +19,7 @@ final class XmlWriterEndCData extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::endCdata()');
+        $this->requireExactUserArgCount($frame, 'XMLWriter::endCdata', 0);
         $ok = VmXmlWriter::endCData($entry);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

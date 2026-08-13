@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::outputMemory() — fetch memory buffer (php-src ext/xmlwriter/php_xmlwriter.c; #6065). */
+/** XMLWriter::outputMemory() — fetch memory buffer (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #6065). */
 final class XmlWriterOutputMemory extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,6 +19,7 @@ final class XmlWriterOutputMemory extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::outputMemory()');
+        $this->requireAtMostUserArgCount($frame, 'XMLWriter::outputMemory', 1);
         $flush = true;
         if (isset($frame->calledArgs[1])) {
             $flushVar = $frame->calledArgs[1]->resolveIndirect();

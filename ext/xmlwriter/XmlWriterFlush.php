@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::flush() — memory string / URI byte count (php-src ext/xmlwriter/php_xmlwriter.c; #6065, #19385). */
+/** XMLWriter::flush() — memory string / URI byte count (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #6065, #19385). */
 final class XmlWriterFlush extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,6 +19,7 @@ final class XmlWriterFlush extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::flush()');
+        $this->requireAtMostUserArgCount($frame, 'XMLWriter::flush', 1);
         $empty = true;
         if (\count($frame->calledArgs) > 1) {
             $empty = $frame->calledArgs[1]->resolveIndirect()->toBool();
