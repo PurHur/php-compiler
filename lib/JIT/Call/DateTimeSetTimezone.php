@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\ext\standard\JitDateMutation;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -83,5 +84,60 @@ final class DateTimeSetTimezone implements Call
         );
 
         return $ret;
+    }
+}
+
+/**
+ * DateTime::getTimestamp() / DateTimeImmutable::getTimestamp() — JIT/AOT (#30745).
+ *
+ * Defined here because DateTimeSetTimezone is always registered (all profiles).
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeTimestampObjectGet}
+ */
+final class DateTimeGetTimestamp implements Call
+{
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeTimestampObjectGet(
+            $context,
+            $this->immutable,
+            ...$args
+        );
+    }
+}
+
+/**
+ * DateTime::setTimestamp() / DateTimeImmutable::setTimestamp() — JIT/AOT (#30745).
+ *
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeTimestampObjectSet}
+ * php-src stub: setTimestamp(int $timestamp): static
+ */
+final class DateTimeSetTimestamp implements Call
+{
+    /** Qualified name for BuiltinParamNames / named-arg resolve. */
+    public string $name;
+
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['timestamp'];
+
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+        $this->name = $immutable
+            ? 'DateTimeImmutable::setTimestamp'
+            : 'DateTime::setTimestamp';
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeTimestampObjectSet(
+            $context,
+            $this->immutable,
+            ...$args
+        );
     }
 }
