@@ -30734,14 +30734,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitParseIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 103)
-- new phpc_native_ht_set_string_key (line 104)
-- new phpc_native_ht_set_string_key_ht (line 105)
-- new phpc_native_ht_set_string_key_long (line 106)
-- new phpc_native_ht_set_string_at (line 107)
-- new phpc_native_ht_set_long_at (line 108)
-- new phpc_native_ht_set_hashtable_at (line 109)
-- 2 class method(s)
+- new phpc_native_ht_alloc (line 164)
+- new phpc_native_ht_set_string_key (line 165)
+- new phpc_native_ht_set_string_key_ht (line 166)
+- new phpc_native_ht_set_string_key_long (line 167)
+- new phpc_native_ht_set_string_at (line 168)
+- new phpc_native_ht_set_long_at (line 169)
+- new phpc_native_ht_set_hashtable_at (line 170)
+- 4 class method(s)
 
 ### `ext/standard/JitParseIniMaterializer.php`
 
@@ -39687,8 +39687,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/parse_ini_file.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- 2 class method(s)
+- new ArgumentCountError (line 33)
+- 4 class method(s)
 
 ### `ext/standard/parse_ini_string.php`
 
