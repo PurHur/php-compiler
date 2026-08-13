@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7397 |
-| Phase A inventory files (M2 ratio SSOT) | 7397 |
+| PHP files on vm.php path | 7398 |
+| Phase A inventory files (M2 ratio SSOT) | 7398 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23969 |
+| Source constructs flagged (warnings) | 23975 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3065,6 +3065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSerialize.php` | 0 | 2 |
 | `ext/standard/JitSessionAbort.php` | 0 | 1 |
 | `ext/standard/JitSessionCacheExpire.php` | 0 | 1 |
+| `ext/standard/JitSessionCookieAndPath.php` | 0 | 6 |
 | `ext/standard/JitSessionCreateId.php` | 0 | 1 |
 | `ext/standard/JitSessionDecode.php` | 0 | 1 |
 | `ext/standard/JitSessionDestroy.php` | 0 | 1 |
@@ -31171,6 +31172,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/JitSessionCookieAndPath.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 49)
+- new ArgumentCountError (line 52)
+- new ArgumentCountError (line 93)
+- new ArgumentCountError (line 110)
+- 9 class method(s)
+
 ### `ext/standard/JitSessionCreateId.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36088,12 +36099,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 168)
 - new Variable (line 171)
 - new Variable (line 174)
-- new Variable (line 296)
-- new HashTable (line 598)
-- new HashTable (line 665)
-- new HashTable (line 687)
-- new HashTable (line 837)
-- 56 class method(s)
+- new Variable (line 325)
+- new HashTable (line 633)
+- new HashTable (line 700)
+- new HashTable (line 722)
+- new HashTable (line 872)
+- 59 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
 

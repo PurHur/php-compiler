@@ -2890,6 +2890,7 @@ require_once __DIR__.'/../../../ext/standard/JitScalarTypeCoerce.php';
 require_once __DIR__.'/../../../ext/standard/JitSerialize.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionAbort.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionCacheExpire.php';
+require_once __DIR__.'/../../../ext/standard/JitSessionCookieAndPath.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionCreateId.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionDecode.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionDestroy.php';

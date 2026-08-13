@@ -77,6 +77,6 @@ class session_cache_limiter_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('session_cache_limiter() is VM-only in this compiler build');
+        return JitSessionCookieAndPath::invokeCacheLimiter($context, ...$args);
     }
 }

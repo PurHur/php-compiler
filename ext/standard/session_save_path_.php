@@ -58,6 +58,6 @@ class session_save_path_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('session_save_path() is VM-only in this compiler build');
+        return JitSessionCookieAndPath::invokeSavePath($context, ...$args);
     }
 }
