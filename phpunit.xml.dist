@@ -144,6 +144,8 @@
             <file>./test/compliance/StreamFilterAppendPrependReflectionVMTest.php</file>
             <file>./test/compliance/SocketReflectionStubsVMTest.php</file>
             <file>./test/compliance/StreamContextSetOptionReturnTrueVMTest.php</file>
+            <file>./test/compliance/StreamContextSetOptionIncomplete30645VMTest.php</file>
+            <file>./test/compliance/StreamContextSetOptionIncomplete30645JITTest.php</file>
             <file>./test/compliance/StreamSocketEnableCryptoReflectionVMTest.php</file>
             <file>./test/compliance/HtmlDecodeFlagsNamedReflectionVMTest.php</file>
             <file>./test/compliance/StreamIsattyReflectionVMTest.php</file>

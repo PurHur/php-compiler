@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7381 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23918 |
+| Source constructs flagged (warnings) | 23917 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4493,7 +4493,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/stream_context_get_options.php` | 0 | 1 |
 | `ext/standard/stream_context_get_params.php` | 0 | 1 |
 | `ext/standard/stream_context_set_default.php` | 0 | 1 |
-| `ext/standard/stream_context_set_option.php` | 0 | 3 |
+| `ext/standard/stream_context_set_option.php` | 0 | 2 |
 | `ext/standard/stream_context_set_options.php` | 0 | 2 |
 | `ext/standard/stream_context_set_params.php` | 0 | 2 |
 | `ext/standard/stream_copy_to_stream.php` | 0 | 1 |
@@ -29637,7 +29637,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFdiv.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 17 class method(s)
 
 ### `ext/standard/JitFeof.php`
 
@@ -31404,7 +31404,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamContextSetOption.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 15 class method(s)
 
 ### `ext/standard/JitStreamContextSetOptions.php`
 
@@ -36201,19 +36201,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 127)
 - new Variable (line 129)
 - new Variable (line 307)
-- new HashTable (line 367)
-- new Variable (line 368)
-- new Variable (line 384)
-- new Variable (line 521)
-- new HashTable (line 541)
-- new Variable (line 550)
-- new HashTable (line 567)
-- new Variable (line 569)
-- new HashTable (line 579)
-- new Variable (line 581)
-- new Variable (line 601)
-- new HashTable (line 606)
-- new Variable (line 608)
+- new HashTable (line 408)
+- new Variable (line 409)
+- new Variable (line 425)
+- new Variable (line 562)
+- new HashTable (line 582)
+- new Variable (line 591)
+- new HashTable (line 608)
+- new Variable (line 610)
+- new HashTable (line 620)
+- new Variable (line 622)
+- new Variable (line 642)
+- new HashTable (line 647)
+- new Variable (line 649)
 - 28 class method(s)
 
 ### `ext/standard/VmStreamContextOptions.php`
@@ -37851,13 +37851,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/diskfreespace.php`
 
 **Warnings** (review for bootstrap subset):
-- new disk_free_space (line 23)
+- new disk_free_space (line 24)
 - 2 class method(s)
 
 ### `ext/standard/disktotalspace.php`
 
 **Warnings** (review for bootstrap subset):
-- new disk_total_space (line 23)
+- new disk_total_space (line 24)
 - 2 class method(s)
 
 ### `ext/standard/dl.php`
@@ -40833,8 +40833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/stream_context_set_option.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 65)
-- 3 class method(s)
+- 2 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/stream_context_set_options.php`
@@ -43453,7 +43452,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/xml_error_string.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 31)
 - 2 class method(s)
 
 ### `ext/xml/xml_get_current_byte_index.php`
@@ -45870,8 +45869,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2393)
-- new ArgumentCountError (line 2404)
+- new ArgumentCountError (line 2396)
+- new ArgumentCountError (line 2407)
 - 19 class method(s)
 - 1 closure(s)
 

@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * stream_context_set_option() — singular or batch wrapper option write (ext/standard/streams.c, #3448).
  *
  * Excess/missing argc → Zend ArgumentCountError (#30584; php-src stub arity 2..4).
+ * Incomplete string form → Zend ValueError (#30645); do not synthesize a null $value.
  */
 final class stream_context_set_option extends Internal
 {
@@ -32,14 +33,19 @@ final class stream_context_set_option extends Internal
         $argc = \count($frame->calledArgs);
         if (2 === $argc) {
             $ok = VmStreamContext::setOption($frame->calledArgs[0], $frame->calledArgs[1]);
+        } elseif (3 === $argc) {
+            // Omit $value so setOption can distinguish missing arg #4 from an explicit null (#30645).
+            $ok = VmStreamContext::setOption(
+                $frame->calledArgs[0],
+                $frame->calledArgs[1],
+                $frame->calledArgs[2]
+            );
         } else {
-            // 3 or 4: singular form; omitted value defaults to null like the stub.
-            $value = 4 === $argc ? $frame->calledArgs[3] : self::nullVar();
             $ok = VmStreamContext::setOption(
                 $frame->calledArgs[0],
                 $frame->calledArgs[1],
                 $frame->calledArgs[2],
-                $value
+                $frame->calledArgs[3]
             );
         }
         BuiltinExecute::writeReturn(
@@ -58,13 +64,5 @@ final class stream_context_set_option extends Internal
         }
 
         return JitStreamContextSetOption::invoke($context, ...$args);
-    }
-
-    private static function nullVar(): Variable
-    {
-        $v = new Variable();
-        $v->null();
-
-        return $v;
     }
 }
