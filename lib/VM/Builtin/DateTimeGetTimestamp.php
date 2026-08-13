@@ -25,6 +25,9 @@ final class DateTimeGetTimestamp extends VmClassMethod
             'DateTime::getTimestamp()',
             $frame->vmContext
         );
+        $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity excludes $this — php-src zim_DateTime_getTimestamp (#30834).
+        $this->requireExactUserArgCount($frame, "{$label}::getTimestamp", 0);
         if (null === $frame->returnVar) {
             return;
         }

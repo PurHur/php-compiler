@@ -27,14 +27,16 @@ final class DateTimeModify extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DateTime::modify() expects exactly 1 argument');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('DateTime::modify() called without $this');
         }
         $receiver = DateTimeSupport::requireDateTimeLike(
             $frame->calledArgs[0],
             'DateTime::modify()'
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity excludes $this — php-src zim_DateTime_modify (#30834).
+        $this->requireExactUserArgCount($frame, "{$label}::modify", 1);
         // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29818).
         // Frame arg 1 includes $this; user-visible Argument #1 ($modifier).
         $modifier = VmString::internalMethodStringArgForFrame(

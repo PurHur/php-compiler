@@ -18,8 +18,8 @@ final class DateTimeSub extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DateTime::sub() expects exactly 1 argument');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('DateTime::sub() called without $this');
         }
         $receiver = DateTimeSupport::requireDateTimeLike(
             $frame->calledArgs[0],
@@ -27,6 +27,8 @@ final class DateTimeSub extends VmClassMethod
             $frame->vmContext
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity excludes $this — php-src zim_DateTime_sub (#30834).
+        $this->requireExactUserArgCount($frame, "{$label}::sub", 1);
         $interval = DateIntervalSupport::requireDateInterval(
             $frame->calledArgs[1],
             "{$label}::sub()",

@@ -18,14 +18,16 @@ final class DateTimeSetDate extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 4) {
-            throw new \LogicException('DateTime::setDate() expects exactly 3 arguments');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('DateTime::setDate() called without $this');
         }
         $receiver = DateTimeSupport::requireDateTimeLike(
             $frame->calledArgs[0],
             'DateTime::setDate()'
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity excludes $this — php-src zim_DateTime_setDate (#30834).
+        $this->requireExactUserArgCount($frame, "{$label}::setDate", 3);
         // Z_PARAM_LONG — caller strict_types → TypeError on null (#29829).
         // VmMath userArgIndex is 1-based (Argument #N).
         $year = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, "{$label}::setDate", 1, 'year');

@@ -28,6 +28,9 @@ final class DateTimeGetTimezone extends VmClassMethod
             'DateTime::getTimezone()',
             $frame->vmContext
         );
+        $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity excludes $this — php-src zim_DateTime_getTimezone (#30834).
+        $this->requireExactUserArgCount($frame, "{$label}::getTimezone", 0);
         if (null === $frame->returnVar) {
             return;
         }

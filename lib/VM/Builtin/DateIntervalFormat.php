@@ -18,13 +18,15 @@ final class DateIntervalFormat extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DateInterval::format() expects exactly 1 argument');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('DateInterval::format() called without $this');
         }
         $receiver = DateIntervalSupport::requireDateInterval(
             $frame->calledArgs[0],
             'DateInterval::format()'
         );
+        // User arity excludes $this — php-src zim_DateInterval_format (#30834).
+        $this->requireExactUserArgCount($frame, 'DateInterval::format', 1);
         $format = VmReflection::stringArg($frame->calledArgs[1], 'DateInterval::format() format', 1);
         if (null === $frame->returnVar) {
             return;

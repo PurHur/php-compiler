@@ -24,6 +24,8 @@ final class DateTimeZoneGetLocation extends VmClassMethod
             $frame->calledArgs[0],
             'DateTimeZone::getLocation()'
         );
+        // User arity excludes $this — php-src zim_DateTimeZone_getLocation (#30834).
+        $this->requireExactUserArgCount($frame, 'DateTimeZone::getLocation', 0);
         if (null === $frame->returnVar) {
             return;
         }

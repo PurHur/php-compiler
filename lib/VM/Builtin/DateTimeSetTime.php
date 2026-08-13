@@ -19,14 +19,16 @@ final class DateTimeSetTime extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 5) {
-            throw new \LogicException('DateTime::setTime() expects two to four arguments');
+        if ($argc < 1) {
+            throw new \LogicException('DateTime::setTime() called without $this');
         }
         $receiver = DateTimeSupport::requireDateTimeLike(
             $frame->calledArgs[0],
             'DateTime::setTime()'
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity 2–4 — php-src zim_DateTime_setTime (#30834); ACE not LogicException.
+        $this->requireUserArgCountRange($frame, "{$label}::setTime", 2, 4);
         // Z_PARAM_LONG — caller strict_types → TypeError on null (#29829).
         // VmMath userArgIndex is 1-based (Argument #N).
         $hour = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, "{$label}::setTime", 1, 'hour');

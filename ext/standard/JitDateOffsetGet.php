@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\TimezoneOffsetRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
@@ -58,12 +60,22 @@ final class JitDateOffsetGet
             throw new \LogicException('DateTime::getOffset() requires $this');
         }
         if (\count($args) > 1) {
-            throw new \ArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
                 \sprintf(
                     'DateTime::getOffset() expects exactly 0 arguments, %d given',
                     \count($args) - 1
                 )
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_getoffset_argc_cont');
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeLong(
+                $context,
+                $slot,
+                $context->getTypeFromString('int64')->constInt(0, true)
+            );
+
+            return $slot;
         }
 
         $folded = self::tryCompileTimeOffset($args[0]);
