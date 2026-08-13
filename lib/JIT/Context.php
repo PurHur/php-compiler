@@ -1575,6 +1575,8 @@ class Context {
         $this->functionProxies['datetimeimmutable::setdate'] = new Call\DateTimeSetDate(true);
         $this->functionProxies['datetime::settime'] = new Call\DateTimeSetTime(false);
         $this->functionProxies['datetimeimmutable::settime'] = new Call\DateTimeSetTime(true);
+        $this->functionProxies['datetime::setisodate'] = new Call\DateTimeSetISODate(false);
+        $this->functionProxies['datetimeimmutable::setisodate'] = new Call\DateTimeSetISODate(true);
         // modify() — avoid ExternalMethod null stub segfault after chained format() (#26789).
         // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772).
         $this->functionProxies['datetime::modify'] = new Call\DateTimeModify(false);
