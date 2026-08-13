@@ -6,11 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** func_num_args() — count of arguments passed to the current user function (issue #197). */
+/**
+ * func_num_args() — count of arguments passed to the current user function (issue #197).
+ *
+ * Excess argc → Zend ArgumentCountError (#30647; php-src Zend/zend_builtin_functions.c).
+ */
 final class func_num_args extends Internal
 {
     public function __construct()
@@ -20,8 +26,11 @@ final class func_num_args extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('func_num_args() takes no arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
+            throw new \ArgumentCountError(
+                'func_num_args() expects exactly 0 arguments, '.$argc.' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -37,8 +46,17 @@ final class func_num_args extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('func_num_args() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            // Catchable ArgumentCountError under AOT/JIT try/catch (#30647).
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'func_num_args() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitFuncArgs::numArgs($context);
