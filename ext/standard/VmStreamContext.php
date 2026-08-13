@@ -329,23 +329,64 @@ final class VmStreamContext
     }
 
     /**
-     * stream_context_set_option() — singular or batch wrapper option write (ext/standard/streams.c, #3448).
+     * php-src streamsfuncs.c zend_argument_value_error(3, "cannot be null when argument #2 … is a string") (#30645).
+     */
+    public const SET_OPTION_OPTION_NAME_NULL_ON_STRING =
+        'stream_context_set_option(): Argument #3 ($option_name) cannot be null when argument #2 ($wrapper_or_options) is a string';
+
+    /**
+     * php-src streamsfuncs.c zend_argument_value_error(4, "must be provided when argument #2 … is a string") (#30645).
+     */
+    public const SET_OPTION_VALUE_REQUIRED_ON_STRING =
+        'stream_context_set_option(): Argument #4 ($value) must be provided when argument #2 ($wrapper_or_options) is a string';
+
+    /**
+     * php-src streamsfuncs.c zend_argument_value_error(3, "must be null when argument #2 … is an array") (#30645).
+     */
+    public const SET_OPTION_OPTION_NAME_MUST_BE_NULL_ON_ARRAY =
+        'stream_context_set_option(): Argument #3 ($option_name) must be null when argument #2 ($wrapper_or_options) is an array';
+
+    /**
+     * php-src streamsfuncs.c zend_argument_value_error(4, "cannot be provided when argument #2 … is an array") (#30645).
+     */
+    public const SET_OPTION_VALUE_FORBIDDEN_ON_ARRAY =
+        'stream_context_set_option(): Argument #4 ($value) cannot be provided when argument #2 ($wrapper_or_options) is an array';
+
+    /**
+     * stream_context_set_option() — singular or batch wrapper option write (ext/standard/streams.c, #3448, #30645).
      *
-     * Two-arg form merges a full options array; four-arg form sets one wrapper option.
+     * Two-arg array form merges a full options array; four-arg string form sets one wrapper option.
+     * Incomplete string form / extra array-form args → Zend ValueError (not LogicException / silent true).
+     *
+     * $arg3/$arg4 PHP null means the argument was omitted; a Variable (including TYPE_NULL) was passed.
      */
     public static function setOption(Variable $context, Variable $arg2, ?Variable $arg3 = null, ?Variable $arg4 = null): bool
     {
         $context = self::requireRepresentation($context, 'stream_context_set_option');
         $resolved2 = $arg2->resolveIndirect();
-        if (Variable::TYPE_ARRAY === $resolved2->type && (null === $arg3 || null === $arg4)) {
+        $optionIsNull = null === $arg3 || Variable::TYPE_NULL === $arg3->resolveIndirect()->type;
+        $valueProvided = null !== $arg4;
+
+        if (Variable::TYPE_ARRAY === $resolved2->type) {
+            if (!$optionIsNull) {
+                throw new \ValueError(self::SET_OPTION_OPTION_NAME_MUST_BE_NULL_ON_ARRAY);
+            }
+            if ($valueProvided) {
+                throw new \ValueError(self::SET_OPTION_VALUE_FORBIDDEN_ON_ARRAY);
+            }
+
             return self::setOptions($context, $arg2);
         }
-        if (null === $arg3 || null === $arg4) {
-            throw new \LogicException('stream_context_set_option(): missing wrapper/option/value arguments');
+
+        if ($optionIsNull) {
+            throw new \ValueError(self::SET_OPTION_OPTION_NAME_NULL_ON_STRING);
+        }
+        if (!$valueProvided) {
+            throw new \ValueError(self::SET_OPTION_VALUE_REQUIRED_ON_STRING);
         }
 
-        $wrapperName = self::coerceOptionKeyString($resolved2, 'stream_context_set_option', 2, 'wrapper');
-        $optionName = self::coerceOptionKeyString($arg3->resolveIndirect(), 'stream_context_set_option', 3, 'option');
+        $wrapperName = self::coerceOptionKeyString($resolved2, 'stream_context_set_option', 2, 'wrapper_or_options');
+        $optionName = self::coerceOptionKeyString($arg3->resolveIndirect(), 'stream_context_set_option', 3, 'option_name');
         $exportedValue = VmHttpBuildQuery::export($arg4);
         if (!\is_scalar($exportedValue) && null !== $exportedValue && !\is_array($exportedValue)) {
             $exportedValue = '';
