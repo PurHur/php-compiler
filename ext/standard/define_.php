@@ -8,12 +8,21 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** define() — register a user constant at runtime (issue #204, JIT #4435). */
+/**
+ * define() — register a user constant at runtime (issue #204, JIT #4435).
+ *
+ * Excess argc (>3) → Zend ArgumentCountError (#30573; php-src Zend/zend_builtin_functions.c).
+ * The 3rd `$case_insensitive` parameter remains arity-legal (deprecated/ignored).
+ *
+ * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(define)
+ * php-src: Zend/zend_builtin_functions.stub.php — define(string, mixed, bool = false): bool
+ */
 final class define_ extends Internal
 {
     public const MSG_CASE_INSENSITIVE_IGNORED =
@@ -29,7 +38,13 @@ final class define_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (count($frame->calledArgs) < 2) {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'define() expects at most 3 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
         $name = self::vmConstantNameArg($frame);
@@ -38,7 +53,7 @@ final class define_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('define() requires VM context');
         }
-        if (\count($frame->calledArgs) >= 3 && $frame->calledArgs[2]->resolveIndirect()->toBool()) {
+        if ($argc >= 3 && $frame->calledArgs[2]->resolveIndirect()->toBool()) {
             $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
             $frame->vmContext->errors->triggerError(
                 self::MSG_CASE_INSENSITIVE_IGNORED,
@@ -57,10 +72,22 @@ final class define_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
+        $argc = \count($args);
+        if ($argc > 3) {
+            // Catchable ArgumentCountError under AOT try/catch (#30573).
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'define() expects at most 3 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if ($argc < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
-        if (\count($args) >= 3
+        if ($argc >= 3
             && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {
             throw new \LogicException('define() case_insensitive must be a boolean literal in this compiler build');
         }

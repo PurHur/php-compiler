@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7381 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23914 |
+| Source constructs flagged (warnings) | 23918 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3963,7 +3963,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/decbin.php` | 0 | 1 |
 | `ext/standard/dechex.php` | 0 | 1 |
 | `ext/standard/decoct.php` | 0 | 1 |
-| `ext/standard/define_.php` | 0 | 10 |
+| `ext/standard/define_.php` | 0 | 11 |
 | `ext/standard/defined_.php` | 0 | 1 |
 | `ext/standard/deflate_add.php` | 0 | 1 |
 | `ext/standard/deflate_init.php` | 0 | 2 |
@@ -4047,8 +4047,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ftok.php` | 0 | 3 |
 | `ext/standard/ftruncate_.php` | 0 | 1 |
 | `ext/standard/func_get_arg.php` | 0 | 3 |
-| `ext/standard/func_get_args.php` | 0 | 2 |
-| `ext/standard/func_num_args.php` | 0 | 2 |
+| `ext/standard/func_get_args.php` | 0 | 3 |
+| `ext/standard/func_num_args.php` | 0 | 3 |
 | `ext/standard/function_exists.php` | 0 | 1 |
 | `ext/standard/fwrite.php` | 0 | 1 |
 | `ext/standard/gc_collect_cycles.php` | 0 | 2 |
@@ -4059,7 +4059,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/gc_status.php` | 0 | 2 |
 | `ext/standard/generator_to_array.php` | 0 | 1 |
 | `ext/standard/get_browser.php` | 0 | 3 |
-| `ext/standard/get_called_class_.php` | 0 | 1 |
+| `ext/standard/get_called_class_.php` | 0 | 2 |
 | `ext/standard/get_cfg_var.php` | 0 | 2 |
 | `ext/standard/get_class_.php` | 0 | 2 |
 | `ext/standard/get_class_methods_.php` | 0 | 2 |
@@ -37790,15 +37790,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/define_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 121)
-- new Variable (line 124)
-- new Variable (line 128)
-- new Variable (line 164)
-- new Variable (line 166)
-- new Variable (line 171)
-- new Variable (line 188)
-- new Variable (line 196)
-- new Variable (line 205)
+- new ArgumentCountError (line 43)
+- new Variable (line 148)
+- new Variable (line 151)
+- new Variable (line 155)
+- new Variable (line 191)
+- new Variable (line 193)
+- new Variable (line 198)
+- new Variable (line 215)
+- new Variable (line 223)
+- new Variable (line 232)
 - 11 class method(s)
 
 ### `ext/standard/defined_.php`
@@ -38273,13 +38274,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/func_get_args.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 33)
+- new ArgumentCountError (line 31)
+- new Error (line 41)
 - 2 class method(s)
 
 ### `ext/standard/func_num_args.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 33)
+- new ArgumentCountError (line 31)
+- new Error (line 42)
 - 2 class method(s)
 
 ### `ext/standard/function_exists.php`
@@ -38342,6 +38345,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/get_called_class_.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 
 ### `ext/standard/get_cfg_var.php`

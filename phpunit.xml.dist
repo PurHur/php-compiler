@@ -344,6 +344,8 @@
             <file>./test/compliance/GetCalledClassExcessArgc30648JITTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647VMTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647JITTest.php</file>
+            <file>./test/compliance/DefineExcessArgc30573VMTest.php</file>
+            <file>./test/compliance/DefineExcessArgc30573JITTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583VMTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
             <file>./test/compliance/StripTagsExcessArgc30592VMTest.php</file>
