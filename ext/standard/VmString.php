@@ -1180,23 +1180,13 @@ final class VmString
         return \implode('', $chars);
     }
 
-    /** chunk_split() — chunk string and append separator after each chunk (PHP semantics). */
+    /**
+     * chunk_split() — chunk string and append separator after each chunk (PHP semantics).
+     * SSOT: {@see VmChunkSplit::chunkSplit} (NestedJIT-safe strlen/substr; #30859).
+     */
     public static function chunkSplit(string $string, int $length, string $separator = "\r\n"): string
     {
-        if ($length < 1) {
-            throw new \ValueError('chunk_split(): Argument #2 ($length) must be greater than 0');
-        }
-        $byteLen = self::byteLength($string);
-        if (0 === $byteLen) {
-            return $separator;
-        }
-        $out = '';
-        for ($i = 0; $i < $byteLen; $i += $length) {
-            $out .= self::byteSlice($string, $i, $length);
-            $out .= $separator;
-        }
-
-        return $out;
+        return VmChunkSplit::chunkSplit($string, $length, $separator);
     }
 
     /**

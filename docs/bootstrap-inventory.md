@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7415 |
-| Phase A inventory files (M2 ratio SSOT) | 7415 |
+| PHP files on vm.php path | 7416 |
+| Phase A inventory files (M2 ratio SSOT) | 7416 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24007 |
+| Source constructs flagged (warnings) | 24008 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3477,6 +3477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmCheckdate.php` | 0 | 1 |
 | `ext/standard/VmChrootNative.php` | 0 | 1 |
 | `ext/standard/VmChrootPure.php` | 0 | 1 |
+| `ext/standard/VmChunkSplit.php` | 0 | 1 |
 | `ext/standard/VmClassHas.php` | 0 | 1 |
 | `ext/standard/VmCli.php` | 0 | 1 |
 | `ext/standard/VmCliArgv.php` | 0 | 3 |
@@ -28436,7 +28437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ChunkSplitJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/ClampJitHelper.php`
 
@@ -34408,6 +34409,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/VmChunkSplit.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/VmClassHas.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36585,9 +36591,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1826)
-- new Error (line 1837)
-- new ArgumentCountError (line 3741)
+- new Error (line 1816)
+- new Error (line 1827)
+- new ArgumentCountError (line 3731)
 - 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -50021,7 +50027,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringChunkSplit.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringClassExists.php`
 
