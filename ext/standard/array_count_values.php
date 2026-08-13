@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayCountValuesRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -17,6 +18,8 @@ use PHPLLVM\Value;
  *
  * VM: {@see VmArray::countValues()}; JIT/AOT: {@see ArrayCountValuesRuntime::countValues()}
  * via call-site {@see \PHPCompiler\JIT\ArrayCountValuesLlvm} (not NestedJIT helper).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30536; php-src ext/standard/array.c).
  */
 final class array_count_values extends Internal
 {
@@ -27,9 +30,8 @@ final class array_count_values extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_count_values() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 — #30536.
+        $this->requireExactArgCount($frame, 'array_count_values', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,8 +41,9 @@ final class array_count_values extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_count_values() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30536 / peer #28229).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_count_values', 1)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
         TypeErrorRaise::ensureLinked($context);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_count_values', 1, 'array');

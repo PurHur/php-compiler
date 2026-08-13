@@ -9,12 +9,15 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayChangeKeyCaseRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * array_change_key_case() — return copy with string keys case-normalized (ASCII subset; issue #78 Phase 2).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30536; php-src ext/standard/array.c).
  */
 final class array_change_key_case extends Internal
 {
@@ -25,10 +28,9 @@ final class array_change_key_case extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 — #30536.
+        $this->requireArgCountRange($frame, 'array_change_key_case', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('array_change_key_case() requires one or two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,10 +49,11 @@ final class array_change_key_case extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('array_change_key_case() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30536 / peer #28229).
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_change_key_case', 1, 2)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
+        $argc = \count($args);
         TypeErrorRaise::ensureLinked($context);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_change_key_case', 1, 'array');
         $i64 = $context->getTypeFromString('int64');
