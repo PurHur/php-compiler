@@ -1476,6 +1476,7 @@
         "ext/mbstring/JitMbConvertCase.php",
         "ext/mbstring/JitMbDetectEncoding.php",
         "ext/mbstring/JitMbEncodingRegistry.php",
+        "ext/mbstring/JitMbEregSearch.php",
         "ext/mbstring/JitMbMimeheader.php",
         "ext/mbstring/JitMbNumericEntity.php",
         "ext/mbstring/JitMbParseStr.php",
@@ -3532,6 +3533,7 @@
         "ext/standard/VmCheckdate.php",
         "ext/standard/VmChrootNative.php",
         "ext/standard/VmChrootPure.php",
+        "ext/standard/VmChunkSplit.php",
         "ext/standard/VmClassHas.php",
         "ext/standard/VmCli.php",
         "ext/standard/VmCliArgv.php",
@@ -3850,6 +3852,7 @@
         "ext/standard/VmVarFormat.php",
         "ext/standard/VmVfscanf.php",
         "ext/standard/VmVprintf.php",
+        "ext/standard/VmWordwrap.php",
         "ext/standard/VmZendDoubleString.php",
         "ext/standard/VmZlib.php",
         "ext/standard/VmZlibArg.php",
@@ -7648,9 +7651,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7414,
+        "inventory_files": 7417,
         "excluded": 0,
-        "eligible": 7414,
+        "eligible": 7417,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7417 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24015 |
+| Source constructs flagged (warnings) | 24009 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1477,7 +1477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbScrub.php` | 0 | 1 |
 | `ext/mbstring/JitMbSearch.php` | 0 | 2 |
 | `ext/mbstring/JitMbStrPad.php` | 0 | 1 |
-| `ext/mbstring/JitMbStrSplit.php` | 0 | 2 |
+| `ext/mbstring/JitMbStrSplit.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrcut.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrlen.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrwidth.php` | 0 | 1 |
@@ -1501,7 +1501,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/VmMbstring.php` | 0 | 19 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_chr.php` | 0 | 3 |
-| `ext/mbstring/mb_convert_case.php` | 0 | 3 |
+| `ext/mbstring/mb_convert_case.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_encoding.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_kana.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_variables.php` | 0 | 3 |
@@ -1540,11 +1540,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_regex_encoding.php` | 0 | 3 |
 | `ext/mbstring/mb_regex_set_options.php` | 0 | 3 |
 | `ext/mbstring/mb_rtrim.php` | 0 | 1 |
-| `ext/mbstring/mb_scrub.php` | 0 | 2 |
+| `ext/mbstring/mb_scrub.php` | 0 | 1 |
 | `ext/mbstring/mb_send_mail.php` | 0 | 1 |
 | `ext/mbstring/mb_split.php` | 0 | 3 |
 | `ext/mbstring/mb_str_pad.php` | 0 | 3 |
-| `ext/mbstring/mb_str_split.php` | 0 | 3 |
+| `ext/mbstring/mb_str_split.php` | 0 | 2 |
 | `ext/mbstring/mb_strcut.php` | 0 | 4 |
 | `ext/mbstring/mb_strimwidth.php` | 0 | 4 |
 | `ext/mbstring/mb_stripos.php` | 0 | 4 |
@@ -1561,7 +1561,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_strwidth.php` | 0 | 2 |
 | `ext/mbstring/mb_substitute_character.php` | 0 | 3 |
 | `ext/mbstring/mb_substr.php` | 0 | 4 |
-| `ext/mbstring/mb_substr_count.php` | 0 | 2 |
+| `ext/mbstring/mb_substr_count.php` | 0 | 1 |
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/mbstring/mb_ucfirst.php` | 0 | 3 |
 | `ext/mbstring/mb_ucwords.php` | 0 | 3 |
@@ -2759,8 +2759,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 6 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateMicrosecond.php` | 0 | 3 |
-| `ext/standard/JitDateMutation.php` | 0 | 19 |
-| `ext/standard/JitDateOffsetGet.php` | 0 | 3 |
+| `ext/standard/JitDateMutation.php` | 0 | 17 |
+| `ext/standard/JitDateOffsetGet.php` | 0 | 2 |
 | `ext/standard/JitDateParse.php` | 0 | 1 |
 | `ext/standard/JitDateParseMaterializer.php` | 0 | 1 |
 | `ext/standard/JitDatePeriodConstruct.php` | 0 | 8 |
@@ -3198,8 +3198,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitTimezoneIdentifiersList.php` | 0 | 1 |
 | `ext/standard/JitTimezoneLocationGet.php` | 0 | 2 |
 | `ext/standard/JitTimezoneNameFromAbbr.php` | 0 | 1 |
-| `ext/standard/JitTimezoneNameGet.php` | 0 | 3 |
-| `ext/standard/JitTimezoneOffsetGet.php` | 0 | 3 |
+| `ext/standard/JitTimezoneNameGet.php` | 0 | 2 |
+| `ext/standard/JitTimezoneOffsetGet.php` | 0 | 2 |
 | `ext/standard/JitTimezoneOpen.php` | 0 | 3 |
 | `ext/standard/JitTimezoneProceduralArg.php` | 0 | 1 |
 | `ext/standard/JitTimezoneTransitionsGet.php` | 0 | 7 |
@@ -6649,7 +6649,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/DateTimeCreateFromImmutable.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeCreateFromInterface.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeCreateFromTimestamp.php` | 0 | 2 |
-| `lib/VM/Builtin/DateTimeDiff.php` | 0 | 2 |
+| `lib/VM/Builtin/DateTimeDiff.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeFormat.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeGetLastErrors.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeGetMicrosecond.php` | 0 | 1 |
@@ -6706,12 +6706,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/FiberSuspend.php` | 0 | 1 |
 | `lib/VM/Builtin/FiberThrow.php` | 0 | 2 |
 | `lib/VM/Builtin/GeneratorCurrent.php` | 0 | 2 |
-| `lib/VM/Builtin/GeneratorGetReturn.php` | 0 | 2 |
+| `lib/VM/Builtin/GeneratorGetReturn.php` | 0 | 3 |
 | `lib/VM/Builtin/GeneratorKey.php` | 0 | 2 |
 | `lib/VM/Builtin/GeneratorNext.php` | 0 | 2 |
 | `lib/VM/Builtin/GeneratorRewind.php` | 0 | 1 |
 | `lib/VM/Builtin/GeneratorSend.php` | 0 | 3 |
-| `lib/VM/Builtin/GeneratorThrow.php` | 0 | 2 |
+| `lib/VM/Builtin/GeneratorThrow.php` | 0 | 3 |
 | `lib/VM/Builtin/GeneratorValid.php` | 0 | 2 |
 | `lib/VM/Builtin/LazyGhostCreateLazyGhost.php` | 0 | 2 |
 | `lib/VM/Builtin/LazyGhostMarkLazyObjectAsInitialized.php` | 0 | 1 |
@@ -7067,7 +7067,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/SensitiveParameterValueDebugInfo.php` | 0 | 1 |
 | `lib/VM/Builtin/SensitiveParameterValueGetValue.php` | 0 | 1 |
 | `lib/VM/Builtin/ThrowableGetMessage.php` | 0 | 1 |
-| `lib/VM/Builtin/VmClassMethod.php` | 0 | 1 |
+| `lib/VM/Builtin/VmClassMethod.php` | 0 | 4 |
 | `lib/VM/Builtin/WeakMapConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/WeakMapCount.php` | 0 | 1 |
 | `lib/VM/Builtin/WeakMapGetIterator.php` | 0 | 1 |
@@ -18928,7 +18928,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbStrSplit.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
 - 4 class method(s)
 
 ### `ext/mbstring/JitMbStrcut.php`
@@ -19142,7 +19141,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_convert_case.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -19404,7 +19402,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_scrub.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/mbstring/mb_send_mail.php`
@@ -19429,7 +19426,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_str_split.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 35)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -19557,7 +19553,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_substr_count.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/mbstring/mb_trim.php`
@@ -29507,31 +29502,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateMutation.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 90)
-- new ArgumentCountError (line 326)
-- new ArgumentCountError (line 341)
-- new ArgumentCountError (line 465)
-- new ArgumentCountError (line 501)
-- new JITVariable (line 740)
-- new JITVariable (line 751)
-- new JITVariable (line 768)
-- new JITVariable (line 974)
-- new ArgumentCountError (line 1018)
-- new ArgumentCountError (line 1044)
-- new ArgumentCountError (line 1155)
-- new ArgumentCountError (line 1178)
-- new ArgumentCountError (line 1239)
-- new ArgumentCountError (line 1271)
-- new ArgumentCountError (line 1276)
-- new ArgumentCountError (line 1352)
-- new ArgumentCountError (line 1601)
+- new ArgumentCountError (line 91)
+- new ArgumentCountError (line 344)
+- new ArgumentCountError (line 508)
+- new JITVariable (line 792)
+- new JITVariable (line 803)
+- new JITVariable (line 820)
+- new JITVariable (line 1026)
+- new ArgumentCountError (line 1070)
+- new ArgumentCountError (line 1096)
+- new ArgumentCountError (line 1220)
+- new ArgumentCountError (line 1261)
+- new ArgumentCountError (line 1322)
+- new ArgumentCountError (line 1368)
+- new ArgumentCountError (line 1373)
+- new ArgumentCountError (line 1449)
+- new ArgumentCountError (line 1725)
 - 59 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new ArgumentCountError (line 61)
+- new ArgumentCountError (line 26)
 - 3 class method(s)
 
 ### `ext/standard/JitDateParse.php`
@@ -31899,15 +31891,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTimezoneNameGet.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new ArgumentCountError (line 41)
+- new ArgumentCountError (line 31)
 - 5 class method(s)
 
 ### `ext/standard/JitTimezoneOffsetGet.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 45)
-- new ArgumentCountError (line 63)
+- new ArgumentCountError (line 46)
 - 13 class method(s)
 
 ### `ext/standard/JitTimezoneOpen.php`
@@ -55635,7 +55625,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/DateTimeDiff.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/DateTimeFormat.php`
@@ -55945,7 +55934,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/GeneratorGetReturn.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 34)
+- new ArgumentCountError (line 29)
+- new Exception (line 42)
 - 3 class method(s)
 
 ### `lib/VM/Builtin/GeneratorKey.php`
@@ -55975,7 +55965,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/GeneratorThrow.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 31)
+- new ArgumentCountError (line 25)
+- new Variable (line 36)
 - 2 class method(s)
 
 ### `lib/VM/Builtin/GeneratorValid.php`
@@ -57868,7 +57859,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/VmClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new ArgumentCountError (line 38)
+- new ArgumentCountError (line 49)
+- new ArgumentCountError (line 52)
+- 7 class method(s)
 
 ### `lib/VM/Builtin/WeakMapConstruct.php`
 

@@ -25,13 +25,8 @@ final class JitMbStrSplit
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        // Arity checked by mb_str_split::call via requireArgCountRangeJit (#30786).
         $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_str_split() expects at least 1 argument, %d given',
-                $argc
-            ));
-        }
 
         $encoding = 'UTF-8';
         if ($argc >= 3) {

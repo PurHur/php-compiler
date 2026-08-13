@@ -16,6 +16,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_convert_case() — multibyte case conversion (php-src ext/mbstring/mbstring.c; #7014).
+ *
+ * Excess argc → Zend `expects at most` ArgumentCountError (#30786).
  */
 final class mb_convert_case extends Internal
 {
@@ -26,13 +28,9 @@ final class mb_convert_case extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity 2..3 — excess uses at-most wording (#30786).
+        $this->requireArgCountRange($frame, 'mb_convert_case', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_convert_case() expects at least 2 arguments, %d given',
-                $argc
-            ));
-        }
         // Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21313).
         $source = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_convert_case', 0, 'string');
         if (null === $frame->returnVar) {
@@ -52,9 +50,9 @@ final class mb_convert_case extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('mb_convert_case() requires two or three arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30786).
+        if (!$this->requireArgCountRangeJit($context, $args, 'mb_convert_case', 2, 3)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
 
         $folded = JitMbConvertCase::tryCompileTimeFold($context, $args);

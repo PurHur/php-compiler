@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -20,6 +21,7 @@ use PHPLLVM\Value;
  * peer #24176 / #24209 (mb_trim / mb_convert_kana family).
  *
  * JIT/AOT: {@see JitMbStrSplit} → NestedJIT {@see MbStrSplitJitHelper} (#26870).
+ * Excess argc → Zend `expects at most` ArgumentCountError (#30786).
  */
 final class mb_str_split extends Internal
 {
@@ -30,13 +32,9 @@ final class mb_str_split extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity 1..3 — excess uses at-most wording (#30786).
+        $this->requireArgCountRange($frame, 'mb_str_split', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_str_split() expects at least 1 argument, %d given',
-                $argc
-            ));
-        }
         // Zend 8.4 ZPP soft-null + DEP (not TypeError) — #24207, peer #24176.
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_str_split', 0, 'string');
         if (null === $frame->returnVar) {
@@ -57,6 +55,11 @@ final class mb_str_split extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError under AOT try/catch (#30786).
+        if (!$this->requireArgCountRangeJit($context, $args, 'mb_str_split', 1, 3)) {
+            return HashTableHelper::alloc($context);
+        }
+
         return JitMbStrSplit::invoke($context, ...$args);
     }
 }
