@@ -3628,6 +3628,7 @@ require_once __DIR__.'/../../../ext/standard/VmZlibLibzReference.php';
 require_once __DIR__.'/../../../ext/standard/VmZlibStreamFilter.php';
 require_once __DIR__.'/../../../ext/standard/VsprintfJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/WeakRefRegistryJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/VmWordwrap.php';
 require_once __DIR__.'/../../../ext/standard/WordwrapJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/XslConstants.php';
 require_once __DIR__.'/../../../ext/standard/ZendSort.php';
