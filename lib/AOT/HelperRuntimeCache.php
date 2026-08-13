@@ -155,6 +155,9 @@ final class HelperRuntimeCache
         // VmConvertUu (strlen/substr/ord/chr) into the user module (peer #30790).
         'phpcompiler\\ext\\standard\\convertuujithelper::encode' => true,
         'phpcompiler\\ext\\standard\\convertuujithelper::decodeargv' => true,
+        // #30812 — prelinked WordwrapJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
+        // VmWordwrap (strlen/substr) into the user module (peer #30790 / #30811).
+        'phpcompiler\\ext\\standard\\wordwrapjithelper::wordwrapargv' => true,
     ];
 
     private static bool $loggedHit = false;

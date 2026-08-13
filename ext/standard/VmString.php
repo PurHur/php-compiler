@@ -1199,116 +1199,14 @@ final class VmString
         return $out;
     }
 
-    /** wordwrap() — wrap string to width at spaces (PHP semantics; byte-oriented subset). */
+    /**
+     * wordwrap() — wrap string to width at spaces (PHP semantics; byte-oriented subset).
+     *
+     * SSOT: {@see VmWordwrap::wrap} (NestedJIT-safe strlen/substr; #30812).
+     */
     public static function wordwrap(string $text, int $width = 75, string $break = "\n", bool $cut = false): string
     {
-        $len = self::byteLength($text);
-        if (0 === $len) {
-            return '';
-        }
-        $breakLen = self::byteLength($break);
-        if (0 === $breakLen) {
-            // php-src string.c PHP_FUNCTION(wordwrap) — Zend "must not be empty" (#29291)
-            throw new \ValueError(self::emptyStringArgValueErrorMessage('wordwrap', 2, 'break'));
-        }
-        if (0 === $width && $cut) {
-            throw new \ValueError('wordwrap(): Argument #4 ($cut_long_words) cannot be true when argument #2 ($width) is 0');
-        }
-
-        if ($cut) {
-            if ($width < 1) {
-                return $text;
-            }
-
-            return self::wordwrapGeneral($text, $len, $width, $break, $breakLen, true);
-        }
-        if (1 === $breakLen) {
-            return self::wordwrapFastSingleByteBreak($text, $len, $width, $break[0]);
-        }
-
-        return self::wordwrapGeneral($text, $len, $width, $break, $breakLen);
-    }
-
-    /** Fast path: single-byte break, cut=false (while/continue CFG for AOT self-host). */
-    private static function wordwrapFastSingleByteBreak(string $text, int $len, int $width, string $breakByte): string
-    {
-        $chars = [];
-        for ($i = 0; $i < $len; ++$i) {
-            $chars[$i] = $text[$i];
-        }
-        $laststart = 0;
-        $lastspace = 0;
-        for ($current = 0; $current < $len; ++$current) {
-            $ch = $chars[$current];
-            if ($ch === $breakByte) {
-                $laststart = $current + 1;
-                $lastspace = $current + 1;
-            }
-            if ($ch !== $breakByte && ' ' === $ch) {
-                if ($current - $laststart >= $width) {
-                    $chars[$current] = $breakByte;
-                    $laststart = $current + 1;
-                }
-                $lastspace = $current;
-            }
-            if ($ch !== $breakByte && ' ' !== $ch && $current - $laststart >= $width && $laststart !== $lastspace) {
-                $chars[$lastspace] = $breakByte;
-                $laststart = $lastspace + 1;
-            }
-        }
-
-        return \implode('', $chars);
-    }
-
-    /** General path: multi-byte break and cut=true (php-src php_wordwrap else branch). */
-    private static function wordwrapGeneral(
-        string $text,
-        int $len,
-        int $width,
-        string $break,
-        int $breakLen,
-        bool $cut = false
-    ): string {
-        $pieces = [];
-        $laststart = 0;
-        $lastspace = 0;
-        $current = 0;
-        while ($current < $len) {
-            if ($current + $breakLen <= $len
-                && $text[$current] === $break[0]
-                && 0 === self::byteCompareN($text, $current, $break, 0, $breakLen)) {
-                $pieces[] = self::byteSlice($text, $laststart, $current - $laststart + $breakLen);
-                $current += $breakLen;
-                $laststart = $current;
-                $lastspace = $current;
-            } elseif (' ' === $text[$current]) {
-                if ($current - $laststart >= $width) {
-                    $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
-                    $pieces[] = $break;
-                    $laststart = $current + 1;
-                }
-                $lastspace = $current;
-                ++$current;
-            } elseif ($cut && $current - $laststart >= $width && $laststart >= $lastspace) {
-                $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
-                $pieces[] = $break;
-                $laststart = $lastspace = $current;
-                ++$current;
-            } elseif ($current - $laststart >= $width && $laststart < $lastspace) {
-                $pieces[] = self::byteSlice($text, $laststart, $lastspace - $laststart);
-                $pieces[] = $break;
-                $laststart = $lastspace + 1;
-                $lastspace = $laststart;
-                ++$current;
-            } else {
-                ++$current;
-            }
-        }
-        if ($laststart < $len) {
-            $pieces[] = self::byteSlice($text, $laststart, $len - $laststart);
-        }
-
-        return \implode('', $pieces);
+        return VmWordwrap::wrap($text, $width, $break, $cut ? 1 : 0);
     }
 
     private static function byteReplaceAt(string $string, int $offset, string $byte): string

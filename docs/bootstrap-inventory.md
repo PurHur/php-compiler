@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7413 |
-| Phase A inventory files (M2 ratio SSOT) | 7413 |
+| PHP files on vm.php path | 7414 |
+| Phase A inventory files (M2 ratio SSOT) | 7414 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24002 |
+| Source constructs flagged (warnings) | 24003 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3792,6 +3792,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmVarFormat.php` | 0 | 1 |
 | `ext/standard/VmVfscanf.php` | 0 | 5 |
 | `ext/standard/VmVprintf.php` | 0 | 1 |
+| `ext/standard/VmWordwrap.php` | 0 | 1 |
 | `ext/standard/VmZendDoubleString.php` | 0 | 1 |
 | `ext/standard/VmZlib.php` | 0 | 1 |
 | `ext/standard/VmZlibArg.php` | 0 | 1 |
@@ -36575,10 +36576,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1928)
-- new Error (line 1939)
-- new ArgumentCountError (line 3843)
-- 221 class method(s)
+- new Error (line 1826)
+- new Error (line 1837)
+- new ArgumentCountError (line 3741)
+- 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -36773,6 +36774,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `ext/standard/VmWordwrap.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/standard/VmZendDoubleString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36825,7 +36831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/WordwrapJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/XslConstants.php`
 
