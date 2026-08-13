@@ -18,16 +18,10 @@ final class DocumentImportNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::importNode', 1, 2);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::importNode()');
         $living = VmDomLiving::isLivingDocument($document);
         $label = $living ? 'Dom\\Document::importNode' : 'DOMDocument::importNode';
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(sprintf(
-                '%s() expects at least 1 argument, %d given',
-                $label,
-                \count($frame->calledArgs) - 1
-            ));
-        }
         $nodeVar = $frame->calledArgs[1]->resolveIndirect();
         $typeLabel = $living ? 'Dom\\Node' : 'DOMNode';
         // php-src stub: importNode(DOMNode|Dom\Node $node, …) — always $node (#30410).

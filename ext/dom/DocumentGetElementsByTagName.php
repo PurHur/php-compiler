@@ -16,10 +16,8 @@ final class DocumentGetElementsByTagName extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::getElementsByTagName', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::getElementsByTagName()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::getElementsByTagName() expects at least 1 argument');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#29959, re-#29942 / #18215).
         $name = $this->stringArg(
             $frame->calledArgs[1],

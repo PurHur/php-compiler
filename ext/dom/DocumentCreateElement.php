@@ -16,10 +16,8 @@ final class DocumentCreateElement extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::createElement', 1, 2);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createElement()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::createElement() expects at least 1 argument');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
         $name = $this->stringArg(
             $frame->calledArgs[1],

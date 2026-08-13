@@ -16,6 +16,7 @@ final class DocumentSaveHTML extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtMostUserArgCount($frame, 'DOMDocument::saveHTML', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::saveHTML()');
         [$node, $options] = $this->parseSaveNodeAndOptionsArgs($frame, 'DOMDocument::saveHTML()');
         if (null !== $frame->returnVar) {

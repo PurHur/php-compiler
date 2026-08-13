@@ -17,10 +17,8 @@ final class NodeIsSameNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::isSameNode', 1);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::isSameNode()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMNode::isSameNode() expects exactly 1 argument');
-        }
         $other = $this->otherNodeArg($frame->calledArgs[1], 'DOMNode::isSameNode()', 0);
         if (null === $frame->returnVar) {
             return;

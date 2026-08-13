@@ -17,10 +17,8 @@ final class DocumentLoadXML extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::loadXML', 1, 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::loadXML()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::loadXML() expects at least 1 argument');
-        }
         // Z_PARAM_STR: strict null → TypeError; weak null → E_DEPRECATED then '' → ValueError (#30041, #22680).
         $xml = VmString::internalMethodStringArgForFrame(
             $frame,

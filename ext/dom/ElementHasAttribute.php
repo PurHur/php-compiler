@@ -16,10 +16,8 @@ final class ElementHasAttribute extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::hasAttribute', 1);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::hasAttribute()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMElement::hasAttribute() expects at least 1 argument');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
         $name = $this->stringArg(
             $frame->calledArgs[1],

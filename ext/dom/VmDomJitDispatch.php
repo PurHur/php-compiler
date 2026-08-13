@@ -51,6 +51,7 @@ final class VmDomJitDispatch
      */
     public static function loadXML(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExtraArgCountRange('DOMDocument::loadXML', $extra, 1, 2);
         // Z_PARAM_STR: strict null → TypeError; weak → DEP + '' → ValueError (#30041 / #22680).
         $xml = self::stringArg(
             $extra[0] ?? self::missingArg('loadXML', 0),
@@ -106,6 +107,7 @@ final class VmDomJitDispatch
      */
     public static function saveXML(ObjectEntry $document, array $extra): Variable
     {
+        self::requireAtMostExtraArgCount('DOMDocument::saveXML', $extra, 2);
         $node = null;
         if (isset($extra[0])) {
             $arg = $extra[0]->resolveIndirect();
@@ -134,6 +136,7 @@ final class VmDomJitDispatch
      */
     public static function getElementById(ObjectEntry $document, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMDocument::getElementById', $extra, 1);
         // Full method label + elementId for Zend-shaped TypeError under strict_types (#29942).
         $id = self::stringArg(
             $extra[0] ?? self::missingArg('getElementById', 0),
@@ -227,6 +230,7 @@ final class VmDomJitDispatch
      */
     public static function saveHtml(ObjectEntry $document, array $extra): Variable
     {
+        self::requireAtMostExtraArgCount('DOMDocument::saveHTML', $extra, 1);
         $node = null;
         if (isset($extra[0])) {
             $first = $extra[0]->resolveIndirect();
@@ -245,6 +249,7 @@ final class VmDomJitDispatch
      */
     public static function createElement(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExtraArgCountRange('DOMDocument::createElement', $extra, 1, 2);
         $name = self::stringArg(
             $extra[0] ?? self::missingArg('createElement', 0),
             'DOMDocument::createElement',
@@ -263,6 +268,7 @@ final class VmDomJitDispatch
      */
     public static function createAttribute(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMDocument::createAttribute', $extra, 1);
         $name = self::stringArg(
             $extra[0] ?? self::missingArg('createAttribute', 0),
             'DOMDocument::createAttribute',
@@ -335,6 +341,7 @@ final class VmDomJitDispatch
      */
     public static function appendChild(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMNode::appendChild', $extra, 1);
         $child = VariableObject::entry($extra[0] ?? self::missingArg('appendChild', 0));
 
         return VmDom::appendChildVariable($ctx, $parent, $child);
@@ -443,6 +450,7 @@ final class VmDomJitDispatch
      */
     public static function importNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExtraArgCountRange('DOMDocument::importNode', $extra, 1, 2);
         $node = VariableObject::entry($extra[0] ?? self::missingArg('importNode', 0));
         $deep = false;
         if (isset($extra[1])) {
@@ -492,6 +500,7 @@ final class VmDomJitDispatch
      */
     public static function adoptNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMDocument::adoptNode', $extra, 1);
         $node = VariableObject::entry($extra[0] ?? self::missingArg('adoptNode', 0));
 
         return VmDom::adoptNode($ctx, $document, $node);
@@ -541,6 +550,7 @@ final class VmDomJitDispatch
      */
     public static function hasAttribute(ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::hasAttribute', $extra, 1);
         $name = self::stringArg(
             $extra[0] ?? self::missingArg('hasAttribute', 0),
             'DOMElement::hasAttribute',
@@ -580,6 +590,7 @@ final class VmDomJitDispatch
      */
     public static function getAttribute(ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::getAttribute', $extra, 1);
         $name = self::stringArg(
             $extra[0] ?? self::missingArg('getAttribute', 0),
             'DOMElement::getAttribute',
@@ -635,6 +646,7 @@ final class VmDomJitDispatch
      */
     public static function setAttribute(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::setAttribute', $extra, 2);
         $name = self::stringArg(
             $extra[0] ?? self::missingArg('setAttribute', 0),
             'DOMElement::setAttribute',
@@ -658,6 +670,7 @@ final class VmDomJitDispatch
      */
     public static function removeAttribute(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::removeAttribute', $extra, 1);
         $name = self::stringArg(
             $extra[0] ?? self::missingArg('removeAttribute', 0),
             'DOMElement::removeAttribute',
@@ -1098,6 +1111,7 @@ final class VmDomJitDispatch
      */
     public static function createTextNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMDocument::createTextNode', $extra, 1);
         $data = self::stringArg(
             $extra[0] ?? self::missingArg('createTextNode', 0),
             'DOMDocument::createTextNode',
@@ -1134,6 +1148,7 @@ final class VmDomJitDispatch
      */
     public static function xpathQuery(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
     {
+        self::requireExtraArgCountRange('DOMXPath::query', $extra, 1, 3);
         $expression = self::stringArg(
             $extra[0] ?? self::missingArg('query', 0),
             'DOMXPath::query',
@@ -1154,6 +1169,7 @@ final class VmDomJitDispatch
      */
     public static function xpathEvaluate(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
     {
+        self::requireExtraArgCountRange('DOMXPath::evaluate', $extra, 1, 3);
         $expression = self::stringArg(
             $extra[0] ?? self::missingArg('evaluate', 0),
             'DOMXPath::evaluate',
@@ -1174,6 +1190,7 @@ final class VmDomJitDispatch
      */
     public static function xpathRegisterNamespace(ObjectEntry $xpath, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMXPath::registerNamespace', $extra, 2);
         // Z_PARAM_STR param names from php_dom.stub.php (#30301, sibling #30041).
         $prefix = self::stringArg(
             $extra[0] ?? self::missingArg('registerNamespace', 0),
@@ -1338,6 +1355,35 @@ final class VmDomJitDispatch
         }
 
         return VmString::coerceStringBuiltinArg($var, $label, $index, 'value');
+    }
+
+
+    /** Excess/missing user argc — Zend ArgumentCountError (#30616). $extra excludes $this. */
+    private static function requireExactExtraArgCount(string $function, array $extra, int $expected): void
+    {
+        $given = \count($extra);
+        if ($given !== $expected) {
+            throw new \ArgumentCountError(DomClassMethod::exactUserArgCountMessage($function, $expected, $given));
+        }
+    }
+
+    private static function requireAtMostExtraArgCount(string $function, array $extra, int $maximum): void
+    {
+        $given = \count($extra);
+        if ($given > $maximum) {
+            throw new \ArgumentCountError(DomClassMethod::atMostUserArgCountMessage($function, $maximum, $given));
+        }
+    }
+
+    private static function requireExtraArgCountRange(string $function, array $extra, int $minimum, int $maximum): void
+    {
+        $given = \count($extra);
+        if ($given < $minimum) {
+            throw new \ArgumentCountError(DomClassMethod::atLeastUserArgCountMessage($function, $minimum, $given));
+        }
+        if ($given > $maximum) {
+            throw new \ArgumentCountError(DomClassMethod::atMostUserArgCountMessage($function, $maximum, $given));
+        }
     }
 
     private static function missingArg(string $method, int $index): Variable

@@ -16,10 +16,8 @@ final class XPathRegisterNamespace extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMXPath::registerNamespace', 2);
         $xpath = $this->xpathReceiver($frame, 'DOMXPath::registerNamespace()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMXPath::registerNamespace() expects at least 2 arguments');
-        }
         // Z_PARAM_STR: pass $frame so caller strict_types rejects null like Zend (#30301).
         $prefix = $this->stringArg(
             $frame->calledArgs[1],

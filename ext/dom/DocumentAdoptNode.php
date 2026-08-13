@@ -22,10 +22,8 @@ final class DocumentAdoptNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::adoptNode', 1);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::adoptNode()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::adoptNode() expects at least 1 argument');
-        }
         $nodeVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $nodeVar->type) {
             throw new \TypeError('DOMDocument::adoptNode(): Argument #1 ($node) must be of type DOMNode');
