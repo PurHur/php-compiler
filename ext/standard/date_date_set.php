@@ -13,7 +13,7 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Value;
 
 /**
- * date_date_set() — procedural DateTime::setDate wrapper (ext/date/php_date.c).
+ * date_date_set() — procedural DateTime::setDate wrapper (ext/date/php_date.c, JIT/AOT #30747).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_date_set)
  */
@@ -51,6 +51,6 @@ final class date_date_set extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_date_set() is VM-only in this compiler build');
+        return JitDateMutation::invokeDateSet($context, ...$args);
     }
 }

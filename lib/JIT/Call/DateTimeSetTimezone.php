@@ -158,6 +158,59 @@ final class DateTimeGetTimezone implements Call
 }
 
 /**
+ * DateTime::setDate() / DateTimeImmutable::setDate() — JIT/AOT (#30747).
+ *
+ * Defined here because DateTimeSetTimezone is always registered (all profiles).
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeObjectDateSet}
+ * php-src stub: setDate(int $year, int $month, int $day): static
+ */
+final class DateTimeSetDate implements Call
+{
+    /** Qualified name for BuiltinParamNames / named-arg resolve. */
+    public string $name;
+
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['year', 'month', 'day'];
+
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+        $this->name = $immutable ? 'DateTimeImmutable::setDate' : 'DateTime::setDate';
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeObjectDateSet($context, $this->immutable, ...$args);
+    }
+}
+
+/**
+ * DateTime::setTime() / DateTimeImmutable::setTime() — JIT/AOT (#30747).
+ *
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateMutation::invokeObjectTimeSet}
+ * php-src stub: setTime(int $hour, int $minute, int $second = 0, int $microsecond = 0): static
+ */
+final class DateTimeSetTime implements Call
+{
+    /** Qualified name for BuiltinParamNames / named-arg resolve. */
+    public string $name;
+
+    /** @var list<string> php-src ext/date/php_date.stub.php */
+    public array $paramNames = ['hour', 'minute', 'second=', 'microsecond='];
+
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+        $this->name = $immutable ? 'DateTimeImmutable::setTime' : 'DateTime::setTime';
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateMutation::invokeObjectTimeSet($context, $this->immutable, ...$args);
+    }
+}
+
+/**
  * DateTime::getOffset() / DateTimeImmutable::getOffset() — JIT/AOT (#30761).
  *
  * Defined here because DateTimeSetTimezone is always registered (all profiles).

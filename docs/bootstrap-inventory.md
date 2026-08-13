@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7392 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23945 |
+| Source constructs flagged (warnings) | 23951 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2752,7 +2752,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 6 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateMicrosecond.php` | 0 | 3 |
-| `ext/standard/JitDateMutation.php` | 0 | 14 |
+| `ext/standard/JitDateMutation.php` | 0 | 16 |
 | `ext/standard/JitDateOffsetGet.php` | 0 | 3 |
 | `ext/standard/JitDateParse.php` | 0 | 1 |
 | `ext/standard/JitDateParseMaterializer.php` | 0 | 1 |
@@ -6347,7 +6347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 193 |
+| `lib/JIT/Context.php` | 0 | 197 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -29436,20 +29436,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateMutation.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 81)
-- new ArgumentCountError (line 317)
-- new ArgumentCountError (line 332)
-- new ArgumentCountError (line 456)
-- new ArgumentCountError (line 492)
-- new JITVariable (line 731)
-- new JITVariable (line 742)
-- new JITVariable (line 759)
-- new JITVariable (line 965)
-- new ArgumentCountError (line 1009)
-- new ArgumentCountError (line 1035)
-- new ArgumentCountError (line 1146)
-- new ArgumentCountError (line 1169)
-- 41 class method(s)
+- new ArgumentCountError (line 87)
+- new ArgumentCountError (line 323)
+- new ArgumentCountError (line 338)
+- new ArgumentCountError (line 462)
+- new ArgumentCountError (line 498)
+- new JITVariable (line 737)
+- new JITVariable (line 748)
+- new JITVariable (line 765)
+- new JITVariable (line 971)
+- new ArgumentCountError (line 1015)
+- new ArgumentCountError (line 1041)
+- new ArgumentCountError (line 1152)
+- new ArgumentCountError (line 1175)
+- new ArgumentCountError (line 1236)
+- new ArgumentCountError (line 1268)
+- 51 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
 
@@ -51435,7 +51437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DateTimeSetTimezone.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Call/DateTimeZoneConstruct.php`
 
@@ -53064,49 +53066,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeGetTimestamp (line 1568)
 - new Call\DateTimeSetTimestamp (line 1569)
 - new Call\DateTimeSetTimestamp (line 1571)
-- new Call\DateTimeModify (line 1574)
-- new Call\DateTimeModify (line 1575)
-- new Call\DateTimeAdd (line 1578)
-- new Call\DateTimeAdd (line 1579)
-- new Call\DateTimeSub (line 1580)
-- new Call\DateTimeSub (line 1581)
-- new Call\DateTimeDiff (line 1583)
-- new Call\DateTimeDiff (line 1584)
-- new Call\DateTimeZoneGetTransitions (line 1586)
-- new Call\DateTimeZoneGetName (line 1588)
-- new Call\DateTimeZoneGetOffset (line 1590)
-- new Call\DateTimeZoneListIdentifiers (line 1592)
-- new Call\NumberFormatterCreate (line 1598)
-- new Call\NumberFormatterFormat (line 1599)
-- new Call\IntlDateFormatterCreate (line 1601)
-- new Call\IntlDateFormatterFormat (line 1602)
-- new Call\CollatorCompare (line 1604)
-- new Call\NormalizerNormalize (line 1606)
-- new Call\MessageFormatterConstruct (line 1608)
-- new Call\MessageFormatterFormat (line 1609)
-- new Call\TransliteratorCreate (line 1611)
-- new Call\TransliteratorTransliterate (line 1612)
-- new Call\FinfoConstruct (line 1614)
-- new Call\FinfoFile (line 1615)
-- new Call\FinfoBuffer (line 1616)
-- new Call\PdoConstruct (line 1618)
-- new Call\PdoGetAvailableDrivers (line 1619)
-- new Call\PdoQuote (line 1620)
-- new Call\DomXmlDocumentCreateFromString (line 1623)
-- new Call\DomHtmlDocumentCreateFromString (line 1624)
-- new Result (line 2001)
-- new Result (line 2023)
-- new Variable (line 2701)
-- new Variable (line 2891)
-- new Variable (line 3156)
-- new Variable (line 3214)
-- new VMVariable (line 3376)
-- new VMVariable (line 3392)
+- new Call\DateTimeSetDate (line 1574)
+- new Call\DateTimeSetDate (line 1575)
+- new Call\DateTimeSetTime (line 1576)
+- new Call\DateTimeSetTime (line 1577)
+- new Call\DateTimeModify (line 1580)
+- new Call\DateTimeModify (line 1581)
+- new Call\DateTimeAdd (line 1584)
+- new Call\DateTimeAdd (line 1585)
+- new Call\DateTimeSub (line 1586)
+- new Call\DateTimeSub (line 1587)
+- new Call\DateTimeDiff (line 1589)
+- new Call\DateTimeDiff (line 1590)
+- new Call\DateTimeZoneGetTransitions (line 1592)
+- new Call\DateTimeZoneGetName (line 1594)
+- new Call\DateTimeZoneGetOffset (line 1596)
+- new Call\DateTimeZoneListIdentifiers (line 1598)
+- new Call\NumberFormatterCreate (line 1604)
+- new Call\NumberFormatterFormat (line 1605)
+- new Call\IntlDateFormatterCreate (line 1607)
+- new Call\IntlDateFormatterFormat (line 1608)
+- new Call\CollatorCompare (line 1610)
+- new Call\NormalizerNormalize (line 1612)
+- new Call\MessageFormatterConstruct (line 1614)
+- new Call\MessageFormatterFormat (line 1615)
+- new Call\TransliteratorCreate (line 1617)
+- new Call\TransliteratorTransliterate (line 1618)
+- new Call\FinfoConstruct (line 1620)
+- new Call\FinfoFile (line 1621)
+- new Call\FinfoBuffer (line 1622)
+- new Call\PdoConstruct (line 1624)
+- new Call\PdoGetAvailableDrivers (line 1625)
+- new Call\PdoQuote (line 1626)
+- new Call\DomXmlDocumentCreateFromString (line 1629)
+- new Call\DomHtmlDocumentCreateFromString (line 1630)
+- new Result (line 2007)
+- new Result (line 2029)
+- new Variable (line 2707)
+- new Variable (line 2897)
+- new Variable (line 3162)
+- new Variable (line 3220)
+- new VMVariable (line 3382)
 - new VMVariable (line 3398)
 - new VMVariable (line 3404)
-- new VMVariable (line 3415)
-- new Variable (line 3445)
-- new Variable (line 3490)
+- new VMVariable (line 3410)
+- new VMVariable (line 3421)
+- new Variable (line 3451)
+- new Variable (line 3496)
 - 112 class method(s)
 - 32 closure(s)
 
