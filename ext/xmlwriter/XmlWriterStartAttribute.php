@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::startAttribute() — begin streaming attribute (php-src ext/xmlwriter/php_xmlwriter.c; #19820). */
+/** XMLWriter::startAttribute() — begin streaming attribute (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19820). */
 final class XmlWriterStartAttribute extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,13 +19,7 @@ final class XmlWriterStartAttribute extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::startAttribute()');
-        $argc = \count($frame->calledArgs) - 1;
-        if (1 !== $argc) {
-            throw new \ArgumentCountError(sprintf(
-                'XMLWriter::startAttribute() expects exactly 1 argument, %d given',
-                $argc
-            ));
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::startAttribute', 1);
         $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startAttribute()', 0, 'name');
         $ok = VmXmlWriter::startAttribute($entry, $name);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

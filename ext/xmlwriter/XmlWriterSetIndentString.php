@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::setIndentString() — indent unit string (php-src ext/xmlwriter/php_xmlwriter.c; #19340). */
+/** XMLWriter::setIndentString() — indent unit string (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19340). */
 final class XmlWriterSetIndentString extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,11 +19,7 @@ final class XmlWriterSetIndentString extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::setIndentString()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'XMLWriter::setIndentString() expects at least 2 arguments, '.\count($frame->calledArgs).' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::setIndentString', 1);
         $indentation = $this->stringArg(
             $frame->calledArgs[1],
             'XMLWriter::setIndentString()',

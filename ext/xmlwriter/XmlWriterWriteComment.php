@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::writeComment() — XML comment (php-src ext/xmlwriter/php_xmlwriter.c; #19340). */
+/** XMLWriter::writeComment() — XML comment (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19340). */
 final class XmlWriterWriteComment extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,11 +19,7 @@ final class XmlWriterWriteComment extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeComment()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'XMLWriter::writeComment() expects at least 2 arguments, '.\count($frame->calledArgs).' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::writeComment', 1);
         $content = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeComment()', 0, 'content');
         $ok = VmXmlWriter::writeComment($entry, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

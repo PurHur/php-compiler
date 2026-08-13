@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::writeAttributeNs() — namespaced attribute (php-src ext/xmlwriter/php_xmlwriter.c; #19371). */
+/** XMLWriter::writeAttributeNs() — namespaced attribute (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19371). */
 final class XmlWriterWriteAttributeNS extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,12 +19,7 @@ final class XmlWriterWriteAttributeNS extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeAttributeNs()');
-        $argc = \count($frame->calledArgs);
-        if ($argc !== 5) {
-            throw new \ArgumentCountError(
-                'XMLWriter::writeAttributeNs() expects exactly 5 arguments, '.$argc.' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'XMLWriter::writeAttributeNs', 4);
         $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::writeAttributeNs()', 0, 'prefix');
         $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeAttributeNs()', 1, 'name');
         $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeAttributeNs()', 2, 'uri');

@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::startDtd() — open DOCTYPE (php-src ext/xmlwriter/php_xmlwriter.c; #19386). */
+/** XMLWriter::startDtd() — open DOCTYPE (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19386). */
 final class XmlWriterStartDtd extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,12 +19,8 @@ final class XmlWriterStartDtd extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::startDtd()');
+        $this->requireUserArgCountRange($frame, 'XMLWriter::startDtd', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2) {
-            throw new \ArgumentCountError(
-                'XMLWriter::startDtd() expects at least 2 arguments, '.$argc.' given'
-            );
-        }
         $qualifiedName = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startDtd()', 0, 'qualifiedName');
         $publicId = null;
         $systemId = null;

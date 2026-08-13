@@ -369,6 +369,8 @@
             <file>./test/compliance/DomLoadHtmlNodelistExcessArgc30835JITTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641VMTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641JITTest.php</file>
+            <file>./test/compliance/XmlWriterExcessArgc30818VMTest.php</file>
+            <file>./test/compliance/XmlWriterExcessArgc30818JITTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648VMTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648JITTest.php</file>
             <file>./test/compliance/ReflectionEnumExcessArgc30865VMTest.php</file>

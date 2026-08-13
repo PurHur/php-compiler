@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::writeDtd() — one-shot DOCTYPE (php-src ext/xmlwriter/php_xmlwriter.c; #19386). */
+/** XMLWriter::writeDtd() — one-shot DOCTYPE (php-src ext/xmlwriter/php_xmlwriter.c; #30818; #19386). */
 final class XmlWriterWriteDtd extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,12 +19,8 @@ final class XmlWriterWriteDtd extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeDtd()');
+        $this->requireUserArgCountRange($frame, 'XMLWriter::writeDtd', 1, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2) {
-            throw new \ArgumentCountError(
-                'XMLWriter::writeDtd() expects at least 2 arguments, '.$argc.' given'
-            );
-        }
         $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtd()', 0, 'name');
         $publicId = null;
         $systemId = null;

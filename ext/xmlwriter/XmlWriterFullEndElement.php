@@ -21,6 +21,7 @@ final class XmlWriterFullEndElement extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::fullEndElement()');
+        $this->requireExactUserArgCount($frame, 'XMLWriter::fullEndElement', 0);
         $ok = VmXmlWriter::fullEndElement($entry);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
