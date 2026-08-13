@@ -375,6 +375,8 @@
             <file>./test/compliance/FilterIdExcessArgc30594JITTest.php</file>
             <file>./test/compliance/IsPredicatesExcessArgc30687VMTest.php</file>
             <file>./test/compliance/IsPredicatesExcessArgc30687JITTest.php</file>
+            <file>./test/compliance/GetResourceTypeExcessArgc30707VMTest.php</file>
+            <file>./test/compliance/GetResourceTypeExcessArgc30707JITTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690VMTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690JITTest.php</file>
             <file>./test/compliance/StreamFileExcessArgc30721VMTest.php</file>
