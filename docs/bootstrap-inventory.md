@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7401 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23978 |
+| Source constructs flagged (warnings) | 23982 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5406,7 +5406,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayValueBoxJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastObjectFromHashtableJit.php` | 0 | 4 |
-| `lib/JIT/Builtin/CastObjectValueBoxJit.php` | 0 | 4 |
+| `lib/JIT/Builtin/CastObjectValueBoxJit.php` | 0 | 6 |
 | `lib/JIT/Builtin/CheckdateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CheckdnsrrRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ChownRuntime.php` | 0 | 1 |
@@ -6343,7 +6343,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CastArrayNativeJit.php` | 0 | 2 |
 | `lib/JIT/CastArrayShared.php` | 0 | 3 |
 | `lib/JIT/CastHelper.php` | 0 | 1 |
-| `lib/JIT/CastObjectNativeJit.php` | 0 | 2 |
+| `lib/JIT/CastObjectNativeJit.php` | 0 | 4 |
 | `lib/JIT/CastUnsetJit.php` | 0 | 2 |
 | `lib/JIT/ClassConstFetchHelperTrait.php` | 0 | 4 |
 | `lib/JIT/ClassConstVisibilityJitGuard.php` | 0 | 2 |
@@ -36150,7 +36150,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 37)
 - new Variable (line 105)
 - new Error (line 358)
-- new ObjectEntry (line 395)
+- new ObjectEntry (line 396)
 - 17 class method(s)
 
 ### `ext/standard/VmShellExecNative.php`
@@ -47888,16 +47888,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 72)
 - new Variable (line 84)
-- new Variable (line 104)
+- new Variable (line 115)
 - 7 class method(s)
 
 ### `lib/JIT/Builtin/CastObjectValueBoxJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 76)
-- new Variable (line 80)
-- new Variable (line 105)
-- 1 class method(s)
+- new Variable (line 84)
+- new Variable (line 112)
+- new Variable (line 128)
+- new Variable (line 155)
+- new Variable (line 166)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/CheckdateRuntime.php`
 
@@ -51148,7 +51150,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 6943)
 - new Variable (line 6976)
 - new Variable (line 6999)
-- new Variable (line 7400)
+- new Variable (line 7409)
 - 299 class method(s)
 - 8 closure(s)
 
@@ -52883,8 +52885,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CastObjectNativeJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 24)
-- 1 class method(s)
+- new Variable (line 49)
+- new Variable (line 82)
+- new Variable (line 98)
+- 3 class method(s)
 
 ### `lib/JIT/CastUnsetJit.php`
 
@@ -53733,12 +53737,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/IssetHelperLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 337)
-- new Variable (line 364)
-- new Variable (line 378)
-- new Variable (line 405)
-- new Variable (line 417)
-- new Variable (line 427)
+- new Variable (line 333)
+- new Variable (line 360)
+- new Variable (line 374)
+- new Variable (line 401)
+- new Variable (line 413)
+- new Variable (line 423)
 - 12 class method(s)
 
 ### `lib/JIT/IteratorHelper.php`
@@ -58432,17 +58436,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 21)
 - new Variable (line 84)
 - new Variable (line 99)
-- new ObjectEntry (line 118)
-- new Variable (line 151)
+- new ObjectEntry (line 119)
 - new Variable (line 153)
-- new Variable (line 163)
-- new Variable (line 167)
-- new Variable (line 175)
-- new Variable (line 179)
-- new HashTable (line 208)
-- new Variable (line 210)
-- new Variable (line 272)
-- new Variable (line 312)
+- new Variable (line 155)
+- new Variable (line 165)
+- new Variable (line 169)
+- new Variable (line 177)
+- new Variable (line 181)
+- new HashTable (line 210)
+- new Variable (line 212)
+- new Variable (line 274)
+- new Variable (line 314)
 - 10 class method(s)
 
 ### `lib/VM/ClassAbstract.php`
