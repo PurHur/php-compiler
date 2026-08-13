@@ -9,17 +9,21 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitResourceArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** flock() — VM via VmFs; JIT/AOT via __compiler_flock (issue #3141, php-src ext/standard/flock.c). */
+/**
+ * flock() — VM via VmFs; JIT/AOT via __compiler_flock (issue #3141, php-src ext/standard/flock.c).
+ *
+ * Excess argc → Zend ArgumentCountError (#30583; php-src ext/standard/file.c).
+ */
 final class flock extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('flock() requires at least two arguments in this compiler build');
-        }
+        // php-src stub arity: 2..3 — #30583.
+        $this->requireArgCountRange($frame, 'flock', 2, 3);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $operationVar = $frame->calledArgs[1]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'flock');
@@ -41,8 +45,11 @@ final class flock extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException('flock() requires at least two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30583).
+        if (!$this->requireArgCountRangeJit($context, $args, 'flock', 2, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         JitResourceArg::rejectEnumCaseOperand($context, $args[0], 'flock', 0, 'stream');
         if (JitFlock::isCompileTimeNullOperation($args[1])) {
