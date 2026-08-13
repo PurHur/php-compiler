@@ -8,7 +8,7 @@ use PHPCompiler\ext\hash\HashAlgosJitHelper;
 use PHPCompiler\ext\standard\HashAlgosRegistry;
 use PHPUnit\Framework\TestCase;
 
-/** hash_algos JIT: NestedJIT-safe HashAlgosRegistry list — no registry kernel (#14909, #20652, #28750). */
+/** hash_algos JIT: NestedJIT-safe inline list — no registry kernel (#14909, #20652, #28750, #30794). */
 final class StringHashAlgosRuntimeShrinkTest extends TestCase
 {
     public function testStringHashAlgosAlwaysUsesHelperBridge(): void
@@ -28,7 +28,11 @@ final class StringHashAlgosRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_hash_algos_kernel', $runtime);
 
         $helper = (string) file_get_contents(__DIR__.'/../../ext/hash/HashAlgosJitHelper.php');
-        $this->assertStringContainsString('HashAlgosRegistry::ALL_ALGOS', $helper);
+        // Cross-dir class const is NestedJIT-unsafe under thin AOT (#30794).
+        $this->assertStringNotContainsString('HashAlgosRegistry::ALL_ALGOS', $helper);
+        $this->assertStringNotContainsString('use PHPCompiler\\ext\\standard\\HashAlgosRegistry', $helper);
+        $this->assertStringContainsString("'md2'", $helper);
+        $this->assertStringContainsString("'haval256,5'", $helper);
         $this->assertStringContainsString('algosArgv(): array', $helper);
         $this->assertStringNotContainsString('phpc_hash_algos_kernel', $helper);
         $this->assertStringNotContainsString('JitHashAlgosKernel', $helper);

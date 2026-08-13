@@ -363,6 +363,8 @@
             <file>./test/compliance/StreamFileExcessArgc30584JITTest.php</file>
             <file>./test/compliance/DomExcessArgc30616VMTest.php</file>
             <file>./test/compliance/DomExcessArgc30616JITTest.php</file>
+            <file>./test/compliance/DomChildNodeRemoveExcessArgc30814VMTest.php</file>
+            <file>./test/compliance/DomChildNodeRemoveExcessArgc30814JITTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641VMTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641JITTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648VMTest.php</file>
@@ -504,6 +506,7 @@
             <file>./test/aot/TimezoneAbbreviationsListAotTest.php</file>
             <file>./test/aot/SessionCookieCachePathAotTest.php</file>
             <file>./test/aot/DirFactoryAotTest.php</file>
+            <file>./test/aot/MbChrOrdAotTest.php</file>
             <file>./test/aot/DateIsodateSetAotTest.php</file>
             <file>./test/aot/DateTimeGetOffsetAotTest.php</file>
             <file>./test/aot/DateTimeCreateFromInterfaceAotTest.php</file>

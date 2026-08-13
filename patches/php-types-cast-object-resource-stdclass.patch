@@ -1,22 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -351,7 +351,12 @@
-         if ($resolved->contains($op->expr)) {
-             $exprType = $resolved[$op->expr];
-             if ($exprType instanceof Type && $exprType->type === Type::TYPE_OBJECT) {
--                return [$resolved[$op->expr]];
-+                // VM Resource wrappers are TYPE_OBJECT but Zend IS_RESOURCE - (object) still
-+                // yields stdClass::$scalar (#30793, zend_operators.c convert_to_object).
-+                $user = strtolower(ltrim((string) ($exprType->userType ?? ''), '\\'));
-+                if ('resource' !== $user) {
-+                    return [$resolved[$op->expr]];
-+                }
-             }
- 
-             return [new Type(Type::TYPE_OBJECT, [], 'stdClass')];
---- prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-+++ prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -408,7 +408,12 @@
+@@ -461,7 +461,12 @@ class TypeReconstructor
          if ($resolved->contains($op->expr)) {
              $exprType = $resolved[$op->expr];
              if ($exprType instanceof Type && $exprType->type === Type::TYPE_OBJECT) {

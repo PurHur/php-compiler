@@ -362,6 +362,35 @@ abstract class DomClassMethod extends VmClassMethod
     }
 
     /**
+     * ChildNode::remove() ArgumentCountError class::method — Zend stub declaring class (#30814).
+     *
+     * Legacy Element → DOMElement::remove; Text/Comment/CDATA → DOMCharacterData::remove.
+     * Living CharacterData uses @implementation-alias DOMElement::remove (php_dom.stub.php).
+     *
+     * @internal Shared with VmDomJitDispatch::childNodeRemove.
+     */
+    public static function childNodeRemoveFunction(ObjectEntry $node): string
+    {
+        if (VmDom::isCharacterData($node)) {
+            $lc = strtolower($node->class->name);
+            if (str_starts_with($lc, 'dom\\')) {
+                return 'DOMElement::remove';
+            }
+
+            return 'DOMCharacterData::remove';
+        }
+        if (VmDom::isElement($node)) {
+            if (VmDomLiving::isLivingElement($node)) {
+                return $node->class->name.'::remove';
+            }
+
+            return 'DOMElement::remove';
+        }
+
+        return $node->class->name.'::remove';
+    }
+
+    /**
      * Exact user arity → Zend ArgumentCountError (#30616; php-src stubs).
      *
      * $function is Class::method without trailing "()".

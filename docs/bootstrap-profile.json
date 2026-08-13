@@ -1472,6 +1472,7 @@
         "ext/mailparse/mailparse_uudecode_all.php",
         "ext/mbstring/EastAsianWidthTable.php",
         "ext/mbstring/JitMbCheckEncoding.php",
+        "ext/mbstring/JitMbChrOrd.php",
         "ext/mbstring/JitMbConvertCase.php",
         "ext/mbstring/JitMbDetectEncoding.php",
         "ext/mbstring/JitMbMimeheader.php",
@@ -7640,9 +7641,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7406,
+        "inventory_files": 7407,
         "excluded": 0,
-        "eligible": 7406,
+        "eligible": 7407,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

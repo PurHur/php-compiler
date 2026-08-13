@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7406 |
-| Phase A inventory files (M2 ratio SSOT) | 7406 |
+| PHP files on vm.php path | 7407 |
+| Phase A inventory files (M2 ratio SSOT) | 7407 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23992 |
+| Source constructs flagged (warnings) | 23993 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1466,6 +1466,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mailparse/mailparse_uudecode_all.php` | 0 | 2 |
 | `ext/mbstring/EastAsianWidthTable.php` | 0 | 1 |
 | `ext/mbstring/JitMbCheckEncoding.php` | 0 | 1 |
+| `ext/mbstring/JitMbChrOrd.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
 | `ext/mbstring/JitMbDetectEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbMimeheader.php` | 0 | 1 |
@@ -9322,11 +9323,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 373)
-- new ArgumentCountError (line 384)
-- new ArgumentCountError (line 395)
-- new ArgumentCountError (line 398)
-- 17 class method(s)
+- new ArgumentCountError (line 402)
+- new ArgumentCountError (line 413)
+- new ArgumentCountError (line 424)
+- new ArgumentCountError (line 427)
+- 18 class method(s)
 
 ### `ext/dom/DomCompareDocumentPositionJitHelper.php`
 
@@ -11267,51 +11268,51 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 380)
 - new Variable (line 392)
 - new Variable (line 404)
-- new Variable (line 430)
-- new Variable (line 442)
-- new ArgumentCountError (line 527)
-- new ArgumentCountError (line 532)
-- new Variable (line 560)
-- new Variable (line 582)
-- new Variable (line 601)
-- new Variable (line 624)
-- new Variable (line 680)
-- new Variable (line 738)
-- new Variable (line 770)
-- new Variable (line 797)
-- new ArgumentCountError (line 811)
-- new Variable (line 815)
-- new Variable (line 827)
-- new Variable (line 839)
-- new Variable (line 851)
-- new Error (line 865)
-- new Error (line 877)
-- new Variable (line 880)
-- new Error (line 899)
-- new Variable (line 911)
-- new Variable (line 929)
-- new Error (line 946)
-- new Variable (line 962)
-- new Variable (line 985)
-- new Variable (line 1006)
-- new Variable (line 1033)
-- new ArgumentCountError (line 1048)
-- new Error (line 1061)
-- new Variable (line 1063)
-- new Variable (line 1089)
-- new Variable (line 1101)
-- new Variable (line 1121)
-- new Variable (line 1133)
-- new Variable (line 1207)
-- new Variable (line 1219)
-- new Variable (line 1236)
-- new Variable (line 1261)
-- new Variable (line 1303)
-- new ArgumentCountError (line 1366)
-- new ArgumentCountError (line 1374)
-- new ArgumentCountError (line 1382)
-- new ArgumentCountError (line 1385)
-- new ArgumentCountError (line 1391)
+- new Variable (line 432)
+- new Variable (line 444)
+- new ArgumentCountError (line 529)
+- new ArgumentCountError (line 534)
+- new Variable (line 562)
+- new Variable (line 584)
+- new Variable (line 603)
+- new Variable (line 626)
+- new Variable (line 682)
+- new Variable (line 740)
+- new Variable (line 772)
+- new Variable (line 799)
+- new ArgumentCountError (line 813)
+- new Variable (line 817)
+- new Variable (line 829)
+- new Variable (line 841)
+- new Variable (line 853)
+- new Error (line 867)
+- new Error (line 879)
+- new Variable (line 882)
+- new Error (line 901)
+- new Variable (line 913)
+- new Variable (line 931)
+- new Error (line 948)
+- new Variable (line 964)
+- new Variable (line 987)
+- new Variable (line 1008)
+- new Variable (line 1035)
+- new ArgumentCountError (line 1050)
+- new Error (line 1063)
+- new Variable (line 1065)
+- new Variable (line 1091)
+- new Variable (line 1103)
+- new Variable (line 1123)
+- new Variable (line 1135)
+- new Variable (line 1209)
+- new Variable (line 1221)
+- new Variable (line 1238)
+- new Variable (line 1263)
+- new Variable (line 1305)
+- new ArgumentCountError (line 1368)
+- new ArgumentCountError (line 1376)
+- new ArgumentCountError (line 1384)
+- new ArgumentCountError (line 1387)
+- new ArgumentCountError (line 1393)
 - 75 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
@@ -18850,6 +18851,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/mbstring/JitMbChrOrd.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/mbstring/JitMbConvertCase.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19101,7 +19107,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_chr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 34)
 - 3 class method(s)
 - 2 closure(s)
 
@@ -19321,7 +19327,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_ord.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 34)
 - 3 class method(s)
 - 2 closure(s)
 
