@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -75,10 +76,35 @@ final class SplFixedArrayJitHelper
      */
     public static function compileFromArray(Context $context, JITVariable ...$args): Value
     {
-        if ([] === $args) {
-            throw new \ArgumentCountError(
+        $argc = \count($args);
+        // Static — user argc is frame argc (#30836; zim_SplFixedArray_fromArray).
+        if (0 === $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
                 'SplFixedArray::fromArray() expects at least 1 argument, 0 given'
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'splfixedarray_fromarray_argc_cont');
+            $out = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $out)
+            );
+
+            return $out;
+        }
+        if ($argc > 2) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('SplFixedArray::fromArray() expects at most 2 arguments, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'splfixedarray_fromarray_argc_cont');
+            $out = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $out)
+            );
+
+            return $out;
         }
         $classId = $context->type->object->lookup(self::CLASS_NAME);
         $obj = $context->type->object->allocate($classId);

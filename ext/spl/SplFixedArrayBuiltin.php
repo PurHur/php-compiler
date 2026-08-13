@@ -580,9 +580,16 @@ final class SplFixedArrayFromArray extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
+        $argc = \count($frame->calledArgs);
+        // Static method — frame args are user args only (#30836; zim_SplFixedArray_fromArray).
+        if ($argc < 1) {
             throw new \ArgumentCountError(
                 'SplFixedArray::fromArray() expects at least 1 argument, 0 given'
+            );
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(
+                \sprintf('SplFixedArray::fromArray() expects at most 2 arguments, %d given', $argc)
             );
         }
         $ctx = $frame->vmContext;
@@ -615,6 +622,8 @@ final class SplFixedArrayToArray extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::toArray()'
         );
+        // User arity excludes $this (#30836; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, 'SplFixedArray::toArray', 0);
         $result = new Variable(Variable::TYPE_ARRAY);
         $result->array(SplFixedArrayBuiltin::toArray($object));
         SplIteratorSupport::copyReturnFrom($frame, $result);
@@ -685,12 +694,8 @@ final class SplFixedArraySetSize extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::setSize()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplFixedArray::setSize() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // User arity excludes $this (#30836; zim_SplFixedArray_setSize).
+        $this->requireExactUserArgCount($frame, 'SplFixedArray::setSize', 1);
         $size = VmMath::parseIntBuiltinArg(
             $frame->calledArgs[1],
             'SplFixedArray::setSize',
