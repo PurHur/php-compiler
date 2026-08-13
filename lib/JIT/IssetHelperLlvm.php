@@ -200,17 +200,13 @@ final class IssetHelperLlvm
         }
         if (Variable::TYPE_OBJECT === $container->type && null === $container->objectPropertySlot) {
             $propName = VmIsset::literalStringKey($dimOp);
-            // Enum tryFrom()/from() temps may lack a precise userType; still probe name/value (#27666).
-            $hasObjectType = null !== $containerOp
-                && null !== $containerOp->type
-                && Type::TYPE_OBJECT === $containerOp->type->type;
-            if (
-                null !== $propName
-                && (
-                    $hasObjectType
-                    || \PHPCompiler\VM\EnumCasePropertyJitHelper::isBuiltinPropertyName(strtolower($propName))
-                )
-            ) {
+            // Literal isset($obj->prop): always use propertyIsSet. Cast temps like (object)$resource
+            // often lack PHPTypes userType; the hashtable fallback wrongly yields false (#30793).
+            // Enum tryFrom()/from() temps similarly lack userType for name/value (#27666).
+            if (null !== $propName) {
+                $hasObjectType = null !== $containerOp
+                    && null !== $containerOp->type
+                    && Type::TYPE_OBJECT === $containerOp->type->type;
                 $class = $hasObjectType ? ($containerOp->type->userType ?? '') : '';
                 $objPtr = Variable::KIND_VALUE === $container->kind
                     ? $container->value

@@ -89,7 +89,7 @@ final class CastSupport
     }
 
     /**
-     * (object) cast — Zend convert_to_object / cast_object (zend_operators.c, #30098).
+     * (object) cast — Zend convert_to_object / cast_object (zend_operators.c, #30098, #30793).
      *
      * @param array<string, ClassEntry>|null $classesByLc
      */
@@ -98,7 +98,8 @@ final class CastSupport
         $src = $src->resolveIndirect();
         $result = new Variable();
 
-        if (Variable::TYPE_OBJECT === $src->type) {
+        // VM Resource wrappers are TYPE_OBJECT but Zend IS_RESOURCE — wrap as stdClass.scalar (#30793).
+        if (Variable::TYPE_OBJECT === $src->type && !ResourceSupport::isVmResource($src)) {
             $result->copyFrom($src);
 
             return $result;
@@ -128,7 +129,8 @@ final class CastSupport
                 );
             }
         } elseif (Variable::TYPE_NULL !== $src->type) {
-            // IS_FALSE/IS_TRUE/IS_LONG/IS_DOUBLE/IS_STRING → stdClass.scalar; IS_NULL stays empty.
+            // IS_FALSE/IS_TRUE/IS_LONG/IS_DOUBLE/IS_STRING/IS_RESOURCE → stdClass.scalar;
+            // IS_NULL stays empty (zend_operators.c convert_to_object, #30098 / #30793).
             $object->allocateProperty('scalar')->copyFrom($src);
         }
 

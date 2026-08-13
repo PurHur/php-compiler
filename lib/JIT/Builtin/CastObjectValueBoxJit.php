@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -16,7 +17,7 @@ use PHPLLVM\Builder;
 /**
  * (object) cast from boxed TYPE_VALUE operands (#10046).
  *
- * php-src: Zend/zend_operators.c — cast_object
+ * php-src: Zend/zend_operators.c — cast_object (#30098, #30793).
  */
 final class CastObjectValueBoxJit
 {
@@ -72,8 +73,11 @@ final class CastObjectValueBoxJit
         $context->builder->branchIf($isNull, $nullBlock, $scalarBlock);
 
         $context->builder->positionAtEnd($objectBlock);
-        $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
-        $objectResult = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        // Resource wrappers are TYPE_OBJECT — wrap as stdClass.scalar like Zend IS_RESOURCE.
+        // Copy the original value-box ($src) so thin AOT keeps the same handle representation
+        // fopen produced (isset/is_resource parity) (#30793).
+        $objectResult = self::emitObjectOrResourceWrap($context, $src, $valuePtr);
+        $objectEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
@@ -84,26 +88,91 @@ final class CastObjectValueBoxJit
             $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr)
         );
         $arrayResult = CastObjectFromHashtableJit::emit($context, $htVar, $block, $op);
+        $arrayEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($nullBlock);
         $nullResult = CastObjectFromHashtableJit::emitEmptyStdClass($context);
+        $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($scalarBlock);
         $scalarResult = CastObjectFromHashtableJit::emitScalarStdClass($context, $src);
+        $scalarEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($objectResult->value->typeOf());
-        $phi->addIncoming($objectResult->value, $objectBlock);
-        $phi->addIncoming($arrayResult->value, $arrayBlock);
-        $phi->addIncoming($nullResult->value, $nullBlock);
-        $phi->addIncoming($scalarResult->value, $scalarBlock);
+        $phi->addIncoming($objectResult->value, $objectEnd);
+        $phi->addIncoming($arrayResult->value, $arrayEnd);
+        $phi->addIncoming($nullResult->value, $nullEnd);
+        $phi->addIncoming($scalarResult->value, $scalarEnd);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $result = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $phi);
 
         return $result;
+    }
+
+    /**
+     * Real objects keep identity; Resource class wraps via stdClass.scalar from $src box (#30793).
+     */
+    private static function emitObjectOrResourceWrap(
+        Context $context,
+        Variable $src,
+        \PHPLLVM\Value $valuePtr
+    ): Variable {
+        $resourceClassId = self::resourceClassIdIfRegistered($context);
+        $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        if (null === $resourceClassId) {
+            return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        }
+
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $isResource = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $context->constantFromInteger($resourceClassId, 'int64')
+        );
+
+        $resourceBlock = BasicBlockHelper::append($context, 'cast_object_vb_res_wrap');
+        $plainBlock = BasicBlockHelper::append($context, 'cast_object_vb_res_plain');
+        $mergeBlock = BasicBlockHelper::append($context, 'cast_object_vb_res_merge');
+        $doneBlock = BasicBlockHelper::append($context, 'cast_object_vb_res_done');
+
+        $context->builder->branchIf($isResource, $resourceBlock, $plainBlock);
+
+        $context->builder->positionAtEnd($resourceBlock);
+        // Keep original box contents (handle + flags), not a re-boxed object* (#30793 AOT).
+        $wrapped = CastObjectFromHashtableJit::emitScalarStdClass($context, $src);
+        $resourceEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($plainBlock);
+        $plain = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($wrapped->value->typeOf());
+        $phi->addIncoming($wrapped->value, $resourceEnd);
+        $phi->addIncoming($plain->value, $plainEnd);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+
+        return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $phi);
+    }
+
+    private static function resourceClassIdIfRegistered(Context $context): ?int
+    {
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            return null;
+        }
+
+        return $object->lookup('resource');
     }
 }

@@ -56,6 +56,9 @@ patch_already_applied() {
     php-types-cast-object.patch)
       grep -q 'exprType instanceof Type' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-cast-object-resource-stdclass.patch)
+      grep -q 'VM Resource wrappers are TYPE_OBJECT but Zend IS_RESOURCE' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     php-types-cast-unset.patch)
       grep -q 'resolveOp_Expr_Cast_Unset' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -6962,6 +6965,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
+  apply_patch "$PATCH_DIR/php-types-cast-object-resource-stdclass.patch"
   apply_patch "$PATCH_DIR/php-types-cast-unset.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_php_types_hex2bin_strict_overlay

@@ -84,7 +84,7 @@ final class CastObjectFromHashtableJit
         return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objVal);
     }
 
-    /** Zend convert_to_object on scalars — stdClass with public scalar property (#30098). */
+    /** Zend convert_to_object on scalars / resources — stdClass with public scalar (#30098, #30793). */
     public static function emitScalarStdClass(Context $context, Variable $src): Variable
     {
         CastArrayShared::ensureInsertBlock($context, 'cast_object_scalar_stdclass');
@@ -98,7 +98,18 @@ final class CastObjectFromHashtableJit
         BasicBlockHelper::ensureOpenInsertBlock($context, 'cast_object_scalar_after_alloc');
         $object->markObjectConstructed($objVal);
         $slot = $object->propertySlotFor($objVal, 'stdClass', 'scalar');
-        $object->propertyStore($slot, $src, Variable::TYPE_VALUE);
+        if (Variable::TYPE_VALUE === $src->type) {
+            // Point the property slot at the operand value box (cast consumes it) — same
+            // pattern as hashtable→object (#26818 / #30793).
+            $valuePtr = \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $src);
+            $voidPtr = $context->getTypeFromString('void*');
+            $context->builder->store(
+                $context->builder->pointerCast($valuePtr, $voidPtr),
+                $slot
+            );
+        } else {
+            $object->propertyStore($slot, $src, Variable::TYPE_VALUE);
+        }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'cast_object_scalar_done');
 
         return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objVal);
@@ -149,13 +160,8 @@ final class CastObjectFromHashtableJit
 
     private static function operandSlot(Block $block, Operand $target): ?int
     {
-        foreach ($block->scope as $operand => $slot) {
-            if ($operand === $target) {
-                return $slot;
-            }
-        }
-
-        return null;
+        // Block::$scope is private — use the public accessor (#30793 AOT fatal).
+        return $block->slotForOperand($target);
     }
 
     private static function literalKeyFromSlot(Block $block, int $keySlot): ?string
