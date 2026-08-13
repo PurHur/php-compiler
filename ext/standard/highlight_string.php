@@ -14,16 +14,17 @@ use PHPLLVM\Value;
 /**
  * highlight_string() — syntax-highlighted PHP as HTML (VM: HighlightEngine, #4824).
  *
- * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.c PHP_FUNCTION(highlight_string)
+ * Excess/missing argc → Zend ArgumentCountError (#30723; php-src ext/standard/url_scanner_ex.re).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/url_scanner_ex.re PHP_FUNCTION(highlight_string)
  */
 final class highlight_string extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30723; ext/standard/basic_functions.stub.php).
+        $this->requireArgCountRange($frame, 'highlight_string', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('highlight_string() expects 1 or 2 arguments in this compiler build');
-        }
         $code = VmString::stringBuiltinArgForFrame(
             $frame,
             0,
@@ -49,9 +50,9 @@ final class highlight_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('highlight_string() expects 1 or 2 arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30723).
+        if (!$this->requireArgCountRangeJit($context, $args, 'highlight_string', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20262).
         // Emit TypeError+abort without linking highlight helper (AOT IR; #20658 pattern).
