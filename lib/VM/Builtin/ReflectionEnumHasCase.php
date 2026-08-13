@@ -18,8 +18,13 @@ final class ReflectionEnumHasCase extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionEnum::hasCase() expects exactly 1 argument');
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (exactly 1)
+        $userArgCount = \count($frame->calledArgs) - 1;
+        if (1 !== $userArgCount) {
+            throw new \ArgumentCountError(\sprintf(
+                'ReflectionEnum::hasCase() expects exactly 1 argument, %d given',
+                $userArgCount
+            ));
         }
         $receiver = ReflectionSupport::requireReflectionEnum($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
