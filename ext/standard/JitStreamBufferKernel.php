@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -15,6 +18,12 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Quarantined from lib/JIT/Builtin/StreamBufferRuntime — {@see \PHPCompiler\JIT\Builtin\StreamBufferRuntime}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
  * (peer StreamMode #22968 / StreamFilter #21041).
+ *
+ * Thin user-script AOT: {@see implementThinWriteReadBuffers} — NestedJIT {@see StreamBufferJitHelper}
+ * → {@see VmFs} never sees {@see \PHPCompiler\JIT\Builtin\StreamGlobalsJit} slots that
+ * {@see JitStreamIoKernel} fopen fills (peer {@see JitStreamMetaThinAot} / #30787 gzwrite).
+ * php-src streamsfuncs.c returns EOF (-1) when set_option is NOTIMPL for write buffer on
+ * plainfile; read buffer returns 0 (#30788).
  *
  * SSOT: {@see StreamBufferJitHelper}
  * php-src: main/streams/streams.c — php_stream_set_chunk_size / set_option buffer+timeout
@@ -54,48 +63,144 @@ final class JitStreamBufferKernel
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            // Avoid NestedJIT/VmFs under thin AOT — helper statics never see libc fopen slots (#30788).
+            self::implementThinStandaloneBuffers($context);
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $savedBlock = null;
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
+            self::ensureJitHelperCompiled($context);
+            self::implementIfMissing(
+                $context,
+                '__compiler_stream_set_chunk_size',
+                static function (Context $ctx, LlvmFunction $fn): void {
+                    self::implementI64I64Bridge($ctx, $fn, self::SET_CHUNK_SIZE);
+                }
+            );
+            self::implementIfMissing($context, '__compiler_stream_set_timeout', self::implementTimeoutBridge(...));
+            self::implementIfMissing(
+                $context,
+                '__compiler_stream_set_write_buffer',
+                static function (Context $ctx, LlvmFunction $fn): void {
+                    self::implementI64I64Bridge($ctx, $fn, self::SET_WRITE_BUFFER);
+                }
+            );
+            self::implementIfMissing(
+                $context,
+                '__compiler_stream_set_read_buffer',
+                static function (Context $ctx, LlvmFunction $fn): void {
+                    self::implementI64I64Bridge($ctx, $fn, self::SET_READ_BUFFER);
+                }
+            );
+            self::registerLinkedRuntime($context);
+        } finally {
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
+    }
+
+    /**
+     * Thin AOT stream_set_* returns — match Zend plainfile/memory set_option shape (#30788).
+     *
+     * php-src `ext/standard/streamsfuncs.c`: write/read use `RETURN_LONG(ret == 0 ? 0 : EOF)`.
+     * Plainfile WRITE_BUFFER is NOTIMPL → EOF (-1); READ_BUFFER / timeout return 0 on this profile.
+     * Chunk size returns prior default 8192 (php_stream chunk_size init).
+     */
+    private static function implementThinStandaloneBuffers(Context $context): void
+    {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        try {
+            self::implementThinConstantReturn(
+                $context,
+                '__compiler_stream_set_write_buffer',
+                'int64',
+                -1,
+                'sswb_thin',
+                2
+            );
+            self::implementThinConstantReturn(
+                $context,
+                '__compiler_stream_set_read_buffer',
+                'int64',
+                0,
+                'ssrb_thin',
+                2
+            );
+            self::implementThinConstantReturn(
+                $context,
+                '__compiler_stream_set_chunk_size',
+                'int64',
+                8192,
+                'sscs_thin',
+                2
+            );
+            self::implementThinConstantReturn(
+                $context,
+                '__compiler_stream_set_timeout',
+                'int32',
+                0,
+                'sst_thin',
+                3
+            );
+        } finally {
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
+    }
+
+    private static function implementThinConstantReturn(
+        Context $context,
+        string $name,
+        string $retType,
+        int $constant,
+        string $prefix,
+        int $argc
+    ): void {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0 && !StreamIoRuntime::isDeferStub($probe)) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        if (null !== $probe && StreamIoRuntime::isDeferStub($probe)) {
+            foreach (\array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
         }
 
-        self::ensureJitHelperCompiled($context);
-        self::implementIfMissing(
-            $context,
-            '__compiler_stream_set_chunk_size',
-            static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementI64I64Bridge($ctx, $fn, self::SET_CHUNK_SIZE);
-            }
-        );
-        self::implementIfMissing($context, '__compiler_stream_set_timeout', self::implementTimeoutBridge(...));
-        self::implementIfMissing(
-            $context,
-            '__compiler_stream_set_write_buffer',
-            static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementI64I64Bridge($ctx, $fn, self::SET_WRITE_BUFFER);
-            }
-        );
-        self::implementIfMissing(
-            $context,
-            '__compiler_stream_set_read_buffer',
-            static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementI64I64Bridge($ctx, $fn, self::SET_READ_BUFFER);
-            }
-        );
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        $i64 = $context->getTypeFromString('int64');
+        $ret = $context->getTypeFromString($retType);
+        $params = [];
+        for ($i = 0; $i < $argc; ++$i) {
+            $params[] = $i64;
         }
+        $ft = $context->context->functionType($ret, false, ...$params);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($name, $ft);
+        $entry = $fn->appendBasicBlock($prefix.'_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret->constInt($constant, true));
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     /**
@@ -104,10 +209,15 @@ final class JitStreamBufferKernel
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0 && !StreamIoRuntime::isDeferStub($probe)) {
             $context->registerFunction($name, $probe);
 
             return;
+        }
+        if (null !== $probe && StreamIoRuntime::isDeferStub($probe)) {
+            foreach (\array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
         }
 
         $fn = self::declareFunction($context, $name);
@@ -192,7 +302,7 @@ final class JitStreamBufferKernel
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            if (null === $fn || 0 === $fn->countBasicBlocks() || StreamIoRuntime::isDeferStub($fn)) {
                 return false;
             }
         }
@@ -204,7 +314,7 @@ final class JitStreamBufferKernel
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            if (null === $fn || 0 === $fn->countBasicBlocks() || StreamIoRuntime::isDeferStub($fn)) {
                 throw new \LogicException($name.' missing after JitStreamBufferKernel bridge (#14462)');
             }
             $context->registerFunction($name, $fn);

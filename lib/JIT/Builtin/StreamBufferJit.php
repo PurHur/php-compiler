@@ -36,7 +36,8 @@ final class StreamBufferJit
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            // Inventory defer stubs (`entry` only) must not count as linked (#30788 / peer #19462).
+            if (null === $fn || 0 === $fn->countBasicBlocks() || StreamIoRuntime::isDeferStub($fn)) {
                 return false;
             }
         }
@@ -48,7 +49,7 @@ final class StreamBufferJit
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
+            if (null === $fn || 0 === $fn->countBasicBlocks() || StreamIoRuntime::isDeferStub($fn)) {
                 throw new \LogicException($name.' missing after StreamBufferJit dispatch (#14462)');
             }
             $context->registerFunction($name, $fn);

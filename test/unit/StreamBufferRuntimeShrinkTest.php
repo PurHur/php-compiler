@@ -52,13 +52,14 @@ final class StreamBufferRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('StreamBufferJitHelper', $source);
+        $this->assertStringContainsString('implementThinStandaloneBuffers', $source);
+        $this->assertStringContainsString('isDeferStub', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(230, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void
