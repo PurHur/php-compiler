@@ -27,10 +27,9 @@ final class idate extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 — #30543 (ext/date/php_date.c).
+        $this->requireArgCountRange($frame, 'idate', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('idate() requires one or two arguments');
-        }
         $format = self::resolveFormatArg($frame);
         if (1 !== \strlen($format)) {
             $this->triggerWarning($frame, self::MSG_FORMAT_ONE_CHAR);
@@ -64,10 +63,11 @@ final class idate extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('idate() requires one or two arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30543).
+        if (!$this->requireArgCountRangeJit($context, $args, 'idate', 1, 2)) {
+            return $context->constantFromInteger(0, 'int64');
         }
+        $argc = \count($args);
         $timestamp = null;
         if (2 === $argc) {
             $timestamp = $args[1];
