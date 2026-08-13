@@ -13,11 +13,16 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** php_uname() — operating system identification (ext/standard/info.c parity, issue #3174). */
+/**
+ * php_uname() — operating system identification (ext/standard/info.c parity, issue #3174).
+ *
+ * Excess argc → Zend ArgumentCountError (#30537; php-src ext/standard/basic_functions.c).
+ */
 final class php_uname extends Internal
 {
     public function __construct()
@@ -27,10 +32,9 @@ final class php_uname extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 0..1 — #30537.
+        $this->requireArgCountRange($frame, 'php_uname', 0, 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('php_uname() accepts at most one argument');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -54,8 +58,11 @@ final class php_uname extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('php_uname() accepts at most one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30537 / peer #30536).
+        if (!$this->requireArgCountRangeJit($context, $args, 'php_uname', 0, 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         if (!isset($args[0])) {
             return JitInfo::php_uname($context, null);
