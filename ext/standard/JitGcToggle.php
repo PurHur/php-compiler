@@ -57,8 +57,16 @@ final class JitGcToggle
 
     public static function isEnabled(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('gc_enabled() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            // Catchable ArgumentCountError (#30653); dummy int1 matches success-path icmp.
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'gc_enabled() expects exactly 0 arguments, '.$argc.' given'
+            );
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         GcToggleRuntime::ensureLinked($context);
         $enabled = $context->builder->call($context->lookupFunction('phpc_gc_is_enabled'));
