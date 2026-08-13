@@ -9,10 +9,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908, #19355, #20050, #20652, #28750).
+ * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908, #19355, #20050, #20652, #28750, #30794).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (password_algos #9908 / nextafter #28716 shape).
- * NestedJIT no longer needs a registry kernel — helper returns {@see \PHPCompiler\ext\standard\HashAlgosRegistry}.
+ * NestedJIT-safe inline list in {@see \PHPCompiler\ext\hash\HashAlgosJitHelper} — not cross-dir
+ * {@see \PHPCompiler\ext\standard\HashAlgosRegistry} class consts (#30794).
  * SSOT for VM: {@see \PHPCompiler\ext\standard\VmHash::hmacAlgos()}
  * php-src: ext/hash/hash.c — php_hash_hmac_algos()
  */
