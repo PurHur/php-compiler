@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -15,9 +16,8 @@ final class readlink extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('readlink() requires exactly one argument in this compiler build');
-        }
+        // php-src link.c / basic_functions.stub.php — exactly 1 (#30553).
+        $this->requireExactArgCount($frame, 'readlink', 1);
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'readlink', 0, 'path', $frame);
         if (null === $frame->returnVar) {
             return;
@@ -37,8 +37,11 @@ final class readlink extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('readlink() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30553 / peer #30551).
+        if (!$this->requireExactJitArgCount($context, $args, 'readlink', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'readlink', 0, 'path');
 
