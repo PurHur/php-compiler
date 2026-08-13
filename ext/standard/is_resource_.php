@@ -24,6 +24,8 @@ use PHPLLVM\Value;
  *
  * VM: {@see Variable::streamHandle()} tags fopen() results so plain integers stay false.
  * JIT/AOT: {@see __compiler_is_resource} checks the native stream handle table.
+ *
+ * Excess argc → Zend ArgumentCountError (#30687; php-src Zend/zend_builtin_functions.c).
  */
 final class is_resource_ extends Internal
 {
@@ -34,9 +36,8 @@ final class is_resource_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('is_resource() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 (#30687; Zend/zend_builtin_functions.c).
+        $this->requireExactArgCount($frame, 'is_resource', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -46,8 +47,9 @@ final class is_resource_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('is_resource() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30687 / peer #30653).
+        if (!$this->requireExactJitArgCount($context, $args, 'is_resource', 1)) {
+            return $context->constantFromBool(false);
         }
         if (0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
             return $context->constantFromBool(false);

@@ -27,14 +27,15 @@ use PHPLLVM\Value;
  * is_numeric() — Zend ext/standard/basic_functions.c parity (#5244).
  *
  * Returns false for arrays, objects, and resources without throwing.
+ *
+ * Excess argc → Zend ArgumentCountError (#30687; php-src Zend/zend_builtin_functions.c).
  */
 final class is_numeric extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('is_numeric() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 (#30687; Zend/zend_builtin_functions.c).
+        $this->requireExactArgCount($frame, 'is_numeric', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -47,8 +48,9 @@ final class is_numeric extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('is_numeric() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30687 / peer #30653).
+        if (!$this->requireExactJitArgCount($context, $args, 'is_numeric', 1)) {
+            return $context->constantFromBool(false);
         }
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
