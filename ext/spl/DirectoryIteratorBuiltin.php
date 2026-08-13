@@ -523,6 +523,8 @@ final class DirectoryIteratorIsDot extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::isDot()'
         );
+        // User arity excludes $this (#30837; zim_DirectoryIterator_isDot).
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::isDot', 0);
         SplIteratorSupport::setReturnBool($frame, DirectoryIteratorStorage::isDot($object));
     }
 }
