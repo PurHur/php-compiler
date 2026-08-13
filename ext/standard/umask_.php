@@ -20,10 +20,9 @@ final class umask_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src filestat.c / basic_functions.stub.php — at most 1 (#30554).
+        $this->requireAtMostArgCount($frame, 'umask', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('umask() accepts at most one argument in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,8 +43,9 @@ final class umask_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('umask() accepts at most one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30554 / peer #30551).
+        if (!$this->requireAtMostJitArgCount($context, $args, 'umask', 1)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $mask = null;
         if (isset($args[0])) {

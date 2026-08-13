@@ -336,6 +336,8 @@
             <file>./test/compliance/DiskSpaceExcessArgc30552JITTest.php</file>
             <file>./test/compliance/LinkUploadExcessArgc30553VMTest.php</file>
             <file>./test/compliance/LinkUploadExcessArgc30553JITTest.php</file>
+            <file>./test/compliance/FilestatBatchExcessArgc30554VMTest.php</file>
+            <file>./test/compliance/FilestatBatchExcessArgc30554JITTest.php</file>
             <file>./test/compliance/ArrayChangeKeyCaseCountValuesExcessArgc30536VMTest.php</file>
             <file>./test/compliance/ArrayChangeKeyCaseCountValuesExcessArgc30536JITTest.php</file>
             <file>./test/compliance/InfoUnameExtensionsGetrusageExcessArgc30537VMTest.php</file>

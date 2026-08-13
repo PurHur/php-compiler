@@ -22,10 +22,9 @@ final class fnmatch extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src fnmatch.c / basic_functions.stub.php — 2..3 (#30554).
+        $this->requireArgCountRange($frame, 'fnmatch', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('fnmatch() requires two or three arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,10 +43,11 @@ final class fnmatch extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('fnmatch() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30554 / peer #30551).
+        if (!$this->requireArgCountRangeJit($context, $args, 'fnmatch', 2, 3)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        $argc = \count($args);
         $i32 = $context->getTypeFromString('int32');
         $flags = $i32->constInt(0, false);
         if (3 === $argc) {

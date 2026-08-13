@@ -21,9 +21,8 @@ final class chown_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('chown() requires exactly two arguments in this compiler build');
-        }
+        // php-src filestat.c / basic_functions.stub.php — exactly 2 (#30554).
+        $this->requireExactArgCount($frame, 'chown', 2);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'chown');
         $userVar = VmFilestatArg::requireIntOrStringArgForFrame($frame, 1, 'chown', 'user');
         if (null === $frame->returnVar) {
@@ -38,8 +37,9 @@ final class chown_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('chown() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30554 / peer #30551).
+        if (!$this->requireExactJitArgCount($context, $args, 'chown', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'chown');
         $userPtr = JitFilestatArg::valuePtrAfterIntOrStringGuard($context, $args[1], 'chown', 1, 'user');
