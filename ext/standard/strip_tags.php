@@ -18,15 +18,16 @@ use PHPLLVM\Value;
 
 /**
  * strip_tags() for strings (subset of PHP; JIT/AOT via __string__strip_tags).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30592; php-src ext/standard/string.c).
  */
 final class strip_tags extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 — #30592.
+        $this->requireArgCountRange($frame, 'strip_tags', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('strip_tags() requires one or two arguments in this compiler build');
-        }
         $subject = self::vmStringArg($frame, 0, 'string');
         $allowed = null;
         if (2 === $argc) {
@@ -40,10 +41,11 @@ final class strip_tags extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('strip_tags() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30592).
+        if (!$this->requireArgCountRangeJit($context, $args, 'strip_tags', 1, 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $allowed = 2 === $argc ? $args[1] : null;
 
         $subjectArg = $args[0];
