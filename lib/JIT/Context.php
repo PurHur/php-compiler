@@ -1916,6 +1916,8 @@ class Context {
             $emitInStandaloneMain(fn () => $this->builder->call($this->initFunc));
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_init'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                // php-src zend_reset_lc_ctype_locale — idle nl_langinfo(CODESET) → UTF-8 (#30789).
+                $emitInStandaloneMain(fn () => Builtin\LocaleStartupRuntime::emitResetLcCtypeForStandaloneMain($this));
                 // Thin user-script AOT still needs pending Error clear/abort for final/readonly
                 // property writes (#23665, #3149). Session/header resets stay full-init only.
                 if (!$this->isThinStandaloneAotMain()) {
