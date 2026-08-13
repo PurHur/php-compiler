@@ -1574,7 +1574,9 @@ require_once __DIR__.'/../../../ext/phar/VmPharTar.php';
 require_once __DIR__.'/../../../ext/posix/JitPosix.php';
 require_once __DIR__.'/../../../ext/posix/PosixGetpidJitHelper.php';
 require_once __DIR__.'/../../../ext/posix/PosixGetppidJitHelper.php';
+require_once __DIR__.'/../../../ext/posix/PosixGetuidJitHelper.php';
 require_once __DIR__.'/../../../ext/posix/JitPosixGetppidKernel.php';
+require_once __DIR__.'/../../../ext/posix/JitPosixGetuidKernel.php';
 require_once __DIR__.'/../../../ext/posix/JitPosixTimes.php';
 require_once __DIR__.'/../../../ext/posix/Module.php';
 require_once __DIR__.'/../../../ext/posix/PosixConstants.php';
@@ -5442,6 +5444,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessIdentityJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PosixGetpidJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PosixGetppidJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/PosixGetuidJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpen.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpenEmbedBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpenJit.php';
