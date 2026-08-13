@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -20,9 +21,8 @@ final class json_last_error_msg_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (0 !== \count($frame->calledArgs)) {
-            throw new \LogicException('json_last_error_msg() takes no arguments');
-        }
+        // php-src stub arity: exactly 0 (#30591; ext/json/json.c / json.stub.php).
+        $this->requireExactArgCount($frame, 'json_last_error_msg', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -31,8 +31,11 @@ final class json_last_error_msg_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (0 !== \count($args)) {
-            throw new \LogicException('json_last_error_msg() takes no arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30591 / peer #30525).
+        if (!$this->requireExactJitArgCount($context, $args, 'json_last_error_msg', 0)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitJsonLastErrorMsg::invoke($context);
