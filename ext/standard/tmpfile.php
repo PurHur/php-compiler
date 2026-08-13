@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -21,9 +22,8 @@ final class tmpfile extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (0 !== \count($frame->calledArgs)) {
-            throw new \LogicException('tmpfile() takes no arguments in this compiler build');
-        }
+        // php-src stub arity: exactly 0 (#30676; ext/standard/file.stub.php).
+        $this->requireExactArgCount($frame, 'tmpfile', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -38,8 +38,11 @@ final class tmpfile extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (0 !== \count($args)) {
-            throw new \LogicException('tmpfile() takes no arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30676).
+        if (!$this->requireExactJitArgCount($context, $args, 'tmpfile', 0)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitTmpfile::invoke($context);

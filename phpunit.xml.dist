@@ -356,6 +356,8 @@
             <file>./test/compliance/GetCalledClassExcessArgc30648JITTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653VMTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653JITTest.php</file>
+            <file>./test/compliance/SessionDestroyTmpfileExcessArgc30676VMTest.php</file>
+            <file>./test/compliance/SessionDestroyTmpfileExcessArgc30676JITTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647VMTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647JITTest.php</file>
             <file>./test/compliance/DefineExcessArgc30573VMTest.php</file>
