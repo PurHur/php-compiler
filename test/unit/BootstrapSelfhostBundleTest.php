@@ -163,6 +163,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitChroot.php',
         'ext/standard/ProcNiceJitHelper.php',
         'ext/standard/JitProcNice.php',
+        'ext/standard/GetmypidJitHelper.php',
+        'ext/standard/JitGetmypidKernel.php',
         'ext/standard/GethostnameJitHelper.php',
         'ext/standard/JitGethostname.php',
         'ext/standard/JitGethostnameKernel.php',

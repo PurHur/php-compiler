@@ -1006,6 +1006,10 @@ class Context {
             // time NestedJIT leaf (#30332) — whitelist time → time::call →
             // StringTime::invoke / JitTimeKernel thin libc time(2) leaf.
             'time',
+            // getmypid NestedJIT leaf (#30623) — whitelist getmypid → getmypid::call →
+            // ProcessIdentityJit::getmypid / JitGetmypidKernel thin libc getpid(2) leaf
+            // (former always-on ProcessIdentityJit getpid LLVM; peer time #30332).
+            'getmypid',
             // fnmatch(3) NestedJIT leaf (#30383) — whitelist fnmatch → fnmatch::call →
             // StringFnmatch::invokeNestedLeaf (module-local fnmatch(3); always-on Module decl removed).
             'fnmatch',

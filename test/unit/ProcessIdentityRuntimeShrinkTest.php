@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * ProcessIdentityJit: always JitVmHelperLink::ensureCompiled — no hand-rolled NestedJit putenv (#21259).
+ * ProcessIdentityJit: getmyuid/gid via ensureCompiled; getmypid via ensureBridge (#21259, #30623).
  */
 final class ProcessIdentityRuntimeShrinkTest extends TestCase
 {
@@ -16,11 +16,14 @@ final class ProcessIdentityRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessIdentityJit.php');
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('ProcessIdentityJitHelper', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('GetmypidJitHelper', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringNotContainsString("putenv('PHP_COMPILER_SELFHOST_AOT", $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString("lookupFunction('getpid')", $source);
     }
 
     public function testJitDateStillRoutesThroughProcessIdentityJit(): void
