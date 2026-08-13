@@ -16,12 +16,7 @@ final class JitStreamContextGetParams
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException(
-                'stream_context_get_params() requires exactly one argument in this compiler build'
-            );
-        }
-
+        // Arity checked by stream_context_get_params::call via requireExactJitArgCount (#30584).
         StreamContextRuntime::ensureLinked($context);
 
         $ctxHt = self::loadContextArray($context, $args[0]);

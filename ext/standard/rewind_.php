@@ -8,11 +8,16 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** rewind() — VM via VmFs; JIT/AOT via __compiler_rewind (issue #3579). */
+/**
+ * rewind() — VM via VmFs; JIT/AOT via __compiler_rewind (issue #3579).
+ *
+ * Excess argc → Zend ArgumentCountError (#30584; php-src ext/standard/file.c).
+ */
 final class rewind_ extends Internal
 {
     public function __construct()
@@ -22,9 +27,8 @@ final class rewind_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('rewind() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 — #30584.
+        $this->requireExactArgCount($frame, 'rewind', 1);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'rewind');
         if (null === $frame->returnVar) {
@@ -35,8 +39,11 @@ final class rewind_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('rewind() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30584).
+        if (!$this->requireExactJitArgCount($context, $args, 'rewind', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitRewind::invoke(

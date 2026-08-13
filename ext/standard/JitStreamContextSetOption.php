@@ -16,12 +16,8 @@ final class JitStreamContextSetOption
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        // Arity checked by stream_context_set_option::call via requireArgCountRangeJit (#30584).
         $argc = \count($args);
-        if (2 !== $argc && 4 !== $argc) {
-            throw new \LogicException(
-                'stream_context_set_option() requires two or four arguments in this compiler build'
-            );
-        }
 
         StreamContextRuntime::ensureLinked($context);
 
@@ -36,9 +32,16 @@ final class JitStreamContextSetOption
                 $optHt
             );
         } else {
+            // 3 or 4 args: singular form; omitted value is null (#30584 / php-src stub).
             $wrapperVal = self::loadValuePointer($context, $args[1], 2);
             $optionVal = self::loadValuePointer($context, $args[2], 3);
-            $valueVal = self::loadValuePointer($context, $args[3], 4);
+            if (4 === $argc) {
+                $valueVal = self::loadValuePointer($context, $args[3], 4);
+            } else {
+                $nullSlot = JitValueBox::alloc($context);
+                $valueVal = JitValueBox::pointer($context, $nullSlot);
+                $context->builder->call($context->lookupFunction('__value__writeNull'), $valueVal);
+            }
             $context->builder->call(
                 $context->lookupFunction('__phpc_stream_context_set_single_option'),
                 $ctxHt,

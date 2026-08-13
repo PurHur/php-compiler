@@ -334,6 +334,8 @@
             <file>./test/compliance/ArrayChangeKeyCaseCountValuesExcessArgc30536JITTest.php</file>
             <file>./test/compliance/InfoUnameExtensionsGetrusageExcessArgc30537VMTest.php</file>
             <file>./test/compliance/InfoUnameExtensionsGetrusageExcessArgc30537JITTest.php</file>
+            <file>./test/compliance/StreamFileExcessArgc30584VMTest.php</file>
+            <file>./test/compliance/StreamFileExcessArgc30584JITTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageVMTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>

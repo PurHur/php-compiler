@@ -17,12 +17,8 @@ final class JitStreamContextCreate
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        // Arity checked by stream_context_create::call via requireArgCountRangeJit (#30584).
         $argc = \count($args);
-        if ($argc > 2) {
-            throw new \LogicException(
-                'stream_context_create() accepts at most two arguments in this compiler build'
-            );
-        }
 
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $nullHt = $htPtrTy->constNull();

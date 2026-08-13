@@ -8,10 +8,15 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** fseek() — VM via VmFs; JIT/AOT via __compiler_fseek (issue #1191). */
+/**
+ * fseek() — VM via VmFs; JIT/AOT via __compiler_fseek (issue #1191).
+ *
+ * Excess argc → Zend ArgumentCountError (#30584; php-src ext/standard/file.c).
+ */
 final class fseek extends Internal
 {
     public function __construct()
@@ -21,10 +26,9 @@ final class fseek extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 2..3 — #30584.
+        $this->requireArgCountRange($frame, 'fseek', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('fseek() requires two or three arguments in this compiler build');
-        }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fseek');
         if (null === $frame->returnVar) {
@@ -40,10 +44,13 @@ final class fseek extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('fseek() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30584).
+        if (!$this->requireArgCountRangeJit($context, $args, 'fseek', 2, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $args[0], 'fseek() handle'),
