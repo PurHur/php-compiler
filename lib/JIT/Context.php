@@ -962,6 +962,9 @@ class Context {
             // chroot(2) NestedJIT leaf (#30558) — whitelist chroot → chroot_::call →
             // StringChroot::invokeNestedLeaf (module-local chroot(2); always-on Module decl removed).
             'chroot',
+            // proc_nice NestedJIT leaf (#30615) — whitelist proc_nice → proc_nice::call →
+            // StringProcNice::invokeNestedLeaf (module-local nice(3); always-on JitProcNice LLVM removed).
+            'proc_nice',
             // getcwd(2) NestedJIT leaf (#29429) — whitelist getcwd → getcwd_::call →
             // GetcwdJit::invokeNestedLeaf (module-local getcwd(2); always-on realpath LLVM removed).
             'getcwd',

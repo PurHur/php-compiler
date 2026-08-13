@@ -9,11 +9,11 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** proc_nice() — process priority (php-src ext/standard/basic_functions.c; #5181). */
+/** proc_nice() — VM via VmProcNicePure; JIT/AOT via ProcNiceJitHelper (#5181, #30615). */
 final class proc_nice extends Internal
 {
     public function __construct()
@@ -51,13 +51,15 @@ final class proc_nice extends Internal
                 $context,
                 'proc_nice() expects exactly 1 argument, '.$argc.' given'
             );
-            $slot = JitValueBox::alloc($context);
 
-            return JitValueBox::pointer($context, $slot);
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         JitInternalStrictArg::requireInt($context, $args[0], 'proc_nice', 'priority', 1);
 
-        return JitProcNice::invoke($context, $args[0]);
+        return JitProcNice::invoke(
+            $context,
+            JitLongArg::lower($context, $args[0], 'proc_nice() priority')
+        );
     }
 }

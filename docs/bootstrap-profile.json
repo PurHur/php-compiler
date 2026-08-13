@@ -3335,6 +3335,7 @@
         "ext/standard/PregQuoteJitHelper.php",
         "ext/standard/PregReplacementExpand.php",
         "ext/standard/PrintRJitHelper.php",
+        "ext/standard/ProcNiceJitHelper.php",
         "ext/standard/ProcessExecCaptureNativeJitHelper.php",
         "ext/standard/ProcessIdentityJitHelper.php",
         "ext/standard/ProcessJitHelper.php",
@@ -5965,6 +5966,7 @@
         "lib/JIT/Builtin/StringPregMatchJit.php",
         "lib/JIT/Builtin/StringPregQuote.php",
         "lib/JIT/Builtin/StringPrintR.php",
+        "lib/JIT/Builtin/StringProcNice.php",
         "lib/JIT/Builtin/StringPropertyExists.php",
         "lib/JIT/Builtin/StringQuotPrint.php",
         "lib/JIT/Builtin/StringQuotemeta.php",
@@ -7610,9 +7612,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7376,
+        "inventory_files": 7378,
         "excluded": 0,
-        "eligible": 7376,
+        "eligible": 7378,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
