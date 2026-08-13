@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7413 |
-| Phase A inventory files (M2 ratio SSOT) | 7413 |
+| PHP files on vm.php path | 7414 |
+| Phase A inventory files (M2 ratio SSOT) | 7414 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24002 |
+| Source constructs flagged (warnings) | 24006 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1469,6 +1469,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbChrOrd.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
 | `ext/mbstring/JitMbDetectEncoding.php` | 0 | 1 |
+| `ext/mbstring/JitMbEncodingRegistry.php` | 0 | 3 |
 | `ext/mbstring/JitMbMimeheader.php` | 0 | 1 |
 | `ext/mbstring/JitMbNumericEntity.php` | 0 | 1 |
 | `ext/mbstring/JitMbParseStr.php` | 0 | 1 |
@@ -1529,7 +1530,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_internal_encoding.php` | 0 | 3 |
 | `ext/mbstring/mb_language.php` | 0 | 3 |
 | `ext/mbstring/mb_lcfirst.php` | 0 | 3 |
-| `ext/mbstring/mb_list_encodings.php` | 0 | 1 |
+| `ext/mbstring/mb_list_encodings.php` | 0 | 2 |
 | `ext/mbstring/mb_ltrim.php` | 0 | 1 |
 | `ext/mbstring/mb_ord.php` | 0 | 3 |
 | `ext/mbstring/mb_output_handler.php` | 0 | 3 |
@@ -18875,6 +18876,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/mbstring/JitMbEncodingRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 45)
+- 4 class method(s)
+
 ### `ext/mbstring/JitMbMimeheader.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19188,7 +19196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_encoding_aliases.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/mbstring/mb_ereg.php`
@@ -19326,6 +19334,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_list_encodings.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/mbstring/mb_ltrim.php`
@@ -30509,33 +30518,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitJsonEncodeCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JsonException (line 118)
-- new stdClass (line 197)
-- new JsonException (line 214)
-- new VmVariable (line 343)
-- new VmVariable (line 362)
-- new HashTable (line 380)
-- new VmVariable (line 382)
-- new VmVariable (line 386)
-- new HashTable (line 444)
-- new VmVariable (line 446)
-- new VmVariable (line 452)
-- new VmVariable (line 456)
-- new VmVariable (line 579)
-- new VmVariable (line 606)
-- new VmVariable (line 638)
-- new VmVariable (line 672)
-- new VmVariable (line 710)
-- new VmVariable (line 776)
-- new VmVariable (line 810)
-- new VmVariable (line 838)
-- new VmVariable (line 872)
-- new VmVariable (line 895)
-- new VmVariable (line 903)
-- new VmVariable (line 1089)
-- new VmVariable (line 1097)
-- new VmVariable (line 1105)
-- 35 class method(s)
+- new JsonException (line 125)
+- new stdClass (line 204)
+- new JsonException (line 221)
+- new VmVariable (line 350)
+- new VmVariable (line 369)
+- new HashTable (line 424)
+- new VmVariable (line 426)
+- new VmVariable (line 430)
+- new HashTable (line 527)
+- new VmVariable (line 529)
+- new VmVariable (line 535)
+- new VmVariable (line 539)
+- new VmVariable (line 662)
+- new VmVariable (line 689)
+- new VmVariable (line 721)
+- new VmVariable (line 755)
+- new VmVariable (line 793)
+- new VmVariable (line 859)
+- new VmVariable (line 893)
+- new VmVariable (line 921)
+- new VmVariable (line 955)
+- new VmVariable (line 978)
+- new VmVariable (line 986)
+- new VmVariable (line 1172)
+- new VmVariable (line 1180)
+- new VmVariable (line 1188)
+- 40 class method(s)
 
 ### `ext/standard/JitJsonLastError.php`
 

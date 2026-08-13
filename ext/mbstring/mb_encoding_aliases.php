@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mb_encoding_aliases() — encoding alias list (php-src ext/mbstring/mbstring.c; #13100). */
+/**
+ * mb_encoding_aliases() — encoding alias list (php-src ext/mbstring/mbstring.c; #13100, #30795).
+ *
+ * JIT/AOT: compile-time fold via {@see JitMbEncodingRegistry} (peer mb_detect_order / pdo_drivers).
+ */
 final class mb_encoding_aliases extends Internal
 {
     public function __construct()
@@ -50,8 +54,6 @@ final class mb_encoding_aliases extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_encoding_aliases() JIT is not supported in this compiler build'
-        );
+        return JitMbEncodingRegistry::foldEncodingAliases($context, ...$args);
     }
 }
