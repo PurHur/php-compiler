@@ -64,6 +64,19 @@ final class ScopeBuiltinRuntime
         self::ensureCompactCollectLinked($context);
         self::ensureStoreSnapshotLinked($context);
         self::ensureMatchNamedVarLinked($context);
+        self::ensureCompactWarningBridgesLinked($context);
+    }
+
+    /** Prefetch compact warning ABIs before CFG splits (#30778). */
+    public static function ensureCompactWarningBridgesLinked(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            self::ensureJitHelperCompiled($context);
+
+            return;
+        }
+        self::ensureCompactInvalidArgWarnStandaloneLinked($context);
+        self::ensureCompactUndefWarnStandaloneLinked($context);
     }
 
     public static function resolveExtractTargetName(
@@ -304,14 +317,28 @@ final class ScopeBuiltinRuntime
     private static function cstrToStringPtr(Context $context, Value $namePtr): Value
     {
         $i64 = $context->getTypeFromString('int64');
+        // constantFromString yields [N x i8]*; strlen/__string__init need i8* (#30778).
+        $i8p = $context->bytePtr($namePtr);
 
         return $context->builder->call(
             $context->lookupFunction('__string__init'),
             $context->builder->zExt(
-                $context->builder->call($context->lookupFunction('strlen'), $namePtr),
+                $context->builder->call($context->lookupFunction('strlen'), $i8p),
                 $i64
             ),
-            $namePtr
+            $i8p
+        );
+    }
+
+    /** Compile-time name → `__string__*` without relocating the builder (#30778). */
+    private static function literalNameToStringPtr(Context $context, string $name): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($name), false),
+            $context->pointerFromStringConstant($name)
         );
     }
 
@@ -324,9 +351,10 @@ final class ScopeBuiltinRuntime
         }
 
         self::ensureJitHelperCompiled($context);
+        // NestedJIT helper takes string → `__string__*` ABI (peer FromCstr / #30778).
         $context->builder->call(
             self::helperFunction($context, self::COMPACT_UNDEF_HELPER),
-            $context->constantFromString($name)
+            self::literalNameToStringPtr($context, $name)
         );
     }
 
@@ -394,9 +422,10 @@ final class ScopeBuiltinRuntime
     private static function emitStandaloneCompactUndefinedWarning(Context $context, string $name): void
     {
         self::ensureCompactUndefWarnStandaloneLinked($context);
+        // ABI is `__string__*` — box via __string__init; avoid constantStringFromString (builder relocate) (#30778).
         $context->builder->call(
             $context->lookupFunction(self::ABI_COMPACT_UNDEF_WARN),
-            $context->constantFromString($name)
+            self::literalNameToStringPtr($context, $name)
         );
     }
 
@@ -411,6 +440,8 @@ final class ScopeBuiltinRuntime
 
     private static function ensureCompactInvalidArgWarnStandaloneLinked(Context $context): void
     {
+        // ScopeBuiltinJitHelper TU may pull isValidVarName → NestedJIT preg_match (#27520 / #30778).
+        PregMatchRuntime::ensureLinked($context);
         $probe = $context->module->getNamedFunction(self::ABI_COMPACT_INVALID_ARG_WARN);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_COMPACT_INVALID_ARG_WARN, $probe);
@@ -451,6 +482,8 @@ final class ScopeBuiltinRuntime
 
     private static function ensureCompactUndefWarnStandaloneLinked(Context $context): void
     {
+        // Helper-runtime unit.o refs `__compiler_preg_match` via isValidVarName (#27520 / #30778).
+        PregMatchRuntime::ensureLinked($context);
         $probe = $context->module->getNamedFunction(self::ABI_COMPACT_UNDEF_WARN);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_COMPACT_UNDEF_WARN, $probe);
