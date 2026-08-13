@@ -421,11 +421,13 @@ final class VmDomJitDispatch
     }
 
     /**
+     * ChildNode::remove — exact user arity 0 (#30814; php_dom.stub.php).
+     *
      * @param list<Variable> $extra
      */
     public static function childNodeRemove(VmContext $ctx, ObjectEntry $node, array $extra): Variable
     {
-        unset($extra);
+        self::requireExactExtraArgCount(DomClassMethod::childNodeRemoveFunction($node), $extra, 0);
         VmDom::removeLiveStandard($ctx, $node);
         $null = new Variable();
         $null->null();
