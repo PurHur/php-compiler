@@ -340,6 +340,8 @@
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
             <file>./test/compliance/ReadfileOptionalArgs30582VMTest.php</file>
             <file>./test/compliance/ReadfileOptionalArgs30582JITTest.php</file>
+            <file>./test/compliance/ScandirContext30569VMTest.php</file>
+            <file>./test/compliance/ScandirContext30569JITTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageVMTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>
