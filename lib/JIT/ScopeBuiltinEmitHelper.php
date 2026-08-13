@@ -228,6 +228,13 @@ final class ScopeBuiltinEmitHelper
             throw new \ArgumentCountError('compact() expects at least 1 argument, 0 given');
         }
 
+        // Link warning + collect/store/match bridges before CFG splits — mid-block ensureBridge
+        // relocates the builder and leaves terminators mid-block (#30778).
+        ScopeBuiltinRuntime::ensureCompactWarningBridgesLinked($context);
+        ScopeBuiltinRuntime::ensureStoreSnapshotLinked($context);
+        ScopeBuiltinRuntime::ensureCompactCollectLinked($context);
+        ScopeBuiltinRuntime::ensureMatchNamedVarLinked($context);
+
         $result = HashTableHelper::alloc($context);
         foreach ($nameArgs as $i => $arg) {
             self::addCompactArgument($context, $result, $arg, (int) $i + 1);
@@ -416,7 +423,8 @@ final class ScopeBuiltinEmitHelper
             $valuePtr
         );
         $namesHt = HashTableHelper::alloc($context);
-        $htResume = self::captureInsertBlock($context);
+        // Prefetch collect bridge in buildCompact — do not capture/restore around import:
+        // import emits the name-walk CFG; restoring would put a terminator mid-block (#30778).
         ScopeBuiltinRuntime::collectCompactNamesFromHashtable(
             $context,
             $namesHt,
@@ -424,7 +432,6 @@ final class ScopeBuiltinEmitHelper
             $context->getTypeFromString('int64')->constInt($argNum, false)
         );
         self::importCompactNamesFromHashtable($context, $result, $namesHt, $named);
-        self::restoreInsertBlock($context, $htResume);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($invalidBlock);
@@ -566,6 +573,14 @@ final class ScopeBuiltinEmitHelper
         Value $keyStr,
         Variable $element
     ): void {
+        // Thin AOT: ScopeBuiltinJitHelper unit.o aborts in storeVarSnapshotAtStringKey (#30778).
+        // Write the snapshot via user-module hashtable IR (same path as `$a[$k]=$v`).
+        if (\PHPCompiler\JIT\Builtin\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            HashTableWriteLlvm::setAtStringKey($context, $ht, $keyStr, $element);
+
+            return;
+        }
+
         if (JitValueBox::isValueOperand($element)) {
             ScopeBuiltinRuntime::storeVarSnapshotAtStringKey(
                 $context,

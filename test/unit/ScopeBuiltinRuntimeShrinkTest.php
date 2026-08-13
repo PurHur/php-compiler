@@ -52,11 +52,17 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__scope_compact_undef_warn', $source);
         $this->assertStringContainsString('ensureCompactInvalidArgWarnStandaloneLinked', $source);
         $this->assertStringContainsString('ensureCompactUndefWarnStandaloneLinked', $source);
+        // AOT undef-warn call must pass `__string__*` via literalNameToStringPtr, not raw cstring (#30778).
+        $this->assertStringContainsString('literalNameToStringPtr', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/lookupFunction\\(self::ABI_COMPACT_UNDEF_WARN\\),\\s*\\$context->constantFromString\\(\\$name\\)/',
+            $source
+        );
         $this->assertStringNotContainsString("lookupFunction('snprintf')", $source);
         $this->assertStringNotContainsString('compact_invalid_int_', $source);
         $this->assertStringNotContainsString('emitStandaloneCompactInvalidArgumentWarningMessage', $source);
         $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(520, $loc, 'ScopeBuiltinRuntime.php LOC');
+        $this->assertLessThan(560, $loc, 'ScopeBuiltinRuntime.php LOC');
     }
 
     public function testScopeBuiltinRuntimeHelperCompileViaJitVmHelperLink(): void
@@ -126,8 +132,9 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
         $loc = substr_count($source, "\n") + 1;
-        // Phase-4b baseline was ≤550 (#19043); #22136 ~574; #27520 EXTR_OVERWRITE AOT path ≤660.
-        $this->assertLessThan(660, $loc, 'ScopeBuiltinEmitHelper.php LOC');
+        // Phase-4b baseline was ≤550 (#19043); #22136 ~574; #27520 EXTR_OVERWRITE AOT path ≤660;
+        // #30778 standalone snapshot write + bridge prefetch ≤680.
+        $this->assertLessThan(680, $loc, 'ScopeBuiltinEmitHelper.php LOC');
         $this->assertStringContainsString('HashTableReadLlvm::forEachStringKeyNode', $source);
         $this->assertStringContainsString('HashTableReadLlvm::forEachIndexedStringAt', $source);
         $this->assertStringContainsString('ScopeBuiltinDefinedLlvm::getDefinedVars', $source);

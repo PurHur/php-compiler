@@ -88,8 +88,20 @@ final class ScopeBuiltinJitHelper
         if ('' === $name) {
             return false;
         }
+        // NestedJIT-safe: no preg_match → `__compiler_preg_match` in helper-runtime unit.o (#27520 / #30778).
+        $c0 = $name[0];
+        if (!(('a' <= $c0 && $c0 <= 'z') || ('A' <= $c0 && $c0 <= 'Z') || '_' === $c0)) {
+            return false;
+        }
+        $len = \strlen($name);
+        for ($i = 1; $i < $len; ++$i) {
+            $c = $name[$i];
+            if (!(('a' <= $c && $c <= 'z') || ('A' <= $c && $c <= 'Z') || ('0' <= $c && $c <= '9') || '_' === $c)) {
+                return false;
+            }
+        }
 
-        return 1 === \preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name);
+        return true;
     }
 
     /**
