@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMNamedNodeMap::item() — VM (php-src ext/dom/namednodemap.c; issue #6189). */
+/**
+ * DOMNamedNodeMap::item() — VM (php-src ext/dom/namednodemap.c; issue #6189).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#30835 follow-up).
+ */
 final class NamedNodeMapItem extends DomClassMethod
 {
     public function __construct()
@@ -17,10 +21,8 @@ final class NamedNodeMapItem extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNamedNodeMap::item', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_NAMED_NODE_MAP, 'DOMNamedNodeMap::item()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMNamedNodeMap::item() expects at least 1 argument');
-        }
         $indexVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_INTEGER !== $indexVar->type && Variable::TYPE_FLOAT !== $indexVar->type) {
             throw new \TypeError(sprintf(

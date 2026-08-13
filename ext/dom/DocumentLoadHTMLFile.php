@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::loadHTMLFile() — VM (#18734, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument::loadHTMLFile() — VM (#18734, php-src ext/dom/php_dom.c).
+ *
+ * User arity 1–2 — Zend ArgumentCountError (#30835; missed by #30616).
+ */
 final class DocumentLoadHTMLFile extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentLoadHTMLFile extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::loadHTMLFile', 1, 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::loadHTMLFile()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::loadHTMLFile() expects at least 1 argument');
-        }
         $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::loadHTMLFile()', 0);
         $options = 0;
         if (isset($frame->calledArgs[2])) {

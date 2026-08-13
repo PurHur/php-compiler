@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 
-/** DOMDocument::loadHTML() — VM (#14356, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument::loadHTML() — VM (#14356, php-src ext/dom/php_dom.c).
+ *
+ * User arity 1–2 — Zend ArgumentCountError (#30835; missed by #30616).
+ */
 final class DocumentLoadHTML extends DomClassMethod
 {
     public function __construct()
@@ -17,10 +21,8 @@ final class DocumentLoadHTML extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::loadHTML', 1, 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::loadHTML()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::loadHTML() expects at least 1 argument');
-        }
         // Z_PARAM_STR: strict null → TypeError; weak null → E_DEPRECATED then '' → ValueError (#30041, #22680).
         $html = VmString::internalMethodStringArgForFrame(
             $frame,
