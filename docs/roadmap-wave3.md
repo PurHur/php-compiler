@@ -1,6 +1,6 @@
 # Roadmap wave 3 tracker (#1354–#1379)
 
-> **Wave 3 complete on master (May 2026):** language **6596/6596** + stdlib **6596/6596** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)). Phase-2 / JIT-only deferrals: [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
+> **Wave 3 complete on master (May 2026):** language **7410/7412** + stdlib **7410/7412** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)). Phase-2 / JIT-only deferrals: [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
 
 Living status for the **25 issues** filed May 2026 toward full PHP language + stdlib coverage. Umbrella: [#1380](https://github.com/PurHur/php-compiler/issues/1380). North stars: [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (self-host; was [#1056](https://github.com/PurHur/php-compiler/issues/1056)).
 
@@ -19,7 +19,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
-**M2 spine:** **7405** / **7407** (2 deferred: #24115, #27103) (`php script/bootstrap-spine-count.php`) — full Phase A inventory in `compiler_lib_spine_smoke`; coverage sync ✅ (`check-selfhost-spine-coverage-sync.php`). Native spine **link** + **lint** ✅ ([#2134](https://github.com/PurHur/php-compiler/issues/2134), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). **M5 daily gate:** `make north-star5-verify-fast` + VM probe ~20ms ([#2201](https://github.com/PurHur/php-compiler/issues/2201)); `--strict` pre-merge only. M4 gen-2→gen-3 recompile ✅. Target doc: [self-host-target.md](self-host-target.md)
+**M2 spine:** **7409** / **7411** (2 deferred: #24115, #27103) (`php script/bootstrap-spine-count.php`) — full Phase A inventory in `compiler_lib_spine_smoke`; coverage sync ✅ (`check-selfhost-spine-coverage-sync.php`). Native spine **link** + **lint** ✅ ([#2134](https://github.com/PurHur/php-compiler/issues/2134), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). **M5 daily gate:** `make north-star5-verify-fast` + VM probe ~20ms ([#2201](https://github.com/PurHur/php-compiler/issues/2201)); `--strict` pre-merge only. M4 gen-2→gen-3 recompile ✅. Target doc: [self-host-target.md](self-host-target.md)
 
 ## Language (#1354–#1366)
 
@@ -69,4 +69,4 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 
 ---
 
-**Wave 3 close-out (May 2026):** language **6596/6596**, stdlib **6596/6596** on master. Do not reopen [#1354](https://github.com/PurHur/php-compiler/issues/1354)–[#1379](https://github.com/PurHur/php-compiler/issues/1379) for phase-1 gaps — use phase-2 trackers [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
+**Wave 3 close-out (May 2026):** language **7410/7412**, stdlib **7410/7412** on master. Do not reopen [#1354](https://github.com/PurHur/php-compiler/issues/1354)–[#1379](https://github.com/PurHur/php-compiler/issues/1379) for phase-1 gaps — use phase-2 trackers [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
