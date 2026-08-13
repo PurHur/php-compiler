@@ -6,13 +6,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** zend_version() — Zend engine version string (Zend/zend.c parity, #3359, #5304). */
+/**
+ * zend_version() — Zend engine version string (Zend/zend.c parity, #3359, #5304).
+ *
+ * Excess argc → Zend ArgumentCountError (#30628; php-src Zend/zend.c).
+ */
 final class zend_version extends Internal
 {
     public function __construct()
@@ -22,9 +25,8 @@ final class zend_version extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('zend_version() expects exactly 0 arguments');
-        }
+        // php-src stub arity: exactly 0 (#30628; Zend/zend.c).
+        $this->requireExactArgCount($frame, 'zend_version', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -33,13 +35,8 @@ final class zend_version extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 0) {
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'zend_version() expects exactly 0 arguments, '.$argc.' given'
-            );
+        // Catchable ArgumentCountError under AOT try/catch (#30628 / peer #30591).
+        if (!$this->requireExactJitArgCount($context, $args, 'zend_version', 0)) {
             $slot = JitValueBox::alloc($context);
 
             return JitValueBox::pointer($context, $slot);
