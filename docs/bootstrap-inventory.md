@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7408 |
-| Phase A inventory files (M2 ratio SSOT) | 7408 |
+| PHP files on vm.php path | 7411 |
+| Phase A inventory files (M2 ratio SSOT) | 7411 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23994 |
+| Source constructs flagged (warnings) | 23997 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3626,6 +3626,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmJsonScanner.php` | 0 | 2 |
 | `ext/standard/VmJsonUtf8.php` | 0 | 1 |
 | `ext/standard/VmJsonValidate.php` | 0 | 1 |
+| `ext/standard/VmLevenshtein.php` | 0 | 1 |
 | `ext/standard/VmLocale.php` | 0 | 7 |
 | `ext/standard/VmLocaleCollate.php` | 0 | 1 |
 | `ext/standard/VmLocalePure.php` | 0 | 1 |
@@ -3715,6 +3716,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSleep.php` | 0 | 1 |
 | `ext/standard/VmSleepNative.php` | 0 | 1 |
 | `ext/standard/VmSleepPure.php` | 0 | 1 |
+| `ext/standard/VmSoundex.php` | 0 | 1 |
 | `ext/standard/VmSplAutoload.php` | 0 | 29 |
 | `ext/standard/VmSprintf.php` | 0 | 3 |
 | `ext/standard/VmSscanf.php` | 0 | 10 |
@@ -5561,6 +5563,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ListSpreadTailRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleParser.php` | 0 | 1 |
+| `lib/JIT/Builtin/LocaleStartupRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAbs.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAcos.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAcosh.php` | 0 | 1 |
@@ -32083,7 +32086,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/LevenshteinJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/LibcryptJitHelper.php`
 
@@ -33616,7 +33619,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SoundexJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/SplAutoloadDefaultJitHelper.php`
 
@@ -35373,6 +35376,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/VmLevenshtein.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/standard/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
@@ -35392,7 +35400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmLocalePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/VmMail.php`
 
@@ -36200,6 +36208,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `ext/standard/VmSoundex.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/standard/VmSplAutoload.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36547,9 +36560,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1959)
-- new Error (line 1970)
-- new ArgumentCountError (line 3986)
+- new Error (line 1928)
+- new Error (line 1939)
+- new ArgumentCountError (line 3955)
 - 223 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -48724,6 +48737,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 14 class method(s)
 
+### `lib/JIT/Builtin/LocaleStartupRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/MathAbs.php`
 
 **Warnings** (review for bootstrap subset):
@@ -53214,21 +53232,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\PdoQuote (line 1649)
 - new Call\DomXmlDocumentCreateFromString (line 1652)
 - new Call\DomHtmlDocumentCreateFromString (line 1653)
-- new Result (line 2030)
-- new Result (line 2052)
-- new Variable (line 2730)
-- new Variable (line 2920)
-- new Variable (line 3185)
-- new Variable (line 3243)
-- new VMVariable (line 3405)
-- new VMVariable (line 3421)
-- new VMVariable (line 3427)
-- new VMVariable (line 3433)
-- new VMVariable (line 3444)
-- new Variable (line 3474)
-- new Variable (line 3519)
+- new Result (line 2032)
+- new Result (line 2054)
+- new Variable (line 2732)
+- new Variable (line 2922)
+- new Variable (line 3187)
+- new Variable (line 3245)
+- new VMVariable (line 3407)
+- new VMVariable (line 3423)
+- new VMVariable (line 3429)
+- new VMVariable (line 3435)
+- new VMVariable (line 3446)
+- new Variable (line 3476)
+- new Variable (line 3521)
 - 112 class method(s)
-- 32 closure(s)
+- 33 closure(s)
 
 ### `lib/JIT/DatePeriodForeachSnapshot.php`
 
