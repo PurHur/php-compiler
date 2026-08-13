@@ -94,8 +94,17 @@ final class GzStreamRuntime
             return;
         }
 
+        if ($context->isThinStandaloneAotMain()) {
+            // NestedJIT VmGzStreamPure statics do not persist — libz gzFile (#30787).
+            \PHPCompiler\ext\standard\JitGzStreamKernel::implement($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_gzopen');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0
+            && !StreamIoRuntime::isDeferStub($probe)
+            && self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -135,10 +144,15 @@ final class GzStreamRuntime
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0 && !StreamIoRuntime::isDeferStub($probe)) {
             $context->registerFunction($name, $probe);
 
             return;
+        }
+        if (null !== $probe && StreamIoRuntime::isDeferStub($probe)) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
         }
 
         $i64 = $context->getTypeFromString('int64');
@@ -328,19 +342,37 @@ final class GzStreamRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
+        // Thin standalone AOT: skip helper-runtime cache — cached GzStreamJitHelper TU is
+        // available_externally and silently returns 0 from gzwrite/gzputs (#30787 / peer #26888).
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#22431'
+            '#22431',
+            $context->isThinStandaloneAotMain()
         );
+    }
+
+    private static function allRuntimeFunctionsLinked(Context $context): bool
+    {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+            if (StreamIoRuntime::isDeferStub($fn)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            if (null === $fn || 0 === $fn->countBasicBlocks() || StreamIoRuntime::isDeferStub($fn)) {
                 throw new \LogicException($name.' missing after GzStreamRuntime bridge (#13420)');
             }
             $context->registerFunction($name, $fn);

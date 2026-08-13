@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7407 |
-| Phase A inventory files (M2 ratio SSOT) | 7407 |
+| PHP files on vm.php path | 7408 |
+| Phase A inventory files (M2 ratio SSOT) | 7408 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23993 |
+| Source constructs flagged (warnings) | 23994 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2888,6 +2888,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGettype.php` | 0 | 1 |
 | `ext/standard/JitGmgetdate.php` | 0 | 1 |
 | `ext/standard/JitGmmktime.php` | 0 | 1 |
+| `ext/standard/JitGzStreamKernel.php` | 0 | 1 |
 | `ext/standard/JitGzclose.php` | 0 | 1 |
 | `ext/standard/JitGzeof.php` | 0 | 1 |
 | `ext/standard/JitGzfile.php` | 0 | 1 |
@@ -30195,6 +30196,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `ext/standard/JitGzStreamKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 17 class method(s)
+
 ### `ext/standard/JitGzclose.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48466,7 +48472,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GzStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 - 12 closure(s)
 
 ### `lib/JIT/Builtin/HashContextEmbedBridge.php`

@@ -2490,6 +2490,7 @@ require_once __DIR__.'/../../../ext/standard/GlobalIntrospectionNameJitHelper.ph
 require_once __DIR__.'/../../../ext/standard/GmgetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GmmktimeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GzStreamJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JitGzStreamKernel.php';
 require_once __DIR__.'/../../../ext/standard/HashAlgosRegistry.php';
 require_once __DIR__.'/../../../ext/standard/HashCryptoJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HashEqualsJitHelper.php';
