@@ -5,17 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Lowered into JIT/AOT modules for phpc_similar_text (#9731, php-in-PHP, #26897).
+ * Host/unit Oliver peel for similar_text (#9731, #26897).
  *
- * Oliver algorithm mirrors {@see VmString} similar_text / similarChar but uses only
- * NestedJIT-safe string primitives (`strlen` / byte index). Calling VmString from this
- * helper lowers to an external stub under thin AOT (writeNull → always 0) — peer
- * NaturalCompare #26975 / ConvertUu #26898.
+ * Thin AOT NestedJIT of this helper segfaults (#30810) — JIT/AOT uses
+ * {@see JitSimilarTextKernel} instead (peer NaturalCompare #30088). Kept for
+ * PHPUnit algorithm checks against {@see VmString}.
  *
- * Offsets into the original strings replace substr() so NestedJIT does not allocate
- * recursive string slices (#26897).
- *
- * SSOT (VM execute): {@see VmString} similar_text method
  * php-src: ext/standard/string.c — php_similar_text, PHP_FUNCTION(similar_text)
  */
 final class SimilarTextJitHelper

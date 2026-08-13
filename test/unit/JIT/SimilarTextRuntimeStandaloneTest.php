@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9731: JIT/AOT similar_text routes through SimilarTextJitHelper PHP.
+ * Issue #30810: JIT/AOT similar_text routes through JitSimilarTextKernel (not NestedJIT helper).
  *
  * @group aot-lint
  */
@@ -24,17 +24,19 @@ final class SimilarTextRuntimeStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('phpc_similar_text');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
-        $this->assertNull($ctx->module->getNamedFunction('__phpc_similar_char'));
-        $this->assertNull($ctx->module->getNamedFunction('__phpc_similar_str'));
+        $charFn = $ctx->module->getNamedFunction('__phpc_similar_char');
+        $strFn = $ctx->module->getNamedFunction('__phpc_similar_str');
+        $this->assertNotNull($charFn);
+        $this->assertNotNull($strFn);
+        $this->assertGreaterThan(0, $charFn->countBasicBlocks());
+        $this->assertGreaterThan(0, $strFn->countBasicBlocks());
     }
 
-    public function testStringSimilarTextJitRoutesThroughSimilarTextJitHelper(): void
+    public function testStringSimilarTextRoutesThroughJitSimilarTextKernel(): void
     {
         $runtimeSource = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringSimilarText.php');
-        $this->assertStringContainsString('SimilarTextJitHelper', $runtimeSource);
-        $this->assertStringNotContainsString('emitSimilarText', $runtimeSource);
-
-        $helperSource = (string) \file_get_contents(__DIR__.'/../../../ext/standard/SimilarTextJitHelper.php');
-        $this->assertStringContainsString('VmString::similar_text', $helperSource);
+        $this->assertStringContainsString('JitSimilarTextKernel', $runtimeSource);
+        $this->assertStringNotContainsString('SimilarTextJitHelper::', $runtimeSource);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtimeSource);
     }
 }

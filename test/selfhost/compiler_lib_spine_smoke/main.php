@@ -5702,6 +5702,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringRename.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringRmdir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSimilarText.php';
+require_once __DIR__.'/../../../ext/standard/JitSimilarTextKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSimilarTextJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketAtmark.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketExportStream.php';
