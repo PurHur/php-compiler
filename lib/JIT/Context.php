@@ -1551,6 +1551,10 @@ class Context {
         $this->functionProxies['datetime::settimezone'] = new Call\DateTimeSetTimezone(false);
         $this->functionProxies['datetime::gettimezone'] = new Call\DateTimeGetTimezone();
         $this->functionProxies['datetimeimmutable::gettimezone'] = new Call\DateTimeGetTimezone();
+        // getOffset lives in DateTimeSetTimezone.php (always loaded above).
+        // Avoid ExternalMethod null stub / invokeJitCall TypeError on thin AOT (#30761).
+        $this->functionProxies['datetime::getoffset'] = new Call\DateTimeGetOffset();
+        $this->functionProxies['datetimeimmutable::getoffset'] = new Call\DateTimeGetOffset();
         // Immutable: allocate+copy (not cloneObject) for MCJIT. Thin user-script AOT still
         // hits "basic block has no parent" inside Object_::allocate / NestedJIT ensureLinked
         // (same as `new DateTimeImmutable` under HELPER_RUNTIME_O=0). VM Builtin covers

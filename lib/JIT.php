@@ -11653,17 +11653,7 @@ class JIT {
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
-                    if (
-                        !empty($this->context->scope->pendingDateTimeZoneGetOffset)
-                        && $this->context->scope->toCall instanceof JIT\Call\DateTimeZoneGetOffset
-                        && \count($callArgs) < 2
-                    ) {
-                        // DateTime::getOffset() has no datetime arg — do not use Zone proxy (#29732).
-                        $this->context->scope->toCall = null;
-                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
-                    } elseif (!empty($this->context->scope->pendingDateTimeZoneGetOffset)) {
-                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
-                    }
+                    $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
@@ -11964,16 +11954,7 @@ class JIT {
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
-                    if (
-                        !empty($this->context->scope->pendingDateTimeZoneGetOffset)
-                        && $this->context->scope->toCall instanceof JIT\Call\DateTimeZoneGetOffset
-                        && \count($callArgs) < 2
-                    ) {
-                        $this->context->scope->toCall = null;
-                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
-                    } elseif (!empty($this->context->scope->pendingDateTimeZoneGetOffset)) {
-                        $this->context->scope->pendingDateTimeZoneGetOffset = false;
-                    }
+                    $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
                     $result = $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
@@ -19543,9 +19524,28 @@ class JIT {
         }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $methodLcEarlyDispatch = strtolower($methodName);
+        $recvHintLc = strtolower(ltrim(
+            (string) ($receiverVar->classUserType ?? $receiverOp->type?->userType ?? ''),
+            '\\'
+        ));
+        // Typed DateTime(Immutable)::getOffset() — do not steal DateTimeZone proxy (#30761).
+        if (
+            'getoffset' === $methodLcEarlyDispatch
+            && \in_array($recvHintLc, ['datetime', 'datetimeimmutable'], true)
+            && $this->context->functionIsRegistered('datetime::getoffset')
+        ) {
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                'datetimeimmutable' === $recvHintLc
+                    ? 'datetimeimmutable::getoffset'
+                    : 'datetime::getoffset'
+            );
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
         // DateTimeZone::{getOffset,getTransitions,getName} — CFG often types `$z` as plain
         // `object`, so the Call proxy never binds and ExternalMethod returns 0/null (#29732).
-        // DateTime::getOffset() has no Call proxy; distinguish at EXEC by argc (Zone needs 1).
+        // DateTime::getOffset() shares the method name; EXEC rewrites when argc==1 (#30761).
         if (
             \in_array($methodLcEarlyDispatch, ['getoffset', 'gettransitions', 'getname'], true)
             && $this->context->functionIsRegistered('datetimezone::'.$methodLcEarlyDispatch)
@@ -19571,7 +19571,7 @@ class JIT {
                 );
                 $this->context->scope->args = [$receiverVar];
                 if ('getoffset' === $methodLcEarlyDispatch) {
-                    // May be DateTime::getOffset() (0 args) — rewrite at EXEC if argc==1 (#29732).
+                    // May be DateTime::getOffset() (0 args) — rewrite at EXEC if argc==1 (#30761).
                     $this->context->scope->pendingDateTimeZoneGetOffset = true;
                 }
 
@@ -21425,6 +21425,33 @@ class JIT {
         $this->context->scope->args = $saved['args'];
         $this->context->scope->argOperands = $saved['argOperands'];
         $this->context->scope->pendingOutboundCallRestore = null;
+    }
+
+    /**
+     * METHODCALL_INIT may bind DateTimeZone::getOffset for any `$x->getOffset()`.
+     * DateTime(Immutable)::getOffset() has no datetime arg — rewrite to that proxy (#30761).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function rewritePendingDateTimeGetOffsetIfNeeded(array $callArgs): void
+    {
+        if (empty($this->context->scope->pendingDateTimeZoneGetOffset)) {
+            return;
+        }
+        if (
+            $this->context->scope->toCall instanceof JIT\Call\DateTimeZoneGetOffset
+            && \count($callArgs) < 2
+            && $this->context->functionIsRegistered('datetime::getoffset')
+        ) {
+            $recv = $callArgs[0] ?? null;
+            $hint = is_object($recv) ? strtolower((string) ($recv->classUserType ?? '')) : '';
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                'datetimeimmutable' === $hint
+                    ? 'datetimeimmutable::getoffset'
+                    : 'datetime::getoffset'
+            );
+        }
+        $this->context->scope->pendingDateTimeZoneGetOffset = false;
     }
 
     /**

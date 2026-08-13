@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\standard\JitDateMutation;
+use PHPCompiler\ext\standard\JitDateOffsetGet;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -153,5 +154,20 @@ final class DateTimeGetTimezone implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         return JitDateMutation::invokeTimezoneObjectGet($context, ...$args);
+    }
+}
+
+/**
+ * DateTime::getOffset() / DateTimeImmutable::getOffset() — JIT/AOT (#30761).
+ *
+ * Defined here because DateTimeSetTimezone is always registered (all profiles).
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateOffsetGet::invokeMethod}
+ * php-src: ext/date/php_date.c — zim_DateTime_getOffset / zim_DateTimeImmutable_getOffset
+ */
+final class DateTimeGetOffset implements Call
+{
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateOffsetGet::invokeMethod($context, ...$args);
     }
 }
