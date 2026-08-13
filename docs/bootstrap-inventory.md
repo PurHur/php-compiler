@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7392 |
-| Phase A inventory files (M2 ratio SSOT) | 7392 |
+| PHP files on vm.php path | 7396 |
+| Phase A inventory files (M2 ratio SSOT) | 7396 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23955 |
+| Source constructs flagged (warnings) | 23962 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2752,7 +2752,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 6 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateMicrosecond.php` | 0 | 3 |
-| `ext/standard/JitDateMutation.php` | 0 | 18 |
+| `ext/standard/JitDateMutation.php` | 0 | 19 |
 | `ext/standard/JitDateOffsetGet.php` | 0 | 3 |
 | `ext/standard/JitDateParse.php` | 0 | 1 |
 | `ext/standard/JitDateParseMaterializer.php` | 0 | 1 |
@@ -4611,7 +4611,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/unserialize.php` | 0 | 3 |
 | `ext/standard/urldecode.php` | 0 | 2 |
 | `ext/standard/urlencode.php` | 0 | 1 |
-| `ext/standard/user_error.php` | 0 | 3 |
+| `ext/standard/user_error.php` | 0 | 1 |
 | `ext/standard/usleep.php` | 0 | 1 |
 | `ext/standard/usort_.php` | 0 | 2 |
 | `ext/standard/utf8_decode.php` | 0 | 2 |
@@ -6071,11 +6071,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DatePeriodIteratorMethod.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeCreateFromFormat.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeCreateFromImmutable.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeCreateFromInterface.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeCreateFromTimestamp.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeDiff.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeFormat.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeGetMicrosecond.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeImmutableConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeImmutableCreateFromMutable.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeModify.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeSetMicrosecond.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeSetTimezone.php` | 0 | 1 |
@@ -6347,7 +6350,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 199 |
+| `lib/JIT/Context.php` | 0 | 203 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -6503,6 +6506,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/RuntimePrepareSpineIdentity.php` | 0 | 1 |
 | `lib/JIT/ScalarDimFetchHelper.php` | 0 | 2 |
 | `lib/JIT/ScalarReturnCheck.php` | 0 | 15 |
+| `lib/JIT/ScopeBuiltinCompactLocalLlvm.php` | 0 | 1 |
 | `lib/JIT/ScopeBuiltinDefinedLlvm.php` | 0 | 2 |
 | `lib/JIT/ScopeBuiltinEmitHelper.php` | 0 | 4 |
 | `lib/JIT/ScopeBuiltinHelper.php` | 0 | 1 |
@@ -29453,7 +29457,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 1271)
 - new ArgumentCountError (line 1276)
 - new ArgumentCountError (line 1352)
-- 55 class method(s)
+- new ArgumentCountError (line 1601)
+- 59 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
 
@@ -41535,8 +41540,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/user_error.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 37)
-- new ArgumentCountError (line 87)
 - 5 class method(s)
 
 ### `ext/standard/usleep.php`
@@ -45922,8 +45925,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2400)
-- new ArgumentCountError (line 2411)
+- new ArgumentCountError (line 2403)
+- new ArgumentCountError (line 2414)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -51401,6 +51404,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DateTimeCreateFromImmutable.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DateTimeCreateFromInterface.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DateTimeCreateFromTimestamp.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51422,6 +51435,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/DateTimeImmutableConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DateTimeImmutableCreateFromMutable.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -53051,72 +53069,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeFormat (line 1532)
 - new Call\DateTimeCreateFromFormat (line 1534)
 - new Call\DateTimeCreateFromFormat (line 1535)
-- new Call\DateTimeCreateFromTimestamp (line 1538)
-- new Call\DateTimeCreateFromTimestamp (line 1539)
-- new Call\DateTimeGetMicrosecond (line 1543)
-- new Call\DateTimeGetMicrosecond (line 1544)
-- new Call\DateTimeSetMicrosecond (line 1545)
-- new Call\DateTimeSetMicrosecond (line 1546)
-- new Call\DateIntervalCreateFromDateString (line 1549)
-- new Call\DateTimeSetTimezone (line 1551)
-- new Call\DateTimeGetTimezone (line 1552)
-- new Call\DateTimeGetTimezone (line 1553)
-- new Call\DateTimeGetOffset (line 1556)
-- new Call\DateTimeGetOffset (line 1557)
-- new Call\DateTimeSetTimezone (line 1563)
-- new Call\DateTimeGetTimestamp (line 1567)
-- new Call\DateTimeGetTimestamp (line 1568)
-- new Call\DateTimeSetTimestamp (line 1569)
-- new Call\DateTimeSetTimestamp (line 1571)
-- new Call\DateTimeSetDate (line 1574)
-- new Call\DateTimeSetDate (line 1575)
-- new Call\DateTimeSetTime (line 1576)
-- new Call\DateTimeSetTime (line 1577)
-- new Call\DateTimeSetISODate (line 1578)
-- new Call\DateTimeSetISODate (line 1579)
-- new Call\DateTimeModify (line 1582)
-- new Call\DateTimeModify (line 1583)
-- new Call\DateTimeAdd (line 1586)
-- new Call\DateTimeAdd (line 1587)
-- new Call\DateTimeSub (line 1588)
-- new Call\DateTimeSub (line 1589)
-- new Call\DateTimeDiff (line 1591)
-- new Call\DateTimeDiff (line 1592)
-- new Call\DateTimeZoneGetTransitions (line 1594)
-- new Call\DateTimeZoneGetName (line 1596)
-- new Call\DateTimeZoneGetOffset (line 1598)
-- new Call\DateTimeZoneListIdentifiers (line 1600)
-- new Call\NumberFormatterCreate (line 1606)
-- new Call\NumberFormatterFormat (line 1607)
-- new Call\IntlDateFormatterCreate (line 1609)
-- new Call\IntlDateFormatterFormat (line 1610)
-- new Call\CollatorCompare (line 1612)
-- new Call\NormalizerNormalize (line 1614)
-- new Call\MessageFormatterConstruct (line 1616)
-- new Call\MessageFormatterFormat (line 1617)
-- new Call\TransliteratorCreate (line 1619)
-- new Call\TransliteratorTransliterate (line 1620)
-- new Call\FinfoConstruct (line 1622)
-- new Call\FinfoFile (line 1623)
-- new Call\FinfoBuffer (line 1624)
-- new Call\PdoConstruct (line 1626)
-- new Call\PdoGetAvailableDrivers (line 1627)
-- new Call\PdoQuote (line 1628)
-- new Call\DomXmlDocumentCreateFromString (line 1631)
-- new Call\DomHtmlDocumentCreateFromString (line 1632)
-- new Result (line 2009)
-- new Result (line 2031)
-- new Variable (line 2709)
-- new Variable (line 2899)
-- new Variable (line 3164)
-- new Variable (line 3222)
-- new VMVariable (line 3384)
-- new VMVariable (line 3400)
-- new VMVariable (line 3406)
-- new VMVariable (line 3412)
-- new VMVariable (line 3423)
-- new Variable (line 3453)
-- new Variable (line 3498)
+- new Call\DateTimeCreateFromInterface (line 1537)
+- new Call\DateTimeCreateFromInterface (line 1538)
+- new Call\DateTimeCreateFromImmutable (line 1539)
+- new Call\DateTimeImmutableCreateFromMutable (line 1540)
+- new Call\DateTimeCreateFromTimestamp (line 1543)
+- new Call\DateTimeCreateFromTimestamp (line 1544)
+- new Call\DateTimeGetMicrosecond (line 1548)
+- new Call\DateTimeGetMicrosecond (line 1549)
+- new Call\DateTimeSetMicrosecond (line 1550)
+- new Call\DateTimeSetMicrosecond (line 1551)
+- new Call\DateIntervalCreateFromDateString (line 1554)
+- new Call\DateTimeSetTimezone (line 1556)
+- new Call\DateTimeGetTimezone (line 1557)
+- new Call\DateTimeGetTimezone (line 1558)
+- new Call\DateTimeGetOffset (line 1561)
+- new Call\DateTimeGetOffset (line 1562)
+- new Call\DateTimeSetTimezone (line 1568)
+- new Call\DateTimeGetTimestamp (line 1572)
+- new Call\DateTimeGetTimestamp (line 1573)
+- new Call\DateTimeSetTimestamp (line 1574)
+- new Call\DateTimeSetTimestamp (line 1576)
+- new Call\DateTimeSetDate (line 1579)
+- new Call\DateTimeSetDate (line 1580)
+- new Call\DateTimeSetTime (line 1581)
+- new Call\DateTimeSetTime (line 1582)
+- new Call\DateTimeSetISODate (line 1583)
+- new Call\DateTimeSetISODate (line 1584)
+- new Call\DateTimeModify (line 1587)
+- new Call\DateTimeModify (line 1588)
+- new Call\DateTimeAdd (line 1591)
+- new Call\DateTimeAdd (line 1592)
+- new Call\DateTimeSub (line 1593)
+- new Call\DateTimeSub (line 1594)
+- new Call\DateTimeDiff (line 1596)
+- new Call\DateTimeDiff (line 1597)
+- new Call\DateTimeZoneGetTransitions (line 1599)
+- new Call\DateTimeZoneGetName (line 1601)
+- new Call\DateTimeZoneGetOffset (line 1603)
+- new Call\DateTimeZoneListIdentifiers (line 1605)
+- new Call\NumberFormatterCreate (line 1611)
+- new Call\NumberFormatterFormat (line 1612)
+- new Call\IntlDateFormatterCreate (line 1614)
+- new Call\IntlDateFormatterFormat (line 1615)
+- new Call\CollatorCompare (line 1617)
+- new Call\NormalizerNormalize (line 1619)
+- new Call\MessageFormatterConstruct (line 1621)
+- new Call\MessageFormatterFormat (line 1622)
+- new Call\TransliteratorCreate (line 1624)
+- new Call\TransliteratorTransliterate (line 1625)
+- new Call\FinfoConstruct (line 1627)
+- new Call\FinfoFile (line 1628)
+- new Call\FinfoBuffer (line 1629)
+- new Call\PdoConstruct (line 1631)
+- new Call\PdoGetAvailableDrivers (line 1632)
+- new Call\PdoQuote (line 1633)
+- new Call\DomXmlDocumentCreateFromString (line 1636)
+- new Call\DomHtmlDocumentCreateFromString (line 1637)
+- new Result (line 2014)
+- new Result (line 2036)
+- new Variable (line 2714)
+- new Variable (line 2904)
+- new Variable (line 3169)
+- new Variable (line 3227)
+- new VMVariable (line 3389)
+- new VMVariable (line 3405)
+- new VMVariable (line 3411)
+- new VMVariable (line 3417)
+- new VMVariable (line 3428)
+- new Variable (line 3458)
+- new Variable (line 3503)
 - 112 class method(s)
 - 32 closure(s)
 
@@ -54240,6 +54262,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 484)
 - 11 class method(s)
 
+### `lib/JIT/ScopeBuiltinCompactLocalLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `lib/JIT/ScopeBuiltinDefinedLlvm.php`
 
 **Warnings** (review for bootstrap subset):
@@ -54250,8 +54277,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 228)
-- new Variable (line 326)
-- 25 class method(s)
+- new Variable (line 281)
+- 23 class method(s)
 - 4 closure(s)
 
 ### `lib/JIT/ScopeBuiltinHelper.php`

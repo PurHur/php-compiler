@@ -132,6 +132,8 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('HashTableReadLlvm::forEachIndexedStringAt', $source);
         $this->assertStringContainsString('ScopeBuiltinDefinedLlvm::getDefinedVars', $source);
         $this->assertStringContainsString('ScopeBuiltinIndexLlvm::branchOnNamedVariableIndex', $source);
+        $this->assertStringContainsString('ScopeBuiltinCompactLocalLlvm::addByName', $source);
+        $this->assertStringContainsString('HashTableHelper::setAtStringKey', $source);
         $this->assertStringNotContainsString('scope_import_str_head', $source);
         $this->assertStringNotContainsString('compact_names_str_head', $source);
         $this->assertStringNotContainsString("lookupFunction('strcmp')", $source);

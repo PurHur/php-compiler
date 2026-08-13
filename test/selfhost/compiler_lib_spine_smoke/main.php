@@ -6265,6 +6265,7 @@ require_once __DIR__.'/../../../lib/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/../../../lib/JIT/ScalarDimFetchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ScalarReturnCheck.php';
 require_once __DIR__.'/../../../lib/JIT/Scope.php';
+require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinCompactLocalLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinDefinedLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinEmitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinHelper.php';

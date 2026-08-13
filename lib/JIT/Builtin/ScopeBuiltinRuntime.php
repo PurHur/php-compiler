@@ -324,9 +324,10 @@ final class ScopeBuiltinRuntime
         }
 
         self::ensureJitHelperCompiled($context);
+        // Helper ABI is __string__* (string $name) — not a raw [N x i8]* cstring (#30778).
         $context->builder->call(
             self::helperFunction($context, self::COMPACT_UNDEF_HELPER),
-            $context->constantFromString($name)
+            $context->builder->load($context->constantStringFromString($name))
         );
     }
 
@@ -394,9 +395,10 @@ final class ScopeBuiltinRuntime
     private static function emitStandaloneCompactUndefinedWarning(Context $context, string $name): void
     {
         self::ensureCompactUndefWarnStandaloneLinked($context);
+        // Standalone ABI is __string__* — constantFromString is [N x i8]* and fails Module->verify (#30778).
         $context->builder->call(
             $context->lookupFunction(self::ABI_COMPACT_UNDEF_WARN),
-            $context->constantFromString($name)
+            $context->builder->load($context->constantStringFromString($name))
         );
     }
 
@@ -411,6 +413,8 @@ final class ScopeBuiltinRuntime
 
     private static function ensureCompactInvalidArgWarnStandaloneLinked(Context $context): void
     {
+        // NestedJIT of ScopeBuiltinJitHelper pulls isValidVarName → preg_match (#27520).
+        PregMatchRuntime::ensureLinked($context);
         $probe = $context->module->getNamedFunction(self::ABI_COMPACT_INVALID_ARG_WARN);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_COMPACT_INVALID_ARG_WARN, $probe);
@@ -451,6 +455,8 @@ final class ScopeBuiltinRuntime
 
     private static function ensureCompactUndefWarnStandaloneLinked(Context $context): void
     {
+        // NestedJIT of ScopeBuiltinJitHelper pulls isValidVarName → preg_match (#27520 / #30778).
+        PregMatchRuntime::ensureLinked($context);
         $probe = $context->module->getNamedFunction(self::ABI_COMPACT_UNDEF_WARN);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_COMPACT_UNDEF_WARN, $probe);

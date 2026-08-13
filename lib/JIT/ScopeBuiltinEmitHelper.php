@@ -251,7 +251,7 @@ final class ScopeBuiltinEmitHelper
     {
         $local = ScopeBuiltinHelper::findVariableByName($context, $name);
         if (null !== $local) {
-            self::addCompactLocalByName($context, $result, $name, $local);
+            ScopeBuiltinCompactLocalLlvm::addByName($context, $result, $name, $local);
 
             return;
         }
@@ -273,57 +273,12 @@ final class ScopeBuiltinEmitHelper
         self::addCompactFromScriptGlobal($context, $result, $name);
     }
 
-    /** CV may exist before first assign — runtime assigned flag like VM initializedSlots (#10164). */
-    private static function addCompactLocalByName(
-        Context $context,
-        Value $result,
-        string $name,
-        Variable $local
-    ): void {
-        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
-        if (!$block instanceof \PHPCompiler\Block || null === $block->slotIndexForVariableName($name)) {
-            $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $local);
-
-            return;
-        }
-
-        $tag = 'cl'.(string) ++self::$blockSeq;
-        $okBlock = BasicBlockHelper::append($context, 'compact_local_ok_'.$tag);
-        $missBlock = BasicBlockHelper::append($context, 'compact_local_miss_'.$tag);
-        $doneBlock = BasicBlockHelper::append($context, 'compact_local_done_'.$tag);
-        $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition(
-            $context,
-            ScopeVariableAssignedFlags::flagKey($context, $name)
-        );
-        $context->builder->branchIf($isAssigned, $okBlock, $missBlock);
-
-        $context->builder->positionAtEnd($okBlock);
-        $hasValueBlock = BasicBlockHelper::append($context, 'compact_local_has_value_'.$tag);
-        $undefAfterAssignBlock = BasicBlockHelper::append($context, 'compact_local_undef_'.$tag);
-        self::branchIfLocalValueIsDefinedForCompact($context, $local, $hasValueBlock, $undefAfterAssignBlock);
-
-        $context->builder->positionAtEnd($hasValueBlock);
-        $keyStr = $context->builder->load($context->constantStringFromString($name));
-        self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $local);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($undefAfterAssignBlock);
-        self::emitCompactUndefinedVariableWarning($context, $name);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($missBlock);
-        self::emitCompactUndefinedVariableWarning($context, $name);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($doneBlock);
-    }
-
     /** $GLOBALS-only symbols — runtime isset before import (#11743, php-src zif_compact). */
     private static function addCompactFromScriptGlobal(Context $context, Value $result, string $name): void
     {
         $global = GlobalsTableInit::ensureGlobal($context, $name);
-        $keyVar = new Variable($context, Variable::TYPE_STRING);
+        $keyStr = $context->builder->load($context->constantStringFromString($name));
+        $keyVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $keyStr);
         $keyVar->compileTimeString = $name;
         $isSet = GlobalsTableInit::offsetIsSet($context, $keyVar);
 
@@ -566,6 +521,15 @@ final class ScopeBuiltinEmitHelper
         Value $keyStr,
         Variable $element
     ): void {
+        // Thin standalone AOT: NestedJIT storeVarSnapshotAtStringKey aborts without Runtime->vm
+        // (SIGABRT in ScopeBuiltinJitHelper::storeVarSnapshotAtStringKey). Use LLVM hashtable
+        // writes — same snapshot semantics as pre-#14507 (#30778).
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            HashTableHelper::setAtStringKey($context, $ht, $keyStr, $element);
+
+            return;
+        }
+
         if (JitValueBox::isValueOperand($element)) {
             ScopeBuiltinRuntime::storeVarSnapshotAtStringKey(
                 $context,
@@ -621,34 +585,5 @@ final class ScopeBuiltinEmitHelper
     private static function emitCompactUndefinedVariableWarning(Context $context, string $name): void
     {
         ScopeBuiltinRuntime::emitCompactUndefinedVariableWarning($context, $name);
-    }
-
-    /** unset() leaves assigned flag set — runtime type check before compact import (#21940). */
-    private static function branchIfLocalValueIsDefinedForCompact(
-        Context $context,
-        Variable $local,
-        BasicBlock $definedBlock,
-        BasicBlock $undefinedBlock
-    ): void {
-        if (Variable::KIND_VARIABLE !== $local->kind || Variable::TYPE_VALUE !== $local->type) {
-            $context->builder->branch($definedBlock);
-
-            return;
-        }
-        $valuePtr = JitValueBox::normalizeValuePtr(
-            $context,
-            JitValueBox::pointer($context, $local->value)
-        );
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isUndef = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false)
-        );
-        $context->builder->branchIf($isUndef, $undefinedBlock, $definedBlock);
     }
 }
