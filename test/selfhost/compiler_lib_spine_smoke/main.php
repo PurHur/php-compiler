@@ -3134,6 +3134,7 @@ require_once __DIR__.'/../../../ext/standard/ProgressJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PropertyExistsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/QuotPrintJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/QuotemetaJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/VmQuotemeta.php';
 require_once __DIR__.'/../../../ext/standard/Rad2degJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RandJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RandomBytesJitHelper.php';

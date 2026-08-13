@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7417 |
-| Phase A inventory files (M2 ratio SSOT) | 7417 |
+| PHP files on vm.php path | 7418 |
+| Phase A inventory files (M2 ratio SSOT) | 7418 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 24009 |
@@ -3698,6 +3698,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmProcessIdentityNative.php` | 0 | 1 |
 | `ext/standard/VmProcessIdentityPure.php` | 0 | 1 |
 | `ext/standard/VmProcessProcOpenNative.php` | 0 | 2 |
+| `ext/standard/VmQuotemeta.php` | 0 | 1 |
 | `ext/standard/VmRandom.php` | 0 | 2 |
 | `ext/standard/VmRandomNative.php` | 0 | 1 |
 | `ext/standard/VmRandomPure.php` | 0 | 2 |
@@ -33380,7 +33381,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/QuotemetaJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/Rad2degJitHelper.php`
 
@@ -35899,6 +35900,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 40 class method(s)
 - 1 closure(s)
 
+### `ext/standard/VmQuotemeta.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/VmRandom.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36590,9 +36596,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1816)
-- new Error (line 1827)
-- new ArgumentCountError (line 3731)
+- new Error (line 1813)
+- new Error (line 1824)
+- new ArgumentCountError (line 3728)
 - 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -50604,7 +50610,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringQuotemeta.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringRandomBytes.php`
 
