@@ -2694,6 +2694,7 @@
         "ext/standard/GethostnameJitHelper.php",
         "ext/standard/GetimagesizeJitHelper.php",
         "ext/standard/GetimagesizeParseLlvm.php",
+        "ext/standard/GetmypidJitHelper.php",
         "ext/standard/GetoptEngine.php",
         "ext/standard/GetoptJitHelper.php",
         "ext/standard/GetrusageJitHelper.php",
@@ -2919,6 +2920,7 @@
         "ext/standard/JitGethostname.php",
         "ext/standard/JitGethostnameKernel.php",
         "ext/standard/JitGetimagesize.php",
+        "ext/standard/JitGetmypidKernel.php",
         "ext/standard/JitGetopt.php",
         "ext/standard/JitGetrusage.php",
         "ext/standard/JitGetrusageArg.php",
@@ -4948,6 +4950,7 @@
         "ext/xmlreader/JitXmlReaderUserScript.php",
         "ext/xmlreader/Module.php",
         "ext/xmlreader/VmXmlReader.php",
+        "ext/xmlreader/XmlReaderClassMethod.php",
         "ext/xmlreader/XmlReaderClose.php",
         "ext/xmlreader/XmlReaderConstants.php",
         "ext/xmlreader/XmlReaderEvent.php",
@@ -7612,9 +7615,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7378,
+        "inventory_files": 7381,
         "excluded": 0,
-        "eligible": 7378,
+        "eligible": 7381,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
