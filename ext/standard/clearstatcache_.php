@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -21,10 +22,8 @@ final class clearstatcache_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc > 2) {
-            throw new \LogicException('clearstatcache() accepts at most two arguments in this compiler build');
-        }
+        // php-src filestat.c / basic_functions.stub.php — at most 2 (#30554).
+        $this->requireAtMostArgCount($frame, 'clearstatcache', 2);
         $hasClearRealpath = isset($frame->calledArgs[0]);
         $hasFilename = isset($frame->calledArgs[1]);
         if (!$hasClearRealpath && !$hasFilename) {
@@ -61,9 +60,11 @@ final class clearstatcache_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 2) {
-            throw new \LogicException('clearstatcache() accepts at most two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30554 / peer #30551).
+        if (!$this->requireAtMostJitArgCount($context, $args, 'clearstatcache', 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitClearstatcache::invoke($context, self::effectiveArgCount($args), ...$args);
