@@ -340,6 +340,8 @@
             <file>./test/compliance/DomExcessArgc30616JITTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583VMTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
+            <file>./test/compliance/StripTagsExcessArgc30592VMTest.php</file>
+            <file>./test/compliance/StripTagsExcessArgc30592JITTest.php</file>
             <file>./test/compliance/ReadfileOptionalArgs30582VMTest.php</file>
             <file>./test/compliance/ReadfileOptionalArgs30582JITTest.php</file>
             <file>./test/compliance/ScandirContext30569VMTest.php</file>
