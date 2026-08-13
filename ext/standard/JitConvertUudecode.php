@@ -10,7 +10,7 @@ use PHPLLVM\Value;
 
 use PHPCompiler\JIT\Builtin\StringConvertUu;
 
-/** LLVM JIT/AOT helper for convert_uudecode() — ConvertUuJitHelper PHP bridge (#13227). */
+/** LLVM JIT/AOT helper for convert_uudecode() — ConvertUuJitHelper+VmConvertUu (#30811). */
 final class JitConvertUudecode
 {
     public static function decode(Context $context, Value $src): Value

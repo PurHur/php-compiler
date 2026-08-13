@@ -9,7 +9,7 @@ use PHPLLVM\Value;
 
 use PHPCompiler\JIT\Builtin\StringConvertUu;
 
-/** LLVM JIT/AOT helper for convert_uuencode() — ConvertUuJitHelper PHP bridge (#13227). */
+/** LLVM JIT/AOT helper for convert_uuencode() — ConvertUuJitHelper+VmConvertUu (#30811). */
 final class JitConvertUuencode
 {
     public static function encode(Context $context, Value $src): Value

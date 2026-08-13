@@ -12,16 +12,23 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper PHP (#13227, #18827, #26898).
+ * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper + VmConvertUu (#13227, #30811).
  *
- * Helper is NestedJIT-self-contained (peer Hex2bin #27008 / Bin2hex #20452 / Base64 #26890).
- * Encode: __string__* → __string__*. Decode: string|false → __value__ writeString / writeBool
- * (no tag+static lastString — AOT statics were empty under helper-runtime units).
+ * NestedJIT bundle peer {@see StringSoundex} / #30790 — solo ConvertUuJitHelper NestedJIT
+ * SIGSEGVs under thin user-script AOT (#30811).
  * php-src: ext/standard/uuencode.c
  */
 final class StringConvertUu
 {
     private const HELPER_PATH = '/ext/standard/ConvertUuJitHelper.php';
+
+    /**
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/VmConvertUu.php',
+        '/ext/standard/ConvertUuJitHelper.php',
+    ];
 
     private const ENCODE_HELPER = 'PHPCompiler\\ext\\standard\\ConvertUuJitHelper::encode';
 
@@ -83,7 +90,7 @@ final class StringConvertUu
             self::ENCODE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#26898'
+            '#30811'
         );
         self::implementDecodeBridge($context);
         self::registerLinkedRuntime($context);
@@ -154,16 +161,16 @@ final class StringConvertUu
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#26898');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#30811');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
-            '#26898'
+            '#30811'
         );
     }
 
@@ -172,7 +179,7 @@ final class StringConvertUu
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringConvertUu bridge (#26898)');
+                throw new \LogicException($name.' missing after StringConvertUu bridge (#30811)');
             }
             $context->registerFunction($name, $fn);
         }

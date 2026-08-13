@@ -151,6 +151,10 @@ final class HelperRuntimeCache
         // VmSoundex / VmLevenshtein (recursive substr / CSV rows) into the user module.
         'phpcompiler\\ext\\standard\\soundexjithelper::soundexargv' => true,
         'phpcompiler\\ext\\standard\\levenshteinjithelper::computeargv' => true,
+        // #30811 — prelinked ConvertUuJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
+        // VmConvertUu (strlen/substr/ord/chr) into the user module (peer #30790).
+        'phpcompiler\\ext\\standard\\convertuujithelper::encode' => true,
+        'phpcompiler\\ext\\standard\\convertuujithelper::decodeargv' => true,
     ];
 
     private static bool $loggedHit = false;
