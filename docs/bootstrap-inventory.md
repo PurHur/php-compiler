@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7386 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23921 |
+| Source constructs flagged (warnings) | 23919 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4097,7 +4097,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/get_resources_.php` | 0 | 1 |
 | `ext/standard/getallheaders_.php` | 0 | 3 |
 | `ext/standard/getcwd_.php` | 0 | 2 |
-| `ext/standard/getdate.php` | 0 | 2 |
+| `ext/standard/getdate.php` | 0 | 1 |
 | `ext/standard/getenv_.php` | 0 | 1 |
 | `ext/standard/gethostbyaddr.php` | 0 | 1 |
 | `ext/standard/gethostbyname.php` | 0 | 1 |
@@ -4561,7 +4561,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/strstr.php` | 0 | 1 |
 | `ext/standard/strtok.php` | 0 | 1 |
 | `ext/standard/strtolower.php` | 0 | 2 |
-| `ext/standard/strtotime.php` | 0 | 2 |
+| `ext/standard/strtotime.php` | 0 | 1 |
 | `ext/standard/strtoupper.php` | 0 | 2 |
 | `ext/standard/strtr.php` | 0 | 2 |
 | `ext/standard/strval.php` | 0 | 1 |
@@ -36883,8 +36883,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_fill.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 44)
-- new Variable (line 46)
+- new HashTable (line 45)
+- new Variable (line 47)
 - 3 class method(s)
 
 ### `ext/standard/array_fill_keys.php`
@@ -38565,7 +38565,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/getdate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
 - 2 class method(s)
 
 ### `ext/standard/getenv_.php`
@@ -41224,7 +41223,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strtotime.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/standard/strtoupper.php`
