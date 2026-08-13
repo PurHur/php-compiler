@@ -377,11 +377,12 @@ final class VmSettype
         return CastSupport::toArray($value, $classes)->toArray();
     }
 
-    /** Zend convert_to_object / php_settype object branch (ext/standard/type.c, #4254). */
+    /** Zend convert_to_object / php_settype object branch (ext/standard/type.c, #4254, #30793). */
     private static function toObject(Variable $result, Variable $value, ?Frame $frame): void
     {
         $v = $value->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $v->type) {
+        // Resource wrappers are TYPE_OBJECT; Zend still wraps IS_RESOURCE as stdClass.scalar (#30793).
+        if (Variable::TYPE_OBJECT === $v->type && !ResourceSupport::isVmResource($v)) {
             $result->copyFrom($v);
 
             return;

@@ -7271,7 +7271,16 @@ class Object_ extends Type {
             return $enumIsset;
         }
         if (!$this->hasProperty($classId, $name)) {
-            return $i1->constInt(0, false);
+            // (object)$resource keeps CFG userType "resource" while runtime value is stdClass
+            // (#30793, TypeReconstructor preserves TYPE_OBJECT). Probe stdClass before giving up.
+            $classLc = strtolower(ltrim($class, '\\'));
+            if ('resource' === $classLc) {
+                $class = 'stdClass';
+                $classId = $this->lookup('stdClass');
+            }
+            if (!$this->hasProperty($classId, $name)) {
+                return $i1->constInt(0, false);
+            }
         }
         $prop = $this->propertyFetch($obj, $class, $name);
         if (Variable::TYPE_VALUE === $prop->type) {

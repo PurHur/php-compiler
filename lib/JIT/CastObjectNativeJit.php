@@ -7,10 +7,14 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\CastObjectFromHashtableJit;
 use PHPCompiler\JIT\Builtin\CastObjectValueBoxJit;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\OpCode;
+use PHPLLVM\Builder;
 
 /**
  * Native-type (object) cast lowering — extracted from CastHelper (#10244).
+ *
+ * php-src: Zend/zend_operators.c — convert_to_object / cast_object (#30098, #30793).
  */
 final class CastObjectNativeJit
 {
@@ -21,12 +25,7 @@ final class CastObjectNativeJit
         OpCode $op
     ): Variable {
         if (Variable::TYPE_OBJECT === $src->type) {
-            return new Variable(
-                $context,
-                Variable::TYPE_OBJECT,
-                Variable::KIND_VALUE,
-                $context->helper->loadValue($src)
-            );
+            return self::emitObjectOperand($context, $src);
         }
         if (Variable::TYPE_HASHTABLE === $src->type) {
             return CastObjectFromHashtableJit::emit($context, $src, $block, $op);
@@ -38,5 +37,74 @@ final class CastObjectNativeJit
         throw new \LogicException(
             '(object) cast unsupported operand type in JIT: '.Variable::getStringType($src->type)
         );
+    }
+
+    /**
+     * TYPE_OBJECT: real objects keep identity; Resource wrappers wrap as stdClass.scalar (#30793).
+     */
+    public static function emitObjectOperand(Context $context, Variable $src): Variable
+    {
+        $resourceClassId = self::resourceClassIdIfRegistered($context);
+        if (null === $resourceClassId) {
+            return new Variable(
+                $context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $context->helper->loadValue($src)
+            );
+        }
+
+        $objPtr = $context->helper->loadValue($src);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        $isResource = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $context->constantFromInteger($resourceClassId, 'int64')
+        );
+
+        $resourceBlock = BasicBlockHelper::append($context, 'cast_object_res_wrap');
+        $plainBlock = BasicBlockHelper::append($context, 'cast_object_res_plain');
+        $mergeBlock = BasicBlockHelper::append($context, 'cast_object_res_merge');
+        $doneBlock = BasicBlockHelper::append($context, 'cast_object_res_done');
+
+        $context->builder->branchIf($isResource, $resourceBlock, $plainBlock);
+
+        $context->builder->positionAtEnd($resourceBlock);
+        $wrapped = CastObjectFromHashtableJit::emitScalarStdClass($context, $src);
+        // allocate()/propertyStore may leave a different open block (#26818 / #30793).
+        $resourceEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($plainBlock);
+        $plain = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $objPtr
+        );
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($wrapped->value->typeOf());
+        $phi->addIncoming($wrapped->value, $resourceEnd);
+        $phi->addIncoming($plain->value, $plainEnd);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+
+        return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $phi);
+    }
+
+    private static function resourceClassIdIfRegistered(Context $context): ?int
+    {
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            return null;
+        }
+
+        return $object->lookup('resource');
     }
 }
