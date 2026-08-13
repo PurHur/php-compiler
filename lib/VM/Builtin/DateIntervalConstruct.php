@@ -18,8 +18,14 @@ final class DateIntervalConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DateInterval::__construct() expects exactly 1 argument');
+        $argc = \count($frame->calledArgs);
+        // User arity excludes $this — php-src zim_DateInterval___construct (#30601).
+        $userArgc = max(0, $argc - 1);
+        if (1 !== $userArgc) {
+            throw new \ArgumentCountError(\sprintf(
+                'DateInterval::__construct() expects exactly 1 argument, %d given',
+                $userArgc
+            ));
         }
         $receiver = DateIntervalSupport::requireDateInterval(
             $frame->calledArgs[0],
