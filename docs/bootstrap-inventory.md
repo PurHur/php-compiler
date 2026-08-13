@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7409 |
-| Phase A inventory files (M2 ratio SSOT) | 7409 |
+| PHP files on vm.php path | 7410 |
+| Phase A inventory files (M2 ratio SSOT) | 7410 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23995 |
+| Source constructs flagged (warnings) | 23996 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5562,6 +5562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ListSpreadTailRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleParser.php` | 0 | 1 |
+| `lib/JIT/Builtin/LocaleStartupRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAbs.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAcos.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAcosh.php` | 0 | 1 |
@@ -35393,7 +35394,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmLocalePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/VmMail.php`
 
@@ -48730,6 +48731,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 14 class method(s)
 
+### `lib/JIT/Builtin/LocaleStartupRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/MathAbs.php`
 
 **Warnings** (review for bootstrap subset):
@@ -53220,21 +53226,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\PdoQuote (line 1649)
 - new Call\DomXmlDocumentCreateFromString (line 1652)
 - new Call\DomHtmlDocumentCreateFromString (line 1653)
-- new Result (line 2030)
-- new Result (line 2052)
-- new Variable (line 2730)
-- new Variable (line 2920)
-- new Variable (line 3185)
-- new Variable (line 3243)
-- new VMVariable (line 3405)
-- new VMVariable (line 3421)
-- new VMVariable (line 3427)
-- new VMVariable (line 3433)
-- new VMVariable (line 3444)
-- new Variable (line 3474)
-- new Variable (line 3519)
+- new Result (line 2032)
+- new Result (line 2054)
+- new Variable (line 2732)
+- new Variable (line 2922)
+- new Variable (line 3187)
+- new Variable (line 3245)
+- new VMVariable (line 3407)
+- new VMVariable (line 3423)
+- new VMVariable (line 3429)
+- new VMVariable (line 3435)
+- new VMVariable (line 3446)
+- new Variable (line 3476)
+- new Variable (line 3521)
 - 112 class method(s)
-- 32 closure(s)
+- 33 closure(s)
 
 ### `lib/JIT/DatePeriodForeachSnapshot.php`
 
