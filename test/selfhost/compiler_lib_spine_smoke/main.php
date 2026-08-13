@@ -5859,6 +5859,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneGetOffset.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneListIdentifiers.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneListAbbreviations.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneGetTransitions.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomAttrRename.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentAppendChild.php';

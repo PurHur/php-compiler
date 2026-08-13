@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7396 |
-| Phase A inventory files (M2 ratio SSOT) | 7396 |
+| PHP files on vm.php path | 7397 |
+| Phase A inventory files (M2 ratio SSOT) | 7397 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23966 |
+| Source constructs flagged (warnings) | 23969 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6087,6 +6087,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DateTimeZoneGetName.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeZoneGetOffset.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeZoneGetTransitions.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeZoneListAbbreviations.php` | 0 | 2 |
 | `lib/JIT/Call/DateTimeZoneListIdentifiers.php` | 0 | 1 |
 | `lib/JIT/Call/DirectoryIteratorMethod.php` | 0 | 2 |
 | `lib/JIT/Call/DomAttrIsId.php` | 0 | 1 |
@@ -6351,7 +6352,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 205 |
+| `lib/JIT/Context.php` | 0 | 206 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -51486,6 +51487,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DateTimeZoneListAbbreviations.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 35)
+- 1 class method(s)
+
 ### `lib/JIT/Call/DateTimeZoneListIdentifiers.php`
 
 **Warnings** (review for bootstrap subset):
@@ -53117,37 +53124,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeZoneGetName (line 1604)
 - new Call\DateTimeZoneGetOffset (line 1606)
 - new Call\DateTimeZoneListIdentifiers (line 1608)
-- new Call\NumberFormatterCreate (line 1614)
-- new Call\NumberFormatterFormat (line 1615)
-- new Call\IntlDateFormatterCreate (line 1617)
-- new Call\IntlDateFormatterFormat (line 1618)
-- new Call\CollatorCompare (line 1620)
-- new Call\NormalizerNormalize (line 1622)
-- new Call\MessageFormatterConstruct (line 1624)
-- new Call\MessageFormatterFormat (line 1625)
-- new Call\TransliteratorCreate (line 1627)
-- new Call\TransliteratorTransliterate (line 1628)
-- new Call\FinfoConstruct (line 1630)
-- new Call\FinfoFile (line 1631)
-- new Call\FinfoBuffer (line 1632)
-- new Call\PdoConstruct (line 1634)
-- new Call\PdoGetAvailableDrivers (line 1635)
-- new Call\PdoQuote (line 1636)
-- new Call\DomXmlDocumentCreateFromString (line 1639)
-- new Call\DomHtmlDocumentCreateFromString (line 1640)
-- new Result (line 2017)
-- new Result (line 2039)
-- new Variable (line 2717)
-- new Variable (line 2907)
-- new Variable (line 3172)
-- new Variable (line 3230)
-- new VMVariable (line 3392)
-- new VMVariable (line 3408)
-- new VMVariable (line 3414)
-- new VMVariable (line 3420)
-- new VMVariable (line 3431)
-- new Variable (line 3461)
-- new Variable (line 3506)
+- new Call\DateTimeZoneListAbbreviations (line 1610)
+- new Call\NumberFormatterCreate (line 1616)
+- new Call\NumberFormatterFormat (line 1617)
+- new Call\IntlDateFormatterCreate (line 1619)
+- new Call\IntlDateFormatterFormat (line 1620)
+- new Call\CollatorCompare (line 1622)
+- new Call\NormalizerNormalize (line 1624)
+- new Call\MessageFormatterConstruct (line 1626)
+- new Call\MessageFormatterFormat (line 1627)
+- new Call\TransliteratorCreate (line 1629)
+- new Call\TransliteratorTransliterate (line 1630)
+- new Call\FinfoConstruct (line 1632)
+- new Call\FinfoFile (line 1633)
+- new Call\FinfoBuffer (line 1634)
+- new Call\PdoConstruct (line 1636)
+- new Call\PdoGetAvailableDrivers (line 1637)
+- new Call\PdoQuote (line 1638)
+- new Call\DomXmlDocumentCreateFromString (line 1641)
+- new Call\DomHtmlDocumentCreateFromString (line 1642)
+- new Result (line 2019)
+- new Result (line 2041)
+- new Variable (line 2719)
+- new Variable (line 2909)
+- new Variable (line 3174)
+- new Variable (line 3232)
+- new VMVariable (line 3394)
+- new VMVariable (line 3410)
+- new VMVariable (line 3416)
+- new VMVariable (line 3422)
+- new VMVariable (line 3433)
+- new Variable (line 3463)
+- new Variable (line 3508)
 - 112 class method(s)
 - 32 closure(s)
 

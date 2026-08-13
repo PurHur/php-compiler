@@ -1606,6 +1606,8 @@ class Context {
         $this->functionProxies['datetimezone::getoffset'] = new Call\DateTimeZoneGetOffset();
         // DateTimeZone::listIdentifiers — avoid ExternalMethod silent NULL on thin AOT (#29735).
         $this->functionProxies['datetimezone::listidentifiers'] = new Call\DateTimeZoneListIdentifiers();
+        // DateTimeZone::listAbbreviations — avoid ExternalMethod silent NULL on thin AOT (#30780).
+        $this->functionProxies['datetimezone::listabbreviations'] = new Call\DateTimeZoneListAbbreviations();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         // Locale::acceptFromHttp — avoid ExternalMethod silent NULL on thin AOT (#28656).

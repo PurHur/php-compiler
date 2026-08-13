@@ -202,6 +202,7 @@
             <file>./test/compliance/DateTimeAddSubJITTest.php</file>
             <file>./test/compliance/DateDateTimeSetJITTest.php</file>
             <file>./test/compliance/DateGetLastErrorsJITTest.php</file>
+            <file>./test/compliance/TimezoneAbbreviationsListJITTest.php</file>
             <file>./test/compliance/DateIsodateSetJITTest.php</file>
             <file>./test/compliance/DateTimeGetOffsetJITTest.php</file>
             <file>./test/compliance/DateTimeCreateFromInterfaceJITTest.php</file>
@@ -496,6 +497,7 @@
             <file>./test/aot/DateTimeAddSubAotTest.php</file>
             <file>./test/aot/DateDateTimeSetAotTest.php</file>
             <file>./test/aot/DateGetLastErrorsAotTest.php</file>
+            <file>./test/aot/TimezoneAbbreviationsListAotTest.php</file>
             <file>./test/aot/DateIsodateSetAotTest.php</file>
             <file>./test/aot/DateTimeGetOffsetAotTest.php</file>
             <file>./test/aot/DateTimeCreateFromInterfaceAotTest.php</file>
