@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\TimezoneOffsetRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -56,13 +57,20 @@ final class JitTimezoneOffsetGet
         );
     }
 
-    /** DateTimeZone::getOffset($this, $datetime) — same ABI as procedural (#27308). */
+    /** DateTimeZone::getOffset($this, $datetime) — same ABI as procedural (#27308 / #30834). */
     public static function invokeMethod(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \ArgumentCountError(
-                \sprintf('DateTimeZone::getOffset() expects exactly 1 argument, %d given', max(0, \count($args) - 1))
+        $argc = \count($args);
+        if (2 !== $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('DateTimeZone::getOffset() expects exactly 1 argument, %d given', max(0, $argc - 1))
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetimezone_getoffset_argc_cont');
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeLong($context, $slot, $context->getTypeFromString('int64')->constInt(0, true));
+
+            return $slot;
         }
 
         return self::lower(

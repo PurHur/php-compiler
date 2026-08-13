@@ -21,18 +21,18 @@ final class DateTimeDiff extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \ArgumentCountError(\sprintf(
-                'DateTime::diff() expects at least 1 argument, %d given',
-                $argc - 1
-            ));
-        }
-        if (null === $frame->returnVar || null === $frame->vmContext) {
-            return;
+        if ($argc < 1) {
+            throw new \LogicException('DateTime::diff() called without $this');
         }
 
         $receiver = DateTimeSupport::requireDateTimeLike($frame->calledArgs[0], 'DateTime::diff()');
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity 1–2 — excess says at most (not at least) (#30834; zim_DateTime_diff).
+        $this->requireUserArgCountRange($frame, "{$label}::diff", 1, 2);
+        if (null === $frame->returnVar || null === $frame->vmContext) {
+            return;
+        }
+
         // Zend zim_DateTime_diff — Argument #1 ($targetObject) DateTimeInterface (#29868).
         $target = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[1],

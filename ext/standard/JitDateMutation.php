@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -111,7 +112,24 @@ final class JitDateMutation
         string $function,
         JITVariable ...$args
     ): Value {
-        if (\count($args) < 2) {
+        $argc = \count($args);
+        // Method path: user arity excludes $this (#30834). Procedural date_modify keeps 2-arg check above.
+        if (\str_contains($function, '::')) {
+            if (2 !== $argc) {
+                ExceptionBridge::emitArgumentCountErrorAndAbort(
+                    $context,
+                    \sprintf('%s() expects exactly 1 argument, %d given', $function, max(0, $argc - 1))
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_modify_argc_cont');
+                $ret = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $ret)
+                );
+
+                return $ret;
+            }
+        } elseif ($argc < 2) {
             throw new \LogicException($function.'() requires $this and a modifier argument');
         }
 
@@ -337,10 +355,35 @@ final class JitDateMutation
     public static function invokeDiffMethod(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \ArgumentCountError(
-                \sprintf('DateTime::diff() expects at least 1 argument, %d given', max(0, $argc - 1))
+        $userArgc = max(0, $argc - 1);
+        // Excess → at most; too few → at least (#30834; zim_DateTime_diff).
+        if ($userArgc < 1) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('DateTime::diff() expects at least 1 argument, %d given', $userArgc)
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_diff_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
+        }
+        if ($userArgc > 2) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('DateTime::diff() expects at most 2 arguments, %d given', $userArgc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_diff_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
         }
 
         return self::lowerDiff($context, 'DateTime::diff', ...$args);
@@ -498,9 +541,18 @@ final class JitDateMutation
             : ($add ? 'DateTime::add' : 'DateTime::sub');
         $argc = \count($args);
         if ($argc !== 2) {
-            throw new \ArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
                 \sprintf('%s() expects exactly 1 argument, %d given', $function, max(0, $argc - 1))
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_addsub_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
         }
 
         $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
@@ -1058,8 +1110,21 @@ final class JitDateMutation
     public static function invokeTimestampObjectGet(Context $context, bool $immutable, JITVariable ...$args): Value
     {
         $function = $immutable ? 'DateTimeImmutable::getTimestamp' : 'DateTime::getTimestamp';
+        $argc = \count($args);
         if ([] === $args) {
             throw new \LogicException($function.'() requires $this');
+        }
+        // User arity excludes $this (#30834).
+        if ($argc > 1) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('%s() expects exactly 0 arguments, %d given', $function, $argc - 1)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_gettimestamp_argc_cont');
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeLong($context, $slot, $context->getTypeFromString('int64')->constInt(0, true));
+
+            return $slot;
         }
         $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
@@ -1167,6 +1232,24 @@ final class JitDateMutation
         if ([] === $args) {
             throw new \LogicException('DateTime::getTimezone() requires $this');
         }
+        // User arity excludes $this (#30834).
+        if (\count($args) > 1) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'DateTime::getTimezone() expects exactly 0 arguments, %d given',
+                    \count($args) - 1
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_gettimezone_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
+        }
 
         return self::allocateZoneFromDateTimeTzProp($context, $args[0]);
     }
@@ -1252,8 +1335,22 @@ final class JitDateMutation
     public static function invokeObjectDateSet(Context $context, bool $immutable, JITVariable ...$args): Value
     {
         $function = $immutable ? 'DateTimeImmutable::setDate' : 'DateTime::setDate';
-        if (\count($args) < 4) {
-            throw new \LogicException($function.'() expects exactly 3 arguments');
+        $argc = \count($args);
+        $userArgc = max(0, $argc - 1);
+        // User arity exactly 3 (#30834; zim_DateTime_setDate).
+        if (3 !== $userArgc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('%s() expects exactly 3 arguments, %d given', $function, $userArgc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_setdate_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
         }
         $year = JitSleep::zParamLong($context, $args[1], $function, 1, 'year');
         $month = JitSleep::zParamLong($context, $args[2], $function, 2, 'month');
@@ -1372,8 +1469,35 @@ final class JitDateMutation
     {
         $function = $immutable ? 'DateTimeImmutable::setTime' : 'DateTime::setTime';
         $argc = \count($args);
-        if ($argc < 3 || $argc > 5) {
-            throw new \LogicException($function.'() expects two to four arguments');
+        $userArgc = max(0, $argc - 1);
+        // User arity 2–4 — ACE not LogicException (#30834; zim_DateTime_setTime).
+        if ($userArgc < 2) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('%s() expects at least 2 arguments, %d given', $function, $userArgc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_settime_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
+        }
+        if ($userArgc > 4) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('%s() expects at most 4 arguments, %d given', $function, $userArgc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_settime_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
         }
         $hour = JitSleep::zParamLong($context, $args[1], $function, 1, 'hour');
         $minute = JitSleep::zParamLong($context, $args[2], $function, 2, 'minute');

@@ -25,6 +25,9 @@ final class DateTimeGetOffset extends VmClassMethod
             'DateTime::getOffset()',
             $frame->vmContext
         );
+        $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // User arity excludes $this — php-src zim_DateTime_getOffset (#30834).
+        $this->requireExactUserArgCount($frame, "{$label}::getOffset", 0);
         if (null === $frame->returnVar) {
             return;
         }

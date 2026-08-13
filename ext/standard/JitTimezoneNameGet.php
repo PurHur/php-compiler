@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -34,13 +36,25 @@ final class JitTimezoneNameGet
         return self::lower($context, 'timezone_name_get', $args[0]);
     }
 
-    /** DateTimeZone::getName($this) — same ABI as procedural (#27307 / #29733). */
+    /** DateTimeZone::getName($this) — same ABI as procedural (#27307 / #29733 / #30834). */
     public static function invokeMethod(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \ArgumentCountError(
-                \sprintf('DateTimeZone::getName() expects exactly 0 arguments, %d given', max(0, \count($args) - 1))
+        $argc = \count($args);
+        if (1 !== $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('DateTimeZone::getName() expects exactly 0 arguments, %d given', max(0, $argc - 1))
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetimezone_getname_argc_cont');
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $context->builder->load($context->constantStringFromString(''))
+            );
+
+            return $ptr;
         }
 
         return self::lower($context, 'DateTimeZone::getName', $args[0]);

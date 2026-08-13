@@ -24,6 +24,8 @@ final class DateTimeZoneGetName extends VmClassMethod
             $frame->calledArgs[0],
             'DateTimeZone::getName()'
         );
+        // User arity excludes $this — php-src zim_DateTimeZone_getName (#30834).
+        $this->requireExactUserArgCount($frame, 'DateTimeZone::getName', 0);
         if (null === $frame->returnVar) {
             return;
         }

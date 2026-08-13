@@ -7,9 +7,11 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\ext\standard\JitDateGetLastErrors;
 use PHPCompiler\ext\standard\JitDateMutation;
 use PHPCompiler\ext\standard\JitDateOffsetGet;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\DateTimeSupport;
@@ -36,8 +38,22 @@ final class DateTimeSetTimezone implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException('DateTime::setTimezone() requires $this and a DateTimeZone argument');
+        $function = $this->immutable ? 'DateTimeImmutable::setTimezone' : 'DateTime::setTimezone';
+        $argc = \count($args);
+        // User arity excludes $this (#30834).
+        if (2 !== $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('%s() expects exactly 1 argument, %d given', $function, max(0, $argc - 1))
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_settimezone_argc_cont');
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $ret)
+            );
+
+            return $ret;
         }
 
         $objectType = $context->type->object;
