@@ -24,9 +24,8 @@ final class dechex extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('dechex() requires exactly one argument');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#30535).
+        $this->requireExactArgCount($frame, 'dechex', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -45,8 +44,9 @@ final class dechex extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('dechex() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #30535.
+        if (!$this->requireExactJitArgCount($context, $args, 'dechex', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
         $num = JitChr::lowerZParamLongArg($context, $args[0], 'dechex', 1, 'num');
 
