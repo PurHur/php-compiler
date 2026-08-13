@@ -10,10 +10,9 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_soundex via SoundexJitHelper PHP (#13448, #21362, #26882).
+ * JIT/AOT link for __compiler_soundex via SoundexJitHelper + VmSoundex (#13448, #30790).
  *
- * User-script AOT uses HelperRuntimeCache prelinked units (#15889). Peer: StringStrRot13 #26868.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString} (VM); helper is NestedJIT-self-contained.
+ * NestedJIT bundle peer {@see StringMetaphone} / #26794.
  * php-src: ext/standard/string.c — PHP_FUNCTION(soundex)
  */
 final class StringSoundex
@@ -21,6 +20,14 @@ final class StringSoundex
     private const ABI = '__compiler_soundex';
 
     private const HELPER_PATH = '/ext/standard/SoundexJitHelper.php';
+
+    /**
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/VmSoundex.php',
+        '/ext/standard/SoundexJitHelper.php',
+    ];
 
     private const SOUNDEX_HELPER = 'PHPCompiler\\ext\\standard\\SoundexJitHelper::soundexArgv';
 
@@ -66,6 +73,12 @@ final class StringSoundex
     private static function implementBridge(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#30790'
+        );
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI,
@@ -75,7 +88,7 @@ final class StringSoundex
             self::SOUNDEX_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#26882'
+            '#30790'
         );
     }
 }

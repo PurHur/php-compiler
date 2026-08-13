@@ -1640,7 +1640,7 @@ final class VmString
     /**
      * levenshtein() — byte-oriented edit distance (subset of PHP; issue #2406).
      *
-     * SSOT: {@see LevenshteinJitHelper::computeArgv} (NestedJIT-safe; #26830).
+     * SSOT: {@see VmLevenshtein::compute} (NestedJIT-safe digit-string DP; #26830 / #30790).
      */
     public static function levenshtein(
         string $string1,
@@ -1649,7 +1649,7 @@ final class VmString
         int $replacementCost = 1,
         int $deletionCost = 1
     ): int {
-        return LevenshteinJitHelper::computeArgv(
+        return VmLevenshtein::compute(
             $string1,
             $string2,
             $insertionCost,
@@ -1752,43 +1752,12 @@ final class VmString
 
     /**
      * soundex() — PHP-compatible Soundex on ASCII letters (issue #2416).
+     *
+     * SSOT: {@see VmSoundex::encode} (NestedJIT-safe recursive substr; #30790).
      */
     public static function soundex(string $string): string
     {
-        /** @var list<int|string> PHP 8 soundex_table[26]: 0 = vowel/H/W, else digit char */
-        static $table = [
-            0, '1', '2', '3', 0, '1', '2', 0, 0, '2', '2', '4', '5', '5', 0, '1', '2', '6', '2', '3', 0, '1', 0, '2', 0, '2',
-        ];
-        $code = '';
-        $last = 0;
-        $len = self::byteLength($string);
-        for ($i = 0; $i < $len; ++$i) {
-            $ord = self::byteOrd($string[$i]);
-            if ($ord >= 97 && $ord <= 122) {
-                $ord -= 32;
-            }
-            if ($ord < 65 || $ord > 90) {
-                continue;
-            }
-            $upper = self::byteChr($ord);
-            $digit = $table[$ord - 65];
-            if ('' === $code) {
-                $code = $upper;
-                $last = $digit;
-                continue;
-            }
-            if ($digit !== $last) {
-                if (0 !== $digit && self::byteLength($code) < 4) {
-                    $code .= (string) $digit;
-                }
-                $last = $digit;
-            }
-        }
-        if ('' === $code) {
-            return '0000';
-        }
-
-        return str_pad($code, 4, '0');
+        return VmSoundex::encode($string);
     }
 
     private static function strncmpCase(string $a, string $b, int $length): int
