@@ -3299,6 +3299,7 @@ require_once __DIR__.'/../../../ext/standard/VmCallableInvoke.php';
 require_once __DIR__.'/../../../ext/standard/VmChdirNative.php';
 require_once __DIR__.'/../../../ext/standard/VmChdirPure.php';
 require_once __DIR__.'/../../../ext/standard/VmCheckdate.php';
+require_once __DIR__.'/../../../ext/standard/VmChunkSplit.php';
 require_once __DIR__.'/../../../ext/standard/VmChrootNative.php';
 require_once __DIR__.'/../../../ext/standard/VmChrootPure.php';
 require_once __DIR__.'/../../../ext/standard/VmClassHas.php';
