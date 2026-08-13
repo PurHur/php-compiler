@@ -1576,16 +1576,16 @@ final class CompilerVersion
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
-     * ("Multiple access type modifiers are not allowed") — #24819, re-#12508 / #17197.
+     * ("Multiple access type modifiers are not allowed") — #30856, re-#24819 / #12508 / #17197.
      * `version_compare` treats `8.4.0-dev` as below `8.4.0`, so unset `PHP_COMPILER_PROFILE`
      * keeps this false (do not use {@see isForwardProfileAtLeast()} here — that reopened the
-     * reference-profile accept regression via #24720/#24722).
+     * reference-profile accept regression via #30205/#30219 and earlier #24720/#24722).
      * Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
      * php-src: Zend/zend_language_parser.y T_PRIVATE_SET; Zend/zend_compile.c ZEND_ACC_*_SET.
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -4455,12 +4455,12 @@ final class CompilerVersion
      * PHP 8.4+ parenthesized asymmetric set modifier `public (private(set))` on properties.
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
-     * (#16450, #24819). Same `version_compare` rule as {@see supportsAsymmetricVisibility()}.
+     * (#16450, #30856, re-#24819). Same `version_compare` rule as {@see supportsAsymmetricVisibility()}.
      * php-src: Zend/zend_compile.c asymmetric visibility scope parsing.
      */
     public static function supportsParenthesizedAsymmetricSetModifier(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
