@@ -519,6 +519,25 @@ final class DateTimeSupport
         return $var;
     }
 
+    /**
+     * Compile-time snapshot of the createFromFormat last-errors bag for JIT/AOT (#30749).
+     *
+     * Same slot as {@see writeCreateFromFormatLastErrors}; peers date_create_from_format /
+     * DateTime::createFromFormat update it during lowering so date_get_last_errors() /
+     * DateTime::getLastErrors() can materialize a constant hashtable (or false).
+     *
+     * @return array{
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>
+     * }|false
+     */
+    public static function peekCreateFromFormatLastErrors(): array|false
+    {
+        return self::$createFromFormatLastErrors;
+    }
+
     /** php-src PHP_METHOD(DateTime, getLastErrors) — false when no recorded errors (#4660). */
     public static function writeCreateFromFormatLastErrors(Variable $returnVar): void
     {

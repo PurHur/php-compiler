@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\ext\standard\JitDateGetLastErrors;
 use PHPCompiler\ext\standard\JitDateMutation;
 use PHPCompiler\ext\standard\JitDateOffsetGet;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
@@ -249,5 +250,35 @@ final class DateTimeSetISODate implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         return JitDateMutation::invokeObjectISODateSet($context, $this->immutable, ...$args);
+    }
+}
+
+/**
+ * DateTime::getLastErrors() / DateTimeImmutable::getLastErrors() — JIT/AOT (#30749).
+ *
+ * Defined here because DateTimeSetTimezone is always registered (all profiles).
+ * SSOT: {@see \PHPCompiler\ext\standard\JitDateGetLastErrors::invokeMethod}
+ * php-src stub: getLastErrors(): array|false
+ */
+final class DateTimeGetLastErrors implements Call
+{
+    /** Qualified name for BuiltinParamNames / named-arg resolve. */
+    public string $name;
+
+    /** @var list<string> */
+    public array $paramNames = [];
+
+    /** Static method — no implicit $this. */
+    public int $namedArgsReceiverPrefix = 0;
+
+    public function __construct(
+        private readonly bool $immutable = false,
+    ) {
+        $this->name = $immutable ? 'DateTimeImmutable::getLastErrors' : 'DateTime::getLastErrors';
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        return JitDateGetLastErrors::invokeMethod($context, $this->name, ...$args);
     }
 }

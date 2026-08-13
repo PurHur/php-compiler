@@ -1582,6 +1582,9 @@ class Context {
         $this->functionProxies['datetimeimmutable::settime'] = new Call\DateTimeSetTime(true);
         $this->functionProxies['datetime::setisodate'] = new Call\DateTimeSetISODate(false);
         $this->functionProxies['datetimeimmutable::setisodate'] = new Call\DateTimeSetISODate(true);
+        // getLastErrors() — compile-time last-errors bag (peer date_get_last_errors) (#30749).
+        $this->functionProxies['datetime::getlasterrors'] = new Call\DateTimeGetLastErrors(false);
+        $this->functionProxies['datetimeimmutable::getlasterrors'] = new Call\DateTimeGetLastErrors(true);
         // modify() — avoid ExternalMethod null stub segfault after chained format() (#26789).
         // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772).
         $this->functionProxies['datetime::modify'] = new Call\DateTimeModify(false);
