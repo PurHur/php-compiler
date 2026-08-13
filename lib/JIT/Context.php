@@ -1316,6 +1316,13 @@ class Context {
         $this->functionProxies['multipleiterator::__construct'] = new Call\MultipleIteratorMethod('__construct');
         $this->functionProxies['multipleiterator::attachiterator'] = new Call\MultipleIteratorMethod('attachIterator');
         $this->functionProxies['recursivetreeiterator::__construct'] = new Call\RecursiveTreeIteratorConstruct();
+        // Directory — dir() factory object + read/rewind/close (#30757).
+        $this->type->object->lookup('Directory');
+        foreach (['__construct', 'read', 'rewind', 'close'] as $dirMethod) {
+            $this->functionProxies['directory::'.strtolower($dirMethod)] = new Call\DirectoryMethod(
+                $dirMethod
+            );
+        }
         // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
