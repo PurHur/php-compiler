@@ -40,6 +40,15 @@ final class JitDateMutation
     private const TIMESTAMP_SET_TYPE_ERROR =
         'date_timestamp_set(): Argument #1 ($object) must be of type DateTime, %s given';
 
+    private const TIMEZONE_GET_TYPE_ERROR =
+        'date_timezone_get(): Argument #1 ($object) must be of type DateTimeInterface, %s given';
+
+    private const TIMEZONE_SET_OBJECT_TYPE_ERROR =
+        'date_timezone_set(): Argument #1 ($object) must be of type DateTime, %s given';
+
+    private const TIMEZONE_SET_ZONE_TYPE_ERROR =
+        'date_timezone_set(): Argument #2 ($timezone) must be of type DateTimeZone, %s given';
+
     public static function invokeAdd(Context $context, JITVariable ...$args): Value
     {
         return self::invokeIntervalMutation($context, 'date_add', true, ...$args);
@@ -938,5 +947,88 @@ final class JitDateMutation
             DateTimeSupport::MICROSECOND_PROPERTY,
             $i64->constInt(0, false)
         );
+    }
+
+    /** Procedural date_timezone_get() / DateTime(Immutable)::getTimezone() — JIT/AOT (#30746). */
+    public static function invokeTimezoneGet(Context $context, JITVariable ...$args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                \sprintf('date_timezone_get() expects exactly 1 argument, %d given', \count($args))
+            );
+        }
+        self::rejectNonObjectTimestampArg($context, $args[0], self::TIMEZONE_GET_TYPE_ERROR);
+
+        return self::allocateZoneFromDateTimeTzProp($context, $args[0]);
+    }
+
+    /** DateTime(Immutable)::getTimezone() — same layout read as date_timezone_get (#30746). */
+    public static function invokeTimezoneObjectGet(Context $context, JITVariable ...$args): Value
+    {
+        if ([] === $args) {
+            throw new \LogicException('DateTime::getTimezone() requires $this');
+        }
+
+        return self::allocateZoneFromDateTimeTzProp($context, $args[0]);
+    }
+
+    /** Procedural date_timezone_set() — mutable TZ property write (#30746). */
+    public static function invokeTimezoneSet(Context $context, JITVariable ...$args): Value
+    {
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                \sprintf('date_timezone_set() expects exactly 2 arguments, %d given', \count($args))
+            );
+        }
+        self::rejectNonObjectTimestampArg($context, $args[0], self::TIMEZONE_SET_OBJECT_TYPE_ERROR);
+        self::rejectNonObjectTimestampArg($context, $args[1], self::TIMEZONE_SET_ZONE_TYPE_ERROR);
+
+        /** @var ObjectBuiltin $objectType */
+        $objectType = $context->type->object;
+        $receiver = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        $timezone = ReflectionSetup::loadObjectFromArg($context, $args[1]);
+        $tzNameVar = $objectType->propertyFetch(
+            $timezone,
+            'DateTimeZone',
+            DateTimeSupport::TZ_NAME_PROPERTY
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiver, 'DateTime', DateTimeSupport::TZ_PROPERTY),
+            $tzNameVar,
+            JITVariable::TYPE_STRING
+        );
+
+        return self::returnObjectArg($context, $args[0]);
+    }
+
+    /**
+     * Allocate DateTimeZone from DateTime::__dt_timezone (date_format layout — avoid class_id).
+     */
+    private static function allocateZoneFromDateTimeTzProp(Context $context, JITVariable $dtArg): Value
+    {
+        /** @var ObjectBuiltin $objectType */
+        $objectType = $context->type->object;
+        $receiver = ReflectionSetup::loadObjectFromArg($context, $dtArg);
+        $tzNameVar = $objectType->propertyFetch(
+            $receiver,
+            'DateTime',
+            DateTimeSupport::TZ_PROPERTY
+        );
+        $classId = $objectType->lookup('DateTimeZone');
+        $zone = $objectType->allocate($classId);
+        ReflectionSetup::markConstructed($context, $zone);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($zone, 'DateTimeZone', DateTimeSupport::TZ_NAME_PROPERTY),
+            $tzNameVar,
+            JITVariable::TYPE_STRING
+        );
+        $ret = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $ret),
+            $zone
+        );
+
+        return $ret;
     }
 }

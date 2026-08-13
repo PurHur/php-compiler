@@ -13,7 +13,7 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Value;
 
 /**
- * date_timezone_get() — procedural DateTimeInterface::getTimezone wrapper (ext/date/php_date.c, #9219).
+ * date_timezone_get() — procedural DateTimeInterface::getTimezone wrapper (ext/date/php_date.c, #9219, JIT/AOT #30746).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_timezone_get)
  */
@@ -50,6 +50,6 @@ final class date_timezone_get extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_timezone_get() is VM-only in this compiler build (issue #9219)');
+        return JitDateMutation::invokeTimezoneGet($context, ...$args);
     }
 }
