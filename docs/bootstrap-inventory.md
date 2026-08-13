@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7401 |
-| Phase A inventory files (M2 ratio SSOT) | 7401 |
+| PHP files on vm.php path | 7402 |
+| Phase A inventory files (M2 ratio SSOT) | 7402 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23982 |
+| Source constructs flagged (warnings) | 23983 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1466,6 +1466,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mailparse/mailparse_uudecode_all.php` | 0 | 2 |
 | `ext/mbstring/EastAsianWidthTable.php` | 0 | 1 |
 | `ext/mbstring/JitMbCheckEncoding.php` | 0 | 1 |
+| `ext/mbstring/JitMbChrOrd.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
 | `ext/mbstring/JitMbDetectEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbMimeheader.php` | 0 | 1 |
@@ -18845,6 +18846,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/mbstring/JitMbChrOrd.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/mbstring/JitMbConvertCase.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19096,7 +19102,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_chr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 34)
 - 3 class method(s)
 - 2 closure(s)
 
@@ -19316,7 +19322,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_ord.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 34)
 - 3 class method(s)
 - 2 closure(s)
 

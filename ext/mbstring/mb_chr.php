@@ -16,7 +16,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_chr() — codepoint to multibyte character (php-src ext/mbstring/mbstring.c; #4559, #29778).
+ * mb_chr() — codepoint to multibyte character (php-src ext/mbstring/mbstring.c; #4559, #29778, #30759).
+ *
+ * JIT/AOT: compile-time fold via {@see JitMbChrOrd} (peer mb_strtolower / JitMbSearch).
  */
 final class mb_chr extends Internal
 {
@@ -70,6 +72,11 @@ final class mb_chr extends Internal
             JitInternalStrictArg::rejectNullInt($context, $args[0], 'mb_chr', 'codepoint', 1);
 
             return self::foldFalse($context);
+        }
+
+        $folded = JitMbChrOrd::tryChrFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
         }
 
         throw new \LogicException('mb_chr() is not lowered for JIT/AOT in this compiler build');
