@@ -2731,16 +2731,41 @@ final class CompilerVersionGateTest extends TestCase
 
     public function testSupportsTypedTraitConstantsTrueOn83Target(): void
     {
-        $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
-    public function testSupportsTypedClassConstantsTrueOnDefaultDevProfile(): void
+    public function testSupportsTypedTraitConstantsFalseOnDefaultDevProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            // PHP 8.3 feature enabled on default 8.4.0-dev (#30176); PROFILE still overrides (#30512).
-            $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
+            $this->assertFalse(CompilerVersion::supportsTypedTraitConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsTypedClassConstantsFalseOnDefaultDevProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            // Withheld on 8.4.0-dev reference (Zend 8.2 parse error) — #24809 / #30857.
+            $this->assertFalse(CompilerVersion::supportsTypedClassConstants());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2856,13 +2881,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsInterfaceTypedConstantsTrueOnDefaultDevProfile(): void
+    public function testSupportsInterfaceTypedConstantsFalseOnDefaultDevProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            // Tracks supportsTypedClassConstants() — enabled by default (#30176 / #30512).
-            $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
+            // Tracks supportsTypedClassConstants() — withheld on reference (#24917 / #30857).
+            $this->assertFalse(CompilerVersion::supportsInterfaceTypedConstants());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

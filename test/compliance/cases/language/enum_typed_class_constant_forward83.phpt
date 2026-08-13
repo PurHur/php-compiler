@@ -1,5 +1,7 @@
 --TEST--
 Language: enum typed user const E::FOO resolves at runtime (zend_enum.c, #6016)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 enum E: int {

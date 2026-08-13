@@ -1,5 +1,7 @@
 --TEST--
-Language: typed class constants parse and evaluate on default profile (#30176, Zend/zend_compile.c)
+Language: typed class constants parse and evaluate under PHP_COMPILER_PROFILE=8.3 (#30176 / #30857, Zend/zend_compile.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 class Config {

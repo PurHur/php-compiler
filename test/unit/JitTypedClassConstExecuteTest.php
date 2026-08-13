@@ -65,9 +65,9 @@ final class JitTypedClassConstExecuteTest extends TestCase
     {
         foreach (
             [
-                'typed_class_const.phpt',
-                'typed_class_const_float_int.phpt',
-                'typed_class_constant.phpt',
+                'typed_class_const_forward83.phpt',
+                'typed_class_const_float_int_forward83.phpt',
+                'typed_class_constant_forward83.phpt',
                 'interface_typed_const.phpt',
             ] as $fixture
         ) {

@@ -1,5 +1,7 @@
 --TEST--
 Language: final typed trait constants compile on 8.3+ target (#7043, Zend/zend_compile.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {

@@ -46,7 +46,7 @@ final class MatchVMTest extends BaseTest
                 'switch_match_enum_typed_subject.phpt',
                 'match_duplicate_default.phpt',
                 'match_default_not_last.phpt',
-                'match_typed_class_const.phpt',
+                'match_typed_class_const_forward83.phpt',
                 'match_class_const_compile_error.phpt',
             ] as $file
         ) {

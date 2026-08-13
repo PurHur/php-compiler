@@ -1,5 +1,7 @@
 --TEST--
 Language: trait constants with union types int|string (#6905, zend_compile.c PHP 8.3+)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
