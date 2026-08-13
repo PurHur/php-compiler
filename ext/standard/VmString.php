@@ -2192,124 +2192,26 @@ final class VmString
         return $c - 97 + 10;
     }
 
-    /** Unix-to-Unix encode (php-src ext/standard/uuencode.c — php_uuencode). */
+    /**
+     * Unix-to-Unix encode (php-src ext/standard/uuencode.c — php_uuencode).
+     *
+     * SSOT: {@see VmConvertUu::encode} (NestedJIT-safe strlen/substr; #30811).
+     */
     public static function convert_uuencode(string $src): string
     {
-        $srcLen = self::byteLength($src);
-        if (0 === $srcLen) {
-            return "`\n";
-        }
-        $len = 45;
-        $out = '';
-        $i = 0;
-        while ($i + 3 <= $srcLen) {
-            $ee = $i + $len;
-            if ($ee > $srcLen) {
-                $ee = $srcLen;
-                $len = $ee - $i;
-                if (0 !== ($len % 3)) {
-                    $ee = $i + (int) (floor($len / 3) * 3);
-                }
-            }
-            $out .= self::uuEnc($len);
-            while ($i < $ee) {
-                $b0 = self::byteOrd($src[$i]);
-                $b1 = self::byteOrd($src[$i + 1]);
-                $b2 = self::byteOrd($src[$i + 2]);
-                $out .= self::uuEnc($b0 >> 2);
-                $out .= self::uuEnc((($b0 << 4) & 060) | (($b1 >> 4) & 017));
-                $out .= self::uuEnc((($b1 << 2) & 074) | (($b2 >> 6) & 03));
-                $out .= self::uuEnc($b2 & 077);
-                $i += 3;
-            }
-            if (45 === $len) {
-                $out .= "\n";
-            }
-        }
-        if ($i < $srcLen) {
-            if (45 === $len) {
-                $out .= self::uuEnc($srcLen - $i);
-                $len = 0;
-            }
-            $b0 = self::byteOrd($src[$i]);
-            $b1 = ($i + 1 < $srcLen) ? self::byteOrd($src[$i + 1]) : 0;
-            $b2 = ($i + 2 < $srcLen) ? self::byteOrd($src[$i + 2]) : 0;
-            $out .= self::uuEnc($b0 >> 2);
-            $out .= self::uuEnc((($b0 << 4) & 060) | (($b1 >> 4) & 017));
-            $out .= ($srcLen - $i > 1)
-                ? self::uuEnc((($b1 << 2) & 074) | (($b2 >> 6) & 03))
-                : self::uuEnc(0);
-            $out .= ($srcLen - $i > 2)
-                ? self::uuEnc($b2 & 077)
-                : self::uuEnc(0);
-        }
-        if ($len < 45) {
-            $out .= "\n";
-        }
-        $out .= self::uuEnc(0)."\n";
-
-        return $out;
+        return VmConvertUu::encode($src);
     }
 
     /**
      * Unix-to-Unix decode (php-src ext/standard/uuencode.c — php_uudecode).
      *
+     * SSOT: {@see VmConvertUu::decode} (NestedJIT-safe strlen/substr; #30811).
+     *
      * @return string|false
      */
-    public static function convert_uudecode(string $src) {
-        $srcLen = self::byteLength($src);
-        if (0 === $srcLen) {
-            return false;
-        }
-        $totalLen = 0;
-        $out = '';
-        $i = 0;
-        while ($i < $srcLen) {
-            $len = self::uuDec(self::byteOrd($src[$i]));
-            ++$i;
-            if (0 === $len) {
-                break;
-            }
-            if ($len > $srcLen) {
-                return false;
-            }
-            $totalLen += $len;
-            $ee = $i + (45 === $len ? 60 : (int) floor($len * 1.33));
-            if ($ee > $srcLen) {
-                return false;
-            }
-            while ($i < $ee) {
-                if ($i + 4 > $srcLen) {
-                    return false;
-                }
-                $out .= \chr(self::uuDec(self::byteOrd($src[$i])) << 2 | self::uuDec(self::byteOrd($src[$i + 1])) >> 4);
-                $out .= \chr(self::uuDec(self::byteOrd($src[$i + 1])) << 4 | self::uuDec(self::byteOrd($src[$i + 2])) >> 2);
-                $out .= \chr(self::uuDec(self::byteOrd($src[$i + 2])) << 6 | self::uuDec(self::byteOrd($src[$i + 3])));
-                $i += 4;
-            }
-            if ($len < 45) {
-                break;
-            }
-            ++$i;
-        }
-        $written = self::byteLength($out);
-        if ($written < $totalLen) {
-            $len = $totalLen;
-            if ($len > $written) {
-                $out .= \chr(self::uuDec(self::byteOrd($src[$i])) << 2 | self::uuDec(self::byteOrd($src[$i + 1])) >> 4);
-                if ($len > 1) {
-                    $out .= \chr(self::uuDec(self::byteOrd($src[$i + 1])) << 4 | self::uuDec(self::byteOrd($src[$i + 2])) >> 2);
-                    if ($len > 2) {
-                        $out .= \chr(self::uuDec(self::byteOrd($src[$i + 2])) << 6 | self::uuDec(self::byteOrd($src[$i + 3])));
-                    }
-                }
-            }
-        }
-        if (self::byteLength($out) !== $totalLen) {
-            return self::byteSlice($out, 0, $totalLen);
-        }
-
-        return $out;
+    public static function convert_uudecode(string $src)
+    {
+        return VmConvertUu::decode($src);
     }
 
     /** ISO-8859-1 to UTF-8 (php-src ext/standard/basic_functions.c — PHP_FUNCTION(utf8_encode)). */
@@ -2392,20 +2294,6 @@ final class VmString
         }
 
         return $out;
-    }
-
-    private static function uuEnc(int $c): string
-    {
-        if (0 === $c) {
-            return '`';
-        }
-
-        return \chr(($c & 077) + 32);
-    }
-
-    private static function uuDec(int $c): int
-    {
-        return ($c - 32) & 077;
     }
 
     /** application/x-www-form-urlencoded (space as '+'). */

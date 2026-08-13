@@ -3312,6 +3312,7 @@ require_once __DIR__.'/../../../ext/standard/VmCombinedLcg.php';
 require_once __DIR__.'/../../../ext/standard/VmConnection.php';
 require_once __DIR__.'/../../../ext/standard/VmConstants.php';
 require_once __DIR__.'/../../../ext/standard/VmConvertCyrString.php';
+require_once __DIR__.'/../../../ext/standard/VmConvertUu.php';
 require_once __DIR__.'/../../../ext/standard/VmCopyFailure.php';
 require_once __DIR__.'/../../../ext/standard/VmCrc32.php';
 require_once __DIR__.'/../../../ext/standard/VmCrc32c.php';
