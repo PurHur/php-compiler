@@ -11,6 +11,29 @@ use PHPUnit\Framework\TestCase;
 /** Typed trait constants compile gate (#5212, #5993, Zend/zend_compile.c). */
 final class TraitTypedConstCompileTest extends TestCase
 {
+    /** @var string|false|null */
+    private $savedCompilerProfile = null;
+
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsTypedTraitConstants()) {
+            $this->savedCompilerProfile = getenv('PHP_COMPILER_PROFILE');
+            putenv('PHP_COMPILER_PROFILE=8.3');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        if (null !== $this->savedCompilerProfile) {
+            if (false === $this->savedCompilerProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$this->savedCompilerProfile);
+            }
+            $this->savedCompilerProfile = null;
+        }
+    }
+
     public function testTypedTraitConstantCompilesOn83Target(): void
     {
         if (!CompilerVersion::supportsTypedTraitConstants()) {
@@ -49,7 +72,9 @@ class C {
 PHP;
         $runtime = new Runtime();
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Type of C::FOO must be compatible with T::FOO of type string');
+        $this->expectExceptionMessage(
+            'C and T define the same constant (FOO) in the composition of C. However, the definition differs and is considered incompatible. Class was composed'
+        );
         $runtime->parseAndCompile($code, 'trait_typed_const_inherit_bad.php');
     }
 

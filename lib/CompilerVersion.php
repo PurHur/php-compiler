@@ -134,26 +134,29 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24809, #30176, #30512).
+     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24809, #30176, #30512, #30857).
      *
-     * Enabled by default when compiler MAJOR.MINOR >= 8.3 (handles 8.4.0-dev where
-     * version_compare treats -dev as below 8.4.0 stable) — PHP 8.3 language feature (#30176).
-     * Explicit `PHP_COMPILER_PROFILE` overrides: PROFILE < 8.3 disables (Zend 8.2 parse error);
-     * PROFILE >= 8.3 enables (#30512). Same override shape as {@see supportsDynamicClassConstFetch()}.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#24809, #30857).
+     * Explicit PROFILE < 8.3 remains disabled (#30512). Same withhold shape as
+     * {@see supportsGlobalTypedConstants()} / {@see supportsClassConstBraceDeref()}.
      */
     public static function supportsTypedClassConstants(): bool
     {
-        if (self::MAJOR_VERSION < 8
-            || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION < 3)) {
+        if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
         }
 
-        return true;
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**

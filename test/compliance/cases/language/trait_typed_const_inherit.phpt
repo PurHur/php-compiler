@@ -1,5 +1,7 @@
 --TEST--
 Language: typed trait constant — incompatible class override (#5993, #5953)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {

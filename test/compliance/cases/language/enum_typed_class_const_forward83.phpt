@@ -1,5 +1,7 @@
 --TEST--
 Language: enum typed class const — getCases() excludes user consts (zend_compile.c, #7370)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 enum E: string {

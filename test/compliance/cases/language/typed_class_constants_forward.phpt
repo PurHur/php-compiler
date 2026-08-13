@@ -1,5 +1,7 @@
 --TEST--
-Language: typed class constants (PHP 8.3) — parse and evaluate (#30176)
+Language: typed class constants (PHP 8.3) — parse and evaluate under forward profile (#30176 / #30857)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 class Config {

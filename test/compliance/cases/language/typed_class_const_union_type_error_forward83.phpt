@@ -1,5 +1,7 @@
 --TEST--
-Language: typed class constant non-constexpr mismatch — runtime TypeError (#4541)
+Language: typed class constant union type mismatch — compile-time TypeError (#6886)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (PHP_VERSION_ID < 80300) {
@@ -9,7 +11,7 @@ if (PHP_VERSION_ID < 80300) {
 --FILE--
 <?php
 class C {
-    public const string S = 1 + 0;
+    public const int|string X = true;
 }
 --EXPECT_EXIT--
 255

@@ -1,5 +1,7 @@
 --TEST--
 Language: typed class constant with enum type preserves enum case (Zend/zend_compile.c, #9790)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 enum Color: string { case Red = 'r'; case Blue = 'b'; }

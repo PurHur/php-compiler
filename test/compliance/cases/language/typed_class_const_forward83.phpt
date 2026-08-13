@@ -1,5 +1,7 @@
 --TEST--
 Language: typed class constants — array and string (issue #3592, Zend zend_constants.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (PHP_VERSION_ID < 80300) {

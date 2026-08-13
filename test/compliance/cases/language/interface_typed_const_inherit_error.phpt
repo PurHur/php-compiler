@@ -1,5 +1,7 @@
 --TEST--
 Language: typed interface constant override must be compatible (PHP 8.3, issue #5980)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {

@@ -1,5 +1,7 @@
 --TEST--
 Language: typed trait constants — value/type mismatch compile error (#6012, Zend/zend_compile.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
