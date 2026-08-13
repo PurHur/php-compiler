@@ -1,5 +1,5 @@
 --TEST--
-AOT: proc_nice() via libc nice(3) (#5181)
+AOT: proc_nice() via ProcNiceJitHelper (#5181, #30615)
 --FILE--
 <?php
 $ok = proc_nice(0);

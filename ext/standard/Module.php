@@ -1113,7 +1113,8 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('chmod', $ft);
             $context->registerFunction('chmod', $fn);
         }
-        // nice(3) dropped (#30530): JitProcNice::ensureLibcNice declares module-locally.
+        // nice(3) dropped (#30530 / #30615): StringProcNice NestedJIT leaf declares
+        // module-locally; ProcNiceJitHelper uses @proc_nice (always-on JitProcNice LLVM removed).
         try {
             $context->lookupFunction('__errno_location');
         } catch (\Throwable $e) {
