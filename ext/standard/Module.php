@@ -1130,37 +1130,9 @@ class Module extends ModuleAbstract
         // LibcExtern already dropped its chdir row.
         // chroot(2) dropped (#30558 / chdir #29219): StringChroot NestedJIT leaf declares
         // module-locally; ChrootJitHelper uses @chroot (Module always-on removed).
-        $double = $context->getTypeFromString('double');
-        try {
-            $context->lookupFunction('fabs');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($double, false, $double);
-            $fn = $context->module->addFunction('fabs', $ft);
-            $context->registerFunction('fabs', $fn);
-        }
-        foreach (['round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'acosh', 'asinh', 'atanh', 'pow', 'hypot', 'atan2'] as $name) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable $e) {
-                $params = in_array($name, ['pow', 'hypot', 'atan2'], true) ? [$double, $double] : [$double];
-                $ft = $context->context->functionType($double, false, ...$params);
-                $fn = $context->module->addFunction($name, $ft);
-                $context->registerFunction($name, $fn);
-            }
-        }
-        $doublePtr = $context->getTypeFromString('double*');
-        $i32Ptr = $context->getTypeFromString('int32*');
-        foreach ([
-            'modf' => [$double, $doublePtr],
-            'frexp' => [$double, $i32Ptr],
-        ] as $name => $params) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable $e) {
-                $ft = $context->context->functionType($double, false, ...$params);
-                $fn = $context->module->addFunction($name, $ft);
-                $context->registerFunction($name, $fn);
-            }
-        }
+        // Math libc always-on decls dropped (#30666 / LibcExtern #28808): MathAbs / MathRound /
+        // MathSqrt / MathLog* / MathExp* / MathSin… / MathPow / MathHypot / MathAtan2 /
+        // MathModf / MathFrexp route via JitVmHelperLink + *JitHelper PHP (no Module
+        // lookupFunction consumers remain).
     }
 }
