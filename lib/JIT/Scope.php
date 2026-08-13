@@ -54,7 +54,7 @@ class Scope {
     public bool $preserveNewResultOnNullCall = false;
 
     /**
-     * METHODCALL_INIT bound datetimezone::getoffset; EXEC may rewrite if argc==1 (#29732).
+     * METHODCALL_INIT bound datetimezone::getoffset; EXEC rewrites DateTime::getOffset when argc==1 (#30761).
      */
     public bool $pendingDateTimeZoneGetOffset = false;
 
