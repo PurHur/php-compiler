@@ -21,6 +21,28 @@ final class VmLocalePure
         return \function_exists('setlocale') && \function_exists('localeconv');
     }
 
+    /**
+     * Match php-src {@see zend_reset_lc_ctype_locale} (Zend/zend_operators.c; #30789).
+     *
+     * Prefer C.UTF-8 so idle nl_langinfo(CODESET) is UTF-8; fall back to C when missing.
+     */
+    public static function resetLcCtypeLocale(): void
+    {
+        if (!\function_exists('setlocale')) {
+            return;
+        }
+
+        $lcCtype = self::lcConstants()['LC_CTYPE'];
+        $result = @\setlocale($lcCtype, 'C.UTF-8');
+        if (false === $result || '' === $result) {
+            $result = @\setlocale($lcCtype, 'C');
+        }
+        if (\is_string($result) && '' !== $result) {
+            self::$preservedLcCtype = $result;
+            self::$trackingInitialized = true;
+        }
+    }
+
     /** @return array<string, int> */
     public static function lcConstants(): array
     {

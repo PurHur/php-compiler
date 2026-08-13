@@ -5344,6 +5344,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.p
 require_once __DIR__.'/../../../lib/JIT/Builtin/ListSpreadTailRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ListUnpackRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/LocaleParser.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/LocaleStartupRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathAbs.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathAcos.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathAcosh.php';
