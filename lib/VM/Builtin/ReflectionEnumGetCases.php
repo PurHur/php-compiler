@@ -18,6 +18,14 @@ final class ReflectionEnumGetCases extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (0 args)
+        $userArgCount = \count($frame->calledArgs) - 1;
+        if (0 !== $userArgCount) {
+            throw new \ArgumentCountError(\sprintf(
+                'ReflectionEnum::getCases() expects exactly 0 arguments, %d given',
+                $userArgCount
+            ));
+        }
         $receiver = ReflectionSupport::requireReflectionEnum($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $enumName = ReflectionSupport::classNameFromReflection($receiver);
