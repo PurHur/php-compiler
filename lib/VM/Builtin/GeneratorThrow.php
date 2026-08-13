@@ -19,8 +19,13 @@ final class GeneratorThrow extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $gen = self::generatorFromFrame($frame);
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('Generator::throw() requires an exception argument');
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (1 arg); $calledArgs[0] is $this (#30866)
+        $userArgCount = \count($frame->calledArgs) - 1;
+        if (1 !== $userArgCount) {
+            throw new \ArgumentCountError(\sprintf(
+                'Generator::throw() expects exactly 1 argument, %d given',
+                $userArgCount
+            ));
         }
         $exception = $frame->calledArgs[1]->resolveIndirect();
         $active = $gen->vm->throwGenerator($gen, $exception);

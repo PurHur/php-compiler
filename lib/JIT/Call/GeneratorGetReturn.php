@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -22,6 +23,21 @@ final class GeneratorGetReturn implements Call
     {
         if ([] === $args) {
             throw new \LogicException('Generator::getReturn() called without $this');
+        }
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (0 args); $args[0] is $this (#30866)
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'Generator::getReturn() expects exactly 0 arguments, %d given',
+                    $userArgCount
+                )
+            );
+            $unreachable = BasicBlockHelper::append($context, 'gen_getreturn_argc_unreach');
+            $context->builder->positionAtEnd($unreachable);
+
+            return JitValueBox::alloc($context);
         }
         $genVar = $args[0];
         GeneratorHelper::ensureStarted($context, $genVar);

@@ -373,6 +373,8 @@
             <file>./test/compliance/GetCalledClassExcessArgc30648JITTest.php</file>
             <file>./test/compliance/ReflectionEnumExcessArgc30865VMTest.php</file>
             <file>./test/compliance/ReflectionEnumExcessArgc30865JITTest.php</file>
+            <file>./test/compliance/GeneratorExcessArgc30866VMTest.php</file>
+            <file>./test/compliance/GeneratorExcessArgc30866JITTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653VMTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653JITTest.php</file>
             <file>./test/compliance/SessionDestroyTmpfileExcessArgc30676VMTest.php</file>

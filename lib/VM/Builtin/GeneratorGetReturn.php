@@ -23,6 +23,14 @@ final class GeneratorGetReturn extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Generator::getReturn() called without $this');
         }
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (0 args); $calledArgs[0] is $this (#30866)
+        $userArgCount = \count($frame->calledArgs) - 1;
+        if (0 !== $userArgCount) {
+            throw new \ArgumentCountError(\sprintf(
+                'Generator::getReturn() expects exactly 0 arguments, %d given',
+                $userArgCount
+            ));
+        }
         $receiver = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $receiver->type) {
             throw new \LogicException('Generator::getReturn() called on non-object');
