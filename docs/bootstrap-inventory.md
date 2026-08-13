@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7416 |
-| Phase A inventory files (M2 ratio SSOT) | 7416 |
+| PHP files on vm.php path | 7417 |
+| Phase A inventory files (M2 ratio SSOT) | 7417 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24008 |
+| Source constructs flagged (warnings) | 24015 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1470,6 +1470,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
 | `ext/mbstring/JitMbDetectEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbEncodingRegistry.php` | 0 | 3 |
+| `ext/mbstring/JitMbEregSearch.php` | 0 | 4 |
 | `ext/mbstring/JitMbMimeheader.php` | 0 | 1 |
 | `ext/mbstring/JitMbNumericEntity.php` | 0 | 1 |
 | `ext/mbstring/JitMbParseStr.php` | 0 | 1 |
@@ -6841,10 +6842,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/ReflectionEnumConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumFromName.php` | 0 | 2 |
 | `lib/VM/Builtin/ReflectionEnumGetBackingType.php` | 0 | 1 |
-| `lib/VM/Builtin/ReflectionEnumGetCase.php` | 0 | 1 |
-| `lib/VM/Builtin/ReflectionEnumGetCases.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionEnumGetCase.php` | 0 | 2 |
+| `lib/VM/Builtin/ReflectionEnumGetCases.php` | 0 | 2 |
 | `lib/VM/Builtin/ReflectionEnumGetName.php` | 0 | 1 |
-| `lib/VM/Builtin/ReflectionEnumHasCase.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionEnumHasCase.php` | 0 | 2 |
 | `lib/VM/Builtin/ReflectionEnumIsBacked.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumUnitCaseConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumUnitCaseGetAttributes.php` | 0 | 1 |
@@ -18885,6 +18886,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 45)
 - 4 class method(s)
 
+### `ext/mbstring/JitMbEregSearch.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 62)
+- new ArgumentCountError (line 90)
+- 5 class method(s)
+
 ### `ext/mbstring/JitMbMimeheader.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18975,7 +18984,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/MbstringAotFoldState.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 9 class method(s)
 
 ### `ext/mbstring/MbstringConstants.php`
 
@@ -56667,11 +56676,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionEnumGetCase.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumGetCases.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumGetName.php`
@@ -56682,6 +56693,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionEnumHasCase.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumIsBacked.php`

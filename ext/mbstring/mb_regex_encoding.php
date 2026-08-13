@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_regex_encoding() — get/set mbregex encoding (php-src ext/mbstring/php_mbregex.c; #4635).
+ * mb_regex_encoding() — get/set mbregex encoding (php-src ext/mbstring/php_mbregex.c; #4635, #30781 AOT).
  */
 final class mb_regex_encoding extends Internal
 {
@@ -60,6 +60,6 @@ final class mb_regex_encoding extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_regex_encoding() is not lowered for JIT/AOT in this compiler build');
+        return JitMbEregSearch::foldRegexEncoding($context, $args);
     }
 }

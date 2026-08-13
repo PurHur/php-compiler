@@ -7,14 +7,14 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\JIT\Context;
 
 /**
- * Per-JIT-Context encoding shadows for thin AOT fold of mb_* (#20014).
+ * Per-JIT-Context encoding shadows for thin AOT fold of mb_* (#20014, #30781).
  *
  * Stored by spl_object_id so we do not edit {@see Context} (helper-runtime
  * core fingerprint) and state does not leak across compiles in one process.
  */
 final class MbstringAotFoldState
 {
-    /** @var array<int, array{http?: string, internal?: string, detect?: list<string>}> */
+    /** @var array<int, array{http?: string, internal?: string, detect?: list<string>, regex?: string}> */
     private static array $byContext = [];
 
     public static function httpOutput(Context $context): ?string
@@ -47,5 +47,26 @@ final class MbstringAotFoldState
     public static function setDetectOrder(Context $context, array $order): void
     {
         self::$byContext[spl_object_id($context)]['detect'] = $order;
+    }
+
+    public static function regexEncoding(Context $context): ?string
+    {
+        return self::$byContext[spl_object_id($context)]['regex'] ?? null;
+    }
+
+    public static function setRegexEncoding(Context $context, string $encoding): void
+    {
+        self::$byContext[spl_object_id($context)]['regex'] = $encoding;
+    }
+
+    /**
+     * Apply per-context regex encoding into {@see MbstringState} before mbregex folds (#30781).
+     */
+    public static function syncRegexEncodingIntoState(Context $context): void
+    {
+        $enc = self::regexEncoding($context);
+        if (null !== $enc) {
+            MbstringState::regexEncoding($enc);
+        }
     }
 }

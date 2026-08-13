@@ -1270,6 +1270,7 @@ require_once __DIR__.'/../../../ext/mbstring/JitMbMimeheader.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbNumericEntity.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbParseStr.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbScrub.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbEregSearch.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbSearch.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbStrPad.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbStrSplit.php';

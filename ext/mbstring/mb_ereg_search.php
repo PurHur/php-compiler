@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ereg_search() — advance search cursor (php-src php_mbregex.c; #20024).
+ * mb_ereg_search() — advance search cursor (php-src php_mbregex.c; #20024, #30781 AOT).
  */
 final class mb_ereg_search extends Internal
 {
@@ -62,6 +62,6 @@ final class mb_ereg_search extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_ereg_search() is not lowered for JIT/AOT in this compiler build');
+        return JitMbEregSearch::foldSearch($context, $args);
     }
 }
