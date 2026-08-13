@@ -7,10 +7,15 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** session_id() — get or set the active session id (issue #1183). */
+/**
+ * session_id() — get or set the active session id (issue #1183).
+ *
+ * Excess argc → Zend ArgumentCountError (#30684; php-src ext/session/session.c).
+ */
 class session_id_ extends Internal
 {
     public function __construct()
@@ -20,10 +25,9 @@ class session_id_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 0..1 (#30684; ext/session/session.stub.php).
+        $this->requireAtMostArgCount($frame, 'session_id', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('session_id() accepts at most one argument in this compiler build');
-        }
         if (0 === $argc) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->string(VmSession::getId());
@@ -62,8 +66,11 @@ class session_id_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('session_id() accepts at most one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30684).
+        if (!$this->requireAtMostJitArgCount($context, $args, 'session_id', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return \call_user_func_array([JitSessionId::class, 'invoke'], array_merge([$context], $args));

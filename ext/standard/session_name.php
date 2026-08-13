@@ -7,11 +7,16 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
-/** session_name() — get or set the session cookie name (issue #1184). */
+/**
+ * session_name() — get or set the session cookie name (issue #1184).
+ *
+ * Excess argc → Zend ArgumentCountError (#30684; php-src ext/session/session.c).
+ */
 class session_name extends Internal
 {
     public function __construct()
@@ -21,10 +26,9 @@ class session_name extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 0..1 (#30684; ext/session/session.stub.php).
+        $this->requireAtMostArgCount($frame, 'session_name', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('session_name() accepts at most one argument in this compiler build');
-        }
         if (0 === $argc) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->string(VmSession::getName());
@@ -78,8 +82,11 @@ class session_name extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('session_name() accepts at most one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30684).
+        if (!$this->requireAtMostJitArgCount($context, $args, 'session_name', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return \call_user_func_array([JitSessionName::class, 'invoke'], array_merge([$context], $args));

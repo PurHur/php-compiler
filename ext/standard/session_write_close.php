@@ -11,7 +11,10 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** session_write_close() / session_commit() alias — persist $_SESSION and close (issue #1185, #12544). */
+/** session_write_close() / session_commit() alias — persist $_SESSION and close (issue #1185, #12544).
+ *
+ * ACE messages use $this->name so session_commit(1) cites session_commit() (#30684).
+ */
 class session_write_close extends Internal
 {
     public function __construct(string $name = 'session_write_close')
