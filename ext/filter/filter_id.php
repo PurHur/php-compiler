@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
@@ -19,9 +20,8 @@ final class filter_id extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException('filter_id() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 (#30594; ext/filter/filter.c).
+        $this->requireExactArgCount($frame, 'filter_id', 1);
         // php-src filter_id(string $name) — null rejected under strict_types (#30309).
         if (InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::requireString($frame, 0, 'filter_id', 'name');
@@ -46,8 +46,10 @@ final class filter_id extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('filter_id() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'filter_id', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitFilterId::invoke($context, $args[0]);
