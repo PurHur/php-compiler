@@ -1511,6 +1511,7 @@ class Type extends Builtin {
         StringTime::ensureLinked($this->context);
         ProcessIdentityJit::ensureLinked($this->context);
         PosixGetpidJit::ensureLinked($this->context);
+        PosixGetppidJit::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
         StringNetInterfacesJit::ensureLinked($this->context);

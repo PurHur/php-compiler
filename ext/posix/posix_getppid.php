@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** posix_getppid() — parent process ID (php-src ext/posix/posix.c; #7271). */
+/** posix_getppid() — parent process ID (VM VmPosix; JIT/AOT PosixGetppidJitHelper via PosixGetppidJit, #30728/#7271). */
 final class posix_getppid extends Internal
 {
     public function __construct()
