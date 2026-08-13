@@ -338,6 +338,8 @@
             <file>./test/compliance/StreamFileExcessArgc30584JITTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583VMTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
+            <file>./test/compliance/ReadfileOptionalArgs30582VMTest.php</file>
+            <file>./test/compliance/ReadfileOptionalArgs30582JITTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageVMTest.php</file>
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>
