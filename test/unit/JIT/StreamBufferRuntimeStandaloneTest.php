@@ -30,6 +30,10 @@ final class StreamBufferRuntimeStandaloneTest extends TestCase
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+            $this->assertFalse(
+                Builtin\StreamIoRuntime::isDeferStub($fn),
+                $name.' must not remain an inventory defer stub (#30788)'
+            );
         }
     }
 }
