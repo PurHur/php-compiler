@@ -1,13 +1,13 @@
 {
     "version": 1,
-    "generated_at": "2026-08-12T21:05:09+00:00",
+    "generated_at": "2026-08-13T04:11:42+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "5f46c13f547de8893ada",
     "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
-    "unit_count": 382,
-    "published_fresh": 2,
+    "unit_count": 385,
+    "published_fresh": 6,
     "kept_live_unpublished": 0,
-    "total_bytes": 799313770,
-    "refresh": "php script/emit-helper-runtime-object.php --unit=/ext/standard/AssertOptionsJitHelper.php + --unit=/ext/standard/IniJitHelper.php then publish (#30547); pinned Docker"
+    "total_bytes": 805698470,
+    "refresh": "php script/emit-helper-runtime-object.php --unit=ProcessIdentity+Ini+ExecutionLimits+Getmypid+Chroot+ProcNice then publish (#30635); pinned Docker"
 }
