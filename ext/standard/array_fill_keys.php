@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 
 /**
  * array_fill_keys() for keys list and scalar fill value (subset of PHP; JIT via ArrayFillKeysRuntime).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30719; php-src ext/standard/array.c).
  */
 final class array_fill_keys extends Internal
 {
@@ -24,9 +26,8 @@ final class array_fill_keys extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_fill_keys() requires exactly two arguments');
-        }
+        // php-src stub arity: exactly 2 (#30719; ext/standard/array.stub.php).
+        $this->requireExactArgCount($frame, 'array_fill_keys', 2);
         $keysHt = VmArray::requireArrayParam($frame->calledArgs[0], 'array_fill_keys', 1, 'keys');
         $value = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -37,8 +38,9 @@ final class array_fill_keys extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('array_fill_keys() requires exactly two arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30719).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_fill_keys', 2)) {
+            return $context->getTypeFromString('__hashtable__*')->constNull();
         }
         $keysArg = $args[0];
         if (JITVariable::TYPE_HASHTABLE !== $keysArg->type

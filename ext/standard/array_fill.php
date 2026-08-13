@@ -24,14 +24,15 @@ use PHPLLVM\Value;
 
 /**
  * array_fill() for integer start index, non-negative count, and a scalar value (subset of PHP).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30719; php-src ext/standard/array.c).
  */
 final class array_fill extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_fill() requires exactly three arguments');
-        }
+        // php-src stub arity: exactly 3 (#30719; ext/standard/array.stub.php).
+        $this->requireExactArgCount($frame, 'array_fill', 3);
         $value = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -55,8 +56,9 @@ final class array_fill extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (3 !== \count($args)) {
-            throw new \LogicException('array_fill() requires exactly three arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30719).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_fill', 3)) {
+            return $context->getTypeFromString('__hashtable__*')->constNull();
         }
         JitInternalStrictArg::requireInt($context, $args[0], 'array_fill', 'start_index', 1);
         $startIndex = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'array_fill', 1, 'start_index');

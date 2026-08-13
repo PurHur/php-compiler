@@ -27,6 +27,8 @@ use PHPLLVM\Value;
 
 /**
  * range() — int/float/char bounds (php-src ext/standard/array.c; #4258 VM, #27563 AOT char, #27158 AOT float).
+ *
+ * Under/over arity → Zend at-least / at-most ArgumentCountError (#30719).
  */
 final class range extends Internal
 {
@@ -34,9 +36,8 @@ final class range extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2 || \count($frame->calledArgs) > 3) {
-            throw new \LogicException('range() requires two or three arguments');
-        }
+        // php-src stub arity: 2..3 (#30719; ext/standard/array.stub.php).
+        $this->requireArgCountRange($frame, 'range', 2, 3);
         $stepVar = 3 === \count($frame->calledArgs) ? $frame->calledArgs[2] : null;
         if (null === $frame->returnVar) {
             VmRange::build($frame, $frame->calledArgs[0], $frame->calledArgs[1], $stepVar);
@@ -53,8 +54,9 @@ final class range extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (\count($args) < 2 || \count($args) > 3) {
-            throw new \LogicException('range() requires two or three arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30719).
+        if (!$this->requireArgCountRangeJit($context, $args, 'range', 2, 3)) {
+            return $context->getTypeFromString('__hashtable__*')->constNull();
         }
 
         // php-src: float path when any bound/step is double — before char (#24399 / #27158).
