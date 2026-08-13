@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __string__quotemeta via QuotemetaJitHelper PHP (#14705, #21589, #27011).
+ * JIT/AOT link for __string__quotemeta via QuotemetaJitHelper + VmQuotemeta (#14705, #21589, #27011, #30858).
  *
- * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit compile loop). Peer: StringStrRot13 #26868 / StringStrrev #27007
- * (self-contained helper — no VmString ExternalMethod stub under NestedJIT).
- * SSOT: {@see \PHPCompiler\ext\standard\QuotemetaJitHelper} (mirrors {@see \PHPCompiler\ext\standard\VmString}).
+ * NestedJIT bundle peer {@see StringChunkSplit} / #30859 and {@see StringSoundex} / #30790 —
+ * solo QuotemetaJitHelper NestedJIT SIGSEGVs under thin user-script AOT (#30858 / re-#27011).
  * php-src: ext/standard/string.c — PHP_FUNCTION(quotemeta)
  */
 final class StringQuotemeta
@@ -22,6 +21,14 @@ final class StringQuotemeta
     private const ABI = '__string__quotemeta';
 
     private const HELPER_PATH = '/ext/standard/QuotemetaJitHelper.php';
+
+    /**
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/VmQuotemeta.php',
+        '/ext/standard/QuotemetaJitHelper.php',
+    ];
 
     private const QUOTEMETA_HELPER = 'PHPCompiler\\ext\\standard\\QuotemetaJitHelper::quotemetaArgv';
 
@@ -39,7 +46,7 @@ final class StringQuotemeta
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::ensureLinked($context);
+        self::implement($context);
     }
 
     private static function implement(Context $context): void
@@ -55,7 +62,24 @@ final class StringQuotemeta
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::implementBridge($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementBridge(Context $context): void
+    {
         $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#30858'
+        );
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI,
@@ -65,7 +89,7 @@ final class StringQuotemeta
             self::QUOTEMETA_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#21589'
+            '#30858'
         );
     }
 }

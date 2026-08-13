@@ -161,6 +161,9 @@ final class HelperRuntimeCache
         // #30859 / re-#26992 — prelinked ChunkSplitJitHelper unit.o SIGSEGVs under thin AOT;
         // NestedJIT VmChunkSplit (strlen/substr) into the user module (peer #30811).
         'phpcompiler\\ext\\standard\\chunksplitjithelper::chunksplitargv' => true,
+        // #30858 / re-#27011 — prelinked QuotemetaJitHelper unit.o SIGSEGVs under thin AOT;
+        // NestedJIT VmQuotemeta (strlen/substr) into the user module (peer #30859).
+        'phpcompiler\\ext\\standard\\quotemetajithelper::quotemetaargv' => true,
     ];
 
     private static bool $loggedHit = false;
