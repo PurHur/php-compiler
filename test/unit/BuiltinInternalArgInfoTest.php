@@ -333,6 +333,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src php_date.stub.php — createFromImmutable / createFromMutable (#30762). */
+    public function testDateTimeCreateFromImmutableMutableParamNames(): void
+    {
+        $this->assertSame(['object'], BuiltinParamNames::forClassMethod('datetime::createfromimmutable'));
+        $this->assertSame(['object'], BuiltinParamNames::forClassMethod('datetimeimmutable::createfrommutable'));
+        $this->assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateTime', 'createFromImmutable'));
+        $this->assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateTimeImmutable', 'createFromMutable'));
+    }
+
     /** php-src php_date.stub.php — strftime/gmstrftime string|false + ?int $timestamp = null (#27981). */
     public function testStrftimeGmstrftimeReflectionStubs(): void
     {

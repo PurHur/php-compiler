@@ -203,6 +203,7 @@
             <file>./test/compliance/DateDateTimeSetJITTest.php</file>
             <file>./test/compliance/DateIsodateSetJITTest.php</file>
             <file>./test/compliance/DateTimeGetOffsetJITTest.php</file>
+            <file>./test/compliance/DateTimeCreateFromInterfaceJITTest.php</file>
             <file>./test/compliance/DateTimeSetISODateNullStrictVMTest.php</file>
             <file>./test/compliance/DateTimeSetISODateNullStrictJITTest.php</file>
             <file>./test/compliance/DateDiffParamShapeVMTest.php</file>
@@ -493,6 +494,7 @@
             <file>./test/aot/DateDateTimeSetAotTest.php</file>
             <file>./test/aot/DateIsodateSetAotTest.php</file>
             <file>./test/aot/DateTimeGetOffsetAotTest.php</file>
+            <file>./test/aot/DateTimeCreateFromInterfaceAotTest.php</file>
             <file>./test/aot/ExampleWebAotTest.php</file>
             <file>./test/aot/StdlibWebBuiltinsTest.php</file>
             <file>./test/aot/RuntimeSuperglobalRefreshTest.php</file>

@@ -42,6 +42,9 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — createFromInterface(DateTimeInterface $object) (#28896)
             'datetime::createfrominterface',
             'datetimeimmutable::createfrominterface' => ['object'],
+            // php-src ext/date/php_date.stub.php — createFromImmutable / createFromMutable (#30762)
+            'datetime::createfromimmutable' => ['object'],
+            'datetimeimmutable::createfrommutable' => ['object'],
             // php-src ext/pdo/pdo_dbh.stub.php — InternalArgInfo still passwd/statement/sql + required (#24590)
             'pdo::__construct' => ['dsn', 'username=', 'password=', 'options='],
             'pdo::prepare' => ['query', 'options='],

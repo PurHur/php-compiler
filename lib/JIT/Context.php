@@ -1533,6 +1533,11 @@ class Context {
         // Wire class static factories to date_create*_from_format JIT (#26788 / #6172).
         $this->functionProxies['datetime::createfromformat'] = new Call\DateTimeCreateFromFormat(false);
         $this->functionProxies['datetimeimmutable::createfromformat'] = new Call\DateTimeCreateFromFormat(true);
+        // Conversion factories — avoid ExternalMethod null / segfault on thin AOT (#30762).
+        $this->functionProxies['datetime::createfrominterface'] = new Call\DateTimeCreateFromInterface(false);
+        $this->functionProxies['datetimeimmutable::createfrominterface'] = new Call\DateTimeCreateFromInterface(true);
+        $this->functionProxies['datetime::createfromimmutable'] = new Call\DateTimeCreateFromImmutable();
+        $this->functionProxies['datetimeimmutable::createfrommutable'] = new Call\DateTimeImmutableCreateFromMutable();
         // PHP 8.4+ createFromTimestamp — avoid ExternalMethod null stub abort on thin AOT (#26936).
         if (CompilerVersion::supportsDateTimeCreateFromTimestamp()) {
             $this->functionProxies['datetime::createfromtimestamp'] = new Call\DateTimeCreateFromTimestamp(false);
