@@ -13,7 +13,7 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Value;
 
 /**
- * date_get_last_errors() — procedural DateTime::getLastErrors wrapper (ext/date/php_date.c, #9219).
+ * date_get_last_errors() — procedural DateTime::getLastErrors wrapper (ext/date/php_date.c, #9219, #30749).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_get_last_errors)
  */
@@ -39,6 +39,6 @@ final class date_get_last_errors extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_get_last_errors() is VM-only in this compiler build (issue #9219)');
+        return JitDateGetLastErrors::invoke($context, ...$args);
     }
 }

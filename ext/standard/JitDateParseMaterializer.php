@@ -137,6 +137,43 @@ final class JitDateParseMaterializer
         return $ht;
     }
 
+    /**
+     * DateTime::getLastErrors() / date_get_last_errors() bag only (#30749).
+     *
+     * php-src zval_from_error_container(): warning_count → warnings → error_count → errors (#25485)
+     *
+     * @param array{
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>
+     * } $result
+     */
+    public static function materializeLastErrors(Context $context, array $result): Value
+    {
+        $ht = HashTableHelper::alloc($context);
+        $i64 = $context->getTypeFromString('int64');
+
+        $keyStr = $context->builder->load($context->constantStringFromString('warning_count'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $ht,
+            $keyStr,
+            $i64->constInt($result['warning_count'], false)
+        );
+        self::setNestedMessages($context, $ht, 'warnings', $result['warnings']);
+        $keyStr = $context->builder->load($context->constantStringFromString('error_count'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $ht,
+            $keyStr,
+            $i64->constInt($result['error_count'], false)
+        );
+        self::setNestedMessages($context, $ht, 'errors', $result['errors']);
+
+        return $ht;
+    }
+
     private static function setIntOrFalse(
         Context $context,
         Value $ht,

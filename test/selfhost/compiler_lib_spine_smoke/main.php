@@ -2583,6 +2583,7 @@ require_once __DIR__.'/../../../ext/standard/JitDateIntervalCreateFromDateString
 require_once __DIR__.'/../../../ext/standard/JitDateIntervalFormat.php';
 require_once __DIR__.'/../../../ext/standard/JitDateMicrosecond.php';
 require_once __DIR__.'/../../../ext/standard/JitDateMutation.php';
+require_once __DIR__.'/../../../ext/standard/JitDateGetLastErrors.php';
 require_once __DIR__.'/../../../ext/standard/JitDateOffsetGet.php';
 require_once __DIR__.'/../../../ext/standard/JitDateParse.php';
 require_once __DIR__.'/../../../ext/standard/JitDateParseMaterializer.php';
