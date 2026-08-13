@@ -19,6 +19,8 @@ use PHPLLVM\Value;
 /**
  * get_meta_tags() — extract meta name/content pairs from an HTML file (#3703, #4608).
  *
+ * Excess/missing argc → Zend ArgumentCountError (#30723; php-src ext/standard/basic_functions.c).
+ *
  * @see https://github.com/php/php-src/blob/master/ext/standard/php_meta_tags.c
  */
 final class get_meta_tags extends Internal
@@ -30,10 +32,9 @@ final class get_meta_tags extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30723; ext/standard/basic_functions.stub.php).
+        $this->requireArgCountRange($frame, 'get_meta_tags', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('get_meta_tags() expects 1 or 2 arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -61,10 +62,11 @@ final class get_meta_tags extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('get_meta_tags() expects 1 or 2 arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30723).
+        if (!$this->requireArgCountRangeJit($context, $args, 'get_meta_tags', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
 
         $path = self::jitStringArg($context, $args[0], 1, 'filename');
         $useIncludePath = $context->constantFromBool(false);

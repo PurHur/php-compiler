@@ -380,6 +380,8 @@
             <file>./test/compliance/ArrayFillRangeExcessArgc30719JITTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720VMTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720JITTest.php</file>
+            <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>
+            <file>./test/compliance/HighlightMetaExcessArgc30723JITTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647VMTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647JITTest.php</file>
             <file>./test/compliance/DefineExcessArgc30573VMTest.php</file>
