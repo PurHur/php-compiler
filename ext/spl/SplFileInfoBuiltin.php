@@ -377,6 +377,8 @@ final class SplFileInfoGetFilename extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getFilename()'
         );
+        // ACE uses called class (DirectoryIterator inherits) (#30837).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getFilename', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -430,6 +432,8 @@ final class SplFileInfoGetPathname extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getPathname()'
         );
+        // ACE uses called class (#30837; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getPathname', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -744,6 +748,8 @@ final class SplFileInfoGetSize extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getSize()'
         );
+        // ACE uses called class (#30837; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getSize', 0);
         if (null === $frame->returnVar) {
             return;
         }

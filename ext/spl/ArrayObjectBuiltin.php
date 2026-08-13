@@ -340,6 +340,8 @@ final class ArrayObjectGetIterator extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getIterator()'
         );
+        // User arity excludes $this (#30837; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::getIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -469,12 +471,8 @@ final class ArrayObjectExchangeArray extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::exchangeArray()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayObject::exchangeArray() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // User arity excludes $this (#30837; zim_ArrayObject_exchangeArray).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::exchangeArray', 1);
         $input = SplIteratorSupport::requireArrayArg(
             $frame->calledArgs[1],
             'ArrayObject::exchangeArray',
@@ -504,12 +502,8 @@ final class ArrayObjectAppend extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::append()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayObject::append() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // User arity excludes $this (#30837; zim_ArrayObject_append).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::append', 1);
         SplArrayStorage::append($object, $frame->calledArgs[1]);
     }
 }
