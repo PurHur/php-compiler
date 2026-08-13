@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -23,8 +25,20 @@ final class JitDateIntervalConstruct
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \ArgumentCountError('DateInterval::__construct() expects exactly 1 argument, 0 given');
+        $argc = \count($args);
+        // User arity excludes $this — emit catchable AOT/JIT ArgumentCountError (#30601).
+        if (2 !== $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'DateInterval::__construct() expects exactly 1 argument, %d given',
+                    max(0, $argc - 1)
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dateinterval_ctor_argc_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         // string $duration — null TypeError under caller strict_types (#29828).
         if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
