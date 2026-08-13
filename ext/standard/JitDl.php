@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -12,7 +13,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
-/** LLVM lowering for dl() stub — enable_dl off, return false + E_WARNING (#3591, ext/standard/dl.c). */
+/**
+ * LLVM lowering for dl() stub — enable_dl off, return false + E_WARNING (#3591, #30250).
+ *
+ * Z_PARAM_STR via lowerStrictOrCoercible — TypeError under caller strict_types before Warning.
+ */
 final class JitDl
 {
     private const MSG_ENABLE_DL_OFF = 'Dynamically loaded extensions aren\'t enabled';
@@ -25,7 +30,28 @@ final class JitDl
             );
         }
 
-        JitStringBuiltinArg::lower($context, $args[0], 'dl', 0, 'extension_filename');
+        // Z_PARAM_STR — soft-null DEP outside strict_types; TypeError under strict (#30250).
+        JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[0],
+            'dl',
+            0,
+            'extension_filename',
+            'string',
+            null,
+            false
+        );
+        // declare(strict_types=1): null rejects via lowerStrictOrCoercible — do not emit Warning (#30250).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
+            // Catchable TypeError seals the insert block; open a dead BB so later try-body
+            // ops (e.g. echo after dl(null)) do not land after a terminator (#30250).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dl_strict_null_dead');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
         self::emitWarning($context);
 
         $slot = JitValueBox::alloc($context);

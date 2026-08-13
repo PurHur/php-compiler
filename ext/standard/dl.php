@@ -12,9 +12,15 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
 /**
- * dl() — runtime extension load stub (ext/standard/dl.c parity, issues #3591/#3779).
+ * dl() — runtime extension load stub (ext/standard/dl.c parity, issues #3591/#3779/#30250).
  *
  * v1: enable_dl is always off; emit Zend warning and return false (no .so loading).
+ *
+ * Z_PARAM_STR $extension_filename — soft-null DEP+coerce outside caller strict_types;
+ * TypeError under declare(strict_types=1) before enablement Warning (#30250).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/dl.c PHP_FUNCTION(dl)
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php
  */
 final class dl extends Internal
 {
@@ -33,12 +39,8 @@ final class dl extends Internal
                 'dl() expects exactly 1 argument, '.\max(0, $argc - 1).' given'
             );
         }
-        VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'dl',
-            0,
-            'extension_filename'
-        );
+        // Z_PARAM_STR — honor caller strict_types (#30250); soft DEP+coerce otherwise.
+        VmString::stringBuiltinArgForFrame($frame, 0, 'dl', 0, 'extension_filename', false);
         if (null === $frame->returnVar) {
             return;
         }
