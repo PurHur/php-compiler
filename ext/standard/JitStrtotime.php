@@ -24,10 +24,8 @@ final class JitStrtotime
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        // Arity enforced by strtotime::call (#30714).
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('strtotime() expects 1 or 2 arguments in this compiler build');
-        }
 
         $folded = self::tryFoldCompileTime($context, $argc, $args);
         if (null !== $folded) {
