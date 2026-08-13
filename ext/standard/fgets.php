@@ -8,10 +8,15 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** fgets() — VM via VmFs; JIT/AOT via __compiler_fgets (issue #1187). */
+/**
+ * fgets() — VM via VmFs; JIT/AOT via __compiler_fgets (issue #1187).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30721; php-src ext/standard/file.c).
+ */
 final class fgets extends Internal
 {
     private const LENGTH_ERROR = 'fgets(): Argument #2 ($length) must be greater than 0';
@@ -23,10 +28,9 @@ final class fgets extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30721; ext/standard/file.c / file.stub.php).
+        $this->requireArgCountRange($frame, 'fgets', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('fgets() requires one or two arguments in this compiler build');
-        }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fgets');
         if (null === $frame->returnVar) {
@@ -51,10 +55,13 @@ final class fgets extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('fgets() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30721).
+        if (!$this->requireArgCountRangeJit($context, $args, 'fgets', 1, 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $args[0], 'fgets() handle'),

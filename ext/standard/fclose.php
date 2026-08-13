@@ -9,17 +9,19 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fclose() — VM via VmFs; JIT/AOT via __compiler_fclose (issue #1117). */
+/**
+ * fclose() — VM via VmFs; JIT/AOT via __compiler_fclose (issue #1117).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30721; php-src ext/standard/file.c).
+ */
 final class fclose extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('fclose() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30721; ext/standard/file.c / file.stub.php).
+        $this->requireExactArgCount($frame, 'fclose', 1);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fclose');
         $closed = VmFs::fclose($handle);
@@ -31,8 +33,9 @@ final class fclose extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('fclose() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30721).
+        if (!$this->requireExactJitArgCount($context, $args, 'fclose', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         return JitFclose::invoke(
