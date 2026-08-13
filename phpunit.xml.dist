@@ -362,6 +362,8 @@
             <file>./test/compliance/StreamFileExcessArgc30584JITTest.php</file>
             <file>./test/compliance/DomExcessArgc30616VMTest.php</file>
             <file>./test/compliance/DomExcessArgc30616JITTest.php</file>
+            <file>./test/compliance/DomChildNodeRemoveExcessArgc30814VMTest.php</file>
+            <file>./test/compliance/DomChildNodeRemoveExcessArgc30814JITTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641VMTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641JITTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648VMTest.php</file>
