@@ -16,10 +16,8 @@ final class NodeRemoveChild extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::removeChild', 1);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::removeChild()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMNode::removeChild() expects exactly 1 argument');
-        }
         $child = $this->requireDomNodeArg($frame->calledArgs[1], 'DOMNode::removeChild', 1, 'child');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMNode::removeChild() requires VM context in this compiler build');

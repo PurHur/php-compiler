@@ -17,6 +17,7 @@ final class NodeCloneNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtMostUserArgCount($frame, 'DOMNode::cloneNode', 1);
         $receiver = $this->cloneableNodeReceiver($frame, 'DOMNode::cloneNode()');
         $deep = isset($frame->calledArgs[1])
             ? VmMath::parseBoolBuiltinArg($frame->calledArgs[1], 'DOMNode::cloneNode', 1, 'deep')

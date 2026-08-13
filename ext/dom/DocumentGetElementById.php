@@ -16,10 +16,8 @@ final class DocumentGetElementById extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::getElementById', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::getElementById()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::getElementById() expects exactly 1 argument');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#29942, re-#18215).
         $id = $this->stringArg(
             $frame->calledArgs[1],

@@ -16,10 +16,8 @@ final class NodeAppendChild extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::appendChild', 1);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::appendChild()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMNode::appendChild() expects exactly 1 argument');
-        }
         $child = $this->requireDomNodeArg($frame->calledArgs[1], 'DOMNode::appendChild', 1, 'node');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMNode::appendChild() requires VM context in this compiler build');

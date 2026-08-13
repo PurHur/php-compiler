@@ -17,10 +17,8 @@ final class NodeInsertBefore extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMNode::insertBefore', 1, 2);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::insertBefore()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMNode::insertBefore() expects at least 1 argument');
-        }
         $newChild = $this->requireDomNodeArg($frame->calledArgs[1], 'DOMNode::insertBefore', 1, 'node');
         $refChild = null;
         if (isset($frame->calledArgs[2])) {

@@ -17,10 +17,8 @@ final class XPathEvaluate extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMXPath::evaluate', 1, 3);
         $xpath = $this->xpathReceiver($frame, 'DOMXPath::evaluate()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMXPath::evaluate() expects at least 1 argument');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#30041).
         $expression = $this->stringArg(
             $frame->calledArgs[1],

@@ -16,10 +16,8 @@ final class ElementSetAttribute extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::setAttribute', 2);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::setAttribute()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMElement::setAttribute() expects at least 2 arguments');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
         $name = $this->stringArg(
             $frame->calledArgs[1],

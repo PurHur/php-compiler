@@ -16,6 +16,7 @@ final class NodeNormalize extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::normalize', 0);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::normalize()');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMNode::normalize() requires VM context in this compiler build');

@@ -16,6 +16,7 @@ final class NodeHasChildNodes extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::hasChildNodes', 0);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::hasChildNodes()');
         if (null === $frame->returnVar) {
             return;

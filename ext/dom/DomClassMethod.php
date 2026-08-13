@@ -353,4 +353,86 @@ abstract class DomClassMethod extends VmClassMethod
         return $object;
     }
 
+    /**
+     * User argc for instance methods — Zend excludes $this (#30616).
+     */
+    protected function userArgCount(Frame $frame): int
+    {
+        return max(0, \count($frame->calledArgs) - 1);
+    }
+
+    /**
+     * Exact user arity → Zend ArgumentCountError (#30616; php-src stubs).
+     *
+     * $function is Class::method without trailing "()".
+     */
+    protected function requireExactUserArgCount(Frame $frame, string $function, int $expected): void
+    {
+        $given = $this->userArgCount($frame);
+        if ($given !== $expected) {
+            throw new \ArgumentCountError(self::exactUserArgCountMessage($function, $expected, $given));
+        }
+    }
+
+    /**
+     * At-most user arity → Zend ArgumentCountError (#30616).
+     */
+    protected function requireAtMostUserArgCount(Frame $frame, string $function, int $maximum): void
+    {
+        $given = $this->userArgCount($frame);
+        if ($given > $maximum) {
+            throw new \ArgumentCountError(self::atMostUserArgCountMessage($function, $maximum, $given));
+        }
+    }
+
+    /**
+     * Inclusive user-arity range → Zend ArgumentCountError (#30616).
+     */
+    protected function requireUserArgCountRange(Frame $frame, string $function, int $minimum, int $maximum): void
+    {
+        $given = $this->userArgCount($frame);
+        if ($given < $minimum) {
+            throw new \ArgumentCountError(self::atLeastUserArgCountMessage($function, $minimum, $given));
+        }
+        if ($given > $maximum) {
+            throw new \ArgumentCountError(self::atMostUserArgCountMessage($function, $maximum, $given));
+        }
+    }
+
+    /** @internal Shared with VmDomJitDispatch ($extra is user args only). */
+    public static function exactUserArgCountMessage(string $function, int $expected, int $given): string
+    {
+        return \sprintf(
+            '%s() expects exactly %d argument%s, %d given',
+            $function,
+            $expected,
+            1 === $expected ? '' : 's',
+            $given
+        );
+    }
+
+    /** @internal Shared with VmDomJitDispatch. */
+    public static function atMostUserArgCountMessage(string $function, int $maximum, int $given): string
+    {
+        return \sprintf(
+            '%s() expects at most %d argument%s, %d given',
+            $function,
+            $maximum,
+            1 === $maximum ? '' : 's',
+            $given
+        );
+    }
+
+    /** @internal Shared with VmDomJitDispatch. */
+    public static function atLeastUserArgCountMessage(string $function, int $minimum, int $given): string
+    {
+        return \sprintf(
+            '%s() expects at least %d argument%s, %d given',
+            $function,
+            $minimum,
+            1 === $minimum ? '' : 's',
+            $given
+        );
+    }
+
 }

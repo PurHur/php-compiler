@@ -16,10 +16,8 @@ final class NodeReplaceChild extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::replaceChild', 2);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::replaceChild()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMNode::replaceChild() expects exactly 2 arguments');
-        }
         $newChild = $this->requireDomNodeArg($frame->calledArgs[1], 'DOMNode::replaceChild', 1, 'node');
         $oldChild = $this->requireDomNodeArg($frame->calledArgs[2], 'DOMNode::replaceChild', 2, 'child');
         if (null === $frame->vmContext) {

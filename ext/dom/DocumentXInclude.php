@@ -16,6 +16,7 @@ final class DocumentXInclude extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtMostUserArgCount($frame, 'DOMDocument::xinclude', 1);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::xinclude()');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::xinclude() requires VM context in this compiler build');

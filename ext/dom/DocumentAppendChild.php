@@ -16,10 +16,8 @@ final class DocumentAppendChild extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::appendChild', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::appendChild()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::appendChild() expects exactly 1 argument');
-        }
         // Declaring class is DOMNode — Zend TypeError cites DOMNode::appendChild (#30410).
         $child = $this->requireDomNodeArg($frame->calledArgs[1], 'DOMNode::appendChild', 1, 'node');
         VmDom::ensureDocument($receiver);

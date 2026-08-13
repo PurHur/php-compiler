@@ -16,10 +16,8 @@ final class DocumentCreateAttribute extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::createAttribute', 1);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createAttribute()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::createAttribute() expects at least 1 argument');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
         $name = $this->stringArg(
             $frame->calledArgs[1],

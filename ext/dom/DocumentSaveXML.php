@@ -16,6 +16,7 @@ final class DocumentSaveXML extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtMostUserArgCount($frame, 'DOMDocument::saveXML', 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::saveXML()');
         [$node, $options] = $this->parseSaveNodeAndOptionsArgs($frame, 'DOMDocument::saveXML()');
         if (null !== $frame->returnVar) {

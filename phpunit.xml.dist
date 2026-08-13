@@ -336,6 +336,8 @@
             <file>./test/compliance/InfoUnameExtensionsGetrusageExcessArgc30537JITTest.php</file>
             <file>./test/compliance/StreamFileExcessArgc30584VMTest.php</file>
             <file>./test/compliance/StreamFileExcessArgc30584JITTest.php</file>
+            <file>./test/compliance/DomExcessArgc30616VMTest.php</file>
+            <file>./test/compliance/DomExcessArgc30616JITTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583VMTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
             <file>./test/compliance/ReadfileOptionalArgs30582VMTest.php</file>
