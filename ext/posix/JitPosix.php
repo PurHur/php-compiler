@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
 use PHPCompiler\JIT\Builtin\PosixGetpidJit;
 use PHPCompiler\JIT\Builtin\PosixGetppidJit;
+use PHPCompiler\JIT\Builtin\PosixGetuidJit;
 use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\Builtin\PosixTerminalRuntime;
@@ -21,7 +22,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728). */
+/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744). */
 final class JitPosix
 {
     private static int $blockSerial = 0;
@@ -57,15 +58,14 @@ final class JitPosix
             : $context->builder->zExt($raw, $i64);
     }
 
+    /**
+     * posix_getuid() — PHP helper bridge (#30744); NestedJIT thin getuid(2) leaf.
+     *
+     * @return Value int64 real user id
+     */
     public static function getuid(Context $context): Value
     {
-        self::ensureLibcUid($context);
-        $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction('getuid'));
-
-        return $raw->typeOf() === $i64
-            ? $raw
-            : $context->builder->zExt($raw, $i64);
+        return PosixGetuidJit::invoke($context);
     }
 
     public static function getgid(Context $context): Value
@@ -336,18 +336,6 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false);
             $fn = $context->module->addFunction('geteuid', $ft);
             $context->registerFunction('geteuid', $fn);
-        }
-    }
-
-    private static function ensureLibcUid(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        try {
-            $context->lookupFunction('getuid');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i32, false);
-            $fn = $context->module->addFunction('getuid', $ft);
-            $context->registerFunction('getuid', $fn);
         }
     }
 

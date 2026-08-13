@@ -1018,6 +1018,10 @@ class Context {
             // PosixGetppidJit::invoke / JitPosixGetppidKernel thin libc getppid(2) leaf
             // (former always-on JitPosix::getppid LLVM; peer posix_getpid #30696).
             'posix_getppid',
+            // posix_getuid NestedJIT leaf (#30744) — whitelist posix_getuid → posix_getuid::call →
+            // PosixGetuidJit::invoke / JitPosixGetuidKernel thin libc getuid(2) leaf
+            // (former always-on JitPosix::getuid LLVM; peer posix_getppid #30728).
+            'posix_getuid',
             // fnmatch(3) NestedJIT leaf (#30383) — whitelist fnmatch → fnmatch::call →
             // StringFnmatch::invokeNestedLeaf (module-local fnmatch(3); always-on Module decl removed).
             'fnmatch',
