@@ -26,6 +26,10 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says modify (#23685)
             'datetime::modify',
             'datetimeimmutable::modify' => ['modifier'],
+            'datetime::add',
+            'datetimeimmutable::add',
+            'datetime::sub',
+            'datetimeimmutable::sub' => ['interval'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo omits microsecond; Immutable second required (#25400)
             'datetime::settime',
             'datetimeimmutable::settime' => ['hour', 'minute', 'second=', 'microsecond='],
