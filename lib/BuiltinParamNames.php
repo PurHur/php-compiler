@@ -127,6 +127,8 @@ final class BuiltinParamNames
             'resourcebundle::count' => [],
             // php-src timezone.stub.php — ICU≥74 (#21553)
             'intltimezone::getianaid' => ['zoneId'],
+            // php-src ext/intl/calendar/calendar.stub.php — both optional; $timezone untyped (#28482)
+            'intlcalendar::createinstance' => ['timezone=', 'locale='],
             // php-src ext/dom/php_dom.stub.php — InternalArgInfo still has pre-stub names (#23391, #25182)
             'domdocument::adoptnode' => ['node'],
             // ParentNode / ChildNode living mutators — variadic ...$nodes (php_dom.stub.php; #25742)

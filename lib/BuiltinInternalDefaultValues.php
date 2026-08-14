@@ -887,6 +887,10 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'null'],
             4 => ['kind' => 'null'],
         ],
+        // php-src ext/intl/calendar/calendar.stub.php — $timezone = null (untyped; no infer) (#28482)
+        'intlcalendar::createinstance' => [
+            0 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

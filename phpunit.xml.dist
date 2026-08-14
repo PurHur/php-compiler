@@ -313,6 +313,8 @@
             <file>./test/compliance/MbSubstituteCharacterNullGetterJITTest.php</file>
             <file>./test/compliance/CollatorCreateNullTypeErrorVMTest.php</file>
             <file>./test/compliance/CollatorCreateNullTypeErrorJITTest.php</file>
+            <file>./test/compliance/IntlCalendarCreateInstanceNamed28482VMTest.php</file>
+            <file>./test/compliance/IntlCalendarCreateInstanceNamed28482JITTest.php</file>
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorVMTest.php</file>
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorJITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
