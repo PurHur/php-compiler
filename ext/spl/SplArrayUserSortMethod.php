@@ -29,12 +29,8 @@ final class SplArrayUserSortMethod extends VmClassMethod
             $this->classLc,
             $className.'::'.$this->methodLc.'()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                $className.'::'.$this->methodLc.'() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayObject_uasort/uksort — exactly 1 user arg (#30965).
+        $this->requireExactUserArgCount($frame, $className.'::'.$this->methodLc, 1);
         $result = match ($this->methodLc) {
             'uasort' => SplArrayStorage::uasortBacking($object, $frame, $frame->calledArgs[1]),
             'uksort' => SplArrayStorage::uksortBacking($object, $frame, $frame->calledArgs[1]),
