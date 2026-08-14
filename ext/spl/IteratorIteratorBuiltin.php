@@ -982,6 +982,8 @@ final class IteratorIteratorRewind extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::rewind()'
         );
+        // php-src zim_IteratorIterator_rewind — ZEND_PARSE_PARAMETERS_NONE (#31010; shared with RII).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::rewind', 0);
         SplDualIteratorStorage::rewindSimple($frame, $object);
     }
 }
@@ -1000,6 +1002,8 @@ final class RecursiveIteratorIteratorRewind extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::rewind()'
         );
+        // php-src zim_RecursiveIteratorIterator_rewind — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::rewind', 0);
         SplDualIteratorStorage::rewindRecursive($frame, $object);
     }
 }
@@ -1018,6 +1022,8 @@ final class IteratorIteratorValid extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::valid()'
         );
+        // php-src dual-it valid — ZEND_PARSE_PARAMETERS_NONE; cite runtime class (#31010).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::valid', 0);
         $valid = SplDualIteratorStorage::usesRecursiveWalk($object)
             ? SplDualIteratorStorage::validRecursive($frame, $object)
             : SplDualIteratorStorage::validSimple($frame, $object);
@@ -1039,6 +1045,8 @@ final class IteratorIteratorCurrent extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::current()'
         );
+        // php-src dual-it current — ZEND_PARSE_PARAMETERS_NONE; cite runtime class (#31010).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::current', 0);
         $current = SplDualIteratorStorage::usesRecursiveWalk($object)
             ? SplDualIteratorStorage::currentRecursive($frame, $object)
             : SplDualIteratorStorage::currentSimple($frame, $object);
@@ -1060,6 +1068,8 @@ final class IteratorIteratorKey extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::key()'
         );
+        // php-src dual-it key — ZEND_PARSE_PARAMETERS_NONE; cite runtime class (#31010).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::key', 0);
         $key = SplDualIteratorStorage::usesRecursiveWalk($object)
             ? SplDualIteratorStorage::keyRecursive($frame, $object)
             : SplDualIteratorStorage::keySimple($frame, $object);
@@ -1081,6 +1091,8 @@ final class IteratorIteratorNext extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::next()'
         );
+        // php-src dual-it next — ZEND_PARSE_PARAMETERS_NONE; cite runtime class (#31010).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::next', 0);
         if (SplDualIteratorStorage::usesRecursiveWalk($object)) {
             SplDualIteratorStorage::nextRecursive($frame, $object);
         } else {
@@ -1238,6 +1250,8 @@ final class RecursiveIteratorIteratorGetMaxDepth extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::getMaxDepth()'
         );
+        // php-src zim_RecursiveIteratorIterator_getMaxDepth — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::getMaxDepth', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1301,6 +1315,8 @@ final class RecursiveIteratorIteratorGetInnerIterator extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::getInnerIterator()'
         );
+        // php-src zim_RecursiveIteratorIterator_getInnerIterator — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1375,6 +1391,8 @@ final class RecursiveIteratorIteratorCallHasChildren extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::callHasChildren()'
         );
+        // php-src zim_RecursiveIteratorIterator_callHasChildren — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::callHasChildren', 0);
         SplIteratorSupport::setReturnBool(
             $frame,
             SplDualIteratorStorage::callHasChildren($frame, $object)
@@ -1396,6 +1414,8 @@ final class RecursiveIteratorIteratorCallGetChildren extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::callGetChildren()'
         );
+        // php-src zim_RecursiveIteratorIterator_callGetChildren — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::callGetChildren', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1419,6 +1439,8 @@ final class RecursiveIteratorIteratorBeginIteration extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::beginIteration()'
         );
+        // php-src zim_RecursiveIteratorIterator_beginIteration — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::beginIteration', 0);
     }
 }
 
@@ -1437,6 +1459,8 @@ final class RecursiveIteratorIteratorEndIteration extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::endIteration()'
         );
+        // php-src zim_RecursiveIteratorIterator_endIteration — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::endIteration', 0);
     }
 }
 
@@ -1455,6 +1479,8 @@ final class RecursiveIteratorIteratorBeginChildren extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::beginChildren()'
         );
+        // php-src zim_RecursiveIteratorIterator_beginChildren — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::beginChildren', 0);
     }
 }
 
@@ -1473,6 +1499,8 @@ final class RecursiveIteratorIteratorEndChildren extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::endChildren()'
         );
+        // php-src zim_RecursiveIteratorIterator_endChildren — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::endChildren', 0);
     }
 }
 
@@ -1491,5 +1519,7 @@ final class RecursiveIteratorIteratorNextElement extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::nextElement()'
         );
+        // php-src zim_RecursiveIteratorIterator_nextElement — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::nextElement', 0);
     }
 }
