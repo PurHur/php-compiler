@@ -19,6 +19,8 @@ final class ReflectionClassGetConstructor extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionClass_getConstructor — ZEND_PARSE_PARAMETERS (0 args) (#31033)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::getConstructor', 0);
         [, $entry, $ctx] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
         if (null === $frame->returnVar) {
             return;

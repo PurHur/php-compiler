@@ -17,6 +17,8 @@ final class ReflectionClassGetMethods extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionClass_getMethods — optional ?int $filter (at most 1) (#31033)
+        $this->requireUserArgCountRange($frame, 'ReflectionClass::getMethods', 0, 1);
         $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $className = ReflectionSupport::classNameFromReflection($receiver);

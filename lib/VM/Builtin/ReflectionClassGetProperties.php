@@ -17,6 +17,8 @@ final class ReflectionClassGetProperties extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionClass_getProperties — optional ?int $filter (at most 1) (#31033)
+        $this->requireUserArgCountRange($frame, 'ReflectionClass::getProperties', 0, 1);
         $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $className = ReflectionSupport::classNameFromReflection($receiver);
