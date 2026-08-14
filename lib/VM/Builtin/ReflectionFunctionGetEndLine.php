@@ -18,6 +18,8 @@ final class ReflectionFunctionGetEndLine extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_getEndLine — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'getEndLine');
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         ReflectionSupport::returnFunctionEndLine(

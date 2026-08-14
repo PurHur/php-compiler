@@ -18,6 +18,8 @@ final class ReflectionFunctionGetStaticVariables extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_getStaticVariables — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'getStaticVariables');
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         ReflectionSupport::returnStaticVariablesFromFunctionReflection($ctx, $receiver, $frame->returnVar);

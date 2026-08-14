@@ -18,6 +18,8 @@ final class ReflectionFunctionGetFileName extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_getFileName — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'getFileName');
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         ReflectionSupport::returnFunctionFileName(

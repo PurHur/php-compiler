@@ -18,6 +18,8 @@ final class ReflectionMethodIsInternal extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_isInternal — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'isInternal');
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         if (null !== $frame->returnVar) {
