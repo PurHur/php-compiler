@@ -508,12 +508,8 @@ final class FilesystemIteratorSetFlags extends VmClassMethod
             FilesystemIteratorBuiltin::CLASS_LC,
             'FilesystemIterator::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'FilesystemIterator::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_FilesystemIterator_setFlags — exactly 1 user arg (#31009).
+        $this->requireExactUserArgCount($frame, 'FilesystemIterator::setFlags', 1);
         $flags = SplFilesystemArg::requireIntArg(
             $frame->calledArgs[1],
             'FilesystemIterator::setFlags',
