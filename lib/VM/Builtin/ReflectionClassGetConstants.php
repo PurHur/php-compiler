@@ -26,7 +26,7 @@ final class ReflectionClassGetConstants extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
-        $filter = VmReflection::reflectionConstantsFilterArg($frame, 1);
+        $filter = VmReflection::reflectionConstantsFilterArg($frame, 1, 'ReflectionClass::getConstants');
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(
                 VmReflection::reflectionClassConstantsMap($ctx, $entry, $filter)

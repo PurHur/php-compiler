@@ -4135,17 +4135,28 @@ final class VmReflection
         return $result;
     }
 
-    public static function optionalReflectionFilterArg(Frame $frame, int $argIndex): int
-    {
+    /**
+     * ReflectionClass::* visibility filter — php-src `?int $filter = null` (#30897).
+     *
+     * Missing/null → 0 (all). Non-coercible types TypeError like Zend Z_PARAM_LONG_OR_NULL.
+     */
+    public static function optionalReflectionFilterArg(
+        Frame $frame,
+        int $argIndex,
+        string $methodLabel = 'ReflectionClass::getProperties'
+    ): int {
         if (\count($frame->calledArgs) <= $argIndex) {
             return 0;
         }
-        $filterArg = $frame->calledArgs[$argIndex]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $filterArg->type) {
-            return 0;
-        }
+        $parsed = VmMath::parseNullableIntBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            $methodLabel,
+            $argIndex,
+            'filter'
+        );
 
-        return $filterArg->toInt();
+        return null === $parsed ? 0 : $parsed;
     }
 
     /**
@@ -4475,17 +4486,16 @@ final class VmReflection
     }
 
     /**
-     * Resolve ReflectionClass::getConstants() visibility filter (#6950, filter flags in #4479).
+     * Resolve ReflectionClass::getConstants() visibility filter (#6950, filter flags in #4479, #30897).
      *
      * php-src: null filter returns all constants; IS_* bitmasks narrow the set.
      */
-    public static function reflectionConstantsFilterArg(Frame $frame, int $argIndex): int
-    {
-        if (\count($frame->calledArgs) <= $argIndex) {
-            return 0;
-        }
-
-        return self::optionalReflectionFilterArg($frame, $argIndex);
+    public static function reflectionConstantsFilterArg(
+        Frame $frame,
+        int $argIndex,
+        string $methodLabel = 'ReflectionClass::getConstants'
+    ): int {
+        return self::optionalReflectionFilterArg($frame, $argIndex, $methodLabel);
     }
 
     /**
