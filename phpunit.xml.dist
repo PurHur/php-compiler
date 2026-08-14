@@ -420,6 +420,8 @@
             <file>./test/compliance/ReflectionClassExcessArgc30888JITTest.php</file>
             <file>./test/compliance/ReflectionClassFilterNullableInt30897VMTest.php</file>
             <file>./test/compliance/ReflectionClassFilterNullableInt30897JITTest.php</file>
+            <file>./test/compliance/ReflectionClassGetMethodsExcessArgc31033VMTest.php</file>
+            <file>./test/compliance/ReflectionClassGetMethodsExcessArgc31033JITTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653VMTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653JITTest.php</file>
             <file>./test/compliance/SessionDestroyTmpfileExcessArgc30676VMTest.php</file>
