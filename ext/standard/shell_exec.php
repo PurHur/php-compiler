@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
@@ -22,9 +23,8 @@ final class shell_exec extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('shell_exec() requires exactly one argument');
-        }
+        // php-src ext/standard/exec.c / basic_functions.stub.php — ArgumentCountError (#30566)
+        $this->requireExactArgCount($frame, 'shell_exec', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -43,8 +43,9 @@ final class shell_exec extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('shell_exec() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT) — #30566.
+        if (!$this->requireExactJitArgCount($context, $args, 'shell_exec', 1)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         $command = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'shell_exec', 0, 'command', 'string', null, false);

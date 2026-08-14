@@ -25,10 +25,9 @@ final class system extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/exec.c / basic_functions.stub.php — ArgumentCountError (#30566)
+        $this->requireArgCountRange($frame, 'system', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('system() accepts one or two arguments in this compiler build');
-        }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'system', 'command', false);
         // php-src exec.c — Zend "cannot be empty" (#30340)
         VmString::rejectEmptyBuiltinStringArg($command, 'system', 0, 'command', true);

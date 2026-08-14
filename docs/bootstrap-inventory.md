@@ -27237,7 +27237,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 281)
 - new Variable (line 283)
 - new ArgumentCountError (line 329)
-- new Error (line 1170)
+- new Error (line 1200)
 - 39 class method(s)
 
 ### `ext/spl/SplFileInfoStorage.php`
@@ -29711,7 +29711,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitExec.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `ext/standard/JitExecutionLimits.php`
 
@@ -34601,10 +34601,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 160)
-- new RecursiveIteratorIterator (line 4016)
-- new RecursiveDirectoryIterator (line 4017)
-- new RecursiveIteratorIterator (line 4123)
-- new RecursiveDirectoryIterator (line 4124)
+- new RecursiveIteratorIterator (line 4017)
+- new RecursiveDirectoryIterator (line 4018)
+- new RecursiveIteratorIterator (line 4124)
+- new RecursiveDirectoryIterator (line 4125)
 - 135 class method(s)
 - 13 closure(s)
 
@@ -38105,8 +38105,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/exec.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 40)
-- new Variable (line 42)
+- new HashTable (line 39)
+- new Variable (line 41)
 - 2 class method(s)
 
 ### `ext/standard/exif_tagname.php`

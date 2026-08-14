@@ -25,10 +25,9 @@ final class passthru extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/exec.c / basic_functions.stub.php — ArgumentCountError (#30566)
+        $this->requireArgCountRange($frame, 'passthru', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
-        }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'passthru', 'command', false);
         // php-src exec.c — Zend "cannot be empty" (#30340)
         VmString::rejectEmptyBuiltinStringArg($command, 'passthru', 0, 'command', true);

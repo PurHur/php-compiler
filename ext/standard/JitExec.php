@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ObOutputRuntime;
 use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -21,8 +22,9 @@ final class JitExec
     public static function exec(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('exec() accepts one to three arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — php-src exec.c / #30566.
+        if (!self::requireArgCountRange($context, $args, 'exec', 1, 3)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'exec', 0, 'command', 'string', null, false);
@@ -69,8 +71,9 @@ final class JitExec
     public static function passthru(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — php-src exec.c / #30566.
+        if (!self::requireArgCountRange($context, $args, 'passthru', 1, 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, false, 'passthru');
@@ -79,8 +82,9 @@ final class JitExec
     public static function system(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('system() accepts one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — php-src exec.c / #30566.
+        if (!self::requireArgCountRange($context, $args, 'system', 1, 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, true, 'system');
@@ -294,6 +298,53 @@ final class JitExec
         $i8p = $context->getTypeFromString('int8*');
 
         return $context->builder->pointerCast($context->constantFromString($text), $i8p);
+    }
+
+    /**
+     * Zend ArgumentCountError for exec/system/passthru (#30566).
+     *
+     * @param JITVariable[] $args
+     */
+    private static function requireArgCountRange(
+        Context $context,
+        array $args,
+        string $function,
+        int $minimum,
+        int $maximum
+    ): bool {
+        $argc = \count($args);
+        if ($argc < $minimum) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    '%s() expects at least %d argument%s, %d given',
+                    $function,
+                    $minimum,
+                    1 === $minimum ? '' : 's',
+                    $argc
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
+
+            return false;
+        }
+        if ($argc > $maximum) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    '%s() expects at most %d argument%s, %d given',
+                    $function,
+                    $maximum,
+                    1 === $maximum ? '' : 's',
+                    $argc
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
+
+            return false;
+        }
+
+        return true;
     }
 
     private static function rejectEmptyCommand(
