@@ -16,16 +16,16 @@ final class TryCatchElseSupportTest extends TestCase
         parent::tearDown();
     }
 
-    public function testExtractStripsElseAndQueuesBody(): void
+    public function testExtractIsNoOpOnPhpSrcStrictIncludingProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
+            $this->assertFalse(CompilerVersion::supportsTryCatchElse());
             TryCatchElseSupport::beginCompilationUnit();
             $src = '<?php try { echo 1; } catch (Throwable $e) { } else { echo 2; }';
-            $out = TryCatchElseSupport::extract($src);
-            $this->assertStringNotContainsString('else', $out);
-            $this->assertSame([' echo 2; '], TryCatchElseSupport::pendingElseSources());
+            $this->assertSame($src, TryCatchElseSupport::extract($src));
+            $this->assertSame([], TryCatchElseSupport::pendingElseSources());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -42,6 +42,25 @@ final class TryCatchElseSupportTest extends TestCase
         try {
             $error = TryCatchElseSupport::referenceProfileSyntaxError(
                 '<?php try { } catch (Throwable) { } else { }'
+            );
+            $this->assertNotNull($error);
+            $this->assertSame(TryCatchElseSupport::REFERENCE_PROFILE_UNEXPECTED_ELSE, $error['message']);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSyntaxErrorOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $error = TryCatchElseSupport::referenceProfileSyntaxError(
+                '<?php try { echo "t"; } catch (Exception $e) { } else { echo "e"; }'
             );
             $this->assertNotNull($error);
             $this->assertSame(TryCatchElseSupport::REFERENCE_PROFILE_UNEXPECTED_ELSE, $error['message']);

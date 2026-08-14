@@ -1757,15 +1757,17 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ try/catch/else — else runs when no exception was thrown (#15817).
+     * Whether `try { } catch { } else { }` is accepted.
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * parse error. Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
-     * php-src: Zend/zend_language_parser.y try_catch_list else; zend_compile.c zend_compile_try.
+     * Always false: php-src never shipped try/catch/else on any version. The production is
+     * `T_TRY '{' inner_statement_list '}' catch_list finally_statement` only — `else` after
+     * catch/finally is a Parse error (`unexpected token "else"`) on Zend 8.2 through master
+     * ({@see Zend/zend_language_parser.y}; {@see Zend/zend_compile.c} zend_compile_try).
+     * Prior PROFILE≥8.4 enables (#15817 / #19225) were incorrect vs php-src-strict (#31159).
      */
     public static function supportsTryCatchElse(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

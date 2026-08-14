@@ -1422,11 +1422,8 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'clone_with_paren')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when try/catch/else enabled (#15817, #19128).
-            if (CompilerVersion::supportsTryCatchElse()
-                && str_contains($name, 'try_catch_else_reference_profile')) {
-                continue;
-            }
+            // php-src never shipped try/catch/else (#31159) — reject cases always run.
+            // Execute fixtures skipped while the gate is false (defense if re-enabled).
             if (!CompilerVersion::supportsTryCatchElse()
                 && str_contains($name, 'try_catch_else')
                 && !str_contains($name, 'try_catch_else_reference_profile')) {
