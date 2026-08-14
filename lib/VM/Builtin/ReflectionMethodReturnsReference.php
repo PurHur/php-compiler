@@ -18,6 +18,8 @@ final class ReflectionMethodReturnsReference extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_returnsReference — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'returnsReference');
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {

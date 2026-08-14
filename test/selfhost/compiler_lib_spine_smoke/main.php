@@ -5969,6 +5969,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/MessageFormatterFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/TransliteratorCreate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/TransliteratorTransliterate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FiberConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/FiberGetCurrent.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FiberGetReturn.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FiberIsRunning.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FiberIsStarted.php';

@@ -24,6 +24,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\IncompleteClassSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\LazyGhostTraitSupport;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\StringableSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -41,6 +42,52 @@ final class VmReflection
         }
 
         return $frame->vmContext;
+    }
+
+    /**
+     * Receiver-only ReflectionFunctionAbstract / ReflectionFunction::getClosure
+     * display names — php-src ZEND_PARSE_PARAMETERS_NONE (#30924).
+     *
+     * @var array<string, string> method name => Class::method (no trailing "()")
+     */
+    public const FUNCTION_ABSTRACT_RECEIVER_ONLY = [
+        'getNumberOfParameters' => 'ReflectionFunctionAbstract::getNumberOfParameters',
+        'getNumberOfRequiredParameters' => 'ReflectionFunctionAbstract::getNumberOfRequiredParameters',
+        'getFileName' => 'ReflectionFunctionAbstract::getFileName',
+        'getStartLine' => 'ReflectionFunctionAbstract::getStartLine',
+        'getEndLine' => 'ReflectionFunctionAbstract::getEndLine',
+        'isClosure' => 'ReflectionFunctionAbstract::isClosure',
+        'isInternal' => 'ReflectionFunctionAbstract::isInternal',
+        'isUserDefined' => 'ReflectionFunctionAbstract::isUserDefined',
+        'isVariadic' => 'ReflectionFunctionAbstract::isVariadic',
+        'returnsReference' => 'ReflectionFunctionAbstract::returnsReference',
+        'hasReturnType' => 'ReflectionFunctionAbstract::hasReturnType',
+        'getStaticVariables' => 'ReflectionFunctionAbstract::getStaticVariables',
+        'getClosure' => 'ReflectionFunction::getClosure',
+    ];
+
+    public static function functionAbstractReceiverOnlyDisplayName(string $method): string
+    {
+        return self::FUNCTION_ABSTRACT_RECEIVER_ONLY[$method]
+            ?? ('ReflectionFunctionAbstract::'.$method);
+    }
+
+    /**
+     * Excess user argc → Zend ArgumentCountError (user arity excludes $this).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionFunctionAbstract_* /
+     * zim_ReflectionFunction_getClosure
+     */
+    public static function requireFunctionAbstractReceiverOnlyArgc(Frame $frame, string $method): void
+    {
+        $given = max(0, \count($frame->calledArgs) - 1);
+        if (0 !== $given) {
+            throw new \ArgumentCountError(VmClassMethod::exactUserArgCountMessage(
+                self::functionAbstractReceiverOnlyDisplayName($method),
+                0,
+                $given
+            ));
+        }
     }
 
     /**

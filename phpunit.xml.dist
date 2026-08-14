@@ -321,6 +321,8 @@
             <file>./test/compliance/DateTimeZoneConstructNullArgIndexJITTest.php</file>
             <file>./test/compliance/DateTimeZoneGetLocationCoords30953VMTest.php</file>
             <file>./test/compliance/DateTimeZoneGetLocationCoords30953JITTest.php</file>
+            <file>./test/compliance/CreateFromFormatClockOverflow30972VMTest.php</file>
+            <file>./test/compliance/CreateFromFormatClockOverflow30972JITTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictVMTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictJITTest.php</file>
             <file>./test/compliance/OpcacheIsScriptCachedInFileCacheVMTest.php</file>
@@ -384,6 +386,8 @@
             <file>./test/compliance/ReflectionEnumIsBackedExcessArgc30929JITTest.php</file>
             <file>./test/compliance/ReflectionFiberExcessArgc30928VMTest.php</file>
             <file>./test/compliance/ReflectionFiberExcessArgc30928JITTest.php</file>
+            <file>./test/compliance/ReflectionFunctionAbstractExcessArgc30924VMTest.php</file>
+            <file>./test/compliance/ReflectionFunctionAbstractExcessArgc30924JITTest.php</file>
             <file>./test/compliance/SplIteratorExcessArgc30911VMTest.php</file>
             <file>./test/compliance/SplIteratorExcessArgc30911JITTest.php</file>
             <file>./test/compliance/EnumSyntheticExcessArgc30864VMTest.php</file>
@@ -462,6 +466,8 @@
             <file>./test/compliance/SplFileObjectExcessArgc30937JITTest.php</file>
             <file>./test/compliance/RiiParentIteratorExcessArgc30956VMTest.php</file>
             <file>./test/compliance/RiiParentIteratorExcessArgc30956JITTest.php</file>
+            <file>./test/compliance/ArrayObjectExcessArgc30965VMTest.php</file>
+            <file>./test/compliance/ArrayObjectExcessArgc30965JITTest.php</file>
             <file>./test/compliance/SplHeapExcessArgc30955VMTest.php</file>
             <file>./test/compliance/SplHeapExcessArgc30955JITTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785VMTest.php</file>
