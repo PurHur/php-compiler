@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,9 +22,9 @@ final class gzpassthru extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('gzpassthru() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30830).
+        $fn = $this->getName();
+        $this->requireExactArgCount($frame, $fn, 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,8 +40,11 @@ final class gzpassthru extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('gzpassthru() requires exactly one argument in this compiler build');
+        $fn = $this->getName();
+        if (!$this->requireExactJitArgCount($context, $args, $fn, 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitGzpassthru::invoke(

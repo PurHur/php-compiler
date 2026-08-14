@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,24 +22,19 @@ final class gzread extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30830).
         $fn = $this->getName();
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($fn.'() expects one or two arguments in this compiler build');
-        }
+        $this->requireExactArgCount($frame, $fn, 2);
         $handle = VmStreamArg::requireStreamHandle($frame->calledArgs[0]->resolveIndirect(), $fn);
         if (null === $frame->returnVar) {
             return;
         }
-        $length = 8192;
-        if (2 === $argc) {
-            $length = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1]->resolveIndirect(),
-                $fn,
-                2,
-                'length'
-            );
-        }
+        $length = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1]->resolveIndirect(),
+            $fn,
+            2,
+            'length'
+        );
         $data = VmGzStream::gzread($handle, $length);
         if (false === $data) {
             $frame->returnVar->bool(false);
@@ -51,19 +47,17 @@ final class gzread extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($fn.'() expects one or two arguments in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, $fn, 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $args[0], $fn.'() stream'),
             $i64
         );
-        $length = $i64->constInt(8192, false);
-        if (2 === $argc) {
-            $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], $fn, 2, 'length');
-        }
+        $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], $fn, 2, 'length');
 
         return JitGzread::invoke($context, $handle, $length);
     }
