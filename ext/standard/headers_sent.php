@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\SapiOutput;
 use PHPCompiler\VM\Variable;
@@ -24,10 +25,9 @@ final class headers_sent extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/head.c — ArgumentCountError (#30705).
+        $this->requireAtMostArgCount($frame, 'headers_sent', 2);
         $argc = \count($frame->calledArgs);
-        if ($argc > 2) {
-            throw new \LogicException('headers_sent() accepts at most two arguments');
-        }
         $sent = SapiOutput::headersSent();
         if ($argc >= 1) {
             if ($sent) {
@@ -47,8 +47,9 @@ final class headers_sent extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 2) {
-            throw new \LogicException('headers_sent() accepts at most two arguments');
+        // Catchable ArgumentCountError (AOT) — peer headers_list / #30705.
+        if (!$this->requireAtMostJitArgCount($context, $args, 'headers_sent', 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         return JitHeadersSent::invoke($context, ...$args);
