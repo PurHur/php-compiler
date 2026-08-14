@@ -10,6 +10,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\MultipleIteratorZipLlvm;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\SplOuterIteratorHt;
 use PHPLLVM\Value;
 
@@ -83,10 +84,15 @@ final class MultipleIteratorMethod implements Call
     /** @param list<Variable> $args */
     private static function compileAttach(Context $context, array $args): Value
     {
-        if (!isset($args[0], $args[1])) {
-            throw new \ArgumentCountError(
-                'MultipleIterator::attachIterator() expects at least 1 argument, 0 given'
-            );
+        // php-src zim_MultipleIterator_attachIterator — ZEND_PARSE_PARAMETERS_ARGS(1, 2) (#30947)
+        if (!VmClassMethod::requireJitUserArgCountRange(
+            $context,
+            $args,
+            'MultipleIterator::attachIterator',
+            1,
+            2
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
         $receiver = self::objectReceiver($context, $args[0]);
         $inner = self::objectReceiver($context, $args[1]);
