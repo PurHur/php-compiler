@@ -2794,6 +2794,37 @@ class Compiler {
                         }
                         break;
                     } elseif (
+                        $child instanceof Op\Expr\StaticPropertyFetch
+                        && null !== ($coalesceMatch = $this->findCoalesceUsingStaticPropertyFetchLeft($child, $ops, $i))
+                    ) {
+                        // php-cfg hoists StaticPropertyFetch before ?? / ??=; skip the R-mode
+                        // fetch so uninitialized typed statics stay BP_VAR_IS (#31146).
+                        /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
+                        [$coalesce, $coalesceIndex] = $coalesceMatch;
+                        $resultOverride = null;
+                        if (
+                            $coalesceIndex + 1 < $opCount
+                            && $ops[$coalesceIndex + 1] instanceof Op\Expr\Assign
+                            && $this->isCoalesceAssignTail($ops[$coalesceIndex + 1], $coalesce)
+                            && $this->operandsChainEqual($ops[$coalesceIndex + 1]->var, $child->result)
+                        ) {
+                            /** @var Op\Expr\Assign $tailAssign */
+                            $tailAssign = $ops[$coalesceIndex + 1];
+                            $resultOverride = $tailAssign->var;
+                        }
+                        if ($this->isCoalesceLoweredByFollowingEchoConcat($ops, $coalesceIndex)) {
+                            $i = $coalesceIndex;
+                            break;
+                        }
+                        $block = null !== $resultOverride
+                            ? $this->compileCoalesceForAssign($coalesce, $block, $resultOverride)
+                            : $this->compileCoalesce($coalesce, $block);
+                        $i = $coalesceIndex;
+                        if (null !== $resultOverride) {
+                            ++$i;
+                        }
+                        break;
+                    } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
                         && ($ops[$i + 1] instanceof Op\Expr\FuncCall || $ops[$i + 1] instanceof Op\Expr\NsFuncCall)
@@ -3635,6 +3666,62 @@ class Compiler {
         }
 
         return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg emits StaticPropertyFetch as its own stmt before ?? / ??= (#31146).
+     */
+    private function isStaticPropertyFetchOnlyCoalesceLeft(
+        Op\Expr\StaticPropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        $left = $next->left;
+        while ($left instanceof Temporary) {
+            if ($left === $fetch->result) {
+                return true;
+            }
+            if (null === $left->original) {
+                break;
+            }
+            $left = $left->original;
+        }
+
+        return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg emits StaticPropertyFetch as its own stmt before ?? / ??= (#31146).
+     *
+     * @param Op[] $ops
+     *
+     * @return ?array{0: Op\Expr\BinaryOp\Coalesce, 1: int}
+     */
+    private function findCoalesceUsingStaticPropertyFetchLeft(
+        Op\Expr\StaticPropertyFetch $fetch,
+        array $ops,
+        int $index
+    ): ?array {
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                if (!$this->isStaticPropertyFetchOnlyCoalesceLeft($fetch, $next)) {
+                    return null;
+                }
+
+                return [$next, $j];
+            }
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     /**
