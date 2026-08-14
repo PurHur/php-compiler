@@ -20,6 +20,8 @@ final class DatePeriodGetRecurrences extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('DatePeriod::getRecurrences() called without $this');
         }
+        // php-src zim_DatePeriod_getRecurrences — ZEND_PARSE_PARAMETERS_NONE (#30934).
+        $this->requireExactUserArgCount($frame, 'DatePeriod::getRecurrences', 0);
         $receiver = DatePeriodSupport::requireDatePeriod($frame->calledArgs[0], 'DatePeriod::getRecurrences()');
         if (null === $frame->returnVar) {
             return;
