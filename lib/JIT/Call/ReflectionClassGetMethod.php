@@ -4,18 +4,38 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
+/** ReflectionClass::getMethod() — JIT/AOT (#1936, #30888). */
 final class ReflectionClassGetMethod implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
+        // php-src: zim_ReflectionClass_getMethod — exactly 1 arg; $args[0] is $this (#30888)
+        $userArgCount = \count($args) - 1;
+        if (1 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::exactUserArgCountMessage(
+                    'ReflectionClass::getMethod',
+                    1,
+                    $userArgCount
+                )
+            );
+            $unreachable = BasicBlockHelper::append($context, 'refl_class_getmethod_argc_unreach');
+            $context->builder->positionAtEnd($unreachable);
+
+            return JitValueBox::alloc($context);
+        }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         [$classSafe, $classLen] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
 
