@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,10 +22,9 @@ final class gzdeflate extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30829).
+        $this->requireArgCountRange($frame, 'gzdeflate', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('gzdeflate() expects one to three arguments in this compiler build');
-        }
         $data = VmZlibArg::resolveDataString($frame, 'gzdeflate');
         $level = -1;
         $encoding = \ZLIB_ENCODING_RAW;
@@ -51,10 +51,12 @@ final class gzdeflate extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('gzdeflate() expects one to three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'gzdeflate', 1, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $level = $i64->constInt(-1, true);
         $encoding = $i64->constInt(\ZLIB_ENCODING_RAW, false);

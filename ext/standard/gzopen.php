@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -22,10 +23,9 @@ final class gzopen extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30829).
+        $this->requireArgCountRange($frame, 'gzopen', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('gzopen() expects two or three arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -52,10 +52,12 @@ final class gzopen extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('gzopen() expects two or three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'gzopen', 2, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $useIncludePath = $i64->constInt(0, false);
         if (3 === $argc) {
