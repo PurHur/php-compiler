@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\Variable;
 
 /** Generator::send() — resume with value into yield expression (#167, Zend zend_generators.c). */
@@ -18,7 +17,22 @@ final class GeneratorSend extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $gen = self::generatorFromFrame($frame);
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('Generator::send() called without $this');
+        }
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (1 arg); $calledArgs[0] is $this (#30907)
+        $userArgCount = \count($frame->calledArgs) - 1;
+        if (1 !== $userArgCount) {
+            throw new \ArgumentCountError(\sprintf(
+                'Generator::send() expects exactly 1 argument, %d given',
+                $userArgCount
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('Generator::send() called on non-object');
+        }
+        $gen = GeneratorGetReturn::requireGeneratorState($receiver->toObject());
         if ($gen->done) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->null();
@@ -27,10 +41,7 @@ final class GeneratorSend extends VmClassMethod
             return;
         }
         $send = new Variable();
-        $send->null();
-        if (\count($frame->calledArgs) >= 2) {
-            $send->copyFrom($frame->calledArgs[1]->resolveIndirect());
-        }
+        $send->copyFrom($frame->calledArgs[1]->resolveIndirect());
         $active = $gen->vm->resumeGenerator($gen, $send);
         if (null === $frame->returnVar) {
             return;
@@ -42,18 +53,5 @@ final class GeneratorSend extends VmClassMethod
         } else {
             $frame->returnVar->null();
         }
-    }
-
-    private static function generatorFromFrame(Frame $frame): GeneratorState
-    {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException('Generator::send() called without $this');
-        }
-        $receiver = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $receiver->type) {
-            throw new \LogicException('Generator::send() called on non-object');
-        }
-
-        return GeneratorGetReturn::requireGeneratorState($receiver->toObject());
     }
 }
