@@ -386,6 +386,8 @@
             <file>./test/compliance/ReflectionAttrExcessArgc30896JITTest.php</file>
             <file>./test/compliance/ReflectionMethodInvokeArgsExcessArgc30922VMTest.php</file>
             <file>./test/compliance/ReflectionMethodInvokeArgsExcessArgc30922JITTest.php</file>
+            <file>./test/compliance/ReflectionClassNewInstanceExcessArgc30923VMTest.php</file>
+            <file>./test/compliance/ReflectionClassNewInstanceExcessArgc30923JITTest.php</file>
             <file>./test/compliance/ClosureWeakrefSpvExcessArgc30867VMTest.php</file>
             <file>./test/compliance/ClosureWeakrefSpvExcessArgc30867JITTest.php</file>
             <file>./test/compliance/ReflectionClassExcessArgc30888VMTest.php</file>

@@ -18,6 +18,8 @@ final class ReflectionClassNewInstanceWithoutConstructor extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionClass_newInstanceWithoutConstructor — exact arity 0 (#30923)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::newInstanceWithoutConstructor', 0);
         if (null === $frame->vmContext) {
             throw new \LogicException('ReflectionClass::newInstanceWithoutConstructor() requires VM context');
         }
