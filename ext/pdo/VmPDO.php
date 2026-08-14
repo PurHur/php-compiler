@@ -1262,6 +1262,8 @@ final class PDOGetAvailableDrivers extends PdoClassMethod
 
     public function execute(Frame $frame): void
     {
+        // Static — calledArgs has no $this (php-src zim_PDO_getAvailableDrivers, #30994).
+        $this->requireExactArgCount($frame, 'PDO::getAvailableDrivers', 0);
         if (null === $frame->returnVar) {
             return;
         }
