@@ -481,6 +481,8 @@
             <file>./test/compliance/DateTimeDiffDstHours30970JITTest.php</file>
             <file>./test/compliance/Xoshiro256StarStarGenerate31053VMTest.php</file>
             <file>./test/compliance/Xoshiro256StarStarGenerate31053JITTest.php</file>
+            <file>./test/compliance/PcgOneseq128XslRr64Generate31054VMTest.php</file>
+            <file>./test/compliance/PcgOneseq128XslRr64Generate31054JITTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994VMTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994JITTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934VMTest.php</file>
