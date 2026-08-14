@@ -28,10 +28,9 @@ final class exec extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/exec.c / basic_functions.stub.php — ArgumentCountError (#30566)
+        $this->requireArgCountRange($frame, 'exec', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('exec() accepts one to three arguments in this compiler build');
-        }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'exec', 'command', false);
         // php-src exec.c — zend_argument_must_not_be_empty_error → Zend "cannot be empty" (#30340)
         VmString::rejectEmptyBuiltinStringArg($command, 'exec', 0, 'command', true);

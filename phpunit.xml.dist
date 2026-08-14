@@ -350,6 +350,8 @@
             <file>./test/compliance/ExplodeEmptySeparatorMessageJITTest.php</file>
             <file>./test/compliance/ExecFamilyEmptyCommandMessageVMTest.php</file>
             <file>./test/compliance/ExecFamilyEmptyCommandMessageJITTest.php</file>
+            <file>./test/compliance/ExecFamilyExcessArgc30566VMTest.php</file>
+            <file>./test/compliance/ExecFamilyExcessArgc30566JITTest.php</file>
             <file>./test/compliance/FilestatPredicatesExcessArgc30544VMTest.php</file>
             <file>./test/compliance/FilestatPredicatesExcessArgc30544JITTest.php</file>
             <file>./test/compliance/FilestatMetaExcessArgc30545VMTest.php</file>
