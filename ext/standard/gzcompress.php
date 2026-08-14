@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,10 +27,9 @@ final class gzcompress extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30829).
+        $this->requireArgCountRange($frame, 'gzcompress', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('gzcompress() expects one to three arguments in this compiler build');
-        }
         // Soft-null — Zend 8.4 deprecate+coerce (#21280); leave shared VmZlibArg Z_PARAM_STR for siblings.
         $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'gzcompress', 0, 'data');
         $level = -1;
@@ -57,10 +57,12 @@ final class gzcompress extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('gzcompress() expects one to three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'gzcompress', 1, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $level = $i64->constInt(-1, true);
         $encoding = $i64->constInt(\ZLIB_ENCODING_DEFLATE, false);

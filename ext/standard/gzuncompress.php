@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,10 +22,9 @@ final class gzuncompress extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30829).
+        $this->requireArgCountRange($frame, 'gzuncompress', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('gzuncompress() expects one or two arguments in this compiler build');
-        }
         $data = VmZlibArg::resolveDataString($frame, 'gzuncompress');
         $maxLength = 0;
         if (2 === $argc) {
@@ -46,10 +46,12 @@ final class gzuncompress extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('gzuncompress() expects one or two arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'gzuncompress', 1, 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $maxLength = $context->getTypeFromString('int64')->constInt(0, false);
         if (2 === $argc) {
             $maxLength = JitStrictIntArg::lower($context, $args[1], 'gzuncompress', 2, 'max_length');

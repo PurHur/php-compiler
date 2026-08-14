@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -24,10 +25,9 @@ final class gzfile extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30829).
+        $this->requireArgCountRange($frame, 'gzfile', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('gzfile() expects one or two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -58,10 +58,12 @@ final class gzfile extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('gzfile() expects one or two arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'gzfile', 1, 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $useIncludePath = $i64->constInt(0, false);
         if (2 === $argc) {

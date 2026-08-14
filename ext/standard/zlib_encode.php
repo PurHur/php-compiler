@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,10 +22,9 @@ final class zlib_encode extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30829).
+        $this->requireArgCountRange($frame, 'zlib_encode', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('zlib_encode() expects two or three arguments in this compiler build');
-        }
         $data = VmZlibArg::resolveDataString($frame, 'zlib_encode');
         $encoding = VmZlibArg::coerceInt($frame, 1, 'zlib_encode', 2, 'encoding');
         self::assertValidEncoding($encoding);
@@ -48,10 +48,12 @@ final class zlib_encode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('zlib_encode() expects two or three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'zlib_encode', 2, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $level = $i64->constInt(-1, true);
         if (3 === $argc) {
