@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
@@ -289,5 +290,92 @@ final class ReflectionSetup
         );
 
         return ['cstr' => $shortCstr, 'len' => $shortLen];
+    }
+
+    /**
+     * ReflectionClass 0-arg kind/query — JIT/AOT (#31126, php_reflection.c).
+     *
+     * $args[0] is $this. Caller must already have checked user argc.
+     *
+     * @param list<Variable> $args
+     */
+    public static function emitKindQuery(
+        Context $context,
+        array $args,
+        string $helperMethod,
+        bool $returnsInt = false
+    ): Value {
+        $obj = self::loadObjectFromArg($context, $args[0]);
+        [$cstr, $len] = self::reflectionClassNameAsCstr($context, $obj);
+        $i64 = $context->getTypeFromString('int64');
+        $nameStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $i64),
+            $cstr
+        );
+        $abi = '__phpc_refl_class_kind_'.strtolower($helperMethod);
+        self::ensureKindQueryLinked($context, $abi, $helperMethod, $returnsInt);
+        $raw = $context->builder->call($context->lookupFunction($abi), $nameStr);
+        $resultSlot = JitValueBox::alloc($context);
+        if ($returnsInt) {
+            JitValueBox::writeLong($context, $resultSlot, $raw);
+        } else {
+            JitValueBox::writeBool($context, $resultSlot, $raw);
+        }
+
+        return $resultSlot;
+    }
+
+    private static function ensureKindQueryLinked(
+        Context $context,
+        string $abi,
+        string $helperMethod,
+        bool $returnsInt
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $retTy = $context->getTypeFromString($returnsInt ? 'int64' : 'int1');
+        $helperLogical = 'PHPCompiler\\ext\\standard\\ReflectionClassKindJitHelper::'.$helperMethod;
+        JitVmHelperLink::ensureBridge(
+            $context,
+            $abi,
+            'refl_class_kind_'.$helperMethod.'_bridge_entry',
+            [$strPtr],
+            $retTy,
+            $helperLogical,
+            '/ext/standard/ReflectionClassKindJitHelper.php',
+            self::kindQueryCompiledHelpers(),
+            '#31126'
+        );
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** @return list<string> */
+    private static function kindQueryCompiledHelpers(): array
+    {
+        $ns = 'PHPCompiler\\ext\\standard\\ReflectionClassKindJitHelper::';
+
+        return [
+            $ns.'isEnum',
+            $ns.'isInterface',
+            $ns.'isTrait',
+            $ns.'isAbstract',
+            $ns.'isReadOnly',
+            $ns.'getModifiers',
+        ];
     }
 }

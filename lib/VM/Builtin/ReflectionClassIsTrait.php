@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Builtin\ReflectionSetup;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPLLVM\Value;
 
 /** ReflectionClass::isTrait() — VM (#18335, ext/reflection/php_reflection.c). */
 final class ReflectionClassIsTrait extends VmClassMethod
@@ -17,9 +21,20 @@ final class ReflectionClassIsTrait extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionClass_isTrait — ZEND_PARSE_PARAMETERS (0 args) (#31126)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::isTrait', 0);
         [, $entry] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(ReflectionSupport::reflectionClassIsTrait($entry));
         }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (!self::requireExactJitUserArgCount($context, $args, 'ReflectionClass::isTrait', 0)) {
+            return self::jitArgcDummyReturn($context);
+        }
+
+        return ReflectionSetup::emitKindQuery($context, $args, 'isTrait');
     }
 }
