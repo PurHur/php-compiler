@@ -168,6 +168,12 @@ abstract class DirectoryMethod extends VmClassMethod
 
         return DirectoryBuiltin::requireReceiver($frame->calledArgs[0], $label);
     }
+
+    /** php-src ext/standard/dir.c — ZEND_PARSE_PARAMETERS_NONE (#30946). */
+    protected function requireNoUserArgs(Frame $frame, string $method): void
+    {
+        $this->requireExactUserArgCount($frame, 'Directory::'.$method, 0);
+    }
 }
 
 final class DirectoryConstruct extends DirectoryMethod
@@ -182,6 +188,7 @@ final class DirectoryRead extends DirectoryMethod
 {
     public function execute(Frame $frame): void
     {
+        $this->requireNoUserArgs($frame, 'read');
         $object = $this->receiver($frame, 'Directory::read()');
         if (null === $frame->returnVar) {
             return;
@@ -201,6 +208,7 @@ final class DirectoryRewind extends DirectoryMethod
 {
     public function execute(Frame $frame): void
     {
+        $this->requireNoUserArgs($frame, 'rewind');
         $object = $this->receiver($frame, 'Directory::rewind()');
         $handle = DirectoryBuiltin::requireOpenHandle($object, 'rewind');
         VmDir::rewinddir($handle);
@@ -211,6 +219,7 @@ final class DirectoryClose extends DirectoryMethod
 {
     public function execute(Frame $frame): void
     {
+        $this->requireNoUserArgs($frame, 'close');
         $object = $this->receiver($frame, 'Directory::close()');
         if (null === $frame->vmContext) {
             throw new \LogicException('Directory::close() requires VM context in this compiler build');
