@@ -226,6 +226,7 @@ final class BuiltinInternalTentativeReturnInfo
         'reflectionmethod::isvariadic' => 'bool',
         'reflectionmethod::returnsreference' => 'bool',
         'reflectionmethod::setaccessible' => 'void',
+        'reflectionproperty::setaccessible' => 'void',
         // php-src ext/spl/*.stub.php — ArrayAccess @tentative-return-type (#25856)
         'spldoublylinkedlist::offsetexists' => 'bool',
         'spldoublylinkedlist::offsetget' => 'mixed',
