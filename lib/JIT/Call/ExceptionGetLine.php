@@ -15,12 +15,12 @@ use PHPCompiler\VM\ExceptionSupport;
 use PHPLLVM\Value;
 
 /**
- * Throwable/Exception::getCode() — read code property (#23974, peer #23641 getMessage, #30895).
+ * Throwable/Exception::getLine() — read line property (#30895).
  *
- * php-src: Zend/zend_exceptions.stub.php — Exception::getCode(): int
- * VM SSOT: {@see \PHPCompiler\VM\Builtin\ExceptionGetCode}
+ * php-src: Zend/zend_exceptions.c — zim_Exception_getLine / zim_Error_getLine
+ * VM SSOT: {@see \PHPCompiler\VM\Builtin\ExceptionGetLine}
  */
-final class ExceptionGetCode implements Call
+final class ExceptionGetLine implements Call
 {
     public function __construct(
         private readonly string $declaringRoot = 'Exception',
@@ -30,34 +30,34 @@ final class ExceptionGetCode implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         if ([] === $args) {
-            throw new \LogicException('getCode() requires an object receiver');
+            throw new \LogicException('getLine() requires an object receiver');
         }
-        // php-src: Zend/zend_exceptions.c — ZEND_PARSE_PARAMETERS (0 args); $args[0] is $this (#30895)
+        // php-src: ZEND_PARSE_PARAMETERS (0 args); $args[0] is $this (#30895)
         $userArgCount = \count($args) - 1;
         if (0 !== $userArgCount) {
             ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
                 \sprintf(
-                    '%s::getCode() expects exactly 0 arguments, %d given',
+                    '%s::getLine() expects exactly 0 arguments, %d given',
                     $this->declaringRoot,
                     $userArgCount
                 )
             );
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'exc_getcode_argc_cont');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'exc_getline_argc_cont');
             $slot = JitValueBox::alloc($context);
             JitValueBox::writeLong($context, $slot, $context->constantFromInteger(0, 'int64'));
 
             return $slot;
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $code = ReflectionSetup::integerPropertyAsI64(
+        $line = ReflectionSetup::integerPropertyAsI64(
             $context,
             $obj,
             $this->declaringRoot,
-            ExceptionSupport::PROP_CODE
+            ExceptionSupport::PROP_LINE
         );
         $slot = JitValueBox::alloc($context);
-        JitValueBox::writeLong($context, $slot, $code);
+        JitValueBox::writeLong($context, $slot, $line);
 
         return $slot;
     }

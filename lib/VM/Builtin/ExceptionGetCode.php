@@ -21,6 +21,12 @@ final class ExceptionGetCode extends VmClassMethod
             throw new \LogicException('getCode() called without $this');
         }
         $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getCode()', $frame->vmContext);
+        // php-src: Zend/zend_exceptions.c — ZEND_PARSE_PARAMETERS(0); $calledArgs[0] is $this (#30895)
+        $this->requireExactUserArgCount(
+            $frame,
+            ExceptionSupport::throwableMethodFunctionLabel($receiver, 'getCode'),
+            0
+        );
         if (null === $frame->returnVar) {
             return;
         }
