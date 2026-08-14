@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DefaultTimezoneCivilRuntime;
 use PHPCompiler\JIT\Builtin\StringGetdate;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -64,6 +65,8 @@ final class JitGetdate
                 JitDate::time($context)
             );
 
+        $ts = self::localCivilTimestamp($context, $ts);
+
         $parts = self::civilParts($context, $ts);
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         self::setLong($context, $ht, 'seconds', $parts['second']);
@@ -101,7 +104,17 @@ final class JitGetdate
      */
     public static function civilPartsPublic(Context $context, Value $timestamp): array
     {
-        return self::civilParts($context, $timestamp);
+        return self::civilParts($context, self::localCivilTimestamp($context, $timestamp));
+    }
+
+    private static function localCivilTimestamp(Context $context, Value $timestamp): Value
+    {
+        DefaultTimezoneCivilRuntime::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_default_tz_civil_timestamp'),
+            $timestamp
+        );
     }
 
     /**

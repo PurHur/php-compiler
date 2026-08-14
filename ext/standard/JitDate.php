@@ -287,7 +287,7 @@ final class JitDate
 
     private static function defaultTimezoneIsUtc(): bool
     {
-        $tz = \date_default_timezone_get();
+        $tz = VmDate::defaultTimezoneGet();
 
         return 'UTC' === $tz || 'Etc/UTC' === $tz || 'Z' === $tz || 'GMT' === $tz;
     }
