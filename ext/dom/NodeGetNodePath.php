@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMNode::getNodePath() — absolute XPath-like path (php-src ext/dom/node.c; #14410). */
+/**
+ * DOMNode::getNodePath() — absolute XPath-like path (php-src ext/dom/node.c; #14410).
+ *
+ * Exact user arity 0 — Zend ArgumentCountError (#31011; missed by #30616).
+ */
 final class NodeGetNodePath extends DomClassMethod
 {
     public function __construct()
@@ -16,6 +20,7 @@ final class NodeGetNodePath extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::getNodePath', 0);
         $node = $this->domRegistryNodeReceiver($frame, 'DOMNode::getNodePath()');
         if (null === $frame->returnVar) {
             return;

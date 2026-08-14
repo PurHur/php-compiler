@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
@@ -21,8 +22,14 @@ final class DomElementGetAttributeNS implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrns_invoke_cont');
-        if (\count($args) < 3) {
-            throw new \LogicException('Dom\\Element::getAttributeNS() expects receiver, namespace, localName');
+        // Legacy DOMElement + living Dom\Element share this Call (#31011).
+        if (!VmClassMethod::requireExactJitUserArgCount(
+            $context,
+            $args,
+            'DOMElement::getAttributeNS',
+            2
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
         $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         if (null === $nsLit && (Variable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant)) {

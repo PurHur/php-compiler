@@ -355,16 +355,136 @@ final class VmDomJitDispatch
      */
     public static function normalizeDocument(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
-        if (\count($extra) > 0) {
-            throw new \ArgumentCountError(
-                'DOMDocument::normalizeDocument() expects exactly 0 arguments, '.\count($extra).' given'
-            );
-        }
+        self::requireExactExtraArgCount('DOMDocument::normalizeDocument', $extra, 0);
         VmDom::normalizeDocument($ctx, $document);
         $null = new Variable();
         $null->null();
 
         return $null;
+    }
+
+    /**
+     * DOMNode::hasAttributes() — exact user arity 0 (#31011; php-src node.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function hasAttributes(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMNode::hasAttributes', $extra, 0);
+        $var = new Variable();
+        $var->bool(VmDom::hasAttributes($node));
+
+        return $var;
+    }
+
+    /**
+     * DOMNode::getNodePath() — exact user arity 0 (#31011; php-src node.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function getNodePath(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMNode::getNodePath', $extra, 0);
+        $path = VmDom::getNodePath($node);
+        $var = new Variable();
+        if (null === $path) {
+            $var->null();
+        } else {
+            $var->string($path);
+        }
+
+        return $var;
+    }
+
+    /**
+     * DOMElement::getElementsByTagName() — exact user arity 1 (#31011; php-src element.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function getElementsByTagNameFromElement(
+        VmContext $ctx,
+        ObjectEntry $element,
+        array $extra
+    ): Variable {
+        self::requireExactExtraArgCount('DOMElement::getElementsByTagName', $extra, 1);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('getElementsByTagName', 0),
+            'DOMElement::getElementsByTagName',
+            0,
+            'qualifiedName'
+        );
+
+        return VmDom::getElementsByTagNameFromNode($ctx, $element, $name);
+    }
+
+    /**
+     * DOMDocument / DOMElement::getElementsByTagName() (#31011).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function dispatchGetElementsByTagName(
+        VmContext $ctx,
+        ObjectEntry $receiver,
+        array $extra
+    ): Variable {
+        if (VmDom::isDocument($receiver)) {
+            self::requireExactExtraArgCount('DOMDocument::getElementsByTagName', $extra, 1);
+            $name = self::stringArg(
+                $extra[0] ?? self::missingArg('getElementsByTagName', 0),
+                'DOMDocument::getElementsByTagName',
+                0,
+                'qualifiedName'
+            );
+
+            return VmDom::getElementsByTagName($ctx, $receiver, $name);
+        }
+        if (VmDom::isElement($receiver)) {
+            return self::getElementsByTagNameFromElement($ctx, $receiver, $extra);
+        }
+
+        throw new \Error('Call to undefined method '.$receiver->class->name.'::getElementsByTagName()');
+    }
+
+    /**
+     * DOMNodeList::count() — exact user arity 0 (#31011; php-src nodelist.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function nodeListCount(ObjectEntry $nodeList, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMNodeList::count', $extra, 0);
+        $var = new Variable();
+        $var->int(VmDom::nodeListCount($nodeList));
+
+        return $var;
+    }
+
+    /**
+     * Countable::count() on NodeList / NamedNodeMap / TokenList (#31011).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function dispatchCount(ObjectEntry $receiver, array $extra): Variable
+    {
+        if (VmDom::isNodeList($receiver)) {
+            return self::nodeListCount($receiver, $extra);
+        }
+        if (VmDom::isNamedNodeMap($receiver)) {
+            self::requireExactExtraArgCount('DOMNamedNodeMap::count', $extra, 0);
+            $var = new Variable();
+            $var->int($receiver->getProperty(VmDom::PROP_LENGTH)->resolveIndirect()->toInt());
+
+            return $var;
+        }
+        if (VmDom::isTokenList($receiver)) {
+            self::requireExactExtraArgCount('DOMTokenList::count', $extra, 0);
+            $var = new Variable();
+            $var->int(VmDomTokenList::length($receiver));
+
+            return $var;
+        }
+
+        throw new \Error('Call to undefined method '.$receiver->class->name.'::count()');
     }
 
     /**
@@ -646,6 +766,7 @@ final class VmDomJitDispatch
      */
     public static function getAttributeNS(ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::getAttributeNS', $extra, 2);
         $namespace = self::nullableStringArg($extra[0] ?? self::missingArg('getAttributeNS', 0), 'getAttributeNS', 0);
         $localName = self::stringArg(
             $extra[1] ?? self::missingArg('getAttributeNS', 1),
@@ -1342,6 +1463,7 @@ final class VmDomJitDispatch
      */
     public static function c14n(VmContext $ctx, ObjectEntry $node, array $extra): Variable
     {
+        self::requireAtMostExtraArgCount('DOMNode::C14N', $extra, 4);
         $exclusive = self::optionalBoolArg($extra[0] ?? null, 'C14N', 0);
         $withComments = self::optionalBoolArg($extra[1] ?? null, 'C14N', 1);
         $xpath = null;

@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMNode::C14N() — canonical XML serialization (php-src ext/dom/node.c; #14409). */
+/**
+ * DOMNode::C14N() — canonical XML serialization (php-src ext/dom/node.c; #14409).
+ *
+ * At most 4 user args — Zend ArgumentCountError (#31011; missed by #30616).
+ */
 final class NodeC14N extends DomClassMethod
 {
     public function __construct()
@@ -17,6 +21,7 @@ final class NodeC14N extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtMostUserArgCount($frame, 'DOMNode::C14N', 4);
         $node = $this->domRegistryNodeReceiver($frame, 'DOMNode::C14N()');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMNode::C14N() requires VM context in this compiler build');
