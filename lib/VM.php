@@ -1180,13 +1180,13 @@ class VM {
         }
         $backing = $this->hookedStaticPropertyBackingValue($classLc, $propNameRaw);
         if (false !== $backing) {
-            $dst->copyFromForClone($backing);
+            $this->copyPropertyValueForIsMode($dst, $backing);
 
             return;
         }
         $storage = $this->resolveStaticPropertyStorage($classLc, strtolower($propNameRaw));
         if (null !== $storage) {
-            $dst->copyFromForClone($storage);
+            $this->copyPropertyValueForIsMode($dst, $storage);
 
             return;
         }
@@ -1412,8 +1412,11 @@ class VM {
             return false;
         }
         $value = $storage->resolveIndirect();
+        if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+            return false;
+        }
 
-        return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
+        return Variable::TYPE_NULL !== $value->type;
     }
 
     /**
@@ -1574,7 +1577,8 @@ class VM {
             }
         }
         if ($object->hasProperty($propName)) {
-            $dst->copyFrom($object->getProperty($propName));
+            // Plain typed slots: BP_VAR_IS must not Error (#31146, zend_object_handlers.c).
+            $this->copyPropertyValueForIsMode($dst, $object->getProperty($propName));
         } else {
             $dst->undefined();
         }
