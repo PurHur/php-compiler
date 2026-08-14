@@ -100,6 +100,7 @@ final class HashTableReplaceRecursiveLlvm
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $fn = $probe;
@@ -117,16 +118,22 @@ final class HashTableReplaceRecursiveLlvm
         // Register before body so recursive calls resolve.
         $context->registerFunction(self::OVERLAY_FN, $fn);
         $context->activeFunction = self::OVERLAY_FN;
+        // Pin lowering owner so BasicBlockHelper::parentFunction does not redirect
+        // appends to the caller's method under #31101 foreign-insert recovery.
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
 
         $entry = $fn->appendBasicBlock('arr_replace_rec_overlay_entry');
         $context->builder->positionAtEnd($entry);
-        self::emitOverlayBody($context, $fn);
-
-        $context->activeFunction = $savedActive;
-        if (null !== $savedBlock) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        try {
+            self::emitOverlayBody($context, $fn);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
 
         return $fn;

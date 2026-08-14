@@ -96,6 +96,16 @@ class Context {
     public string $activeFunction = '';
     /** LLVM function owning the in-flight compileBlockInternal lowering (#31101). */
     public ?\PHPLLVM\Value\Function_ $loweringLlvmFunction = null;
+
+    /**
+     * Per-LLVM-function CFG Block → BB maps (#31101).
+     * Entries are `[canonical Function_ wrapper, blockStorage, blockEntryStorage]` matched via
+     * {@see TryCatchHelper::sameLlvmFunction} (PHPLLVM wrappers are not pointer-stable).
+     *
+     * @var list<array{0: \PHPLLVM\Value\Function_, 1: \SplObjectStorage, 2: \SplObjectStorage}>
+     */
+    public array $blockStorageByLlvmFunc = [];
+
     public array $functionScope = [];
 
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
