@@ -47,35 +47,49 @@ final class ArrayObjectMethod implements Call
                     $args[0] ?? throw new \LogicException('ArrayObject::getArrayCopy() called without $this')
                 )
             ),
-            'offsetget' => ArrayObjectJitHelper::compileOffsetGet(
+            'offsetget' => $this->compileExact(
                 $context,
-                $args[0] ?? throw new \LogicException('ArrayObject::offsetGet() called without $this'),
-                $args[1] ?? throw new \ArgumentCountError(
-                    'ArrayObject::offsetGet() expects exactly 1 argument, 0 given'
+                $args,
+                'ArrayObject::offsetGet',
+                1,
+                static fn () => ArrayObjectJitHelper::compileOffsetGet(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::offsetGet() called without $this'),
+                    $args[1]
                 )
             ),
-            'offsetset' => ArrayObjectJitHelper::compileOffsetSet(
+            'offsetset' => $this->compileExact(
                 $context,
-                $args[0] ?? throw new \LogicException('ArrayObject::offsetSet() called without $this'),
-                $args[1] ?? throw new \ArgumentCountError(
-                    'ArrayObject::offsetSet() expects exactly 2 arguments, 0 given'
-                ),
-                $args[2] ?? throw new \ArgumentCountError(
-                    'ArrayObject::offsetSet() expects exactly 2 arguments, 1 given'
+                $args,
+                'ArrayObject::offsetSet',
+                2,
+                static fn () => ArrayObjectJitHelper::compileOffsetSet(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::offsetSet() called without $this'),
+                    $args[1],
+                    $args[2]
                 )
             ),
-            'offsetexists' => ArrayObjectJitHelper::compileOffsetExists(
+            'offsetexists' => $this->compileExact(
                 $context,
-                $args[0] ?? throw new \LogicException('ArrayObject::offsetExists() called without $this'),
-                $args[1] ?? throw new \ArgumentCountError(
-                    'ArrayObject::offsetExists() expects exactly 1 argument, 0 given'
+                $args,
+                'ArrayObject::offsetExists',
+                1,
+                static fn () => ArrayObjectJitHelper::compileOffsetExists(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::offsetExists() called without $this'),
+                    $args[1]
                 )
             ),
-            'offsetunset' => ArrayObjectJitHelper::compileOffsetUnset(
+            'offsetunset' => $this->compileExact(
                 $context,
-                $args[0] ?? throw new \LogicException('ArrayObject::offsetUnset() called without $this'),
-                $args[1] ?? throw new \ArgumentCountError(
-                    'ArrayObject::offsetUnset() expects exactly 1 argument, 0 given'
+                $args,
+                'ArrayObject::offsetUnset',
+                1,
+                static fn () => ArrayObjectJitHelper::compileOffsetUnset(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::offsetUnset() called without $this'),
+                    $args[1]
                 )
             ),
             'getiteratorclass' => $this->compileExact(
