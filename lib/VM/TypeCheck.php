@@ -895,9 +895,11 @@ final class TypeCheck
         if (self::matchesLiteralBool($dest, $literal)) {
             return;
         }
+        // Use the resolved slot so property TypeErrors see objectPropertyOwner /
+        // objectPropertyName (zend_object_handlers.c) — INDIRECT wrappers omit them (#31108).
         $value = $dest->resolveIndirect();
         throw self::typedSlotError(
-            $dest,
+            $value,
             $constraint,
             $value,
             $kind,
