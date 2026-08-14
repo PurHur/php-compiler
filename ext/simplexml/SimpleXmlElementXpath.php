@@ -21,9 +21,11 @@ final class SimpleXmlElementXpath extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('SimpleXMLElement::xpath() requires VM context');
         }
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('SimpleXMLElement::xpath() expects at least 1 argument');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SimpleXMLElement::xpath() called without $this');
         }
+        // php-src simplexml.stub.php: xpath(string $expression) (#30828).
+        $this->requireExactUserArgCount($frame, 'SimpleXMLElement::xpath', 1);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::xpath()'

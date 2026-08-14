@@ -55,7 +55,9 @@ final class SimpleXmlInstanceMethodJit
         }
         // saveXML is a php-src FALIAS of asXML (#19413).
         if ('simplexmlelement::asxml' === $lc || 'simplexmlelement::savexml' === $lc) {
-            $context->functionProxies[$lc] = new Call\SimpleXMLElementAsXml();
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementAsXml(
+                'simplexmlelement::savexml' === $lc ? 'saveXML' : 'asXML'
+            );
 
             return;
         }

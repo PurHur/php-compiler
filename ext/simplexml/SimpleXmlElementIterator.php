@@ -241,6 +241,11 @@ final class SimpleXmlElementHasChildren extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SimpleXMLElement::hasChildren() called without $this');
+        }
+        // php-src simplexml.stub.php: hasChildren(): bool (#30828).
+        $this->requireExactUserArgCount($frame, 'SimpleXMLElement::hasChildren', 0);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::hasChildren()'
@@ -264,6 +269,11 @@ final class SimpleXmlElementGetChildren extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('SimpleXMLElement::getChildren() requires VM context');
         }
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SimpleXMLElement::getChildren() called without $this');
+        }
+        // php-src simplexml.stub.php: getChildren(): ?SimpleXMLElement (#30828).
+        $this->requireExactUserArgCount($frame, 'SimpleXMLElement::getChildren', 0);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::getChildren()'

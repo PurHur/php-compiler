@@ -24,9 +24,11 @@ final class SimpleXmlElementConstruct extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('SimpleXMLElement::__construct() requires VM context');
         }
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('SimpleXMLElement::__construct() expects at least 1 argument, 0 given');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SimpleXMLElement::__construct() called without $this');
         }
+        // php-src simplexml.stub.php: __construct(string $data, int $options = 0, bool $dataIsURL = false, string $namespaceOrPrefix = "", bool $isPrefix = false) (#30828).
+        $this->requireUserArgCountRange($frame, 'SimpleXMLElement::__construct', 1, 5);
         $entry = $frame->calledArgs[0]->resolveIndirect()->toObject();
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_STRING !== $dataVar->type) {

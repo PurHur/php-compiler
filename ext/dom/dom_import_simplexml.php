@@ -20,9 +20,8 @@ final class dom_import_simplexml extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('dom_import_simplexml() expects at least 1 argument, 0 given');
-        }
+        // php-src ext/dom/php_dom.stub.php: dom_import_simplexml(object $node) (#30828).
+        $this->requireExactArgCount($frame, 'dom_import_simplexml', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('dom_import_simplexml() requires VM context');
         }

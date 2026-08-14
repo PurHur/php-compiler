@@ -21,9 +21,11 @@ final class SimpleXmlElementAddChild extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('SimpleXMLElement::addChild() requires VM context');
         }
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('SimpleXMLElement::addChild() expects at least 1 argument');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SimpleXMLElement::addChild() called without $this');
         }
+        // php-src simplexml.stub.php: addChild(string $qualifiedName, ?string $value = null, ?string $namespace = null) (#30828).
+        $this->requireUserArgCountRange($frame, 'SimpleXMLElement::addChild', 1, 3);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::addChild()'

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\simplexml;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /** LLVM lowering for SimpleXMLElement::__construct() — user-script AOT (#19306). */
@@ -14,6 +15,9 @@ final class JitSimpleXmlConstruct
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'SimpleXMLElement::__construct', 1, 5)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
         if (\count($args) < 2) {
             throw new \LogicException('SimpleXMLElement::__construct() expects receiver and data');
         }

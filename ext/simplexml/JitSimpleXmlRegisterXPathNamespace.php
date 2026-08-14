@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\simplexml;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /** LLVM lowering for SimpleXMLElement::registerXPathNamespace() — user-script AOT (#27534). */
@@ -14,6 +15,9 @@ final class JitSimpleXmlRegisterXPathNamespace
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::registerXPathNamespace', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
         if (\count($args) < 3) {
             throw new \LogicException('SimpleXMLElement::registerXPathNamespace() expects receiver, prefix, and namespace');
         }

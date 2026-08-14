@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7430 |
-| Phase A inventory files (M2 ratio SSOT) | 7430 |
+| PHP files on vm.php path | 7431 |
+| Phase A inventory files (M2 ratio SSOT) | 7431 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24022 |
+| Source constructs flagged (warnings) | 24016 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -575,8 +575,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/XmlDocumentCreateEmpty.php` | 0 | 2 |
 | `ext/dom/XmlDocumentCreateFromFile.php` | 0 | 3 |
 | `ext/dom/XmlDocumentCreateFromString.php` | 0 | 3 |
-| `ext/dom/dom_import_simplexml.php` | 0 | 2 |
-| `ext/dom/ns_import_simplexml.php` | 0 | 2 |
+| `ext/dom/dom_import_simplexml.php` | 0 | 1 |
+| `ext/dom/ns_import_simplexml.php` | 0 | 1 |
 | `ext/ds/BuiltinClasses.php` | 0 | 19 |
 | `ext/ds/DsDepthClasses.php` | 0 | 43 |
 | `ext/ds/DsExtensionPolicy.php` | 0 | 1 |
@@ -2082,12 +2082,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 7 |
 | `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
 | `ext/simplexml/Module.php` | 0 | 4 |
-| `ext/simplexml/SimpleXmlElementAddAttribute.php` | 0 | 2 |
+| `ext/simplexml/SimpleXmlElementAddAttribute.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementAddChild.php` | 0 | 1 |
-| `ext/simplexml/SimpleXmlElementAsXml.php` | 0 | 2 |
+| `ext/simplexml/SimpleXmlElementAsXml.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementAttributes.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementChildren.php` | 0 | 1 |
-| `ext/simplexml/SimpleXmlElementConstruct.php` | 0 | 2 |
+| `ext/simplexml/SimpleXmlElementConstruct.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementCount.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementGet.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementGetDocNamespaces.php` | 0 | 1 |
@@ -2111,9 +2111,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlSerializeDeny.php` | 0 | 3 |
 | `ext/simplexml/VmSimpleXml.php` | 0 | 60 |
 | `ext/simplexml/VmSimpleXmlIterator.php` | 0 | 4 |
-| `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
-| `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
-| `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
+| `ext/simplexml/simplexml_import_dom.php` | 0 | 1 |
+| `ext/simplexml/simplexml_load_file.php` | 0 | 1 |
+| `ext/simplexml/simplexml_load_string.php` | 0 | 1 |
 | `ext/snmp/BuiltinClasses.php` | 0 | 1 |
 | `ext/snmp/Module.php` | 0 | 25 |
 | `ext/snmp/SNMPClose.php` | 0 | 2 |
@@ -6187,6 +6187,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ExceptionToString.php` | 0 | 1 |
 | `lib/JIT/Call/ExternalMethod.php` | 0 | 1 |
 | `lib/JIT/Call/FiberConstruct.php` | 0 | 2 |
+| `lib/JIT/Call/FiberGetCurrent.php` | 0 | 1 |
 | `lib/JIT/Call/FiberGetReturn.php` | 0 | 1 |
 | `lib/JIT/Call/FiberIsRunning.php` | 0 | 1 |
 | `lib/JIT/Call/FiberIsStarted.php` | 0 | 1 |
@@ -6405,7 +6406,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/EvalHelper.php` | 0 | 1 |
 | `lib/JIT/ExceptionBridge.php` | 0 | 1 |
 | `lib/JIT/ExceptionHandlerCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/FiberHelper.php` | 0 | 11 |
+| `lib/JIT/FiberHelper.php` | 0 | 12 |
 | `lib/JIT/FiberHelperLlvm.php` | 0 | 8 |
 | `lib/JIT/FromCallableHelper.php` | 0 | 1 |
 | `lib/JIT/FunctionStaticHelper.php` | 0 | 1 |
@@ -6717,7 +6718,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/FiberResume.php` | 0 | 2 |
 | `lib/VM/Builtin/FiberStart.php` | 0 | 2 |
 | `lib/VM/Builtin/FiberSuspend.php` | 0 | 1 |
-| `lib/VM/Builtin/FiberThrow.php` | 0 | 2 |
+| `lib/VM/Builtin/FiberThrow.php` | 0 | 1 |
 | `lib/VM/Builtin/GeneratorCurrent.php` | 0 | 3 |
 | `lib/VM/Builtin/GeneratorGetReturn.php` | 0 | 3 |
 | `lib/VM/Builtin/GeneratorKey.php` | 0 | 3 |
@@ -7080,7 +7081,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/SensitiveParameterValueDebugInfo.php` | 0 | 1 |
 | `lib/VM/Builtin/SensitiveParameterValueGetValue.php` | 0 | 1 |
 | `lib/VM/Builtin/ThrowableGetMessage.php` | 0 | 1 |
-| `lib/VM/Builtin/VmClassMethod.php` | 0 | 4 |
+| `lib/VM/Builtin/VmClassMethod.php` | 0 | 5 |
 | `lib/VM/Builtin/WeakMapConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/WeakMapCount.php` | 0 | 1 |
 | `lib/VM/Builtin/WeakMapGetIterator.php` | 0 | 1 |
@@ -11528,13 +11529,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/dom_import_simplexml.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 2 class method(s)
 
 ### `ext/dom/ns_import_simplexml.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/ds/BuiltinClasses.php`
@@ -24397,7 +24396,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 26)
+- new Exception (line 30)
 - 1 class method(s)
 
 ### `ext/simplexml/JitSimpleXmlCount.php`
@@ -24429,7 +24428,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlRegisterXPathNamespace.php`
 
 **Warnings** (review for bootstrap subset):
-- new ExternalMethod (line 25)
+- new ExternalMethod (line 29)
 - 1 class method(s)
 
 ### `ext/simplexml/JitSimpleXmlToString.php`
@@ -24464,7 +24463,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlElementAddAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `ext/simplexml/SimpleXmlElementAddChild.php`
@@ -24475,7 +24473,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlElementAsXml.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
 - 3 class method(s)
 
 ### `ext/simplexml/SimpleXmlElementAttributes.php`
@@ -24491,7 +24488,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlElementConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
 - 1 class method(s)
 
 ### `ext/simplexml/SimpleXmlElementCount.php`
@@ -24697,19 +24693,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/simplexml_import_dom.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
 - 3 class method(s)
 
 ### `ext/simplexml/simplexml_load_file.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/simplexml/simplexml_load_string.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/snmp/BuiltinClasses.php`
@@ -34620,11 +34613,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 160)
-- new RecursiveIteratorIterator (line 3945)
-- new RecursiveDirectoryIterator (line 3946)
-- new RecursiveIteratorIterator (line 4052)
-- new RecursiveDirectoryIterator (line 4053)
-- 133 class method(s)
+- new RecursiveIteratorIterator (line 3967)
+- new RecursiveDirectoryIterator (line 3968)
+- new RecursiveIteratorIterator (line 4074)
+- new RecursiveDirectoryIterator (line 4075)
+- 134 class method(s)
 - 13 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -51998,6 +51991,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 38)
 - 1 class method(s)
 
+### `lib/JIT/Call/FiberGetCurrent.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/FiberGetReturn.php`
 
 **Warnings** (review for bootstrap subset):
@@ -52041,7 +52039,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/FiberThrow.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 170)
+- new Variable (line 171)
 - 3 class method(s)
 
 ### `lib/JIT/Call/FilterIteratorMethod.php`
@@ -53574,17 +53572,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/FiberHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\FiberConstruct (line 30)
-- new Call\FiberStart (line 31)
-- new Call\FiberResume (line 32)
-- new Call\FiberThrow (line 33)
-- new Call\FiberSuspendStatic (line 34)
-- new Call\FiberGetReturn (line 35)
-- new Call\FiberIsTerminated (line 36)
-- new Call\FiberIsStarted (line 37)
-- new Call\FiberIsSuspended (line 38)
-- new Call\FiberIsRunning (line 39)
-- 16 class method(s)
+- new Call\FiberConstruct (line 31)
+- new Call\FiberStart (line 32)
+- new Call\FiberResume (line 33)
+- new Call\FiberThrow (line 34)
+- new Call\FiberSuspendStatic (line 35)
+- new Call\FiberGetCurrent (line 36)
+- new Call\FiberGetReturn (line 37)
+- new Call\FiberIsTerminated (line 38)
+- new Call\FiberIsStarted (line 39)
+- new Call\FiberIsSuspended (line 40)
+- new Call\FiberIsRunning (line 41)
+- 24 class method(s)
 
 ### `lib/JIT/FiberHelperLlvm.php`
 
@@ -54542,15 +54541,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\SimpleXMLElementConstruct (line 47)
 - new Call\SimpleXMLElementAddChild (line 52)
 - new Call\SimpleXMLElementAsXml (line 58)
-- new Call\SimpleXMLElementXpath (line 63)
-- new Call\SimpleXMLElementRegisterXPathNamespace (line 68)
-- new Call\SimpleXMLElementGet (line 73)
-- new Call\SimpleXMLElementOffsetGet (line 78)
-- new Call\SimpleXMLElementCount (line 83)
-- new Call\SimpleXMLElementToString (line 88)
-- new Call\SimpleXMLElementChildren (line 93)
-- new Call\SimpleXMLElementAttributes (line 98)
-- new Call\SimpleXMLElementGetName (line 103)
+- new Call\SimpleXMLElementXpath (line 65)
+- new Call\SimpleXMLElementRegisterXPathNamespace (line 70)
+- new Call\SimpleXMLElementGet (line 75)
+- new Call\SimpleXMLElementOffsetGet (line 80)
+- new Call\SimpleXMLElementCount (line 85)
+- new Call\SimpleXMLElementToString (line 90)
+- new Call\SimpleXMLElementChildren (line 95)
+- new Call\SimpleXMLElementAttributes (line 100)
+- new Call\SimpleXMLElementGetName (line 105)
 - 2 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`
@@ -55943,16 +55942,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/FiberGetCurrent.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 33)
+- new Variable (line 35)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/FiberGetReturn.php`
 
 **Warnings** (review for bootstrap subset):
-- new NativeFiberError (line 30)
-- new NativeFiberError (line 33)
-- new NativeFiberError (line 42)
+- new NativeFiberError (line 32)
+- new NativeFiberError (line 35)
 - new NativeFiberError (line 44)
+- new NativeFiberError (line 46)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/FiberIsRunning.php`
@@ -55978,7 +55977,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/FiberResume.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
+- new Variable (line 34)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/FiberStart.php`
@@ -55995,7 +55994,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/FiberThrow.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 2 class method(s)
 
 ### `lib/VM/Builtin/GeneratorCurrent.php`
@@ -57937,10 +57935,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/VmClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 38)
-- new ArgumentCountError (line 49)
+- new ArgumentCountError (line 41)
 - new ArgumentCountError (line 52)
-- 7 class method(s)
+- new ArgumentCountError (line 63)
+- new ArgumentCountError (line 66)
+- 11 class method(s)
 
 ### `lib/VM/Builtin/WeakMapConstruct.php`
 
