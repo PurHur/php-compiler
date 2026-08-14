@@ -17,6 +17,8 @@ final class DateTimeZoneListAbbreviations extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // Static — calledArgs has no $this (php-src zim_DateTimeZone_listAbbreviations, #30898).
+        $this->requireExactArgCount($frame, 'DateTimeZone::listAbbreviations', 0);
         if (null === $frame->returnVar) {
             return;
         }

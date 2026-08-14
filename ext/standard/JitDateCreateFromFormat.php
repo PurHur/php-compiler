@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -43,12 +45,15 @@ final class JitDateCreateFromFormat
         JITVariable ...$args
     ): Value {
         $argc = \count($args);
+        // Zend stub: at least 2 / at most 3 — before timezone TypeError (#30898).
         if ($argc < 2 || $argc > 3) {
-            throw new \ArgumentCountError(\sprintf(
-                '%s() expects at least 2 arguments, %d given',
-                $function,
-                $argc
-            ));
+            $message = $argc < 2
+                ? \sprintf('%s() expects at least 2 arguments, %d given', $function, $argc)
+                : \sprintf('%s() expects at most 3 arguments, %d given', $function, $argc);
+            ExceptionBridge::emitArgumentCountErrorAndAbort($context, $message);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'date_create_from_format_argc_cont');
+
+            return self::unreachableFalseBox($context);
         }
 
         $formatLit = self::resolveZparamStrLit($context, $args[0], $function, 0, 'format');

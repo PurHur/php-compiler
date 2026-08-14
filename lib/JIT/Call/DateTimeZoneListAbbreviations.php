@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\standard\JitTimezoneAbbreviationsList;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
@@ -31,10 +34,16 @@ final class DateTimeZoneListAbbreviations implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         $argc = \count($args);
+        // Catchable ArgumentCountError under AOT try/catch (#30898; peer #30681).
         if (0 !== $argc) {
-            throw new \ArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
                 \sprintf('DateTimeZone::listAbbreviations() expects exactly 0 arguments, %d given', $argc)
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'datetimezone_listabbreviations_argc_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitTimezoneAbbreviationsList::invoke($context);

@@ -23,10 +23,9 @@ final class DateTimeImmutableCreateFromFormat extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DateTimeImmutable::createFromFormat() requires VM context');
         }
+        // Static factory: calledArgs has no $this — Zend stub arity before coercion (#30898).
+        $this->requireArgCountRange($frame, 'DateTimeImmutable::createFromFormat', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2) {
-            throw new \LogicException('DateTimeImmutable::createFromFormat() expects at least 2 arguments');
-        }
         // Static factory: calledArgs has no $this — Zend stub indices (php-src php_date.stub.php, #29269/#29830).
         // Z_PARAM_STR — caller strict_types → TypeError on null $format/$datetime.
         $format = VmString::stringBuiltinArgForFrame(
