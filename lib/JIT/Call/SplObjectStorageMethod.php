@@ -39,14 +39,39 @@ final class SplObjectStorageMethod implements Call
             case 'offsetset':
                 return $this->callOffsetSet($context, ...$args);
             case 'rewind':
+                // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+                if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SplObjectStorage::rewind', 0)) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileRewind($context, $args[0]);
             case 'next':
+                // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+                if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SplObjectStorage::next', 0)) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileNext($context, $args[0]);
             case 'valid':
+                // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+                if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SplObjectStorage::valid', 0)) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileValid($context, $args[0]);
             case 'key':
+                // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+                if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SplObjectStorage::key', 0)) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileKey($context, $args[0]);
             case 'current':
+                // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+                if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SplObjectStorage::current', 0)) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileCurrent($context, $args[0]);
             case 'getinfo':
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileGetInfo($context, $args[0]);
@@ -110,8 +135,9 @@ final class SplObjectStorageMethod implements Call
 
     private function callOffsetGet(Context $context, Variable ...$args): Value
     {
-        if (count($args) < 2) {
-            throw new \LogicException('SplObjectStorage::offsetGet() requires an object key');
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SplObjectStorage::offsetGet', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
         $ht = self::backingHashtable($context, $args[0]);
         $keyObj = self::loadKeyObject($context, $args[1]);

@@ -573,12 +573,8 @@ final class SplObjectStorageAddAll extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::addAll()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::addAll() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::addAll', 1);
         $other = SplObjectStorageStorageArg::require($frame->calledArgs[1], 'addAll');
         SplObjectStorageBuiltin::addAll($object, $other);
     }
@@ -598,12 +594,8 @@ final class SplObjectStorageRemoveAll extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::removeAll()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::removeAll() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::removeAll', 1);
         $other = SplObjectStorageStorageArg::require($frame->calledArgs[1], 'removeAll');
         SplObjectStorageBuiltin::removeAll($object, $other);
     }
@@ -623,12 +615,8 @@ final class SplObjectStorageRemoveAllExcept extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::removeAllExcept()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::removeAllExcept() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::removeAllExcept', 1);
         $other = SplObjectStorageStorageArg::require($frame->calledArgs[1], 'removeAllExcept');
         SplObjectStorageBuiltin::removeAllExcept($object, $other);
     }
@@ -732,11 +720,10 @@ final class SplObjectStorageOffsetGet extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::offsetGet()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::offsetGet() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::offsetGet', 1);
+        if (null === $frame->returnVar) {
+            return;
         }
         SplIteratorSupport::copyReturnFrom(
             $frame,
@@ -832,6 +819,8 @@ final class SplObjectStorageRewind extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::rewind()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::rewind', 0);
         SplObjectStorageBuiltin::rewind($object);
     }
 }
@@ -850,6 +839,8 @@ final class SplObjectStorageNext extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::next()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::next', 0);
         SplObjectStorageBuiltin::next($object);
     }
 }
@@ -868,6 +859,8 @@ final class SplObjectStorageValid extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::valid()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::valid', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -889,6 +882,11 @@ final class SplObjectStorageCurrent extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::current()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::current', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
         SplIteratorSupport::copyReturnFrom(
             $frame,
             SplObjectStorageBuiltin::current($object)
@@ -910,6 +908,11 @@ final class SplObjectStorageKey extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::key()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::key', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
         SplIteratorSupport::copyReturnFrom(
             $frame,
             SplObjectStorageBuiltin::key($object)
@@ -975,12 +978,8 @@ final class SplObjectStorageGetHash extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::getHash()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::getHash() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::getHash', 1);
         if (null === $frame->returnVar) {
             return;
         }
