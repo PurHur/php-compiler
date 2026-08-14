@@ -24,7 +24,7 @@ final class ReflectionClassGetMethods extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
-        $filter = VmReflection::optionalReflectionFilterArg($frame, 1);
+        $filter = VmReflection::optionalReflectionFilterArg($frame, 1, 'ReflectionClass::getMethods');
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(
                 VmReflection::reflectionMethodsArray($ctx, $entry, $entry->name, $filter)

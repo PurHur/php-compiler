@@ -32,7 +32,7 @@ final class ReflectionClassHasProperty extends VmClassMethod
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
         $property = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::hasProperty() name', 1);
-        $filter = VmReflection::optionalReflectionFilterArg($frame, 2);
+        $filter = VmReflection::optionalReflectionFilterArg($frame, 2, 'ReflectionClass::hasProperty');
         $frame->returnVar->bool(
             VmReflection::classHasPropertyForReflection($entry, $ctx, $property, $filter)
         );

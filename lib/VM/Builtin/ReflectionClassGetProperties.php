@@ -24,7 +24,7 @@ final class ReflectionClassGetProperties extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
-        $filter = VmReflection::optionalReflectionFilterArg($frame, 1);
+        $filter = VmReflection::optionalReflectionFilterArg($frame, 1, 'ReflectionClass::getProperties');
         if (null !== $frame->returnVar) {
             $instance = ReflectionSupport::objectTargetFromReflectionObject($receiver);
             $frame->returnVar->copyFrom(
