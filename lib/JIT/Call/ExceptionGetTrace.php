@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\GetClassRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
@@ -31,10 +32,33 @@ final class ExceptionGetTrace implements Call
 {
     private static int $seq = 0;
 
+    public function __construct(
+        private readonly string $declaringRoot = 'Exception',
+    ) {
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
         if ([] === $args) {
             throw new \LogicException('getTrace() requires an object receiver');
+        }
+        // php-src: Zend/zend_exceptions.c — ZEND_PARSE_PARAMETERS (0 args); $args[0] is $this (#30895)
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    '%s::getTrace() expects exactly 0 arguments, %d given',
+                    $this->declaringRoot,
+                    $userArgCount
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'exc_gettrace_argc_cont');
+            $emptyHt = HashTableHelper::alloc($context);
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+
+            return self::writeHt($context, $ptr, $emptyHt);
         }
         $context->type->object->lookup(SensitiveParamSupport::CLASS_NAME);
         GetClassRuntime::ensureLinked($context);

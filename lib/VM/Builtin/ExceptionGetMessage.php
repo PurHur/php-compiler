@@ -21,6 +21,12 @@ final class ExceptionGetMessage extends VmClassMethod
             throw new \LogicException('getMessage() called without $this');
         }
         $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getMessage()', $frame->vmContext);
+        // php-src: Zend/zend_exceptions.c — ZEND_PARSE_PARAMETERS(0); $calledArgs[0] is $this (#30895)
+        $this->requireExactUserArgCount(
+            $frame,
+            ExceptionSupport::throwableMethodFunctionLabel($receiver, 'getMessage'),
+            0
+        );
         if (null === $frame->returnVar) {
             return;
         }

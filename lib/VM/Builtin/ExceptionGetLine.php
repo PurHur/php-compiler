@@ -21,6 +21,12 @@ final class ExceptionGetLine extends VmClassMethod
             throw new \LogicException('getLine() called without $this');
         }
         $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getLine()', $frame->vmContext);
+        // php-src: Zend/zend_exceptions.c — ZEND_PARSE_PARAMETERS(0); $calledArgs[0] is $this (#30895)
+        $this->requireExactUserArgCount(
+            $frame,
+            ExceptionSupport::throwableMethodFunctionLabel($receiver, 'getLine'),
+            0
+        );
         if (null === $frame->returnVar) {
             return;
         }

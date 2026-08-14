@@ -215,6 +215,28 @@ final class ExceptionSupport
     }
 
     /**
+     * Zend zim_Exception_* / zim_Error_* ACE label — declaring root, not runtime class (#30895).
+     *
+     * php-src: Zend/zend_exceptions.c — methods live on Exception or Error; subclasses inherit
+     * the root name in ArgumentCountError ("Error::getMessage()", not "TypeError::getMessage()").
+     */
+    public static function throwableMethodFunctionLabel(ObjectEntry $receiver, string $methodName): string
+    {
+        $methodLc = strtolower($methodName);
+        $declLc = $receiver->class->methodDeclaringClassLc[$methodLc] ?? null;
+        if (null === $declLc || '' === $declLc) {
+            $lc = strtolower(ltrim($receiver->class->name, '\\'));
+            $declLc = (self::CLASS_ERROR === $lc || ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR))
+                ? self::CLASS_ERROR
+                : self::CLASS_EXCEPTION;
+        }
+        $root = self::CLASS_ERROR === $declLc ? 'Error' : 'Exception';
+        $display = $receiver->class->methodNames[$methodLc] ?? $methodName;
+
+        return $root.'::'.$display;
+    }
+
+    /**
      * Zend Z_PARAM_LONG / typed int $code for Exception/Error/ErrorException::__construct (#28797).
      *
      * Weak mode coerces numeric strings, floats, and bools; declare(strict_types=1) requires int.

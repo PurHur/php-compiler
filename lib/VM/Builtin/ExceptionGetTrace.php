@@ -23,6 +23,12 @@ final class ExceptionGetTrace extends VmClassMethod
             throw new \LogicException('getTrace() called without $this');
         }
         $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getTrace()', $frame->vmContext);
+        // php-src: Zend/zend_exceptions.c — ZEND_PARSE_PARAMETERS(0); $calledArgs[0] is $this (#30895)
+        $this->requireExactUserArgCount(
+            $frame,
+            ExceptionSupport::throwableMethodFunctionLabel($receiver, 'getTrace'),
+            0
+        );
         if (null === $frame->returnVar) {
             return;
         }

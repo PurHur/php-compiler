@@ -20085,7 +20085,21 @@ class JIT {
         }
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ('getmessage' === $methodLc && $this->context->functionIsRegistered('exception::getmessage')) {
-                $this->context->scope->toCall = $this->context->resolveFunctionProxy('exception::getmessage');
+                $msgProxy = 'exception::getmessage';
+                if (
+                    '' !== $declaringClassLc
+                    && (
+                        \PHPCompiler\ext\standard\ThrowableManifest::isDescendantOf(
+                            $declaringClassLc,
+                            \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR
+                        )
+                        || \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR === $declaringClassLc
+                    )
+                    && $this->context->functionIsRegistered('error::getmessage')
+                ) {
+                    $msgProxy = 'error::getmessage';
+                }
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($msgProxy);
                 $this->context->scope->args = [$receiverVar];
 
                 return;
@@ -20107,6 +20121,30 @@ class JIT {
                     $codeProxy = 'error::getcode';
                 }
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($codeProxy);
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+            // Exception/Error getFile/getLine/getPrevious inherit like getMessage (#30895).
+            if (
+                \in_array($methodLc, ['getfile', 'getline', 'getprevious'], true)
+                && $this->context->functionIsRegistered('exception::'.$methodLc)
+            ) {
+                $propProxy = 'exception::'.$methodLc;
+                if (
+                    '' !== $declaringClassLc
+                    && (
+                        \PHPCompiler\ext\standard\ThrowableManifest::isDescendantOf(
+                            $declaringClassLc,
+                            \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR
+                        )
+                        || \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR === $declaringClassLc
+                    )
+                    && $this->context->functionIsRegistered('error::'.$methodLc)
+                ) {
+                    $propProxy = 'error::'.$methodLc;
+                }
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($propProxy);
                 $this->context->scope->args = [$receiverVar];
 
                 return;
