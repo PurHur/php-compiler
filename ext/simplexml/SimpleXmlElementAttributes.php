@@ -24,6 +24,8 @@ final class SimpleXmlElementAttributes extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('SimpleXMLElement::attributes() called without $this');
         }
+        // php-src simplexml.stub.php: attributes(?string $namespaceOrPrefix = null, bool $isPrefix = false) (#30828).
+        $this->requireAtMostUserArgCount($frame, 'SimpleXMLElement::attributes', 2);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::attributes()'

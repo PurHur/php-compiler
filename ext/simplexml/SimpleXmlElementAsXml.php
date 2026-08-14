@@ -30,13 +30,8 @@ final class SimpleXmlElementAsXml extends VmClassMethod
         if ($argc < 1) {
             throw new \LogicException($label.' called without $this');
         }
-        if ($argc > 2) {
-            throw new \ArgumentCountError(\sprintf(
-                '%s expects at most 1 argument, %d given',
-                $label,
-                $argc - 1
-            ));
-        }
+        // php-src simplexml.stub.php: asXML(?string $filename = null) / saveXML FALIAS (#30828).
+        $this->requireAtMostUserArgCount($frame, 'SimpleXMLElement::'.$this->name, 1);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             $label

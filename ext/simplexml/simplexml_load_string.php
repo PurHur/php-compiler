@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -22,9 +23,8 @@ final class simplexml_load_string extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('simplexml_load_string() expects at least 1 argument, 0 given');
-        }
+        // php-src simplexml.stub.php: simplexml_load_string($data, $class_name = SimpleXMLElement::class, $options = 0, $namespace_or_prefix = "", $is_prefix = false) (#30828).
+        $this->requireArgCountRange($frame, 'simplexml_load_string', 1, 5);
         if (null === $frame->vmContext) {
             throw new \LogicException('simplexml_load_string() requires VM context');
         }
@@ -62,6 +62,10 @@ final class simplexml_load_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireArgCountRangeJit($context, $args, 'simplexml_load_string', 1, 5)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
         return JitSimpleXmlLoadString::invoke($context, ...$args);
     }
 }

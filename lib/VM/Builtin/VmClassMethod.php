@@ -6,7 +6,10 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -36,6 +39,17 @@ abstract class VmClassMethod extends Internal
         $given = $this->userArgCount($frame);
         if ($given !== $expected) {
             throw new \ArgumentCountError(self::exactUserArgCountMessage($function, $expected, $given));
+        }
+    }
+
+    /**
+     * At-most user arity → Zend ArgumentCountError (#30828).
+     */
+    protected function requireAtMostUserArgCount(Frame $frame, string $function, int $maximum): void
+    {
+        $given = $this->userArgCount($frame);
+        if ($given > $maximum) {
+            throw new \ArgumentCountError(self::atMostUserArgCountMessage($function, $maximum, $given));
         }
     }
 
@@ -84,5 +98,57 @@ abstract class VmClassMethod extends Internal
             1 === $minimum ? '' : 's',
             $given
         );
+    }
+
+    /**
+     * Instance-method JIT argc — $args[0] is $this (php-src ZEND_NUM_ARGS; #30828).
+     *
+     * @param JITVariable[] $args
+     */
+    public static function requireJitUserArgCountRange(
+        Context $context,
+        array $args,
+        string $function,
+        int $minimum,
+        int $maximum
+    ): bool {
+        $given = max(0, \count($args) - 1);
+        if ($given < $minimum) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                self::atLeastUserArgCountMessage($function, $minimum, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
+
+            return false;
+        }
+        if ($given > $maximum) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                self::atMostUserArgCountMessage($function, $maximum, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function requireExactJitUserArgCount(
+        Context $context,
+        array $args,
+        string $function,
+        int $expected
+    ): bool {
+        return self::requireJitUserArgCountRange($context, $args, $function, $expected, $expected);
+    }
+
+    public static function jitArgcDummyReturn(Context $context): Value
+    {
+        return JitValueBox::pointer($context, JitValueBox::alloc($context));
     }
 }

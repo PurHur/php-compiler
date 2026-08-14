@@ -20,6 +20,8 @@ final class SimpleXmlElementGetName extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('SimpleXMLElement::getName() called without $this');
         }
+        // php-src simplexml.stub.php: getName(): string (#30828).
+        $this->requireExactUserArgCount($frame, 'SimpleXMLElement::getName', 0);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::getName()'

@@ -20,6 +20,8 @@ final class SimpleXmlElementCount extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('SimpleXMLElement::count() called without $this');
         }
+        // php-src simplexml.stub.php: count(): int (#30828).
+        $this->requireExactUserArgCount($frame, 'SimpleXMLElement::count', 0);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::count()'

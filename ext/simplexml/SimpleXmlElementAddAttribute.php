@@ -21,12 +21,11 @@ final class SimpleXmlElementAddAttribute extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('SimpleXMLElement::addAttribute() requires VM context');
         }
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'SimpleXMLElement::addAttribute() expects at least 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SimpleXMLElement::addAttribute() called without $this');
         }
+        // php-src simplexml.stub.php: addAttribute(string $qualifiedName, string $value = "", ?string $namespace = null) (#30828).
+        $this->requireUserArgCountRange($frame, 'SimpleXMLElement::addAttribute', 2, 3);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::addAttribute()'

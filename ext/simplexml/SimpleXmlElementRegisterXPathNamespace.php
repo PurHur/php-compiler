@@ -18,9 +18,11 @@ final class SimpleXmlElementRegisterXPathNamespace extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('SimpleXMLElement::registerXPathNamespace() expects at least 2 arguments');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SimpleXMLElement::registerXPathNamespace() called without $this');
         }
+        // php-src simplexml.stub.php: registerXPathNamespace(string $prefix, string $namespace) (#30828).
+        $this->requireExactUserArgCount($frame, 'SimpleXMLElement::registerXPathNamespace', 2);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::registerXPathNamespace()'

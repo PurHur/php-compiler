@@ -21,6 +21,8 @@ final class SimpleXmlElementGetDocNamespaces extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('SimpleXMLElement::getDocNamespaces() called without $this');
         }
+        // php-src simplexml.stub.php: getDocNamespaces(bool $recursive = false, bool $fromRoot = true) (#30828).
+        $this->requireAtMostUserArgCount($frame, 'SimpleXMLElement::getDocNamespaces', 2);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::getDocNamespaces()'

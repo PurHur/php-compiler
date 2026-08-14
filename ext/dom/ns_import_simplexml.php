@@ -26,9 +26,8 @@ final class ns_import_simplexml extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('Dom\\import_simplexml() expects at least 1 argument, 0 given');
-        }
+        // php-src php_dom.stub.php: Dom\import_simplexml(object $node) (#30828).
+        $this->requireExactArgCount($frame, 'Dom\\import_simplexml', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('Dom\\import_simplexml() requires VM context');
         }

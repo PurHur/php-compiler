@@ -24,6 +24,8 @@ final class SimpleXmlElementChildren extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('SimpleXMLElement::children() called without $this');
         }
+        // php-src simplexml.stub.php: children(?string $namespaceOrPrefix = null, bool $isPrefix = false) (#30828).
+        $this->requireAtMostUserArgCount($frame, 'SimpleXMLElement::children', 2);
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::children()'

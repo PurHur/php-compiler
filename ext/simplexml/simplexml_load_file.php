@@ -22,9 +22,8 @@ final class simplexml_load_file extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \ArgumentCountError('simplexml_load_file() expects at least 1 argument, 0 given');
-        }
+        // php-src simplexml.stub.php: simplexml_load_file — same arity as load_string (#30828).
+        $this->requireArgCountRange($frame, 'simplexml_load_file', 1, 5);
         if (null === $frame->vmContext) {
             throw new \LogicException('simplexml_load_file() requires VM context');
         }
