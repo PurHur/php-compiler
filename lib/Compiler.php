@@ -12110,6 +12110,7 @@ class Compiler {
     /**
      * Constant-fetch default name for ReflectionParameter (#22026, zim_reflection_parameter_*).
      * true/false/null and ::class are not constant defaults (php-src).
+     * self::/parent:: keep source spelling (#31149, ext/reflection/php_reflection.c).
      */
     protected function paramDefaultConstantName(Op\Expr\Param $param): ?string
     {
@@ -12136,8 +12137,17 @@ class Compiler {
             if ('class' === strtolower($constName)) {
                 return null;
             }
+            $className = ltrim($className, '\\');
+            $lcClass = strtolower($className);
+            if ('self' === $lcClass || 'parent' === $lcClass || 'static' === $lcClass) {
+                return $className.'::'.$constName;
+            }
+            $scopeKeyword = $expr->getAttribute('phpcLexicalScopeKeyword');
+            if (is_string($scopeKeyword) && '' !== $scopeKeyword) {
+                return $scopeKeyword.'::'.$constName;
+            }
 
-            return ltrim($className, '\\').'::'.$constName;
+            return $className.'::'.$constName;
         }
 
         return null;
