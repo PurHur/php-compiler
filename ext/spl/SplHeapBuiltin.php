@@ -1133,6 +1133,7 @@ final class SplHeapIsCorrupted extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::isCorrupted()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::isCorrupted', 0);
         SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::isCorrupted($object));
     }
 }
@@ -1225,6 +1226,7 @@ final class SplHeapRecoverFromCorruption extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::recoverFromCorruption()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::recoverFromCorruption', 0);
         SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::recoverFromCorruption($object));
     }
 }
@@ -1363,6 +1365,7 @@ final class SplPriorityQueueIsCorrupted extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::isCorrupted()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::isCorrupted', 0);
         SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::isCorrupted($object));
     }
 }
@@ -1381,12 +1384,7 @@ final class SplPriorityQueueSetExtractFlags extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::setExtractFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplPriorityQueue::setExtractFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::setExtractFlags', 1);
         $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
         $result = SplPriorityQueueBuiltin::setExtractFlags($object, $flags);
         if (null !== $frame->returnVar) {
@@ -1409,6 +1407,7 @@ final class SplPriorityQueueGetExtractFlags extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::getExtractFlags()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::getExtractFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1528,6 +1527,7 @@ final class SplPriorityQueueRecoverFromCorruption extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::recoverFromCorruption()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::recoverFromCorruption', 0);
         SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::recoverFromCorruption($object));
     }
 }
