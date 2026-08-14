@@ -1501,6 +1501,10 @@ final class VmReflection
                 || self::staticPropertyDeclaredExact($object->class, $property, $ctx)) {
                 return false;
             }
+            // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys as properties (spl_array.c; #31039).
+            if (\PHPCompiler\ext\spl\SplArrayStorage::propertyExistsByName($object, $property)) {
+                return true;
+            }
             // php-src zend_property_exists: dynamic instance properties (stdClass, etc.)
             // Declared phpInvisible slots still allocate storage — do not treat as dynamics (#22513).
             if ($object->hasProperty($property)) {
