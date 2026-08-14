@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMElement::removeAttributeNS() — VM (#15291, php-src ext/dom/element.c). */
+/**
+ * DOMElement::removeAttributeNS() — VM (#15291, php-src ext/dom/element.c).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31032; missed by #31011).
+ */
 final class ElementRemoveAttributeNS extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class ElementRemoveAttributeNS extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::removeAttributeNS', 2);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::removeAttributeNS()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMElement::removeAttributeNS() expects at least 2 arguments');
-        }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::removeAttributeNS()', 0);
         // Pass $frame so caller strict_types rejects null localName (#30091, peer #29985).
         $localName = $this->stringArg(

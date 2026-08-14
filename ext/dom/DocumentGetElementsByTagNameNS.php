@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::getElementsByTagNameNS() — VM (php-src ext/dom/php_dom.c; #14454). */
+/**
+ * DOMDocument::getElementsByTagNameNS() — VM (php-src ext/dom/php_dom.c; #14454).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31032; missed by #31011).
+ */
 final class DocumentGetElementsByTagNameNS extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentGetElementsByTagNameNS extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::getElementsByTagNameNS', 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::getElementsByTagNameNS()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMDocument::getElementsByTagNameNS() expects at least 2 arguments');
-        }
         // php-src stub: ?string $namespace — null must not TypeError under strict (#30091).
         $namespace = $this->nullableStringArg(
             $frame->calledArgs[1],

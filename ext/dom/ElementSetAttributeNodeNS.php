@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMElement::setAttributeNodeNS() — VM (php-src ext/dom/element.c; #19265). */
+/**
+ * DOMElement::setAttributeNodeNS() — VM (php-src ext/dom/element.c; #19265).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31032; missed by #31011).
+ */
 final class ElementSetAttributeNodeNS extends DomClassMethod
 {
     public function __construct()
@@ -17,10 +21,8 @@ final class ElementSetAttributeNodeNS extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::setAttributeNodeNS', 1);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::setAttributeNodeNS()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('DOMElement::setAttributeNodeNS() expects exactly 1 argument, ' . (\count($frame->calledArgs) - 1) . ' given');
-        }
         $attrVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $attrVar->type) {
             throw new \TypeError('DOMElement::setAttributeNodeNS(): Argument #1 ($attr) must be of type DOMAttr');

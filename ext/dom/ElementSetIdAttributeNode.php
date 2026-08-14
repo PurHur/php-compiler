@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMElement::setIdAttributeNode() — VM (php-src ext/dom/element.c; #20123). */
+/**
+ * DOMElement::setIdAttributeNode() — VM (php-src ext/dom/element.c; #20123).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31032; missed by #31011).
+ */
 final class ElementSetIdAttributeNode extends DomClassMethod
 {
     public function __construct()
@@ -17,13 +21,8 @@ final class ElementSetIdAttributeNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::setIdAttributeNode', 2);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::setIdAttributeNode()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'DOMElement::setIdAttributeNode() expects exactly 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
         $attrVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $attrVar->type) {
             throw new \TypeError(
