@@ -63,6 +63,8 @@
             <file>./test/compliance/ArraySpreadNonTraversableGiven30055VMTest.php</file>
             <file>./test/compliance/RedundantDnfArmVMTest.php</file>
             <file>./test/compliance/PropertyDefaultClassPseudoConstVMTest.php</file>
+            <file>./test/compliance/StaticScopeCompileTimeConstVMTest.php</file>
+            <file>./test/compliance/StaticScopeCompileTimeConstJITTest.php</file>
             <file>./test/compliance/TraitSelfClassStaticComposingVMTest.php</file>
             <file>./test/compliance/MagicConstClassInTraitVMTest.php</file>
             <file>./test/compliance/LspSelfResolveVMTest.php</file>

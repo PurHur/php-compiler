@@ -8949,6 +8949,7 @@ class Compiler {
 
     protected function compileClassConstDeclaration(Op\Terminal\Const_ $child, Block $result): void
     {
+        $this->rejectStaticScopeInCompileTimeConstExpr($child->valueBlock, $child, $child->value);
         $constName = $this->staticNameFromOperand($child->name);
         if (null !== $constName && null !== $this->compilingClassLc) {
             // Case-sensitive — const A and const a are distinct (#25929).
@@ -9896,6 +9897,7 @@ class Compiler {
         if (null === $param->defaultVar) {
             return null;
         }
+        $this->rejectStaticScopeInCompileTimeConstExpr($param->defaultBlock, $param, $param->defaultVar);
         $folded = $this->tryFoldParamDefaultSlot($param, $block);
         if (null !== $folded) {
             return $folded;
@@ -11575,36 +11577,96 @@ class Compiler {
     }
 
     /**
-     * Zend message when {@code static::class} appears in a property default (#26629).
+     * Zend message when {@code static::} appears in a property default (#26629, #31145).
+     *
+     * {@code static::class} keeps the more specific zend_compile.c diagnostic; other
+     * {@code static::CONST} fetches use {@see ThrowInClassConstCompileCheck::STATIC_SCOPE_MESSAGE}.
      */
     protected function propertyDefaultStaticClassRejectMessage(Op\Stmt\Property $prop): ?string
     {
-        $expr = null;
-        if (null !== $prop->defaultBlock && [] !== $prop->defaultBlock->children) {
-            $last = $prop->defaultBlock->children[\count($prop->defaultBlock->children) - 1];
-            if ($last instanceof Op\Expr\ClassConstFetch) {
-                $expr = $last;
-            }
-        }
-        if (null === $expr) {
+        $fetch = $this->findStaticScopeClassConstFetchInBlock($prop->defaultBlock);
+        if (null === $fetch) {
             $root = null !== $prop->defaultVar ? $this->unwrapOperandChain($prop->defaultVar) : null;
             if ($root instanceof Op\Expr\ClassConstFetch) {
-                $expr = $root;
+                $fetch = $root;
             }
         }
-        if (null === $expr) {
-            return null;
-        }
-        $constName = $this->staticNameFromOperand($expr->name);
-        $className = $this->staticNameFromOperand($expr->class);
-        if (null === $constName || null === $className) {
-            return null;
-        }
-        if ('class' !== strtolower($constName) || 'static' !== strtolower($className)) {
+        if (null === $fetch) {
             return null;
         }
 
-        return 'static::class cannot be used for compile-time class name resolution';
+        return ThrowInClassConstCompileCheck::staticScopeRejectMessage($fetch);
+    }
+
+    /**
+     * Reject {@code static::} in class-const / param-default / property-default const-exprs (#31145).
+     */
+    protected function rejectStaticScopeInCompileTimeConstExpr(
+        ?CfgBlock $block,
+        Op $site,
+        ?Operand $value = null
+    ): void {
+        $fetch = $this->findStaticScopeClassConstFetchInBlock($block);
+        if (null === $fetch && null !== $value) {
+            $root = $this->unwrapOperandChain($value);
+            if ($root instanceof Op\Expr\ClassConstFetch) {
+                $fetch = $root;
+            }
+        }
+        if (null === $fetch) {
+            return;
+        }
+        $msg = ThrowInClassConstCompileCheck::staticScopeRejectMessage($fetch);
+        if (null === $msg) {
+            return;
+        }
+        $sourceFile = $fetch->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = $site->getFile();
+        }
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $line = $fetch->getLine();
+        if ($line < 1) {
+            $line = $site->getLine();
+        }
+        throw new CompileFatal($sourceFile, max(1, $line), $msg);
+    }
+
+    protected function findStaticScopeClassConstFetchInBlock(?CfgBlock $block): ?Op\Expr\ClassConstFetch
+    {
+        if (null === $block) {
+            return null;
+        }
+        $queue = [$block];
+        $seen = new SplObjectStorage();
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            if ($seen->contains($current)) {
+                continue;
+            }
+            $seen->attach($current);
+            foreach ($current->children ?? [] as $op) {
+                if (!$op instanceof Op) {
+                    continue;
+                }
+                if ($op instanceof Op\Expr\ClassConstFetch
+                    && null !== ThrowInClassConstCompileCheck::staticScopeRejectMessage($op)
+                ) {
+                    return $op;
+                }
+                if ($op instanceof Op\Expr\Assign
+                    && $op->expr instanceof Op\Expr\ClassConstFetch
+                    && null !== ThrowInClassConstCompileCheck::staticScopeRejectMessage($op->expr)
+                ) {
+                    return $op->expr;
+                }
+                OpSubBlockAccess::enqueueSubBlocks($op, $queue);
+            }
+        }
+
+        return null;
     }
 
     protected function compileTimeClassConstFetchCallerLc(Block $block): ?string
