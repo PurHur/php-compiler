@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,10 +22,9 @@ final class token_get_all extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src tokenizer.stub.php: token_get_all(string $code, int $flags = 0) (#30890).
+        $this->requireArgCountRange($frame, 'token_get_all', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \ArgumentCountError('token_get_all() expects at least 1 argument, '.$argc.' given');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -43,6 +43,11 @@ final class token_get_all extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError under AOT try/catch (#30890).
+        if (!$this->requireArgCountRangeJit($context, $args, 'token_get_all', 1, 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
         return JitTokenGetAll::lower($context, ...$args);
     }
 }

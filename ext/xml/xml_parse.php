@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -22,10 +23,9 @@ final class xml_parse extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src xml.stub.php: xml_parse(..., bool $is_final = false) — at-most/at-least (#30890).
+        $this->requireArgCountRange($frame, 'xml_parse', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \ArgumentCountError('xml_parse() expects 2 or 3 arguments, '.$argc.' given');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -55,6 +55,10 @@ final class xml_parse extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError under AOT try/catch (#30890).
+        if (!$this->requireArgCountRangeJit($context, $args, 'xml_parse', 2, 3)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
         if (JitXmlParserUserScript::isUserScriptAot()) {
             $result = JitXmlParserUserScript::tryParse($context, ...$args);
             if (null !== $result) {

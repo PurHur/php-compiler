@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7419 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23982 |
+| Source constructs flagged (warnings) | 23980 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4822,7 +4822,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/tokenizer/TokenGetAllJitHelper.php` | 0 | 1 |
 | `ext/tokenizer/VmPhpToken.php` | 0 | 15 |
 | `ext/tokenizer/VmTokenizer.php` | 0 | 5 |
-| `ext/tokenizer/token_get_all.php` | 0 | 2 |
+| `ext/tokenizer/token_get_all.php` | 0 | 1 |
 | `ext/tokenizer/token_name.php` | 0 | 2 |
 | `ext/types/JitStrlen.php` | 0 | 1 |
 | `ext/types/Module.php` | 0 | 12 |
@@ -4885,7 +4885,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_get_current_column_number.php` | 0 | 2 |
 | `ext/xml/xml_get_current_line_number.php` | 0 | 2 |
 | `ext/xml/xml_get_error_code.php` | 0 | 2 |
-| `ext/xml/xml_parse.php` | 0 | 2 |
+| `ext/xml/xml_parse.php` | 0 | 1 |
 | `ext/xml/xml_parse_into_struct.php` | 0 | 4 |
 | `ext/xml/xml_parser_create.php` | 0 | 1 |
 | `ext/xml/xml_parser_create_ns.php` | 0 | 2 |
@@ -42892,7 +42892,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/JitTokenGetAll.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
+- new ArgumentCountError (line 25)
 - 5 class method(s)
 
 ### `ext/tokenizer/JitTokenName.php`
@@ -43001,7 +43001,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/token_get_all.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/tokenizer/token_name.php`
@@ -43655,7 +43654,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/xml_parse.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/xml/xml_parse_into_struct.php`

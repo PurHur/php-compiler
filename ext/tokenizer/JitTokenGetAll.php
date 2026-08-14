@@ -19,6 +19,8 @@ final class JitTokenGetAll
     public static function lower(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // Arity is enforced in token_get_all::call via requireArgCountRangeJit (#30890).
+        // Keep a defensive floor so direct lower() callers still match Zend at-least wording.
         if ($argc < 1) {
             throw new \ArgumentCountError('token_get_all() expects at least 1 argument, '.$argc.' given');
         }
