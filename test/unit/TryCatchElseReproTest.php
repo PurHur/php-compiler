@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #19225 repro: try/catch/else on PHP 8.4 forward profile (#15817).
+ * Issue #31159 repro: try/catch/else is a Zend Parse error on php-src-strict (including PROFILE=8.4).
  */
 final class TryCatchElseReproTest extends TestCase
 {
@@ -18,49 +18,48 @@ final class TryCatchElseReproTest extends TestCase
         $this->repoRoot = dirname(__DIR__, 2);
     }
 
-    public function testIssueReproVmOutputsTryElseOnForwardProfile(): void
+    /** @return list<array{0: array<string, string>}> */
+    public static function rejectEnvProvider(): array
     {
-        if (!CompilerVersion::supportsTryCatchElse()) {
-            self::markTestSkipped('try/catch/else requires PHP_COMPILER_PROFILE=8.4');
-        }
-
-        $repro = $this->repoRoot.'/test/repro/maintainer_gap_try_catch_else_compile.php';
-        $this->assertFileExists($repro);
-        $this->assertSame('tryelse', $this->runVmFile($repro, ['PHP_COMPILER_PROFILE' => '8.4']));
+        return [
+            'unset' => [[]],
+            '8.4' => [['PHP_COMPILER_PROFILE' => '8.4']],
+            '8.5' => [['PHP_COMPILER_PROFILE' => '8.5']],
+        ];
     }
 
-    public function testIssueReproReferenceProfileParseError(): void
+    /** @dataProvider rejectEnvProvider */
+    public function testIssueReproParseErrorOnPhpSrcStrict(array $env): void
     {
-        if (CompilerVersion::supportsTryCatchElse()) {
-            self::markTestSkipped('reference profile gate only when try/catch/else disabled');
-        }
-
-        $repro = $this->repoRoot.'/test/repro/maintainer_gap_try_catch_else_compile.php';
+        $repro = $this->repoRoot.'/test/repro/issue_31159_try_catch_else.php';
         $this->assertFileExists($repro);
-        $exit = $this->runVmFileExit($repro, []);
+        [$exit, $stderr] = $this->runVmFile($repro, $env);
         $this->assertSame(255, $exit);
+        $this->assertStringContainsString('unexpected token "else"', $stderr);
+        $this->assertMatchesRegularExpression('/Parse error/i', $stderr);
     }
 
-    /** @param array<string, string> $env */
-    private function runVmFile(string $path, array $env): string
+    public function testOrdinaryTryCatchFinallyStillRuns(): void
     {
-        $bin = $this->repoRoot.'/bin/vm.php';
-        $merged = $this->mergedEnv($env);
-        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-        $proc = proc_open([PHP_BINARY, $bin, $path], $descriptor, $pipes, $this->repoRoot, $merged);
-        $this->assertIsResource($proc);
-        fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        $exit = proc_close($proc);
-        $this->assertSame(0, $exit);
-
-        return $stdout !== false ? $stdout : '';
+        $src = tempnam(sys_get_temp_dir(), 'phpc_tce_ok_');
+        $this->assertNotFalse($src);
+        file_put_contents($src, <<<'PHP'
+<?php
+try { echo "t"; } catch (Exception $e) { echo "c"; } finally { echo "f"; }
+echo "\n";
+PHP
+        );
+        [$exit, $stderr, $stdout] = $this->runVmFile($src, []);
+        @unlink($src);
+        $this->assertSame(0, $exit, $stderr);
+        $this->assertSame("tf\n", $stdout);
     }
 
-    /** @param array<string, string> $env */
-    private function runVmFileExit(string $path, array $env): int
+    /**
+     * @param array<string, string> $env
+     * @return array{0: int, 1: string, 2: string}
+     */
+    private function runVmFile(string $path, array $env): array
     {
         $bin = $this->repoRoot.'/bin/vm.php';
         $merged = $this->mergedEnv($env);
@@ -71,10 +70,13 @@ final class TryCatchElseReproTest extends TestCase
         $proc = proc_open([PHP_BINARY, $bin, $path], $descriptor, $pipes, $this->repoRoot, $merged);
         $this->assertIsResource($proc);
         fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
+        $exit = proc_close($proc);
 
-        return proc_close($proc);
+        return [$exit, $stderr !== false ? $stderr : '', $stdout !== false ? $stdout : ''];
     }
 
     /** @param array<string, string> $overrides */

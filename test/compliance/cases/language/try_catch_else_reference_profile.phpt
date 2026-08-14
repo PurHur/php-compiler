@@ -1,14 +1,5 @@
 --TEST--
-Language: try/catch/else rejected on reference profile (#15817)
---SKIPIF--
-<?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../vendor/autoload.php';
-}
-if (PHPCompiler\CompilerVersion::supportsTryCatchElse()) {
-    die('skip try/catch/else enabled on PHP 8.4.0+ target');
-}
-?>
+Language: try/catch/else rejected on php-src-strict (#31159, Zend/zend_language_parser.y)
 --FILE--
 <?php
 try {
@@ -19,3 +10,5 @@ try {
 }
 --EXPECT_EXIT--
 255
+--EXPECTF--
+PHP Parse error:  syntax error, unexpected token "else" in %s on line %d
