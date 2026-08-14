@@ -41,11 +41,12 @@ final class array_count extends Internal
     public function execute(Frame $frame): void
     {
         // php-src ext/standard/array.c — ArgumentCountError (#21964).
-        $this->requireArgCountRange($frame, 'count', 1, 2);
+        // Use called name so sizeof() ACE cites sizeof(), not count() (#30686 / re-#15003).
+        $this->requireArgCountRange($frame, $this->name, 1, 2);
         $argc = \count($frame->calledArgs);
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->vmContext) {
-            throw new \LogicException('count() requires VM context in this compiler build');
+            throw new \LogicException($this->name.'() requires VM context in this compiler build');
         }
         if (Variable::TYPE_NULL === $v->type) {
             // php-src 8.0+: count()/sizeof() always TypeError on null (not soft-coerce).
@@ -58,12 +59,12 @@ final class array_count extends Internal
         if (2 === $argc) {
             $modeArg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $modeArg->type) {
-                throw new \TypeError('count(): Argument #2 ($mode) must be of type int');
+                throw new \TypeError($this->name.'(): Argument #2 ($mode) must be of type int');
             }
             $mode = $modeArg->toInt();
             if (VmArray::COUNT_NORMAL !== $mode && VmArray::COUNT_RECURSIVE !== $mode) {
                 throw new \LogicException(
-                    'count(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
+                    $this->name.'(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
                 );
             }
         }
@@ -86,7 +87,8 @@ final class array_count extends Internal
     {
         $this->context = $context;
         TypeErrorRaise::ensureLinked($context);
-        if (!$this->requireArgCountRangeJit($context, $args, 'count', 1, 2)) {
+        // Called name for sizeof() alias ACE (#30686).
+        if (!$this->requireArgCountRangeJit($context, $args, $this->name, 1, 2)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $argc = \count($args);
@@ -110,13 +112,13 @@ final class array_count extends Internal
         if (2 === $argc) {
             $modeLit = JitLongArg::compileTimeLiteral($args[1]);
             if (null === $modeLit) {
-                throw new \LogicException('count() mode must be a compile-time integer in this compiler build');
+                throw new \LogicException($this->name.'() mode must be a compile-time integer in this compiler build');
             }
             if (VmArray::COUNT_RECURSIVE === $modeLit) {
                 $recursive = true;
             } elseif (VmArray::COUNT_NORMAL !== $modeLit) {
                 throw new \LogicException(
-                    'count(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
+                    $this->name.'(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
                 );
             }
         }
