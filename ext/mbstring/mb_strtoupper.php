@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_strtoupper() — multibyte upper case (php-src ext/mbstring/mbstring.c; #3239).
+ *
+ * Excess argc → Zend `expects at most` ArgumentCountError (#31036).
  */
 final class mb_strtoupper extends Internal
 {
@@ -25,13 +27,9 @@ final class mb_strtoupper extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity 1..2 — excess uses at-most wording (#31036).
+        $this->requireArgCountRange($frame, 'mb_strtoupper', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_strtoupper() expects at least 1 argument, %d given',
-                $argc
-            ));
-        }
         // Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21313).
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_strtoupper', 0, 'string');
         if (null === $frame->returnVar) {
@@ -48,10 +46,11 @@ final class mb_strtoupper extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('mb_strtoupper() requires one or two arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#31036).
+        if (!$this->requireArgCountRangeJit($context, $args, 'mb_strtoupper', 1, 2)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
+        $argc = \count($args);
         if (
             JITVariable::TYPE_STRING === $args[0]->type
             && null !== ($args[0]->compileTimeString ?? null)
