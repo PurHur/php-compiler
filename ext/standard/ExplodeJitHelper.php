@@ -24,8 +24,8 @@ final class ExplodeJitHelper
     public static function explodeArgv(string $delimiter, string $haystack, int $limit): HashTable
     {
         if ('' === $delimiter) {
-            // NestedJIT-safe: do not call VmString (unbound → writeNull). Wording SSOT: #30505.
-            throw new \ValueError('explode(): Argument #1 ($separator) cannot be empty');
+            // NestedJIT-safe: do not call VmString (unbound → writeNull). Wording SSOT: #30505 / #30625.
+            throw new \ValueError('explode(): Argument #1 ($separator) '.self::zendEmptyArgSuffix());
         }
         if ('' === $haystack) {
             if ($limit >= 0) {
@@ -198,5 +198,22 @@ final class ExplodeJitHelper
         $out .= $right;
 
         return $out;
+    }
+
+    /**
+     * NestedJIT-safe copy of {@see VmString::zendArgumentMustNotBeEmptySuffix} (#30625).
+     */
+    private static function zendEmptyArgSuffix(): string
+    {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === $raw) {
+            return 'cannot be empty';
+        }
+        $raw = trim($raw);
+        if (isset($raw[0], $raw[1], $raw[2]) && '8' === $raw[0] && '.' === $raw[1] && $raw[2] >= '4') {
+            return 'must not be empty';
+        }
+
+        return 'cannot be empty';
     }
 }
