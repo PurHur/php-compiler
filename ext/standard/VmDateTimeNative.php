@@ -1144,10 +1144,10 @@ final class VmDateTimeNative
 
             return self::failedParseResult($failure['errors'], $failure['error_count']);
         }
-        $normalized = self::warnInvalidCalendarComponents($matched);
+        $normalized = self::warnInvalidCalendarComponents($matched, $time);
         $result = self::parseResultFromComponents($normalized['components']);
-        if ([] !== $normalized['warnings']) {
-            $result['warning_count'] = \count($normalized['warnings']);
+        if ($normalized['warning_count'] > 0) {
+            $result['warning_count'] = $normalized['warning_count'];
             $result['warnings'] = $normalized['warnings'];
         }
 
@@ -1164,14 +1164,11 @@ final class VmDateTimeNative
         if (false === $matched) {
             return false;
         }
-        $normalized = self::normalizeMatchedComponents($matched);
+        $normalized = self::normalizeMatchedComponents($matched, $time);
         $matched = $normalized['components'];
         $year = $matched['year'] ?? false;
         $month = $matched['month'] ?? false;
         $day = $matched['day'] ?? false;
-        if (false === $year || false === $month || false === $day) {
-            return false;
-        }
         $hour = false === $matched['hour'] ? 0 : $matched['hour'];
         $minute = false === $matched['minute'] ? 0 : $matched['minute'];
         $second = false === $matched['second'] ? 0 : $matched['second'];
@@ -1180,22 +1177,40 @@ final class VmDateTimeNative
         $useTz = isset($matched['timezone']) && \is_string($matched['timezone'])
             ? $matched['timezone']
             : $tzName;
-        if (!self::formatStringHasTimeTokens($format)) {
+        // php-src timelib: unset calendar fields default to "now" so time-only
+        // formats (H:i) reach mktime; invalid H/i/s overflow rather than fail (#30972).
+        $needNowDate = false === $year || false === $month || false === $day;
+        $needNowTime = !self::formatStringHasTimeTokens($format);
+        if ($needNowDate || $needNowTime) {
             $now = self::readNow();
             $nowTm = self::withTimezone($useTz, static function () use ($now): ?array {
                 return self::localtime($now['timestamp']);
             });
             if (null !== $nowTm) {
-                if (false === $matched['hour']) {
-                    $hour = self::tmInt($nowTm, 'tm_hour');
+                if (false === $year) {
+                    $year = self::tmInt($nowTm, 'tm_year') + 1900;
                 }
-                if (false === $matched['minute']) {
-                    $minute = self::tmInt($nowTm, 'tm_min');
+                if (false === $month) {
+                    $month = self::tmInt($nowTm, 'tm_mon') + 1;
                 }
-                if (false === $matched['second']) {
-                    $second = self::tmInt($nowTm, 'tm_sec');
+                if (false === $day) {
+                    $day = self::tmInt($nowTm, 'tm_mday');
+                }
+                if ($needNowTime) {
+                    if (false === $matched['hour']) {
+                        $hour = self::tmInt($nowTm, 'tm_hour');
+                    }
+                    if (false === $matched['minute']) {
+                        $minute = self::tmInt($nowTm, 'tm_min');
+                    }
+                    if (false === $matched['second']) {
+                        $second = self::tmInt($nowTm, 'tm_sec');
+                    }
                 }
             }
+        }
+        if (false === $year || false === $month || false === $day) {
+            return false;
         }
 
         try {
@@ -1838,6 +1853,12 @@ final class VmDateTimeNative
     }
 
     /**
+     * php-src timelib_parse_from_format — invalid clock/calendar warnings at the
+     * consumed input offset (end of a successful match = strlen($time)) (#30972).
+     *
+     * warning_count counts emitted messages; the assoc bag is keyed by offset so
+     * two warnings at the same position overwrite (Zend warning_count=2, one key).
+     *
      * @param array{
      *   year: int|false,
      *   month: int|false,
@@ -1848,20 +1869,28 @@ final class VmDateTimeNative
      *   fraction: float|false
      * } $components
      *
-     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
+     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>, warning_count: int}
      */
-    private static function warnInvalidCalendarComponents(array $components): array
+    private static function warnInvalidCalendarComponents(array $components, string $time): array
     {
         $warnings = [];
+        $warningCount = 0;
+        $offset = \strlen($time);
+        // Time first, then date — same-offset date overwrites the bag entry like timelib.
+        if (self::clockComponentsAreInvalid($components)) {
+            $warnings[$offset] = 'The parsed time was invalid';
+            ++$warningCount;
+        }
         $year = $components['year'];
         $month = $components['month'];
         $day = $components['day'];
         if (false !== $year && false !== $month && false !== $day
             && !self::isValidCalendarDate($year, $month, $day)) {
-            $warnings[10] = 'The parsed date was invalid';
+            $warnings[$offset] = 'The parsed date was invalid';
+            ++$warningCount;
         }
 
-        return ['components' => $components, 'warnings' => $warnings];
+        return ['components' => $components, 'warnings' => $warnings, 'warning_count' => $warningCount];
     }
 
     /**
@@ -1877,7 +1906,7 @@ final class VmDateTimeNative
      *
      * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
      */
-    private static function normalizeMatchedComponents(array $components): array
+    private static function normalizeMatchedComponents(array $components, string $time): array
     {
         $warnings = [];
         $year = $components['year'];
@@ -1907,7 +1936,7 @@ final class VmDateTimeNative
             $invalid = true;
         }
         if ($invalid) {
-            $warnings[10] = 'The parsed date was invalid';
+            $warnings[\strlen($time)] = 'The parsed date was invalid';
         }
         $components['year'] = $year;
         $components['month'] = $month;
@@ -2163,6 +2192,26 @@ final class VmDateTimeNative
         }
 
         return $day <= self::daysInMonth($year, $month);
+    }
+
+    /**
+     * php-src timelib — parsed H/i/s outside 0–23 / 0–59 (#30972, parse_date.c).
+     *
+     * @param array{hour: int|false, minute: int|false, second: int|false} $components
+     */
+    private static function clockComponentsAreInvalid(array $components): bool
+    {
+        $hour = $components['hour'];
+        if (false !== $hour && ($hour < 0 || $hour > 23)) {
+            return true;
+        }
+        $minute = $components['minute'];
+        if (false !== $minute && ($minute < 0 || $minute > 59)) {
+            return true;
+        }
+        $second = $components['second'];
+
+        return false !== $second && ($second < 0 || $second > 59);
     }
 
     /**

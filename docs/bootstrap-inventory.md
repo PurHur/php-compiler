@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7431 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24016 |
+| Source constructs flagged (warnings) | 24015 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6079,7 +6079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ClosureBind.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureBindTo.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureCall.php` | 0 | 1 |
-| `lib/JIT/Call/ClosureFromCallable.php` | 0 | 3 |
+| `lib/JIT/Call/ClosureFromCallable.php` | 0 | 2 |
 | `lib/JIT/Call/ClosureWithBinding.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureWithCaptures.php` | 0 | 1 |
 | `lib/JIT/Call/CollatorCompare.php` | 0 | 1 |
@@ -34613,11 +34613,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 160)
-- new RecursiveIteratorIterator (line 3967)
-- new RecursiveDirectoryIterator (line 3968)
-- new RecursiveIteratorIterator (line 4074)
-- new RecursiveDirectoryIterator (line 4075)
-- 134 class method(s)
+- new RecursiveIteratorIterator (line 4016)
+- new RecursiveDirectoryIterator (line 4017)
+- new RecursiveIteratorIterator (line 4123)
+- new RecursiveDirectoryIterator (line 4124)
+- 135 class method(s)
 - 13 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -51443,8 +51443,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/ClosureFromCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 35)
-- new Block (line 43)
+- new Block (line 56)
 - 1 class method(s)
 
 ### `lib/JIT/Call/ClosureWithBinding.php`
@@ -55497,7 +55496,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ClosureFromCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 35)
+- new Variable (line 34)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ClosureFromStatic.php`
