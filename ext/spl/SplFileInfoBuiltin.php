@@ -480,6 +480,8 @@ final class SplFileInfoGetExtension extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getExtension()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getExtension', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -532,6 +534,8 @@ final class SplFileInfoGetType extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getType()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getType', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -558,6 +562,8 @@ final class SplFileInfoIsFile extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::isFile()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::isFile', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -582,6 +588,8 @@ final class SplFileInfoIsLink extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::isLink()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::isLink', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -606,6 +614,8 @@ final class SplFileInfoIsExecutable extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::isExecutable()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::isExecutable', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -630,6 +640,8 @@ final class SplFileInfoIsDir extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::isDir()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::isDir', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -654,6 +666,8 @@ final class SplFileInfoIsReadable extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::isReadable()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::isReadable', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -678,6 +692,8 @@ final class SplFileInfoIsWritable extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::isWritable()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::isWritable', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -702,6 +718,8 @@ final class SplFileInfoGetCTime extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getCTime()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getCTime', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -728,6 +746,8 @@ final class SplFileInfoGetMTime extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getMTime()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getMTime', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -782,6 +802,8 @@ final class SplFileInfoGetATime extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getATime()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getATime', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -808,6 +830,8 @@ final class SplFileInfoGetPerms extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getPerms()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getPerms', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -834,6 +858,8 @@ final class SplFileInfoGetOwner extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getOwner()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getOwner', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -860,6 +886,8 @@ final class SplFileInfoGetGroup extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getGroup()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getGroup', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -886,6 +914,8 @@ final class SplFileInfoGetInode extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getInode()'
         );
+        // ACE uses called class (#31000; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getInode', 0);
         if (null === $frame->returnVar) {
             return;
         }

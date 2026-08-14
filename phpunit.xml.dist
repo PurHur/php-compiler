@@ -466,6 +466,8 @@
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934JITTest.php</file>
             <file>./test/compliance/SplFileInfoPathExcessArgc30935VMTest.php</file>
             <file>./test/compliance/SplFileInfoPathExcessArgc30935JITTest.php</file>
+            <file>./test/compliance/SplFileInfoStatExcessArgc31000VMTest.php</file>
+            <file>./test/compliance/SplFileInfoStatExcessArgc31000JITTest.php</file>
             <file>./test/compliance/RdiSubPathExcessArgc30936VMTest.php</file>
             <file>./test/compliance/RdiSubPathExcessArgc30936JITTest.php</file>
             <file>./test/compliance/SplFileObjectExcessArgc30937VMTest.php</file>
