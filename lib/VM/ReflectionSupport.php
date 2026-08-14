@@ -1366,7 +1366,10 @@ final class ReflectionSupport
     }
 
     /**
-     * ReflectionClass::newInstance() / newInstanceArgs() — php-src zim_ReflectionClass_newInstanceArgs (#22086).
+     * ReflectionClass::newInstance() / newInstanceArgs() — php-src zim_ReflectionClass_newInstanceArgs (#22086, #30889).
+     *
+     * php-src: when argc>0 and the class has no constructor, throw ReflectionException
+     * (empty newInstance() / newInstanceArgs([]) still succeed).
      *
      * @param list<Variable> $ctorArgs
      */
@@ -1379,6 +1382,9 @@ final class ReflectionSupport
             self::throwReflectionException('Class '.$entry->name.' is not instantiable');
         }
         ReservedBuiltinClass::assertUserInstantiable($entry);
+        if (null === $entry->constructor && [] !== $ctorArgs) {
+            self::throwReflectionException(self::reflectionClassNoCtorArgsMessage($entry->name));
+        }
         $object = new ObjectEntry($entry);
         $vm->initInstancePropertyDefaults($object);
         $thisVar = new Variable(Variable::TYPE_OBJECT);
@@ -1392,6 +1398,12 @@ final class ReflectionSupport
         }
 
         return $object;
+    }
+
+    /** php-src zim_ReflectionClass_newInstanceArgs ReflectionException text (#30889). */
+    public static function reflectionClassNoCtorArgsMessage(string $className): string
+    {
+        return 'Class '.ltrim($className, '\\').' does not have a constructor, so you cannot pass any constructor arguments';
     }
 
     /**
