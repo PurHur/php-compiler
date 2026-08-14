@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -21,6 +23,21 @@ final class GeneratorRewind implements Call
     {
         if ([] === $args) {
             throw new \LogicException('Generator::rewind() called without $this');
+        }
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (0 args); $args[0] is $this (#31034)
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'Generator::rewind() expects exactly 0 arguments, %d given',
+                    $userArgCount
+                )
+            );
+            $unreachable = BasicBlockHelper::append($context, 'gen_rewind_argc_unreach');
+            $context->builder->positionAtEnd($unreachable);
+
+            return JitValueBox::alloc($context);
         }
         $genVar = $args[0];
         // zend_generator_rewind: ensure_initialized, then require AT_FIRST_YIELD (#23713).
