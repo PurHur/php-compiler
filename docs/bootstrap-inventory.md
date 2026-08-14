@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7419 |
-| Phase A inventory files (M2 ratio SSOT) | 7419 |
+| PHP files on vm.php path | 7420 |
+| Phase A inventory files (M2 ratio SSOT) | 7420 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23980 |
+| Source constructs flagged (warnings) | 23985 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5345,7 +5345,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayWalkLlvm.php` | 0 | 8 |
 | `lib/JIT/AsymmetricVisibilityGuard.php` | 0 | 2 |
 | `lib/JIT/BackedEnumDuplicateJitGuard.php` | 0 | 1 |
-| `lib/JIT/BackedEnumFromJit.php` | 0 | 2 |
+| `lib/JIT/BackedEnumFromJit.php` | 0 | 3 |
 | `lib/JIT/BasicBlockHelper.php` | 0 | 1 |
 | `lib/JIT/BootstrapCompileSmokeM3Emit.php` | 0 | 3 |
 | `lib/JIT/BoundMethodCallableHelper.php` | 0 | 1 |
@@ -6175,6 +6175,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomXPathRegisterPhpFunctions.php` | 0 | 1 |
 | `lib/JIT/Call/DomXmlDocumentCreateFromString.php` | 0 | 1 |
 | `lib/JIT/Call/EmptyIteratorMethod.php` | 0 | 1 |
+| `lib/JIT/Call/EnumSyntheticStatic.php` | 0 | 1 |
 | `lib/JIT/Call/ExceptionConstruct.php` | 0 | 7 |
 | `lib/JIT/Call/ExceptionGetCode.php` | 0 | 1 |
 | `lib/JIT/Call/ExceptionGetMessage.php` | 0 | 1 |
@@ -6386,7 +6387,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/EmptyObjectPropertyHelper.php` | 0 | 1 |
 | `lib/JIT/EmptyObjectPropertyLlvm.php` | 0 | 4 |
 | `lib/JIT/EmptyStaticPropertyHelper.php` | 0 | 3 |
-| `lib/JIT/EnumCasesHelper.php` | 0 | 2 |
+| `lib/JIT/EnumCasesHelper.php` | 0 | 3 |
 | `lib/JIT/EnumFromHelper.php` | 0 | 1 |
 | `lib/JIT/ErrorBridge.php` | 0 | 1 |
 | `lib/JIT/ErrorHandlerCallbackPolicy.php` | 0 | 1 |
@@ -6681,7 +6682,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/DateTimeZoneListIdentifiers.php` | 0 | 3 |
 | `lib/VM/Builtin/DateTimeZoneSetState.php` | 0 | 5 |
 | `lib/VM/Builtin/DeprecatedConstruct.php` | 0 | 1 |
-| `lib/VM/Builtin/EnumCases.php` | 0 | 1 |
+| `lib/VM/Builtin/EnumCases.php` | 0 | 2 |
 | `lib/VM/Builtin/EnumCasesConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/ErrorExceptionConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ErrorExceptionGetSeverity.php` | 0 | 1 |
@@ -7128,7 +7129,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/EnumCasePropertyJitHelper.php` | 0 | 1 |
 | `lib/VM/EnumCaseSupport.php` | 0 | 29 |
 | `lib/VM/EnumCasesJitHelper.php` | 0 | 1 |
-| `lib/VM/EnumFromHandler.php` | 0 | 1 |
+| `lib/VM/EnumFromHandler.php` | 0 | 2 |
 | `lib/VM/EnumFromJitHelper.php` | 0 | 1 |
 | `lib/VM/EnumSupport.php` | 0 | 6 |
 | `lib/VM/ErrorReporter.php` | 0 | 4 |
@@ -47560,7 +47561,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/BackedEnumFromJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 50)
+- new Call\EnumSyntheticStatic (line 53)
+- new Call\Native (line 54)
 - 7 class method(s)
 
 ### `lib/JIT/BasicBlockHelper.php`
@@ -51928,6 +51930,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Call/EnumSyntheticStatic.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/ExceptionConstruct.php`
 
 **Warnings** (review for bootstrap subset):
@@ -53443,7 +53450,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/EnumCasesHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new NativeCall (line 42)
+- new EnumSyntheticStatic (line 45)
+- new NativeCall (line 46)
 - 1 class method(s)
 
 ### `lib/JIT/EnumFromHelper.php`
@@ -55771,6 +55779,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/EnumCases.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/EnumCasesConstruct.php`
@@ -58975,6 +58984,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/EnumFromHandler.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 35)
 - 2 class method(s)
 
 ### `lib/VM/EnumFromJitHelper.php`

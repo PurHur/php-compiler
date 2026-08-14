@@ -3704,6 +3704,7 @@
         "ext/standard/VmNetInterfacesNative.php",
         "ext/standard/VmNetInterfacesPure.php",
         "ext/standard/VmNetworkServices.php",
+        "ext/standard/VmNl2br.php",
         "ext/standard/VmNullNumberParamDeprecation.php",
         "ext/standard/VmNullStringParamDeprecation.php",
         "ext/standard/VmNumberFormat.php",
@@ -3755,6 +3756,7 @@
         "ext/standard/VmProcessIdentityNative.php",
         "ext/standard/VmProcessIdentityPure.php",
         "ext/standard/VmProcessProcOpenNative.php",
+        "ext/standard/VmQuotemeta.php",
         "ext/standard/VmRandom.php",
         "ext/standard/VmRandomNative.php",
         "ext/standard/VmRandomPure.php",
@@ -6252,6 +6254,7 @@
         "lib/JIT/Call/DomXPathRegisterPhpFunctions.php",
         "lib/JIT/Call/DomXmlDocumentCreateFromString.php",
         "lib/JIT/Call/EmptyIteratorMethod.php",
+        "lib/JIT/Call/EnumSyntheticStatic.php",
         "lib/JIT/Call/ExceptionConstruct.php",
         "lib/JIT/Call/ExceptionGetCode.php",
         "lib/JIT/Call/ExceptionGetMessage.php",
@@ -7651,9 +7654,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7417,
+        "inventory_files": 7420,
         "excluded": 0,
-        "eligible": 7417,
+        "eligible": 7420,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
