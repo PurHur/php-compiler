@@ -85,7 +85,7 @@ final class TypedPropertyCheck
 
             return sprintf(
                 'Typed static property %s::$%s must not be accessed before initialization',
-                $classLabel,
+                \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($classLabel),
                 $name
             );
         }
@@ -93,7 +93,7 @@ final class TypedPropertyCheck
 
         return sprintf(
             'Typed property %s::$%s must not be accessed before initialization',
-            $owner->class->name,
+            \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($owner->class->name),
             $name
         );
     }
@@ -142,7 +142,7 @@ final class TypedPropertyCheck
 
             return sprintf(
                 'Cannot access uninitialized non-nullable property %s::$%s by reference',
-                $classLabel,
+                \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($classLabel),
                 $name
             );
         }
@@ -150,7 +150,7 @@ final class TypedPropertyCheck
 
         return sprintf(
             'Cannot access uninitialized non-nullable property %s::$%s by reference',
-            $owner->class->name,
+            \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($owner->class->name),
             $name
         );
     }

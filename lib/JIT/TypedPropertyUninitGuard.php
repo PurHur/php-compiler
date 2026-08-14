@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
@@ -86,7 +87,7 @@ final class TypedPropertyUninitGuard
                 $context,
                 sprintf(
                     'Typed property %s::$%s must not be accessed before initialization',
-                    $declaringClass,
+                    MethodVisibility::formatAnonymousScopeForMessage((string) $declaringClass),
                     $var->objectPropertyName
                 )
             );
@@ -165,7 +166,7 @@ final class TypedPropertyUninitGuard
             $context,
             sprintf(
                 'Typed static property %s::$%s must not be accessed before initialization',
-                $declaringClass,
+                MethodVisibility::formatAnonymousScopeForMessage($declaringClass),
                 $propertyName
             )
         );
