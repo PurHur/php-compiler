@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\SplDllistJitHelper;
 use PHPLLVM\Value;
 
@@ -37,42 +38,57 @@ final class SplDllistMethod implements Call
 
         return match (strtolower($this->method)) {
             '__construct' => SplDllistJitHelper::compileConstruct($context, $args[0], $this->className),
-            'push', 'enqueue' => SplDllistJitHelper::compilePush(
+            // push lives on SplDoublyLinkedList; enqueue is SplQueue-only (php-src ACE cites defining class)
+            'push', 'enqueue' => $this->callExactArg(
                 $context,
-                $args[0],
-                $args[1] ?? throw new \ArgumentCountError(
-                    $this->className.'::'.$this->method.'() expects exactly 1 argument, 0 given'
+                $args,
+                'enqueue' === strtolower($this->method)
+                    ? 'SplQueue::enqueue'
+                    : 'SplDoublyLinkedList::push',
+                1,
+                static fn (Context $ctx, Variable $self, Variable $value): Value => SplDllistJitHelper::compilePush(
+                    $ctx,
+                    $self,
+                    $value
                 )
             ),
-            'unshift' => SplDllistJitHelper::compileUnshift(
+            'unshift' => $this->callExactArg(
                 $context,
-                $args[0],
-                $args[1] ?? throw new \ArgumentCountError(
-                    $this->className.'::unshift() expects exactly 1 argument, 0 given'
+                $args,
+                'SplDoublyLinkedList::unshift',
+                1,
+                static fn (Context $ctx, Variable $self, Variable $value): Value => SplDllistJitHelper::compileUnshift(
+                    $ctx,
+                    $self,
+                    $value
                 )
             ),
-            'pop' => $this->callZeroArg(
+            'pop' => $this->callExactArg(
                 $context,
                 $args,
                 'SplDoublyLinkedList::pop',
+                0,
                 static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compilePop($ctx, $self)
             ),
-            'shift', 'dequeue' => $this->callZeroArg(
+            'shift', 'dequeue' => $this->callExactArg(
                 $context,
                 $args,
                 'dequeue' === strtolower($this->method) ? 'SplQueue::dequeue' : 'SplDoublyLinkedList::shift',
+                0,
                 static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileShift($ctx, $self)
             ),
-            'top' => $this->callZeroArg(
+            'top' => $this->callExactArg(
                 $context,
                 $args,
                 'SplDoublyLinkedList::top',
+                0,
                 static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileTop($ctx, $self)
             ),
-            'bottom' => $this->callZeroArg(
+            'bottom' => $this->callExactArg(
                 $context,
                 $args,
                 'SplDoublyLinkedList::bottom',
+                0,
                 static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileBottom($ctx, $self)
             ),
             default => throw new \LogicException(
@@ -82,17 +98,22 @@ final class SplDllistMethod implements Call
     }
 
     /**
-     * php-src ZEND_PARSE_PARAMETERS_NONE — ACE cites defining class (#30911).
+     * php-src ZEND_PARSE_PARAMETERS_* — ACE cites defining class (#30911, #30964).
      *
-     * @param callable(Context, Variable): Value $emit
+     * @param callable(Context, Variable...): Value $emit
      */
-    private function callZeroArg(Context $context, array $args, string $function, callable $emit): Value
-    {
-        $userArgCount = \count($args) - 1;
-        if (0 !== $userArgCount) {
+    private function callExactArg(
+        Context $context,
+        array $args,
+        string $function,
+        int $expected,
+        callable $emit
+    ): Value {
+        $userArgCount = max(0, \count($args) - 1);
+        if ($userArgCount !== $expected) {
             ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
-                \sprintf('%s() expects exactly 0 arguments, %d given', $function, $userArgCount)
+                VmClassMethod::exactUserArgCountMessage($function, $expected, $userArgCount)
             );
             $unreachable = BasicBlockHelper::append(
                 $context,
@@ -103,6 +124,6 @@ final class SplDllistMethod implements Call
             return JitValueBox::alloc($context);
         }
 
-        return $emit($context, $args[0]);
+        return $emit($context, ...$args);
     }
 }
