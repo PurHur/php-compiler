@@ -3447,6 +3447,7 @@ final class VmDateTimeNative
             if (null === $tm) {
                 return '';
             }
+            $tm['tm_isdst'] = self::timezoneIsDst($tzName, $timestamp) ? 1 : 0;
 
             return VmDate::formatDateTimeFromTm($format, $timestamp, $microsecond, $tm, $fixed, $tzName);
         }
@@ -3460,6 +3461,7 @@ final class VmDateTimeNative
             if (null === $tm) {
                 return '';
             }
+            $tm['tm_isdst'] = self::timezoneIsDst($tzName, $timestamp) ? 1 : 0;
 
             return VmDate::formatDateTimeFromTm($format, $timestamp, $microsecond, $tm, $offset, $tzName);
         });
@@ -3475,6 +3477,26 @@ final class VmDateTimeNative
         return self::withTimezone($tzName, static function () use ($timestamp): int {
             return self::offsetSecondsForTimestamp($timestamp);
         });
+    }
+
+    /**
+     * php-src timelib ttinfo tt_isdst / format('I') — infer DST from active offset (#31048, #31047).
+     */
+    public static function timezoneIsDst(string $tzName, int $timestamp): bool
+    {
+        $offset = self::timezoneOffsetSeconds($tzName, $timestamp);
+        $standardOffset = self::standardOffsetForTimezone($tzName, $timestamp);
+        if ($offset === $standardOffset) {
+            return false;
+        }
+
+        return $offset > $standardOffset;
+    }
+
+    /** strftime() under a named zone — pushes process TZ for host libc (#31047). */
+    public static function strftimeInTimezone(string $tzName, string $format, int $timestamp): string|false
+    {
+        return self::withTimezone($tzName, static fn (): string|false => VmDatePure::strftime($format, $timestamp, false));
     }
 
     /**
@@ -4408,11 +4430,11 @@ final class VmDateTimeNative
             $year += $sign * $state['y'];
             $month += $sign * $state['m'];
             $day += $sign * $state['d'];
-            $hour += $sign * $state['h'];
-            $minute += $sign * $state['i'];
-            $second += $sign * $state['s'];
 
-            $newTs = self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+            // Calendar y/m/d via mktime; h/i/s as elapsed unix seconds (timelib_add, #31050).
+            $calendarTs = self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+            $elapsedSeconds = $sign * ($state['h'] * 3600 + $state['i'] * 60 + $state['s']);
+            $newTs = $calendarTs + $elapsedSeconds;
             $newMicro = $microsecond + (int) \round($sign * $state['f'] * 1_000_000);
             if ($newMicro >= 1_000_000) {
                 $newTs += intdiv($newMicro, 1_000_000);
@@ -4453,15 +4475,13 @@ final class VmDateTimeNative
         if ($absolute) {
             $invert = 0;
         }
-        $days = (int) \floor(\abs($targetTs - $baseTs) / 86_400);
 
         return self::withTimezone($tzName, static function () use (
             $earlier,
             $later,
             $earlierUs,
             $laterUs,
-            $invert,
-            $days
+            $invert
         ): array {
             $tm1 = self::localtime($earlier);
             $tm2 = self::localtime($later);
@@ -4526,6 +4546,8 @@ final class VmDateTimeNative
                 --$y;
             }
 
+            $days = \abs(self::civilDaysSinceEpoch($y2, $m2, $d2) - self::civilDaysSinceEpoch($y1, $m1, $d1));
+
             return [
                 'y' => $y,
                 'm' => $m,
@@ -4562,6 +4584,21 @@ final class VmDateTimeNative
         }
 
         return $mdays[$month - 1];
+    }
+
+    /** Howard Hinnant days_from_civil — calendar days since 1970-01-01 (#31055). */
+    private static function civilDaysSinceEpoch(int $year, int $month, int $day): int
+    {
+        $y = $year;
+        if ($month <= 2) {
+            --$y;
+        }
+        $era = intdiv($y >= 0 ? $y : $y - 399, 400);
+        $yoe = $y - $era * 400;
+        $doy = intdiv(153 * ($month - 1) + 2, 5) + $day - 1;
+        $doe = $yoe * 365 + intdiv($yoe, 4) - intdiv($yoe, 100) + $doy;
+
+        return $era * 146097 + $doe - 719468;
     }
 
     /**
