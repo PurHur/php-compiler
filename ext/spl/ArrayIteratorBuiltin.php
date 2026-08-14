@@ -247,12 +247,8 @@ final class ArrayIteratorSeek extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::seek()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::seek() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayIterator_seek — exactly 1 user arg (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::seek', 1);
         $offset = $frame->calledArgs[1]->resolveIndirect()->toInt();
         ArrayIteratorBuiltin::seek($object, $offset);
     }
@@ -385,6 +381,8 @@ final class ArrayIteratorGetArrayCopy extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::getArrayCopy()'
         );
+        // php-src zim_ArrayIterator_getArrayCopy — ZEND_PARSE_PARAMETERS_NONE (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::getArrayCopy', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -406,6 +404,8 @@ final class ArrayIteratorGetFlags extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::getFlags()'
         );
+        // php-src zim_ArrayIterator_getFlags — ZEND_PARSE_PARAMETERS_NONE (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -427,12 +427,8 @@ final class ArrayIteratorSetFlags extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayIterator_setFlags — exactly 1 user arg (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::setFlags', 1);
         $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
         SplArrayStorage::setFlags($object, $flags);
     }
@@ -452,12 +448,8 @@ final class ArrayIteratorAppend extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::append()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::append() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayIterator_append — exactly 1 user arg (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::append', 1);
         SplArrayStorage::append($object, $frame->calledArgs[1]);
     }
 }
@@ -476,12 +468,8 @@ final class ArrayIteratorOffsetGet extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::offsetGet()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::offsetGet() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayIterator_offsetGet — exactly 1 user arg (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::offsetGet', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -506,12 +494,8 @@ final class ArrayIteratorOffsetSet extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::offsetSet()'
         );
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::offsetSet() expects exactly 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayIterator_offsetSet — exactly 2 user args (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::offsetSet', 2);
         SplArrayStorage::offsetSet($object, $frame->calledArgs[1], $frame->calledArgs[2]);
     }
 }
@@ -530,12 +514,8 @@ final class ArrayIteratorOffsetExists extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::offsetExists()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::offsetExists() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayIterator_offsetExists — exactly 1 user arg (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::offsetExists', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -557,12 +537,8 @@ final class ArrayIteratorOffsetUnset extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::offsetUnset()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::offsetUnset() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayIterator_offsetUnset — exactly 1 user arg (#30963)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::offsetUnset', 1);
         SplArrayStorage::offsetUnset($object, $frame->calledArgs[1]);
     }
 }

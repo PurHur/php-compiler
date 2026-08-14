@@ -238,6 +238,8 @@ final class RecursiveArrayIteratorHasChildren extends VmClassMethod
             RecursiveArrayIteratorBuiltin::CLASS_LC,
             'RecursiveArrayIterator::hasChildren()'
         );
+        // php-src zim_RecursiveArrayIterator_hasChildren — ZEND_PARSE_PARAMETERS_NONE (#30963)
+        $this->requireExactUserArgCount($frame, 'RecursiveArrayIterator::hasChildren', 0);
         SplIteratorSupport::setReturnBool($frame, RecursiveArrayIteratorBuiltin::hasChildren($object));
     }
 }
