@@ -143,7 +143,7 @@ final class RandomEngineStorage
     {
         return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
             'random\\engine\\mt19937' => self::mt19937($engineObject)->generateRaw() >> 1,
-            default => self::generateUInt64($engineObject) >> 1,
+            default => self::generateRandomU64($engineObject)->shiftRight(1)->toInt(),
         };
     }
 
