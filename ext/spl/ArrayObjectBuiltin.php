@@ -186,6 +186,8 @@ final class ArrayObjectGetArrayCopy extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getArrayCopy()'
         );
+        // php-src ZEND_PARSE_PARAMETERS_NONE (#30965).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::getArrayCopy', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -235,6 +237,8 @@ final class ArrayObjectGetIteratorClass extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getIteratorClass()'
         );
+        // php-src ZEND_PARSE_PARAMETERS_NONE (#30965).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::getIteratorClass', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -256,12 +260,8 @@ final class ArrayObjectSetIteratorClass extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::setIteratorClass()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayObject::setIteratorClass() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayObject_setIteratorClass — exactly 1 user arg (#30965).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::setIteratorClass', 1);
         $iteratorClass = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'ArrayObject::setIteratorClass',
@@ -294,6 +294,8 @@ final class ArrayObjectGetFlags extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::getFlags()'
         );
+        // php-src ZEND_PARSE_PARAMETERS_NONE (#30965).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -315,12 +317,8 @@ final class ArrayObjectSetFlags extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayObject::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayObject_setFlags — exactly 1 user arg (#30965).
+        $this->requireExactUserArgCount($frame, 'ArrayObject::setFlags', 1);
         $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
         SplArrayStorage::setFlags($object, $flags);
     }

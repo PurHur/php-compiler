@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ArrayObjectJitHelper;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
@@ -34,9 +37,15 @@ final class ArrayObjectMethod implements Call
                     'ArrayObject::append() expects exactly 1 argument, 0 given'
                 )
             ),
-            'getarraycopy' => ArrayObjectJitHelper::compileGetArrayCopy(
+            'getarraycopy' => $this->compileExact(
                 $context,
-                $args[0] ?? throw new \LogicException('ArrayObject::getArrayCopy() called without $this')
+                $args,
+                'ArrayObject::getArrayCopy',
+                0,
+                static fn () => ArrayObjectJitHelper::compileGetArrayCopy(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::getArrayCopy() called without $this')
+                )
             ),
             'offsetget' => ArrayObjectJitHelper::compileOffsetGet(
                 $context,
@@ -69,9 +78,15 @@ final class ArrayObjectMethod implements Call
                     'ArrayObject::offsetUnset() expects exactly 1 argument, 0 given'
                 )
             ),
-            'getiteratorclass' => ArrayObjectJitHelper::compileGetIteratorClass(
+            'getiteratorclass' => $this->compileExact(
                 $context,
-                $args[0] ?? throw new \LogicException('ArrayObject::getIteratorClass() called without $this')
+                $args,
+                'ArrayObject::getIteratorClass',
+                0,
+                static fn () => ArrayObjectJitHelper::compileGetIteratorClass(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::getIteratorClass() called without $this')
+                )
             ),
             'getiterator' => ArrayObjectJitHelper::compileGetIterator(
                 $context,
@@ -81,5 +96,35 @@ final class ArrayObjectMethod implements Call
                 'ArrayObject JIT lowering is not implemented for '.$this->method.'()'
             ),
         };
+    }
+
+    /**
+     * php-src ZEND_PARSE_PARAMETERS_* — $args[0] is $this (#30965).
+     *
+     * @param callable(): Value $compile
+     */
+    private function compileExact(
+        Context $context,
+        array $args,
+        string $function,
+        int $expected,
+        callable $compile
+    ): Value {
+        $given = max(0, \count($args) - 1);
+        if ($given !== $expected) {
+            // ZEND_PARSE_PARAMETERS_NONE / exact arity — "exactly N", not "at most".
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::exactUserArgCountMessage($function, $expected, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock(
+                $context,
+                'ao_'.strtolower($this->method).'_argc_cont'
+            );
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+
+        return $compile();
     }
 }
