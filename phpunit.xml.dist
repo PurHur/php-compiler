@@ -477,6 +477,8 @@
             <file>./test/compliance/DateStaticExcessArgc30898JITTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampGetLastErrorsExcessArgc30991VMTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampGetLastErrorsExcessArgc30991JITTest.php</file>
+            <file>./test/compliance/DateTimeDiffDstHours30970VMTest.php</file>
+            <file>./test/compliance/DateTimeDiffDstHours30970JITTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994VMTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994JITTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934VMTest.php</file>

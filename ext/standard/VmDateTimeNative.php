@@ -4449,9 +4449,10 @@ final class VmDateTimeNative
     }
 
     /**
-     * Calendar diff between two timestamps (php-src php_date_diff / timelib_diff, #4604, #26693).
+     * Calendar diff between two timestamps (php-src php_date_diff / timelib_diff, #4604, #26693, #30970).
      *
      * Microseconds participate in ordering, invert, and DateInterval::$f (fractional seconds).
+     * Named-TZ hour fields use elapsed unix time across DST (timelib_diff_with_tzid).
      *
      * @return array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: int}
      */
@@ -4481,7 +4482,8 @@ final class VmDateTimeNative
             $later,
             $earlierUs,
             $laterUs,
-            $invert
+            $invert,
+            $tzName
         ): array {
             $tm1 = self::localtime($earlier);
             $tm2 = self::localtime($later);
@@ -4548,6 +4550,18 @@ final class VmDateTimeNative
 
             $days = \abs(self::civilDaysSinceEpoch($y2, $m2, $d2) - self::civilDaysSinceEpoch($y1, $m1, $d1));
 
+            // timelib_diff_with_tzid — elapsed h/i across DST after civil normalize (#30970).
+            if (null === self::parseNumericTimezoneOffset($tzName)) {
+                [$h, $i, $d] = self::applyTzidDstHourCorrection(
+                    $tzName,
+                    $earlier,
+                    $later,
+                    $h,
+                    $i,
+                    $d
+                );
+            }
+
             return [
                 'y' => $y,
                 'm' => $m,
@@ -4560,6 +4574,99 @@ final class VmDateTimeNative
                 'days' => $days,
             ];
         });
+    }
+
+    /**
+     * php-src `timelib_diff_with_tzid` DST hour correction (ext/date/lib/interval.c, #30970).
+     *
+     * Wall-clock y/m/d/h/i/s are already range-normalized. Same-day spring-forward /
+     * fall-back then subtracts the UTC-offset delta so DateInterval::$h is elapsed
+     * unix hours. Multi-day same-wall-clock spans keep h=0 (#31055).
+     *
+     * @return array{0: int, 1: int, 2: int} h, i, d
+     */
+    private static function applyTzidDstHourCorrection(
+        string $tzName,
+        int $oneSse,
+        int $twoSse,
+        int $h,
+        int $i,
+        int $d
+    ): array {
+        $oneZ = self::timezoneOffsetSeconds($tzName, $oneSse);
+        $twoZ = self::timezoneOffsetSeconds($tzName, $twoSse);
+        $oneDst = self::timezoneIsDst($tzName, $oneSse);
+        $twoDst = self::timezoneIsDst($tzName, $twoSse);
+        $dstCorr = $twoZ - $oneZ;
+        $dstHCorr = intdiv($dstCorr, 3600);
+        $dstMCorr = intdiv($dstCorr % 3600, 60);
+
+        if ($oneDst && !$twoDst) {
+            if (($twoSse - $oneSse + $dstCorr) < 86400) {
+                $h -= $dstHCorr;
+                $i -= $dstMCorr;
+            }
+        } elseif (!$oneDst && $twoDst) {
+            $info = self::tzidOffsetInfoAt($tzName, $twoSse);
+            if (null !== $info) {
+                $trans = $info['transition'];
+                $inWindow = ($oneSse + 86400 > $trans) && ($oneSse + 86400 <= ($trans + $dstCorr));
+                if (
+                    !$inWindow
+                    && $twoSse >= $trans
+                    && (($twoSse - $oneSse + $dstCorr) % 86400) > ($twoSse - $trans)
+                ) {
+                    $h -= $dstHCorr;
+                    $i -= $dstMCorr;
+                }
+            }
+        } elseif (($twoSse - $oneSse) >= 86400) {
+            $info = self::tzidOffsetInfoAt($tzName, $twoSse - $twoZ);
+            if (null !== $info) {
+                $dstCorr24 = $oneZ - $info['offset'];
+                $trans = $info['transition'];
+                if ($twoSse >= ($trans - $dstCorr24) && $twoSse < $trans) {
+                    --$d;
+                    $h = 24;
+                }
+            }
+        }
+
+        return [$h, $i, $d];
+    }
+
+    /**
+     * php-src `timelib_get_time_zone_offset_info` — offset in effect at $sse and the
+     * TZif transition unix time that established it (ext/date/lib/parse_tz.c).
+     *
+     * @return array{offset: int, transition: int}|null
+     */
+    private static function tzidOffsetInfoAt(string $tzName, int $sse): ?array
+    {
+        $path = self::zoneinfoPath($tzName);
+        if (null === $path) {
+            return null;
+        }
+        $times = self::readTzifTransitionTimes($path);
+        if (null === $times) {
+            return null;
+        }
+        $transition = null;
+        foreach ($times as $ts) {
+            if ($ts <= $sse) {
+                $transition = $ts;
+            } else {
+                break;
+            }
+        }
+        if (null === $transition) {
+            return null;
+        }
+
+        return [
+            'offset' => self::timezoneOffsetSeconds($tzName, $sse),
+            'transition' => $transition,
+        ];
     }
 
     private static function normalizeMicrosecond(int $us): int
