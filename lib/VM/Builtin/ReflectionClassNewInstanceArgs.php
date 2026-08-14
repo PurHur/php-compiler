@@ -19,18 +19,17 @@ final class ReflectionClassNewInstanceArgs extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2) {
-            throw new \ArgumentCountError(
-                'ReflectionClass::newInstanceArgs() expects exactly 1 argument, '.($argc - 1).' given'
+        // php-src: zim_ReflectionClass_newInstanceArgs — optional array $args (at most 1) (#30923)
+        $this->requireUserArgCountRange($frame, 'ReflectionClass::newInstanceArgs', 0, 1);
+        [, $entry] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
+        $ctorArgs = [];
+        if ($this->userArgCount($frame) >= 1) {
+            $ctorArgs = ReflectionSupport::invokeArgsFromArray(
+                $frame->calledArgs[1],
+                'ReflectionClass::newInstanceArgs',
+                1
             );
         }
-        [, $entry] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
-        $ctorArgs = ReflectionSupport::invokeArgsFromArray(
-            $frame->calledArgs[1],
-            'ReflectionClass::newInstanceArgs',
-            1
-        );
         $vm = VM::running();
         if (null === $vm) {
             throw new \LogicException('ReflectionClass::newInstanceArgs() requires active VM');
