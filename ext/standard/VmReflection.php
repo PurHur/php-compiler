@@ -4351,21 +4351,13 @@ final class VmReflection
     }
 
     /**
-     * True when $constLc is declared on $class (not only inherited onto its merged constant table).
-     */
-    private static function isClassConstantDeclaredOnClass(ClassEntry $class, string $constLc): bool
-    {
-        if ($class->isEnum && isset($class->enumCaseCanonicalNames[$constLc])) {
-            return true;
-        }
-        $classLc = strtolower(ltrim($class->name, '\\'));
-        $declLc = $class->constDeclaringClassLc[$constLc] ?? $classLc;
-
-        return $declLc === $classLc;
-    }
-
-    /**
      * Class constants visible on $entry (child overrides parent), php-src ReflectionClass::getConstants (#6950, #4479).
+     *
+     * Walk the parent chain child-first and keep the first occurrence of each name.
+     * Interface-declared constants (e.g. DateTimeInterface::ATOM copied onto DateTime with
+     * constDeclaringClassLc = datetimeinterface, #30229) are not in the parent chain, so they
+     * must be taken from the merged table on the concrete class (#30887) — not filtered by
+     * "declared on this ClassEntry name".
      *
      * @return list<array{name: string, declaring: ClassEntry, constLc: string}>
      */
@@ -4375,12 +4367,14 @@ final class VmReflection
         $byLc = [];
         foreach (self::classHierarchyChain($entry, $ctx) as $class) {
             foreach ($class->constants as $constLc => $_stored) {
-                if (!self::isClassConstantDeclaredOnClass($class, $constLc)) {
+                if (isset($byLc[$constLc])) {
                     continue;
                 }
                 $vis = $class->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
                 $declLc = $class->constDeclaringClassLc[$constLc]
                     ?? strtolower(ltrim($class->name, '\\'));
+                // Parent private constants are not inherited onto children; if we still see one
+                // while walking ancestors, keep it only when reflecting that declaring class.
                 if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declLc !== $entryLc) {
                     continue;
                 }
@@ -4390,9 +4384,10 @@ final class VmReflection
                 $displayName = $class->constNames[$constLc]
                     ?? $class->enumCaseCanonicalNames[$constLc]
                     ?? $constLc;
+                $declaring = $ctx->classes[$declLc] ?? $class;
                 $byLc[$constLc] = [
                     'name' => $displayName,
-                    'declaring' => $class,
+                    'declaring' => $declaring,
                     'constLc' => $constLc,
                 ];
             }
