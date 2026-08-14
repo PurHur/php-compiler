@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7449 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23967 |
+| Source constructs flagged (warnings) | 23966 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2007,7 +2007,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pspell/pspell_save_wordlist.php` | 0 | 2 |
 | `ext/pspell/pspell_store_replacement.php` | 0 | 2 |
 | `ext/pspell/pspell_suggest.php` | 0 | 2 |
-| `ext/random/AdditionalEnginesBuiltin.php` | 0 | 25 |
+| `ext/random/AdditionalEnginesBuiltin.php` | 0 | 24 |
 | `ext/random/BuiltinClasses.php` | 0 | 4 |
 | `ext/random/BuiltinEnums.php` | 0 | 3 |
 | `ext/random/GammaSection.php` | 0 | 1 |
@@ -23640,11 +23640,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PcgUnserialize (line 87)
 - new EngineDebugInfo (line 88)
 - new Xoshiro256StarStarInstance (line 149)
-- new Xoshiro256StarStarInstance (line 201)
-- new PcgOneseq128XslRr64Instance (line 211)
-- new ArgumentCountError (line 241)
-- new PcgOneseq128XslRr64Instance (line 265)
-- new ArgumentCountError (line 285)
+- new Xoshiro256StarStarInstance (line 204)
+- new PcgOneseq128XslRr64Instance (line 214)
+- new PcgOneseq128XslRr64Instance (line 267)
+- new ArgumentCountError (line 287)
 - 19 class method(s)
 - 2 closure(s)
 
