@@ -14,6 +14,7 @@ use PHPLLVM\Value;
 /**
  * inet_pton() — printable address to binary form (ext/standard/basic_functions.c, #3225).
  *
+ * php-src stub names the parameter `$ip` (not historical `$ip_address`) — #28916.
  * Excess/missing argc → Zend ArgumentCountError (#30546).
  */
 final class inet_pton extends Internal

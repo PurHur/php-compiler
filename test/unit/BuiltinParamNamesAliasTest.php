@@ -5523,6 +5523,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #28916 */
+    public function testInetPtonNtopStubNamesAndStringFalseReturn(): void
+    {
+        foreach (['inet_pton', 'inet_ntop'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['ip'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'ip', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ip_address', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'in_addr', $fn));
+            self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+    }
+
     /** @covers issue #28483 */
     public function testFstatStubReturnArrayFalse(): void
     {
