@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\simplexml\SimpleXmlJsonExport;
+use PHPCompiler\ext\spl\SplArrayStorage;
 use PHPCompiler\Block;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
@@ -1510,6 +1511,14 @@ final class VmReflection
                 }
 
                 return true;
+            }
+            // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys as properties (spl_array.c; #31039).
+            if (SplArrayStorage::hasArrayAsProps($object)) {
+                $key = new Variable(Variable::TYPE_STRING);
+                $key->string($property);
+                if (SplArrayStorage::offsetExists($object, $key)) {
+                    return true;
+                }
             }
 
             return false;
