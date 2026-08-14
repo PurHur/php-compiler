@@ -548,6 +548,10 @@ final class BuiltinParamNames
             case 'gethostbyname':
                 // php-src ext/standard/basic_functions.stub.php / dns.c (#23492)
                 return ['hostname'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says ip_address/in_addr (#28916)
+            case 'inet_pton':
+            case 'inet_ntop':
+                return ['ip'];
             // php-src ext/ftp/ftp.stub.php — InternalArgInfo still says host (#23644)
             case 'ftp_connect':
             case 'ftp_ssl_connect':
