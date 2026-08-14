@@ -18,9 +18,8 @@ final class ClosureFromCallable extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException('Closure::fromCallable() expects at least 1 argument');
-        }
+        // Static factory — calledArgs are user args only (php-src zim_Closure_fromCallable, #30930).
+        $this->requireExactArgCount($frame, 'Closure::fromCallable', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('Closure::fromCallable() requires VM context');
         }
