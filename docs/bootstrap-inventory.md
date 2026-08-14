@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7448 |
-| Phase A inventory files (M2 ratio SSOT) | 7448 |
+| PHP files on vm.php path | 7449 |
+| Phase A inventory files (M2 ratio SSOT) | 7449 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23969 |
+| Source constructs flagged (warnings) | 23970 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3337,6 +3337,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/RealpathJitHelper.php` | 0 | 1 |
 | `ext/standard/ReflectionClassIsFinalJitHelper.php` | 0 | 1 |
 | `ext/standard/ReflectionClassIsIterateableJitHelper.php` | 0 | 1 |
+| `ext/standard/ReflectionClassKindJitHelper.php` | 0 | 1 |
 | `ext/standard/RenameJitHelper.php` | 0 | 1 |
 | `ext/standard/RequestMethodEnumData.php` | 0 | 1 |
 | `ext/standard/RequestParseBodyEngine.php` | 0 | 4 |
@@ -33459,6 +33460,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/ReflectionClassKindJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
 ### `ext/standard/RenameJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49533,8 +49539,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ReflectionSetup.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 163)
-- 12 class method(s)
+- new Variable (line 164)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/RegexIteratorFilterRuntime.php`
 
@@ -56354,7 +56360,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassGetModifiers.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassGetName.php`
 
@@ -56471,7 +56477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassIsAbstract.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassIsAnonymous.php`
 
@@ -56486,7 +56492,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassIsEnum.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassIsFinal.php`
 
@@ -56506,7 +56512,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassIsInterface.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassIsInternal.php`
 
@@ -56526,7 +56532,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassIsReadOnly.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassIsStatic.php`
 
@@ -56541,7 +56547,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionClassIsTrait.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/VM/Builtin/ReflectionClassIsUninitializedLazyObject.php`
 

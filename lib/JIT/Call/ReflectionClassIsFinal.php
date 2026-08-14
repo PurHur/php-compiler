@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /** ReflectionClass::isFinal()/isIterateable() — JIT/AOT (#18297, ext/reflection/php_reflection.c). */
@@ -17,6 +18,10 @@ final class ReflectionClassIsFinal implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
+        // php-src: zim_ReflectionClass_isFinal — 0 args; $args[0] is $this (#31126)
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ReflectionClass::isFinal', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         [$cstr, $len] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
         $i64 = $context->getTypeFromString('int64');

@@ -6,7 +6,11 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Builtin\ReflectionSetup;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPLLVM\Value;
 
 /** ReflectionClass::isReadOnly() — VM (#5221, ext/reflection/php_reflection.c). */
 final class ReflectionClassIsReadOnly extends VmClassMethod
@@ -18,6 +22,8 @@ final class ReflectionClassIsReadOnly extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionClass_isReadOnly — ZEND_PARSE_PARAMETERS (0 args) (#31126)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::isReadOnly', 0);
         $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $className = ReflectionSupport::classNameFromReflection($receiver);
@@ -28,5 +34,14 @@ final class ReflectionClassIsReadOnly extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($entry->readonly);
         }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (!self::requireExactJitUserArgCount($context, $args, 'ReflectionClass::isReadOnly', 0)) {
+            return self::jitArgcDummyReturn($context);
+        }
+
+        return ReflectionSetup::emitKindQuery($context, $args, 'isReadOnly');
     }
 }
