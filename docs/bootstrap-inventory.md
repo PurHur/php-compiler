@@ -29502,9 +29502,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateMicrosecond.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 74)
-- new JITVariable (line 86)
-- 5 class method(s)
+- new JITVariable (line 75)
+- new JITVariable (line 87)
+- 6 class method(s)
 
 ### `ext/standard/JitDateMutation.php`
 
@@ -53602,7 +53602,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ExceptionBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/ExceptionHandlerCallbackPolicy.php`
 
@@ -59002,25 +59002,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new NativeDateRangeError (line 638)
 - new NativeDateObjectError (line 644)
 - new NativeDateMalformedStringException (line 683)
-- new ObjectEntry (line 1158)
-- new ObjectEntry (line 1181)
-- new ObjectEntry (line 1204)
-- new ObjectEntry (line 1227)
+- new ObjectEntry (line 1168)
+- new ObjectEntry (line 1191)
+- new ObjectEntry (line 1214)
 - new ObjectEntry (line 1237)
-- new Variable (line 1367)
-- new Variable (line 1369)
-- new Variable (line 1371)
-- new Variable (line 1389)
-- new Variable (line 1391)
-- new Error (line 1459)
-- new Error (line 1465)
-- new Error (line 1476)
-- new ObjectEntry (line 1478)
-- new Error (line 1504)
-- new Error (line 1519)
-- new Error (line 1534)
-- new Error (line 1541)
-- 94 class method(s)
+- new ObjectEntry (line 1247)
+- new Variable (line 1377)
+- new Variable (line 1379)
+- new Variable (line 1381)
+- new Variable (line 1399)
+- new Variable (line 1401)
+- new Error (line 1469)
+- new Error (line 1475)
+- new Error (line 1486)
+- new ObjectEntry (line 1488)
+- new Error (line 1514)
+- new Error (line 1529)
+- new Error (line 1544)
+- new Error (line 1551)
+- 95 class method(s)
 
 ### `lib/VM/DateTimeZoneSupport.php`
 

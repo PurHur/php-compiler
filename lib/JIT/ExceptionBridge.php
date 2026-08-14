@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 
@@ -146,6 +147,36 @@ final class ExceptionBridge
         TypeErrorRaise::emitValueError($context, $message);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+    }
+
+    /**
+     * Builtin DateRangeError — catchable in active try/catch, fatal when uncaught (#31118).
+     *
+     * php-src: ext/date/php_date.c — zend_argument_error(date_ce_date_range_error, …)
+     */
+    public static function emitDateRangeErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            ErrorRaise::ensureStandaloneBodies($context);
+        }
+
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'DateRangeError', $message);
+
+            return;
+        }
+
+        ErrorRaise::emitRaise($context, $message);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
         } else {
             $context->builder->call($context->lookupFunction('abort'));
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
