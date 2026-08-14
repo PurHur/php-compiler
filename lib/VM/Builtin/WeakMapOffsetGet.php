@@ -18,9 +18,11 @@ final class WeakMapOffsetGet extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('WeakMap::offsetGet() expects object key');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('WeakMap::offsetGet() called without $this');
         }
+        // php-src Zend/zend_weakrefs.stub.php — offsetGet(object $object): mixed (#30909)
+        $this->requireExactUserArgCount($frame, 'WeakMap::offsetGet', 1);
         if (null === $frame->returnVar) {
             return;
         }

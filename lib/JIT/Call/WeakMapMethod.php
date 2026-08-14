@@ -18,6 +18,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -68,8 +69,12 @@ final class WeakMapMethod implements Call
 
     private function callOffsetGet(Context $context, Variable ...$args): Value
     {
-        if (count($args) < 2) {
-            throw new \LogicException('WeakMap::offsetGet() expects map and key');
+        if ([] === $args) {
+            throw new \LogicException('WeakMap::offsetGet() called without $this');
+        }
+        // php-src Zend/zend_weakrefs.stub.php — offsetGet(object $object): mixed (#30909)
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'WeakMap::offsetGet', 1)) {
+            return self::voidResult($context);
         }
         // Zend zend_weakmap_offset_get — absent key throws Error (#24771).
         ErrorRaise::registerDeclarations($context);
@@ -198,8 +203,12 @@ final class WeakMapMethod implements Call
 
     private function callOffsetExists(Context $context, Variable ...$args): Value
     {
-        if (count($args) < 2) {
-            throw new \LogicException('WeakMap::offsetExists() expects map and key');
+        if ([] === $args) {
+            throw new \LogicException('WeakMap::offsetExists() called without $this');
+        }
+        // php-src Zend/zend_weakrefs.stub.php — offsetExists(object $object): bool (#30909)
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'WeakMap::offsetExists', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $ht = self::backingHashtable($context, $args[0]);
         $keyObj = WeakRefSetup::loadObjectFromArg($context, $args[1]);
@@ -214,8 +223,12 @@ final class WeakMapMethod implements Call
 
     private function callOffsetUnset(Context $context, Variable ...$args): Value
     {
-        if (count($args) < 2) {
-            throw new \LogicException('WeakMap::offsetUnset() expects map and key');
+        if ([] === $args) {
+            throw new \LogicException('WeakMap::offsetUnset() called without $this');
+        }
+        // php-src Zend/zend_weakrefs.stub.php — offsetUnset(object $object): void (#30909)
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'WeakMap::offsetUnset', 1)) {
+            return self::voidResult($context);
         }
         WeakRefRuntime::ensureLinked($context);
         WeakRefNative::registerDeclarations($context);

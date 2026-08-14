@@ -19,9 +19,11 @@ final class WeakMapOffsetUnset extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('WeakMap::offsetUnset() expects object key');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('WeakMap::offsetUnset() called without $this');
         }
+        // php-src Zend/zend_weakrefs.stub.php — offsetUnset(object $object): void (#30909)
+        $this->requireExactUserArgCount($frame, 'WeakMap::offsetUnset', 1);
         $receiver = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakMap');
         $targetId = WeakRefSupport::targetObjectId($frame->calledArgs[1]);
         $key = WeakRefSupport::objectKey($frame->calledArgs[1]);
