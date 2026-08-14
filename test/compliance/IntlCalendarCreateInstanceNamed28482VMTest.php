@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+require_once __DIR__.'/../BaseTest.php';
+
+/** VM: IntlCalendar::createInstance Reflection + named $timezone (#28482). */
+final class IntlCalendarCreateInstanceNamed28482VMTest extends BaseTest
+{
+    protected static string $DIR = __DIR__;
+
+    public static function providePHPTests(): \Generator
+    {
+        $file = 'intlcalendar_createinstance_named_28482.phpt';
+        yield $file => self::parsePHPT(
+            __DIR__.'/cases/intl/'.$file,
+            $file
+        );
+    }
+
+    public function setUp(): void
+    {
+        $this->BIN = realpath(__DIR__.'/../../bin/vm.php');
+    }
+}
