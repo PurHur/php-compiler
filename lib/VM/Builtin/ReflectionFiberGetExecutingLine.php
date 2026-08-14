@@ -18,6 +18,8 @@ final class ReflectionFiberGetExecutingLine extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFiber_getExecutingLine — ZEND_PARSE_PARAMETERS_NONE (#30928)
+        $this->requireExactUserArgCount($frame, 'ReflectionFiber::getExecutingLine', 0);
         $receiver = ReflectionSupport::requireReflectionFiber($frame, $frame->calledArgs[0]);
         $fiber = FiberTrace::fiberStateFromReflection($receiver);
         if (null !== $frame->returnVar) {
