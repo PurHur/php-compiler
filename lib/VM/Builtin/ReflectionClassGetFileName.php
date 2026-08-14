@@ -19,6 +19,13 @@ final class ReflectionClassGetFileName extends ReflectionSourceGetter
         });
     }
 
+    public function execute(Frame $frame): void
+    {
+        // php-src: zim_ReflectionClass_getFileName — 0 args (#30888)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::getFileName', 0);
+        parent::execute($frame);
+    }
+
     protected function resolveLocation(Frame $frame): ?SourceLocation
     {
         return $this->resolveEntry($frame)->sourceLocation;

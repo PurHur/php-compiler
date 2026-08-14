@@ -18,9 +18,8 @@ final class ReflectionClassHasMethod extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionClass::hasMethod() expects a method name');
-        }
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (1 args) (#30888)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::hasMethod', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -32,9 +31,8 @@ final class ReflectionClassHasMethod extends VmClassMethod
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
         $method = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::hasMethod() name', 1);
-        $filter = VmReflection::optionalReflectionFilterArg($frame, 2);
         $frame->returnVar->bool(
-            VmReflection::classHasMethodForReflection($entry, $ctx, $method, $filter)
+            VmReflection::classHasMethodForReflection($entry, $ctx, $method, 0)
         );
     }
 }

@@ -19,9 +19,8 @@ final class ReflectionClassIsInstance extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionClass::isInstance() expects an object');
-        }
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (1 args) (#30888)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::isInstance', 1);
         [, $entry, $ctx] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
         $object = $frame->calledArgs[1]->resolveIndirect();
         $matches = false;

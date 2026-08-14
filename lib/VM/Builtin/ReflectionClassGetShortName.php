@@ -17,6 +17,8 @@ final class ReflectionClassGetShortName extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (0 args) (#30888)
+        $this->requireExactUserArgCount($frame, 'ReflectionClass::getShortName', 0);
         $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(ReflectionSupport::shortClassNameFromReflection($receiver));

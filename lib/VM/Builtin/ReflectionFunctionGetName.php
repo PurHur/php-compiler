@@ -17,6 +17,8 @@ final class ReflectionFunctionGetName extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (0 args) (#30888)
+        $this->requireExactUserArgCount($frame, 'ReflectionFunctionAbstract::getName', 0);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(ReflectionSupport::functionNameFromReflection($receiver));
