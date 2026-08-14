@@ -440,6 +440,8 @@
             <file>./test/compliance/DateStaticExcessArgc30898JITTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934VMTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934JITTest.php</file>
+            <file>./test/compliance/SplFileInfoPathExcessArgc30935VMTest.php</file>
+            <file>./test/compliance/SplFileInfoPathExcessArgc30935JITTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785VMTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785JITTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>

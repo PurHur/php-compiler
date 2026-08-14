@@ -355,6 +355,8 @@ final class SplFileInfoGetPath extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getPath()'
         );
+        // ACE uses called class (#30935; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getPath', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -400,6 +402,8 @@ final class SplFileInfoGetBasename extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getBasename()'
         );
+        // php-src zim_SplFileInfo_getBasename — optional suffix; at most 1 (#30935).
+        $this->requireUserArgCountRange($frame, $object->class->name.'::getBasename', 0, 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -499,6 +503,8 @@ final class SplFileInfoGetRealPath extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getRealPath()'
         );
+        // ACE uses called class (#30935; ZEND_PARSE_PARAMETERS_NONE).
+        $this->requireExactUserArgCount($frame, $object->class->name.'::getRealPath', 0);
         if (null === $frame->returnVar) {
             return;
         }
