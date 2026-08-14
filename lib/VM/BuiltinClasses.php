@@ -1751,7 +1751,7 @@ final class BuiltinClasses
             $dt->methods['createfromtimestamp'] = new DateTimeCreateFromTimestamp();
             $dt->methodVisibility['createfromtimestamp'] = $pubStatic;
         }
-        $dt->methods['getlasterrors'] = new DateTimeGetLastErrors();
+        $dt->methods['getlasterrors'] = new DateTimeGetLastErrors('DateTime');
         $dt->methodVisibility['getlasterrors'] = $pubStatic;
         // php-src php_date.stub.php — getMicrosecond(): int; setMicrosecond(): static (#28711)
         if (CompilerVersion::supportsDateTimeMicrosecond()) {
@@ -1819,7 +1819,7 @@ final class BuiltinClasses
             $dti->methods['createfromtimestamp'] = new DateTimeImmutableCreateFromTimestamp();
             $dti->methodVisibility['createfromtimestamp'] = $pubStatic;
         }
-        $dti->methods['getlasterrors'] = new DateTimeGetLastErrors();
+        $dti->methods['getlasterrors'] = new DateTimeGetLastErrors('DateTimeImmutable');
         $dti->methodVisibility['getlasterrors'] = $pubStatic;
         // php-src php_date.stub.php — getMicrosecond(): int; setMicrosecond(): static (#28711)
         if (CompilerVersion::supportsDateTimeMicrosecond()) {

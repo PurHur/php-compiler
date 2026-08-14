@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
@@ -37,10 +39,16 @@ final class JitDateGetLastErrors
     public static function invokeMethod(Context $context, string $function, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // Catchable ArgumentCountError under JIT/AOT try/catch (#30991; peer #30898).
         if (0 !== $argc) {
-            throw new \ArgumentCountError(
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
                 \sprintf('%s() expects exactly 0 arguments, %d given', $function, $argc)
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return self::materializePeek($context);
