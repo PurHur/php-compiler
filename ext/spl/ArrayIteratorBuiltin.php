@@ -227,6 +227,8 @@ final class ArrayIteratorRewind extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::rewind()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::rewind', 0);
         ArrayIteratorBuiltin::rewind($object);
     }
 }
@@ -270,6 +272,8 @@ final class ArrayIteratorNext extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::next()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::next', 0);
         ArrayIteratorBuiltin::next($object);
     }
 }
@@ -288,6 +292,8 @@ final class ArrayIteratorValid extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::valid()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::valid', 0);
         SplIteratorSupport::setReturnBool($frame, ArrayIteratorBuiltin::valid($object));
     }
 }
@@ -306,6 +312,8 @@ final class ArrayIteratorCurrent extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::current()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::current', 0);
         SplIteratorSupport::copyReturnFrom($frame, ArrayIteratorBuiltin::current($object));
     }
 }
@@ -324,6 +332,8 @@ final class ArrayIteratorKey extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::key()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::key', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -352,13 +362,8 @@ final class ArrayIteratorCount extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::count()'
         );
-        // php-src: ZEND_PARSE_PARAMETERS_NONE — ArrayIterator::count() (#20162)
-        if (\count($frame->calledArgs) > 1) {
-            throw new \ArgumentCountError(
-                'ArrayIterator::count() expects exactly 0 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — ArrayIterator::count() (#20162, #30911)
+        $this->requireExactUserArgCount($frame, 'ArrayIterator::count', 0);
         if (null === $frame->returnVar) {
             return;
         }

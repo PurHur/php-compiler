@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\SplDllistJitHelper;
 use PHPLLVM\Value;
@@ -48,13 +51,58 @@ final class SplDllistMethod implements Call
                     $this->className.'::unshift() expects exactly 1 argument, 0 given'
                 )
             ),
-            'pop' => SplDllistJitHelper::compilePop($context, $args[0]),
-            'shift', 'dequeue' => SplDllistJitHelper::compileShift($context, $args[0]),
-            'top' => SplDllistJitHelper::compileTop($context, $args[0]),
-            'bottom' => SplDllistJitHelper::compileBottom($context, $args[0]),
+            'pop' => $this->callZeroArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::pop',
+                static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compilePop($ctx, $self)
+            ),
+            'shift', 'dequeue' => $this->callZeroArg(
+                $context,
+                $args,
+                'dequeue' === strtolower($this->method) ? 'SplQueue::dequeue' : 'SplDoublyLinkedList::shift',
+                static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileShift($ctx, $self)
+            ),
+            'top' => $this->callZeroArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::top',
+                static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileTop($ctx, $self)
+            ),
+            'bottom' => $this->callZeroArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::bottom',
+                static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileBottom($ctx, $self)
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
         };
+    }
+
+    /**
+     * php-src ZEND_PARSE_PARAMETERS_NONE — ACE cites defining class (#30911).
+     *
+     * @param callable(Context, Variable): Value $emit
+     */
+    private function callZeroArg(Context $context, array $args, string $function, callable $emit): Value
+    {
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('%s() expects exactly 0 arguments, %d given', $function, $userArgCount)
+            );
+            $unreachable = BasicBlockHelper::append(
+                $context,
+                'spl_dllist_'.strtolower($this->method).'_argc_unreach'
+            );
+            $context->builder->positionAtEnd($unreachable);
+
+            return JitValueBox::alloc($context);
+        }
+
+        return $emit($context, $args[0]);
     }
 }

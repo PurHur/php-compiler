@@ -378,6 +378,8 @@
             <file>./test/compliance/ReflectionEnumExcessArgc30865JITTest.php</file>
             <file>./test/compliance/ReflectionEnumIsBackedExcessArgc30929VMTest.php</file>
             <file>./test/compliance/ReflectionEnumIsBackedExcessArgc30929JITTest.php</file>
+            <file>./test/compliance/SplIteratorExcessArgc30911VMTest.php</file>
+            <file>./test/compliance/SplIteratorExcessArgc30911JITTest.php</file>
             <file>./test/compliance/EnumSyntheticExcessArgc30864VMTest.php</file>
             <file>./test/compliance/EnumSyntheticExcessArgc30864JITTest.php</file>
             <file>./test/compliance/GeneratorExcessArgc30866VMTest.php</file>
