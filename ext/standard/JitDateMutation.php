@@ -14,6 +14,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -1389,10 +1390,10 @@ final class JitDateMutation
     public static function invokeObjectISODateSet(Context $context, bool $immutable, JITVariable ...$args): Value
     {
         $function = $immutable ? 'DateTimeImmutable::setISODate' : 'DateTime::setISODate';
-        $argc = \count($args);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException($function.'() expects two to three arguments');
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, $function, 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
+        $argc = \count($args);
         JitSleep::zParamLong($context, $args[1], $function, 1, 'year');
         JitSleep::zParamLong($context, $args[2], $function, 2, 'week');
         if (4 === $argc) {
