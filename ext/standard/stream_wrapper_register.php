@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -22,11 +23,8 @@ final class stream_wrapper_register extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \ArgumentCountError(
-                'stream_wrapper_register() expects exactly 2 arguments, '.\count($frame->calledArgs).' given'
-            );
-        }
+        // php-src main/streams/userspace.c — optional $flags (default 0); #31069.
+        $this->requireArgCountRange($frame, 'stream_wrapper_register', 2, 3);
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,17 +40,23 @@ final class stream_wrapper_register extends Internal
             1,
             'class'
         );
+        if (3 === \count($frame->calledArgs)) {
+            VmMath::parseIntBuiltinArgForFrame($frame, 2, 'stream_wrapper_register', 3, 'flags');
+        }
         VmStreamWrapperRegistry::requireValidWrapperClass($frame, $className);
         $frame->returnVar->bool(VmStreamWrapperRegistry::register($protocol, $className));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (!JitStreamWrapperRegistry::requireExactArgCount($context, $args, 'stream_wrapper_register', 2)) {
+        if (!$this->requireArgCountRangeJit($context, $args, 'stream_wrapper_register', 2, 3)) {
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         JitStringBuiltinArg::lower($context, $args[0], 'stream_wrapper_register', 0, 'protocol');
         JitStringBuiltinArg::lower($context, $args[1], 'stream_wrapper_register', 1, 'class');
+        if (3 === \count($args)) {
+            JitLongArg::lower($context, $args[2], 'stream_wrapper_register', 3, 'flags');
+        }
 
         return JitStreamWrapperRegistry::register($context, $args[0], $args[1]);
     }
