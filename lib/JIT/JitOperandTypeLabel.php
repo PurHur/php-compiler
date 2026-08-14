@@ -44,10 +44,13 @@ final class JitOperandTypeLabel
     }
 
     /**
-     * zend_execute.c — bool actuals print true/false, not bool (#29097).
+     * zend_zval_type_name() — bool actuals are {@code bool} until PROFILE≥8.4 GH-8385 (#31160).
      */
     private static function nativeBoolLiteralLabel(Variable $arg): string
     {
+        if (!\PHPCompiler\CompilerVersion::supportsTrueFalseZvalTypeName()) {
+            return 'bool';
+        }
         $value = $arg->value;
         if (method_exists($value, 'isConstant') && $value->isConstant()
             && method_exists($value, 'getConstantValue')

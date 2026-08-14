@@ -1,5 +1,7 @@
 --TEST--
-TypeError actual bool prints true/false not bool (#29097, zend_execute.c)
+TypeError actual bool prints true/false not bool on PROFILE=8.4 (#29097 / #31160, GH-8385)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 function need_array(array $x) {}

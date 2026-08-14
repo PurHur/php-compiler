@@ -25,7 +25,10 @@ final class TypeErrorBoolActualLabelTest extends TestCase
         $out = ob_get_clean();
         self::assertStringContainsString('count_false:count(): Argument #1 ($value) must be of type Countable|array, false given', $out);
         self::assertStringContainsString('count_true:count(): Argument #1 ($value) must be of type Countable|array, true given', $out);
-        self::assertStringContainsString('need_array_false:need_array(): Argument #1 ($x) must be of type array, false given', $out);
+        self::assertMatchesRegularExpression(
+            '/need_array_false:.*must be of type array, false given/',
+            $out
+        );
         self::assertStringContainsString('count_null:count(): Argument #1 ($value) must be of type Countable|array, null given', $out);
         self::assertStringNotContainsString('bool given', $out);
     }

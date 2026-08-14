@@ -14,5 +14,5 @@ try {
 $prev = error_reporting(0);
 echo $prev === 22527 ? "old-level\n" : "old-bad\n";
 --EXPECT--
-error_reporting(): Argument #1 ($error_level) must be of type ?int, false given
+error_reporting(): Argument #1 ($error_level) must be of type ?int, bool given
 old-level

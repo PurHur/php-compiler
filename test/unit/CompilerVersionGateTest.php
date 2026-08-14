@@ -67,6 +67,64 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    /** Issue #31160: GH-8385 true/false zend_zval_type_name withheld on 8.4.0-dev (Zend 8.2 bool). */
+    public function testSupportsTrueFalseZvalTypeNameFalseOnDefault84DevProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsTrueFalseZvalTypeName());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #31160: PROFILE=8.2 / 8.3 keep zend_zval_type_name "bool". */
+    public function testSupportsTrueFalseZvalTypeNameFalseOnPhp82And83Profiles(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        try {
+            foreach (['8.2', '8.3'] as $profile) {
+                putenv('PHP_COMPILER_PROFILE='.$profile);
+                $this->assertFalse(
+                    CompilerVersion::supportsTrueFalseZvalTypeName(),
+                    'PROFILE='.$profile
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #31160: PROFILE=8.4 / 8.5 enable GH-8385 true/false TypeError actuals. */
+    public function testSupportsTrueFalseZvalTypeNameTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        try {
+            foreach (['8.4', '8.5'] as $profile) {
+                putenv('PHP_COMPILER_PROFILE='.$profile);
+                $this->assertTrue(
+                    CompilerVersion::supportsTrueFalseZvalTypeName(),
+                    'PROFILE='.$profile
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsStrIncrementFalseOnPhp82Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

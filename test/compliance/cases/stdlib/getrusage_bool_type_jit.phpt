@@ -9,4 +9,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-getrusage(): Argument #1 ($mode) must be of type int, true given
+getrusage(): Argument #1 ($mode) must be of type int, bool given

@@ -66,13 +66,13 @@ foreach ([
 --EXPECT--
 param_int:{closure}(): Argument #1 ($x) must be of type ?int, string given
 param_string:{closure}(): Argument #1 ($x) must be of type ?string, array given
-param_false:{closure}(): Argument #1 ($x) must be of type ?false, true given
+param_false:{closure}(): Argument #1 ($x) must be of type ?false, bool given
 param_array:{closure}(): Argument #1 ($x) must be of type ?array, int given
 param_bool:{closure}(): Argument #1 ($x) must be of type ?bool, array given
 param_float:{closure}(): Argument #1 ($x) must be of type ?float, array given
 param_object:{closure}(): Argument #1 ($x) must be of type ?object, int given
-param_true:{closure}(): Argument #1 ($x) must be of type ?true, false given
+param_true:{closure}(): Argument #1 ($x) must be of type ?true, bool given
 return_int:{closure}(): Return value must be of type ?int, string returned
-return_false:{closure}(): Return value must be of type ?false, true returned
+return_false:{closure}(): Return value must be of type ?false, bool returned
 return_string:{closure}(): Return value must be of type ?string, array returned
 union_keeps_pipe:{closure}(): Argument #1 ($x) must be of type string|int|null, array given

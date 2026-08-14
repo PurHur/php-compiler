@@ -1,5 +1,7 @@
 --TEST--
 object builtins TypeError actual false|true not bool (#30100)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['spl_object_hash', 'spl_object_id', 'get_object_vars', 'get_mangled_object_vars'] as $fn) {

@@ -1282,7 +1282,7 @@ final class TypeCheck
 
     private static function valueTypeLabel(Variable $value): string
     {
-        // zend_execute.c — bool actuals print true/false, not bool (#29097).
+        // zend_zval_type_name — bool actuals are "bool" until PROFILE≥8.4 GH-8385 (#31160).
         return EnumCaseSupport::typeNameForTypeErrorActual($value);
     }
 

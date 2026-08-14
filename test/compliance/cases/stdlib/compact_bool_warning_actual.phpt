@@ -1,5 +1,7 @@
 --TEST--
 compact() Warning actual false|true not bool (#30119)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 set_error_handler(static function (int $errno, string $message): bool {

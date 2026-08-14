@@ -60,6 +60,6 @@ expect_iterable(): Return value must be of type Traversable|array, int returned
 arr:0
 trav:2
 bad_null(): Return value must be of type Traversable|array, null returned
-C29888::method(): Return value must be of type Traversable|array, false returned
+C29888::method(): Return value must be of type Traversable|array, bool returned
 y:1
 gen-ok
