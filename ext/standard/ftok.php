@@ -30,7 +30,7 @@ final class ftok extends Internal
         }
         $pathname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ftok', 0, 'filename');
         if ('' === $pathname) {
-            throw new \ValueError('ftok(): Argument #1 ($filename) cannot be empty');
+            throw new \ValueError(VmString::emptyStringArgValueErrorMessageCannot('ftok', 0, 'filename'));
         }
         $proj = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ftok', 1, 'project_id');
         if (1 !== \strlen($proj)) {

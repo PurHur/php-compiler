@@ -30,6 +30,8 @@
             <file>./test/compliance/RegisterArgcArgvVMTest.php</file>
             <file>./test/compliance/MagicScriptConstVMTest.php</file>
             <file>./test/compliance/VMTest.php</file>
+            <file>./test/compliance/DuplicateFunctionRedeclare31109VMTest.php</file>
+            <file>./test/compliance/DuplicateFunctionRedeclare31109JITTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedVMTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedJITTest.php</file>
             <file>./test/compliance/DeclareTicksEchoCadenceVMTest.php</file>
@@ -348,6 +350,8 @@
             <file>./test/compliance/WordwrapEmptyBreakMessageJITTest.php</file>
             <file>./test/compliance/ExplodeEmptySeparatorMessageVMTest.php</file>
             <file>./test/compliance/ExplodeEmptySeparatorMessageJITTest.php</file>
+            <file>./test/compliance/Issue30625EmptyStringMustNotBeEmptyVMTest.php</file>
+            <file>./test/compliance/Issue30625EmptyStringMustNotBeEmptyJITTest.php</file>
             <file>./test/compliance/ExecFamilyEmptyCommandMessageVMTest.php</file>
             <file>./test/compliance/ExecFamilyEmptyCommandMessageJITTest.php</file>
             <file>./test/compliance/ExecFamilyExcessArgc30566VMTest.php</file>
@@ -435,6 +439,10 @@
             <file>./test/compliance/IsPredicatesExcessArgc30687JITTest.php</file>
             <file>./test/compliance/GetResourceTypeExcessArgc30707VMTest.php</file>
             <file>./test/compliance/GetResourceTypeExcessArgc30707JITTest.php</file>
+            <file>./test/compliance/PasswordGetInfoExcessArgc30712VMTest.php</file>
+            <file>./test/compliance/PasswordGetInfoExcessArgc30712JITTest.php</file>
+            <file>./test/compliance/StrpbrkStrrchrStrtokExcessArgc30703VMTest.php</file>
+            <file>./test/compliance/StrpbrkStrrchrStrtokExcessArgc30703JITTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690VMTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690JITTest.php</file>
             <file>./test/compliance/SizeofExcessArgc30686VMTest.php</file>
@@ -465,6 +473,8 @@
             <file>./test/compliance/ZlibStreamExcessArgc30830JITTest.php</file>
             <file>./test/compliance/DateStaticExcessArgc30898VMTest.php</file>
             <file>./test/compliance/DateStaticExcessArgc30898JITTest.php</file>
+            <file>./test/compliance/DateTimeSetTimestampGetLastErrorsExcessArgc30991VMTest.php</file>
+            <file>./test/compliance/DateTimeSetTimestampGetLastErrorsExcessArgc30991JITTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994VMTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994JITTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934VMTest.php</file>

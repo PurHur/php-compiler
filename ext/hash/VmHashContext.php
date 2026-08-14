@@ -123,7 +123,7 @@ final class VmHashContext
             }
             if ('' === $key) {
                 throw new \ValueError(
-                    'hash_init(): Argument #3 ($key) cannot be empty when HMAC is requested'
+                    \PHPCompiler\ext\standard\VmString::hashInitEmptyHmacKeyValueErrorMessage()
                 );
             }
         }

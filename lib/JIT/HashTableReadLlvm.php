@@ -176,9 +176,10 @@ final class HashTableReadLlvm
             throw new \LogicException('valuePtrFromDim requires TYPE_VALUE');
         }
 
-        return Variable::KIND_VARIABLE === $dim->kind
-            ? JitValueBox::pointer($context, $dim->value)
-            : $context->helper->loadValue($dim);
+        // KIND_VALUE / by-value __value__ must become __value__* (store+alloca), not
+        // loadValue()'s struct-by-value — structGep asserts pointer receivers (#24302
+        // HashContextJitHelper emit after #30625 fingerprint churn).
+        return JitValueBox::valuePtrFromVariable($context, $dim);
     }
 
     /** isset() / empty() on a boxed dimension key (#16390, split from HashTableHelper). */

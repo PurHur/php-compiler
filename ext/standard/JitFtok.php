@@ -19,9 +19,12 @@ use PHPLLVM\Value;
 /** LLVM lowering for ftok() via __compiler_ftok (issue #6296 / #27389, ext/standard/basic_functions.c). */
 final class JitFtok
 {
-    private const EMPTY_PATH_ERROR = 'ftok(): Argument #1 ($filename) cannot be empty';
-
     private const PROJ_LEN_ERROR = 'ftok(): Argument #2 ($project_id) must be a single character';
+
+    private static function emptyPathError(): string
+    {
+        return VmString::emptyStringArgValueErrorMessageCannot('ftok', 0, 'filename');
+    }
 
     public static function invoke(Context $context, JITVariable $pathArg, JITVariable $projArg): Value
     {
@@ -67,7 +70,7 @@ final class JitFtok
     {
         if (null !== ($arg->compileTimeString ?? null)) {
             if ('' === $arg->compileTimeString) {
-                throw new \ValueError(self::EMPTY_PATH_ERROR);
+                throw new \ValueError(self::emptyPathError());
             }
 
             return;
@@ -86,7 +89,7 @@ final class JitFtok
         $okBlock = BasicBlockHelper::append($context, 'ftok_path_empty_ok');
         $context->builder->branchIf($empty, $failBlock, $okBlock);
         $context->builder->positionAtEnd($failBlock);
-        TypeErrorRaise::emitValueError($context, self::EMPTY_PATH_ERROR);
+        TypeErrorRaise::emitValueError($context, self::emptyPathError());
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($okBlock);
     }

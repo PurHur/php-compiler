@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,9 +22,8 @@ final class password_get_info extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('password_get_info() requires exactly one argument');
-        }
+        // php-src ext/standard/password.c — ArgumentCountError (#30712).
+        $this->requireExactArgCount($frame, 'password_get_info', 1);
         // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21537, reverts #20672; password.c).
         $hash = VmString::trimFamilyStringArgForFrame(
             $frame,
@@ -42,8 +42,11 @@ final class password_get_info extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('password_get_info() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #30712.
+        if (!$this->requireExactJitArgCount($context, $args, 'password_get_info', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitPasswordGetInfo::invoke(

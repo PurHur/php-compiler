@@ -43,8 +43,9 @@ final class HashContextJitHelper
                 );
             }
             if ('' === $key) {
+                // NestedJIT-safe: do not call VmString. Wording SSOT: VmString::zendArgumentMustNotBeEmptySuffix (#30625).
                 throw new \ValueError(
-                    'hash_init(): Argument #3 ($key) cannot be empty when HMAC is requested'
+                    'hash_init(): Argument #3 ($key) '.self::zendEmptyArgSuffix().' when HMAC is requested'
                 );
             }
         }
@@ -75,6 +76,23 @@ final class HashContextJitHelper
         }
 
         return $id;
+    }
+
+    /**
+     * NestedJIT-safe copy of {@see \PHPCompiler\ext\standard\VmString::zendArgumentMustNotBeEmptySuffix} (#30625).
+     */
+    private static function zendEmptyArgSuffix(): string
+    {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === $raw) {
+            return 'cannot be empty';
+        }
+        $raw = trim($raw);
+        if (isset($raw[0], $raw[1], $raw[2]) && '8' === $raw[0] && '.' === $raw[1] && $raw[2] >= '4') {
+            return 'must not be empty';
+        }
+
+        return 'cannot be empty';
     }
 
     public static function update(int $id, string $data): int

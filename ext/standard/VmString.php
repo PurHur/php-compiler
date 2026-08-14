@@ -595,15 +595,33 @@ final class VmString
     /**
      * Zend empty-string ValueError wording (php-src zend_argument_error / string.c).
      *
-     * Use {@see EMPTY_STRING_ARG_VALUE_ERROR_CANNOT} for builtins whose php-src path is
-     * `zend_argument_must_not_be_empty_error` / current Zend text "cannot be empty"
-     * (explode / substr_count — #30505/#30522; hash_hkdf, checkdnsrr, …).
-     * Keep MUST_NOT only where Zend still prints that suffix (e.g. some mbstring paths).
+     * {@see EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT} is the php-src 8.4+ text of
+     * `zend_argument_must_not_be_empty_error` (Zend/zend_API.c) and of builtins that
+     * always printed that suffix (wordwrap / str_pad / mb_str_pad).
+     * {@see EMPTY_STRING_ARG_VALUE_ERROR_CANNOT} is the 8.2/8.3 text of the same API.
+     *
+     * Callers of {@see emptyStringArgValueErrorMessageCannot} (explode / substr_count /
+     * ftok / hash_hkdf / exec / checkdnsrr / …) pick the suffix via
+     * {@see zendArgumentMustNotBeEmptySuffix} (#30625). Keep
+     * {@see emptyStringArgValueErrorMessage} only where Zend printed "must not" on 8.2 too.
      */
     public const EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT = 'must not be empty';
 
-    /** php-src zend_argument_must_not_be_empty_error — current Zend text (#30505/#30522/#29760) */
+    /** php-src zend_argument_must_not_be_empty_error — Zend 8.2/8.3 text (#30505/#30522/#29760) */
     public const EMPTY_STRING_ARG_VALUE_ERROR_CANNOT = 'cannot be empty';
+
+    /**
+     * Suffix for php-src `zend_argument_must_not_be_empty_error` (#30625).
+     *
+     * Zend 8.4+ (explicit `PHP_COMPILER_PROFILE=8.4` / stable 8.4.0+): "must not be empty".
+     * 8.4.0-dev reference / PROFILE≤8.3: "cannot be empty" (match Zend 8.2).
+     */
+    public static function zendArgumentMustNotBeEmptySuffix(): string
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')
+            ? self::EMPTY_STRING_ARG_VALUE_ERROR_MUST_NOT
+            : self::EMPTY_STRING_ARG_VALUE_ERROR_CANNOT;
+    }
 
     /**
      * Format `fn(): Argument #N ($name) must not be empty` (1-based $argIndex).
@@ -622,7 +640,9 @@ final class VmString
     }
 
     /**
-     * Format `fn(): Argument #N ($name) cannot be empty` (1-based $argIndex).
+     * Format `fn(): Argument #N ($name) {cannot|must not} be empty` (1-based $argIndex).
+     *
+     * php-src `zend_argument_must_not_be_empty_error` — profile-gated (#30625).
      */
     public static function emptyStringArgValueErrorMessageCannot(
         string $function,
@@ -633,8 +653,17 @@ final class VmString
             $function,
             $argIndex,
             $paramName,
-            self::EMPTY_STRING_ARG_VALUE_ERROR_CANNOT
+            self::zendArgumentMustNotBeEmptySuffix()
         );
+    }
+
+    /**
+     * hash_init() HMAC empty key — php-src ext/hash/hash.c zend_argument_value_error(3, …) (#30625).
+     */
+    public static function hashInitEmptyHmacKeyValueErrorMessage(): string
+    {
+        return 'hash_init(): Argument #3 ($key) '.self::zendArgumentMustNotBeEmptySuffix()
+            .' when HMAC is requested';
     }
 
     private static function emptyStringArgValueErrorMessageWithSuffix(
