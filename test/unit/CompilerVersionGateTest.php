@@ -692,6 +692,21 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsMbStrPadTrueOn83Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbStrPad());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsHex2binStrictFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsHex2binStrict());
@@ -3228,6 +3243,22 @@ final class CompilerVersionGateTest extends TestCase
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersMbStrPadOn83Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
         try {
             $runtime = new Runtime();
             $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
