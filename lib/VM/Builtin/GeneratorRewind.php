@@ -27,6 +27,14 @@ final class GeneratorRewind extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Generator::rewind() called without $this');
         }
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (0 args); $calledArgs[0] is $this (#31034)
+        $userArgCount = \count($frame->calledArgs) - 1;
+        if (0 !== $userArgCount) {
+            throw new \ArgumentCountError(\sprintf(
+                'Generator::rewind() expects exactly 0 arguments, %d given',
+                $userArgCount
+            ));
+        }
         $receiver = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $receiver->type) {
             throw new \LogicException('Generator::rewind() called on non-object');
