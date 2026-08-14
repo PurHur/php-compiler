@@ -258,6 +258,8 @@ final class RecursiveArrayIteratorGetChildren extends VmClassMethod
             RecursiveArrayIteratorBuiltin::CLASS_LC,
             'RecursiveArrayIterator::getChildren()'
         );
+        // php-src zim_RecursiveArrayIterator_getChildren — ZEND_PARSE_PARAMETERS_NONE (#31042)
+        $this->requireExactUserArgCount($frame, 'RecursiveArrayIterator::getChildren', 0);
         if (null === $frame->vmContext) {
             throw new \LogicException('RecursiveArrayIterator::getChildren() requires VM context');
         }
