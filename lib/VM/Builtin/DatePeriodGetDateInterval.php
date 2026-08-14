@@ -20,6 +20,8 @@ final class DatePeriodGetDateInterval extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('DatePeriod::getDateInterval() called without $this');
         }
+        // php-src zim_DatePeriod_getDateInterval — ZEND_PARSE_PARAMETERS_NONE (#30934).
+        $this->requireExactUserArgCount($frame, 'DatePeriod::getDateInterval', 0);
         $receiver = DatePeriodSupport::requireDatePeriod($frame->calledArgs[0], 'DatePeriod::getDateInterval()');
         if (null === $frame->returnVar) {
             return;
