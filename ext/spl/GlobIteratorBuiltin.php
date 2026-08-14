@@ -378,6 +378,8 @@ final class GlobIteratorCount extends VmClassMethod
             GlobIteratorBuiltin::CLASS_LC,
             'GlobIterator::count()'
         );
+        // php-src zim_GlobIterator_count — ZEND_PARSE_PARAMETERS_NONE (#31010).
+        $this->requireExactUserArgCount($frame, 'GlobIterator::count', 0);
         if (null === $frame->returnVar) {
             return;
         }
