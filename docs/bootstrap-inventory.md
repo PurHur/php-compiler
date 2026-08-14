@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7444 |
-| Phase A inventory files (M2 ratio SSOT) | 7444 |
+| PHP files on vm.php path | 7448 |
+| Phase A inventory files (M2 ratio SSOT) | 7448 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23981 |
+| Source constructs flagged (warnings) | 23980 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -383,7 +383,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ElementGetAttributeNS.php` | 0 | 1 |
 | `ext/dom/ElementGetAttributeNames.php` | 0 | 1 |
 | `ext/dom/ElementGetAttributeNode.php` | 0 | 1 |
-| `ext/dom/ElementGetAttributeNodeNS.php` | 0 | 2 |
+| `ext/dom/ElementGetAttributeNodeNS.php` | 0 | 1 |
 | `ext/dom/ElementGetDescendantNamespaces.php` | 0 | 1 |
 | `ext/dom/ElementGetElementsByClassName.php` | 0 | 2 |
 | `ext/dom/ElementGetElementsByTagName.php` | 0 | 1 |
@@ -406,10 +406,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ElementSetAttribute.php` | 0 | 1 |
 | `ext/dom/ElementSetAttributeNS.php` | 0 | 1 |
 | `ext/dom/ElementSetAttributeNode.php` | 0 | 1 |
-| `ext/dom/ElementSetAttributeNodeNS.php` | 0 | 2 |
+| `ext/dom/ElementSetAttributeNodeNS.php` | 0 | 1 |
 | `ext/dom/ElementSetIdAttribute.php` | 0 | 1 |
 | `ext/dom/ElementSetIdAttributeNS.php` | 0 | 1 |
-| `ext/dom/ElementSetIdAttributeNode.php` | 0 | 2 |
+| `ext/dom/ElementSetIdAttributeNode.php` | 0 | 1 |
 | `ext/dom/ElementToggleAttribute.php` | 0 | 1 |
 | `ext/dom/EntityReferenceConstruct.php` | 0 | 2 |
 | `ext/dom/FragmentAppendChild.php` | 0 | 1 |
@@ -439,7 +439,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateDocumentFragment.php` | 0 | 3 |
 | `ext/dom/JitDomCreateDocumentType.php` | 0 | 4 |
 | `ext/dom/JitDomCreateElement.php` | 0 | 8 |
-| `ext/dom/JitDomCreateElementNS.php` | 0 | 6 |
+| `ext/dom/JitDomCreateElementNS.php` | 0 | 8 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
 | `ext/dom/JitDomDocumentDoctype.php` | 0 | 3 |
 | `ext/dom/JitDomDocumentElement.php` | 0 | 12 |
@@ -2401,7 +2401,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 25 |
 | `ext/spl/ArrayObjectBuiltin.php` | 0 | 24 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
-| `ext/spl/CachingIteratorBuiltin.php` | 0 | 23 |
+| `ext/spl/CachingIteratorBuiltin.php` | 0 | 22 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/DirectoryIteratorSnapshotJitHelper.php` | 0 | 1 |
@@ -2410,13 +2410,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/FilterIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/GlobIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/GlobIteratorSnapshotJitHelper.php` | 0 | 2 |
-| `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 7 |
+| `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 5 |
 | `ext/spl/InternalIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/InternalIteratorLiveHandler.php` | 0 | 1 |
 | `ext/spl/InternalIteratorSerializeDeny.php` | 0 | 3 |
 | `ext/spl/IteratorIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
-| `ext/spl/LimitIteratorBuiltin.php` | 0 | 10 |
+| `ext/spl/LimitIteratorBuiltin.php` | 0 | 9 |
 | `ext/spl/Module.php` | 0 | 2 |
 | `ext/spl/MultipleIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/ParentIteratorBuiltin.php` | 0 | 8 |
@@ -2600,6 +2600,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/DateIntervalFormatJitHelper.php` | 0 | 1 |
 | `ext/standard/DateMutationJitHelper.php` | 0 | 1 |
 | `ext/standard/DateTimeFormatJitHelper.php` | 0 | 1 |
+| `ext/standard/DefaultTimezoneCivilJitHelper.php` | 0 | 1 |
 | `ext/standard/DefaultTimezoneJitHelper.php` | 0 | 1 |
 | `ext/standard/DefineJitHelper.php` | 0 | 2 |
 | `ext/standard/Deg2radJitHelper.php` | 0 | 1 |
@@ -5446,6 +5447,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateMutationRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateTimeFormatRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/DefaultTimezoneCivilRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DefaultTimezoneRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DefineRuntime.php` | 0 | 6 |
 | `lib/JIT/Builtin/DirectoryIteratorSnapshotRuntime.php` | 0 | 1 |
@@ -5686,6 +5688,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PosixGetppidJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixGetuidJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixSessionRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/PosixSetegidJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/PosixSeteuidJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixSetgidJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixSetuidJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixStrerrorRuntime.php` | 0 | 1 |
@@ -9834,7 +9838,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/ElementGetAttributeNodeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
 - 1 class method(s)
 
 ### `ext/dom/ElementGetDescendantNamespaces.php`
@@ -9959,7 +9962,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/ElementSetAttributeNodeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/dom/ElementSetIdAttribute.php`
@@ -9975,7 +9977,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/ElementSetIdAttributeNode.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/dom/ElementToggleAttribute.php`
@@ -10185,11 +10186,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateElementNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 310)
-- new JITVariable (line 312)
-- new JITVariable (line 408)
-- new JITVariable (line 440)
-- new JITVariable (line 455)
+- new ArgumentCountError (line 38)
+- new ArgumentCountError (line 89)
+- new JITVariable (line 326)
+- new JITVariable (line 328)
+- new JITVariable (line 424)
+- new JITVariable (line 456)
+- new JITVariable (line 471)
 - 18 class method(s)
 
 ### `ext/dom/JitDomCreateTextNode.php`
@@ -11297,68 +11300,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 233)
 - new Variable (line 251)
 - new Variable (line 272)
-- new ArgumentCountError (line 338)
-- new Variable (line 347)
-- new Variable (line 360)
-- new Variable (line 374)
-- new Variable (line 389)
-- new Error (line 445)
-- new Variable (line 456)
-- new Variable (line 474)
-- new Variable (line 481)
-- new Error (line 487)
-- new Variable (line 507)
-- new Variable (line 519)
-- new Variable (line 531)
-- new Variable (line 543)
-- new Variable (line 555)
-- new Variable (line 583)
-- new Variable (line 595)
-- new ArgumentCountError (line 680)
-- new ArgumentCountError (line 685)
-- new Variable (line 713)
-- new Variable (line 735)
-- new Variable (line 754)
-- new Variable (line 778)
-- new Variable (line 834)
-- new Variable (line 892)
-- new Variable (line 924)
-- new Variable (line 951)
-- new ArgumentCountError (line 965)
-- new Variable (line 969)
-- new Variable (line 981)
-- new Variable (line 993)
-- new Variable (line 1005)
-- new Error (line 1020)
-- new Error (line 1032)
-- new Variable (line 1043)
-- new Error (line 1067)
-- new Variable (line 1071)
-- new Error (line 1090)
-- new Variable (line 1102)
-- new Variable (line 1120)
-- new Error (line 1137)
-- new Variable (line 1154)
-- new Variable (line 1177)
-- new Variable (line 1198)
-- new Variable (line 1225)
-- new ArgumentCountError (line 1240)
-- new Error (line 1253)
-- new Variable (line 1255)
-- new Variable (line 1281)
-- new Variable (line 1293)
-- new Variable (line 1313)
-- new Variable (line 1325)
-- new Variable (line 1399)
-- new Variable (line 1411)
-- new Variable (line 1428)
-- new Variable (line 1453)
-- new Variable (line 1496)
-- new ArgumentCountError (line 1559)
-- new ArgumentCountError (line 1567)
-- new ArgumentCountError (line 1575)
-- new ArgumentCountError (line 1578)
+- new ArgumentCountError (line 339)
+- new Variable (line 348)
+- new Variable (line 361)
+- new Variable (line 375)
+- new Variable (line 390)
+- new Error (line 446)
+- new Variable (line 457)
+- new Variable (line 475)
+- new Variable (line 482)
+- new Error (line 488)
+- new Variable (line 508)
+- new Variable (line 520)
+- new Variable (line 532)
+- new Variable (line 544)
+- new Variable (line 556)
+- new Variable (line 584)
+- new Variable (line 596)
+- new ArgumentCountError (line 681)
+- new ArgumentCountError (line 686)
+- new Variable (line 714)
+- new Variable (line 737)
+- new Variable (line 756)
+- new Variable (line 780)
+- new Variable (line 836)
+- new Variable (line 896)
+- new Variable (line 929)
+- new Variable (line 957)
+- new ArgumentCountError (line 971)
+- new Variable (line 975)
+- new Variable (line 987)
+- new Variable (line 999)
+- new Variable (line 1011)
+- new Error (line 1026)
+- new Error (line 1038)
+- new Variable (line 1049)
+- new Error (line 1073)
+- new Variable (line 1077)
+- new Error (line 1096)
+- new Variable (line 1108)
+- new Variable (line 1126)
+- new Error (line 1143)
+- new Variable (line 1160)
+- new Variable (line 1183)
+- new Variable (line 1204)
+- new Variable (line 1231)
+- new ArgumentCountError (line 1246)
+- new Error (line 1259)
+- new Variable (line 1261)
+- new Variable (line 1287)
+- new Variable (line 1299)
+- new Variable (line 1319)
+- new Variable (line 1331)
+- new Variable (line 1405)
+- new Variable (line 1417)
+- new Variable (line 1434)
+- new Variable (line 1459)
+- new Variable (line 1502)
+- new ArgumentCountError (line 1565)
+- new ArgumentCountError (line 1573)
+- new ArgumentCountError (line 1581)
 - new ArgumentCountError (line 1584)
+- new ArgumentCountError (line 1590)
 - 83 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
@@ -22886,7 +22889,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/JitPosix.php`
 
 **Warnings** (review for bootstrap subset):
-- 28 class method(s)
+- 26 class method(s)
 
 ### `ext/posix/JitPosixGetegidKernel.php`
 
@@ -23353,19 +23356,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/posix_setegid.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/posix/posix_seteuid.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/posix/posix_setgid.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/posix/posix_setpgid.php`
@@ -26769,7 +26772,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 144)
 - new ObjectEntry (line 148)
 - new Variable (line 151)
-- new ArgumentCountError (line 250)
+- new ArgumentCountError (line 252)
 - 22 class method(s)
 
 ### `ext/spl/ArrayIteratorBuiltin.php`
@@ -26798,7 +26801,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 168)
 - new Variable (line 170)
 - new Variable (line 174)
-- new HashTable (line 195)
+- new HashTable (line 197)
 - 26 class method(s)
 
 ### `ext/spl/ArrayObjectBuiltin.php`
@@ -26825,8 +26828,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 124)
 - new Variable (line 126)
 - new Variable (line 130)
-- new HashTable (line 151)
-- new ArgumentCountError (line 214)
+- new HashTable (line 153)
+- new ArgumentCountError (line 216)
 - 16 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -26853,12 +26856,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 544)
 - new Variable (line 550)
 - new BadMethodCallException (line 563)
-- new ArgumentCountError (line 610)
-- new ArgumentCountError (line 860)
-- new ArgumentCountError (line 972)
-- new ArgumentCountError (line 1002)
-- new ArgumentCountError (line 1033)
-- new ArgumentCountError (line 1062)
+- new ArgumentCountError (line 856)
+- new ArgumentCountError (line 968)
+- new ArgumentCountError (line 998)
+- new ArgumentCountError (line 1029)
+- new ArgumentCountError (line 1058)
 - 51 class method(s)
 
 ### `ext/spl/CallbackFilterIteratorBuiltin.php`
@@ -26964,8 +26966,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new InfiniteIteratorConstruct (line 43)
 - new ClassEntry (line 84)
 - new NoRewindIteratorConstruct (line 94)
-- new ArgumentCountError (line 135)
-- new ArgumentCountError (line 167)
 - 18 class method(s)
 
 ### `ext/spl/InternalIteratorBuiltin.php`
@@ -27030,8 +27030,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OutOfBoundsException (line 180)
 - new OutOfBoundsException (line 186)
 - new Variable (line 246)
-- new ArgumentCountError (line 299)
-- new ArgumentCountError (line 467)
+- new ArgumentCountError (line 463)
 - 26 class method(s)
 
 ### `ext/spl/Module.php`
@@ -27168,8 +27167,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplArraySortMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 39)
-- new ArgumentCountError (line 55)
+- new ArgumentCountError (line 40)
+- new ArgumentCountError (line 57)
 - 1 class method(s)
 
 ### `ext/spl/SplArrayStorage.php`
@@ -28593,6 +28592,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/standard/DefaultTimezoneCivilJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/DefaultTimezoneJitHelper.php`
 
@@ -30155,7 +30159,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/JitGethostbyaddr.php`
 
@@ -30382,7 +30386,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/JitImageTypeArg.php`
@@ -34594,9 +34598,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 643)
 - new HashTable (line 777)
 - new HashTable (line 817)
-- new Variable (line 1330)
-- new Variable (line 1337)
 - new Variable (line 1344)
+- new Variable (line 1351)
+- new Variable (line 1358)
 - 69 class method(s)
 
 ### `ext/standard/VmDateInterval.php`
@@ -34632,12 +34636,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 160)
-- new RecursiveIteratorIterator (line 4017)
-- new RecursiveDirectoryIterator (line 4018)
-- new RecursiveIteratorIterator (line 4124)
-- new RecursiveDirectoryIterator (line 4125)
-- 135 class method(s)
-- 13 closure(s)
+- new RecursiveIteratorIterator (line 4039)
+- new RecursiveDirectoryIterator (line 4040)
+- new RecursiveIteratorIterator (line 4146)
+- new RecursiveDirectoryIterator (line 4147)
+- 138 class method(s)
+- 14 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
 
@@ -35336,9 +35340,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInternalCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- new Frame (line 534)
-- new Variable (line 536)
-- new Variable (line 557)
+- new Frame (line 545)
+- new Variable (line 547)
+- new Variable (line 568)
 - 47 class method(s)
 
 ### `ext/standard/VmIptc.php`
@@ -48055,6 +48059,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/DefaultTimezoneCivilRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
 ### `lib/JIT/Builtin/DefaultTimezoneRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49316,6 +49325,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/Builtin/PosixSetegidJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/PosixSeteuidJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/PosixSetgidJit.php`
 
@@ -53155,229 +53174,229 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 753)
 - new Scope (line 773)
 - new Call\ExternalMethod (line 828)
-- new Builtin\IsNullFn (line 1242)
-- new Builtin\IsNullFn (line 1243)
-- new Call\SplObjectStorageMethod (line 1244)
-- new Call\SplObjectStorageMethod (line 1245)
-- new Call\SplObjectStorageMethod (line 1246)
-- new Call\SplObjectStorageMethod (line 1247)
-- new Call\SplObjectStorageMethod (line 1248)
-- new Call\SplObjectStorageMethod (line 1249)
-- new Call\SplObjectStorageMethod (line 1251)
-- new Call\SplObjectStorageMethod (line 1252)
-- new Call\SplObjectStorageMethod (line 1253)
-- new Call\SplObjectStorageMethod (line 1254)
-- new Call\SplObjectStorageMethod (line 1255)
+- new Builtin\IsNullFn (line 1254)
+- new Builtin\IsNullFn (line 1255)
 - new Call\SplObjectStorageMethod (line 1256)
 - new Call\SplObjectStorageMethod (line 1257)
-- new Call\ArrayIteratorConstruct (line 1259)
-- new Call\ArrayIteratorConstruct (line 1260)
-- new Call\ArrayIteratorConstruct (line 1265)
-- new Call\ArrayObjectMethod (line 1267)
-- new Call\RecursiveIteratorIteratorConstruct (line 1270)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 1272)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 1273)
-- new Call\RecursiveIteratorIteratorArgcMethod (line 1274)
-- new Call\LimitIteratorConstruct (line 1280)
-- new Call\AppendIteratorMethod (line 1281)
-- new Call\AppendIteratorMethod (line 1282)
-- new Call\RegexIteratorConstruct (line 1283)
-- new Call\CallbackFilterIteratorConstruct (line 1284)
-- new Call\CachingIteratorConstruct (line 1286)
-- new Call\CachingIteratorGetCache (line 1287)
-- new Call\SplHtPosIteratorMethod (line 1292)
-- new Call\SplHtPosIteratorMethod (line 1298)
-- new Call\EmptyIteratorMethod (line 1310)
-- new Call\FilterIteratorMethod (line 1319)
-- new Call\ParentIteratorConstruct (line 1327)
-- new Call\ParentIteratorArgcMethod (line 1329)
-- new Call\ParentIteratorArgcMethod (line 1333)
-- new Call\MultipleIteratorMethod (line 1337)
-- new Call\MultipleIteratorMethod (line 1338)
-- new Call\RecursiveTreeIteratorConstruct (line 1339)
-- new Call\DirectoryMethod (line 1343)
-- new Call\DirectoryIteratorMethod (line 1357)
-- new Call\DirectoryIteratorMethod (line 1363)
-- new Call\SplFileObjectMethod (line 1369)
-- new Call\GlobIteratorMethod (line 1376)
-- new Call\SplHeapMethod (line 1390)
-- new Call\SplPriorityQueueMethod (line 1399)
-- new Call\SplDllistMethod (line 1412)
-- new Call\SplFixedArrayMethod (line 1422)
-- new Call\WeakReferenceCreate (line 1425)
-- new Call\WeakReferenceGet (line 1426)
-- new Call\SensitiveParameterValueConstruct (line 1427)
-- new Call\SensitiveParameterValueGetValue (line 1428)
-- new Call\WeakMapMethod (line 1429)
-- new Call\WeakMapMethod (line 1430)
-- new Call\WeakMapMethod (line 1431)
-- new Call\WeakMapMethod (line 1432)
-- new Call\WeakMapMethod (line 1433)
-- new Call\PhpTokenConstruct (line 1436)
-- new Call\PhpTokenTokenize (line 1437)
-- new Call\PhpTokenGetTokenName (line 1438)
-- new Call\BcMathNumberConstruct (line 1441)
-- new Call\BcMathNumberToString (line 1442)
-- new Call\BcMathNumberMethod (line 1445)
-- new Call\ReflectionClassConstruct (line 1449)
-- new Call\ReflectionObjectConstruct (line 1450)
-- new Call\ReflectionClassGetName (line 1451)
-- new Call\ReflectionClassGetShortName (line 1452)
-- new Call\ReflectionClassGetAttributes (line 1453)
-- new Call\ReflectionClassGetMethod (line 1454)
-- new Call\ReflectionClassGetProperty (line 1455)
-- new Call\ReflectionClassGetReflectionConstant (line 1456)
-- new Call\ReflectionClassIsFinal (line 1457)
-- new Call\ReflectionClassIsIterateable (line 1458)
-- new Call\ReflectionClassIsIterateable (line 1459)
-- new Call\ReflectionClassNewLazyProxy (line 1461)
-- new Call\ReflectionClassNewLazyGhost (line 1462)
-- new Call\ReflectionPropertyConstruct (line 1465)
-- new Call\ReflectionPropertyGetAttributes (line 1466)
-- new Call\ReflectionPropertyIsFinal (line 1467)
-- new Call\ReflectionPropertyIsVirtual (line 1468)
-- new Call\ReflectionPropertyGetRawValue (line 1469)
-- new Call\ReflectionPropertySetRawValue (line 1470)
-- new Call\ReflectionSetAccessible (line 1472)
-- new Call\ReflectionPropertyGetValue (line 1473)
-- new Call\ReflectionPropertySetValue (line 1474)
-- new Call\ReflectionSetAccessible (line 1475)
-- new Call\ReflectionMethodInvoke (line 1476)
-- new Call\ReflectionPropertyGetMangledName (line 1478)
-- new Call\ReflectionConstantConstruct (line 1481)
-- new Call\ReflectionConstantGetName (line 1482)
-- new Call\ReflectionConstantGetValue (line 1483)
-- new Call\ReflectionConstantGetAttributes (line 1486)
-- new Call\ReflectionClassConstantGetAttributes (line 1489)
-- new Call\ReflectionMethodGetAttributes (line 1490)
-- new Call\ReflectionFunctionConstruct (line 1491)
-- new Call\ReflectionFunctionGetName (line 1492)
-- new Call\ReflectionFunctionIsVariadic (line 1493)
-- new Call\ReflectionParameterIsSensitiveParameter (line 1495)
-- new Call\ReflectionFunctionGetNamedArguments (line 1498)
-- new Call\ReflectionMethodGetNamedArguments (line 1499)
-- new Call\ReflectionAttributeGetName (line 1501)
-- new Call\ReflectionAttributeGetTarget (line 1502)
-- new Call\ReflectionAttributeNewInstance (line 1503)
-- new Call\ReflectionEnumConstruct (line 1504)
-- new Call\ReflectionEnumGetName (line 1505)
-- new Call\ReflectionEnumHasCase (line 1506)
-- new Call\ReflectionEnumGetCase (line 1507)
-- new Call\ReflectionEnumGetCases (line 1508)
-- new Call\ReflectionEnumIsBacked (line 1509)
-- new Call\ReflectionEnumGetBackingType (line 1510)
-- new Call\ReflectionEnumUnitCaseGetName (line 1511)
-- new Call\ReflectionEnumUnitCaseGetName (line 1512)
-- new Call\ReflectionEnumUnitCaseGetValue (line 1513)
-- new Call\ReflectionNamedTypeGetName (line 1516)
-- new Call\ExceptionGetMessage (line 1517)
-- new Call\ExceptionGetCode (line 1518)
-- new Call\ExceptionToString (line 1519)
-- new Call\ExceptionGetTrace (line 1520)
-- new Call\ExceptionGetTraceAsString (line 1521)
-- new Call\ExceptionGetFile (line 1522)
-- new Call\ExceptionGetLine (line 1523)
-- new Call\ExceptionGetPrevious (line 1524)
-- new Call\ExceptionConstruct (line 1548)
-- new Call\ExceptionGetTrace (line 1560)
-- new Call\ExceptionGetTraceAsString (line 1563)
-- new Call\ExceptionGetMessage (line 1566)
-- new Call\ExceptionGetCode (line 1569)
-- new Call\ExceptionGetFile (line 1572)
-- new Call\ExceptionGetLine (line 1575)
-- new Call\ExceptionGetPrevious (line 1578)
-- new Call\ExceptionGetMessage (line 1582)
-- new Call\ExceptionGetCode (line 1583)
-- new Call\ExceptionGetTrace (line 1585)
-- new Call\ExceptionGetTraceAsString (line 1586)
-- new Call\ExceptionGetFile (line 1587)
-- new Call\ExceptionGetLine (line 1588)
-- new Call\ExceptionGetPrevious (line 1589)
-- new Call\DateTimeConstruct (line 1595)
-- new Call\DateTimeImmutableConstruct (line 1596)
-- new Call\DateTimeZoneConstruct (line 1597)
-- new Call\DateIntervalConstruct (line 1598)
-- new Call\DatePeriodConstruct (line 1599)
-- new Call\DatePeriodCreateFromISO8601String (line 1601)
-- new Call\DatePeriodIteratorMethod (line 1603)
-- new Call\DatePeriodAccessorMethod (line 1608)
-- new Call\DateTimeFormat (line 1610)
-- new Call\DateTimeFormat (line 1611)
-- new Call\DateTimeCreateFromFormat (line 1613)
-- new Call\DateTimeCreateFromFormat (line 1614)
-- new Call\DateTimeCreateFromInterface (line 1616)
-- new Call\DateTimeCreateFromInterface (line 1617)
-- new Call\DateTimeCreateFromImmutable (line 1618)
-- new Call\DateTimeImmutableCreateFromMutable (line 1619)
-- new Call\DateTimeCreateFromTimestamp (line 1622)
-- new Call\DateTimeCreateFromTimestamp (line 1623)
-- new Call\DateTimeGetMicrosecond (line 1627)
-- new Call\DateTimeGetMicrosecond (line 1628)
-- new Call\DateTimeSetMicrosecond (line 1629)
-- new Call\DateTimeSetMicrosecond (line 1630)
-- new Call\DateIntervalCreateFromDateString (line 1633)
-- new Call\DateTimeSetTimezone (line 1635)
-- new Call\DateTimeGetTimezone (line 1636)
-- new Call\DateTimeGetTimezone (line 1637)
-- new Call\DateTimeGetOffset (line 1640)
-- new Call\DateTimeGetOffset (line 1641)
+- new Call\SplObjectStorageMethod (line 1258)
+- new Call\SplObjectStorageMethod (line 1259)
+- new Call\SplObjectStorageMethod (line 1260)
+- new Call\SplObjectStorageMethod (line 1261)
+- new Call\SplObjectStorageMethod (line 1263)
+- new Call\SplObjectStorageMethod (line 1264)
+- new Call\SplObjectStorageMethod (line 1265)
+- new Call\SplObjectStorageMethod (line 1266)
+- new Call\SplObjectStorageMethod (line 1267)
+- new Call\SplObjectStorageMethod (line 1268)
+- new Call\SplObjectStorageMethod (line 1269)
+- new Call\ArrayIteratorConstruct (line 1271)
+- new Call\ArrayIteratorConstruct (line 1272)
+- new Call\ArrayIteratorConstruct (line 1277)
+- new Call\ArrayObjectMethod (line 1279)
+- new Call\RecursiveIteratorIteratorConstruct (line 1282)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 1284)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 1285)
+- new Call\RecursiveIteratorIteratorArgcMethod (line 1286)
+- new Call\LimitIteratorConstruct (line 1292)
+- new Call\AppendIteratorMethod (line 1293)
+- new Call\AppendIteratorMethod (line 1294)
+- new Call\RegexIteratorConstruct (line 1295)
+- new Call\CallbackFilterIteratorConstruct (line 1296)
+- new Call\CachingIteratorConstruct (line 1298)
+- new Call\CachingIteratorGetCache (line 1299)
+- new Call\SplHtPosIteratorMethod (line 1304)
+- new Call\SplHtPosIteratorMethod (line 1310)
+- new Call\EmptyIteratorMethod (line 1322)
+- new Call\FilterIteratorMethod (line 1331)
+- new Call\ParentIteratorConstruct (line 1339)
+- new Call\ParentIteratorArgcMethod (line 1341)
+- new Call\ParentIteratorArgcMethod (line 1345)
+- new Call\MultipleIteratorMethod (line 1349)
+- new Call\MultipleIteratorMethod (line 1350)
+- new Call\RecursiveTreeIteratorConstruct (line 1351)
+- new Call\DirectoryMethod (line 1355)
+- new Call\DirectoryIteratorMethod (line 1369)
+- new Call\DirectoryIteratorMethod (line 1375)
+- new Call\SplFileObjectMethod (line 1381)
+- new Call\GlobIteratorMethod (line 1388)
+- new Call\SplHeapMethod (line 1402)
+- new Call\SplPriorityQueueMethod (line 1411)
+- new Call\SplDllistMethod (line 1424)
+- new Call\SplFixedArrayMethod (line 1434)
+- new Call\WeakReferenceCreate (line 1437)
+- new Call\WeakReferenceGet (line 1438)
+- new Call\SensitiveParameterValueConstruct (line 1439)
+- new Call\SensitiveParameterValueGetValue (line 1440)
+- new Call\WeakMapMethod (line 1441)
+- new Call\WeakMapMethod (line 1442)
+- new Call\WeakMapMethod (line 1443)
+- new Call\WeakMapMethod (line 1444)
+- new Call\WeakMapMethod (line 1445)
+- new Call\PhpTokenConstruct (line 1448)
+- new Call\PhpTokenTokenize (line 1449)
+- new Call\PhpTokenGetTokenName (line 1450)
+- new Call\BcMathNumberConstruct (line 1453)
+- new Call\BcMathNumberToString (line 1454)
+- new Call\BcMathNumberMethod (line 1457)
+- new Call\ReflectionClassConstruct (line 1461)
+- new Call\ReflectionObjectConstruct (line 1462)
+- new Call\ReflectionClassGetName (line 1463)
+- new Call\ReflectionClassGetShortName (line 1464)
+- new Call\ReflectionClassGetAttributes (line 1465)
+- new Call\ReflectionClassGetMethod (line 1466)
+- new Call\ReflectionClassGetProperty (line 1467)
+- new Call\ReflectionClassGetReflectionConstant (line 1468)
+- new Call\ReflectionClassIsFinal (line 1469)
+- new Call\ReflectionClassIsIterateable (line 1470)
+- new Call\ReflectionClassIsIterateable (line 1471)
+- new Call\ReflectionClassNewLazyProxy (line 1473)
+- new Call\ReflectionClassNewLazyGhost (line 1474)
+- new Call\ReflectionPropertyConstruct (line 1477)
+- new Call\ReflectionPropertyGetAttributes (line 1478)
+- new Call\ReflectionPropertyIsFinal (line 1479)
+- new Call\ReflectionPropertyIsVirtual (line 1480)
+- new Call\ReflectionPropertyGetRawValue (line 1481)
+- new Call\ReflectionPropertySetRawValue (line 1482)
+- new Call\ReflectionSetAccessible (line 1484)
+- new Call\ReflectionPropertyGetValue (line 1485)
+- new Call\ReflectionPropertySetValue (line 1486)
+- new Call\ReflectionSetAccessible (line 1487)
+- new Call\ReflectionMethodInvoke (line 1488)
+- new Call\ReflectionPropertyGetMangledName (line 1490)
+- new Call\ReflectionConstantConstruct (line 1493)
+- new Call\ReflectionConstantGetName (line 1494)
+- new Call\ReflectionConstantGetValue (line 1495)
+- new Call\ReflectionConstantGetAttributes (line 1498)
+- new Call\ReflectionClassConstantGetAttributes (line 1501)
+- new Call\ReflectionMethodGetAttributes (line 1502)
+- new Call\ReflectionFunctionConstruct (line 1503)
+- new Call\ReflectionFunctionGetName (line 1504)
+- new Call\ReflectionFunctionIsVariadic (line 1505)
+- new Call\ReflectionParameterIsSensitiveParameter (line 1507)
+- new Call\ReflectionFunctionGetNamedArguments (line 1510)
+- new Call\ReflectionMethodGetNamedArguments (line 1511)
+- new Call\ReflectionAttributeGetName (line 1513)
+- new Call\ReflectionAttributeGetTarget (line 1514)
+- new Call\ReflectionAttributeNewInstance (line 1515)
+- new Call\ReflectionEnumConstruct (line 1516)
+- new Call\ReflectionEnumGetName (line 1517)
+- new Call\ReflectionEnumHasCase (line 1518)
+- new Call\ReflectionEnumGetCase (line 1519)
+- new Call\ReflectionEnumGetCases (line 1520)
+- new Call\ReflectionEnumIsBacked (line 1521)
+- new Call\ReflectionEnumGetBackingType (line 1522)
+- new Call\ReflectionEnumUnitCaseGetName (line 1523)
+- new Call\ReflectionEnumUnitCaseGetName (line 1524)
+- new Call\ReflectionEnumUnitCaseGetValue (line 1525)
+- new Call\ReflectionNamedTypeGetName (line 1528)
+- new Call\ExceptionGetMessage (line 1529)
+- new Call\ExceptionGetCode (line 1530)
+- new Call\ExceptionToString (line 1531)
+- new Call\ExceptionGetTrace (line 1532)
+- new Call\ExceptionGetTraceAsString (line 1533)
+- new Call\ExceptionGetFile (line 1534)
+- new Call\ExceptionGetLine (line 1535)
+- new Call\ExceptionGetPrevious (line 1536)
+- new Call\ExceptionConstruct (line 1560)
+- new Call\ExceptionGetTrace (line 1572)
+- new Call\ExceptionGetTraceAsString (line 1575)
+- new Call\ExceptionGetMessage (line 1578)
+- new Call\ExceptionGetCode (line 1581)
+- new Call\ExceptionGetFile (line 1584)
+- new Call\ExceptionGetLine (line 1587)
+- new Call\ExceptionGetPrevious (line 1590)
+- new Call\ExceptionGetMessage (line 1594)
+- new Call\ExceptionGetCode (line 1595)
+- new Call\ExceptionGetTrace (line 1597)
+- new Call\ExceptionGetTraceAsString (line 1598)
+- new Call\ExceptionGetFile (line 1599)
+- new Call\ExceptionGetLine (line 1600)
+- new Call\ExceptionGetPrevious (line 1601)
+- new Call\DateTimeConstruct (line 1607)
+- new Call\DateTimeImmutableConstruct (line 1608)
+- new Call\DateTimeZoneConstruct (line 1609)
+- new Call\DateIntervalConstruct (line 1610)
+- new Call\DatePeriodConstruct (line 1611)
+- new Call\DatePeriodCreateFromISO8601String (line 1613)
+- new Call\DatePeriodIteratorMethod (line 1615)
+- new Call\DatePeriodAccessorMethod (line 1620)
+- new Call\DateTimeFormat (line 1622)
+- new Call\DateTimeFormat (line 1623)
+- new Call\DateTimeCreateFromFormat (line 1625)
+- new Call\DateTimeCreateFromFormat (line 1626)
+- new Call\DateTimeCreateFromInterface (line 1628)
+- new Call\DateTimeCreateFromInterface (line 1629)
+- new Call\DateTimeCreateFromImmutable (line 1630)
+- new Call\DateTimeImmutableCreateFromMutable (line 1631)
+- new Call\DateTimeCreateFromTimestamp (line 1634)
+- new Call\DateTimeCreateFromTimestamp (line 1635)
+- new Call\DateTimeGetMicrosecond (line 1639)
+- new Call\DateTimeGetMicrosecond (line 1640)
+- new Call\DateTimeSetMicrosecond (line 1641)
+- new Call\DateTimeSetMicrosecond (line 1642)
+- new Call\DateIntervalCreateFromDateString (line 1645)
 - new Call\DateTimeSetTimezone (line 1647)
-- new Call\DateTimeGetTimestamp (line 1651)
-- new Call\DateTimeGetTimestamp (line 1652)
-- new Call\DateTimeSetTimestamp (line 1653)
-- new Call\DateTimeSetTimestamp (line 1655)
-- new Call\DateTimeSetDate (line 1658)
-- new Call\DateTimeSetDate (line 1659)
-- new Call\DateTimeSetTime (line 1660)
-- new Call\DateTimeSetTime (line 1661)
-- new Call\DateTimeSetISODate (line 1662)
-- new Call\DateTimeSetISODate (line 1663)
-- new Call\DateTimeGetLastErrors (line 1665)
-- new Call\DateTimeGetLastErrors (line 1666)
-- new Call\DateTimeModify (line 1669)
-- new Call\DateTimeModify (line 1670)
-- new Call\DateTimeAdd (line 1673)
-- new Call\DateTimeAdd (line 1674)
-- new Call\DateTimeSub (line 1675)
-- new Call\DateTimeSub (line 1676)
-- new Call\DateTimeDiff (line 1678)
-- new Call\DateTimeDiff (line 1679)
-- new Call\DateTimeZoneGetTransitions (line 1681)
-- new Call\DateTimeZoneGetName (line 1683)
-- new Call\DateTimeZoneGetOffset (line 1685)
-- new Call\DateTimeZoneListIdentifiers (line 1687)
-- new Call\DateTimeZoneListAbbreviations (line 1689)
-- new Call\NumberFormatterCreate (line 1695)
-- new Call\NumberFormatterFormat (line 1696)
-- new Call\IntlDateFormatterCreate (line 1698)
-- new Call\IntlDateFormatterFormat (line 1699)
-- new Call\CollatorCompare (line 1701)
-- new Call\NormalizerNormalize (line 1703)
-- new Call\MessageFormatterConstruct (line 1705)
-- new Call\MessageFormatterFormat (line 1706)
-- new Call\TransliteratorCreate (line 1708)
-- new Call\TransliteratorTransliterate (line 1709)
-- new Call\FinfoConstruct (line 1711)
-- new Call\FinfoFile (line 1712)
-- new Call\FinfoBuffer (line 1713)
-- new Call\PdoConstruct (line 1715)
-- new Call\PdoGetAvailableDrivers (line 1716)
-- new Call\PdoQuote (line 1717)
-- new Call\DomXmlDocumentCreateFromString (line 1720)
-- new Call\DomHtmlDocumentCreateFromString (line 1721)
-- new Result (line 2100)
-- new Result (line 2122)
-- new Variable (line 2800)
-- new Variable (line 2990)
-- new Variable (line 3255)
-- new Variable (line 3313)
-- new VMVariable (line 3475)
-- new VMVariable (line 3491)
-- new VMVariable (line 3497)
+- new Call\DateTimeGetTimezone (line 1648)
+- new Call\DateTimeGetTimezone (line 1649)
+- new Call\DateTimeGetOffset (line 1652)
+- new Call\DateTimeGetOffset (line 1653)
+- new Call\DateTimeSetTimezone (line 1659)
+- new Call\DateTimeGetTimestamp (line 1663)
+- new Call\DateTimeGetTimestamp (line 1664)
+- new Call\DateTimeSetTimestamp (line 1665)
+- new Call\DateTimeSetTimestamp (line 1667)
+- new Call\DateTimeSetDate (line 1670)
+- new Call\DateTimeSetDate (line 1671)
+- new Call\DateTimeSetTime (line 1672)
+- new Call\DateTimeSetTime (line 1673)
+- new Call\DateTimeSetISODate (line 1674)
+- new Call\DateTimeSetISODate (line 1675)
+- new Call\DateTimeGetLastErrors (line 1677)
+- new Call\DateTimeGetLastErrors (line 1678)
+- new Call\DateTimeModify (line 1681)
+- new Call\DateTimeModify (line 1682)
+- new Call\DateTimeAdd (line 1685)
+- new Call\DateTimeAdd (line 1686)
+- new Call\DateTimeSub (line 1687)
+- new Call\DateTimeSub (line 1688)
+- new Call\DateTimeDiff (line 1690)
+- new Call\DateTimeDiff (line 1691)
+- new Call\DateTimeZoneGetTransitions (line 1693)
+- new Call\DateTimeZoneGetName (line 1695)
+- new Call\DateTimeZoneGetOffset (line 1697)
+- new Call\DateTimeZoneListIdentifiers (line 1699)
+- new Call\DateTimeZoneListAbbreviations (line 1701)
+- new Call\NumberFormatterCreate (line 1707)
+- new Call\NumberFormatterFormat (line 1708)
+- new Call\IntlDateFormatterCreate (line 1710)
+- new Call\IntlDateFormatterFormat (line 1711)
+- new Call\CollatorCompare (line 1713)
+- new Call\NormalizerNormalize (line 1715)
+- new Call\MessageFormatterConstruct (line 1717)
+- new Call\MessageFormatterFormat (line 1718)
+- new Call\TransliteratorCreate (line 1720)
+- new Call\TransliteratorTransliterate (line 1721)
+- new Call\FinfoConstruct (line 1723)
+- new Call\FinfoFile (line 1724)
+- new Call\FinfoBuffer (line 1725)
+- new Call\PdoConstruct (line 1727)
+- new Call\PdoGetAvailableDrivers (line 1728)
+- new Call\PdoQuote (line 1729)
+- new Call\DomXmlDocumentCreateFromString (line 1732)
+- new Call\DomHtmlDocumentCreateFromString (line 1733)
+- new Result (line 2112)
+- new Result (line 2134)
+- new Variable (line 2812)
+- new Variable (line 3002)
+- new Variable (line 3267)
+- new Variable (line 3325)
+- new VMVariable (line 3487)
 - new VMVariable (line 3503)
-- new VMVariable (line 3514)
-- new Variable (line 3544)
-- new Variable (line 3589)
+- new VMVariable (line 3509)
+- new VMVariable (line 3515)
+- new VMVariable (line 3526)
+- new Variable (line 3556)
+- new Variable (line 3601)
 - 112 class method(s)
 - 33 closure(s)
 
