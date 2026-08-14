@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMImplementation::createDocument() — VM (#6140). */
+/**
+ * DOMImplementation::createDocument() — VM (#6140).
+ *
+ * At most 3 user args — Zend ArgumentCountError (#31090; missed by #31011).
+ */
 final class ImplementationCreateDocument extends DomClassMethod
 {
     public function __construct()
@@ -17,6 +21,7 @@ final class ImplementationCreateDocument extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtMostUserArgCount($frame, 'DOMImplementation::createDocument', 3);
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMImplementation::createDocument() requires VM context');
         }

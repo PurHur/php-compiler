@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMImplementation::hasFeature() — VM (#6140). */
+/**
+ * DOMImplementation::hasFeature() — VM (#6140).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31090; missed by #31011).
+ */
 final class ImplementationHasFeature extends DomClassMethod
 {
     public function __construct()
@@ -16,9 +20,7 @@ final class ImplementationHasFeature extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMImplementation::hasFeature() expects exactly 2 arguments');
-        }
+        $this->requireExactUserArgCount($frame, 'DOMImplementation::hasFeature', 2);
         self::receiver($frame, VmDom::CLASS_IMPLEMENTATION, 'DOMImplementation::hasFeature()');
         $feature = $this->stringArg($frame->calledArgs[1], 'DOMImplementation::hasFeature()', 0);
         $version = $this->stringArg($frame->calledArgs[2], 'DOMImplementation::hasFeature()', 1);
