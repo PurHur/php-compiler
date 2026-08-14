@@ -1429,6 +1429,7 @@ class Context {
         $this->functionProxies['reflectionclass::getshortname'] = new Call\ReflectionClassGetShortName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
+        $this->functionProxies['reflectionclass::getproperty'] = new Call\ReflectionClassGetProperty();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
         $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
@@ -1444,6 +1445,12 @@ class Context {
         $this->functionProxies['reflectionproperty::isvirtual'] = new Call\ReflectionPropertyIsVirtual();
         $this->functionProxies['reflectionproperty::getrawvalue'] = new Call\ReflectionPropertyGetRawValue();
         $this->functionProxies['reflectionproperty::setrawvalue'] = new Call\ReflectionPropertySetRawValue();
+        // Thin AOT: avoid undefined setaccessible / null invoke (#30910).
+        $this->functionProxies['reflectionproperty::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionProperty');
+        $this->functionProxies['reflectionproperty::getvalue'] = new Call\ReflectionPropertyGetValue();
+        $this->functionProxies['reflectionproperty::setvalue'] = new Call\ReflectionPropertySetValue();
+        $this->functionProxies['reflectionmethod::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionMethod');
+        $this->functionProxies['reflectionmethod::invoke'] = new Call\ReflectionMethodInvoke();
         if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {
             $this->functionProxies['reflectionproperty::getmangledname'] = new Call\ReflectionPropertyGetMangledName();
         }
