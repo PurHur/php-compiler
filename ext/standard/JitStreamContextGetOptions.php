@@ -16,12 +16,7 @@ final class JitStreamContextGetOptions
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException(
-                'stream_context_get_options() requires exactly one argument in this compiler build'
-            );
-        }
-
+        // Arity checked by stream_context_get_options::call via requireExactJitArgCount (#30785).
         StreamContextRuntime::ensureLinked($context);
 
         JitStreamContextRequiredArg::validate($context, $args[0], 'stream_context_get_options', 1);
