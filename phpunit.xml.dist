@@ -456,6 +456,8 @@
             <file>./test/compliance/ZlibStreamExcessArgc30830JITTest.php</file>
             <file>./test/compliance/DateStaticExcessArgc30898VMTest.php</file>
             <file>./test/compliance/DateStaticExcessArgc30898JITTest.php</file>
+            <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994VMTest.php</file>
+            <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994JITTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934VMTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934JITTest.php</file>
             <file>./test/compliance/SplFileInfoPathExcessArgc30935VMTest.php</file>

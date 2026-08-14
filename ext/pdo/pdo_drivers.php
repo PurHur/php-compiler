@@ -6,13 +6,15 @@ namespace PHPCompiler\ext\pdo;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * pdo_drivers() — procedural alias of PDO::getAvailableDrivers (php-src ext/pdo/pdo.c; #20239).
+ * pdo_drivers() — procedural alias of PDO::getAvailableDrivers (php-src ext/pdo/pdo.c; #20239, #30994).
  */
 final class pdo_drivers extends Internal
 {
@@ -23,13 +25,7 @@ final class pdo_drivers extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if (0 !== $argc) {
-            throw new \ArgumentCountError(\sprintf(
-                'pdo_drivers() expects exactly 0 arguments, %d given',
-                $argc
-            ));
-        }
+        $this->requireExactArgCount($frame, 'pdo_drivers', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,11 +35,16 @@ final class pdo_drivers extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // Catchable ArgumentCountError under AOT try/catch (#30994; peer #30898).
         if (0 !== $argc) {
-            throw new \ArgumentCountError(\sprintf(
-                'pdo_drivers() expects exactly 0 arguments, %d given',
-                $argc
-            ));
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('pdo_drivers() expects exactly 0 arguments, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'pdo_drivers_argc_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $ht = VmPDO::availableDriversHashTable();
         $cacheKey = 'pdo_drivers_'
