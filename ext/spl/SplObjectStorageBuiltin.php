@@ -552,12 +552,8 @@ final class SplObjectStorageAttach extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::attach()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::attach() expects at least 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 2) — #30954
+        $this->requireUserArgCountRange($frame, 'SplObjectStorage::attach', 1, 2);
         $info = isset($frame->calledArgs[2]) ? $frame->calledArgs[2] : null;
         SplObjectStorageBuiltin::attach($object, $frame->calledArgs[1], $info);
     }
@@ -690,12 +686,8 @@ final class SplObjectStorageContains extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::contains()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::contains() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30954
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::contains', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -820,12 +812,8 @@ final class SplObjectStorageDetach extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::detach()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::detach() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30954
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::detach', 1);
         SplObjectStorageBuiltin::detach($object, $frame->calledArgs[1]);
     }
 }
@@ -967,12 +955,8 @@ final class SplObjectStorageSetInfo extends VmClassMethod
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::setInfo()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplObjectStorage::setInfo() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30954
+        $this->requireExactUserArgCount($frame, 'SplObjectStorage::setInfo', 1);
         SplObjectStorageBuiltin::setInfo($object, $frame->calledArgs[1]);
     }
 }

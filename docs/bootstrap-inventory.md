@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7434 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23985 |
+| Source constructs flagged (warnings) | 23974 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -558,7 +558,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDom.php` | 0 | 408 |
 | `ext/dom/VmDomCollectionDimension.php` | 0 | 1 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
-| `ext/dom/VmDomJitDispatch.php` | 0 | 67 |
+| `ext/dom/VmDomJitDispatch.php` | 0 | 73 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
 | `ext/dom/VmDomLiving.php` | 0 | 21 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
@@ -2391,7 +2391,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_unpad.php` | 0 | 1 |
 | `ext/spl/AppendIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 32 |
-| `ext/spl/ArrayObjectBuiltin.php` | 0 | 28 |
+| `ext/spl/ArrayObjectBuiltin.php` | 0 | 24 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 23 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
@@ -2410,7 +2410,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/Module.php` | 0 | 2 |
-| `ext/spl/MultipleIteratorBuiltin.php` | 0 | 18 |
+| `ext/spl/MultipleIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/ParentIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 9 |
 | `ext/spl/RecursiveCachingIteratorBuiltin.php` | 0 | 8 |
@@ -2435,7 +2435,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplHeapBuiltin.php` | 0 | 47 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 3 |
 | `ext/spl/SplLegacySerializableMethods.php` | 0 | 6 |
-| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 39 |
+| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 35 |
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 11 |
 | `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 8 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
@@ -5320,7 +5320,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 151 |
+| `lib/JIT.php` | 0 | 152 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
@@ -6072,7 +6072,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call.php` | 0 | 1 |
 | `lib/JIT/Call/AppendIteratorMethod.php` | 0 | 6 |
 | `lib/JIT/Call/ArrayIteratorConstruct.php` | 0 | 7 |
-| `lib/JIT/Call/ArrayObjectMethod.php` | 0 | 8 |
+| `lib/JIT/Call/ArrayObjectMethod.php` | 0 | 3 |
 | `lib/JIT/Call/BcMathNumberConstruct.php` | 0 | 2 |
 | `lib/JIT/Call/BcMathNumberMethod.php` | 0 | 1 |
 | `lib/JIT/Call/BcMathNumberToString.php` | 0 | 1 |
@@ -6248,7 +6248,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/LimitIteratorConstruct.php` | 0 | 5 |
 | `lib/JIT/Call/MessageFormatterConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/MessageFormatterFormat.php` | 0 | 1 |
-| `lib/JIT/Call/MultipleIteratorMethod.php` | 0 | 7 |
+| `lib/JIT/Call/MultipleIteratorMethod.php` | 0 | 6 |
 | `lib/JIT/Call/Native.php` | 0 | 4 |
 | `lib/JIT/Call/NestedClosureInvoke.php` | 0 | 2 |
 | `lib/JIT/Call/NestedJitCompileScopeIsActiveTrue.php` | 0 | 1 |
@@ -11271,7 +11271,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomInstanceInvoke.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 126)
+- new Error (line 130)
 - 6 class method(s)
 
 ### `ext/dom/VmDomJitDispatch.php`
@@ -11289,61 +11289,67 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 272)
 - new ArgumentCountError (line 338)
 - new Variable (line 347)
-- new ArgumentCountError (line 359)
-- new Variable (line 364)
-- new Variable (line 387)
-- new Variable (line 399)
-- new Variable (line 411)
-- new Variable (line 423)
-- new Variable (line 435)
-- new Variable (line 463)
-- new Variable (line 475)
-- new ArgumentCountError (line 560)
-- new ArgumentCountError (line 565)
-- new Variable (line 593)
-- new Variable (line 615)
-- new Variable (line 634)
-- new Variable (line 657)
+- new Variable (line 360)
+- new Variable (line 374)
+- new Variable (line 389)
+- new Error (line 445)
+- new Variable (line 456)
+- new Variable (line 474)
+- new Variable (line 481)
+- new Error (line 487)
+- new Variable (line 507)
+- new Variable (line 519)
+- new Variable (line 531)
+- new Variable (line 543)
+- new Variable (line 555)
+- new Variable (line 583)
+- new Variable (line 595)
+- new ArgumentCountError (line 680)
+- new ArgumentCountError (line 685)
 - new Variable (line 713)
-- new Variable (line 771)
-- new Variable (line 803)
-- new Variable (line 830)
-- new ArgumentCountError (line 844)
-- new Variable (line 848)
-- new Variable (line 860)
-- new Variable (line 872)
-- new Variable (line 884)
-- new Error (line 899)
-- new Error (line 911)
-- new Variable (line 922)
-- new Error (line 946)
-- new Variable (line 950)
-- new Error (line 969)
+- new Variable (line 735)
+- new Variable (line 754)
+- new Variable (line 778)
+- new Variable (line 834)
+- new Variable (line 892)
+- new Variable (line 924)
+- new Variable (line 951)
+- new ArgumentCountError (line 965)
+- new Variable (line 969)
 - new Variable (line 981)
-- new Variable (line 999)
-- new Error (line 1016)
-- new Variable (line 1033)
-- new Variable (line 1056)
-- new Variable (line 1077)
-- new Variable (line 1104)
-- new ArgumentCountError (line 1119)
-- new Error (line 1132)
-- new Variable (line 1134)
-- new Variable (line 1160)
-- new Variable (line 1172)
-- new Variable (line 1192)
-- new Variable (line 1204)
-- new Variable (line 1278)
-- new Variable (line 1290)
-- new Variable (line 1307)
-- new Variable (line 1332)
-- new Variable (line 1374)
-- new ArgumentCountError (line 1437)
-- new ArgumentCountError (line 1445)
-- new ArgumentCountError (line 1453)
-- new ArgumentCountError (line 1456)
-- new ArgumentCountError (line 1462)
-- 77 class method(s)
+- new Variable (line 993)
+- new Variable (line 1005)
+- new Error (line 1020)
+- new Error (line 1032)
+- new Variable (line 1043)
+- new Error (line 1067)
+- new Variable (line 1071)
+- new Error (line 1090)
+- new Variable (line 1102)
+- new Variable (line 1120)
+- new Error (line 1137)
+- new Variable (line 1154)
+- new Variable (line 1177)
+- new Variable (line 1198)
+- new Variable (line 1225)
+- new ArgumentCountError (line 1240)
+- new Error (line 1253)
+- new Variable (line 1255)
+- new Variable (line 1281)
+- new Variable (line 1293)
+- new Variable (line 1313)
+- new Variable (line 1325)
+- new Variable (line 1399)
+- new Variable (line 1411)
+- new Variable (line 1428)
+- new Variable (line 1453)
+- new Variable (line 1496)
+- new ArgumentCountError (line 1559)
+- new ArgumentCountError (line 1567)
+- new ArgumentCountError (line 1575)
+- new ArgumentCountError (line 1578)
+- new ArgumentCountError (line 1584)
+- 83 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
 
@@ -26777,10 +26783,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 130)
 - new HashTable (line 151)
 - new ArgumentCountError (line 214)
-- new ArgumentCountError (line 368)
-- new ArgumentCountError (line 398)
-- new ArgumentCountError (line 422)
-- new ArgumentCountError (line 449)
 - 16 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -26901,7 +26903,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 171)
 - new ObjectEntry (line 189)
 - new ArgumentCountError (line 241)
-- new ArgumentCountError (line 426)
+- new ArgumentCountError (line 428)
 - 23 class method(s)
 - 1 closure(s)
 
@@ -26963,8 +26965,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new UnexpectedValueException (line 842)
 - new ArgumentCountError (line 908)
 - new ArgumentCountError (line 940)
-- new ArgumentCountError (line 1136)
-- new Error (line 1150)
+- new ArgumentCountError (line 1148)
+- new Error (line 1162)
 - 80 class method(s)
 - 1 closure(s)
 
@@ -27010,10 +27012,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 302)
 - new HashTable (line 303)
 - new HashTable (line 309)
-- new ArgumentCountError (line 386)
-- new ArgumentCountError (line 445)
-- new ArgumentCountError (line 480)
-- new ArgumentCountError (line 536)
 - 32 class method(s)
 
 ### `ext/spl/ParentIteratorBuiltin.php`
@@ -27403,20 +27401,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 422)
 - new Variable (line 434)
 - new Variable (line 492)
-- new ArgumentCountError (line 556)
-- new ArgumentCountError (line 581)
-- new ArgumentCountError (line 606)
-- new ArgumentCountError (line 631)
-- new ArgumentCountError (line 694)
-- new ArgumentCountError (line 744)
-- new ArgumentCountError (line 771)
-- new ArgumentCountError (line 795)
-- new ArgumentCountError (line 824)
-- new ArgumentCountError (line 947)
-- new ArgumentCountError (line 971)
-- new ArgumentCountError (line 995)
-- new ArgumentCountError (line 1024)
-- new ArgumentCountError (line 1071)
+- new ArgumentCountError (line 577)
+- new ArgumentCountError (line 602)
+- new ArgumentCountError (line 627)
+- new ArgumentCountError (line 736)
+- new ArgumentCountError (line 763)
+- new ArgumentCountError (line 787)
+- new ArgumentCountError (line 935)
+- new ArgumentCountError (line 979)
+- new ArgumentCountError (line 1008)
+- new ArgumentCountError (line 1055)
 - 57 class method(s)
 - 1 closure(s)
 
@@ -47316,54 +47310,55 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 16610)
 - new Variable (line 16669)
 - new Variable (line 16696)
-- new Variable (line 16722)
-- new Variable (line 17071)
-- new Variable (line 17459)
-- new Variable (line 17489)
-- new Variable (line 17508)
-- new Variable (line 17538)
-- new Variable (line 17575)
-- new Variable (line 17595)
-- new Variable (line 17608)
+- new Variable (line 16740)
+- new Variable (line 16765)
+- new Variable (line 17114)
+- new Variable (line 17502)
+- new Variable (line 17532)
+- new Variable (line 17551)
+- new Variable (line 17581)
+- new Variable (line 17618)
+- new Variable (line 17638)
 - new Variable (line 17651)
-- new VM\Variable (line 18253)
-- new Variable (line 18291)
-- new Variable (line 18339)
-- new Variable (line 18353)
-- new Variable (line 18383)
-- new OpCode (line 18405)
-- new Variable (line 18406)
-- new Variable (line 18738)
-- new Variable (line 18794)
-- new Variable (line 18832)
-- new OpCode (line 18846)
-- new Variable (line 18847)
-- new Variable (line 18906)
-- new OpCode (line 18927)
-- new Variable (line 18928)
-- new Variable (line 19027)
-- new Variable (line 19049)
-- new Variable (line 19117)
-- new Operand\Literal (line 19126)
-- new Variable (line 19141)
-- new Variable (line 19456)
-- new VM\PropertyIsInitializedHandler (line 19553)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19708)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 20289)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 20543)
-- new JIT\Call\VmCoerceVariableToString (line 20670)
-- new JIT\Call\NoOpConstruct (line 20845)
-- new JIT\Call\IncludePathResolverResolve (line 21016)
-- new Operand\Literal (line 21106)
-- new Operand\Literal (line 21108)
-- new Operand\Literal (line 21119)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 21177)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 21330)
-- new VM (line 22587)
-- new VM\Variable (line 22596)
-- new Variable (line 22623)
-- new Variable (line 22669)
-- new Variable (line 23442)
+- new Variable (line 17694)
+- new VM\Variable (line 18296)
+- new Variable (line 18334)
+- new Variable (line 18382)
+- new Variable (line 18396)
+- new Variable (line 18426)
+- new OpCode (line 18448)
+- new Variable (line 18449)
+- new Variable (line 18781)
+- new Variable (line 18837)
+- new Variable (line 18875)
+- new OpCode (line 18889)
+- new Variable (line 18890)
+- new Variable (line 18949)
+- new OpCode (line 18970)
+- new Variable (line 18971)
+- new Variable (line 19070)
+- new Variable (line 19092)
+- new Variable (line 19160)
+- new Operand\Literal (line 19169)
+- new Variable (line 19184)
+- new Variable (line 19499)
+- new VM\PropertyIsInitializedHandler (line 19596)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19751)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 20332)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 20586)
+- new JIT\Call\VmCoerceVariableToString (line 20713)
+- new JIT\Call\NoOpConstruct (line 20888)
+- new JIT\Call\IncludePathResolverResolve (line 21059)
+- new Operand\Literal (line 21149)
+- new Operand\Literal (line 21151)
+- new Operand\Literal (line 21162)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 21220)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 21373)
+- new VM (line 22630)
+- new VM\Variable (line 22639)
+- new Variable (line 22666)
+- new Variable (line 22712)
+- new Variable (line 23485)
 - 440 class method(s)
 - 21 closure(s)
 
@@ -51363,13 +51358,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 36)
-- new ArgumentCountError (line 53)
-- new ArgumentCountError (line 60)
-- new ArgumentCountError (line 63)
-- new ArgumentCountError (line 70)
-- new ArgumentCountError (line 77)
 - 2 class method(s)
-- 2 closure(s)
+- 6 closure(s)
 
 ### `lib/JIT/Call/BcMathNumberConstruct.php`
 
@@ -52289,12 +52279,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/MultipleIteratorMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 54)
-- new Variable (line 67)
-- new ArgumentCountError (line 87)
-- new Variable (line 117)
-- new Variable (line 130)
-- new Variable (line 151)
+- new Variable (line 55)
+- new Variable (line 68)
+- new Variable (line 123)
+- new Variable (line 136)
+- new Variable (line 157)
 - 6 class method(s)
 
 ### `lib/JIT/Call/Native.php`
@@ -52826,8 +52815,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/SplObjectStorageMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 178)
-- new Variable (line 224)
+- new Variable (line 197)
+- new Variable (line 243)
 - 11 class method(s)
 
 ### `lib/JIT/Call/SplPriorityQueueMethod.php`
