@@ -18,6 +18,8 @@ final class ReflectionGeneratorGetExecutingLine extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionGenerator_getExecutingLine — ZEND_PARSE_PARAMETERS_NONE (#30927)
+        $this->requireExactUserArgCount($frame, 'ReflectionGenerator::getExecutingLine', 0);
         $receiver = ReflectionSupport::requireReflectionGenerator($frame, $frame->calledArgs[0]);
         $gen = GeneratorTrace::generatorStateFromReflection($receiver);
         if (null !== $frame->returnVar) {

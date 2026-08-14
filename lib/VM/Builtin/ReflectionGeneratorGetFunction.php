@@ -19,6 +19,8 @@ final class ReflectionGeneratorGetFunction extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionGenerator_getFunction — ZEND_PARSE_PARAMETERS_NONE (#30927)
+        $this->requireExactUserArgCount($frame, 'ReflectionGenerator::getFunction', 0);
         $receiver = ReflectionSupport::requireReflectionGenerator($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $gen = GeneratorTrace::generatorStateFromReflection($receiver);

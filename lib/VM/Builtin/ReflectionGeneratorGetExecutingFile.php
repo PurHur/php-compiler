@@ -18,6 +18,8 @@ final class ReflectionGeneratorGetExecutingFile extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionGenerator_getExecutingFile — ZEND_PARSE_PARAMETERS_NONE (#30927)
+        $this->requireExactUserArgCount($frame, 'ReflectionGenerator::getExecutingFile', 0);
         $receiver = ReflectionSupport::requireReflectionGenerator($frame, $frame->calledArgs[0]);
         $gen = GeneratorTrace::generatorStateFromReflection($receiver);
         $file = GeneratorTrace::executingFile($gen);
