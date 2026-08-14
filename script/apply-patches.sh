@@ -320,7 +320,8 @@ patch_already_applied() {
       ;;
     php-cfg-magic-constants.patch)
       grep -q 'traitStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null \
-        && grep -q '#26459' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
+        && grep -q '#26459' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null \
+        && grep -q 'phpcLexicalScopeKeyword' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
     php-cfg-magic-script-const.patch)
       grep -q 'KIND_LINE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php" 2>/dev/null
@@ -5444,6 +5445,7 @@ apply_php_cfg_magic_constants_overlay() {
     && grep -q 'beginCompilationUnit' "$target" 2>/dev/null \
     && grep -q "T_FUNC_C / T_METHOD_C inside closures are \"{closure}\"" "$target" 2>/dev/null \
     && grep -q '#26459' "$target" 2>/dev/null \
+    && grep -q 'phpcLexicalScopeKeyword' "$target" 2>/dev/null \
     && grep -q 'implements\[0\]' "$target" 2>/dev/null \
     && ! grep -q "return 'AnonymousClass@'" "$target" 2>/dev/null; then
     echo "Skip php-cfg-magic-constants.patch (already applied)"
