@@ -8,11 +8,14 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * gettimeofday() — wall-clock array or float (VM VmDate; JIT GettimeofdayJitHelper PHP, #13764).
+ *
+ * php-src: ext/standard/microtime.c — PHP_FUNCTION(gettimeofday)
  */
 final class gettimeofday extends Internal
 {
@@ -23,10 +26,9 @@ final class gettimeofday extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#30682).
+        $this->requireAtMostArgCount($frame, 'gettimeofday', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('gettimeofday() accepts at most one argument');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,8 +46,9 @@ final class gettimeofday extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('gettimeofday() accepts at most one argument');
+        // Catchable ArgumentCountError (AOT) — peer microtime #28691 / #30682.
+        if (!$this->requireAtMostJitArgCount($context, $args, 'gettimeofday', 1)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         $asFloat = $context->constantFromBool(false);
         if (isset($args[0])) {
