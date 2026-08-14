@@ -236,8 +236,6 @@ final class SplFileObjectConstruct extends VmClassMethod
 
 final class SplFileObjectFgets extends VmClassMethod
 {
-    private const LENGTH_ERROR = 'SplFileObject::fgets(): Argument #1 ($length) must be greater than 0';
-
     public function __construct()
     {
         parent::__construct('fgets');
@@ -250,22 +248,12 @@ final class SplFileObjectFgets extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fgets()'
         );
+        // php-src zim_SplFileObject_fgets — ZEND_PARSE_PARAMETERS_NONE on 8.2 (#30937).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::fgets', 0);
         if (null === $frame->returnVar) {
             return;
         }
-        $length = null;
-        if (isset($frame->calledArgs[1])) {
-            $length = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
-                'SplFileObject::fgets',
-                1,
-                'length'
-            );
-            if ($length <= 0) {
-                throw new \ValueError(self::LENGTH_ERROR);
-            }
-        }
-        $line = SplFileObjectStorage::fgets($object, $length);
+        $line = SplFileObjectStorage::fgets($object, null);
         if (false === $line) {
             $frame->returnVar->bool(false);
 
@@ -543,6 +531,8 @@ final class SplFileObjectEof extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::eof()'
         );
+        // php-src zim_SplFileObject_eof — ZEND_PARSE_PARAMETERS_NONE (#30937).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::eof', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -727,6 +717,8 @@ final class SplFileObjectFflush extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fflush()'
         );
+        // php-src zim_SplFileObject_fflush — ZEND_PARSE_PARAMETERS_NONE; ACE cites SplFileObject (#30937).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::fflush', 0);
         if (null === $frame->returnVar) {
             return;
         }
