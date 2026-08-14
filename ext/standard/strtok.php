@@ -25,10 +25,9 @@ final class strtok extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#30703).
+        $this->requireArgCountRange($frame, 'strtok', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('strtok() accepts one or two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -52,10 +51,11 @@ final class strtok extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('strtok() accepts one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #30703.
+        if (!$this->requireArgCountRangeJit($context, $args, 'strtok', 1, 2)) {
+            return JitStrtok::deadFalseResult($context);
         }
+        $argc = \count($args);
 
         // Early TypeError return before StringStrtok::ensureLinked (AOT helper IR gap; #19242 / #29784).
         if (
