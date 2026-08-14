@@ -8,11 +8,13 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
-/** posix_setgid() — set real group ID (php-src ext/posix/posix.c; #7376). */
+/** posix_setgid() — set real group ID (VM VmPosix; JIT/AOT PosixSetgidJitHelper via PosixSetgidJit, #31066/#7376). */
 final class posix_setgid extends Internal
 {
     public function __construct()
@@ -29,7 +31,7 @@ final class posix_setgid extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $gid = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_setgid', 0, 'gid');
+        $gid = InternalStrictArg::requireInt($frame, 0, 'posix_setgid', 'gid')->toInt();
         $frame->returnVar->bool(VmPosix::setgid($gid));
     }
 
@@ -42,11 +44,15 @@ final class posix_setgid extends Internal
                 $context,
                 'posix_setgid() expects exactly 1 argument, '.$argc.' given'
             );
-            $slot = JitValueBox::alloc($context);
 
-            return JitValueBox::pointer($context, $slot);
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
-        return JitPosix::setgid($context, $args[0]);
+        JitInternalStrictArg::requireInt($context, $args[0], 'posix_setgid', 'gid', 1);
+
+        return JitPosix::setgid(
+            $context,
+            JitLongArg::lower($context, $args[0], 'posix_setgid() gid')
+        );
     }
 }
