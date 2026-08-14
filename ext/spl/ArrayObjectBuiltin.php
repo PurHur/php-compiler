@@ -364,12 +364,8 @@ final class ArrayObjectOffsetGet extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetGet()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayObject::offsetGet() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayObject_offsetGet — ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#31001)
+        $this->requireExactUserArgCount($frame, 'ArrayObject::offsetGet', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -394,12 +390,8 @@ final class ArrayObjectOffsetSet extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetSet()'
         );
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'ArrayObject::offsetSet() expects exactly 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayObject_offsetSet — ZEND_PARSE_PARAMETERS_ARGS(2, 2) (#31001)
+        $this->requireExactUserArgCount($frame, 'ArrayObject::offsetSet', 2);
         SplArrayStorage::offsetSet($object, $frame->calledArgs[1], $frame->calledArgs[2]);
     }
 }
@@ -418,12 +410,8 @@ final class ArrayObjectOffsetExists extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetExists()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayObject::offsetExists() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayObject_offsetExists — ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#31001)
+        $this->requireExactUserArgCount($frame, 'ArrayObject::offsetExists', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -445,12 +433,8 @@ final class ArrayObjectOffsetUnset extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::offsetUnset()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'ArrayObject::offsetUnset() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_ArrayObject_offsetUnset — ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#31001)
+        $this->requireExactUserArgCount($frame, 'ArrayObject::offsetUnset', 1);
         SplArrayStorage::offsetUnset($object, $frame->calledArgs[1]);
     }
 }
