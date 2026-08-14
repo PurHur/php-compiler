@@ -790,6 +790,8 @@ final class CachingIteratorHasNext extends VmClassMethod
             CachingIteratorBuiltin::CLASS_LC,
             'CachingIterator::hasNext()'
         );
+        // php-src zim_CachingIterator_hasNext — ZEND_PARSE_PARAMETERS_NONE (#30948)
+        $this->requireExactUserArgCount($frame, 'CachingIterator::hasNext', 0);
         SplIteratorSupport::setReturnBool($frame, SplCachingIteratorStorage::hasNext($frame, $object));
     }
 }
@@ -829,6 +831,8 @@ final class CachingIteratorGetFlags extends VmClassMethod
             CachingIteratorBuiltin::CLASS_LC,
             'CachingIterator::getFlags()'
         );
+        // php-src zim_CachingIterator_getFlags — ZEND_PARSE_PARAMETERS_NONE (#30948)
+        $this->requireExactUserArgCount($frame, 'CachingIterator::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -917,6 +921,8 @@ final class CachingIteratorGetCache extends VmClassMethod
             CachingIteratorBuiltin::CLASS_LC,
             'CachingIterator::getCache()'
         );
+        // php-src zim_CachingIterator_getCache — ZEND_PARSE_PARAMETERS_NONE (#30948)
+        $this->requireExactUserArgCount($frame, 'CachingIterator::getCache', 0);
         if (null === $frame->returnVar) {
             return;
         }

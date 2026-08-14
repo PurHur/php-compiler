@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
@@ -21,6 +24,21 @@ final class CachingIteratorGetCache implements Call
     {
         if ([] === $args) {
             throw new \LogicException('CachingIterator::getCache() called without $this');
+        }
+        // php-src ZEND_PARSE_PARAMETERS_NONE (#30948) — $args[0] is $this.
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::exactUserArgCountMessage(
+                    'CachingIterator::getCache',
+                    0,
+                    $userArgCount
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'cachingiterator_getcache_argc_cont');
+
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
         $receiver = $args[0];
         if (Variable::TYPE_OBJECT !== $receiver->type) {
