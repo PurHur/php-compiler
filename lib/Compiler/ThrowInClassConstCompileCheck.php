@@ -12,23 +12,28 @@ use PHPCfg\Op\Expr\ArrowFunction;
 use PHPCfg\Op\Expr\Assign;
 use PHPCfg\Op\Expr\BinaryOp\Identical;
 use PHPCfg\Op\Expr\Cast;
+use PHPCfg\Op\Expr\ClassConstFetch;
 use PHPCfg\Op\Expr\Closure;
 use PHPCfg\Op\Expr\FuncCall;
 use PHPCfg\Op\Expr\MethodCall;
+use PHPCfg\Op\Expr\Param;
 use PHPCfg\Op\Expr\StaticCall;
 use PHPCfg\Op\Expr\Throw_;
+use PHPCfg\Op\Stmt\Function_;
 use PHPCfg\Op\Stmt\Jump;
 use PHPCfg\Op\Stmt\JumpIf;
 use PHPCfg\Op\Terminal\Const_ as ConstTerminal;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\CompilerVersion;
 
 /**
  * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905, #24947, #25839, #26240).
  *
  * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c zend_compile_const_expr().
- * Distinct from runtime throw expressions (#3802) and property/param defaults (#3803).
+ * Distinct from runtime throw expressions (#3802). {@code static::} in class-const / property /
+ * param-default const-exprs is rejected here (#31145); other #3803 default folding stays in Compiler.
  *
  * {@code match} is never a constant expression (no ZEND_AST_MATCH in the allow-list); php-cfg
  * lowers it to a result-seed Assign plus Identical/JumpIf (or default-only Assign+Jump).
@@ -48,6 +53,12 @@ final class ThrowInClassConstCompileCheck
 {
     public const MESSAGE = 'Constant expression contains invalid operations';
 
+    /** php-src Zend/zend_compile.c — LSB is not a compile-time constant (#31145). */
+    public const STATIC_SCOPE_MESSAGE = '"static::" is not allowed in compile-time constants';
+
+    /** php-src Zend/zend_compile.c — more specific than STATIC_SCOPE_MESSAGE for `::class` (#26629). */
+    public const STATIC_CLASS_MESSAGE = 'static::class cannot be used for compile-time class name resolution';
+
     public static function validate(Script $script): void
     {
         $check = new self();
@@ -62,8 +73,47 @@ final class ThrowInClassConstCompileCheck
                 || $child instanceof Op\Stmt\Enum_
             ) {
                 $check->walkClassLike($child);
+                continue;
+            }
+            if ($child instanceof Function_ && null !== $child->func) {
+                $check->walkParams($child->func->params);
             }
         }
+        foreach ($script->functions as $func) {
+            if (!is_array($func->params)) {
+                continue;
+            }
+            $check->walkParams($func->params);
+        }
+    }
+
+    /**
+     * Zend message when {@code static::} appears in a compile-time constant expression (#31145).
+     */
+    public static function staticScopeRejectMessage(ClassConstFetch $expr): ?string
+    {
+        $className = self::operandLiteralString($expr->class);
+        if (null === $className || 'static' !== strtolower($className)) {
+            return null;
+        }
+        $constName = self::operandLiteralString($expr->name);
+        if (null !== $constName && 'class' === strtolower($constName)) {
+            return self::STATIC_CLASS_MESSAGE;
+        }
+
+        return self::STATIC_SCOPE_MESSAGE;
+    }
+
+    public static function operandLiteralString(mixed $op): ?string
+    {
+        if ($op instanceof Operand\Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return self::operandLiteralString($op->name);
+        }
+
+        return null;
     }
 
     private function walkClassLike(Op\Stmt\Class_|Op\Stmt\Interface_|Op\Stmt\Trait_|Op\Stmt\Enum_ $class): void
@@ -71,7 +121,24 @@ final class ThrowInClassConstCompileCheck
         foreach ($class->stmts->children as $stmt) {
             if ($stmt instanceof Op\Terminal\Const_) {
                 $this->walkConstValueBlock($stmt->valueBlock);
+                continue;
             }
+            if ($stmt instanceof Function_ && null !== $stmt->func) {
+                $this->walkParams($stmt->func->params);
+            }
+        }
+    }
+
+    /**
+     * @param list<Param> $params
+     */
+    private function walkParams(array $params): void
+    {
+        foreach ($params as $param) {
+            if (!$param instanceof Param) {
+                continue;
+            }
+            $this->walkStaticScopeInBlock($param->defaultBlock);
         }
     }
 
@@ -87,7 +154,47 @@ final class ThrowInClassConstCompileCheck
         if ($valueBlock instanceof ErrorSuppressBlock) {
             throw new \CompileError(self::MESSAGE);
         }
+        $this->walkStaticScopeInBlock($valueBlock);
         $this->walkOps($valueBlock->children ?? []);
+    }
+
+    private function walkStaticScopeInBlock(?Block $block): void
+    {
+        if (null === $block) {
+            return;
+        }
+        $this->walkStaticScopeFetches($block->children ?? []);
+    }
+
+    /**
+     * @param list<Op> $ops
+     */
+    private function walkStaticScopeFetches(array $ops): void
+    {
+        foreach ($ops as $op) {
+            if ($op instanceof ClassConstFetch) {
+                $this->rejectStaticScopeFetch($op);
+            }
+            if ($op instanceof Assign && $op->expr instanceof ClassConstFetch) {
+                $this->rejectStaticScopeFetch($op->expr);
+            }
+            OpSubBlockAccess::walkSubBlocks($op, function (Block $sub): void {
+                $this->walkStaticScopeFetches($sub->children ?? []);
+            });
+        }
+    }
+
+    private function rejectStaticScopeFetch(ClassConstFetch $expr): void
+    {
+        $msg = self::staticScopeRejectMessage($expr);
+        if (null === $msg) {
+            return;
+        }
+        $file = $expr->getFile();
+        if ('' === $file) {
+            $file = 'unknown';
+        }
+        throw new CompileFatal($file, max(1, $expr->getLine()), $msg);
     }
 
     /**

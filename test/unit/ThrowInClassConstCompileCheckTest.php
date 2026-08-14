@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -410,6 +411,20 @@ function f(): int {
 }
 PHP, 'throw_expr_ok.php');
         $this->assertNotNull($block);
+    }
+
+    public function testStaticScopeClassConstIsCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(ThrowInClassConstCompileCheck::STATIC_SCOPE_MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    const X = 1;
+    const Y = static::X;
+}
+PHP, 'static_scope_class_const.php');
     }
 
     private function expectCompileError(string $code): void
