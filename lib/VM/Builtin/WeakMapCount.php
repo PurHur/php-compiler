@@ -20,6 +20,8 @@ final class WeakMapCount extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('WeakMap::count() called without $this');
         }
+        // php-src Zend/zend_weakrefs.stub.php — count(): int (#31129)
+        $this->requireExactUserArgCount($frame, 'WeakMap::count', 0);
         if (null === $frame->returnVar) {
             return;
         }
