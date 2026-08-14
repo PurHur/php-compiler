@@ -481,12 +481,8 @@ final class SplFixedArrayOffsetGet extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetGet()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplFixedArray::offsetGet() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30997)
+        $this->requireExactUserArgCount($frame, 'SplFixedArray::offsetGet', 1);
         SplIteratorSupport::copyReturnFrom(
             $frame,
             SplFixedArrayBuiltin::offsetGet($object, $frame->calledArgs[1])
@@ -508,12 +504,8 @@ final class SplFixedArrayOffsetSet extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetSet()'
         );
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'SplFixedArray::offsetSet() expects exactly 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(2, 2) (#30997)
+        $this->requireExactUserArgCount($frame, 'SplFixedArray::offsetSet', 2);
         SplFixedArrayBuiltin::offsetSet($object, $frame->calledArgs[1], $frame->calledArgs[2]);
     }
 }
@@ -532,12 +524,8 @@ final class SplFixedArrayOffsetExists extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetExists()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplFixedArray::offsetExists() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30997)
+        $this->requireExactUserArgCount($frame, 'SplFixedArray::offsetExists', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -561,12 +549,8 @@ final class SplFixedArrayOffsetUnset extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetUnset()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplFixedArray::offsetUnset() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30997)
+        $this->requireExactUserArgCount($frame, 'SplFixedArray::offsetUnset', 1);
         SplFixedArrayBuiltin::offsetUnset($object, $frame->calledArgs[1]);
     }
 }

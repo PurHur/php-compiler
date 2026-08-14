@@ -478,6 +478,8 @@
             <file>./test/compliance/SplIteratorExcessArgc30949JITTest.php</file>
             <file>./test/compliance/SplDllistExcessArgc30964VMTest.php</file>
             <file>./test/compliance/SplDllistExcessArgc30964JITTest.php</file>
+            <file>./test/compliance/SplFixedArrayOffsetExcessArgc30997VMTest.php</file>
+            <file>./test/compliance/SplFixedArrayOffsetExcessArgc30997JITTest.php</file>
             <file>./test/compliance/RiiParentIteratorExcessArgc30956VMTest.php</file>
             <file>./test/compliance/RiiParentIteratorExcessArgc30956JITTest.php</file>
             <file>./test/compliance/ArrayObjectExcessArgc30965VMTest.php</file>
