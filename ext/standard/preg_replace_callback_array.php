@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
@@ -27,12 +28,9 @@ final class preg_replace_callback_array extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/pcre/php_pcre.stub.php — ArgumentCountError (#30966).
+        $this->requireArgCountRange($frame, 'preg_replace_callback_array', 2, 5);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException(
-                'preg_replace_callback_array() expects 2 to 5 arguments in this compiler build'
-            );
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException(
                 'preg_replace_callback_array() requires VM context in this compiler build'
@@ -109,10 +107,8 @@ final class preg_replace_callback_array extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException(
-                'preg_replace_callback_array() JIT/AOT lowering requires at least two arguments in this compiler build'
-            );
+        if (!$this->requireArgCountRangeJit($context, $args, 'preg_replace_callback_array', 2, 5)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         JitPregSubject::requireStringOrArray($context, $args[1], 'preg_replace_callback_array', 1, 'subject');
