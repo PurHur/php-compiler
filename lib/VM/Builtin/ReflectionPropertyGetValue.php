@@ -23,6 +23,8 @@ final class ReflectionPropertyGetValue extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('ReflectionProperty::getValue() expects an object');
         }
+        // php-src: zim_ReflectionProperty_getValue — at most 1 user arg (#30896)
+        $this->requireUserArgCountRange($frame, 'ReflectionProperty::getValue', 0, 1);
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         ReflectionSupport::assertReflectionPropertyAccessible($ctx, $receiver);

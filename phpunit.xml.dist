@@ -382,6 +382,8 @@
             <file>./test/compliance/GeneratorExcessArgc30866JITTest.php</file>
             <file>./test/compliance/ExceptionExcessArgc30895VMTest.php</file>
             <file>./test/compliance/ExceptionExcessArgc30895JITTest.php</file>
+            <file>./test/compliance/ReflectionAttrExcessArgc30896VMTest.php</file>
+            <file>./test/compliance/ReflectionAttrExcessArgc30896JITTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653VMTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653JITTest.php</file>
             <file>./test/compliance/SessionDestroyTmpfileExcessArgc30676VMTest.php</file>

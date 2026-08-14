@@ -21,6 +21,8 @@ final class ReflectionPropertyIsInitialized extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionProperty_isInitialized — at most 1 user arg (#30896)
+        $this->requireUserArgCountRange($frame, 'ReflectionProperty::isInitialized', 0, 1);
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $className = ReflectionSupport::classNameFromReflection($receiver);

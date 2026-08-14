@@ -18,6 +18,8 @@ final class ReflectionNamedTypeGetName extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (0 args); $calledArgs[0] is $this (#30896)
+        $this->requireExactUserArgCount($frame, 'ReflectionNamedType::getName', 0);
         $receiver = ReflectionSupport::requireReflectionType($frame, $frame->calledArgs[0]);
         if (strtolower($receiver->class->name) !== ReflectionSupport::REFLECTION_NAMED_TYPE) {
             throw new \LogicException('Expected ReflectionNamedType instance');

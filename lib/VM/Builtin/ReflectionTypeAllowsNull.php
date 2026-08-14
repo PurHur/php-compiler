@@ -17,6 +17,8 @@ final class ReflectionTypeAllowsNull extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: ext/reflection/php_reflection.c — ReflectionType::allowsNull ZEND_PARSE_PARAMETERS (0) (#30896)
+        $this->requireExactUserArgCount($frame, 'ReflectionType::allowsNull', 0);
         $receiver = ReflectionSupport::requireReflectionType($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(ReflectionSupport::allowsNullFromReflection($receiver));
