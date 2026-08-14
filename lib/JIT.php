@@ -18009,6 +18009,7 @@ class JIT {
             || $toCall instanceof JIT\Call\RandomizerConstruct
             || $toCall instanceof JIT\Call\SimpleXMLElementConstruct
             || $toCall instanceof JIT\Call\BcMathNumberConstruct
+            || $toCall instanceof JIT\Call\SensitiveParameterValueConstruct
             || $toCall instanceof JIT\Call\DateTimeConstruct
             || $toCall instanceof JIT\Call\DateTimeImmutableConstruct
             || $toCall instanceof JIT\Call\DateTimeZoneConstruct
@@ -20851,6 +20852,7 @@ class JIT {
     {
         return $proxy instanceof JIT\Call\Native
             || $proxy instanceof JIT\Call\ExceptionConstruct
+            || $proxy instanceof JIT\Call\SensitiveParameterValueConstruct
             || $proxy instanceof JIT\Call\Vararg
             || $proxy instanceof CoreFunc\Internal;
     }

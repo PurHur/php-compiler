@@ -1403,6 +1403,8 @@ class Context {
 
         $this->functionProxies['weakreference::create'] = new Call\WeakReferenceCreate();
         $this->functionProxies['weakreference::get'] = new Call\WeakReferenceGet();
+        $this->functionProxies['sensitiveparametervalue::__construct'] = new Call\SensitiveParameterValueConstruct();
+        $this->functionProxies['sensitiveparametervalue::getvalue'] = new Call\SensitiveParameterValueGetValue();
         $this->functionProxies['weakmap::offsetset'] = new Call\WeakMapMethod('offsetset');
         $this->functionProxies['weakmap::offsetget'] = new Call\WeakMapMethod('offsetget');
         $this->functionProxies['weakmap::offsetexists'] = new Call\WeakMapMethod('offsetexists');

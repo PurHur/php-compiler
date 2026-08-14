@@ -7,8 +7,10 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Builtin\WeakRefNative;
 use PHPCompiler\JIT\Builtin\WeakRefRuntime;
 use PHPCompiler\JIT\Builtin\WeakRefSetup;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
@@ -26,8 +28,17 @@ final class WeakReferenceCreate implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        if (count($args) < 1) {
-            throw new \LogicException('WeakReference::create() expects the referent object');
+        // Static — no implicit $this (php-src zim_WeakReference_create, #30867).
+        $argc = \count($args);
+        if (1 !== $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('WeakReference::create() expects exactly 1 argument, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'weakreference_create_argc_cont');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         WeakRefRuntime::ensureLinked($context);
         WeakRefNative::registerDeclarations($context);

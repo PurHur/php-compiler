@@ -17,6 +17,11 @@ final class SensitiveParameterValueGetValue extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('SensitiveParameterValue::getValue() called without $this');
+        }
+        // php-src: Zend/zend_attributes.stub.php — getValue(): mixed; ZEND_PARSE_PARAMETERS(0) (#30867)
+        $this->requireExactUserArgCount($frame, 'SensitiveParameterValue::getValue', 0);
         $receiver = SensitiveParamSupport::requireMarkerObject($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(

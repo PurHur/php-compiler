@@ -21,9 +21,8 @@ final class WeakReferenceCreate extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException('WeakReference::create() expects exactly 1 argument');
-        }
+        // Static factory — calledArgs are user args only (php-src zim_WeakReference_create, #30867).
+        $this->requireExactArgCount($frame, 'WeakReference::create', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('WeakReference::create() requires VM context');
         }

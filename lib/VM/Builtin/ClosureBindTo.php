@@ -21,6 +21,8 @@ final class ClosureBindTo extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Closure::bindTo() expects at least 2 arguments');
         }
+        // php-src: Zend/zend_closures.c — ZEND_PARSE_PARAMETERS(1, 2); $calledArgs[0] is $this (#30867)
+        $this->requireUserArgCountRange($frame, 'Closure::bindTo', 1, 2);
         if (null === $frame->vmContext) {
             throw new \LogicException('Closure::bindTo() requires VM context');
         }

@@ -4231,6 +4231,7 @@ class Object_ extends Type {
             // Private like Zend zend_exceptions.stub.php — json_encode must not leak (#23042).
             $this->defineProperty($id, 'value', Variable::TYPE_VALUE);
             $this->definePropertyVisibility($id, 'value', \PHPCfg\Func::FLAG_PRIVATE);
+            $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach (['__construct', 'getvalue', '__debuginfo'] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
