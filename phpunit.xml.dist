@@ -417,6 +417,8 @@
             <file>./test/compliance/ZlibStreamExcessArgc30830JITTest.php</file>
             <file>./test/compliance/DateStaticExcessArgc30898VMTest.php</file>
             <file>./test/compliance/DateStaticExcessArgc30898JITTest.php</file>
+            <file>./test/compliance/StreamContextGetOptionsExcessArgc30785VMTest.php</file>
+            <file>./test/compliance/StreamContextGetOptionsExcessArgc30785JITTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723JITTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647VMTest.php</file>
