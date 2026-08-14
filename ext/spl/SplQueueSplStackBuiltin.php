@@ -316,6 +316,8 @@ final class SplStackTop extends VmClassMethod
             SplStackBuiltin::CLASS_LC,
             'SplStack::top()'
         );
+        // php-src: method lives on SplDoublyLinkedList; ACE cites defining class (#30911)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::top', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::top($object));
     }
 }

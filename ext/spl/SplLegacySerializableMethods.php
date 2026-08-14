@@ -55,6 +55,8 @@ final class SplLegacySerializableSerialize extends VmClassMethod
             $this->ownerLc,
             $this->displayName.'::serialize()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911)
+        $this->requireExactUserArgCount($frame, $this->displayName.'::serialize', 0);
         if (null === $frame->returnVar) {
             return;
         }

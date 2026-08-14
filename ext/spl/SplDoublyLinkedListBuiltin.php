@@ -577,6 +577,8 @@ final class SplDoublyLinkedListPop extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::pop()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911); ACE cites defining class
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::pop', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::pop($object));
     }
 }
@@ -637,6 +639,8 @@ final class SplDoublyLinkedListTop extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::top()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911); ACE cites defining class
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::top', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::top($object));
     }
 }
@@ -691,6 +695,8 @@ final class SplDoublyLinkedListCount extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::count()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30911); ACE cites defining class
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::count', 0);
         if (null === $frame->returnVar) {
             return;
         }
