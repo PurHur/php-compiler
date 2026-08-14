@@ -7,12 +7,14 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\SplOuterIteratorHt;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -192,6 +194,46 @@ final class ParentIteratorConstruct implements Call
 
     private static function voidResult(Context $context): Value
     {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return $slot;
+    }
+}
+
+/**
+ * ParentIterator::accept / hasChildren excess argc (#30956).
+ *
+ * php-src: ext/spl/spl_iterators.c — ZEND_PARSE_PARAMETERS_NONE.
+ * hasChildren ACE cites RecursiveFilterIterator (inherited stub).
+ */
+final class ParentIteratorArgcMethod implements Call
+{
+    public function __construct(
+        private readonly string $method,
+        private readonly string $function,
+    ) {
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        if ([] === $args) {
+            throw new \LogicException($this->function.'() called without $this');
+        }
+        $given = max(0, \count($args) - 1);
+        if (0 !== $given) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::exactUserArgCountMessage($this->function, 0, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock(
+                $context,
+                'parent_it_'.strtolower($this->method).'_argc_cont'
+            );
+        }
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
