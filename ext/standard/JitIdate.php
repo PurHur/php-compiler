@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DefaultTimezoneCivilRuntime;
 use PHPCompiler\JIT\Builtin\StringIdate;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -139,12 +140,27 @@ final class JitIdate
             $out
         );
         $out = $context->builder->select(
+            $context->builder->icmp(Builder::INT_EQ, $ch64, $ord('I')),
+            self::localIsDst($context, $ts),
+            $out
+        );
+        $out = $context->builder->select(
             $context->builder->icmp(Builder::INT_EQ, $ch64, $ord('w')),
             $parts['wday'],
             $out
         );
 
         return $out;
+    }
+
+    private static function localIsDst(Context $context, Value $timestamp): Value
+    {
+        DefaultTimezoneCivilRuntime::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_default_tz_is_dst'),
+            $timestamp
+        );
     }
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value

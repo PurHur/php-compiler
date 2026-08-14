@@ -187,6 +187,8 @@ final class ArrayIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src zim_ArrayIterator___construct — array/object + optional flags (#31071).
+        $this->requireAtMostUserArgCount($frame, 'ArrayIterator::__construct', 2);
         $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayIteratorBuiltin::CLASS_LC,

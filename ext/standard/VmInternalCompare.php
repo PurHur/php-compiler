@@ -75,14 +75,20 @@ final class VmInternalCompare
     /**
      * Parse optional sort_flags argument on ksort/asort family (php-src basic_functions.c).
      *
-     * @throws \LogicException when flags are not an integer
+     * @param int|null $displayArgNum Zend argument index for errors (methods: 1; functions: $argIndex + 1)
+     *
+     * @throws \TypeError when flags are not an integer
      */
-    public static function resolveFrameSortFlags(Frame $frame, string $function, int $argIndex = 1): int
-    {
+    public static function resolveFrameSortFlags(
+        Frame $frame,
+        string $function,
+        int $argIndex = 1,
+        ?int $displayArgNum = null
+    ): int {
         return self::resolveFrameSortFlagsOperand(
             $frame->calledArgs[$argIndex]->resolveIndirect(),
             $function,
-            $argIndex + 1,
+            $displayArgNum ?? ($argIndex + 1),
             '$flags',
             false,
             $frame,
@@ -112,8 +118,7 @@ final class VmInternalCompare
     }
 
     /**
-     * @throws \LogicException when $allowSortingEnum is false and operand is not int
-     * @throws \TypeError when $allowSortingEnum is true and operand is not int (historical Sorting path)
+     * @throws \TypeError when operand is not int (php-src Z_PARAM_LONG)
      */
     public static function resolveFrameSortFlagsOperand(
         Variable $flagsArg,
@@ -172,7 +177,13 @@ final class VmInternalCompare
             return $flagsArg->toInt();
         }
         if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-            throw new \LogicException($function.'() flags must be an integer in this compiler build');
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d (%s) must be of type int, %s given',
+                $function,
+                $argNum,
+                $paramName,
+                self::vmSortFlagsTypeName($flagsArg->type)
+            ));
         }
 
         return $flagsArg->toInt();

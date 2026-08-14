@@ -1500,6 +1500,7 @@ class Type extends Builtin {
         CheckdateRuntime::ensureLinked($this->context);
         DateIntervalFormatRuntime::ensureLinked($this->context);
         DefaultTimezoneRuntime::ensureLinked($this->context);
+        DefaultTimezoneCivilRuntime::ensureLinked($this->context);
         InetRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);
         ProcessRuntime::ensureLinked($this->context);

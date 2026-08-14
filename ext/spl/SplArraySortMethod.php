@@ -33,7 +33,8 @@ final class SplArraySortMethod extends VmClassMethod
             $className.'::'.$this->methodLc.'()'
         );
         $argc = \count($frame->calledArgs);
-        $method = $className.'::'.$this->methodLc.'()';
+        $methodLabel = $className.'::'.$this->methodLc;
+        $method = $methodLabel.'()';
         if ($this->acceptsFlags) {
             if ($argc > 2) {
                 throw new \ArgumentCountError(
@@ -42,7 +43,8 @@ final class SplArraySortMethod extends VmClassMethod
             }
             $flags = StdlibConstants::SORT_REGULAR;
             if ($argc >= 2) {
-                $flags = VmInternalCompare::resolveFrameSortFlags($frame, $method, 1);
+                // Method user arg #1 — not $argIndex + 1 (#31035).
+                $flags = VmInternalCompare::resolveFrameSortFlags($frame, $methodLabel, 1, 1);
             }
             SplArrayStorage::sortBacking($object, $this->methodLc, $flags);
             if (null !== $frame->returnVar) {

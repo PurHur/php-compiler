@@ -1254,15 +1254,29 @@ final class VmDate
 
     private static function libcStrftime(string $format, int $timestamp, bool $gmt): string|false
     {
-        return VmDatePure::strftime($format, $timestamp, $gmt);
+        if ($gmt) {
+            return VmDatePure::strftime($format, $timestamp, true);
+        }
+
+        return VmDateTimeNative::strftimeInTimezone(self::$defaultTimezone, $format, $timestamp);
     }
 
     /**
+     * Default-timezone civil tm — epoch + zone offset, not host {@see date()} (#31047, #27142).
+     *
      * @return array<string, int>|null
      */
     private static function localtime(int $timestamp): ?array
     {
-        return VmDatePure::localtime($timestamp);
+        $tzName = self::$defaultTimezone;
+        $offset = VmDateTimeNative::timezoneOffsetSeconds($tzName, $timestamp);
+        $tm = self::gmtime($timestamp + $offset);
+        if (null === $tm) {
+            return null;
+        }
+        $tm['tm_isdst'] = VmDateTimeNative::timezoneIsDst($tzName, $timestamp) ? 1 : 0;
+
+        return $tm;
     }
 
     /**

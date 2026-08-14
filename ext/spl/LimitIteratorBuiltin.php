@@ -290,17 +290,13 @@ final class LimitIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src zim_LimitIterator___construct — iterator + optional offset/limit (#31071).
+        $this->requireUserArgCountRange($frame, 'LimitIterator::__construct', 1, 3);
         $object = SplIteratorSupport::receiver(
             $frame,
             LimitIteratorBuiltin::CLASS_LC,
             'LimitIterator::__construct()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'LimitIterator::__construct() expects at least 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('LimitIterator::__construct() requires VM context');
         }

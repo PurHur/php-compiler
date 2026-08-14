@@ -33,6 +33,14 @@ final class JitDomCreateElementNS
         if (\count($args) < 3) {
             throw new \LogicException('DOMDocument::createElementNS() expects receiver, namespace, and qualified name');
         }
+        $userArgCount = \count($args) - 1;
+        if ($userArgCount > 3) {
+            throw new \ArgumentCountError(DomClassMethod::atMostUserArgCountMessage(
+                'DOMDocument::createElementNS',
+                3,
+                $userArgCount
+            ));
+        }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $nsResolved = self::isCompileTimeNullableString($args[1]);
@@ -75,6 +83,14 @@ final class JitDomCreateElementNS
     ): Value {
         if (\count($args) < 3) {
             throw new \LogicException('Dom\\Document::createElementNS() expects receiver, namespace, and qualified name');
+        }
+        $userArgCount = \count($args) - 1;
+        if ($userArgCount > 3) {
+            throw new \ArgumentCountError(DomClassMethod::atMostUserArgCountMessage(
+                'Dom\\Document::createElementNS',
+                3,
+                $userArgCount
+            ));
         }
 
         $nsResolved = self::isCompileTimeNullableString($args[1]);

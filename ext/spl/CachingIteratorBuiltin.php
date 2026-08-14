@@ -601,17 +601,13 @@ final class CachingIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src zim_cachingiterator_construct — iterator + optional flags (#31071).
+        $this->requireUserArgCountRange($frame, 'CachingIterator::__construct', 1, 2);
         $object = SplIteratorSupport::receiverIsA(
             $frame,
             CachingIteratorBuiltin::CLASS_LC,
             'CachingIterator::__construct()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'CachingIterator::__construct() expects at least 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('CachingIterator::__construct() requires VM context');
         }

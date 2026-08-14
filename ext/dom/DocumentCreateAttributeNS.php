@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::createAttributeNS() — VM (#15253, php-src ext/dom/document.c). */
+/**
+ * DOMDocument::createAttributeNS() — VM (#15253, php-src ext/dom/document.c).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31032; missed by #31011).
+ */
 final class DocumentCreateAttributeNS extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentCreateAttributeNS extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::createAttributeNS', 2);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createAttributeNS()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMDocument::createAttributeNS() expects at least 2 arguments');
-        }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMDocument::createAttributeNS()', 0);
         // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
         $qualifiedName = $this->stringArg(

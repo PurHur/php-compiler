@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::createElementNS() — VM (#14314, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument::createElementNS() — VM (#14314, php-src ext/dom/php_dom.c).
+ *
+ * User arity 2–3 — Zend ArgumentCountError (#31032; missed by #31011).
+ */
 final class DocumentCreateElementNS extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentCreateElementNS extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::createElementNS', 2, 3);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createElementNS()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMDocument::createElementNS() expects at least 2 arguments');
-        }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMDocument::createElementNS()', 0);
         // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
         $qualifiedName = $this->stringArg(
