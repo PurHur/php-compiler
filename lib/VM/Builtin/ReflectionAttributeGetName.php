@@ -18,6 +18,8 @@ final class ReflectionAttributeGetName extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS (0 args); $calledArgs[0] is $this (#30896)
+        $this->requireExactUserArgCount($frame, 'ReflectionAttribute::getName', 0);
         $receiver = ReflectionSupport::requireReflectionAttribute($frame, $frame->calledArgs[0]);
         $nameVar = $receiver->getProperty(ReflectionSupport::PROP_ATTR_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {

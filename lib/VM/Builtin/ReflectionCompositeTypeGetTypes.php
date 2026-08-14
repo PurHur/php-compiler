@@ -24,6 +24,8 @@ final class ReflectionCompositeTypeGetTypes extends VmClassMethod
             && ReflectionSupport::REFLECTION_INTERSECTION_TYPE !== $classLc) {
             throw new \LogicException('Expected ReflectionUnionType or ReflectionIntersectionType instance');
         }
+        // php-src: zim_ReflectionUnionType_getTypes / Intersection — ZEND_PARSE_PARAMETERS (0) (#30896)
+        $this->requireExactUserArgCount($frame, $receiver->class->name.'::getTypes', 0);
         $members = $receiver->getProperty(ReflectionSupport::PROP_TYPE_MEMBERS)->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $members->type) {
             throw new \LogicException('Reflection composite type missing member types');

@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\ReflectionRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -25,6 +26,25 @@ final class ReflectionAttributeNewInstance implements Call
         AttributeNewInstanceRuntime::ensureLinked($context);
         if ([] === $args) {
             throw new \LogicException('ReflectionAttribute::newInstance() requires an object receiver');
+        }
+        // php-src: zim_ReflectionAttribute_newInstance — 0 user args (#30896)
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'ReflectionAttribute::newInstance() expects exactly 0 arguments, %d given',
+                    $userArgCount
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'refl_attr_newinstance_argc_cont');
+            $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                \PHPCompiler\JIT\JitValueBox::pointer($context, $slot)
+            );
+
+            return $slot;
         }
         $attrObj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $nameVar = $context->type->object->propertyFetch($attrObj, 'ReflectionAttribute', 'name');

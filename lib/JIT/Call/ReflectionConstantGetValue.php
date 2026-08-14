@@ -26,6 +26,20 @@ final class ReflectionConstantGetValue implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
+        // php-src: zim_ReflectionConstant_getValue — 0 user args (#30896)
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'ReflectionConstant::getValue() expects exactly 0 arguments, %d given',
+                    $userArgCount
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'refl_const_getvalue_argc_cont');
+
+            return JitValueBox::alloc($context);
+        }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $cached = $context->type->object->propertyFetch($obj, 'ReflectionConstant', 'value');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $cached);

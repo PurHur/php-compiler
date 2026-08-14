@@ -18,6 +18,8 @@ final class ReflectionConstantGetName extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $receiver = ReflectionSupport::requireReflectionConstant($frame, $frame->calledArgs[0]);
+        // php-src: zim_ReflectionClassConstant_getName / ReflectionConstant — 0 args (#30896)
+        $this->requireExactUserArgCount($frame, $receiver->class->name.'::getName', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(ReflectionSupport::constantNameFromReflection($receiver));
         }
