@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMElement::getAttributeNS() — VM (#14313, php-src ext/dom/php_dom.c). */
+/**
+ * DOMElement::getAttributeNS() — VM (#14313, php-src ext/dom/php_dom.c).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31011; missed by #30616).
+ */
 final class ElementGetAttributeNS extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class ElementGetAttributeNS extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::getAttributeNS', 2);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::getAttributeNS()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMElement::getAttributeNS() expects at least 2 arguments');
-        }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::getAttributeNS()', 0);
         // Pass $frame so caller strict_types rejects null localName (#30091, peer #29985).
         $localName = $this->stringArg(
