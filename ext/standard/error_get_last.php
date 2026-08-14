@@ -7,11 +7,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * error_get_last() — last PHP error state (ext/standard/error.c parity, issue #3158).
+ *
+ * Excess argc → Zend ArgumentCountError (#30674; php-src ext/standard/error.c).
  */
 final class error_get_last extends Internal
 {
@@ -22,9 +25,8 @@ final class error_get_last extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('error_get_last() takes no arguments');
-        }
+        // php-src stub arity: exactly 0 (#30674; ext/standard/error.c).
+        $this->requireExactArgCount($frame, 'error_get_last', 0);
         if (null === $frame->returnVar || null === $frame->vmContext) {
             return;
         }
@@ -33,8 +35,11 @@ final class error_get_last extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('error_get_last() takes no arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30674 / peer #30653).
+        if (!$this->requireExactJitArgCount($context, $args, 'error_get_last', 0)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitErrorGetLast::invoke($context);
