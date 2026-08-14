@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCfg\Operand;
 use PHPLLVM\Value;
 
@@ -32,6 +33,7 @@ final class FiberHelper
         $context->functionProxies['fiber::resume'] = new Call\FiberResume();
         $context->functionProxies['fiber::throw'] = new Call\FiberThrow();
         $context->functionProxies['fiber::suspend'] = new Call\FiberSuspendStatic();
+        $context->functionProxies['fiber::getcurrent'] = new Call\FiberGetCurrent();
         $context->functionProxies['fiber::getreturn'] = new Call\FiberGetReturn();
         $context->functionProxies['fiber::isterminated'] = new Call\FiberIsTerminated();
         $context->functionProxies['fiber::isstarted'] = new Call\FiberIsStarted();
@@ -120,5 +122,119 @@ final class FiberHelper
     public static function loadStatusBool(Context $context, Variable $fiberVar, string $which): Variable
     {
         return FiberHelperLlvm::loadStatusBool($context, $fiberVar, $which);
+    }
+
+    /**
+     * Instance-method user argc (excludes $this). php-src ZEND_NUM_ARGS (#30906).
+     *
+     * @param Variable[] $args
+     */
+    public static function emitExactInstanceUserArgc(
+        Context $context,
+        array $args,
+        string $function,
+        int $expected
+    ): bool {
+        return self::emitUserArgcExact($context, max(0, \count($args) - 1), $function, $expected);
+    }
+
+    /**
+     * Instance-method user argc (excludes $this). php-src ZEND_NUM_ARGS (#30906).
+     *
+     * @param Variable[] $args
+     */
+    public static function emitAtMostInstanceUserArgc(
+        Context $context,
+        array $args,
+        string $function,
+        int $maximum
+    ): bool {
+        return self::emitUserArgcAtMost($context, max(0, \count($args) - 1), $function, $maximum);
+    }
+
+    /**
+     * Static-method argc (no $this). php-src ZEND_NUM_ARGS (#30906).
+     *
+     * @param Variable[] $args
+     */
+    public static function emitExactStaticArgc(
+        Context $context,
+        array $args,
+        string $function,
+        int $expected
+    ): bool {
+        return self::emitUserArgcExact($context, \count($args), $function, $expected);
+    }
+
+    /**
+     * Static-method argc (no $this). php-src ZEND_NUM_ARGS (#30906).
+     *
+     * @param Variable[] $args
+     */
+    public static function emitAtMostStaticArgc(
+        Context $context,
+        array $args,
+        string $function,
+        int $maximum
+    ): bool {
+        return self::emitUserArgcAtMost($context, \count($args), $function, $maximum);
+    }
+
+    public static function dummyNullValue(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    public static function dummyNativeFalse(Context $context): Value
+    {
+        return $context->getTypeFromString('int1')->constInt(0, false);
+    }
+
+    private static function emitUserArgcExact(
+        Context $context,
+        int $given,
+        string $function,
+        int $expected
+    ): bool {
+        if ($given === $expected) {
+            return true;
+        }
+        ExceptionBridge::emitArgumentCountErrorAndAbort(
+            $context,
+            VmClassMethod::exactUserArgCountMessage($function, $expected, $given)
+        );
+        BasicBlockHelper::ensureOpenInsertBlock(
+            $context,
+            strtolower(str_replace('::', '_', $function)).'_argc_cont'
+        );
+
+        return false;
+    }
+
+    private static function emitUserArgcAtMost(
+        Context $context,
+        int $given,
+        string $function,
+        int $maximum
+    ): bool {
+        if ($given <= $maximum) {
+            return true;
+        }
+        ExceptionBridge::emitArgumentCountErrorAndAbort(
+            $context,
+            VmClassMethod::atMostUserArgCountMessage($function, $maximum, $given)
+        );
+        BasicBlockHelper::ensureOpenInsertBlock(
+            $context,
+            strtolower(str_replace('::', '_', $function)).'_argc_cont'
+        );
+
+        return false;
     }
 }

@@ -19,6 +19,10 @@ final class FiberResume implements Call
         if (count($args) < 1) {
             throw new \LogicException('Fiber::resume() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — resume(mixed $value = null); at most 1 user arg (#30906)
+        if (!FiberHelper::emitAtMostInstanceUserArgc($context, $args, 'Fiber::resume', 1)) {
+            return FiberHelper::dummyNullValue($context);
+        }
         $fiberVar = $args[0];
         $resumeName = FiberHelper::resolveResumeLc($context, $fiberVar);
         $statePtr = $fiberVar->fiberStatePtr ?? FiberHelper::loadStateFromFiberObject($context, $fiberVar);

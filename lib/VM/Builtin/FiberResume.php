@@ -22,6 +22,8 @@ final class FiberResume extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Fiber::resume() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — resume(mixed $value = null); ZEND_NUM_ARGS at most 1 (#30906)
+        $this->requireUserArgCountRange($frame, 'Fiber::resume', 0, 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('Fiber::resume() requires VM context');
         }

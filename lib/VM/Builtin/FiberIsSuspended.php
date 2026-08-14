@@ -21,6 +21,8 @@ final class FiberIsSuspended extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Fiber::isSuspended() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — isSuspended(): bool; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        $this->requireExactUserArgCount($frame, 'Fiber::isSuspended', 0);
         FiberSupport::requireFiberObject($frame->calledArgs[0], 'Fiber::isSuspended()');
         $fiber = FiberSupport::fiberFromObject($frame->calledArgs[0]->resolveIndirect()->toObject());
         if (null !== $frame->returnVar) {

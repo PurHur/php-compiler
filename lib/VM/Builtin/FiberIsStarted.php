@@ -21,6 +21,8 @@ final class FiberIsStarted extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Fiber::isStarted() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — isStarted(): bool; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        $this->requireExactUserArgCount($frame, 'Fiber::isStarted', 0);
         FiberSupport::requireFiberObject($frame->calledArgs[0], 'Fiber::isStarted()');
         $fiber = FiberSupport::fiberFromObject($frame->calledArgs[0]->resolveIndirect()->toObject());
         if (null !== $frame->returnVar) {

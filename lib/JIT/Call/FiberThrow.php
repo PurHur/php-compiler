@@ -32,8 +32,9 @@ final class FiberThrow implements Call
         if (count($args) < 1) {
             throw new \LogicException('Fiber::throw() called without $this');
         }
-        if (count($args) < 2) {
-            throw new \LogicException('Fiber::throw() expects exactly 1 argument');
+        // php-src Zend/zend_fibers.stub.php — throw(Throwable $exception); exactly 1 user arg (#30906)
+        if (!FiberHelper::emitExactInstanceUserArgc($context, $args, 'Fiber::throw', 1)) {
+            return FiberHelper::dummyNullValue($context);
         }
         $fiberVar = $args[0];
         $exception = $args[1];

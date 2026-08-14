@@ -18,6 +18,10 @@ final class FiberIsSuspended implements Call
         if ([] === $args) {
             throw new \LogicException('Fiber::isSuspended() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — isSuspended(): bool; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        if (!FiberHelper::emitExactInstanceUserArgc($context, $args, 'Fiber::isSuspended', 0)) {
+            return FiberHelper::dummyNativeFalse($context);
+        }
 
         return FiberHelper::loadStatusBool($context, $args[0], 'suspended')->value;
     }
