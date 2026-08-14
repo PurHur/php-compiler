@@ -1,5 +1,7 @@
 --TEST--
 get_parent_class()/siblings TypeError bool actual is true/false not bool (#29631, zend_execute.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach ([

@@ -925,6 +925,23 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ {@code zend_zval_type_name()} prints {@code true}/{@code false} for IS_TRUE/IS_FALSE
+     * (GH-8385, #31160). User TypeError “given”/“returned” follows that spelling.
+     *
+     * Zend 8.2/8.3 still print {@code bool}. Withheld on the 8.4.0-dev reference profile (matches
+     * Zend 8.2); enable via stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4}/{@code 8.5}.
+     * Same withhold as {@see supportsHexFloatLiterals()} — do not use
+     * {@see isForwardProfileAtLeast()} (that would re-enable on unset PROFILE).
+     *
+     * Distinct from {@see supportsClassPseudoConstValueNameTypeError()} (8.3+
+     * {@code zend_zval_value_name} for {@code $expr::class}).
+     */
+    public static function supportsTrueFalseZvalTypeName(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ TENTATIVE_RETURN Core constant (Zend/zend_attributes.h, issue #18060).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+ or

@@ -36,6 +36,6 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-TypeError: Cannot assign false to property TrueP::$x of type true
-TypeError: Cannot assign true to property FalseP::$y of type false
+TypeError: Cannot assign bool to property TrueP::$x of type true
+TypeError: Cannot assign bool to property FalseP::$y of type false
 TypeError: Cannot assign array to property IntP::$z of type int

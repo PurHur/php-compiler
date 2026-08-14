@@ -1,5 +1,7 @@
 --TEST--
 iterator_to_array/count/apply TypeError actual false|true not bool (#30117)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['iterator_to_array', 'iterator_count', 'iterator_apply'] as $fn) {

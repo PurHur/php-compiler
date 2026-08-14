@@ -17,6 +17,6 @@ $flat = ini_get_all(null, false);
 echo is_string($flat['display_errors']) ? "flat_ok\n" : "flat_fail\n";
 ?>
 --EXPECT--
-ini_get_all(): Argument #1 ($extension) must be of type ?string, false given
+ini_get_all(): Argument #1 ($extension) must be of type ?string, bool given
 all_ok
 flat_ok

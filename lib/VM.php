@@ -11353,7 +11353,8 @@ restart:
     /**
      * Zend {@code zend_zval_value_name()} labels for method-on-non-object Errors (#4241, #30054).
      *
-     * Booleans use {@code true}/{@code false}, not {@code bool}.
+     * Booleans use {@code true}/{@code false}, not {@code bool} (distinct from TypeError
+     * {@code zend_zval_type_name} spelling gated in {@see VM\EnumCaseSupport::typeNameForTypeErrorActual()}).
      */
     private function valueDebugTypeLabel(Variable $value): string
     {
@@ -11361,7 +11362,7 @@ restart:
             return 'object';
         }
 
-        return VM\EnumCaseSupport::typeNameForTypeErrorActual($value);
+        return VM\EnumCaseSupport::typeNameForZvalValueName($value);
     }
 
     /**

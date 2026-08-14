@@ -122,6 +122,7 @@ final class EnumCaseTypeNameTest extends TestCase
             // #29592 / #30054 — bool uses concrete true/false, not "bool"
             $t = new Variable(Variable::TYPE_BOOLEAN);
             $t->bool(true);
+            $this->assertSame('true', EnumCaseSupport::typeNameForZvalValueName($t));
             $this->assertSame('true', EnumCaseSupport::typeNameForTypeErrorActual($t));
             $this->assertSame(
                 'Cannot use "::class" on true',
@@ -129,6 +130,7 @@ final class EnumCaseTypeNameTest extends TestCase
             );
             $f = new Variable(Variable::TYPE_BOOLEAN);
             $f->bool(false);
+            $this->assertSame('false', EnumCaseSupport::typeNameForZvalValueName($f));
             $this->assertSame('false', EnumCaseSupport::typeNameForTypeErrorActual($f));
             $this->assertSame(
                 'Cannot use "::class" on false',
@@ -172,6 +174,39 @@ final class EnumCaseTypeNameTest extends TestCase
                 'Cannot use "::class" on value of type string',
                 EnumCaseSupport::classPseudoConstTypeErrorMessage($s)
             );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    /**
+     * @covers \PHPCompiler\VM\EnumCaseSupport::typeNameForTypeErrorActual
+     * @covers issue #31160
+     */
+    public function testTypeNameForTypeErrorActualBoolOnDefaultProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        try {
+            $this->assertFalse(CompilerVersion::supportsTrueFalseZvalTypeName());
+            $t = new Variable(Variable::TYPE_BOOLEAN);
+            $t->bool(true);
+            $this->assertSame('bool', EnumCaseSupport::typeNameForTypeErrorActual($t));
+            $this->assertSame('true', EnumCaseSupport::typeNameForZvalValueName($t));
+            $f = new Variable(Variable::TYPE_BOOLEAN);
+            $f->bool(false);
+            $this->assertSame('bool', EnumCaseSupport::typeNameForTypeErrorActual($f));
+            $this->assertSame('false', EnumCaseSupport::typeNameForZvalValueName($f));
+            $i = new Variable(Variable::TYPE_INTEGER);
+            $i->int(0);
+            $this->assertSame('int', EnumCaseSupport::typeNameForTypeErrorActual($i));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
