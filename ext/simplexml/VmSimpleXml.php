@@ -478,11 +478,7 @@ final class VmSimpleXml
 
             return;
         }
-        $state = SimpleXmlRegistry::state($entry);
-        $state->children = array_values(array_filter(
-            $state->children,
-            static fn (SimpleXmlNodeState $child): bool => $child->name !== $name
-        ));
+        SimpleXmlRegistry::state($entry)->removeElementsNamed($name);
     }
 
     /**
@@ -520,8 +516,7 @@ final class VmSimpleXml
         $count = \count($matches);
         if (1 === $count) {
             $node = $matches[0];
-            $node->children = [];
-            $node->text = $stringValue;
+            $node->replaceText($stringValue);
             VmDomSimpleXmlBridge::syncDomTextFromSimpleXml($ctx, $node, $stringValue);
 
             return;
@@ -544,8 +539,8 @@ final class VmSimpleXml
             return;
         }
         $child = new SimpleXmlNodeState($name);
-        $child->text = $stringValue;
-        $parent->children[] = $child;
+        $child->replaceText($stringValue);
+        $parent->appendElement($child);
     }
 
     /**
@@ -610,9 +605,9 @@ final class VmSimpleXml
 
     private static function removeNodeFromParent(SimpleXmlNodeState $parent, SimpleXmlNodeState $target): bool
     {
-        foreach ($parent->children as $index => $child) {
+        foreach ($parent->children as $child) {
             if ($child === $target) {
-                array_splice($parent->children, $index, 1);
+                $parent->removeElement($target);
                 // Live xpath handles keep the ObjectEntry but stringify empty (#20483).
                 $target->markDetached();
 
@@ -760,8 +755,7 @@ final class VmSimpleXml
                 return;
             }
             $node = $elements[$index];
-            $node->children = [];
-            $node->text = $stringValue;
+            $node->replaceText($stringValue);
             // Live DOM peer — same libxml node in php-src (#20137).
             VmDomSimpleXmlBridge::syncDomTextFromSimpleXml($ctx, $node, $stringValue);
 
@@ -1145,9 +1139,9 @@ final class VmSimpleXml
 
         $child = new SimpleXmlNodeState($childName, $childAttrs);
         if (null !== $value && '' !== $value) {
-            $child->text = $value;
+            $child->replaceText($value);
         }
-        SimpleXmlRegistry::state($entry)->children[] = $child;
+        SimpleXmlRegistry::state($entry)->appendElement($child);
 
         return self::wrapNode($ctx, $entry->class, $child, SimpleXmlRegistry::documentKey($entry));
     }
@@ -1953,15 +1947,37 @@ final class VmSimpleXml
         foreach ($node->attributes as $name => $value) {
             $attrs .= sprintf(' %s="%s"', $name, self::escapeXmlAttribute($value));
         }
-        if ([] === $node->children && '' === $node->text) {
+        $inner = self::serializeMixedContent($node);
+        if ('' === $inner) {
             return sprintf('<%s%s/>', $node->name, $attrs);
+        }
+
+        return sprintf('<%s%s>%s</%s>', $node->name, $attrs, $inner, $node->name);
+    }
+
+    /**
+     * xmlNodeDump order: text and element children interleaved (php-src sxe.c / libxml; #31049).
+     */
+    private static function serializeMixedContent(SimpleXmlNodeState $node): string
+    {
+        if ([] !== $node->content) {
+            $inner = '';
+            foreach ($node->content as $part) {
+                if (\is_string($part)) {
+                    $inner .= self::escapeXmlText($part);
+                } else {
+                    $inner .= self::serializeNode($part);
+                }
+            }
+
+            return $inner;
         }
         $inner = self::escapeXmlText($node->text);
         foreach ($node->children as $child) {
             $inner .= self::serializeNode($child);
         }
 
-        return sprintf('<%s%s>%s</%s>', $node->name, $attrs, $inner, $node->name);
+        return $inner;
     }
 
     private static function escapeXmlAttribute(string $value): string
@@ -2600,7 +2616,7 @@ final class VmSimpleXml
                 continue;
             }
             if ('' !== $textBuffer) {
-                $node->text .= $textBuffer;
+                $node->appendText($textBuffer);
                 $textBuffer = '';
             }
             $end = self::findElementEnd($inner, $pos);
@@ -2612,10 +2628,10 @@ final class VmSimpleXml
             if (null === $child) {
                 return null;
             }
-            $node->children[] = $child;
+            $node->appendElement($child);
             $pos = $end;
         }
-        $node->text .= $textBuffer;
+        $node->appendText($textBuffer);
 
         return $node;
     }
