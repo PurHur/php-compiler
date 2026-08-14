@@ -367,6 +367,20 @@ final class SplArrayStorage
     }
 
     /**
+     * php-src spl_array_has_property — ARRAY_AS_PROPS backing keys for property_exists() (#31039).
+     */
+    public static function propertyExistsByName(ObjectEntry $object, string $name): bool
+    {
+        if (!self::hasArrayAsProps($object)) {
+            return false;
+        }
+        $key = new Variable(Variable::TYPE_STRING);
+        $key->string($name);
+
+        return self::offsetExists($object, $key);
+    }
+
+    /**
      * php-src spl_array_get_properties — internal storage keys as object properties for json_encode (#13924).
      *
      * @return array<string, Variable>

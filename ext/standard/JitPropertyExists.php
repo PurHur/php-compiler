@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\spl\ArrayIteratorBuiltin;
+use PHPCompiler\ext\spl\ArrayObjectBuiltin;
+use PHPCompiler\ext\spl\RecursiveArrayIteratorBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringPropertyExists;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -259,18 +262,46 @@ final class JitPropertyExists
         Value $classId
     ): Value {
         if (null !== $propLiteral) {
-            // Enum pseudo-props name/value are case-sensitive (#23532).
-            if ('name' === $propLiteral || 'value' === $propLiteral) {
-                $enumExists = self::existsForEnumCasePropertyLiteral($context, $classId, $propLiteral);
-                $regularExists = self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
+            // ARRAY_AS_PROPS flags are runtime — fold only via PHP helper (#31039).
+            $isSplArray = self::isSplArrayStorageClassId($context, $classId);
+            $splBlock = BasicBlockHelper::append($context, 'prop_exists_spl_array');
+            $normBlock = BasicBlockHelper::append($context, 'prop_exists_not_spl_array');
+            $mergeBlock = BasicBlockHelper::append($context, 'prop_exists_spl_merge');
+            $context->builder->branchIf($isSplArray, $splBlock, $normBlock);
 
-                return $context->builder->or($enumExists, $regularExists);
-            }
+            $context->builder->positionAtEnd($splBlock);
+            $splResult = self::routeObjectThroughPhpHelper($context, $objectArg, $propertyArg);
+            $context->builder->branch($mergeBlock);
 
-            return self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
+            $context->builder->positionAtEnd($normBlock);
+            $normResult = self::forCompleteObjectLiteralProperty($context, $classId, $propLiteral);
+            $context->builder->branch($mergeBlock);
+
+            $context->builder->positionAtEnd($mergeBlock);
+            $phi = $context->builder->phi($splResult->typeOf());
+            $phi->addIncoming($splResult, $splBlock);
+            $phi->addIncoming($normResult, $normBlock);
+
+            return $phi;
         }
 
         return self::routeObjectThroughPhpHelper($context, $objectArg, $propertyArg);
+    }
+
+    private static function forCompleteObjectLiteralProperty(
+        Context $context,
+        Value $classId,
+        string $propLiteral
+    ): Value {
+        // Enum pseudo-props name/value are case-sensitive (#23532).
+        if ('name' === $propLiteral || 'value' === $propLiteral) {
+            $enumExists = self::existsForEnumCasePropertyLiteral($context, $classId, $propLiteral);
+            $regularExists = self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
+
+            return $context->builder->or($enumExists, $regularExists);
+        }
+
+        return self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
     }
 
     private static function existsForEnumCasePropertyLiteral(
@@ -300,6 +331,34 @@ final class JitPropertyExists
         }
 
         return $exists;
+    }
+
+    private static function isSplArrayStorageClassId(Context $context, Value $classId): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $object = $context->type->object;
+        $isSpl = $i1->constInt(0, false);
+        foreach ([
+            ArrayObjectBuiltin::CLASS_LC,
+            ArrayIteratorBuiltin::CLASS_LC,
+            RecursiveArrayIteratorBuiltin::CLASS_LC,
+        ] as $classLc) {
+            $id = $object->classIdByName($classLc);
+            if (null === $id) {
+                $id = $object->classIdForLowerName($classLc);
+            }
+            if (null === $id) {
+                continue;
+            }
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($id, 'int64')
+            );
+            $isSpl = $context->builder->or($isSpl, $match);
+        }
+
+        return $isSpl;
     }
 
     private static function existsForClassIdLiteralProperty(
