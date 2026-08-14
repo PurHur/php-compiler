@@ -445,6 +445,8 @@
             <file>./test/compliance/PasswordGetInfoExcessArgc30712JITTest.php</file>
             <file>./test/compliance/StrpbrkStrrchrStrtokExcessArgc30703VMTest.php</file>
             <file>./test/compliance/StrpbrkStrrchrStrtokExcessArgc30703JITTest.php</file>
+            <file>./test/compliance/ClassAliasExcessArgc30783VMTest.php</file>
+            <file>./test/compliance/ClassAliasExcessArgc30783JITTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690VMTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690JITTest.php</file>
             <file>./test/compliance/SizeofExcessArgc30686VMTest.php</file>

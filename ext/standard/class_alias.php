@@ -27,9 +27,8 @@ final class class_alias extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2 || \count($frame->calledArgs) > 3) {
-            throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
-        }
+        // php-src Zend/zend_builtin_functions.c — ZEND_PARSE_PARAMETERS 2..3 (#30783).
+        $this->requireArgCountRange($frame, 'class_alias', 2, 3);
         $ctx = VmReflection::requireContext($frame);
         // php-src Zend/zend_builtin_functions.stub.php — string $class / string $alias.
         // Z_PARAM_STR: declare(strict_types=1) → TypeError on null; else soft-null DEP+coerce (#29816 / #29661).
@@ -51,8 +50,9 @@ final class class_alias extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2 || \count($args) > 3) {
-            throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #30783.
+        if (!$this->requireArgCountRangeJit($context, $args, 'class_alias', 2, 3)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $autoloadArg = 3 === \count($args) ? $args[2] : null;
         // Under strict_types, force Z_PARAM_STR TypeError before literal fold (#29816).
