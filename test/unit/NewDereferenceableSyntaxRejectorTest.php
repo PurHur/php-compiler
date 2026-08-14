@@ -111,14 +111,37 @@ PHP
         self::assertSame($src, NewDereferenceableDesugar::desugar($src));
     }
 
-    public function testAllowsCtorParensObjectDerefOnDefault84DevReferenceProfile(): void
+    public function testRejectsCtorParensObjectDerefOnDefault84DevReferenceProfile(): void
     {
         putenv('PHP_COMPILER_PROFILE');
-        if (!CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
-            self::markTestSkipped('dereferencable new not enabled on default profile');
+        if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+            self::markTestSkipped('dereferencable new unexpectedly enabled on default 8.2 advertisement');
         }
 
-        $code = '<?php echo new Greeter()->hello();';
-        self::assertSame($code, NewDereferenceableSyntaxRejector::reject($code, 'default_new.php'));
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(NewDereferenceableDesugar::REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR);
+
+        NewDereferenceableSyntaxRejector::reject(
+            '<?php class C { function m() { return 2; } } echo new C()->m();',
+            'default_new.php'
+        );
+    }
+
+    /** Issue #31164: default advertisement (phpversion 8.2.31) parse-errors like Zend 8.2. */
+    public function testVmParseAndCompileRejectsOnDefaultProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+            self::markTestSkipped('dereferencable new unexpectedly enabled on default 8.2 advertisement');
+        }
+
+        $code = <<<'PHP'
+<?php
+class C { function m() { return 2; } }
+echo new C()->m(), "\n";
+PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(NewDereferenceableDesugar::REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR);
+        (new Runtime())->parseAndCompile($code, 'issue_31164.php');
     }
 }

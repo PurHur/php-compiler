@@ -8,10 +8,12 @@ use PHPCompiler\Ast\TryCatchElseSupport;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject PHP 8.4 try/catch/else on the Zend 8.2 reference profile (#15817).
+ * Reject try/catch/else on all php-src-strict profiles (#31159, re-#15817).
  *
+ * php-src never shipped this production; Zend parse-errors `else` after catch/finally
+ * (`unexpected token "else"`) on every shipping version including 8.4/8.5.
  * Must run before {@see TryCatchElseSupport::extract()} so else clauses are not stripped.
- * php-src: Zend/zend_language_parser.y try_catch_list.
+ * php-src: Zend/zend_language_parser.y try_catch_list; Zend/zend_compile.c zend_compile_try.
  */
 final class TryCatchElseSyntaxRejector
 {

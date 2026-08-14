@@ -111,6 +111,10 @@
             <file>./test/compliance/AnonymousClassImplementsNameJITTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
+            <file>./test/compliance/FinalPromotedCtorParamParse31153VMTest.php</file>
+            <file>./test/compliance/FinalPromotedCtorParamParse31153JITTest.php</file>
+            <file>./test/compliance/TryCatchElsePhpSrcStrict31159VMTest.php</file>
+            <file>./test/compliance/TryCatchElsePhpSrcStrict31159JITTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146VMTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146JITTest.php</file>
             <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
@@ -574,6 +578,8 @@
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageJITTest.php</file>
+            <file>./test/compliance/MbStrPadPhantomCallVMTest.php</file>
+            <file>./test/compliance/MbStrPadPhantomCallJITTest.php</file>
             <file>./test/compliance/MbSplitEmptyPatternVMTest.php</file>
             <file>./test/compliance/GraphemePosEmptyNeedleVMTest.php</file>
             <file>./test/compliance/MbStrstrFamilyReflectionVMTest.php</file>

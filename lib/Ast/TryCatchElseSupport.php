@@ -7,15 +7,17 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Extract PHP 8.4+ try/catch/else before nikic/php-parser (#15817).
+ * Detect try/catch/else for php-src-strict Parse error (#31159).
  *
- * php-src: Zend/zend_language_parser.y try_catch_list else; zend_compile.c zend_compile_try.
+ * Extraction of else arms is gated on {@see CompilerVersion::supportsTryCatchElse()}, which
+ * is always false on php-src-strict (php-src never shipped this production).
+ * php-src: Zend/zend_language_parser.y try_catch_list; zend_compile.c zend_compile_try.
  */
 final class TryCatchElseSupport
 {
     public const ATTRIBUTE = 'compilerTryCatchElseSource';
 
-    /** Zend 8.2 reference profile message for try/catch/else (#15817). */
+    /** Zend Parse error message for try/catch/else (#31159, Zend/zend_language_parser.y). */
     public const REFERENCE_PROFILE_UNEXPECTED_ELSE = 'syntax error, unexpected token "else"';
 
     /** @var list<string> else-block inner sources (statements only), FIFO per compilation unit */
