@@ -41,6 +41,12 @@ final class TimezoneLocationRuntimeShrinkTest extends TestCase
         $native = VmDateTimeNative::timezoneLocation('Europe/Berlin');
         $this->assertIsArray($native);
         $this->assertSame($native['country_code'], $ht->find('country_code')->resolveIndirect()->toString());
+        $this->assertSame(13.36666, $native['longitude']);
+        $this->assertSame(52.5, $native['latitude']);
+        $this->assertSame(
+            '{"country_code":"DE","latitude":52.5,"longitude":13.36666,"comments":"most of Germany"}',
+            json_encode($native)
+        );
         $this->assertNull(TimezoneLocationJitHelper::locationHashtable('Not/A/Real/Zone'));
     }
 }

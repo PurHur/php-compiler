@@ -319,6 +319,8 @@
             <file>./test/compliance/DateIntervalConstructNullStrictJITTest.php</file>
             <file>./test/compliance/DateTimeZoneConstructNullArgIndexVMTest.php</file>
             <file>./test/compliance/DateTimeZoneConstructNullArgIndexJITTest.php</file>
+            <file>./test/compliance/DateTimeZoneGetLocationCoords30953VMTest.php</file>
+            <file>./test/compliance/DateTimeZoneGetLocationCoords30953JITTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictVMTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictJITTest.php</file>
             <file>./test/compliance/OpcacheIsScriptCachedInFileCacheVMTest.php</file>

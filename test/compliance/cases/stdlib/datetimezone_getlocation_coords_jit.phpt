@@ -1,5 +1,5 @@
 --TEST--
-stdlib DateTimeZone::getLocation / timezone_location_get lat/lon bit-match Zend (#22291, #30953, ext/date/php_date.c)
+JIT: DateTimeZone::getLocation / timezone_location_get lat/lon bit-match Zend (#30953, ext/date/php_date.c)
 --FILE--
 <?php
 $cases = [
