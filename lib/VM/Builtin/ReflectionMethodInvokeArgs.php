@@ -19,12 +19,8 @@ final class ReflectionMethodInvokeArgs extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 3) {
-            throw new \ArgumentCountError(
-                'ReflectionMethod::invokeArgs() expects exactly 2 arguments, '.($argc - 1).' given'
-            );
-        }
+        // php-src: zim_ReflectionMethod_invokeArgs — ZEND_PARSE_PARAMETERS exactly 2 user args (#30922)
+        $this->requireExactUserArgCount($frame, 'ReflectionMethod::invokeArgs', 2);
         $reflection = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
         $objectArg = $frame->calledArgs[1];
         $ctx = VmReflection::requireContext($frame);
