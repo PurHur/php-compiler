@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -16,9 +17,8 @@ final class strrchr extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#30703).
+        $this->requireExactArgCount($frame, 'strrchr', 2);
         // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29783 / #29766).
         $haystackStr = VmString::trimFamilyStringArgForFrame($frame, 0, 'strrchr', 0, 'haystack');
         $needleStr = VmString::stringBuiltinArgForFrame($frame, 1, 'strrchr', 1, 'needle');
@@ -35,8 +35,11 @@ final class strrchr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #30703.
+        if (!$this->requireExactJitArgCount($context, $args, 'strrchr', 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         // Null → TypeError under strict without helper IR after abort (peer utf8_encode #29889 / #29783).
