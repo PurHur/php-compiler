@@ -231,9 +231,15 @@ class AotTest extends BaseTest
                 continue;
             }
             // AOT mb_str_pad_*_forward* / json_validate_*_forward* fixtures set PROFILE via --ENV--; always include (#22373, #22544).
+            // Phantom cases assert absence on the 8.2 reference — always include (#31174).
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
-                && !str_contains($name, 'forward')) {
+                && !str_contains($name, 'forward')
+                && !str_contains($name, 'phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsJsonValidate()

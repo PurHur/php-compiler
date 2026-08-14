@@ -505,6 +505,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testMbStrPadAdvertisedOn83Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbStrPad());
+            $this->assertTrue(CompilerVersion::advertisesMbStrPad());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testMbUcfirstLcfirstWithheldOnPhp83Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
