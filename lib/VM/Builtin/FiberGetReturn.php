@@ -23,6 +23,8 @@ final class FiberGetReturn extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Fiber::getReturn() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — getReturn(): mixed; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        $this->requireExactUserArgCount($frame, 'Fiber::getReturn', 0);
         FiberSupport::requireFiberObject($frame->calledArgs[0], 'Fiber::getReturn()');
         $fiber = FiberSupport::fiberFromObject($frame->calledArgs[0]->resolveIndirect()->toObject());
         if (FiberState::STATUS_TERMINATED === $fiber->status) {

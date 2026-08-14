@@ -20,9 +20,11 @@ final class FiberThrow extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('Fiber::throw() expects exactly 1 argument');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('Fiber::throw() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — throw(Throwable $exception); ZEND_NUM_ARGS exactly 1 (#30906)
+        $this->requireExactUserArgCount($frame, 'Fiber::throw', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('Fiber::throw() requires VM context');
         }
