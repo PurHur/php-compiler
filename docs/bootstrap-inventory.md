@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7418 |
-| Phase A inventory files (M2 ratio SSOT) | 7418 |
+| PHP files on vm.php path | 7419 |
+| Phase A inventory files (M2 ratio SSOT) | 7419 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23984 |
+| Source constructs flagged (warnings) | 23982 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2389,7 +2389,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_unpad.php` | 0 | 1 |
 | `ext/spl/AppendIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 33 |
-| `ext/spl/ArrayObjectBuiltin.php` | 0 | 32 |
+| `ext/spl/ArrayObjectBuiltin.php` | 0 | 30 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 23 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
@@ -7222,7 +7222,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/SplArrayCastJitHelper.php` | 0 | 2 |
 | `lib/VM/SplDllistJitHelper.php` | 0 | 3 |
 | `lib/VM/SplFileObjectJitHelper.php` | 0 | 3 |
-| `lib/VM/SplFixedArrayJitHelper.php` | 0 | 8 |
+| `lib/VM/SplFixedArrayJitHelper.php` | 0 | 7 |
 | `lib/VM/SplHeapJitHelper.php` | 0 | 5 |
 | `lib/VM/SplHtPosIteratorJitHelper.php` | 0 | 5 |
 | `lib/VM/SplObjectStorageJitHelper.php` | 0 | 3 |
@@ -26771,12 +26771,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 212)
 - new ArgumentCountError (line 260)
 - new ArgumentCountError (line 319)
-- new ArgumentCountError (line 368)
-- new ArgumentCountError (line 398)
-- new ArgumentCountError (line 422)
-- new ArgumentCountError (line 449)
-- new ArgumentCountError (line 473)
-- new ArgumentCountError (line 508)
+- new ArgumentCountError (line 370)
+- new ArgumentCountError (line 400)
+- new ArgumentCountError (line 424)
+- new ArgumentCountError (line 451)
 - 16 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -27232,7 +27230,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 281)
 - new Variable (line 283)
 - new ArgumentCountError (line 329)
-- new Error (line 1158)
+- new Error (line 1164)
 - 39 class method(s)
 
 ### `ext/spl/SplFileInfoStorage.php`
@@ -27307,15 +27305,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 512)
 - new ArgumentCountError (line 536)
 - new ArgumentCountError (line 565)
-- new ArgumentCountError (line 584)
-- new Variable (line 598)
-- new Variable (line 618)
-- new ArgumentCountError (line 662)
-- new ArgumentCountError (line 689)
-- new Variable (line 718)
-- new Variable (line 739)
-- new Variable (line 743)
-- new ArgumentCountError (line 766)
+- new ArgumentCountError (line 586)
+- new ArgumentCountError (line 591)
+- new Variable (line 605)
+- new Variable (line 627)
+- new ArgumentCountError (line 671)
+- new Variable (line 723)
+- new Variable (line 744)
+- new Variable (line 748)
+- new ArgumentCountError (line 771)
 - 35 class method(s)
 
 ### `ext/spl/SplFixedArraySerializeSupport.php`
@@ -59806,13 +59804,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/SplFixedArrayJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 32)
-- new JITVariable (line 50)
-- new ArgumentCountError (line 79)
-- new JITVariable (line 88)
-- new JITVariable (line 208)
-- new JITVariable (line 250)
-- new JITVariable (line 318)
+- new JITVariable (line 33)
+- new JITVariable (line 51)
+- new JITVariable (line 114)
+- new JITVariable (line 234)
+- new JITVariable (line 276)
+- new JITVariable (line 344)
 - 16 class method(s)
 
 ### `lib/VM/SplHeapJitHelper.php`
