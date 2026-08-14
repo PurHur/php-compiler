@@ -121,6 +121,8 @@ class Object_ extends Type {
     private array $hasConstructor = [];
     /** @var array<int, true> vendor/external classes without lowered methods (#2666) */
     private array $externalOnlyClassIds = [];
+    /** @var array<string, object> lc name => DECLARE opcode that claimed this name (#31110) */
+    private array $userDeclareOpcodeByLc = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
 
@@ -1255,6 +1257,36 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $name->value;
 
         return $this->classes[strtolower($name->value)] = $id;
+    }
+
+    /**
+     * True when a second DECLARE_* opcode must E_COMPILE_ERROR for this name (#31110).
+     *
+     * Same opcode may be revisited during JIT recompile — that is not a duplicate.
+     */
+    public function shouldRejectUserDeclare(string $name, object $op): bool
+    {
+        $lc = strtolower(ltrim($name, '\\'));
+        $prev = $this->userDeclareOpcodeByLc[$lc] ?? null;
+        if ($prev === $op) {
+            return false;
+        }
+        if (null !== $prev) {
+            return true;
+        }
+        if (isset($this->enums[$lc])) {
+            return true;
+        }
+        if (!isset($this->classes[$lc])) {
+            return false;
+        }
+
+        return !$this->isExternalOnlyClass($this->classes[$lc]);
+    }
+
+    public function recordUserDeclareOpcode(string $name, object $op): void
+    {
+        $this->userDeclareOpcodeByLc[strtolower(ltrim($name, '\\'))] = $op;
     }
 
     public function setClassReadonly(int $classId, bool $readonly): void

@@ -6698,6 +6698,7 @@ class Compiler {
             OpCode::TYPE_DECLARE_INTERFACE,
             $this->compileOperand($iface->name, $block, true)
         );
+        $this->assignSourceMetadata($return, $iface);
         $this->assignAttributeMetadata($return, $iface);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class', $return->attributeEntries);
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class', $return->attributeEntries);
@@ -6741,6 +6742,7 @@ class Compiler {
             OpCode::TYPE_DECLARE_TRAIT,
             $this->compileOperand($trait->name, $block, true)
         );
+        $this->assignSourceMetadata($return, $trait);
         $this->assignAttributeMetadata($return, $trait);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class', $return->attributeEntries);
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class', $return->attributeEntries);

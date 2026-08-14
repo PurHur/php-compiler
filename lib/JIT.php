@@ -12075,6 +12075,9 @@ class JIT {
                 case OpCode::TYPE_DECLARE_INTERFACE:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'interface', $nameOp->value)) {
+                        break;
+                    }
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
@@ -12105,6 +12108,9 @@ class JIT {
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'trait', $nameOp->value)) {
+                        break;
+                    }
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
@@ -12126,6 +12132,9 @@ class JIT {
                 case OpCode::TYPE_DECLARE_ENUM:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'enum', $nameOp->value)) {
+                        break;
+                    }
                     if ([] !== $op->classImplements) {
                         JIT\ImplementsHierarchyJitGuard::emitBeforeDeclare(
                             $this->context,
@@ -12169,6 +12178,9 @@ class JIT {
                 case OpCode::TYPE_DECLARE_CLASS:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'class', $nameOp->value)) {
+                        break;
+                    }
                     $declareParentLc = null;
                     if (null !== $op->arg2) {
                         $earlyParent = $block->getOperand($op->arg2);
@@ -14631,6 +14643,33 @@ class JIT {
         $name = strtolower($this->context->scope->className ?? '');
 
         return 'phpcompiler\\web\\superglobals' === $name || 'superglobals' === $name;
+    }
+
+    /**
+     * Zend E_COMPILE_ERROR when a second class/interface/trait/enum reuses a name (#31110).
+     *
+     * @return true when fatal IR was emitted and the DECLARE body must be skipped
+     */
+    private function emitDuplicateClassLikeDeclareFatalIfNeeded(
+        OpCode $op,
+        Block $block,
+        string $kind,
+        string $name
+    ): bool {
+        $object = $this->context->type->object;
+        if (!$object->shouldRejectUserDeclare($name, $op)) {
+            $object->recordUserDeclareOpcode($name, $op);
+
+            return false;
+        }
+        JIT\ImplementsHierarchyJitGuard::emitCompileFatal(
+            $this->context,
+            sprintf('Cannot declare %s %s, because the name is already in use', $kind, $name),
+            $block->scriptPath(),
+            $op->sourceLocation
+        );
+
+        return true;
     }
 
     private function compileClass(?Block $block, int $classId) {
