@@ -45813,7 +45813,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/FinalPromotedPropertyRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `lib/Ast/GeneratorYieldSourceMarker.php`
 
