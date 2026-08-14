@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\posix;
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
+use PHPCompiler\JIT\Builtin\PosixGetegidJit;
 use PHPCompiler\JIT\Builtin\PosixGeteuidJit;
 use PHPCompiler\JIT\Builtin\PosixGetgidJit;
 use PHPCompiler\JIT\Builtin\PosixGetpidJit;
@@ -24,7 +25,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744, #30767, #30803). */
+/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744, #30767, #30803, #30986). */
 final class JitPosix
 {
     private static int $blockSerial = 0;
@@ -79,15 +80,14 @@ final class JitPosix
         return PosixGetgidJit::invoke($context);
     }
 
+    /**
+     * posix_getegid() — PHP helper bridge (#30986); NestedJIT thin getegid(2) leaf.
+     *
+     * @return Value int64 effective group id
+     */
     public static function getegid(Context $context): Value
     {
-        self::ensureLibcEgid($context);
-        $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction('getegid'));
-
-        return $raw->typeOf() === $i64
-            ? $raw
-            : $context->builder->zExt($raw, $i64);
+        return PosixGetegidJit::invoke($context);
     }
 
     public static function strerror(Context $context, JITVariable $errnoArg): Value
@@ -324,18 +324,6 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false);
             $fn = $context->module->addFunction('setsid', $ft);
             $context->registerFunction('setsid', $fn);
-        }
-    }
-
-    private static function ensureLibcEgid(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        try {
-            $context->lookupFunction('getegid');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i32, false);
-            $fn = $context->module->addFunction('getegid', $ft);
-            $context->registerFunction('getegid', $fn);
         }
     }
 

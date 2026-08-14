@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** posix_getegid() — effective group ID (php-src ext/posix/posix.c; #7376). */
+/** posix_getegid() — effective group ID (VM VmPosix; JIT/AOT PosixGetegidJitHelper via PosixGetegidJit, #30986/#7376). */
 final class posix_getegid extends Internal
 {
     public function __construct()
