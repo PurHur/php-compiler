@@ -19,6 +19,8 @@ final class ReflectionMethodHasReturnType extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_hasReturnType — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'hasReturnType');
         if (null === $frame->returnVar) {
             return;
         }

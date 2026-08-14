@@ -21,6 +21,8 @@ final class ReflectionFunctionGetClosure extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunction_getClosure — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'getClosure');
         $reflection = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         if (null === $frame->returnVar) {
             return;

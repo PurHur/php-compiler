@@ -18,6 +18,8 @@ final class ReflectionFunctionGetNumberOfRequiredParameters extends VmClassMetho
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_getNumberOfRequiredParameters — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'getNumberOfRequiredParameters');
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         $count = ReflectionSupport::functionNumberOfRequiredParameters($ctx, $receiver);

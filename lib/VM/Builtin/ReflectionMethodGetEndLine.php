@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Compiler\SourceLocation;
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ReflectionSupport;
@@ -17,6 +18,13 @@ final class ReflectionMethodGetEndLine extends ReflectionSourceGetter
         parent::__construct('getEndLine', static function (SourceLocation $loc, ClassEntry $entry, Frame $frame): void {
             $frame->returnVar->int($loc->endLine);
         });
+    }
+
+    public function execute(Frame $frame): void
+    {
+        // php-src: zim_ReflectionFunctionAbstract_getEndLine — 0 args (#30924)
+        VmReflection::requireFunctionAbstractReceiverOnlyArgc($frame, 'getEndLine');
+        parent::execute($frame);
     }
 
     protected function resolveLocation(Frame $frame): ?SourceLocation
