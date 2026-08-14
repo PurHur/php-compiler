@@ -1015,9 +1015,7 @@ final class SplMinHeapCompare extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiverIsA($frame, SplMinHeapBuiltin::CLASS_LC, 'SplMinHeap::compare()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError('SplMinHeap::compare() expects exactly 2 arguments');
-        }
+        $this->requireExactUserArgCount($frame, 'SplMinHeap::compare', 2);
         $cmp = -Variable::spaceshipCompare($frame->calledArgs[1], $frame->calledArgs[2]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($cmp);
@@ -1035,9 +1033,7 @@ final class SplMaxHeapCompare extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiverIsA($frame, SplMaxHeapBuiltin::CLASS_LC, 'SplMaxHeap::compare()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError('SplMaxHeap::compare() expects exactly 2 arguments');
-        }
+        $this->requireExactUserArgCount($frame, 'SplMaxHeap::compare', 2);
         $cmp = Variable::spaceshipCompare($frame->calledArgs[1], $frame->calledArgs[2]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($cmp);
@@ -1055,11 +1051,7 @@ final class SplHeapInsert extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::insert()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplHeap::insert() expects exactly 1 argument, '.(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'SplHeap::insert', 1);
         SplHeapBuiltin::insert($object, $frame->calledArgs[1], $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -1077,6 +1069,7 @@ final class SplHeapExtract extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::extract()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::extract', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::extract($object, $frame));
     }
 }
@@ -1091,6 +1084,7 @@ final class SplHeapTop extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::top()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::top', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::top($object));
     }
 }
@@ -1105,6 +1099,7 @@ final class SplHeapCount extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::count()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::count', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1122,6 +1117,7 @@ final class SplHeapIsEmpty extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::isEmpty()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::isEmpty', 0);
         SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::isEmpty($object));
     }
 }
@@ -1151,6 +1147,7 @@ final class SplHeapRewind extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::rewind()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::rewind', 0);
         SplHeapBuiltin::rewind($object);
     }
 }
@@ -1165,6 +1162,7 @@ final class SplHeapValid extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::valid()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::valid', 0);
         SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::valid($object));
     }
 }
@@ -1179,6 +1177,7 @@ final class SplHeapCurrent extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::current()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::current', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::current($object));
     }
 }
@@ -1193,6 +1192,7 @@ final class SplHeapKey extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::key()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::key', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1210,6 +1210,7 @@ final class SplHeapNext extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::next()');
+        $this->requireExactUserArgCount($frame, 'SplHeap::next', 0);
         SplHeapBuiltin::next($object, $frame);
     }
 }
@@ -1260,12 +1261,7 @@ final class SplPriorityQueueInsert extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::insert()'
         );
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'SplPriorityQueue::insert() expects exactly 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::insert', 2);
         SplPriorityQueueBuiltin::insert($object, $frame->calledArgs[1], $frame->calledArgs[2], $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -1287,6 +1283,7 @@ final class SplPriorityQueueExtract extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::extract()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::extract', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::extract($object, $frame));
     }
 }
@@ -1305,6 +1302,7 @@ final class SplPriorityQueueTop extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::top()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::top', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::top($object));
     }
 }
@@ -1323,6 +1321,7 @@ final class SplPriorityQueueCount extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::count()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::count', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1344,6 +1343,7 @@ final class SplPriorityQueueIsEmpty extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::isEmpty()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::isEmpty', 0);
         SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::isEmpty($object));
     }
 }
@@ -1430,6 +1430,7 @@ final class SplPriorityQueueRewind extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::rewind()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::rewind', 0);
         SplPriorityQueueBuiltin::rewind($object);
     }
 }
@@ -1448,6 +1449,7 @@ final class SplPriorityQueueValid extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::valid()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::valid', 0);
         SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::valid($object));
     }
 }
@@ -1466,6 +1468,7 @@ final class SplPriorityQueueCurrent extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::current()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::current', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::current($object));
     }
 }
@@ -1484,6 +1487,7 @@ final class SplPriorityQueueKey extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::key()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::key', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1505,6 +1509,7 @@ final class SplPriorityQueueNext extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::next()'
         );
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::next', 0);
         SplPriorityQueueBuiltin::next($object, $frame);
     }
 }
@@ -1541,9 +1546,7 @@ final class SplPriorityQueueCompare extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::compare()'
         );
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError('SplPriorityQueue::compare() expects exactly 2 arguments');
-        }
+        $this->requireExactUserArgCount($frame, 'SplPriorityQueue::compare', 2);
         $cmp = Variable::spaceshipCompare($frame->calledArgs[1], $frame->calledArgs[2]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($cmp);
