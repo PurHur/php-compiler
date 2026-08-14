@@ -22,6 +22,8 @@ final class WeakReferenceGet extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('WeakReference::get() called without $this');
         }
+        // php-src: Zend/zend_weakrefs.stub.php — get(): ?object; ZEND_PARSE_PARAMETERS(0) (#30925)
+        $this->requireExactUserArgCount($frame, 'WeakReference::get', 0);
         $receiver = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakReference');
         if (null === $frame->returnVar) {
             return;
