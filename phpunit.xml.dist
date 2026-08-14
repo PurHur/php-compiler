@@ -113,6 +113,8 @@
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146VMTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146JITTest.php</file>
+            <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
+            <file>./test/compliance/InOperatorPhpSrcReject31158JITTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameVMTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameJITTest.php</file>
             <file>./test/compliance/SelfReturnTypeerrorResolvedNameVMTest.php</file>
