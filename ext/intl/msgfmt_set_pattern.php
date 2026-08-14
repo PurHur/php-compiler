@@ -39,7 +39,7 @@ final class msgfmt_set_pattern extends Internal
                 \PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($formatter)
             ));
         }
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[1], 'msgfmt_set_pattern', 1);
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame($frame, 1, 'msgfmt_set_pattern', 1);
         $ok = VmMessageFormatter::setPattern($formatter->toObject(), $pattern);
         if (null === $frame->returnVar) {
             return;

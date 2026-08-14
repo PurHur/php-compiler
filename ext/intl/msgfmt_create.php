@@ -29,8 +29,8 @@ final class msgfmt_create extends Internal
                 $argc
             ));
         }
-        $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[0], 'msgfmt_create', 0);
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[1], 'msgfmt_create', 1);
+        $locale = VmMessageFormatter::coerceLocaleArgFromFrame($frame, 0, 'msgfmt_create', 0);
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame($frame, 1, 'msgfmt_create', 1);
         if (null === $frame->returnVar) {
             return;
         }

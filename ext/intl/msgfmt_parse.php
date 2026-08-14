@@ -39,7 +39,7 @@ final class msgfmt_parse extends Internal
                 \PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($formatter)
             ));
         }
-        $source = VmMessageFormatter::coerceSourceArg($frame->calledArgs[1], 'msgfmt_parse', 1);
+        $source = VmMessageFormatter::coerceSourceArgFromFrame($frame, 1, 'msgfmt_parse', 1);
         $result = VmMessageFormatter::parse($formatter->toObject(), $source);
         if (null === $frame->returnVar) {
             return;

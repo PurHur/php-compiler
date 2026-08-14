@@ -30,9 +30,9 @@ final class msgfmt_parse_message extends Internal
                 $argc
             ));
         }
-        $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[0], 'msgfmt_parse_message', 0);
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[1], 'msgfmt_parse_message', 1);
-        $source = VmMessageFormatter::coerceSourceArg($frame->calledArgs[2], 'msgfmt_parse_message', 2);
+        $locale = VmMessageFormatter::coerceLocaleArgFromFrame($frame, 0, 'msgfmt_parse_message', 0);
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame($frame, 1, 'msgfmt_parse_message', 1);
+        $source = VmMessageFormatter::coerceSourceArgFromFrame($frame, 2, 'msgfmt_parse_message', 2);
         $result = VmMessageFormatter::parseMessage($locale, $pattern, $source);
         if (null === $frame->returnVar) {
             return;

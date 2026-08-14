@@ -365,16 +365,76 @@ final class VmMessageFormatter
         );
     }
 
+    /**
+     * Z_PARAM_STR $locale — caller strict_types TypeError on null (#29921, msgformat.stub.php).
+     *
+     * Non-strict soft-coerces with E_DEPRECATED (php-src Z_PARAM_STR). Prefer this over bare
+     * {@see VmString::coerceStringBuiltinArg} so declare(strict_types=1) matches Zend.
+     */
+    public static function coerceLocaleArgFromFrame(
+        Frame $frame,
+        int $frameArgIndex,
+        string $function,
+        int $userArgIndex
+    ): string {
+        return VmString::stringBuiltinArgForFrame(
+            $frame,
+            $frameArgIndex,
+            $function,
+            $userArgIndex,
+            'locale'
+        );
+    }
+
+    /**
+     * Z_PARAM_STR $pattern — caller strict_types TypeError on null (#29921).
+     */
+    public static function coercePatternArgFromFrame(
+        Frame $frame,
+        int $frameArgIndex,
+        string $function,
+        int $userArgIndex
+    ): string {
+        return VmString::stringBuiltinArgForFrame(
+            $frame,
+            $frameArgIndex,
+            $function,
+            $userArgIndex,
+            'pattern'
+        );
+    }
+
+    /**
+     * Z_PARAM_STR $string / source — caller strict_types TypeError on null (#29921 sibling).
+     */
+    public static function coerceSourceArgFromFrame(
+        Frame $frame,
+        int $frameArgIndex,
+        string $function,
+        int $userArgIndex
+    ): string {
+        return VmString::stringBuiltinArgForFrame(
+            $frame,
+            $frameArgIndex,
+            $function,
+            $userArgIndex,
+            'string'
+        );
+    }
+
+    /** @deprecated Use {@see coerceLocaleArgFromFrame} — kept for Variable-only call sites. */
     public static function coerceLocaleArg(Variable $var, string $function, int $position): string
     {
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'locale');
     }
 
+    /** @deprecated Use {@see coercePatternArgFromFrame}. */
     public static function coercePatternArg(Variable $var, string $function, int $position): string
     {
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'pattern');
     }
 
+    /** @deprecated Use {@see coerceSourceArgFromFrame}. */
     public static function coerceSourceArg(Variable $var, string $function, int $position): string
     {
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'string');
@@ -1047,8 +1107,18 @@ final class MessageFormatterConstruct extends VmClassMethod
             || !VmMessageFormatter::isFormatterObject($receiver->toObject())) {
             throw new \Error('MessageFormatter::__construct() called on incompatible object');
         }
-        $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[1], 'MessageFormatter::__construct', 1);
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[2], 'MessageFormatter::__construct', 2);
+        $locale = VmMessageFormatter::coerceLocaleArgFromFrame(
+            $frame,
+            1,
+            'MessageFormatter::__construct',
+            0
+        );
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame(
+            $frame,
+            2,
+            'MessageFormatter::__construct',
+            1
+        );
         if (!VmMessageFormatter::initObject($receiver->toObject(), $locale, $pattern)) {
             // php-src msgformat_create.c — construct failure throws IntlException (#22577).
             throw new \IntlException(IntlError::getMessage());
@@ -1078,8 +1148,18 @@ final class MessageFormatterCreate extends VmClassMethod
                 $argc
             ));
         }
-        $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[0], 'MessageFormatter::create', 0);
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[1], 'MessageFormatter::create', 1);
+        $locale = VmMessageFormatter::coerceLocaleArgFromFrame(
+            $frame,
+            0,
+            'MessageFormatter::create',
+            0
+        );
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame(
+            $frame,
+            1,
+            'MessageFormatter::create',
+            1
+        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -1157,7 +1237,12 @@ final class MessageFormatterSetPattern extends VmClassMethod
             || !VmMessageFormatter::isFormatterObject($receiver->toObject())) {
             throw new \Error('MessageFormatter::setPattern() called on incompatible object');
         }
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[1], 'MessageFormatter::setPattern', 1);
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame(
+            $frame,
+            1,
+            'MessageFormatter::setPattern',
+            0
+        );
         $ok = VmMessageFormatter::setPattern($receiver->toObject(), $pattern);
         if (null === $frame->returnVar) {
             return;
@@ -1218,8 +1303,18 @@ final class MessageFormatterFormatMessage extends VmClassMethod
                 $argc
             ));
         }
-        $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[0], 'MessageFormatter::formatMessage', 0);
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[1], 'MessageFormatter::formatMessage', 1);
+        $locale = VmMessageFormatter::coerceLocaleArgFromFrame(
+            $frame,
+            0,
+            'MessageFormatter::formatMessage',
+            0
+        );
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame(
+            $frame,
+            1,
+            'MessageFormatter::formatMessage',
+            1
+        );
         $args = VmMessageFormatter::coerceArgsArray($frame->calledArgs[2], 'MessageFormatter::formatMessage', 2);
         $result = VmMessageFormatter::formatMessage($locale, $pattern, $args);
         if (null === $frame->returnVar) {
@@ -1256,7 +1351,12 @@ final class MessageFormatterParse extends VmClassMethod
             || !VmMessageFormatter::isFormatterObject($receiver->toObject())) {
             throw new \Error('MessageFormatter::parse() called on incompatible object');
         }
-        $source = VmMessageFormatter::coerceSourceArg($frame->calledArgs[1], 'MessageFormatter::parse', 1);
+        $source = VmMessageFormatter::coerceSourceArgFromFrame(
+            $frame,
+            1,
+            'MessageFormatter::parse',
+            0
+        );
         $result = VmMessageFormatter::parse($receiver->toObject(), $source);
         if (null === $frame->returnVar) {
             return;
@@ -1287,9 +1387,24 @@ final class MessageFormatterParseMessage extends VmClassMethod
                 $argc
             ));
         }
-        $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[0], 'MessageFormatter::parseMessage', 0);
-        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[1], 'MessageFormatter::parseMessage', 1);
-        $source = VmMessageFormatter::coerceSourceArg($frame->calledArgs[2], 'MessageFormatter::parseMessage', 2);
+        $locale = VmMessageFormatter::coerceLocaleArgFromFrame(
+            $frame,
+            0,
+            'MessageFormatter::parseMessage',
+            0
+        );
+        $pattern = VmMessageFormatter::coercePatternArgFromFrame(
+            $frame,
+            1,
+            'MessageFormatter::parseMessage',
+            1
+        );
+        $source = VmMessageFormatter::coerceSourceArgFromFrame(
+            $frame,
+            2,
+            'MessageFormatter::parseMessage',
+            2
+        );
         $result = VmMessageFormatter::parseMessage($locale, $pattern, $source);
         if (null === $frame->returnVar) {
             return;
