@@ -401,6 +401,8 @@
             <file>./test/compliance/GetResourceTypeExcessArgc30707JITTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690VMTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690JITTest.php</file>
+            <file>./test/compliance/SizeofExcessArgc30686VMTest.php</file>
+            <file>./test/compliance/SizeofExcessArgc30686JITTest.php</file>
             <file>./test/compliance/StreamFileExcessArgc30721VMTest.php</file>
             <file>./test/compliance/StreamFileExcessArgc30721JITTest.php</file>
             <file>./test/compliance/SessionExcessArgc30684VMTest.php</file>
