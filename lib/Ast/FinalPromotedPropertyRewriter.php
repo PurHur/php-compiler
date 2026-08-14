@@ -11,7 +11,8 @@ use PHPCompiler\CompilerVersion;
  *
  * php-src: Zend/zend_language_parser.y — promoted property_modifier includes `final`
  * (PHP 8.5+ only; gated via {@see CompilerVersion::supportsFinalPromotedProperties()}).
- * Zend ≤8.4: {@code Cannot use the final modifier on a parameter}.
+ * Zend ≤8.3: Parse error {@code unexpected token "final"} (no T_FINAL in parameter list).
+ * Zend 8.4: {@code Cannot use the final modifier on a parameter} (parser allows, compiler rejects).
  * Zend/zend_compile.c — promotion + ZEND_ACC_FINAL (inheritance only — writes still allowed).
  *
  * php-parser 4.x rejects `public final string $x` in a param list (`unexpected T_FINAL`).
@@ -25,8 +26,12 @@ final class FinalPromotedPropertyRewriter
     /** @internal Marker embedded in source for Param attribute recovery. */
     public const MARKER_PATTERN = '/\/\*\s*phpc-promoted-final\s*\*\//i';
 
-    /** Zend ≤8.4 / PROFILE≤8.4 compile fatal (#27123, Zend/zend_compile.c). */
+    /** Zend 8.4 compile fatal (#27123, Zend/zend_compile.c) — parser allows T_FINAL, compiler rejects. */
     public const REFERENCE_PROFILE_FINAL_ON_PARAMETER = 'Cannot use the final modifier on a parameter';
+
+    /** Zend ≤8.3 / unset reference parse error (#31153, Zend/zend_language_parser.y). */
+    public const REFERENCE_PROFILE_PARSE_UNEXPECTED_FINAL =
+        'syntax error, unexpected token "final", expecting variable';
 
     public static function containsFinalPromotedPropertySyntax(string $source): bool
     {
@@ -45,8 +50,24 @@ final class FinalPromotedPropertyRewriter
 
         return [
             'line' => substr_count(substr($source, 0, $offset), "\n") + 1,
-            'message' => self::REFERENCE_PROFILE_FINAL_ON_PARAMETER,
+            'message' => self::referenceProfileRejectMessage(),
         ];
+    }
+
+    /**
+     * PROFILE≤8.3 / unset: Zend 8.2 parse error. PROFILE=8.4: compile fatal. (#31153)
+     *
+     * 8.4 property_modifier includes T_FINAL (plain final properties); zend_compile.c then
+     * rejects it on parameters. ≤8.3 grammar has no T_FINAL in the parameter list.
+     */
+    public static function referenceProfileRejectMessage(): string
+    {
+        if (CompilerVersion::supportsFinalProperties()
+            && !CompilerVersion::supportsFinalPromotedProperties()) {
+            return self::REFERENCE_PROFILE_FINAL_ON_PARAMETER;
+        }
+
+        return self::REFERENCE_PROFILE_PARSE_UNEXPECTED_FINAL;
     }
 
     public static function rewrite(string $source): string

@@ -1656,9 +1656,9 @@ final class CompilerVersion
      * PHP 8.5+ `final` on constructor-promoted properties (RFC final_promotion, #27123).
      *
      * Plain `final` properties are 8.4+ ({@see supportsFinalProperties()}); promotion of
-     * `final` on a ctor parameter landed in 8.5. Zend ≤8.4 compiles
-     * `function __construct(public final string $x)` as
-     * {@code Cannot use the final modifier on a parameter}.
+     * `final` on a ctor parameter landed in 8.5. Zend ≤8.3 parse-errors
+     * `function __construct(final public int $x)` ({@code unexpected token "final"});
+     * Zend 8.4 compiles it as {@code Cannot use the final modifier on a parameter} (#31153).
      *
      * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5}.
      * php-src: Zend/zend_language_parser.y property_modifier; Zend/zend_compile.c.
