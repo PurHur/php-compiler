@@ -18,6 +18,8 @@ final class ReflectionParameterIsPassedByReference extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionParameter_isPassedByReference — ZEND_PARSE_PARAMETERS (0 args) (#31128)
+        $this->requireExactUserArgCount($frame, 'ReflectionParameter::isPassedByReference', 0);
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {

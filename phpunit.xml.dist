@@ -437,6 +437,8 @@
             <file>./test/compliance/ReflectionClassKindExcessArgc31126JITTest.php</file>
             <file>./test/compliance/ReflectionMethodKindExcessArgc31127VMTest.php</file>
             <file>./test/compliance/ReflectionMethodKindExcessArgc31127JITTest.php</file>
+            <file>./test/compliance/ReflectionParameterQueryExcessArgc31128VMTest.php</file>
+            <file>./test/compliance/ReflectionParameterQueryExcessArgc31128JITTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653VMTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653JITTest.php</file>
             <file>./test/compliance/SessionDestroyTmpfileExcessArgc30676VMTest.php</file>
