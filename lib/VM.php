@@ -8174,7 +8174,7 @@ restart:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
                     if (isset($this->context->classes[$lcname])) {
-                        throw new \LogicException("Duplicate interface definition for $name");
+                        $this->raiseDuplicateClassLikeDeclareFatal('interface', $name, $frame);
                     }
                     $ifaceEntry = new VM\ClassEntry($name);
                     $ifaceEntry->isInterface = true;
@@ -8210,7 +8210,7 @@ restart:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
                     if (isset($this->context->classes[$lcname])) {
-                        throw new \LogicException("Duplicate trait definition for $name");
+                        $this->raiseDuplicateClassLikeDeclareFatal('trait', $name, $frame);
                     }
                     $traitEntry = new ClassEntry($name);
                     $traitEntry->isTrait = true;
@@ -8265,7 +8265,7 @@ restart:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
                     if (isset($this->context->classes[$lcname]) || isset($this->context->enums[$lcname])) {
-                        throw new \LogicException("Duplicate enum definition for $name");
+                        $this->raiseDuplicateClassLikeDeclareFatal('enum', $name, $frame);
                     }
                     $classEntry = new ClassEntry($name);
                     $classEntry->isEnum = true;
@@ -8337,7 +8337,7 @@ restart:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
                     if (isset($this->context->classes[$lcname])) {
-                        throw new \LogicException("Duplicate class definition for $name");
+                        $this->raiseDuplicateClassLikeDeclareFatal('class', $name, $frame);
                     }
                     $classEntry = new ClassEntry($name);
                     \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($classEntry);
@@ -12813,6 +12813,26 @@ restart:
             $this->context->errors->getDisplayErrors()
         );
         throw new ScriptExit(255);
+    }
+
+    /**
+     * Duplicate class/interface/trait/enum — Zend E_COMPILE_ERROR, not catchable LogicException (#31110).
+     *
+     * php-src: zend_error_noreturn(E_COMPILE_ERROR, "Cannot declare %s %s, because the name is already in use")
+     *
+     * @return never
+     */
+    private function raiseDuplicateClassLikeDeclareFatal(string $kind, string $name, Frame $frame): never
+    {
+        $error = new \CompileError(sprintf(
+            'Cannot declare %s %s, because the name is already in use',
+            $kind,
+            $name
+        ));
+        if (VmEval::isEvalScriptPath((string) $frame->scriptPath)) {
+            $this->raiseEvalCompileFatal($error, $frame);
+        }
+        $this->raiseClassDeclareCompileFatal($error, $frame);
     }
 
     /**

@@ -41,35 +41,47 @@ final class ImplementsHierarchyJitGuard
                 continue;
             }
 
-            $file = null !== $scriptPath && '' !== $scriptPath ? $scriptPath : 'Standard input code';
-            if (null !== $sourceLocation && '' !== $sourceLocation->filename) {
-                $file = $sourceLocation->filename;
-            }
-            $line = null !== $sourceLocation && $sourceLocation->startLine > 0
-                ? $sourceLocation->startLine
-                : 0;
-
-            $full = sprintf(
-                'PHP Fatal error:  %s in %s on line %d',
-                $message,
-                $file,
-                $line
-            );
-
-            // Standalone AOT: fprintf+exit — pending ReadonlyRaise abort helpers segfault on
-            // this edge (#26538 / #25869; same pattern as ListUnpackHelper #25096).
-            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-                self::emitStandaloneFatalExit($context, $full);
-
-                return;
-            }
-
-            ReadonlyRaise::registerDeclarations($context);
-            ReadonlyRaise::ensureLinked($context);
-            ReadonlyRaise::emitRaise($context, $full);
+            self::emitCompileFatal($context, $message, $scriptPath, $sourceLocation);
 
             return;
         }
+    }
+
+    /**
+     * Uncatchable JIT/AOT compile fatal (E_COMPILE_ERROR shape) at the current insert point.
+     */
+    public static function emitCompileFatal(
+        Context $context,
+        string $message,
+        ?string $scriptPath,
+        ?SourceLocation $sourceLocation,
+    ): void {
+        $file = null !== $scriptPath && '' !== $scriptPath ? $scriptPath : 'Standard input code';
+        if (null !== $sourceLocation && '' !== $sourceLocation->filename) {
+            $file = $sourceLocation->filename;
+        }
+        $line = null !== $sourceLocation && $sourceLocation->startLine > 0
+            ? $sourceLocation->startLine
+            : 0;
+
+        $full = sprintf(
+            'PHP Fatal error:  %s in %s on line %d',
+            $message,
+            $file,
+            $line
+        );
+
+        // Standalone AOT: fprintf+exit — pending ReadonlyRaise abort helpers segfault on
+        // this edge (#26538 / #25869; same pattern as ListUnpackHelper #25096).
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::emitStandaloneFatalExit($context, $full);
+
+            return;
+        }
+
+        ReadonlyRaise::registerDeclarations($context);
+        ReadonlyRaise::ensureLinked($context);
+        ReadonlyRaise::emitRaise($context, $full);
     }
 
     private static function emitStandaloneFatalExit(Context $context, string $fullMessage): void
