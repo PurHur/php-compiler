@@ -14,6 +14,9 @@ use PHPCompiler\JIT\Builtin\PosixGetpidJit;
 use PHPCompiler\JIT\Builtin\PosixGetppidJit;
 use PHPCompiler\JIT\Builtin\PosixGetuidJit;
 use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
+use PHPCompiler\JIT\Builtin\PosixSetegidJit;
+use PHPCompiler\JIT\Builtin\PosixSeteuidJit;
+use PHPCompiler\JIT\Builtin\PosixSetgidJit;
 use PHPCompiler\JIT\Builtin\PosixSetuidJit;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\Builtin\PosixTerminalRuntime;
@@ -26,7 +29,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744, #30767, #30803, #30986, #31038). */
+/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744, #30767, #30803, #30986, #31038, #31066). */
 final class JitPosix
 {
     private static int $blockSerial = 0;
@@ -127,19 +130,55 @@ final class JitPosix
         return PosixSetuidJit::invoke($context, $uid);
     }
 
-    public static function setgid(Context $context, JITVariable $arg): Value
+    /**
+     * posix_setgid() — PHP helper bridge (#31066); NestedJIT thin setgid(2) leaf.
+     *
+     * @param Value $gidI64 zend long gid (caller: {@see JitLongArg::lower})
+     *
+     * @return Value i1 — true when setgid succeeds (peer posix_setuid #31038)
+     */
+    public static function setgid(Context $context, Value $gidI64): Value
     {
-        return self::setId($context, 'setgid', 'posix_setgid', $arg, 'gid');
+        $i64 = $context->getTypeFromString('int64');
+        $gid = $gidI64->typeOf() === $i64
+            ? $gidI64
+            : $context->builder->sext($gidI64, $i64);
+
+        return PosixSetgidJit::invoke($context, $gid);
     }
 
-    public static function seteuid(Context $context, JITVariable $arg): Value
+    /**
+     * posix_seteuid() — PHP helper bridge (#31066); NestedJIT thin seteuid(2) leaf.
+     *
+     * @param Value $uidI64 zend long uid (caller: {@see JitLongArg::lower})
+     *
+     * @return Value i1 — true when seteuid succeeds (peer posix_setuid #31038)
+     */
+    public static function seteuid(Context $context, Value $uidI64): Value
     {
-        return self::setId($context, 'seteuid', 'posix_seteuid', $arg, 'uid');
+        $i64 = $context->getTypeFromString('int64');
+        $uid = $uidI64->typeOf() === $i64
+            ? $uidI64
+            : $context->builder->sext($uidI64, $i64);
+
+        return PosixSeteuidJit::invoke($context, $uid);
     }
 
-    public static function setegid(Context $context, JITVariable $arg): Value
+    /**
+     * posix_setegid() — PHP helper bridge (#31066); NestedJIT thin setegid(2) leaf.
+     *
+     * @param Value $gidI64 zend long gid (caller: {@see JitLongArg::lower})
+     *
+     * @return Value i1 — true when setegid succeeds (peer posix_setuid #31038)
+     */
+    public static function setegid(Context $context, Value $gidI64): Value
     {
-        return self::setId($context, 'setegid', 'posix_setegid', $arg, 'gid');
+        $i64 = $context->getTypeFromString('int64');
+        $gid = $gidI64->typeOf() === $i64
+            ? $gidI64
+            : $context->builder->sext($gidI64, $i64);
+
+        return PosixSetegidJit::invoke($context, $gid);
     }
 
     /** posix_getpgid() — process group ID or false (php-src ext/posix/posix.c; #6505 JIT). */
@@ -282,38 +321,6 @@ final class JitPosix
         $context->builder->positionAtEnd($doneBlock);
 
         return JitValueBox::pointer($context, $slot);
-    }
-
-    private static function setId(
-        Context $context,
-        string $libcFn,
-        string $phpFn,
-        JITVariable $arg,
-        string $paramName
-    ): Value {
-        self::ensureLibcSetId($context, $libcFn);
-        $id = JitSleep::zParamLong($context, $arg, $phpFn, 1, $paramName);
-        $i32 = $context->getTypeFromString('int32');
-        $id32 = $context->builder->trunc($id, $i32);
-        $ret = $context->builder->call($context->lookupFunction($libcFn), $id32);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $isTrue = $context->builder->icmp(Builder::INT_EQ, $ret, $i32->constInt(0, false));
-        JitValueBox::writeBool($context, $slot, $isTrue);
-
-        return $ptr;
-    }
-
-    private static function ensureLibcSetId(Context $context, string $name): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $ft = $context->context->functionType($i32, false, $i32);
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
     }
 
     private static function ensureLibcSetpgid(Context $context): void
