@@ -553,12 +553,8 @@ final class SplDoublyLinkedListPush extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::push()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::push() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::push', 1);
         SplDoublyLinkedListBuiltin::push($object, $frame->calledArgs[1]);
     }
 }
@@ -615,12 +611,8 @@ final class SplDoublyLinkedListUnshift extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::unshift()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::unshift() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::unshift', 1);
         SplDoublyLinkedListBuiltin::unshift($object, $frame->calledArgs[1]);
     }
 }
@@ -659,6 +651,8 @@ final class SplDoublyLinkedListBottom extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::bottom()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::bottom', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::bottom($object));
     }
 }
@@ -677,6 +671,8 @@ final class SplDoublyLinkedListIsEmpty extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::isEmpty()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::isEmpty', 0);
         SplIteratorSupport::setReturnBool($frame, SplDoublyLinkedListBuiltin::isEmpty($object));
     }
 }
@@ -718,12 +714,8 @@ final class SplDoublyLinkedListOffsetGet extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::offsetGet()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::offsetGet() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::offsetGet', 1);
         SplIteratorSupport::copyReturnFrom(
             $frame,
             SplDoublyLinkedListBuiltin::offsetGet($object, $frame->calledArgs[1])
@@ -745,12 +737,8 @@ final class SplDoublyLinkedListOffsetSet extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::offsetSet()'
         );
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::offsetSet() expects exactly 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(2, 2) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::offsetSet', 2);
         SplDoublyLinkedListBuiltin::offsetSet($object, $frame->calledArgs[1], $frame->calledArgs[2]);
     }
 }
@@ -769,12 +757,8 @@ final class SplDoublyLinkedListOffsetExists extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::offsetExists()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::offsetExists() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::offsetExists', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -798,12 +782,8 @@ final class SplDoublyLinkedListOffsetUnset extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::offsetUnset()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::offsetUnset() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::offsetUnset', 1);
         SplDoublyLinkedListBuiltin::offsetUnset($object, $frame->calledArgs[1]);
     }
 }
@@ -936,12 +916,8 @@ final class SplDoublyLinkedListAdd extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::add()'
         );
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::add() expects exactly 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(2, 2) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::add', 2);
         SplDoublyLinkedListBuiltin::add($object, $frame->calledArgs[1], $frame->calledArgs[2]);
     }
 }
@@ -960,12 +936,8 @@ final class SplDoublyLinkedListSetIteratorMode extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::setIteratorMode()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplDoublyLinkedList::setIteratorMode() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::setIteratorMode', 1);
         $mode = $frame->calledArgs[1]->resolveIndirect()->toInt();
         $newMode = SplDoublyLinkedListBuiltin::setIteratorMode($object, $mode);
         if (null === $frame->returnVar) {
@@ -989,6 +961,8 @@ final class SplDoublyLinkedListGetIteratorMode extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::getIteratorMode()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::getIteratorMode', 0);
         if (null === $frame->returnVar) {
             return;
         }
