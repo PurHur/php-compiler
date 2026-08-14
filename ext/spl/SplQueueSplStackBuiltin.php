@@ -214,8 +214,8 @@ final class SplQueueSetIteratorMode extends VmClassMethod
             SplQueueBuiltin::CLASS_LC,
             'SplQueue::setIteratorMode()'
         );
-        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1)
-        $this->requireExactUserArgCount($frame, 'SplQueue::setIteratorMode', 1);
+        // php-src ACE cites defining class SplDoublyLinkedList (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::setIteratorMode', 1);
         $mode = $frame->calledArgs[1]->resolveIndirect()->toInt();
         $newMode = SplDoublyLinkedListBuiltin::setIteratorMode($object, $mode);
         if (null === $frame->returnVar) {
@@ -262,8 +262,8 @@ final class SplStackSetIteratorMode extends VmClassMethod
             SplStackBuiltin::CLASS_LC,
             'SplStack::setIteratorMode()'
         );
-        // php-src: ZEND_PARSE_PARAMETERS_ARGS(1, 1); ACE cites SplStack override
-        $this->requireExactUserArgCount($frame, 'SplStack::setIteratorMode', 1);
+        // php-src ACE cites defining class SplDoublyLinkedList (#30964)
+        $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::setIteratorMode', 1);
         $mode = $frame->calledArgs[1]->resolveIndirect()->toInt();
         $newMode = SplDoublyLinkedListBuiltin::setIteratorMode($object, $mode);
         if (null === $frame->returnVar) {
