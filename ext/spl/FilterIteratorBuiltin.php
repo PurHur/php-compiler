@@ -278,6 +278,8 @@ final class RecursiveFilterIteratorGetChildren extends VmClassMethod
             RecursiveFilterIteratorBuiltin::CLASS_LC,
             'RecursiveFilterIterator::getChildren()'
         );
+        // php-src zim_RecursiveFilterIterator_getChildren — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'RecursiveFilterIterator::getChildren', 0);
         if (null === $frame->returnVar) {
             return;
         }

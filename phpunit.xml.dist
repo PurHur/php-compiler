@@ -468,6 +468,8 @@
             <file>./test/compliance/RdiSubPathExcessArgc30936JITTest.php</file>
             <file>./test/compliance/SplFileObjectExcessArgc30937VMTest.php</file>
             <file>./test/compliance/SplFileObjectExcessArgc30937JITTest.php</file>
+            <file>./test/compliance/SplIteratorExcessArgc30949VMTest.php</file>
+            <file>./test/compliance/SplIteratorExcessArgc30949JITTest.php</file>
             <file>./test/compliance/RiiParentIteratorExcessArgc30956VMTest.php</file>
             <file>./test/compliance/RiiParentIteratorExcessArgc30956JITTest.php</file>
             <file>./test/compliance/ArrayObjectExcessArgc30965VMTest.php</file>

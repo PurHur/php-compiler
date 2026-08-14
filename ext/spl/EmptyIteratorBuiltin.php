@@ -68,6 +68,8 @@ final class EmptyIteratorCurrent extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiver($frame, EmptyIteratorBuiltin::CLASS_LC, 'EmptyIterator::current()');
+        // php-src zim_EmptyIterator_* — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'EmptyIterator::current', 0);
         throw new \BadMethodCallException('Accessing the value of an EmptyIterator');
     }
 }
@@ -82,6 +84,8 @@ final class EmptyIteratorKey extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiver($frame, EmptyIteratorBuiltin::CLASS_LC, 'EmptyIterator::key()');
+        // php-src zim_EmptyIterator_* — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'EmptyIterator::key', 0);
         throw new \BadMethodCallException('Accessing the key of an EmptyIterator');
     }
 }
@@ -96,6 +100,8 @@ final class EmptyIteratorNext extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiver($frame, EmptyIteratorBuiltin::CLASS_LC, 'EmptyIterator::next()');
+        // php-src zim_EmptyIterator_* — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'EmptyIterator::next', 0);
     }
 }
 
@@ -109,6 +115,8 @@ final class EmptyIteratorRewind extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiver($frame, EmptyIteratorBuiltin::CLASS_LC, 'EmptyIterator::rewind()');
+        // php-src zim_EmptyIterator_* — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'EmptyIterator::rewind', 0);
     }
 }
 
@@ -122,6 +130,8 @@ final class EmptyIteratorValid extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiver($frame, EmptyIteratorBuiltin::CLASS_LC, 'EmptyIterator::valid()');
+        // php-src zim_EmptyIterator_* — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'EmptyIterator::valid', 0);
         SplIteratorSupport::setReturnBool($frame, false);
     }
 }

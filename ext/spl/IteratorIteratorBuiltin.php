@@ -1103,6 +1103,8 @@ final class IteratorIteratorGetInnerIterator extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::getInnerIterator()'
         );
+        // php-src zim_IteratorIterator_getInnerIterator — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }

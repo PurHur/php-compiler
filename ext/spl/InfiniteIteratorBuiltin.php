@@ -297,6 +297,8 @@ final class InfiniteIteratorGetInnerIterator extends VmClassMethod
             InfiniteIteratorBuiltin::CLASS_LC,
             'InfiniteIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#30949).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -412,6 +414,8 @@ final class NoRewindIteratorGetInnerIterator extends VmClassMethod
             NoRewindIteratorBuiltin::CLASS_LC,
             'NoRewindIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#30949).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }

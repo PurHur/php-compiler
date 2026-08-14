@@ -645,6 +645,8 @@ final class RegexIteratorGetInnerIterator extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#30949).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -666,6 +668,8 @@ final class RegexIteratorGetRegex extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::getRegex()'
         );
+        // php-src zim_RegexIterator_getRegex — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'RegexIterator::getRegex', 0);
         if (null === $frame->returnVar) {
             return;
         }
