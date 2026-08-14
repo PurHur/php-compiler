@@ -1145,8 +1145,9 @@ final class JitDateMutation
     public static function invokeTimestampObjectSet(Context $context, bool $immutable, JITVariable ...$args): Value
     {
         $function = $immutable ? 'DateTimeImmutable::setTimestamp' : 'DateTime::setTimestamp';
-        if (\count($args) < 2) {
-            throw new \LogicException($function.'() expects exactly 1 argument');
+        // php-src zim_DateTime_setTimestamp — ZEND_NUM_ARGS exactly 1 (#30991).
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, $function, 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
 
         $timestamp = JitSleep::zParamLong($context, $args[1], $function, 1, 'timestamp');

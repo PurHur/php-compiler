@@ -18,15 +18,14 @@ final class DateTimeSetTimestamp extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DateTime::setTimestamp() expects exactly 1 argument');
-        }
         $receiver = DateTimeSupport::requireDateTimeLike(
             $frame->calledArgs[0],
             'DateTime::setTimestamp()',
             $frame->vmContext
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        // php-src zim_DateTime_setTimestamp — ZEND_PARSE_PARAMETERS exactly 1 (#30991).
+        $this->requireExactUserArgCount($frame, "{$label}::setTimestamp", 1);
         // Z_PARAM_LONG — caller strict_types → TypeError on null (#29841).
         // Frame arg 1 includes $this; user-visible Argument #1 ($timestamp).
         $timestamp = VmMath::parseZParamLongBuiltinArgForFrame(
