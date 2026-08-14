@@ -488,6 +488,8 @@
             <file>./test/compliance/ArrayObjectExcessArgc30965JITTest.php</file>
             <file>./test/compliance/ArrayObjectOffsetExcessArgc31001VMTest.php</file>
             <file>./test/compliance/ArrayObjectOffsetExcessArgc31001JITTest.php</file>
+            <file>./test/compliance/MultipleIteratorExcessArgc30947VMTest.php</file>
+            <file>./test/compliance/MultipleIteratorExcessArgc30947JITTest.php</file>
             <file>./test/compliance/SplHeapExcessArgc30955VMTest.php</file>
             <file>./test/compliance/SplHeapExcessArgc30955JITTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785VMTest.php</file>

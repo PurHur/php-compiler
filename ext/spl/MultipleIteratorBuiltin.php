@@ -382,12 +382,8 @@ final class MultipleIteratorAttachIterator extends VmClassMethod
             MultipleIteratorBuiltin::CLASS_LC,
             'MultipleIterator::attachIterator()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'MultipleIterator::attachIterator() expects at least 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_MultipleIterator_attachIterator — ZEND_PARSE_PARAMETERS_ARGS(1, 2) (#30947)
+        $this->requireUserArgCountRange($frame, 'MultipleIterator::attachIterator', 1, 2);
         if (null === $frame->vmContext) {
             throw new \LogicException('MultipleIterator::attachIterator() requires VM context');
         }
@@ -441,12 +437,8 @@ final class MultipleIteratorDetachIterator extends VmClassMethod
             MultipleIteratorBuiltin::CLASS_LC,
             'MultipleIterator::detachIterator()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'MultipleIterator::detachIterator() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_MultipleIterator_detachIterator — ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30947)
+        $this->requireExactUserArgCount($frame, 'MultipleIterator::detachIterator', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('MultipleIterator::detachIterator() requires VM context');
         }
@@ -476,12 +468,8 @@ final class MultipleIteratorContainsIterator extends VmClassMethod
             MultipleIteratorBuiltin::CLASS_LC,
             'MultipleIterator::containsIterator()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'MultipleIterator::containsIterator() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_MultipleIterator_containsIterator — ZEND_PARSE_PARAMETERS_ARGS(1, 1) (#30947)
+        $this->requireExactUserArgCount($frame, 'MultipleIterator::containsIterator', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('MultipleIterator::containsIterator() requires VM context');
         }
@@ -532,12 +520,8 @@ final class MultipleIteratorSetFlags extends VmClassMethod
             MultipleIteratorBuiltin::CLASS_LC,
             'MultipleIterator::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'MultipleIterator::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_MultipleIterator_setFlags — ZEND_PARSE_PARAMETERS_ARGS(1, 1)
+        $this->requireExactUserArgCount($frame, 'MultipleIterator::setFlags', 1);
         $flags = VmMath::parseIntBuiltinArg(
             $frame->calledArgs[1],
             'MultipleIterator::setFlags',
@@ -562,6 +546,8 @@ final class MultipleIteratorGetFlags extends VmClassMethod
             MultipleIteratorBuiltin::CLASS_LC,
             'MultipleIterator::getFlags()'
         );
+        // php-src zim_MultipleIterator_getFlags — ZEND_PARSE_PARAMETERS_NONE (#30947)
+        $this->requireExactUserArgCount($frame, 'MultipleIterator::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
