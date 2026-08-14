@@ -25,6 +25,8 @@ final class AttributeConstruct extends VmClassMethod
         if (Variable::TYPE_OBJECT !== $receiver->type) {
             throw new \LogicException('Attribute::__construct() called without $this');
         }
+        // php-src: Zend/zend_attributes.stub.php — __construct(int $flags = …); ZEND_PARSE_PARAMETERS(0, 1) (#31089)
+        $this->requireAtMostUserArgCount($frame, 'Attribute::__construct', 1);
 
         $flags = AttributeSupport::targetAll();
         if (isset($frame->calledArgs[1])) {

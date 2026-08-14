@@ -24,5 +24,8 @@ final class OverrideConstruct extends VmClassMethod
         if (Variable::TYPE_OBJECT !== $receiver->type) {
             throw new \LogicException('Override::__construct() called without $this');
         }
+        $object = $receiver->toObject();
+        // php-src: marker attribute ctors take no args (AllowDynamicProperties/ReturnTypeWillChange/SensitiveParameter/Override; #31089)
+        $this->requireExactUserArgCount($frame, $object->class->name.'::__construct', 0);
     }
 }
