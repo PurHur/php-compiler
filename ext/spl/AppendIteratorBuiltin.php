@@ -223,6 +223,8 @@ final class AppendIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src spl_append_it_construct — ZEND_PARSE_PARAMETERS_NONE (#31071).
+        $this->requireExactUserArgCount($frame, 'AppendIterator::__construct', 0);
         $object = SplIteratorSupport::receiverIsA(
             $frame,
             AppendIteratorBuiltin::CLASS_LC,

@@ -126,17 +126,13 @@ final class InfiniteIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src zim_InfiniteIterator___construct — exactly one iterator (#31071).
+        $this->requireExactUserArgCount($frame, 'InfiniteIterator::__construct', 1);
         $object = SplIteratorSupport::receiver(
             $frame,
             InfiniteIteratorBuiltin::CLASS_LC,
             'InfiniteIterator::__construct()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'InfiniteIterator::__construct() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('InfiniteIterator::__construct() requires VM context');
         }
@@ -158,17 +154,13 @@ final class NoRewindIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src zim_NoRewindIterator___construct — exactly one iterator (#31071).
+        $this->requireExactUserArgCount($frame, 'NoRewindIterator::__construct', 1);
         $object = SplIteratorSupport::receiver(
             $frame,
             NoRewindIteratorBuiltin::CLASS_LC,
             'NoRewindIterator::__construct()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'NoRewindIterator::__construct() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('NoRewindIterator::__construct() requires VM context');
         }

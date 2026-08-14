@@ -350,6 +350,8 @@ final class MultipleIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src zim_MultipleIterator___construct — optional flags only (#31071).
+        $this->requireAtMostUserArgCount($frame, 'MultipleIterator::__construct', 1);
         $object = SplIteratorSupport::receiver(
             $frame,
             MultipleIteratorBuiltin::CLASS_LC,
