@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\DirectoryJitHelper;
 use PHPLLVM\Value;
 
@@ -33,7 +36,22 @@ final class DirectoryMethod implements Call
             throw new \LogicException('Directory::'.$this->method.'() called without $this');
         }
 
-        return match (strtolower($this->method)) {
+        $method = strtolower($this->method);
+        if (\in_array($method, ['read', 'rewind', 'close'], true)) {
+            // php-src ext/standard/dir.c — ZEND_PARSE_PARAMETERS_NONE (#30946)
+            $given = max(0, \count($args) - 1);
+            if (0 !== $given) {
+                ExceptionBridge::emitArgumentCountErrorAndAbort(
+                    $context,
+                    VmClassMethod::exactUserArgCountMessage('Directory::'.$method, 0, $given)
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'directory_'.$method.'_argc_cont');
+
+                return VmClassMethod::jitArgcDummyReturn($context);
+            }
+        }
+
+        return match ($method) {
             '__construct' => DirectoryJitHelper::compileConstruct($context),
             'read' => DirectoryJitHelper::compileRead($context, $args[0]),
             'rewind' => DirectoryJitHelper::compileRewind($context, $args[0]),
