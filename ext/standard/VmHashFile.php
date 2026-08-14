@@ -30,12 +30,14 @@ final class VmHashFile
      */
     public static function hashHmacFile(string $algo, string $path, string $key, bool $raw = false) {
         self::rejectEmptyPath($path);
+        // php-src PHP_FUNCTION(hash_hmac_file) — unknown algo cites hash_hmac_file() (#30646).
+        VmHash::ensureHmacAlgo($algo, 'hash_hmac_file');
         $data = VmFs::fileGetContents($path);
         if (false === $data) {
             return false;
         }
 
-        return VmHash::hashHmac($algo, $data, $key, $raw);
+        return VmHash::hashHmac($algo, $data, $key, $raw, 'hash_hmac_file');
     }
 
     /** @throws \ValueError php-src Z_PARAM_PATH empty-string guard (#14074). */

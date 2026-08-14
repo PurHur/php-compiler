@@ -51,8 +51,10 @@ final class VmHash
         throw new \ValueError(self::unknownDigestAlgoMsg($fn));
     }
 
-    /** @throws \ValueError ext/hash/hash.c unknown HMAC algo (issue #4408). */
-    public static function ensureHmacAlgo(string $algo): void
+    /**
+     * @throws \ValueError ext/hash/hash.c unknown HMAC algo (issue #4408; callee name #30646).
+     */
+    public static function ensureHmacAlgo(string $algo, string $fn = 'hash_hmac'): void
     {
         if (VmHashNative::supports($algo)) {
             return;
@@ -62,17 +64,22 @@ final class VmHash
             return;
         }
 
-        throw new \ValueError(self::HASH_HMAC_UNKNOWN_ALGO_MSG);
+        throw new \ValueError(self::unknownHmacAlgoMsg($fn));
     }
 
-    public static function hashHmac(string $algo, string $data, string $key, bool $raw = false): string
-    {
-        self::ensureHmacAlgo($algo);
+    public static function hashHmac(
+        string $algo,
+        string $data,
+        string $key,
+        bool $raw = false,
+        string $fn = 'hash_hmac'
+    ): string {
+        self::ensureHmacAlgo($algo, $fn);
         $lower = \strtolower($algo);
         if (VmHashHostFallback::supportsHmac($lower)) {
             $digest = VmHashHostFallback::hashHmac($lower, $data, $key, $raw);
             if (false === $digest) {
-                throw new \ValueError(self::HASH_HMAC_UNKNOWN_ALGO_MSG);
+                throw new \ValueError(self::unknownHmacAlgoMsg($fn));
             }
 
             return $digest;
@@ -80,7 +87,7 @@ final class VmHash
 
         $native = VmHashNative::hashHmac($algo, $data, $key, $raw);
         if (false === $native) {
-            throw new \ValueError(self::HASH_HMAC_UNKNOWN_ALGO_MSG);
+            throw new \ValueError(self::unknownHmacAlgoMsg($fn));
         }
 
         return $native;
@@ -172,5 +179,15 @@ final class VmHash
         }
 
         return $fn.'(): Argument #1 ($algo) must be a valid hashing algorithm';
+    }
+
+    /** Peer {@see unknownDigestAlgoMsg}; hash_hmac_file() cites its own name (#30646). */
+    private static function unknownHmacAlgoMsg(string $fn): string
+    {
+        if ('hash_hmac' === $fn) {
+            return self::HASH_HMAC_UNKNOWN_ALGO_MSG;
+        }
+
+        return $fn.'(): Argument #1 ($algo) must be a valid cryptographic hashing algorithm';
     }
 }

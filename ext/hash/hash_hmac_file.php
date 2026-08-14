@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\hash;
 
 use PHPCompiler\ext\standard\JitHashFile;
 use PHPCompiler\ext\standard\JitStreamPath;
+use PHPCompiler\ext\standard\VmHash;
 use PHPCompiler\ext\standard\VmHashFile;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
@@ -85,6 +86,21 @@ final class hash_hmac_file extends Internal
         $algo = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_hmac_file', 0, 'algo')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'hash_hmac_file', 0, 'algo');
+        // Compile-time unknown/empty algo → ValueError cites hash_hmac_file() (not NestedJIT hash_hmac) (#30646).
+        $constAlgo = $args[0]->compileTimeString;
+        if (null === $constAlgo && JITVariable::TYPE_NULL === $args[0]->type && !$context->callerStrictTypes) {
+            $constAlgo = '';
+        }
+        if (null !== $constAlgo) {
+            try {
+                VmHash::ensureHmacAlgo($constAlgo, 'hash_hmac_file');
+            } catch (\ValueError $e) {
+                $slot = JitValueBox::alloc($context);
+                ExceptionBridge::emitValueErrorAndAbort($context, $e->getMessage());
+
+                return $slot;
+            }
+        }
         $path = JitStreamPath::lowerNonEmptyPath($context, $args[1], 'hash_hmac_file', 1, 'filename');
         $key = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'hash_hmac_file', 2, 'key')
