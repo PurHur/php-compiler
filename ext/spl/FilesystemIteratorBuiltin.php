@@ -485,6 +485,8 @@ final class FilesystemIteratorGetFlags extends VmClassMethod
             FilesystemIteratorBuiltin::CLASS_LC,
             'FilesystemIterator::getFlags()'
         );
+        // php-src zim_FilesystemIterator_getFlags — ZEND_PARSE_PARAMETERS_NONE (#30937).
+        $this->requireExactUserArgCount($frame, 'FilesystemIterator::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
