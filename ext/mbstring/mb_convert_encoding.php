@@ -23,6 +23,8 @@ use PHPLLVM\Value;
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_encoding)
  * $from_encoding is array|string|null — arrays / comma lists use detect-then-convert.
+ *
+ * Excess argc → Zend `expects at most` ArgumentCountError (#30891).
  */
 final class mb_convert_encoding extends Internal
 {
@@ -33,13 +35,9 @@ final class mb_convert_encoding extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity 2..3 — excess uses at-most wording (#30891).
+        $this->requireArgCountRange($frame, 'mb_convert_encoding', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_convert_encoding() expects at least 2 arguments, %d given',
-                $argc
-            ));
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -100,10 +98,11 @@ final class mb_convert_encoding extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('mb_convert_encoding() requires two or three arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30891).
+        if (!$this->requireArgCountRangeJit($context, $args, 'mb_convert_encoding', 2, 3)) {
+            return self::foldFalse($context);
         }
+        $argc = \count($args);
 
         // Compile-time null $string — strict TypeError / weak soft-null (#29777 / #21282).
         $sourceIsNull = JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant;

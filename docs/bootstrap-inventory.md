@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7430 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24028 |
+| Source constructs flagged (warnings) | 24022 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -989,10 +989,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/iconv/iconv_mime_decode_headers.php` | 0 | 7 |
 | `ext/iconv/iconv_mime_encode.php` | 0 | 3 |
 | `ext/iconv/iconv_set_encoding.php` | 0 | 3 |
-| `ext/iconv/iconv_strlen.php` | 0 | 2 |
-| `ext/iconv/iconv_strpos.php` | 0 | 2 |
-| `ext/iconv/iconv_strrpos.php` | 0 | 2 |
-| `ext/iconv/iconv_substr.php` | 0 | 2 |
+| `ext/iconv/iconv_strlen.php` | 0 | 1 |
+| `ext/iconv/iconv_strpos.php` | 0 | 1 |
+| `ext/iconv/iconv_strrpos.php` | 0 | 1 |
+| `ext/iconv/iconv_substr.php` | 0 | 1 |
 | `ext/igbinary/IgbinaryExtensionPolicy.php` | 0 | 1 |
 | `ext/igbinary/IgbinaryFunction.php` | 0 | 3 |
 | `ext/igbinary/Module.php` | 0 | 5 |
@@ -1502,7 +1502,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_chr.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 2 |
-| `ext/mbstring/mb_convert_encoding.php` | 0 | 3 |
+| `ext/mbstring/mb_convert_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_kana.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_variables.php` | 0 | 3 |
 | `ext/mbstring/mb_decode_mimeheader.php` | 0 | 2 |
@@ -1549,7 +1549,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_strimwidth.php` | 0 | 4 |
 | `ext/mbstring/mb_stripos.php` | 0 | 4 |
 | `ext/mbstring/mb_stristr.php` | 0 | 4 |
-| `ext/mbstring/mb_strlen.php` | 0 | 2 |
+| `ext/mbstring/mb_strlen.php` | 0 | 1 |
 | `ext/mbstring/mb_strpos.php` | 0 | 4 |
 | `ext/mbstring/mb_strrchr.php` | 0 | 4 |
 | `ext/mbstring/mb_strrichr.php` | 0 | 4 |
@@ -14485,7 +14485,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/IconvStringFunction.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 - 2 closure(s)
 
 ### `ext/iconv/IconvStringJitHelper.php`
@@ -14506,7 +14506,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/JitIconvString.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/iconv/Module.php`
 
@@ -14584,25 +14584,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/iconv_strlen.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/iconv/iconv_strpos.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/iconv/iconv_strrpos.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/iconv/iconv_substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/igbinary/IgbinaryExtensionPolicy.php`
@@ -19160,7 +19156,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_convert_encoding.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 38)
 - 4 class method(s)
 - 3 closure(s)
 
@@ -19477,7 +19472,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_strlen.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/mbstring/mb_strpos.php`
@@ -26878,7 +26872,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 240)
 - new ArgumentCountError (line 278)
 - new ObjectEntry (line 421)
-- new ArgumentCountError (line 506)
+- new ArgumentCountError (line 512)
 - 18 class method(s)
 
 ### `ext/spl/FilterIteratorBuiltin.php`
@@ -27261,18 +27255,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 50)
 - new SplFileObjectConstruct (line 69)
 - new ArgumentCountError (line 171)
-- new ArgumentCountError (line 296)
-- new ArgumentCountError (line 339)
-- new ArgumentCountError (line 377)
-- new ArgumentCountError (line 569)
-- new ArgumentCountError (line 599)
-- new ArgumentCountError (line 698)
-- new ArgumentCountError (line 754)
-- new ArgumentCountError (line 816)
-- new ArgumentCountError (line 894)
-- new ArgumentCountError (line 997)
-- new Variable (line 1132)
-- new ArgumentCountError (line 1175)
+- new ArgumentCountError (line 284)
+- new ArgumentCountError (line 327)
+- new ArgumentCountError (line 365)
+- new ArgumentCountError (line 559)
+- new ArgumentCountError (line 589)
+- new ArgumentCountError (line 688)
+- new ArgumentCountError (line 746)
+- new ArgumentCountError (line 808)
+- new ArgumentCountError (line 886)
+- new ArgumentCountError (line 989)
+- new Variable (line 1124)
+- new ArgumentCountError (line 1167)
 - 35 class method(s)
 
 ### `ext/spl/SplFileObjectSnapshotJitHelper.php`
@@ -36052,33 +36046,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 4018)
 - new Variable (line 4116)
 - new Variable (line 4130)
-- new Variable (line 4297)
-- new Variable (line 4302)
-- new Error (line 4322)
-- new Error (line 4326)
-- new Variable (line 4406)
-- new Variable (line 4412)
-- new Variable (line 4418)
-- new Variable (line 4464)
-- new Variable (line 4469)
-- new Variable (line 4498)
+- new Variable (line 4308)
+- new Variable (line 4313)
+- new Error (line 4333)
+- new Error (line 4337)
+- new Variable (line 4417)
+- new Variable (line 4423)
+- new Variable (line 4429)
+- new Variable (line 4475)
+- new Variable (line 4480)
 - new Variable (line 4508)
-- new Variable (line 4514)
-- new Variable (line 4536)
-- new Variable (line 4557)
-- new HashTable (line 4591)
-- new Variable (line 4608)
-- new Variable (line 4610)
-- new HashTable (line 4711)
-- new Variable (line 4743)
-- new Variable (line 4745)
-- new HashTable (line 4758)
-- new Variable (line 4765)
-- new Variable (line 4776)
-- new HashTable (line 4791)
-- new Variable (line 4794)
-- new HashTable (line 4813)
-- new Variable (line 4816)
+- new Variable (line 4518)
+- new Variable (line 4524)
+- new Variable (line 4546)
+- new Variable (line 4567)
+- new HashTable (line 4601)
+- new Variable (line 4618)
+- new Variable (line 4620)
+- new HashTable (line 4721)
+- new Variable (line 4753)
+- new Variable (line 4755)
+- new HashTable (line 4768)
+- new Variable (line 4775)
+- new Variable (line 4786)
+- new HashTable (line 4801)
+- new Variable (line 4804)
+- new HashTable (line 4823)
+- new Variable (line 4826)
 - 205 class method(s)
 - 2 closure(s)
 
