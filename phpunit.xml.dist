@@ -413,6 +413,8 @@
             <file>./test/compliance/StripcslashesExcessArgc30704JITTest.php</file>
             <file>./test/compliance/ZlibOneshotExcessArgc30829VMTest.php</file>
             <file>./test/compliance/ZlibOneshotExcessArgc30829JITTest.php</file>
+            <file>./test/compliance/ZlibStreamExcessArgc30830VMTest.php</file>
+            <file>./test/compliance/ZlibStreamExcessArgc30830JITTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723JITTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647VMTest.php</file>

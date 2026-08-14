@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,11 +22,10 @@ final class gzseek extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30830).
         $fn = $this->getName();
+        $this->requireArgCountRange($frame, $fn, 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException($fn.'() expects two or three arguments in this compiler build');
-        }
         $handle = VmStreamArg::requireStreamHandle($frame->calledArgs[0]->resolveIndirect(), $fn);
         if (null === $frame->returnVar) {
             return;
@@ -41,10 +41,12 @@ final class gzseek extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException($fn.'() expects two or three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, $fn, 2, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $args[0], $fn.'() stream'),

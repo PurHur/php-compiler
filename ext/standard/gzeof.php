@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,10 +22,9 @@ final class gzeof extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/zlib/zlib.c — ArgumentCountError (#30830).
         $fn = $this->getName();
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException($fn.'() expects exactly one argument in this compiler build');
-        }
+        $this->requireExactArgCount($frame, $fn, 1);
         $handle = VmStreamArg::requireStreamHandle($frame->calledArgs[0]->resolveIndirect(), $fn);
         if (null === $frame->returnVar) {
             return;
@@ -35,8 +35,10 @@ final class gzeof extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        if (1 !== \count($args)) {
-            throw new \LogicException($fn.'() expects exactly one argument in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, $fn, 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
