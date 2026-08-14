@@ -413,6 +413,8 @@ final class AppendIteratorGetIteratorIndex extends VmClassMethod
             AppendIteratorBuiltin::CLASS_LC,
             'AppendIterator::getIteratorIndex()'
         );
+        // php-src zim_AppendIterator_getIteratorIndex — ZEND_PARSE_PARAMETERS_NONE (#31041).
+        $this->requireExactUserArgCount($frame, 'AppendIterator::getIteratorIndex', 0);
         if (null === $frame->returnVar) {
             return;
         }
