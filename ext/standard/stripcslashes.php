@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
@@ -20,14 +21,14 @@ use PHPLLVM\Value;
  * stripcslashes() — unescape C-style byte sequences (php-src ext/standard/string.c; issue #3356).
  *
  * Soft-null on forward profile like addslashes/stripslashes (#21220 / #21180).
+ * Excess argc → ArgumentCountError like Zend (#30704).
  */
 final class stripcslashes extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#30704).
+        $this->requireExactArgCount($frame, 'stripcslashes', 1);
         $subject = self::vmStringArg($frame, 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
@@ -37,8 +38,10 @@ final class stripcslashes extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, 'stripcslashes', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             if ($context->callerStrictTypes) {
