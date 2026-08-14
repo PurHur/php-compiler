@@ -5940,6 +5940,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomXPathEvaluate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomXPathQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomXPathRegisterNamespace.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomXPathRegisterPhpFunctions.php';
+require_once __DIR__.'/../../../lib/JIT/Call/EnumSyntheticStatic.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetCode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetFile.php';
