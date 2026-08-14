@@ -101,12 +101,8 @@ final class SplLegacySerializableUnserialize extends VmClassMethod
             $this->ownerLc,
             $this->displayName.'::unserialize()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                $this->displayName.'::unserialize() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
+        $this->requireExactUserArgCount($frame, $this->displayName.'::unserialize', 1);
         // Zend mutates $this in place; global serialize()/unserialize() use dedicated SPL wire paths (#14164).
     }
 }
