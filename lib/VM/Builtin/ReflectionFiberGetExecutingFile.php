@@ -18,6 +18,8 @@ final class ReflectionFiberGetExecutingFile extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFiber_getExecutingFile — ZEND_PARSE_PARAMETERS_NONE (#30928)
+        $this->requireExactUserArgCount($frame, 'ReflectionFiber::getExecutingFile', 0);
         $receiver = ReflectionSupport::requireReflectionFiber($frame, $frame->calledArgs[0]);
         $fiber = FiberTrace::fiberStateFromReflection($receiver);
         $file = FiberTrace::executingFile($fiber);

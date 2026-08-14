@@ -24,6 +24,8 @@ final class ReflectionFiberGetCallable extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFiber_getCallable — ZEND_PARSE_PARAMETERS_NONE (#30928)
+        $this->requireExactUserArgCount($frame, 'ReflectionFiber::getCallable', 0);
         $receiver = ReflectionSupport::requireReflectionFiber($frame, $frame->calledArgs[0]);
         $fiber = FiberTrace::fiberStateFromReflection($receiver);
         if (null === $frame->returnVar) {

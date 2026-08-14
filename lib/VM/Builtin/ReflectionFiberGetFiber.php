@@ -17,6 +17,8 @@ final class ReflectionFiberGetFiber extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFiber_getFiber — ZEND_PARSE_PARAMETERS_NONE (#30928)
+        $this->requireExactUserArgCount($frame, 'ReflectionFiber::getFiber', 0);
         $receiver = ReflectionSupport::requireReflectionFiber($frame, $frame->calledArgs[0]);
         $target = $receiver->getProperty(ReflectionSupport::PROP_FIBER_TARGET)->resolveIndirect();
         if (null !== $frame->returnVar) {
