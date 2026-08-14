@@ -1913,6 +1913,7 @@
         "ext/phar/VmPharTar.php",
         "ext/phar/bootstrap_pharexception.php",
         "ext/posix/JitPosix.php",
+        "ext/posix/JitPosixGetegidKernel.php",
         "ext/posix/JitPosixGeteuidKernel.php",
         "ext/posix/JitPosixGetgidKernel.php",
         "ext/posix/JitPosixGetppidKernel.php",
@@ -1922,6 +1923,7 @@
         "ext/posix/PosixConstants.php",
         "ext/posix/PosixCtermidJitHelper.php",
         "ext/posix/PosixFunction.php",
+        "ext/posix/PosixGetegidJitHelper.php",
         "ext/posix/PosixGeteuidJitHelper.php",
         "ext/posix/PosixGetgidJitHelper.php",
         "ext/posix/PosixGetpidJitHelper.php",
@@ -5748,6 +5750,7 @@
         "lib/JIT/Builtin/PendingHeadersRuntime.php",
         "lib/JIT/Builtin/PhpTokenRuntime.php",
         "lib/JIT/Builtin/PosixCtermidRuntime.php",
+        "lib/JIT/Builtin/PosixGetegidJit.php",
         "lib/JIT/Builtin/PosixGeteuidJit.php",
         "lib/JIT/Builtin/PosixGetgidJit.php",
         "lib/JIT/Builtin/PosixGetpidJit.php",
@@ -7665,9 +7668,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7431,
+        "inventory_files": 7434,
         "excluded": 0,
-        "eligible": 7431,
+        "eligible": 7434,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
