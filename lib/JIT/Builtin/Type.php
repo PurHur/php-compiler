@@ -1516,6 +1516,7 @@ class Type extends Builtin {
         PosixGeteuidJit::ensureLinked($this->context);
         PosixGetgidJit::ensureLinked($this->context);
         PosixGetegidJit::ensureLinked($this->context);
+        PosixSetuidJit::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
         StringNetInterfacesJit::ensureLinked($this->context);

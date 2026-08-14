@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Builtin\PosixGetpidJit;
 use PHPCompiler\JIT\Builtin\PosixGetppidJit;
 use PHPCompiler\JIT\Builtin\PosixGetuidJit;
 use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
+use PHPCompiler\JIT\Builtin\PosixSetuidJit;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\Builtin\PosixTerminalRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -25,7 +26,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744, #30767, #30803, #30986). */
+/** LLVM lowering for posix v1 builtins (#7271, #30696, #30728, #30744, #30767, #30803, #30986, #31038). */
 final class JitPosix
 {
     private static int $blockSerial = 0;
@@ -109,9 +110,21 @@ final class JitPosix
         return JitGetcwd::boxed($context, $resolved);
     }
 
-    public static function setuid(Context $context, JITVariable $arg): Value
+    /**
+     * posix_setuid() — PHP helper bridge (#31038); NestedJIT thin setuid(2) leaf.
+     *
+     * @param Value $uidI64 zend long uid (caller: {@see JitLongArg::lower})
+     *
+     * @return Value i1 — true when setuid succeeds (peer proc_nice #30615)
+     */
+    public static function setuid(Context $context, Value $uidI64): Value
     {
-        return self::setId($context, 'setuid', 'posix_setuid', $arg, 'uid');
+        $i64 = $context->getTypeFromString('int64');
+        $uid = $uidI64->typeOf() === $i64
+            ? $uidI64
+            : $context->builder->sext($uidI64, $i64);
+
+        return PosixSetuidJit::invoke($context, $uid);
     }
 
     public static function setgid(Context $context, JITVariable $arg): Value

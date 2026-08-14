@@ -8,12 +8,13 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
-/** posix_setuid() — set real user ID (php-src ext/posix/posix.c; #7376). */
+/** posix_setuid() — set real user ID (VM VmPosix; JIT/AOT PosixSetuidJitHelper via PosixSetuidJit, #31038/#7376). */
 final class posix_setuid extends Internal
 {
     public function __construct()
@@ -43,11 +44,15 @@ final class posix_setuid extends Internal
                 $context,
                 'posix_setuid() expects exactly 1 argument, '.$argc.' given'
             );
-            $slot = JitValueBox::alloc($context);
 
-            return JitValueBox::pointer($context, $slot);
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
-        return JitPosix::setuid($context, $args[0]);
+        JitInternalStrictArg::requireInt($context, $args[0], 'posix_setuid', 'user_id', 1);
+
+        return JitPosix::setuid(
+            $context,
+            JitLongArg::lower($context, $args[0], 'posix_setuid() user_id')
+        );
     }
 }
