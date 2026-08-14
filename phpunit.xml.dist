@@ -107,6 +107,8 @@
             <file>./test/compliance/ClosureDynpropErrorThrowSiteVMTest.php</file>
             <file>./test/compliance/AnonymousClassImplementsNameVMTest.php</file>
             <file>./test/compliance/AnonymousClassImplementsNameJITTest.php</file>
+            <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
+            <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameVMTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameJITTest.php</file>
             <file>./test/compliance/SelfReturnTypeerrorResolvedNameVMTest.php</file>
