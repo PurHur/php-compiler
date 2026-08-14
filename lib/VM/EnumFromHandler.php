@@ -26,13 +26,17 @@ final class EnumFromHandler extends Internal
     {
         $enum = EnumSupport::resolveRuntimeEnumClass($frame->vmContext, $this->enum);
         EnumSupport::ensureBackedEnumValuesUnique($enum);
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException(
-                $this->getName().'() requires exactly 1 argument in this compiler build'
+        // php-src: Zend/zend_enum.c — zend_enum_from_func / zend_enum_try_from_func (#30864)
+        // Static: calledArgs are user args only (no $this).
+        $argc = \count($frame->calledArgs);
+        $method = $this->try ? 'tryFrom' : 'from';
+        $function = $enum->name.'::'.$method;
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                Builtin\VmClassMethod::exactUserArgCountMessage($function, 1, $argc)
             );
         }
         $arg = $frame->calledArgs[0];
-        $method = $this->try ? 'tryFrom' : 'from';
         BackedEnum::assertStrictCallerBackingArg(
             $enum,
             $arg,
