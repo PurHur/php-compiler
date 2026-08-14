@@ -235,13 +235,8 @@ final class FilesystemIteratorConstruct extends VmClassMethod
             FilesystemIteratorBuiltin::CLASS_LC,
             'FilesystemIterator::__construct()'
         );
+        $this->requireUserArgCountRange($frame, 'FilesystemIterator::__construct', 1, 2);
         $argCount = \count($frame->calledArgs);
-        if ($argCount < 2) {
-            throw new \ArgumentCountError(
-                'FilesystemIterator::__construct() expects at least 1 argument, '
-                .($argCount - 1).' given'
-            );
-        }
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
             'FilesystemIterator::__construct'
@@ -273,13 +268,8 @@ final class RecursiveDirectoryIteratorConstruct extends VmClassMethod
             RecursiveDirectoryIteratorBuiltin::CLASS_LC,
             'RecursiveDirectoryIterator::__construct()'
         );
+        $this->requireUserArgCountRange($frame, 'RecursiveDirectoryIterator::__construct', 1, 2);
         $argCount = \count($frame->calledArgs);
-        if ($argCount < 2) {
-            throw new \ArgumentCountError(
-                'RecursiveDirectoryIterator::__construct() expects at least 1 argument, '
-                .($argCount - 1).' given'
-            );
-        }
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
             'RecursiveDirectoryIterator::__construct'
