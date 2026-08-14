@@ -18,6 +18,10 @@ final class FiberIsStarted implements Call
         if ([] === $args) {
             throw new \LogicException('Fiber::isStarted() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — isStarted(): bool; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        if (!FiberHelper::emitExactInstanceUserArgc($context, $args, 'Fiber::isStarted', 0)) {
+            return FiberHelper::dummyNativeFalse($context);
+        }
 
         return FiberHelper::loadStatusBool($context, $args[0], 'started')->value;
     }

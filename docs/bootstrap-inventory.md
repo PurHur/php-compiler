@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7430 |
-| Phase A inventory files (M2 ratio SSOT) | 7430 |
+| PHP files on vm.php path | 7431 |
+| Phase A inventory files (M2 ratio SSOT) | 7431 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24021 |
+| Source constructs flagged (warnings) | 24016 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -989,10 +989,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/iconv/iconv_mime_decode_headers.php` | 0 | 7 |
 | `ext/iconv/iconv_mime_encode.php` | 0 | 3 |
 | `ext/iconv/iconv_set_encoding.php` | 0 | 3 |
-| `ext/iconv/iconv_strlen.php` | 0 | 2 |
-| `ext/iconv/iconv_strpos.php` | 0 | 2 |
-| `ext/iconv/iconv_strrpos.php` | 0 | 2 |
-| `ext/iconv/iconv_substr.php` | 0 | 2 |
+| `ext/iconv/iconv_strlen.php` | 0 | 1 |
+| `ext/iconv/iconv_strpos.php` | 0 | 1 |
+| `ext/iconv/iconv_strrpos.php` | 0 | 1 |
+| `ext/iconv/iconv_substr.php` | 0 | 1 |
 | `ext/igbinary/IgbinaryExtensionPolicy.php` | 0 | 1 |
 | `ext/igbinary/IgbinaryFunction.php` | 0 | 3 |
 | `ext/igbinary/Module.php` | 0 | 5 |
@@ -1502,7 +1502,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_chr.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 2 |
-| `ext/mbstring/mb_convert_encoding.php` | 0 | 3 |
+| `ext/mbstring/mb_convert_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_kana.php` | 0 | 2 |
 | `ext/mbstring/mb_convert_variables.php` | 0 | 3 |
 | `ext/mbstring/mb_decode_mimeheader.php` | 0 | 2 |
@@ -1549,7 +1549,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_strimwidth.php` | 0 | 4 |
 | `ext/mbstring/mb_stripos.php` | 0 | 4 |
 | `ext/mbstring/mb_stristr.php` | 0 | 4 |
-| `ext/mbstring/mb_strlen.php` | 0 | 2 |
+| `ext/mbstring/mb_strlen.php` | 0 | 1 |
 | `ext/mbstring/mb_strpos.php` | 0 | 4 |
 | `ext/mbstring/mb_strrchr.php` | 0 | 4 |
 | `ext/mbstring/mb_strrichr.php` | 0 | 4 |
@@ -6187,6 +6187,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ExceptionToString.php` | 0 | 1 |
 | `lib/JIT/Call/ExternalMethod.php` | 0 | 1 |
 | `lib/JIT/Call/FiberConstruct.php` | 0 | 2 |
+| `lib/JIT/Call/FiberGetCurrent.php` | 0 | 1 |
 | `lib/JIT/Call/FiberGetReturn.php` | 0 | 1 |
 | `lib/JIT/Call/FiberIsRunning.php` | 0 | 1 |
 | `lib/JIT/Call/FiberIsStarted.php` | 0 | 1 |
@@ -6405,7 +6406,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/EvalHelper.php` | 0 | 1 |
 | `lib/JIT/ExceptionBridge.php` | 0 | 1 |
 | `lib/JIT/ExceptionHandlerCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/FiberHelper.php` | 0 | 11 |
+| `lib/JIT/FiberHelper.php` | 0 | 12 |
 | `lib/JIT/FiberHelperLlvm.php` | 0 | 8 |
 | `lib/JIT/FromCallableHelper.php` | 0 | 1 |
 | `lib/JIT/FunctionStaticHelper.php` | 0 | 1 |
@@ -6717,7 +6718,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/FiberResume.php` | 0 | 2 |
 | `lib/VM/Builtin/FiberStart.php` | 0 | 2 |
 | `lib/VM/Builtin/FiberSuspend.php` | 0 | 1 |
-| `lib/VM/Builtin/FiberThrow.php` | 0 | 2 |
+| `lib/VM/Builtin/FiberThrow.php` | 0 | 1 |
 | `lib/VM/Builtin/GeneratorCurrent.php` | 0 | 3 |
 | `lib/VM/Builtin/GeneratorGetReturn.php` | 0 | 3 |
 | `lib/VM/Builtin/GeneratorKey.php` | 0 | 3 |
@@ -14483,7 +14484,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/IconvStringFunction.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 - 2 closure(s)
 
 ### `ext/iconv/IconvStringJitHelper.php`
@@ -14504,7 +14505,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/JitIconvString.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/iconv/Module.php`
 
@@ -14582,25 +14583,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/iconv_strlen.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/iconv/iconv_strpos.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/iconv/iconv_strrpos.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/iconv/iconv_substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/igbinary/IgbinaryExtensionPolicy.php`
@@ -19158,7 +19155,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_convert_encoding.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 38)
 - 4 class method(s)
 - 3 closure(s)
 
@@ -19475,7 +19471,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_strlen.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/mbstring/mb_strpos.php`
@@ -34618,11 +34613,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 160)
-- new RecursiveIteratorIterator (line 3945)
-- new RecursiveDirectoryIterator (line 3946)
-- new RecursiveIteratorIterator (line 4052)
-- new RecursiveDirectoryIterator (line 4053)
-- 133 class method(s)
+- new RecursiveIteratorIterator (line 3967)
+- new RecursiveDirectoryIterator (line 3968)
+- new RecursiveIteratorIterator (line 4074)
+- new RecursiveDirectoryIterator (line 4075)
+- 134 class method(s)
 - 13 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -51996,6 +51991,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 38)
 - 1 class method(s)
 
+### `lib/JIT/Call/FiberGetCurrent.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/FiberGetReturn.php`
 
 **Warnings** (review for bootstrap subset):
@@ -52039,7 +52039,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/FiberThrow.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 170)
+- new Variable (line 171)
 - 3 class method(s)
 
 ### `lib/JIT/Call/FilterIteratorMethod.php`
@@ -53572,17 +53572,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/FiberHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\FiberConstruct (line 30)
-- new Call\FiberStart (line 31)
-- new Call\FiberResume (line 32)
-- new Call\FiberThrow (line 33)
-- new Call\FiberSuspendStatic (line 34)
-- new Call\FiberGetReturn (line 35)
-- new Call\FiberIsTerminated (line 36)
-- new Call\FiberIsStarted (line 37)
-- new Call\FiberIsSuspended (line 38)
-- new Call\FiberIsRunning (line 39)
-- 16 class method(s)
+- new Call\FiberConstruct (line 31)
+- new Call\FiberStart (line 32)
+- new Call\FiberResume (line 33)
+- new Call\FiberThrow (line 34)
+- new Call\FiberSuspendStatic (line 35)
+- new Call\FiberGetCurrent (line 36)
+- new Call\FiberGetReturn (line 37)
+- new Call\FiberIsTerminated (line 38)
+- new Call\FiberIsStarted (line 39)
+- new Call\FiberIsSuspended (line 40)
+- new Call\FiberIsRunning (line 41)
+- 24 class method(s)
 
 ### `lib/JIT/FiberHelperLlvm.php`
 
@@ -55941,16 +55942,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/FiberGetCurrent.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 33)
+- new Variable (line 35)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/FiberGetReturn.php`
 
 **Warnings** (review for bootstrap subset):
-- new NativeFiberError (line 30)
-- new NativeFiberError (line 33)
-- new NativeFiberError (line 42)
+- new NativeFiberError (line 32)
+- new NativeFiberError (line 35)
 - new NativeFiberError (line 44)
+- new NativeFiberError (line 46)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/FiberIsRunning.php`
@@ -55976,7 +55977,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/FiberResume.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
+- new Variable (line 34)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/FiberStart.php`
@@ -55993,7 +55994,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/FiberThrow.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 2 class method(s)
 
 ### `lib/VM/Builtin/GeneratorCurrent.php`

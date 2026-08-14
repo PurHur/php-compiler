@@ -28,6 +28,16 @@ final class JitIconvString
         };
     }
 
+    /** Dummy IR value after catchable ArgumentCountError abort (#30891). */
+    public static function dummyAfterArgcAbort(Context $context, string $function): Value
+    {
+        if ('iconv_substr' === $function) {
+            return self::unreachableStringOrFalse($context);
+        }
+
+        return self::unreachableIntOrFalse($context);
+    }
+
     private static function strlen(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 1 || \count($args) > 2) {

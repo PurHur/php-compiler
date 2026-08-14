@@ -3646,6 +3646,15 @@ final class VmDateTimeNative
      * (e.g. America/New_York `+404251-0740023`). Matching only the minute form
      * zeroes latitude/longitude while country_code/comments still parse (#22291).
      *
+     * Bundled timezonedb stores coords as uint32 packed at 1e5 scale
+     * (php-src ext/date/lib/parse_tz.c read_location):
+     *   latitude  = packed / 100000 - 90
+     *   longitude = packed / 100000 - 180
+     * The generator truncates the ISO-6709 degree value toward zero at 5 decimals
+     * before packing, so the observable Zend float is
+     *   (int)($deg * 100000) / 100000.0
+     * which json_encode bit-matches php-src (#30953).
+     *
      * @return array{latitude: float, longitude: float}
      */
     private static function parseZoneTabCoordinates(string $coords): array
@@ -3664,7 +3673,20 @@ final class VmDateTimeNative
         $lonSec = isset($matches[8]) && '' !== $matches[8] ? (int) $matches[8] : 0;
         $lon = $lonSign * ((int) $matches[6] + ((int) $matches[7]) / 60.0 + $lonSec / 3600.0);
 
-        return ['latitude' => $lat, 'longitude' => $lon];
+        return [
+            'latitude' => self::quantizeTimelibGeoCoord($lat),
+            'longitude' => self::quantizeTimelibGeoCoord($lon),
+        ];
+    }
+
+    /**
+     * Toward-zero 5-decimal quantisation matching timelib location packing (#30953).
+     *
+     * php-src: ext/date/lib/parse_tz.c read_location — packed uint32 / 100000.
+     */
+    private static function quantizeTimelibGeoCoord(float $degrees): float
+    {
+        return ((int) ($degrees * 100000.0)) / 100000.0;
     }
 
     /** @return list<string> */

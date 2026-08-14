@@ -18,6 +18,8 @@ final class FiberGetCurrent extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src Zend/zend_fibers.stub.php — static getCurrent(): ?Fiber; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        $this->requireExactArgCount($frame, 'Fiber::getCurrent', 0);
         if (null === $frame->vmContext) {
             throw new \LogicException('Fiber::getCurrent() requires VM context');
         }

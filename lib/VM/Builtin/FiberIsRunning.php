@@ -21,6 +21,8 @@ final class FiberIsRunning extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('Fiber::isRunning() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — isRunning(): bool; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        $this->requireExactUserArgCount($frame, 'Fiber::isRunning', 0);
         FiberSupport::requireFiberObject($frame->calledArgs[0], 'Fiber::isRunning()');
         $fiber = FiberSupport::fiberFromObject($frame->calledArgs[0]->resolveIndirect()->toObject());
         if (null !== $frame->returnVar) {

@@ -22,6 +22,10 @@ final class FiberGetReturn implements Call
         if ([] === $args) {
             throw new \LogicException('Fiber::getReturn() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — getReturn(): mixed; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        if (!FiberHelper::emitExactInstanceUserArgc($context, $args, 'Fiber::getReturn', 0)) {
+            return FiberHelper::dummyNullValue($context);
+        }
         $fiberVar = $args[0];
         FiberHelper::ensureTypes($context);
         $statePtr = $fiberVar->fiberStatePtr ?? FiberHelper::loadStateFromFiberObject($context, $fiberVar);

@@ -18,6 +18,10 @@ final class FiberIsRunning implements Call
         if ([] === $args) {
             throw new \LogicException('Fiber::isRunning() called without $this');
         }
+        // php-src Zend/zend_fibers.stub.php — isRunning(): bool; ZEND_PARSE_PARAMETERS_NONE (#30906)
+        if (!FiberHelper::emitExactInstanceUserArgc($context, $args, 'Fiber::isRunning', 0)) {
+            return FiberHelper::dummyNativeFalse($context);
+        }
 
         return FiberHelper::loadStatusBool($context, $args[0], 'running')->value;
     }

@@ -21,7 +21,27 @@ abstract class IconvStringFunction extends Internal
 {
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $range = self::stringHelperArgcRange($this->getName());
+        if (null !== $range && !$this->requireArgCountRangeJit($context, $args, $this->getName(), $range[0], $range[1])) {
+            return JitIconvString::dummyAfterArgcAbort($context, $this->getName());
+        }
+
         return JitIconvString::dispatch($context, $this->getName(), ...$args);
+    }
+
+    /**
+     * php-src stub arities — excess uses Zend `at most` wording (#30891).
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    protected static function stringHelperArgcRange(string $function): ?array
+    {
+        return match ($function) {
+            'iconv_strlen' => [1, 2],
+            'iconv_strpos', 'iconv_substr' => [2, 4],
+            'iconv_strrpos' => [2, 3],
+            default => null,
+        };
     }
 
     /**
