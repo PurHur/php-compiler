@@ -18,15 +18,13 @@ final class DateTimeSetISODate extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('DateTime::setISODate() expects two to three arguments');
-        }
         $receiver = DateTimeSupport::requireDateTimeLike(
             $frame->calledArgs[0],
             'DateTime::setISODate()'
         );
         $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        $this->requireUserArgCountRange($frame, "{$label}::setISODate", 2, 3);
+        $argc = \count($frame->calledArgs);
         // Z_PARAM_LONG — caller strict_types → TypeError on null (#29842).
         // Frame args include $this; user-visible Argument #1 ($year) …
         $year = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, "{$label}::setISODate", 1, 'year');
