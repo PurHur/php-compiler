@@ -9731,7 +9731,7 @@ class Compiler {
         $declare->propertyFinal = $explicitFinal
             || PropertyVisibility::isImplicitlyFinalFromPrivateSet((int) $declare->propertySetVisibility);
         if ($explicitFinal && !CompilerVersion::supportsFinalPromotedProperties()) {
-            // php-src Zend/zend_compile.c — final on parameter rejected until 8.5 (#27123).
+            // php-src: ≤8.3 parse error; 8.4 zend_compile.c fatal until 8.5 (#27123, #31153).
             $sourceFile = $param->getFile();
             if ('' === $sourceFile) {
                 $sourceFile = 'unknown';
@@ -9739,7 +9739,7 @@ class Compiler {
             throw new CompileFatal(
                 $sourceFile,
                 max(1, $param->getLine()),
-                \PHPCompiler\Ast\FinalPromotedPropertyRewriter::REFERENCE_PROFILE_FINAL_ON_PARAMETER
+                \PHPCompiler\Ast\FinalPromotedPropertyRewriter::referenceProfileRejectMessage()
             );
         }
         $declare->propertyAsymmetricExplicitRead = Ast\AsymmetricVisibilityRewriter::hasExplicitReadModifierFromAttributes(

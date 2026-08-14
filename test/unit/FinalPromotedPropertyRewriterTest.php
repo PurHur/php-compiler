@@ -91,6 +91,10 @@ PHP;
                 FinalPromotedPropertyRewriter::REFERENCE_PROFILE_FINAL_ON_PARAMETER,
                 $err['message']
             );
+            self::assertSame(
+                FinalPromotedPropertyRewriter::REFERENCE_PROFILE_FINAL_ON_PARAMETER,
+                FinalPromotedPropertyRewriter::referenceProfileRejectMessage()
+            );
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -107,6 +111,57 @@ PHP;
         }
         $src = '<?php class C { public function __construct(public final string $x) {} }';
         self::assertSame($src, FinalPromotedPropertyRewriter::rewrite($src));
+    }
+
+    /** #31153 — PROFILE≤8.3 / unset: Zend parse error, not the 8.4 compile fatal. */
+    public function testParseErrorOnProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            self::assertFalse(CompilerVersion::supportsFinalProperties());
+            self::assertFalse(CompilerVersion::supportsFinalPromotedProperties());
+            $src = '<?php class C { public function __construct(final public int $x) {} }';
+            $err = FinalPromotedPropertyRewriter::referenceProfileSyntaxError($src);
+            self::assertNotNull($err);
+            self::assertSame(
+                FinalPromotedPropertyRewriter::REFERENCE_PROFILE_PARSE_UNEXPECTED_FINAL,
+                $err['message']
+            );
+            self::assertSame(
+                FinalPromotedPropertyRewriter::REFERENCE_PROFILE_PARSE_UNEXPECTED_FINAL,
+                FinalPromotedPropertyRewriter::referenceProfileRejectMessage()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** #31153 — PROFILE=8.3 matches 8.2 grammar (no T_FINAL in parameter list). */
+    public function testParseErrorOnProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            self::assertFalse(CompilerVersion::supportsFinalProperties());
+            $src = '<?php class C { public function __construct(final public int $x) {} }';
+            $err = FinalPromotedPropertyRewriter::referenceProfileSyntaxError($src);
+            self::assertNotNull($err);
+            self::assertSame(
+                FinalPromotedPropertyRewriter::REFERENCE_PROFILE_PARSE_UNEXPECTED_FINAL,
+                $err['message']
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     /** #28481 — eval()/string payloads must not look like real promoted-final decls. */
