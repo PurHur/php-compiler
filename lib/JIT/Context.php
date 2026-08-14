@@ -1260,6 +1260,10 @@ class Context {
         }
         // RecursiveIteratorIterator — flatten inner HT to LEAVES_ONLY `__spl_ht` (#26775).
         $this->functionProxies['recursiveiteratoriterator::__construct'] = new Call\RecursiveIteratorIteratorConstruct();
+        // php-src ZEND_PARSE_PARAMETERS_* — excess argc ArgumentCountError (#30956).
+        $this->functionProxies['recursiveiteratoriterator::getdepth'] = new Call\RecursiveIteratorIteratorArgcMethod('getDepth', 0);
+        $this->functionProxies['recursiveiteratoriterator::setmaxdepth'] = new Call\RecursiveIteratorIteratorArgcMethod('setMaxDepth', 1);
+        $this->functionProxies['recursiveiteratoriterator::getsubiterator'] = new Call\RecursiveIteratorIteratorArgcMethod('getSubIterator', 1);
         // LimitIterator / AppendIterator / RegexIterator / CallbackFilterIterator — `__spl_ht` (#26825, #27259).
         $this->type->object->lookup('LimitIterator');
         $this->type->object->lookup('AppendIterator');
@@ -1313,6 +1317,15 @@ class Context {
         $this->type->object->lookup('MultipleIterator');
         $this->type->object->lookup('RecursiveTreeIterator');
         $this->functionProxies['parentiterator::__construct'] = new Call\ParentIteratorConstruct();
+        // php-src ZEND_PARSE_PARAMETERS_NONE; hasChildren ACE cites RecursiveFilterIterator (#30956).
+        $this->functionProxies['parentiterator::accept'] = new Call\ParentIteratorArgcMethod(
+            'accept',
+            'ParentIterator::accept'
+        );
+        $this->functionProxies['parentiterator::haschildren'] = new Call\ParentIteratorArgcMethod(
+            'hasChildren',
+            'RecursiveFilterIterator::hasChildren'
+        );
         $this->functionProxies['multipleiterator::__construct'] = new Call\MultipleIteratorMethod('__construct');
         $this->functionProxies['multipleiterator::attachiterator'] = new Call\MultipleIteratorMethod('attachIterator');
         $this->functionProxies['recursivetreeiterator::__construct'] = new Call\RecursiveTreeIteratorConstruct();

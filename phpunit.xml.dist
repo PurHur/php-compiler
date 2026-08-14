@@ -458,6 +458,8 @@
             <file>./test/compliance/RdiSubPathExcessArgc30936JITTest.php</file>
             <file>./test/compliance/SplFileObjectExcessArgc30937VMTest.php</file>
             <file>./test/compliance/SplFileObjectExcessArgc30937JITTest.php</file>
+            <file>./test/compliance/RiiParentIteratorExcessArgc30956VMTest.php</file>
+            <file>./test/compliance/RiiParentIteratorExcessArgc30956JITTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785VMTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785JITTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>

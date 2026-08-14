@@ -1186,6 +1186,8 @@ final class RecursiveIteratorIteratorGetDepth extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::getDepth()'
         );
+        // php-src zim_RecursiveIteratorIterator_getDepth — ZEND_PARSE_PARAMETERS_NONE (#30956).
+        $this->requireExactUserArgCount($frame, 'RecursiveIteratorIterator::getDepth', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1207,6 +1209,8 @@ final class RecursiveIteratorIteratorSetMaxDepth extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::setMaxDepth()'
         );
+        // php-src zim_RecursiveIteratorIterator_setMaxDepth — optional max_depth; at most 1 (#30956).
+        $this->requireUserArgCountRange($frame, 'RecursiveIteratorIterator::setMaxDepth', 0, 1);
         $maxDepth = -1;
         if (isset($frame->calledArgs[1])) {
             $arg = $frame->calledArgs[1]->resolveIndirect();
@@ -1258,6 +1262,8 @@ final class RecursiveIteratorIteratorGetSubIterator extends VmClassMethod
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::getSubIterator()'
         );
+        // php-src zim_RecursiveIteratorIterator_getSubIterator — optional level; at most 1 (#30956).
+        $this->requireUserArgCountRange($frame, 'RecursiveIteratorIterator::getSubIterator', 0, 1);
         if (null === $frame->returnVar) {
             return;
         }

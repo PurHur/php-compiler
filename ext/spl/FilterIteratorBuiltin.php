@@ -253,6 +253,8 @@ final class RecursiveFilterIteratorHasChildren extends VmClassMethod
             RecursiveFilterIteratorBuiltin::CLASS_LC,
             'RecursiveFilterIterator::hasChildren()'
         );
+        // php-src zim_RecursiveFilterIterator_hasChildren — ZEND_PARSE_PARAMETERS_NONE (#30956).
+        $this->requireExactUserArgCount($frame, 'RecursiveFilterIterator::hasChildren', 0);
         $inner = SplDualIteratorStorage::inner($object);
         $result = SplDualIteratorStorage::callInner($frame, $inner, 'hasChildren')->resolveIndirect();
         SplIteratorSupport::setReturnBool(

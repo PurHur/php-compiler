@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\RecursiveLeavesFlattenRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
@@ -123,6 +126,61 @@ final class RecursiveIteratorIteratorConstruct implements Call
 
     private static function voidResult(Context $context): Value
     {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return $slot;
+    }
+}
+
+/**
+ * RecursiveIteratorIterator getDepth / setMaxDepth / getSubIterator argc (#30956).
+ *
+ * php-src: ext/spl/spl_iterators.c — ZEND_PARSE_PARAMETERS_NONE / optional 1-arg.
+ * Thin AOT has no native depth/sub-iterator state (LEAVES_ONLY flatten); valid arity
+ * keeps the prior ExternalMethod null. Excess argc is ArgumentCountError.
+ */
+final class RecursiveIteratorIteratorArgcMethod implements Call
+{
+    public function __construct(
+        private readonly string $method,
+        private readonly int $maxUserArgs,
+    ) {
+    }
+
+    public function call(Context $context, Variable ...$args): Value
+    {
+        if ([] === $args) {
+            throw new \LogicException(
+                'RecursiveIteratorIterator::'.$this->method.'() called without $this'
+            );
+        }
+        $function = 'RecursiveIteratorIterator::'.$this->method;
+        $given = max(0, \count($args) - 1);
+        if (0 === $this->maxUserArgs) {
+            if (0 !== $given) {
+                ExceptionBridge::emitArgumentCountErrorAndAbort(
+                    $context,
+                    VmClassMethod::exactUserArgCountMessage($function, 0, $given)
+                );
+                BasicBlockHelper::ensureOpenInsertBlock(
+                    $context,
+                    'rii_'.strtolower($this->method).'_argc_cont'
+                );
+            }
+        } elseif ($given > $this->maxUserArgs) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::atMostUserArgCountMessage($function, $this->maxUserArgs, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock(
+                $context,
+                'rii_'.strtolower($this->method).'_argc_cont'
+            );
+        }
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),

@@ -141,6 +141,8 @@ final class ParentIteratorAccept extends VmClassMethod
             ParentIteratorBuiltin::CLASS_LC,
             'ParentIterator::accept()'
         );
+        // php-src zim_ParentIterator_accept — ZEND_PARSE_PARAMETERS_NONE (#30956).
+        $this->requireExactUserArgCount($frame, 'ParentIterator::accept', 0);
         $inner = SplDualIteratorStorage::inner($object);
         $result = SplDualIteratorStorage::callInner($frame, $inner, 'hasChildren')->resolveIndirect();
         SplIteratorSupport::setReturnBool(
@@ -279,6 +281,9 @@ final class ParentIteratorHasChildren extends VmClassMethod
             ParentIteratorBuiltin::CLASS_LC,
             'ParentIterator::hasChildren()'
         );
+        // php-src inherits RecursiveFilterIterator::hasChildren — ZEND_PARSE_PARAMETERS_NONE;
+        // ACE cites the declaring class, not ParentIterator (#30956).
+        $this->requireExactUserArgCount($frame, 'RecursiveFilterIterator::hasChildren', 0);
         $inner = SplDualIteratorStorage::inner($object);
         $result = SplDualIteratorStorage::callInner($frame, $inner, 'hasChildren')->resolveIndirect();
         SplIteratorSupport::setReturnBool(
