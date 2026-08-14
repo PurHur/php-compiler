@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -50,8 +51,14 @@ final class SplObjectStorageMethod implements Call
             case 'getinfo':
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileGetInfo($context, $args[0]);
             case 'setinfo':
-                if (count($args) < 2) {
-                    throw new \LogicException('SplObjectStorage::setInfo() requires an info value');
+                // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30954
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::setInfo',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
                 }
 
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileSetInfo($context, $args[0], $args[1]);
@@ -64,8 +71,15 @@ final class SplObjectStorageMethod implements Call
 
     private function callAttach(Context $context, Variable ...$args): Value
     {
-        if (count($args) < 2) {
-            throw new \LogicException('SplObjectStorage::attach() requires an object key');
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 2) — #30954
+        if (!VmClassMethod::requireJitUserArgCountRange(
+            $context,
+            $args,
+            'SplObjectStorage::attach',
+            1,
+            2
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
         $ht = self::backingHashtable($context, $args[0]);
         $keyObj = self::loadKeyObject($context, $args[1]);
@@ -108,8 +122,13 @@ final class SplObjectStorageMethod implements Call
 
     private function callContains(Context $context, Variable ...$args): Value
     {
-        if (count($args) < 2) {
-            throw new \LogicException('SplObjectStorage::contains() requires an object key');
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30954
+        // offsetExists shares the contains lowering; Zend exact arity 1.
+        $display = 'offsetexists' === strtolower($this->method)
+            ? 'SplObjectStorage::offsetExists'
+            : 'SplObjectStorage::contains';
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, $display, 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
         $ht = self::backingHashtable($context, $args[0]);
         $keyObj = self::loadKeyObject($context, $args[1]);
