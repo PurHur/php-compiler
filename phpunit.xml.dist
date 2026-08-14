@@ -501,6 +501,8 @@
             <file>./test/compliance/PcgOneseq128XslRr64Generate31054JITTest.php</file>
             <file>./test/compliance/RandomizerExcessArgc31092VMTest.php</file>
             <file>./test/compliance/RandomizerExcessArgc31092JITTest.php</file>
+            <file>./test/compliance/RandomEngineGenerateExcessArgc31096VMTest.php</file>
+            <file>./test/compliance/RandomEngineGenerateExcessArgc31096JITTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994VMTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994JITTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934VMTest.php</file>

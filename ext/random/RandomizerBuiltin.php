@@ -504,6 +504,8 @@ final class Mt19937Generate extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = RandomizerBuiltin::receiverMt19937($frame, 'Random\\Engine\\Mt19937::generate()');
+        // php-src engine_mt19937.c generate() — ZEND_PARSE_PARAMETERS exactly 0 (#31096).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\Mt19937::generate', 0);
         if (null === $frame->returnVar) {
             return;
         }

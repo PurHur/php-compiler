@@ -132,6 +132,8 @@ final class SecureGenerate extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::SECURE_LC, 'generate');
+        // php-src engine_secure.c generate() — ZEND_PARSE_PARAMETERS exactly 0 (#31096).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\Secure::generate', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(RandomEngineStorage::secure($object)->generate());
         }
@@ -159,6 +161,8 @@ final class XoshiroGenerate extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::XOSHIRO_LC, 'generate');
+        // php-src engine_xoshiro256starstar.c generate() — ZEND_PARSE_PARAMETERS exactly 0 (#31096).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\Xoshiro256StarStar::generate', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(RandomEngineStorage::xoshiro($object)->generate());
         }
@@ -219,6 +223,8 @@ final class PcgGenerate extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::PCG_LC, 'generate');
+        // php-src engine_pcgoneseq128xslrr64.c generate() — ZEND_PARSE_PARAMETERS exactly 0 (#31096).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\PcgOneseq128XslRr64::generate', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(RandomEngineStorage::pcg($object)->generate());
         }
