@@ -3933,7 +3933,8 @@ final class VmDateTimeNative
 
         return [
             'ts' => $timestamp,
-            'time' => self::format($timestamp, 0, $tzName, 'c'),
+            // php-src zim_DateTimeZone_getTransitions: `time` is the unix ts as UTC ISO-8601 (#30971).
+            'time' => self::format($timestamp, 0, 'UTC', 'c'),
             'offset' => $state['offset'],
             'isdst' => $isdst,
             'abbr' => self::timezoneAbbreviation($tzName, $timestamp),
