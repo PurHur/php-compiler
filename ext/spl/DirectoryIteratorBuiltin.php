@@ -374,12 +374,7 @@ final class DirectoryIteratorConstruct extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::__construct()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'DirectoryIterator::__construct() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::__construct', 1);
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
             'DirectoryIterator::__construct'

@@ -236,13 +236,8 @@ final class GlobIteratorConstruct extends VmClassMethod
             GlobIteratorBuiltin::CLASS_LC,
             'GlobIterator::__construct()'
         );
+        $this->requireUserArgCountRange($frame, 'GlobIterator::__construct', 1, 2);
         $argCount = \count($frame->calledArgs);
-        if ($argCount < 2) {
-            throw new \ArgumentCountError(
-                'GlobIterator::__construct() expects at least 1 argument, '
-                .($argCount - 1).' given'
-            );
-        }
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
             'GlobIterator::__construct'
