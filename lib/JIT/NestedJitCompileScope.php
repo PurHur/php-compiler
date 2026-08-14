@@ -53,6 +53,7 @@ final class NestedJitCompileScope
         $savedBuilder = $context->builder;
         $savedActive = $context->activeFunction;
         $restoreBlock = self::captureInsertBlock($context);
+        $savedLoweringLlvm = $context->loweringLlvmFunction;
         $savedBlockStorage = $context->scope->blockStorage;
         $savedBlockEntryStorage = $context->scope->blockEntryStorage;
         $savedVariables = $context->scope->variables;
@@ -107,6 +108,7 @@ final class NestedJitCompileScope
         // Drop outer activeFunction while insert is cleared — otherwise parentFunction() /
         // entryAlloca pin allocas into the outer fn and NestedJIT bodies load them (#28053).
         $context->activeFunction = '';
+        $context->loweringLlvmFunction = null;
         $prevStubEnv = self::clearStubEnvForNestedHelperCompile();
         try {
             $context->builder->clearInsertionPosition();
@@ -140,6 +142,7 @@ final class NestedJitCompileScope
             $context->builder = $savedBuilder;
             self::restoreInsertBlock($context, $restoreBlock);
             $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLoweringLlvm;
             self::restoreStubEnv($prevStubEnv);
         }
     }

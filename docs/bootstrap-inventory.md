@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7448 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23980 |
+| Source constructs flagged (warnings) | 23968 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1556,8 +1556,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_strripos.php` | 0 | 4 |
 | `ext/mbstring/mb_strrpos.php` | 0 | 4 |
 | `ext/mbstring/mb_strstr.php` | 0 | 4 |
-| `ext/mbstring/mb_strtolower.php` | 0 | 3 |
-| `ext/mbstring/mb_strtoupper.php` | 0 | 3 |
+| `ext/mbstring/mb_strtolower.php` | 0 | 2 |
+| `ext/mbstring/mb_strtoupper.php` | 0 | 2 |
 | `ext/mbstring/mb_strwidth.php` | 0 | 2 |
 | `ext/mbstring/mb_substitute_character.php` | 0 | 3 |
 | `ext/mbstring/mb_substr.php` | 0 | 4 |
@@ -2403,12 +2403,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 22 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
-| `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 7 |
+| `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 6 |
 | `ext/spl/DirectoryIteratorSnapshotJitHelper.php` | 0 | 1 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 10 |
-| `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 16 |
+| `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/FilterIteratorBuiltin.php` | 0 | 14 |
-| `ext/spl/GlobIteratorBuiltin.php` | 0 | 8 |
+| `ext/spl/GlobIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/GlobIteratorSnapshotJitHelper.php` | 0 | 2 |
 | `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 5 |
 | `ext/spl/InternalIteratorBuiltin.php` | 0 | 10 |
@@ -2442,8 +2442,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplHeapBuiltin.php` | 0 | 47 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 3 |
-| `ext/spl/SplLegacySerializableMethods.php` | 0 | 6 |
-| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 35 |
+| `ext/spl/SplLegacySerializableMethods.php` | 0 | 5 |
+| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 30 |
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 11 |
 | `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 8 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
@@ -4567,7 +4567,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/stream_socket_shutdown.php` | 0 | 2 |
 | `ext/standard/stream_supports.php` | 0 | 1 |
 | `ext/standard/stream_supports_lock.php` | 0 | 1 |
-| `ext/standard/stream_wrapper_register.php` | 0 | 2 |
+| `ext/standard/stream_wrapper_register.php` | 0 | 1 |
 | `ext/standard/stream_wrapper_restore.php` | 0 | 2 |
 | `ext/standard/stream_wrapper_unregister.php` | 0 | 2 |
 | `ext/standard/strftime.php` | 0 | 3 |
@@ -6701,7 +6701,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/DateTimeSetTimestamp.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeSetTimezone.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeSub.php` | 0 | 1 |
-| `lib/VM/Builtin/DateTimeZoneConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/DateTimeZoneConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/DateTimeZoneGetLocation.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeZoneGetName.php` | 0 | 1 |
 | `lib/VM/Builtin/DateTimeZoneGetOffset.php` | 0 | 1 |
@@ -19547,14 +19547,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_strtolower.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
 - 2 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/mb_strtoupper.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -26881,7 +26879,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OutOfBoundsException (line 142)
 - new Variable (line 176)
 - new ObjectEntry (line 194)
-- new ArgumentCountError (line 378)
 - 36 class method(s)
 
 ### `ext/spl/DirectoryIteratorSnapshotJitHelper.php`
@@ -26918,9 +26915,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RecursiveDirectoryIteratorGetChildren (line 199)
 - new RecursiveDirectoryIteratorGetSubPath (line 202)
 - new RecursiveDirectoryIteratorGetSubPathname (line 205)
-- new ArgumentCountError (line 240)
-- new ArgumentCountError (line 278)
-- new ObjectEntry (line 421)
+- new ObjectEntry (line 411)
 - 18 class method(s)
 
 ### `ext/spl/FilterIteratorBuiltin.php`
@@ -26948,8 +26943,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new GlobIteratorConstruct (line 45)
 - new Variable (line 171)
 - new ObjectEntry (line 189)
-- new ArgumentCountError (line 241)
-- new ArgumentCountError (line 428)
+- new ArgumentCountError (line 423)
 - 23 class method(s)
 - 1 closure(s)
 
@@ -27416,7 +27410,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SplLegacySerializableUnserialize (line 30)
 - new ParameterMetadata (line 35)
 - new VmSerializeRefState (line 79)
-- new ArgumentCountError (line 105)
 - 4 class method(s)
 
 ### `ext/spl/SplObjectStorageBuiltin.php`
@@ -27445,16 +27438,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 422)
 - new Variable (line 434)
 - new Variable (line 492)
-- new ArgumentCountError (line 577)
-- new ArgumentCountError (line 602)
-- new ArgumentCountError (line 627)
-- new ArgumentCountError (line 736)
-- new ArgumentCountError (line 763)
-- new ArgumentCountError (line 787)
-- new ArgumentCountError (line 935)
-- new ArgumentCountError (line 979)
-- new ArgumentCountError (line 1008)
-- new ArgumentCountError (line 1055)
+- new ArgumentCountError (line 750)
+- new ArgumentCountError (line 774)
+- new ArgumentCountError (line 938)
+- new ArgumentCountError (line 1007)
+- new ArgumentCountError (line 1054)
 - 57 class method(s)
 - 1 closure(s)
 
@@ -28640,8 +28628,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DirectoryConstruct (line 46)
 - new ObjectEntry (line 69)
 - new Variable (line 79)
-- new Error (line 177)
-- 13 class method(s)
+- new Error (line 183)
+- 14 class method(s)
 
 ### `ext/standard/EmbedObJitHelper.php`
 
@@ -29521,22 +29509,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateMutation.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 91)
-- new ArgumentCountError (line 344)
-- new ArgumentCountError (line 508)
-- new JITVariable (line 792)
-- new JITVariable (line 803)
-- new JITVariable (line 820)
-- new JITVariable (line 1026)
-- new ArgumentCountError (line 1070)
-- new ArgumentCountError (line 1096)
-- new ArgumentCountError (line 1220)
-- new ArgumentCountError (line 1261)
-- new ArgumentCountError (line 1322)
-- new ArgumentCountError (line 1368)
-- new ArgumentCountError (line 1373)
-- new ArgumentCountError (line 1449)
-- new ArgumentCountError (line 1725)
+- new ArgumentCountError (line 92)
+- new ArgumentCountError (line 345)
+- new ArgumentCountError (line 509)
+- new JITVariable (line 793)
+- new JITVariable (line 804)
+- new JITVariable (line 821)
+- new JITVariable (line 1027)
+- new ArgumentCountError (line 1071)
+- new ArgumentCountError (line 1097)
+- new ArgumentCountError (line 1221)
+- new ArgumentCountError (line 1262)
+- new ArgumentCountError (line 1323)
+- new ArgumentCountError (line 1369)
+- new ArgumentCountError (line 1374)
+- new ArgumentCountError (line 1450)
+- new ArgumentCountError (line 1726)
 - 59 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
@@ -29606,8 +29594,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateTimeZoneConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new JITVariable (line 49)
+- new ArgumentCountError (line 30)
+- new JITVariable (line 53)
 - 1 class method(s)
 
 ### `ext/standard/JitDateTimestampArg.php`
@@ -41258,7 +41246,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/stream_wrapper_register.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/standard/stream_wrapper_restore.php`
@@ -52890,8 +52877,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/SplObjectStorageMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 197)
-- new Variable (line 243)
+- new Variable (line 223)
+- new Variable (line 269)
 - 11 class method(s)
 
 ### `lib/JIT/Call/SplPriorityQueueMethod.php`
@@ -55519,7 +55506,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/AttributeConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 40)
+- new Error (line 42)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ClosureBind.php`
@@ -55856,6 +55843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/DateTimeZoneConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/DateTimeZoneGetLocation.php`

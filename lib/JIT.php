@@ -404,7 +404,15 @@ class JIT {
                     }
                 }
             }
-            $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
+            $savedLoweringLlvm = $this->context->loweringLlvmFunction;
+            if ($llvmFunc instanceof \PHPLLVM\Value\Function_) {
+                $this->context->loweringLlvmFunction = $llvmFunc;
+            }
+            try {
+                $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
+            } finally {
+                $this->context->loweringLlvmFunction = $savedLoweringLlvm;
+            }
         }
     }
 
@@ -7855,10 +7863,16 @@ class JIT {
             self::$blockNumber++;
             $origBasicBlock = $basicBlock = $func->appendBasicBlock('block_' . self::$blockNumber);
         }
-        if (!$this->context->scope->blockStorage->contains($block) || null === $entryBlock) {
+        $storageStale = $this->context->scope->blockStorage->contains($block)
+            && $this->context->scope->blockStorage[$block]->getParent() !== $func;
+        if (!$this->context->scope->blockStorage->contains($block) || null === $entryBlock || $storageStale) {
             $this->context->scope->blockStorage[$block] = $basicBlock;
         }
-        if (!$this->context->scope->blockEntryStorage->contains($block) || null === $entryBlock) {
+        if (
+            !$this->context->scope->blockEntryStorage->contains($block)
+            || null === $entryBlock
+            || $storageStale
+        ) {
             $this->context->scope->blockEntryStorage[$block] = $basicBlock;
         }
         $builder = $this->context->builder;
@@ -10711,8 +10725,8 @@ class JIT {
                         $coalesceVar->compileTimeConstantName = null;
                         $coalesceVar->compileTimeEnumCase = null;
                     }
-                    $leftEntry = $this->context->scope->blockStorage[$op->block1];
-                    $rightEntry = $this->context->scope->blockStorage[$op->block2];
+                    $leftEntry = $this->jitBranchEntryBlock($op->block1);
+                    $rightEntry = $this->jitBranchEntryBlock($op->block2);
                     $builder->positionAtEnd($coalesceTestBlock);
                     // Do not free php-cfg "dead" operands here; ?? temps are used on branch/merge blocks (#99).
                     $builder->branchIf($condition, $leftEntry, $rightEntry);
@@ -10789,8 +10803,8 @@ class JIT {
                         $nullsafeVar->compileTimeConstantName = null;
                         $nullsafeVar->compileTimeEnumCase = null;
                     }
-                    $nullEntry = $this->context->scope->blockStorage[$op->block1];
-                    $fetchEntry = $this->context->scope->blockStorage[$op->block2];
+                    $nullEntry = $this->jitBranchEntryBlock($op->block1);
+                    $fetchEntry = $this->jitBranchEntryBlock($op->block2);
                     $builder->positionAtEnd($branchBlock);
                     // Do not free php-cfg "dead" operands here; ?-> temps are used on branch/merge blocks (#3219).
                     $builder->branchIf($isNull, $nullEntry, $fetchEntry);

@@ -94,6 +94,8 @@ class Context {
     public array $externalMethodStubs = [];
     public array $functionReturnType = [];
     public string $activeFunction = '';
+    /** LLVM function owning the in-flight compileBlockInternal lowering (#31101). */
+    public ?\PHPLLVM\Value\Function_ $loweringLlvmFunction = null;
     public array $functionScope = [];
 
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */

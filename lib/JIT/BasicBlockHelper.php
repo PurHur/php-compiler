@@ -63,6 +63,9 @@ final class BasicBlockHelper
                 return $fn;
             }
         }
+        if ($context->loweringLlvmFunction instanceof Function_) {
+            return $context->loweringLlvmFunction;
+        }
         if ($context->main instanceof Function_) {
             return $context->main;
         }
