@@ -21,5 +21,5 @@ foreach ([
 ?>
 --EXPECT--
 parse_ini_file(): Argument #1 ($filename) must not be empty
-checkdnsrr(): Argument #1 ($hostname) cannot be empty
+checkdnsrr(): Argument #1 ($hostname) must not be empty
 setcookie(): Argument #1 ($name) must not be empty

@@ -32,9 +32,9 @@ try {
 }
 ?>
 --EXPECT--
-shell_exec(): Argument #1 ($command) cannot be empty
-system(): Argument #1 ($command) cannot be empty
-passthru(): Argument #1 ($command) cannot be empty
-exec(): Argument #1 ($command) cannot be empty
-scandir(): Argument #1 ($directory) cannot be empty
+shell_exec(): Argument #1 ($command) must not be empty
+system(): Argument #1 ($command) must not be empty
+passthru(): Argument #1 ($command) must not be empty
+exec(): Argument #1 ($command) must not be empty
+scandir(): Argument #1 ($directory) must not be empty
 popen: NO_ERROR

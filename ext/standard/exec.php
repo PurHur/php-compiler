@@ -32,7 +32,7 @@ final class exec extends Internal
         $this->requireArgCountRange($frame, 'exec', 1, 3);
         $argc = \count($frame->calledArgs);
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'exec', 'command', false);
-        // php-src exec.c — zend_argument_must_not_be_empty_error → Zend "cannot be empty" (#30340)
+        // php-src exec.c — zend_argument_must_not_be_empty_error (#30340 / #30625)
         VmString::rejectEmptyBuiltinStringArg($command, 'exec', 0, 'command', true);
         $result = VmExecNative::run($command);
         if (false !== $result && $argc >= 2) {
