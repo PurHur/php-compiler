@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "generated_at": "2026-08-14T02:57:21+00:00",
+    "generated_at": "2026-08-14T03:52:19+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "4d99ca1b0d201e003623",
@@ -9,5 +9,5 @@
     "published_fresh": 11,
     "kept_live_unpublished": 2,
     "total_bytes": 817233442,
-    "refresh": "selective publish of 11 stale units after #30897/#30968 VmReflection + #30953 VmDateTimeNative (Pillar 1)"
+    "refresh": "selective publish of 11 stale unit fingerprints after VmReflection/VmDateTimeNative dep churn (Pillar 1 / #24302 residual)"
 }
