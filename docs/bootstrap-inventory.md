@@ -52971,7 +52971,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 153)
-- new Variable (line 302)
+- new Variable (line 306)
 - 10 class method(s)
 
 ### `lib/JIT/Call/WeakReferenceCreate.php`
