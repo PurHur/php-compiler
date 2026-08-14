@@ -34627,7 +34627,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RecursiveDirectoryIterator (line 4040)
 - new RecursiveIteratorIterator (line 4146)
 - new RecursiveDirectoryIterator (line 4147)
-- 138 class method(s)
+- 140 class method(s)
 - 14 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
