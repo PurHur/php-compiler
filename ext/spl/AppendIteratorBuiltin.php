@@ -385,6 +385,8 @@ final class AppendIteratorGetInnerIterator extends VmClassMethod
             AppendIteratorBuiltin::CLASS_LC,
             'AppendIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#30949).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -437,6 +439,8 @@ final class AppendIteratorGetArrayIterator extends VmClassMethod
             AppendIteratorBuiltin::CLASS_LC,
             'AppendIterator::getArrayIterator()'
         );
+        // php-src zim_AppendIterator_getArrayIterator — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'AppendIterator::getArrayIterator', 0);
         SplIteratorSupport::copyReturnFrom(
             $frame,
             AppendIteratorBuiltin::createArrayIterator($frame, $object)

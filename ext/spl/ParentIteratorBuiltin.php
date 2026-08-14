@@ -259,6 +259,8 @@ final class ParentIteratorGetInnerIterator extends VmClassMethod
             ParentIteratorBuiltin::CLASS_LC,
             'ParentIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#30949).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -307,6 +309,8 @@ final class ParentIteratorGetChildren extends VmClassMethod
             ParentIteratorBuiltin::CLASS_LC,
             'ParentIterator::getChildren()'
         );
+        // php-src inherits RecursiveFilterIterator::getChildren — ACE cites declaring class (#30949).
+        $this->requireExactUserArgCount($frame, 'RecursiveFilterIterator::getChildren', 0);
         if (null === $frame->returnVar) {
             return;
         }

@@ -514,6 +514,8 @@ final class LimitIteratorGetPosition extends VmClassMethod
             LimitIteratorBuiltin::CLASS_LC,
             'LimitIterator::getPosition()'
         );
+        // php-src zim_LimitIterator_getPosition — ZEND_PARSE_PARAMETERS_NONE (#30949).
+        $this->requireExactUserArgCount($frame, 'LimitIterator::getPosition', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(SplLimitIteratorStorage::position($object));
         }
@@ -534,6 +536,8 @@ final class LimitIteratorGetInnerIterator extends VmClassMethod
             LimitIteratorBuiltin::CLASS_LC,
             'LimitIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#30949).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
