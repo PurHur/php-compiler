@@ -678,12 +678,8 @@ final class RandomizerGetInt extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::getInt()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'Random\\Randomizer::getInt() expects at least 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src randomizer.c zim_Random_Randomizer_getInt — ZEND_PARSE_PARAMETERS exactly 2 (#31092).
+        $this->requireExactUserArgCount($frame, 'Random\\Randomizer::getInt', 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -704,12 +700,8 @@ final class RandomizerGetBytes extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::getBytes()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'Random\\Randomizer::getBytes() expects at least 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src randomizer.c zim_Random_Randomizer_getBytes — ZEND_PARSE_PARAMETERS exactly 1 (#31092).
+        $this->requireExactUserArgCount($frame, 'Random\\Randomizer::getBytes', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -780,12 +772,8 @@ final class RandomizerShuffleArray extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::shuffleArray()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'Random\\Randomizer::shuffleArray() expects at least 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src randomizer.c zim_Random_Randomizer_shuffleArray — ZEND_PARSE_PARAMETERS exactly 1 (#31092).
+        $this->requireExactUserArgCount($frame, 'Random\\Randomizer::shuffleArray', 1);
         // php-src randomizer.c: zend_array_dup then shuffle; return copy (input unchanged).
         $src = VmArray::requireArrayParam($frame->calledArgs[1], 'Random\\Randomizer::shuffleArray', 1, 'array');
         $ht = $src->duplicate();
@@ -851,12 +839,8 @@ final class RandomizerPickArrayKeys extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::pickArrayKeys()');
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError(
-                'Random\\Randomizer::pickArrayKeys() expects at least 2 arguments, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src randomizer.c zim_Random_Randomizer_pickArrayKeys — ZEND_PARSE_PARAMETERS exactly 2 (#31092).
+        $this->requireExactUserArgCount($frame, 'Random\\Randomizer::pickArrayKeys', 2);
         if (null === $frame->returnVar) {
             return;
         }

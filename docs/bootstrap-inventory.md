@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7449 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23971 |
+| Source constructs flagged (warnings) | 23967 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2022,7 +2022,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/RandomSecureSerializeDeny.php` | 0 | 3 |
 | `ext/random/RandomU64.php` | 0 | 16 |
 | `ext/random/RandomUint128.php` | 0 | 6 |
-| `ext/random/RandomizerBuiltin.php` | 0 | 27 |
+| `ext/random/RandomizerBuiltin.php` | 0 | 23 |
 | `ext/random/RandomizerGetBytesFromStringAlgo.php` | 0 | 3 |
 | `ext/random/SecureInstance.php` | 0 | 1 |
 | `ext/random/Xoshiro256StarStarInstance.php` | 0 | 1 |
@@ -23764,16 +23764,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 624)
 - new ObjectEntry (line 645)
 - new SecureInstance (line 647)
-- new ArgumentCountError (line 682)
-- new ArgumentCountError (line 708)
-- new ArgumentCountError (line 743)
-- new ArgumentCountError (line 784)
-- new ArgumentCountError (line 814)
-- new ArgumentCountError (line 855)
-- new Variable (line 899)
-- new HashTable (line 901)
-- new ArgumentCountError (line 918)
-- new ArgumentCountError (line 982)
+- new ArgumentCountError (line 735)
+- new ArgumentCountError (line 802)
+- new Variable (line 883)
+- new HashTable (line 885)
+- new ArgumentCountError (line 902)
+- new ArgumentCountError (line 966)
 - 57 class method(s)
 - 4 closure(s)
 
