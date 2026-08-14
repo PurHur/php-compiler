@@ -315,6 +315,7 @@ final class VmDomJitDispatch
      */
     public static function createAttributeNS(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMDocument::createAttributeNS', $extra, 2);
         $namespace = self::nullableStringArg(
             $extra[0] ?? self::missingArg('createAttributeNS', 0),
             'createAttributeNS',
@@ -721,6 +722,7 @@ final class VmDomJitDispatch
      */
     public static function hasAttributeNS(ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::hasAttributeNS', $extra, 2);
         $namespace = self::nullableStringArg(
             $extra[0] ?? self::missingArg('hasAttributeNS', 0),
             'hasAttributeNS',
@@ -842,6 +844,7 @@ final class VmDomJitDispatch
      */
     public static function getAttributeNodeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::getAttributeNodeNS', $extra, 2);
         $namespace = self::nullableStringArg($extra[0] ?? self::missingArg('getAttributeNodeNS', 0), 'getAttributeNodeNS', 0);
         $localName = self::stringArg(
             $extra[1] ?? self::missingArg('getAttributeNodeNS', 1),
@@ -858,6 +861,7 @@ final class VmDomJitDispatch
      */
     public static function setAttributeNodeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::setAttributeNodeNS', $extra, 1);
         $attrVar = ($extra[0] ?? self::missingArg('setAttributeNodeNS', 0))->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $attrVar->type) {
             throw new \TypeError('DOMElement::setAttributeNodeNS(): Argument #1 ($attr) must be of type DOMAttr');
@@ -902,6 +906,7 @@ final class VmDomJitDispatch
      */
     public static function setIdAttributeNS(ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::setIdAttributeNS', $extra, 3);
         // php-src stub: string $namespace (not ?string) + string $qualifiedName (#30091).
         $namespace = self::stringArg(
             $extra[0] ?? self::missingArg('setIdAttributeNS', 0),
@@ -934,6 +939,7 @@ final class VmDomJitDispatch
      */
     public static function setIdAttributeNode(ObjectEntry $element, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMElement::setIdAttributeNode', $extra, 2);
         $attrVar = ($extra[0] ?? self::missingArg('setIdAttributeNode', 0))->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $attrVar->type) {
             throw new \TypeError('DOMElement::setIdAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');

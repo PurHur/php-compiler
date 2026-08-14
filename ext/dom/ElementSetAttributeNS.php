@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMElement::setAttributeNS() — VM (#14313, php-src ext/dom/php_dom.c). */
+/**
+ * DOMElement::setAttributeNS() — VM (#14313, php-src ext/dom/php_dom.c).
+ *
+ * Exact user arity 3 — Zend ArgumentCountError (#31032; missed by #31011).
+ */
 final class ElementSetAttributeNS extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class ElementSetAttributeNS extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::setAttributeNS', 3);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::setAttributeNS()');
-        if (\count($frame->calledArgs) < 4) {
-            throw new \LogicException('DOMElement::setAttributeNS() expects at least 3 arguments');
-        }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::setAttributeNS()', 0);
         // Pass $frame so caller strict_types rejects null before empty ValueError (#30091).
         $qualifiedName = $this->stringArg(
