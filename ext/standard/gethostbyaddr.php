@@ -16,6 +16,7 @@ use PHPLLVM\Value;
  * gethostbyaddr() — reverse DNS for IPv4 (ext/standard/dns.c parity, #5854, #29809).
  *
  * VM: VmDns (/etc/hosts then UDP PTR via resolv.conf). JIT/AOT: GethostbyaddrJitHelper PHP (#9474).
+ * Excess/missing argc → Zend ArgumentCountError (#30546).
  * Z_PARAM_STR: strict_types → TypeError on null; soft path DEP+coerce (#29809).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(gethostbyaddr)
@@ -30,9 +31,8 @@ final class gethostbyaddr extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('gethostbyaddr() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30546; ext/standard/basic_functions.stub.php).
+        $this->requireExactArgCount($frame, 'gethostbyaddr', 1);
         // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29809).
         // Param name $ip matches php-src basic_functions.stub.php / zend TypeError text.
         $ip = VmString::stringBuiltinArgForFrame($frame, 0, 'gethostbyaddr', 0, 'ip', false);
@@ -67,8 +67,9 @@ final class gethostbyaddr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('gethostbyaddr() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30546).
+        if (!$this->requireExactJitArgCount($context, $args, 'gethostbyaddr', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         // Soft-null outside strict_types; strict → TypeError (#29809).
         $ip = $context->callerStrictTypes

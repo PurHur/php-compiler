@@ -403,6 +403,8 @@
             <file>./test/compliance/MbstringExcessArgc30786JITTest.php</file>
             <file>./test/compliance/ArrayFillRangeExcessArgc30719VMTest.php</file>
             <file>./test/compliance/ArrayFillRangeExcessArgc30719JITTest.php</file>
+            <file>./test/compliance/NetworkExcessArgc30546VMTest.php</file>
+            <file>./test/compliance/NetworkExcessArgc30546JITTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720VMTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720JITTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>

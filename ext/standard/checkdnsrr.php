@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  * checkdnsrr() and dns_check_record() alias — DNS record existence probe (#5983, #30261).
  *
  * VM: VmDns (libc res_query FFI + host fallback). JIT/AOT: CheckdnsrrRuntime → CheckdnsrrJitHelper PHP (#9379).
+ * Excess/missing argc → Zend ArgumentCountError (#30546).
  * Z_PARAM_STR: strict_types → TypeError on null; soft path DEP+coerce then empty ValueError (#30261).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(checkdnsrr)
@@ -34,10 +35,9 @@ final class checkdnsrr extends Internal
     public function execute(Frame $frame): void
     {
         $fn = $this->getName();
+        // php-src stub arity: 1..2 (#30546; ext/standard/basic_functions.stub.php / dns.c).
+        $this->requireArgCountRange($frame, $fn, 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($fn.'() requires one or two arguments in this compiler build');
-        }
         // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#30261).
         $hostname = VmString::stringBuiltinArgForFrame($frame, 0, $fn, 0, 'hostname', false);
         VmString::rejectEmptyBuiltinStringArg($hostname, $fn, 0, 'hostname', true);
@@ -59,10 +59,11 @@ final class checkdnsrr extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($fn.'() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30546).
+        if (!$this->requireArgCountRangeJit($context, $args, $fn, 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
 
         // Soft-null outside strict_types; strict → TypeError (#30261; peer gethostbyaddr #29809).
         // Early return after compile-time null TypeError — rejectEmpty must not emit after abort
