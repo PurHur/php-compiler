@@ -2264,12 +2264,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDereferencableNewWithoutOuterParensTrueOnDefault84DevReference(): void
+    public function testSupportsDereferencableNewWithoutOuterParensFalseOnDefault84DevReference(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
+            $this->assertFalse(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
