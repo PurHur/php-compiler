@@ -465,4 +465,52 @@ PHP;
             ob_get_clean()
         );
     }
+
+    public function test_msgfmt_format_message_null_strict_types_typeerror(): void
+    {
+        // php-src msgformat.stub.php Z_PARAM_STR — null under strict_types (#29921).
+        if (!IntlExtensionPolicy::advertisesBuiltins()) {
+            self::markTestSkipped('MessageFormatter withheld until extension_loaded(\'intl\') (#19670)');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+foreach ([
+    'proc_locale' => static fn () => msgfmt_format_message(null, 'Hi {0}', [1]),
+    'proc_pattern' => static fn () => msgfmt_format_message('en', null, [1]),
+    'static_locale' => static fn () => MessageFormatter::formatMessage(null, 'Hi {0}', [1]),
+    'static_pattern' => static fn () => MessageFormatter::formatMessage('en', null, [1]),
+] as $name => $call) {
+    try {
+        $r = $call();
+        echo $name, ' OK ', var_export($r, true), "\n";
+    } catch (TypeError $e) {
+        echo $name, ' TypeError';
+        if (false !== strpos($e->getMessage(), 'null given')) {
+            echo ' null';
+        }
+        if (false !== strpos($e->getMessage(), '($locale)')) {
+            echo ' locale';
+        }
+        if (false !== strpos($e->getMessage(), '($pattern)')) {
+            echo ' pattern';
+        }
+        echo "\n";
+    }
+}
+echo 'ok=', msgfmt_format_message('en', 'Hi {0}', [1]), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_msgfmt_null_strict.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "proc_locale TypeError null locale\n"
+            ."proc_pattern TypeError null pattern\n"
+            ."static_locale TypeError null locale\n"
+            ."static_pattern TypeError null pattern\n"
+            ."ok=Hi 1\n",
+            ob_get_clean()
+        );
+    }
 }
