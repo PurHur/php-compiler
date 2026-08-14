@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
@@ -19,6 +21,21 @@ final class GeneratorSend implements Call
     {
         if ([] === $args) {
             throw new \LogicException('Generator::send() called without $this');
+        }
+        // php-src: Zend/zend_generators.c — ZEND_PARSE_PARAMETERS (1 arg); $args[0] is $this (#30907)
+        $userArgCount = \count($args) - 1;
+        if (1 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'Generator::send() expects exactly 1 argument, %d given',
+                    $userArgCount
+                )
+            );
+            $unreachable = BasicBlockHelper::append($context, 'gen_send_argc_unreach');
+            $context->builder->positionAtEnd($unreachable);
+
+            return JitValueBox::alloc($context);
         }
         $genVar = $args[0];
         $statePtr = GeneratorHelper::loadStateFromGeneratorObject($context, $genVar);
@@ -43,14 +60,7 @@ final class GeneratorSend implements Call
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($okBlock);
         $pendingField = $context->builder->structGep($statePtr, $map['pending_send']);
-        if (count($args) >= 2) {
-            GeneratorHelper::assignValueField($context, $pendingField, $args[1], null);
-        } else {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                JitValueBox::pointer($context, $pendingField)
-            );
-        }
+        GeneratorHelper::assignValueField($context, $pendingField, $args[1], null);
         $context->builder->store($i1->constInt(1, false), $context->builder->structGep($statePtr, $map['has_pending_send']));
         $activeSlot = GeneratorHelper::resumeSendAndBoxYield($context, $genVar);
         // resumeSendAndBoxYield may leave the builder in gen_send_auto_skip, not $okBlock (#23712).
