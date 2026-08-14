@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 
 /**
  * iconv_strlen() — character count in encoding (php-src ext/iconv/iconv.c; #6247).
+ *
+ * Excess argc → Zend `expects at most` ArgumentCountError (#30891).
  */
 final class iconv_strlen extends IconvStringFunction
 {
@@ -18,13 +20,9 @@ final class iconv_strlen extends IconvStringFunction
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity 1..2 — excess uses at-most wording (#30891).
+        $this->requireArgCountRange($frame, 'iconv_strlen', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \ArgumentCountError(sprintf(
-                'iconv_strlen() expects between 1 and 2 arguments, %d given',
-                $argc
-            ));
-        }
         $input = $this->coerceInputString($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;

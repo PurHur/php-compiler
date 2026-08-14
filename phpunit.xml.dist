@@ -428,6 +428,8 @@
             <file>./test/compliance/GetdateStrtotimeArgc30714JITTest.php</file>
             <file>./test/compliance/MbstringExcessArgc30786VMTest.php</file>
             <file>./test/compliance/MbstringExcessArgc30786JITTest.php</file>
+            <file>./test/compliance/MbIconvExcessArgc30891VMTest.php</file>
+            <file>./test/compliance/MbIconvExcessArgc30891JITTest.php</file>
             <file>./test/compliance/ArrayFillRangeExcessArgc30719VMTest.php</file>
             <file>./test/compliance/ArrayFillRangeExcessArgc30719JITTest.php</file>
             <file>./test/compliance/NetworkExcessArgc30546VMTest.php</file>

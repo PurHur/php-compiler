@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 
 /**
  * iconv_strpos() — find substring in encoding (php-src ext/iconv/iconv.c; #6247).
+ *
+ * Excess argc → Zend `expects at most` ArgumentCountError (#30891).
  */
 final class iconv_strpos extends IconvStringFunction
 {
@@ -18,13 +20,9 @@ final class iconv_strpos extends IconvStringFunction
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity 2..4 — excess uses at-most wording (#30891).
+        $this->requireArgCountRange($frame, 'iconv_strpos', 2, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \ArgumentCountError(sprintf(
-                'iconv_strpos() expects between 2 and 4 arguments, %d given',
-                $argc
-            ));
-        }
         $haystack = $this->coerceInputString($frame, 0, 'haystack');
         $needle = $this->coerceInputString($frame, 1, 'needle');
         if (null === $frame->returnVar) {
