@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\xml;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -20,6 +21,8 @@ final class xml_parser_create extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src xml.stub.php: xml_parser_create(?string $encoding = null) (#30890).
+        $this->requireAtMostArgCount($frame, 'xml_parser_create', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -28,6 +31,10 @@ final class xml_parser_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError under AOT try/catch (#30890).
+        if (!$this->requireAtMostJitArgCount($context, $args, 'xml_parser_create', 1)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
         if (JitXmlParserUserScript::isUserScriptAot()) {
             $result = JitXmlParserUserScript::tryCreate($context, ...$args);
             if (null !== $result) {
