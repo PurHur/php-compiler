@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7449 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23970 |
+| Source constructs flagged (warnings) | 23971 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2116,7 +2116,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlElementXpath.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlIteratorStorage.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlJsonExport.php` | 0 | 20 |
-| `ext/simplexml/SimpleXmlNodeState.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlNodeState.php` | 0 | 2 |
 | `ext/simplexml/SimpleXmlRegistry.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlSerializeDeny.php` | 0 | 3 |
 | `ext/simplexml/VmSimpleXml.php` | 0 | 60 |
@@ -11398,10 +11398,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomSimpleXmlBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 277)
-- new SimpleXmlNodeState (line 438)
-- new ObjectEntry (line 468)
-- 25 class method(s)
+- new ObjectEntry (line 276)
+- new SimpleXmlNodeState (line 437)
+- new ObjectEntry (line 457)
+- 24 class method(s)
 
 ### `ext/dom/VmDomTokenList.php`
 
@@ -24674,7 +24674,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlNodeState.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 7 class method(s)
+- 2 closure(s)
 
 ### `ext/simplexml/SimpleXmlRegistry.php`
 
@@ -24717,40 +24718,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 183)
 - new Exception (line 187)
 - new Exception (line 194)
-- new SimpleXmlNodeState (line 546)
-- new Variable (line 639)
-- new Variable (line 645)
-- new Variable (line 652)
-- new Variable (line 658)
-- new Variable (line 673)
-- new Error (line 894)
-- new SimpleXmlNodeState (line 995)
-- new SimpleXmlNodeState (line 1031)
-- new SimpleXmlNodeState (line 1146)
-- new HashTable (line 1217)
-- new Variable (line 1260)
-- new Variable (line 1269)
-- new Variable (line 1330)
-- new Variable (line 1356)
-- new SimpleXmlNodeState (line 1470)
-- new ObjectEntry (line 1494)
-- new SimpleXmlNodeState (line 1589)
-- new SimpleXmlNodeState (line 1599)
-- new SimpleXmlNodeState (line 1602)
-- new ObjectEntry (line 1623)
-- new ObjectEntry (line 1644)
-- new ObjectEntry (line 1734)
-- new SimpleXmlNodeState (line 1738)
-- new ObjectEntry (line 1756)
-- new ObjectEntry (line 1772)
-- new Error (line 1910)
-- new ObjectEntry (line 1922)
-- new HashTable (line 2283)
-- new Variable (line 2285)
-- new SimpleXmlNodeState (line 2564)
-- new SimpleXmlNodeState (line 2573)
-- 95 class method(s)
-- 3 closure(s)
+- new SimpleXmlNodeState (line 541)
+- new Variable (line 634)
+- new Variable (line 640)
+- new Variable (line 647)
+- new Variable (line 653)
+- new Variable (line 668)
+- new Error (line 888)
+- new SimpleXmlNodeState (line 989)
+- new SimpleXmlNodeState (line 1025)
+- new SimpleXmlNodeState (line 1140)
+- new HashTable (line 1211)
+- new Variable (line 1254)
+- new Variable (line 1263)
+- new Variable (line 1324)
+- new Variable (line 1350)
+- new SimpleXmlNodeState (line 1464)
+- new ObjectEntry (line 1488)
+- new SimpleXmlNodeState (line 1583)
+- new SimpleXmlNodeState (line 1593)
+- new SimpleXmlNodeState (line 1596)
+- new ObjectEntry (line 1617)
+- new ObjectEntry (line 1638)
+- new ObjectEntry (line 1728)
+- new SimpleXmlNodeState (line 1732)
+- new ObjectEntry (line 1750)
+- new ObjectEntry (line 1766)
+- new Error (line 1904)
+- new ObjectEntry (line 1916)
+- new HashTable (line 2299)
+- new Variable (line 2301)
+- new SimpleXmlNodeState (line 2580)
+- new SimpleXmlNodeState (line 2589)
+- 96 class method(s)
+- 2 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
 
@@ -46011,7 +46012,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1670)
+- new InternalArgInfo (line 1672)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46027,8 +46028,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2407)
-- new ArgumentCountError (line 2418)
+- new ArgumentCountError (line 2409)
+- new ArgumentCountError (line 2420)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -57282,7 +57283,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionMethodGetDeclaringClass.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 26)
+- new Variable (line 28)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionMethodGetDeprecatedMessage.php`
@@ -57361,7 +57362,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionMethodGetPrototype.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 40)
+- new Variable (line 42)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionMethodGetReturnType.php`
