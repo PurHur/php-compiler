@@ -25,8 +25,12 @@ final class JitDateTimeZoneConstruct
         if ([] === $args) {
             throw new \LogicException('DateTimeZone::__construct() called without $this');
         }
-        if (\count($args) < 2) {
-            throw new \ArgumentCountError('DateTimeZone::__construct() expects exactly 1 argument');
+        $userArgc = max(0, \count($args) - 1);
+        if (1 !== $userArgc) {
+            throw new \ArgumentCountError(\sprintf(
+                'DateTimeZone::__construct() expects exactly 1 argument, %d given',
+                $userArgc
+            ));
         }
         $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         if (null === $name) {
