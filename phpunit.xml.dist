@@ -414,6 +414,7 @@
             <file>./test/compliance/ClosureFromCallableExcessArgc30930JITTest.php</file>
             <file>./test/compliance/WeakrefGetExcessArgc30925VMTest.php</file>
             <file>./test/compliance/WeakrefGetExcessArgc30925JITTest.php</file>
+            <file>./test/compliance/AttributeMarkerCtorExcessArgc31089VMTest.php</file>
             <file>./test/compliance/WeakMapExcessArgc30909VMTest.php</file>
             <file>./test/compliance/WeakMapExcessArgc30909JITTest.php</file>
             <file>./test/compliance/ReflectionClassExcessArgc30888VMTest.php</file>
