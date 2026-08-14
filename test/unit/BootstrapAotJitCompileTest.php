@@ -327,7 +327,7 @@ PHP;
         );
     }
 
-    /** TimezoneAbbreviationsData nested array literal via require — compile (#16866). */
+    /** TimezoneAbbreviationsData nested array literal via require — compile (#16866, #28998). */
     public function testTimezoneAbbreviationsDataRequireCompiles(): void
     {
         $this->skipUnlessLlvmReady();
@@ -339,11 +339,56 @@ $tz = require '.var_export($dataPath, true).';
 echo count($tz), "\n";
 ';
         $stderr = $this->compileSourceAllowFailure($source, 'timezone abbreviations require');
+        $this->assertStringNotContainsString('Cannot assign to a value', $stderr);
         $this->assertStringNotContainsString(
             'Array offset access requires hashtable or boxed array',
             $stderr
         );
         $this->assertStringNotContainsString('loadHashtablePointer on native string', $stderr);
+    }
+
+    /** Standalone TimezoneAbbreviationsData.php must AOT-compile (#28998 / re-#16866). */
+    public function testTimezoneAbbreviationsDataFileCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $dataPath = $repoRoot.'/ext/standard/TimezoneAbbreviationsData.php';
+        $this->assertFileExists($dataPath);
+
+        $outfile = tempnam(sys_get_temp_dir(), 'tzabbr_aot_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $dataPath]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $code = proc_close($compile);
+        $combined = ($stdout !== false ? $stdout : '').($stderr !== false ? $stderr : '');
+        $this->assertStringNotContainsString('Cannot assign to a value', $combined);
+        $this->assertSame(0, $code, $combined);
+        $this->assertFileExists($outfile);
+        @unlink($outfile);
     }
 
     /**

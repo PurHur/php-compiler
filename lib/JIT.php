@@ -16705,6 +16705,49 @@ class JIT {
                 }
                 $this->context->setVariableOp($resultOp, $promoted);
                 $result = $promoted;
+            } elseif (Variable::KIND_VALUE === $result->kind) {
+                // TYPE_NULL / TYPE_VALUE KIND_VALUE temps that later receive an assign —
+                // nested array literals in TimezoneAbbreviationsData.php (#28998 / re-#16866).
+                // Promote to a boxed KIND_VARIABLE slot (same shape as branchMergeTarget).
+                $destTy = null !== $result->value
+                    ? $this->context->getStringFromType($result->value->typeOf())
+                    : '';
+                if ('__value__*' === $destTy) {
+                    $slot = $result->value;
+                } else {
+                    $slot = JIT\JitValueBox::alloc($this->context);
+                    if ('__value__' === $destTy && null !== $result->value) {
+                        JIT\JitValueBox::copyFromPointer(
+                            $this->context,
+                            $slot,
+                            JIT\JitValueBox::pointer($this->context, $result->value)
+                        );
+                    } elseif (Variable::TYPE_NULL === $result->type) {
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__writeNull'),
+                            JIT\JitValueBox::pointer($this->context, $slot)
+                        );
+                    } elseif (Variable::TYPE_HASHTABLE === $result->type) {
+                        $ptr = $this->context->helper->loadValue($result);
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__writeHashtable'),
+                            JIT\JitValueBox::pointer($this->context, $slot),
+                            $ptr
+                        );
+                        $this->context->refcount->addref($ptr);
+                    }
+                }
+                $promoted = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                if (Variable::TYPE_HASHTABLE === $result->type) {
+                    $promoted->valueBoxHashtable = true;
+                }
+                $this->context->setVariableOp($resultOp, $promoted);
+                $result = $promoted;
             } else {
                 throw new \LogicException('Cannot assign to a value');
             }
