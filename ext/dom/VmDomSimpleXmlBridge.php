@@ -175,8 +175,7 @@ final class VmDomSimpleXmlBridge
         }
         self::$syncing = true;
         try {
-            $sxe->children = [];
-            $sxe->text = $value;
+            $sxe->replaceText($value);
         } finally {
             self::$syncing = false;
         }
@@ -436,31 +435,21 @@ final class VmDomSimpleXmlBridge
     {
         $state = DomRegistry::state($element);
         $node = new SimpleXmlNodeState($state->nodeName, $state->attributes);
-        $node->text = self::directTextContent($element);
         self::linkPeers($element, $node);
 
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
-            if (null !== $child && VmDom::isElement($child)) {
-                $node->children[] = self::simpleXmlStateFromDomElement($child);
+            if (null === $child) {
+                continue;
+            }
+            if (VmDom::isElement($child)) {
+                $node->appendElement(self::simpleXmlStateFromDomElement($child));
+            } elseif (VmDom::isTextOrCdataNode($child)) {
+                $node->appendText(DomRegistry::state($child)->textContent ?? '');
             }
         }
 
         return $node;
-    }
-
-    private static function directTextContent(ObjectEntry $element): string
-    {
-        $state = DomRegistry::state($element);
-        $parts = [];
-        foreach ($state->childIds as $childId) {
-            $child = DomRegistry::entry($childId);
-            if (null !== $child && VmDom::isTextNode($child)) {
-                $parts[] = DomRegistry::state($child)->textContent ?? '';
-            }
-        }
-
-        return implode('', $parts);
     }
 
     private static function wrapSimpleXml(ClassEntry $class, SimpleXmlNodeState $state): ObjectEntry
