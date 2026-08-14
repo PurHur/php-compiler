@@ -121,6 +121,8 @@
             <file>./test/compliance/HashFileReflectionReturnVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictJITTest.php</file>
+            <file>./test/compliance/HashHmacFileUnknownAlgoNameVMTest.php</file>
+            <file>./test/compliance/HashHmacFileUnknownAlgoNameJITTest.php</file>
             <file>./test/compliance/Utf8EncodeDecodeNullStrictVMTest.php</file>
             <file>./test/compliance/Utf8EncodeDecodeNullStrictJITTest.php</file>
             <file>./test/compliance/NumberFormatNullNumStrict29976VMTest.php</file>

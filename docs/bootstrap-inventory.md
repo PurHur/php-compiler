@@ -35116,11 +35116,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHash.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 130)
-- new Variable (line 132)
-- new HashTable (line 143)
-- new Variable (line 145)
-- 10 class method(s)
+- new HashTable (line 137)
+- new Variable (line 139)
+- new HashTable (line 150)
+- new Variable (line 152)
+- 11 class method(s)
 
 ### `ext/standard/VmHashFile.php`
 
