@@ -391,7 +391,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
         </div>
         <p class="overall-progress__note">
           <code>fix/spine-aot-jit-blockers</code> @ <a href="https://github.com/PurHur/php-compiler/commit/a8cffaa0e">a8cffaa0e</a> (15 Jun 2026, LLVM 9).
-          M2 spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>**7415** / **7417**</strong> Phase A inventory (literal coverage ✅).
+          M2 spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>**7428** / **7430**</strong> Phase A inventory (literal coverage ✅).
           M4: <code>make bootstrap-loop-probe</code> full ladder ✅.
           M5: <code>make north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; VM driver probe ~<strong>20ms</strong> in CI loops.
           Remaining: MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)); honest PHP <code>main()</code> in full spine AOT (native bundle-OK probe is bootstrap smoke).
@@ -437,7 +437,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M5</h4>
           <p>Vendor prelink <strong>7410/7410</strong> ✅; committed <code>.o</code> cold boot ✅;
-            <code>north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; spine <strong>**7415** / **7417**</strong>; prelinked gen-0 refreshed;
+            <code>north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; spine <strong>**7428** / **7430**</strong>; prelinked gen-0 refreshed;
             fast VM execute probe (~20ms); compiled-only cold boot via <code>BOOTSTRAP_M5_NO_ZEND=1</code> ✅
             (<a href="https://github.com/PurHur/php-compiler/issues/3053">#3053</a>,
             <a href="https://github.com/PurHur/php-compiler/issues/8559">#8559</a>,
