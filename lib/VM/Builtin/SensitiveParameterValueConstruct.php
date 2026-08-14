@@ -18,9 +18,8 @@ final class SensitiveParameterValueConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('SensitiveParameterValue::__construct() expects a value');
-        }
+        // php-src: Zend/zend_attributes.stub.php — __construct(mixed $value); $calledArgs[0] is $this (#30867)
+        $this->requireExactUserArgCount($frame, 'SensitiveParameterValue::__construct', 1);
         $receiver = SensitiveParamSupport::requireMarkerObject($frame, $frame->calledArgs[0]);
         $value = $frame->calledArgs[1]->resolveIndirect();
         $receiver->getProperty(SensitiveParamSupport::PROP_VALUE)->copyFrom($value);
