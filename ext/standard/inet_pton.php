@@ -13,6 +13,8 @@ use PHPLLVM\Value;
 
 /**
  * inet_pton() — printable address to binary form (ext/standard/basic_functions.c, #3225).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30546).
  */
 final class inet_pton extends Internal
 {
@@ -23,9 +25,8 @@ final class inet_pton extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('inet_pton() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30546; ext/standard/basic_functions.stub.php).
+        $this->requireExactArgCount($frame, 'inet_pton', 1);
         // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29785 / #20303).
         $address = VmString::stringBuiltinArgForFrame($frame, 0, 'inet_pton', 0, 'ip', false);
         if (null === $frame->returnVar) {
@@ -42,8 +43,9 @@ final class inet_pton extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('inet_pton() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30546).
+        if (!$this->requireExactJitArgCount($context, $args, 'inet_pton', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         // Soft-null outside strict_types; strict → TypeError (#29785).
         $address = $context->callerStrictTypes

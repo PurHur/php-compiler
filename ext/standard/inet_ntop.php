@@ -15,6 +15,7 @@ use PHPLLVM\Value;
  * inet_ntop() — binary address to printable form (ext/standard/basic_functions.c, #3225).
  *
  * php-src stub names the parameter `$ip` (not historical `$in_addr`) — #29785 / #28916.
+ * Excess/missing argc → Zend ArgumentCountError (#30546).
  */
 final class inet_ntop extends Internal
 {
@@ -25,9 +26,8 @@ final class inet_ntop extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('inet_ntop() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30546; ext/standard/basic_functions.stub.php).
+        $this->requireExactArgCount($frame, 'inet_ntop', 1);
         // Z_PARAM_STR — caller strict_types → TypeError on null; else soft-null (#29785 / #20303).
         $in_addr = VmString::stringBuiltinArgForFrame($frame, 0, 'inet_ntop', 0, 'ip', false);
         if (null === $frame->returnVar) {
@@ -44,8 +44,9 @@ final class inet_ntop extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('inet_ntop() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30546).
+        if (!$this->requireExactJitArgCount($context, $args, 'inet_ntop', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         // Soft-null outside strict_types; strict → TypeError (#29785). Param name `$ip` (php-src stub).
         $in_addr = $context->callerStrictTypes

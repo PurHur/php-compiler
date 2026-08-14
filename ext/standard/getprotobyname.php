@@ -15,6 +15,7 @@ use PHPLLVM\Value;
 /**
  * getprotobyname() — protocol number by name (JIT/AOT via libc, issue #4024, #30282).
  *
+ * Excess/missing argc → Zend ArgumentCountError (#30546).
  * Z_PARAM_STR: strict_types → TypeError on null; soft path DEP+coerce (#30282).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/network.c PHP_FUNCTION(getprotobyname)
@@ -29,9 +30,8 @@ final class getprotobyname extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('getprotobyname() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30546; ext/standard/basic_functions.stub.php).
+        $this->requireExactArgCount($frame, 'getprotobyname', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -48,8 +48,9 @@ final class getprotobyname extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('getprotobyname() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30546).
+        if (!$this->requireExactJitArgCount($context, $args, 'getprotobyname', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         // Soft-null outside strict_types; strict → TypeError (#30282).
