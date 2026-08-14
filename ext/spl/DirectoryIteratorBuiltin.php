@@ -402,6 +402,8 @@ final class DirectoryIteratorRewind extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::rewind()'
         );
+        // php-src zim_DirectoryIterator_rewind — ZEND_PARSE_PARAMETERS_NONE (#31009).
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::rewind', 0);
         DirectoryIteratorStorage::rewind($object);
     }
 }
@@ -420,6 +422,8 @@ final class DirectoryIteratorValid extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::valid()'
         );
+        // php-src zim_DirectoryIterator_valid — ZEND_PARSE_PARAMETERS_NONE (#31009).
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::valid', 0);
         SplIteratorSupport::setReturnBool($frame, DirectoryIteratorStorage::valid($object));
     }
 }
@@ -438,6 +442,8 @@ final class DirectoryIteratorCurrent extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::current()'
         );
+        // php-src zim_DirectoryIterator_current — ZEND_PARSE_PARAMETERS_NONE (#31009).
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::current', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -459,6 +465,8 @@ final class DirectoryIteratorKey extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::key()'
         );
+        // php-src zim_DirectoryIterator_key — ZEND_PARSE_PARAMETERS_NONE (#31009).
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::key', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -480,6 +488,8 @@ final class DirectoryIteratorNext extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::next()'
         );
+        // php-src zim_DirectoryIterator_next — ZEND_PARSE_PARAMETERS_NONE (#31009).
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::next', 0);
         DirectoryIteratorStorage::next($object);
     }
 }
@@ -498,12 +508,8 @@ final class DirectoryIteratorSeek extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::seek()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'DirectoryIterator::seek() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_DirectoryIterator_seek — exactly 1 user arg (#31009).
+        $this->requireExactUserArgCount($frame, 'DirectoryIterator::seek', 1);
         $offset = $frame->calledArgs[1]->resolveIndirect()->toInt();
         DirectoryIteratorStorage::seek($object, $offset);
     }
