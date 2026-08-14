@@ -439,6 +439,8 @@ final class RecursiveDirectoryIteratorGetSubPath extends VmClassMethod
             RecursiveDirectoryIteratorBuiltin::CLASS_LC,
             'RecursiveDirectoryIterator::getSubPath()'
         );
+        // php-src zim_RecursiveDirectoryIterator_getSubPath — ZEND_PARSE_PARAMETERS_NONE (#30936).
+        $this->requireExactUserArgCount($frame, 'RecursiveDirectoryIterator::getSubPath', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -460,6 +462,8 @@ final class RecursiveDirectoryIteratorGetSubPathname extends VmClassMethod
             RecursiveDirectoryIteratorBuiltin::CLASS_LC,
             'RecursiveDirectoryIterator::getSubPathname()'
         );
+        // php-src zim_RecursiveDirectoryIterator_getSubPathname — ZEND_PARSE_PARAMETERS_NONE (#30936).
+        $this->requireExactUserArgCount($frame, 'RecursiveDirectoryIterator::getSubPathname', 0);
         if (null === $frame->returnVar) {
             return;
         }
