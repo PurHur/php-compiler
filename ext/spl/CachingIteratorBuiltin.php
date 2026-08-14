@@ -810,6 +810,8 @@ final class CachingIteratorGetInnerIterator extends VmClassMethod
             CachingIteratorBuiltin::CLASS_LC,
             'CachingIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#31040).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
