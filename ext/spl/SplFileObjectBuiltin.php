@@ -280,12 +280,8 @@ final class SplFileObjectFread extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fread()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplFileObject::fread() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_SplFileObject_fread — exactly 1 user arg (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::fread', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -420,6 +416,8 @@ final class SplFileObjectRewind extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::rewind()'
         );
+        // php-src zim_SplFileObject_rewind — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::rewind', 0);
         SplFileObjectStorage::rewind($object);
     }
 }
@@ -438,6 +436,8 @@ final class SplFileObjectNext extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::next()'
         );
+        // php-src zim_SplFileObject_next — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::next', 0);
         SplFileObjectStorage::next($object);
     }
 }
@@ -456,6 +456,8 @@ final class SplFileObjectValid extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::valid()'
         );
+        // php-src zim_SplFileObject_valid — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::valid', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -477,6 +479,8 @@ final class SplFileObjectKey extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::key()'
         );
+        // php-src zim_SplFileObject_key — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::key', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -498,6 +502,8 @@ final class SplFileObjectCurrent extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::current()'
         );
+        // php-src zim_SplFileObject_current — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::current', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -584,12 +590,8 @@ final class SplFileObjectFseek extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fseek()'
         );
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2) {
-            throw new \ArgumentCountError(
-                'SplFileObject::fseek() expects at least 1 argument, '.$argc.' given'
-            );
-        }
+        // php-src zim_SplFileObject_fseek — offset + optional whence (#31008).
+        $this->requireUserArgCountRange($frame, 'SplFileObject::fseek', 1, 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -600,7 +602,7 @@ final class SplFileObjectFseek extends VmClassMethod
             'offset'
         );
         $whence = \SEEK_SET;
-        if ($argc >= 3) {
+        if (\count($frame->calledArgs) >= 3) {
             $whence = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[2],
                 'SplFileObject::fseek',
@@ -627,6 +629,8 @@ final class SplFileObjectFtell extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::ftell()'
         );
+        // php-src zim_SplFileObject_ftell — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::ftell', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -655,6 +659,8 @@ final class SplFileObjectFstat extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fstat()'
         );
+        // php-src zim_SplFileObject_fstat — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::fstat', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -683,12 +689,8 @@ final class SplFileObjectFlock extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::flock()'
         );
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2) {
-            throw new \ArgumentCountError(
-                'SplFileObject::flock() expects at least 1 argument, '.($argc - 1).' given'
-            );
-        }
+        // php-src zim_SplFileObject_flock — operation + optional would_block (#31008).
+        $this->requireUserArgCountRange($frame, 'SplFileObject::flock', 1, 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -775,6 +777,8 @@ final class SplFileObjectFpassthru extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fpassthru()'
         );
+        // php-src zim_SplFileObject_fpassthru — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::fpassthru', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -834,6 +838,8 @@ final class SplFileObjectGetMaxLineLen extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::getMaxLineLen()'
         );
+        // php-src zim_SplFileObject_getMaxLineLen — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::getMaxLineLen', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -855,6 +861,8 @@ final class SplFileObjectGetCurrentLine extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::getCurrentLine()'
         );
+        // php-src zim_SplFileObject_getCurrentLine — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::getCurrentLine', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -882,12 +890,8 @@ final class SplFileObjectFwrite extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fwrite()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplFileObject::fwrite() expects at least 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_SplFileObject_fwrite — data + optional length (#31008).
+        $this->requireUserArgCountRange($frame, 'SplFileObject::fwrite', 1, 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -930,6 +934,8 @@ final class SplFileObjectFgetcsv extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fgetcsv()'
         );
+        // php-src zim_SplFileObject_fgetcsv — optional separator/enclosure/escape (#31008).
+        $this->requireAtMostUserArgCount($frame, 'SplFileObject::fgetcsv', 3);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1070,6 +1076,8 @@ final class SplFileObjectSetCsvControl extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::setCsvControl()'
         );
+        // php-src zim_SplFileObject_setCsvControl — optional separator/enclosure/escape (#31008).
+        $this->requireAtMostUserArgCount($frame, 'SplFileObject::setCsvControl', 3);
         [$separator, $enclosure, $escape] = SplFileObjectStorage::getCsvControl($object);
         if (isset($frame->calledArgs[1])) {
             $separator = VmString::coerceStringBuiltinArg(
@@ -1114,6 +1122,8 @@ final class SplFileObjectGetCsvControl extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::getCsvControl()'
         );
+        // php-src zim_SplFileObject_getCsvControl — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::getCsvControl', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1142,6 +1152,8 @@ final class SplFileObjectGetFlags extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::getFlags()'
         );
+        // php-src zim_SplFileObject_getFlags — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1163,12 +1175,8 @@ final class SplFileObjectSetFlags extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'SplFileObject::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src zim_SplFileObject_setFlags — exactly 1 user arg (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::setFlags', 1);
         $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
         SplFileObjectStorage::setFlags($object, $flags);
     }
@@ -1189,6 +1197,8 @@ final class SplFileObjectHasChildren extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::hasChildren()'
         );
+        // php-src zim_SplFileObject_hasChildren — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::hasChildren', 0);
         SplIteratorSupport::setReturnBool($frame, false);
     }
 }
@@ -1208,6 +1218,8 @@ final class SplFileObjectGetChildren extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::getChildren()'
         );
+        // php-src zim_SplFileObject_getChildren — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::getChildren', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1229,6 +1241,8 @@ final class SplFileObjectToString extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::__toString()'
         );
+        // php-src zim_SplFileObject___toString — ZEND_PARSE_PARAMETERS_NONE (#31008).
+        $this->requireExactUserArgCount($frame, 'SplFileObject::__toString', 0);
         if (null === $frame->returnVar) {
             return;
         }
