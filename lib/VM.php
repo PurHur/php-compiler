@@ -7263,7 +7263,30 @@ restart:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
                     if (isset($this->context->functions[$lcname])) {
-                        throw new \LogicException("Duplicate function definition for $lcname()");
+                        $existing = $this->context->functions[$lcname];
+                        $prevFile = '';
+                        $prevLine = 0;
+                        if ($existing instanceof Func\PHP && null !== $existing->sourceLocation) {
+                            $prevFile = $existing->sourceLocation->filename;
+                            $prevLine = $existing->sourceLocation->startLine;
+                        }
+                        $message = ('' !== $prevFile && 'unknown' !== $prevFile && $prevLine > 0)
+                            ? sprintf(
+                                'Cannot redeclare %s() (previously declared in %s:%d)',
+                                $name,
+                                $prevFile,
+                                $prevLine
+                            )
+                            : sprintf('Cannot redeclare %s()', $name);
+                        $error = new \CompileError($message);
+                        // Inside eval(): rethrow so TYPE_EVAL can raiseEvalCompileFatal.
+                        // Outside eval, uncatchable E_COMPILE_ERROR like Zend (#31109).
+                        if (VmEval::EVAL_FILENAME === $frame->scriptPath
+                            || str_ends_with((string) $frame->scriptPath, VmEval::EVAL_FILENAME)
+                        ) {
+                            throw $error;
+                        }
+                        $this->raiseClassDeclareCompileFatal($error, $frame);
                     }
                     $func = new Func\PHP($name, $op->block1);
                     $func->sourceLocation = $op->sourceLocation;

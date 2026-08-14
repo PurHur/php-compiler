@@ -30,6 +30,8 @@
             <file>./test/compliance/RegisterArgcArgvVMTest.php</file>
             <file>./test/compliance/MagicScriptConstVMTest.php</file>
             <file>./test/compliance/VMTest.php</file>
+            <file>./test/compliance/DuplicateFunctionRedeclare31109VMTest.php</file>
+            <file>./test/compliance/DuplicateFunctionRedeclare31109JITTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedVMTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedJITTest.php</file>
             <file>./test/compliance/DeclareTicksEchoCadenceVMTest.php</file>

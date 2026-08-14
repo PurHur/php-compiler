@@ -12248,7 +12248,32 @@ class Compiler {
                     <=> ((int) ($b->getAttribute('startLine') ?? 0));
             }
         );
+        /** @var array<string, array{file: string, line: int}> $declared */
+        $declared = [];
         foreach ($funcs as $fn) {
+            $name = $fn->func->name;
+            if (is_string($name) && '' !== $name) {
+                $lc = strtolower($name);
+                if (isset($declared[$lc])) {
+                    $prev = $declared[$lc];
+                    $this->throwCompileError(
+                        ('' !== $prev['file'] && 'unknown' !== $prev['file'] && $prev['line'] > 0)
+                            ? sprintf(
+                                'Cannot redeclare %s() (previously declared in %s:%d)',
+                                $name,
+                                $prev['file'],
+                                $prev['line']
+                            )
+                            : sprintf('Cannot redeclare %s()', $name),
+                        $fn->getFile(),
+                        max(1, $fn->getLine())
+                    );
+                }
+                $declared[$lc] = [
+                    'file' => $fn->getFile(),
+                    'line' => max(0, $fn->getLine()),
+                ];
+            }
             $this->earlyBoundFunctionOps[$fn] = true;
             $dest->addOpCode($this->compileFunction($fn, $dest));
         }
