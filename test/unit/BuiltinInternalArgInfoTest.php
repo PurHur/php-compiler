@@ -1079,6 +1079,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         );
     }
 
+    /** php-src iconv.stub.php — InternalArgInfo return string (missing |false) (#28424; restore). */
+    public function testIconvReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv'));
+    }
+
     /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#27629). */
     public function testIconvStrlenReflectionStubTypes(): void
     {
@@ -1107,6 +1113,28 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNotNull($strrposEnc);
         $this->assertSame('?string', $strrposEnc['type']);
         $this->assertTrue($strrposEnc['isOptional']);
+    }
+
+    /** php-src iconv.stub.php — InternalArgInfo return string / int length / string encoding (#28585). */
+    public function testIconvSubstrReflectionStubTypes(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv_substr'));
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('iconv_substr', 2));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('iconv_substr', 3));
+        $length = BuiltinInternalArgInfo::paramInfoForFunction('iconv_substr', 2);
+        $this->assertNotNull($length);
+        $this->assertSame('?int', $length['type']);
+        $this->assertTrue($length['isOptional']);
+        $encoding = BuiltinInternalArgInfo::paramInfoForFunction('iconv_substr', 3);
+        $this->assertNotNull($encoding);
+        $this->assertSame('?string', $encoding['type']);
+        $this->assertTrue($encoding['isOptional']);
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('iconv_substr', 2, $length, false)
+        );
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('iconv_substr', 3, $encoding, false)
+        );
     }
 
     /** php-src openssl.stub.php — InternalArgInfo omits return (#28368). */
