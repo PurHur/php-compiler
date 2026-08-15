@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -26,12 +25,8 @@ final class file_get_contents extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 5) {
-            throw new \ArgumentCountError(
-                'file_get_contents() expects at least 1 argument, '.\max(0, $argc - 1).' given'
-            );
-        }
+        // php-src file.c / file.stub.php — split under/over arity (#30677; peer #30574).
+        $this->requireArgCountRange($frame, 'file_get_contents', 1, 5);
         $filename = VmStreamPath::coerceNonEmptyPathArgForFrame(
             $frame,
             0,
@@ -119,13 +114,7 @@ final class file_get_contents extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 5) {
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'file_get_contents() expects at least 1 argument, '.\max(0, $argc - 1).' given'
-            );
-
+        if (!$this->requireArgCountRangeJit($context, $args, 'file_get_contents', 1, 5)) {
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 

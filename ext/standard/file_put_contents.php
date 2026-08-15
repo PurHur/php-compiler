@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -20,12 +21,8 @@ final class file_put_contents extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \ArgumentCountError(
-                'file_put_contents() expects at least 2 arguments, '.$argc.' given'
-            );
-        }
+        // php-src file.c / file.stub.php — split under/over arity (#30677; peer #30574).
+        $this->requireArgCountRange($frame, 'file_put_contents', 2, 4);
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -62,10 +59,8 @@ final class file_put_contents extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \ArgumentCountError(
-                'file_put_contents() expects at least 2 arguments, '.$argc.' given'
-            );
+        if (!$this->requireArgCountRangeJit($context, $args, 'file_put_contents', 2, 4)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         $flags = 0;
         if ($argc >= 3) {
