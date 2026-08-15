@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 /**
  * iterator_apply() — invoke a callback over a traversable (ext/spl/iterator.c, #3313).
  *
+ * Excess/missing argc → Zend ArgumentCountError (#30603).
+ *
  * @see https://github.com/php/php-src/blob/master/ext/spl/php_spl.c PHP_FUNCTION(iterator_apply)
  */
 final class iterator_apply extends Internal
@@ -25,10 +27,9 @@ final class iterator_apply extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/spl/php_spl.c — ArgumentCountError arity 2..3 (#30603).
+        $this->requireArgCountRange($frame, 'iterator_apply', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('iterator_apply() requires two or three arguments');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -50,9 +51,9 @@ final class iterator_apply extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('iterator_apply() requires two or three arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30603).
+        if (!$this->requireArgCountRangeJit($context, $args, 'iterator_apply', 2, 3)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (!ArrayMapCallbackPolicy::isClosureJitLowerable($args[1])) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());

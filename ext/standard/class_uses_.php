@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 /**
  * class_uses() — traits used by a class (issue #3119).
  *
+ * Excess/missing argc → Zend ArgumentCountError (#30603).
+ *
  * php-src: ext/standard/spl_functions.c — PHP_FUNCTION(class_uses)
  */
 final class class_uses_ extends Internal
@@ -25,10 +27,9 @@ final class class_uses_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30603; peer class_implements).
+        $this->requireArgCountRange($frame, 'class_uses', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('class_uses() requires one or two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -58,8 +59,9 @@ final class class_uses_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('class_uses() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30603).
+        if (!$this->requireArgCountRangeJit($context, $args, 'class_uses', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         $autoload = true;
         if (\count($args) >= 2) {

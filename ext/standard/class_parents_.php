@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 /**
  * class_parents() — parent class chain for a class or object (issue #3159).
  *
+ * Excess/missing argc → Zend ArgumentCountError (#30603).
+ *
  * php-src: ext/standard/class.c — PHP_FUNCTION(class_parents)
  */
 final class class_parents_ extends Internal
@@ -26,10 +28,9 @@ final class class_parents_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30603; peer class_implements).
+        $this->requireArgCountRange($frame, 'class_parents', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('class_parents() requires one or two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -70,8 +71,9 @@ final class class_parents_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('class_parents() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30603).
+        if (!$this->requireArgCountRangeJit($context, $args, 'class_parents', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         $autoload = true;
         if (\count($args) >= 2) {
