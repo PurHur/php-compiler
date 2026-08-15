@@ -104,6 +104,16 @@ final class VmSocket
         return self::$domains[$object->id] ?? null;
     }
 
+    /** AF_* for JIT/AOT NestedJIT handles keyed by object address (#31240). */
+    public static function domainForLookupKey(int $key): ?int
+    {
+        if ($key <= 0) {
+            return null;
+        }
+
+        return self::$domains[$key] ?? null;
+    }
+
     public static function setDomainForObject(ObjectEntry $object, int $domain): void
     {
         self::$domains[$object->id] = $domain;

@@ -57,14 +57,43 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
     }
 
+    public function testSocketConnectCallUsesJitSocketConnect(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_connect.php');
+        $this->assertStringContainsString('JitSocketConnect::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketConnectJitHelperExposesConnectArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketConnectJitHelper.php');
+        $this->assertStringContainsString('function connectArgv', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::connectInet', $source);
+    }
+
+    public function testSocketConnectRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketConnectRuntime.php');
+        $this->assertStringContainsString('::connectArgv', $source);
+        $this->assertStringContainsString('SocketConnectJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_connect', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
     public function testSpineBundleIncludesSocketCreateCloseHelpers(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('SocketCreateJitHelper.php', $spine);
         $this->assertStringContainsString('SocketCloseJitHelper.php', $spine);
+        $this->assertStringContainsString('SocketConnectJitHelper.php', $spine);
         $this->assertStringContainsString('JitSocketCreate.php', $spine);
         $this->assertStringContainsString('JitSocketClose.php', $spine);
+        $this->assertStringContainsString('JitSocketConnect.php', $spine);
         $this->assertStringContainsString('SocketCreateRuntime.php', $spine);
         $this->assertStringContainsString('SocketCloseRuntime.php', $spine);
+        $this->assertStringContainsString('SocketConnectRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketConnect.php', $spine);
     }
 }
