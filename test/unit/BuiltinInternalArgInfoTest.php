@@ -1076,6 +1076,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($info['isOptional']);
     }
 
+    /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#28586). */
+    public function testIconvStrposStrrposReflectionStubTypes(): void
+    {
+        foreach (['iconv_strpos', 'iconv_strrpos'] as $fn) {
+            $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('iconv_strpos', 3));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('iconv_strrpos', 2));
+        $strposEnc = BuiltinInternalArgInfo::paramInfoForFunction('iconv_strpos', 3);
+        $this->assertNotNull($strposEnc);
+        $this->assertSame('?string', $strposEnc['type']);
+        $this->assertTrue($strposEnc['isOptional']);
+        $strrposEnc = BuiltinInternalArgInfo::paramInfoForFunction('iconv_strrpos', 2);
+        $this->assertNotNull($strrposEnc);
+        $this->assertSame('?string', $strrposEnc['type']);
+        $this->assertTrue($strrposEnc['isOptional']);
+    }
+
     /** php-src openssl.stub.php — InternalArgInfo omits return (#28368). */
     public function testOpensslErrorStringReflectionReturnUnion(): void
     {
