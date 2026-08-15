@@ -69,6 +69,6 @@ final class socket_create_listen extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_create_listen() not implemented for JIT (#6212)');
+        return JitSocketCreateListen::invoke($context, ...$args);
     }
 }

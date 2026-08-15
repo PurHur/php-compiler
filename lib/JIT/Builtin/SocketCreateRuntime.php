@@ -32,9 +32,12 @@ final class SocketCreateRuntime
         self::H.'::readFailedArgv',
         self::H.'::markReadFailedArgv',
         self::H.'::clearReadFailedArgv',
-        // bind/listen share this unit so pair fds resolve under thin AOT (#31241).
+        // bind/listen/accept/create_listen share this unit so pair fds resolve (#31241/#31242).
         self::H.'::bindArgv',
         self::H.'::listenArgv',
+        self::H.'::acceptArgv',
+        self::H.'::domainForHandleArgv',
+        self::H.'::createListenFdArgv',
     ];
 
     /** @var list<string> */

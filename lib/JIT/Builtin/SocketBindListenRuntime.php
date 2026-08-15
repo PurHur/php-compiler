@@ -10,12 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for socket_bind() / socket_listen() via SocketCreateJitHelper (#31241).
+ * JIT/AOT link for socket_bind/listen/accept/create_listen via SocketCreateJitHelper (#31241/#31242).
  *
- * Uses the create/pair NestedJIT unit so owned fds from socket_create_pair() resolve
- * (a separate helper unit cannot see that static fd map under thin AOT).
+ * Uses the create/pair NestedJIT unit so owned fds resolve under thin AOT.
  *
- * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_bind), PHP_FUNCTION(socket_listen)
+ * php-src: ext/sockets/sockets.c
  */
 final class SocketBindListenRuntime
 {
@@ -35,18 +34,26 @@ final class SocketBindListenRuntime
         self::H.'::clearReadFailedArgv',
         self::H.'::bindArgv',
         self::H.'::listenArgv',
+        self::H.'::acceptArgv',
+        self::H.'::domainForHandleArgv',
+        self::H.'::createListenFdArgv',
     ];
 
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
         '__compiler_socket_bind',
         '__compiler_socket_listen',
+        '__compiler_socket_accept',
+        '__compiler_socket_domain_for_handle_create',
+        '__compiler_socket_create_listen_fd',
     ];
 
     public static function ensureLinked(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_socket_bind');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        $accept = $context->module->getNamedFunction('__compiler_socket_accept');
+        if (null !== $probe && $probe->countBasicBlocks() > 0
+            && null !== $accept && $accept->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -58,11 +65,13 @@ final class SocketBindListenRuntime
         } catch (\Throwable) {
         }
 
-        // Ensure create/pair bridges exist when bind shares the NestedJIT unit.
         SocketCreateRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementBindBridge($context);
         self::implementListenBridge($context);
+        self::implementAcceptBridge($context);
+        self::implementDomainBridge($context);
+        self::implementCreateListenBridge($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -74,29 +83,79 @@ final class SocketBindListenRuntime
 
     private static function implementBindBridge(Context $context): void
     {
-        $abiName = '__compiler_socket_bind';
+        self::implementI64StrI64Bridge(
+            $context,
+            '__compiler_socket_bind',
+            'socket_bind_entry',
+            self::H.'::bindArgv'
+        );
+    }
+
+    private static function implementListenBridge(Context $context): void
+    {
+        self::implementI64I64Bridge(
+            $context,
+            '__compiler_socket_listen',
+            'socket_listen_entry',
+            self::H.'::listenArgv'
+        );
+    }
+
+    private static function implementAcceptBridge(Context $context): void
+    {
+        self::implementI64Bridge(
+            $context,
+            '__compiler_socket_accept',
+            'socket_accept_entry',
+            self::H.'::acceptArgv'
+        );
+    }
+
+    private static function implementDomainBridge(Context $context): void
+    {
+        self::implementI64Bridge(
+            $context,
+            '__compiler_socket_domain_for_handle_create',
+            'socket_domain_create_entry',
+            self::H.'::domainForHandleArgv'
+        );
+    }
+
+    private static function implementCreateListenBridge(Context $context): void
+    {
+        self::implementI64I64Bridge(
+            $context,
+            '__compiler_socket_create_listen_fd',
+            'socket_create_listen_entry',
+            self::H.'::createListenFdArgv'
+        );
+    }
+
+    private static function implementI64Bridge(
+        Context $context,
+        string $abiName,
+        string $entryName,
+        string $logical
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
             return;
         }
-
         $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
                 $abiName,
-                $context->context->functionType($i64, false, $i64, $strPtr, $i64)
+                $context->context->functionType($i64, false, $i64)
             );
-
-        $entry = $fn->appendBasicBlock('socket_bind_entry');
+        $entry = $fn->appendBasicBlock($entryName);
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::bindArgv'),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
+            self::helperFunction($context, $logical),
+            [$fn->getParam(0)]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
@@ -105,16 +164,18 @@ final class SocketBindListenRuntime
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementListenBridge(Context $context): void
-    {
-        $abiName = '__compiler_socket_listen';
+    private static function implementI64I64Bridge(
+        Context $context,
+        string $abiName,
+        string $entryName,
+        string $logical
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
             return;
         }
-
         $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
             ? $probe
@@ -122,13 +183,46 @@ final class SocketBindListenRuntime
                 $abiName,
                 $context->context->functionType($i64, false, $i64, $i64)
             );
-
-        $entry = $fn->appendBasicBlock('socket_listen_entry');
+        $entry = $fn->appendBasicBlock($entryName);
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::listenArgv'),
+            self::helperFunction($context, $logical),
             [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementI64StrI64Bridge(
+        Context $context,
+        string $abiName,
+        string $entryName,
+        string $logical
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false, $i64, $strPtr, $i64)
+            );
+        $entry = $fn->appendBasicBlock($entryName);
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $logical),
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
@@ -141,7 +235,7 @@ final class SocketBindListenRuntime
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#31241');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#31242');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -150,7 +244,7 @@ final class SocketBindListenRuntime
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#31241'
+            '#31242'
         );
     }
 
@@ -159,9 +253,14 @@ final class SocketBindListenRuntime
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after SocketBindListenRuntime link (#31241)');
+                throw new \LogicException($name.' missing after SocketBindListenRuntime link (#31242)');
             }
             $context->registerFunction($name, $fn);
+        }
+        // Accept/create_listen also need create register ABI.
+        $reg = $context->module->getNamedFunction('__compiler_socket_create_register');
+        if (null !== $reg) {
+            $context->registerFunction('__compiler_socket_create_register', $reg);
         }
     }
 }

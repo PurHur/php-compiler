@@ -57,6 +57,6 @@ final class socket_accept extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_accept() JIT lowering not implemented (#6176)');
+        return JitSocketAccept::invoke($context, ...$args);
     }
 }
