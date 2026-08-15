@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\sockets;
 
 /**
- * Owned-socket NestedJIT helpers for create/pair/write/read/sendto (#27394, #27423, #31308).
+ * Owned-socket NestedJIT helpers for create/pair/write/read/sendto/getsockname (#27394, #27423, #31308, #31327).
  *
  * One NestedJIT unit so {@see SocketsLibcThinAbi} FFI statics stay shared under thin AOT.
  * php-src: ext/sockets/sockets.c
  *
  * Note: socketpair(2) itself is invoked from LLVM (libc) in {@see \PHPCompiler\JIT\Builtin\SocketPairIoRuntime}
  * because NestedJIT cannot reliably read FFI out-params (#27423). This helper only registers
- * fds and performs write/read/sendto.
+ * fds and performs write/read/sendto/name lookups.
  */
 final class SocketCreateJitHelper
 {
@@ -265,6 +265,75 @@ final class SocketCreateJitHelper
         VmSockets::clearErrorForLookupKey($handle);
 
         return $n;
+    }
+
+    /**
+     * socket_getsockname() address — AF_INET; null on failure (#31327 / re-#6248).
+     */
+    public static function getsocknameAddrArgv(int $handle): ?string
+    {
+        $name = self::nameInetForHandle($handle, false);
+        if (null === $name) {
+            return null;
+        }
+
+        return $name[0];
+    }
+
+    /**
+     * socket_getsockname() port — AF_INET; -1 on failure (#31327 / re-#6248).
+     */
+    public static function getsocknamePortArgv(int $handle): int
+    {
+        $name = self::nameInetForHandle($handle, false);
+
+        return null === $name ? -1 : $name[1];
+    }
+
+    /**
+     * socket_getpeername() address — AF_INET; null on failure (#31327 / re-#6248).
+     */
+    public static function getpeernameAddrArgv(int $handle): ?string
+    {
+        $name = self::nameInetForHandle($handle, true);
+        if (null === $name) {
+            return null;
+        }
+
+        return $name[0];
+    }
+
+    /**
+     * socket_getpeername() port — AF_INET; -1 on failure (#31327 / re-#6248).
+     */
+    public static function getpeernamePortArgv(int $handle): int
+    {
+        $name = self::nameInetForHandle($handle, true);
+
+        return null === $name ? -1 : $name[1];
+    }
+
+    /**
+     * @return array{0: string, 1: int}|null
+     */
+    private static function nameInetForHandle(int $handle, bool $peer): ?array
+    {
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return null;
+        }
+        $name = $peer
+            ? SocketsLibcThinAbi::getpeernameInet($fd)
+            : SocketsLibcThinAbi::getsocknameInet($fd);
+        if (false === $name) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return null;
+        }
+        VmSockets::clearErrorForLookupKey($handle);
+
+        return $name;
     }
 
     /**

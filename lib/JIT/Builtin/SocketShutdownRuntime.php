@@ -40,6 +40,10 @@ final class SocketShutdownRuntime
         self::H.'::createListenFdArgv',
         self::H.'::shutdownArgv',
         self::H.'::sendtoArgv',
+        self::H.'::getsocknameAddrArgv',
+        self::H.'::getsocknamePortArgv',
+        self::H.'::getpeernameAddrArgv',
+        self::H.'::getpeernamePortArgv',
     ];
 
     /** @var list<string> */
