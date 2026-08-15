@@ -12,8 +12,8 @@ setcookie('n', 'v', [
     'samesite' => 'Lax',
 ]);
 echo setcookie('ok', '1', ['path' => '/app']) ? "ok\n" : "no\n";
-echo header_list()[0], "\n";
-echo header_list()[1], "\n";
+echo headers_list()[0], "\n";
+echo headers_list()[1], "\n";
 --EXPECT--
 ok
 Set-Cookie: n=v; expires=Thu, 15-Jan-2026 12:30:45 GMT; path=/; secure; httponly; samesite=Lax

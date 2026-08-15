@@ -126,6 +126,8 @@
             <file>./test/compliance/ObStartNullChunkSize31228JITTest.php</file>
             <file>./test/compliance/VfscanfPhantom26758VMTest.php</file>
             <file>./test/compliance/VfscanfPhantom26758JITTest.php</file>
+            <file>./test/compliance/HeaderListPhantom28404VMTest.php</file>
+            <file>./test/compliance/HeaderListPhantom28404JITTest.php</file>
             <file>./test/compliance/ArrayPadOversizeValueError29342VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153JITTest.php</file>

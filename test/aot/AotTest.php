@@ -417,14 +417,7 @@ class AotTest extends BaseTest
                 && str_contains($name, 'http_last_response_headers_phantom')) {
                 continue;
             }
-            $usesHeaderList = str_contains($name, 'header_list')
-                || str_contains($name, 'header_remove')
-                || str_contains($name, 'setcookie')
-                || str_contains($name, 'setrawcookie')
-                || str_contains($name, 'session_cookie');
-            if (!CompilerVersion::supportsHeaderList() && $usesHeaderList) {
-                continue;
-            }
+            // header_list() is a forever-off phantom (#28404); cases use headers_list() and always run.
             // Pipe operator AOT: enabled after AssertOptionsRuntime CFG fix (#9750).
             // Concat-on-LHS (`"a" . "b" |> f`) remains VM/JIT-only until inline concat-in-call AOT lands.
             // preg_match() float offset: VM (#13818); native AOT emits float→int deprecation on stderr before stdout.
@@ -616,7 +609,7 @@ class AotTest extends BaseTest
 
     /**
      * Standalone AOT binaries defer-flush header() before body output (#634).
-     * Default GET unless a case explicitly tests CLI header_list() semantics.
+     * Default GET unless a case explicitly tests CLI headers_list() semantics.
      *
      * @param array<string, string> $env
      */

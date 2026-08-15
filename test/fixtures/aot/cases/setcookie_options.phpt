@@ -11,7 +11,7 @@ setcookie('n', 'v', [
     'httponly' => true,
     'samesite' => 'Lax',
 ]);
-echo header_list()[0], "\n";
+echo headers_list()[0], "\n";
 --EXPECT--
 Set-Cookie: n=v; expires=Thu, 15-Jan-2026 12:30:45 GMT; path=/; secure; httponly; samesite=Lax
 Set-Cookie: n=v; expires=Thu, 15-Jan-2026 12:30:45 GMT; path=/; secure; httponly; samesite=Lax

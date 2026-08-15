@@ -14,13 +14,16 @@ use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
- * header_list() — list pending response headers (issue #311).
+ * Shared pending-header list implementation for headers_list() / apache_response_headers().
+ *
+ * Public symbol header_list() is absent from php-src (#28404) — do not register that name;
+ * subclasses pass the Zend-facing name into the constructor.
  */
 class header_list extends Internal
 {
     public function __construct(?string $name = null)
     {
-        parent::__construct($name ?? 'header_list');
+        parent::__construct($name ?? 'headers_list');
     }
 
     public function execute(Frame $frame): void
