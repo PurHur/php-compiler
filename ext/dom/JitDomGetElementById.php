@@ -81,18 +81,20 @@ final class JitDomGetElementById
         $idStr = self::loadStringArg($context, $args[1]);
 
         // Thin AOT: consult DomUserScriptElementCache before PROP_ELEMENT_ID_MAP.
-        // loadXML leaves the map uninitialized; reading it segfaults. setIdAttribute
-        // (#29257) and loadHTML populate the cache so lookups stay safe.
+        // loadXML without ID-typed attrs leaves the map uninitialized; reading it
+        // segfaults (#31367). setIdAttribute (#29257) and loadHTML/loadXML indexed
+        // IDs populate the cache so lookups stay safe. Cache-inactive → return null
+        // (same as an authoritative cache miss); do not touch PROP_ELEMENT_ID_MAP.
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $cacheActive = DomUserScriptElementCacheLlvm::isActive($context);
             $cacheBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_first');
-            $mapBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_map_after_cache');
+            $inactiveBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_inactive');
             $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_first_done');
             $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
                 $context,
                 $context->getTypeFromString('__value__*')
             );
-            $context->builder->branchIf($cacheActive, $cacheBlock, $mapBlock);
+            $context->builder->branchIf($cacheActive, $cacheBlock, $inactiveBlock);
 
             $context->builder->positionAtEnd($cacheBlock);
             $cached = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr);
@@ -117,20 +119,10 @@ final class JitDomGetElementById
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
-            $context->builder->positionAtEnd($mapBlock);
-            $objectType = $context->type->object;
-            $classId = $objectType->lookup(self::CLASS_DOCUMENT);
-            $mapVar = ObjectInstancePropertyLlvm::propertyFetchOrdinary(
-                $objectType,
-                $document,
-                self::CLASS_DOCUMENT,
-                VmDom::PROP_ELEMENT_ID_MAP,
-                $classId
-            );
-            $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
-            $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
-            $mapOrCache = self::lookupUserScriptWithCacheFallback($context, $foundVar, $idStr);
-            $context->builder->store(JitValueBox::normalizeValuePtr($context, $mapOrCache), $resultSlot);
+            // Cache never activated (e.g. loadXML with plain id= not ID-typed) (#31367).
+            $context->builder->positionAtEnd($inactiveBlock);
+            $nullInactive = self::boxNullResult($context);
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullInactive), $resultSlot);
             $context->builder->branch($doneBlock);
 
             $context->builder->positionAtEnd($doneBlock);

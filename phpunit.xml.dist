@@ -352,6 +352,7 @@
             <file>./test/compliance/DomDocumentLoadReflectionVMTest.php</file>
             <file>./test/compliance/DomGetElementByIdNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementByIdNullStrictJITTest.php</file>
+            <file>./test/compliance/DomGetElementByIdNonIdNullVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictJITTest.php</file>
             <file>./test/compliance/DomCreateNullStrictVMTest.php</file>
