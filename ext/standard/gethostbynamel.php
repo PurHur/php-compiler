@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  * (#24966 / sibling of #24965 gethostbyname; php-src ext/standard/dns.c).
  *
  * VM: VmDns (libc FFI, #4928). JIT/AOT: GethostbynamelRuntime → GethostbynamelJitHelper PHP (#9382).
+ * Excess/missing argc → Zend ArgumentCountError (#30585).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(gethostbynamel)
  */
@@ -32,9 +33,8 @@ final class gethostbynamel extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('gethostbynamel() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30585; ext/standard/dns.c).
+        $this->requireExactArgCount($frame, 'gethostbynamel', 1);
         $hostname = VmString::trimFamilyStringArgForFrame($frame, 0, 'gethostbynamel', 0, 'hostname');
         if (null === $frame->returnVar) {
             return;
@@ -49,8 +49,9 @@ final class gethostbynamel extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('gethostbynamel() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30585).
+        if (!$this->requireExactJitArgCount($context, $args, 'gethostbynamel', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         $hostnameArg = $args[0];

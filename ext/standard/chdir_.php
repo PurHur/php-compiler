@@ -10,7 +10,10 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** chdir() — VM via VmChdirNative; JIT/AOT via ChdirJitHelper (#8180, #21147). */
+/**
+ * chdir() — VM via VmChdirNative; JIT/AOT via ChdirJitHelper (#8180, #21147).
+ * Excess/missing argc → Zend ArgumentCountError (#30585).
+ */
 final class chdir_ extends Internal
 {
     public function __construct()
@@ -20,9 +23,8 @@ final class chdir_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('chdir() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30585; ext/standard/dir.c).
+        $this->requireExactArgCount($frame, 'chdir', 1);
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chdir', 0, 'directory', $frame);
         $ok = VmFs::chdir($path);
         if (!$ok) {
@@ -36,9 +38,11 @@ final class chdir_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('chdir() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30585).
+        if (!$this->requireExactJitArgCount($context, $args, 'chdir', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+
         return JitChdir::invoke(
             $context,
             JitFilestatArg::lowerFilename($context, $args[0], 'chdir', 0, 'directory')

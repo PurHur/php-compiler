@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  * (#24965 / re-#24178, reverts #23858 over-strict; php-src ext/standard/dns.c).
  *
  * VM: VmDns (reuses gethostbynamel getaddrinfo path). JIT/AOT: JitGethostbyname LLVM delegate.
+ * Excess/missing argc → Zend ArgumentCountError (#30585).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(gethostbyname)
  */
@@ -32,9 +33,8 @@ final class gethostbyname extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('gethostbyname() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30585; ext/standard/dns.c).
+        $this->requireExactArgCount($frame, 'gethostbyname', 1);
         $hostname = VmString::trimFamilyStringArgForFrame($frame, 0, 'gethostbyname', 0, 'hostname');
         if (null === $frame->returnVar) {
             return;
@@ -44,8 +44,9 @@ final class gethostbyname extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('gethostbyname() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30585).
+        if (!$this->requireExactJitArgCount($context, $args, 'gethostbyname', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         $hostnameArg = $args[0];
