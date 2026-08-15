@@ -7,8 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Host {@code php -d zend.assertions=... bin/vm.php} must gate assert() like Zend (#29551).
- * Distro php.ini alone must not override the guest compiled default 1 (#28823).
+ * Host {@code zend.assertions} (php.ini or {@code -d}) must gate assert() like Zend (#31195 / #29551).
  */
 final class ZendAssertionsHostDashDTest extends TestCase
 {
@@ -27,13 +26,15 @@ final class ZendAssertionsHostDashDTest extends TestCase
         $this->assertSame("ini=1\nAssertionError:nope\ndone\n", $this->runVmWithHostDashD('1'));
     }
 
-    public function testHostDefaultKeepsCompiledOne(): void
+    public function testHostDefaultMatchesProcessIni(): void
     {
-        // Distro php.ini may be -1; guest must keep php-src compiled default 1 (#28823).
-        $this->assertSame(
-            "ini=1\nAssertionError:nope\ndone\n",
-            $this->runVmWithHostDashD(null)
-        );
+        // Docker/production php.ini is typically -1; php -n is 1 (#31195).
+        $host = (string) ini_get('zend.assertions');
+        if ('-1' === $host || '0' === $host) {
+            $this->assertSame("ini={$host}\nAFTER\ndone\n", $this->runVmWithHostDashD(null));
+        } else {
+            $this->assertSame("ini=1\nAssertionError:nope\ndone\n", $this->runVmWithHostDashD(null));
+        }
     }
 
     public function testGuestDashDOverrideBeatsHost(): void
@@ -83,6 +84,32 @@ final class ZendAssertionsHostDashDTest extends TestCase
         $result = $this->runCommand($cmd, $repoRoot);
         $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
         $this->assertSame("ini=-1\nAFTER\ndone\n", $result['stdout']);
+    }
+
+    public function testHostDefaultOnJitMatchesProcessIni(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $jit = realpath($repoRoot.'/bin/jit.php');
+        $script = realpath($repoRoot.'/test/repro/issue_29551_zend_assertions_host_dash_d.php');
+        if (false === $jit || false === $script) {
+            $this->markTestSkipped('jit or repro missing');
+        }
+
+        $host = (string) ini_get('zend.assertions');
+        $cmd = [
+            PHP_BINARY,
+            '-d',
+            'display_errors=0',
+            $jit,
+            $script,
+        ];
+        $result = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        if ('-1' === $host || '0' === $host) {
+            $this->assertSame("ini={$host}\nAFTER\ndone\n", $result['stdout']);
+        } else {
+            $this->assertSame("ini=1\nAssertionError:nope\ndone\n", $result['stdout']);
+        }
     }
 
     private function runVmWithHostDashD(?string $mode): string

@@ -275,11 +275,12 @@ if (!function_exists('php_compiler_cli_sync_host_exception_string_param_max_len'
 
 if (!function_exists('php_compiler_cli_sync_host_zend_assertions')) {
     /**
-     * Inherit host {@code php -d zend.assertions=...} into the guest VM (#29551).
+     * Inherit host {@code zend.assertions} into the guest VM (#31195 / #29551).
      *
-     * Guest argv {@code bin/vm.php -d zend.assertions=-1} wins via
-     * {@see php_compiler_cli_apply_ini_overrides} (startup stage). Host php.ini alone is ignored
-     * so the guest keeps php-src's compiled default {@code 1} (#28823; distro ini is often {@code -1}).
+     * Guest argv {@code bin/vm.php -d zend.assertions=...} wins via
+     * {@see php_compiler_cli_apply_ini_overrides} (startup stage). Otherwise mirror the host
+     * process value from {@code ini_get('zend.assertions')} so Docker/production php.ini
+     * ({@code -1}) and {@code php -n}/{@code -d} (compiled default {@code 1}) match Zend.
      *
      * @param array<string, mixed> $options
      */
@@ -292,9 +293,6 @@ if (!function_exists('php_compiler_cli_sync_host_zend_assertions')) {
                     return;
                 }
             }
-        }
-        if (!php_compiler_cli_host_cmdline_has_dash_d('zend.assertions')) {
-            return;
         }
         $raw = @\ini_get('zend.assertions');
         if (false === $raw) {
