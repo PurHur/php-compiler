@@ -21,7 +21,6 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -40,7 +39,14 @@ final class intval extends Internal
         $argc = \count($frame->calledArgs);
         $base = 10;
         if (2 === $argc) {
-            $base = self::parseBase($frame->calledArgs[1]->resolveIndirect());
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31227).
+            $base = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
+                'intval',
+                2,
+                'base'
+            );
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($v);
@@ -107,9 +113,22 @@ final class intval extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $i64 = $context->getTypeFromString('int64');
-        $baseVal = 2 === $argc
-            ? $this->parseBaseJit($context, $args[1])
-            : $i64->constInt(10, false);
+        if (2 === $argc) {
+            // Soft-null outside strict_types; strict → TypeError (#31227).
+            // Early return after compile-time null TypeError — open a dead insert block so the
+            // call site can lower a discarded return without mid-block terminator (AOT verify;
+            // peer dirname #31210 / settype #30506 / count #27446).
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+                JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'intval', 2, 'base');
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'intval_null_base_te_cont');
+
+                return $i64->constInt(0, false);
+            }
+            $baseVal = $this->parseBaseJit($context, $args[1]);
+        } else {
+            $baseVal = $i64->constInt(10, false);
+        }
         $v = $context->helper->loadValue($args[0]);
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
@@ -135,32 +154,6 @@ final class intval extends Internal
         }
     }
 
-    private static function parseBase(Variable $v): int
-    {
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return $v->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            return (int) $v->toFloat();
-        }
-        if (Variable::TYPE_BOOLEAN === $v->type) {
-            return $v->toBool() ? 1 : 0;
-        }
-        if (Variable::TYPE_NULL === $v->type) {
-            return 0;
-        }
-        if (Variable::TYPE_STRING === $v->type) {
-            $s = $v->toString();
-            if ('' === $s || !is_numeric($s)) {
-                throw new \TypeError(self::baseTypeErrorMessage('string'));
-            }
-
-            return (int) $s;
-        }
-        // php-src ZPP IS_LONG — name concrete class for objects (#25724, zend_API.c).
-        throw new \TypeError(self::baseTypeErrorMessage(EnumCaseSupport::typeNameForVariable($v)));
-    }
-
     private static function baseTypeErrorMessage(string $given): string
     {
         return 'intval(): Argument #2 ($base) must be of type int, '.$given.' given';
@@ -177,6 +170,16 @@ final class intval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->zExt($context->helper->loadValue($arg), $i64);
             case JITVariable::TYPE_NULL:
+                // Z_PARAM_LONG: strict TypeError; weak soft-null DEP+0 (#31227).
+                if ($context->callerStrictTypes) {
+                    $this->emitBaseTypeErrorAndAbort($context, 'null');
+
+                    return $i64->constInt(0, false);
+                }
+                if (!$context->isUserScriptAot()) {
+                    JitIntdiv::emitNullIntDeprecation($context, 'intval', 2, 'base');
+                }
+
                 return $i64->constInt(0, false);
             case JITVariable::TYPE_STRING:
                 return $this->stringToInt(
@@ -247,7 +250,18 @@ final class intval extends Internal
             $afterNull
         );
         $context->builder->positionAtEnd($nullBlock);
-        $context->builder->branch($doneBlock);
+        // Boxed null: strict TypeError; weak soft-null DEP+0 (#31227).
+        if ($context->callerStrictTypes) {
+            $this->emitBaseTypeErrorAndAbort($context, 'null');
+            $nullEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+        } else {
+            if (!$context->isUserScriptAot()) {
+                JitIntdiv::emitNullIntDeprecation($context, 'intval', 2, 'base');
+            }
+            $nullEnd = $nullBlock;
+            $context->builder->branch($doneBlock);
+        }
 
         $context->builder->positionAtEnd($afterNull);
         $afterLong = BasicBlockHelper::append($context, 'intval_base_after_long');
@@ -337,7 +351,7 @@ final class intval extends Internal
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, 'intval_base_phi');
-        $phi->addIncoming($i64->constInt(0, false), $nullBlock);
+        $phi->addIncoming($i64->constInt(0, false), $nullEnd);
         $phi->addIncoming($longVal, $longEnd);
         $phi->addIncoming($boolInt, $boolEnd);
         $phi->addIncoming($doubleInt, $doubleEnd);
