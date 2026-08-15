@@ -23,7 +23,8 @@ final class strspn extends Internal
         $this->requireArgCountRange($frame, 'strspn', 2, 4);
         $argc = \count($frame->calledArgs);
         $str = VmString::trimFamilyStringArgForFrame($frame, 0, 'strspn', 0, 'string');
-        $mask = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'strspn', 1, 'characters');
+        // $characters soft-null DEP+coerce (peer #29394 / #29393) — not Z_PARAM_STR TypeError on 8.4.
+        $mask = VmString::trimFamilyStringArgForFrame($frame, 1, 'strspn', 1, 'characters');
         $offset = 0;
         if ($argc >= 3) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strspn', 3, 'offset');
