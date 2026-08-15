@@ -369,6 +369,8 @@
             <file>./test/compliance/MbConvertEncodingNullStrictJITTest.php</file>
             <file>./test/compliance/MbstringNullEncodingLimit31312VMTest.php</file>
             <file>./test/compliance/MbstringNullEncodingLimit31312JITTest.php</file>
+            <file>./test/compliance/IconvNullEncodingDep31309VMTest.php</file>
+            <file>./test/compliance/IconvNullEncodingDep31309JITTest.php</file>
             <file>./test/compliance/MbChrOrdNullStrictVMTest.php</file>
             <file>./test/compliance/MbChrOrdNullStrictJITTest.php</file>
             <file>./test/compliance/MbDetectOrderNullGetterVMTest.php</file>

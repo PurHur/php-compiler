@@ -22,7 +22,8 @@ final class JitIconv
             throw new \LogicException('iconv() requires exactly three arguments');
         }
 
-        // Z_PARAM_STR $string — soft-null DEP+coerce on 8.4 (#21197); encodings stay TypeError (#19387).
+        // Z_PARAM_STR $string — soft-null DEP+coerce (#21197).
+        // Encoding args: TypeError on PROFILE=8.4 / strict_types (#19387); soft-null DEP on default (#31309).
         // Do not map null→'' before the fold guard for encoding args — that incorrectly constant-folds
         // iconv(null, …) under AOT (#19387).
         $fromIsNull = self::encodingArgIsNullConstant($args[0]);
@@ -33,6 +34,15 @@ final class JitIconv
         $fromLit = $fromIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $toLit = $toIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[1]);
         // Soft-null input: fold null→'' outside strict_types (#21197).
+        // Soft-null encodings on default profile: fold null→'' with DEP (#31309).
+        if (!$rejectNullZparam) {
+            if ($fromIsNull) {
+                $fromLit = '';
+            }
+            if ($toIsNull) {
+                $toLit = '';
+            }
+        }
         $inputLit = $inputIsNull
             ? ($context->callerStrictTypes ? null : '')
             : JitStringBuiltinArg::compileTimeLiteral($args[2]);
@@ -45,6 +55,12 @@ final class JitIconv
             && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($fromLit, true))
             && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($toLit, false))
         ) {
+            if ($fromIsNull && !$rejectNullZparam) {
+                JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'iconv', 0, 'from_encoding');
+            }
+            if ($toIsNull && !$rejectNullZparam) {
+                JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'iconv', 1, 'to_encoding');
+            }
             if ($inputIsNull) {
                 JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'iconv', 2, 'string');
             }
@@ -54,14 +70,18 @@ final class JitIconv
 
         IconvRuntimeLink::ensureLinked($context);
 
-        // Encoding args: Z_PARAM_STR TypeError on PROFILE=8.4 (#19387).
+        // Encoding args: Z_PARAM_STR TypeError on PROFILE=8.4 (#19387); soft-null DEP otherwise (#31309).
         // $string: soft-null DEP+coerce (#21197).
         $from = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv', 0, 'from_encoding')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv', 0, 'from_encoding');
+            : ($rejectNullZparam
+                ? JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv', 0, 'from_encoding')
+                : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'iconv', 0, 'from_encoding'));
         $to = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv', 1, 'to_encoding')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'iconv', 1, 'to_encoding');
+            : ($rejectNullZparam
+                ? JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'iconv', 1, 'to_encoding')
+                : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'iconv', 1, 'to_encoding'));
         $input = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv', 2, 'string')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[2], 'iconv', 2, 'string');
