@@ -379,7 +379,8 @@ final class VmMath
         string $function,
         int $argIndex,
         string $paramName,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        string $nullDepExpectedType = 'int'
     ): int {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseIntBuiltinArg($var, $function, $argIndex, $paramName);
@@ -403,7 +404,14 @@ final class VmMath
             return self::floatToZendLong($f);
         }
 
-        return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName, $frame);
+        return self::parseLongBuiltinArgCore(
+            $var,
+            $function,
+            $argIndex,
+            $paramName,
+            $frame,
+            $nullDepExpectedType
+        );
     }
 
     /**
@@ -615,7 +623,8 @@ final class VmMath
         string $function,
         int $argIndex,
         string $paramName,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        string $nullDepExpectedType = 'int'
     ): int {
         switch ($var->type) {
             case Variable::TYPE_INTEGER:
@@ -627,7 +636,14 @@ final class VmMath
                     throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'null'));
                 }
                 // Z_PARAM_LONG: E_DEPRECATED then coerce to 0 (chr/dechex; #19756).
-                VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'int');
+                // Callers with union stubs (e.g. substr_replace $offset array|int) pass the Zend type label (#29396).
+                VmNullNumberParamDeprecation::emit(
+                    $frame,
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    $nullDepExpectedType
+                );
 
                 return 0;
             case Variable::TYPE_STRING:

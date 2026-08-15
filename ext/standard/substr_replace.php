@@ -52,7 +52,15 @@ final class substr_replace extends Internal
                 );
             }
             $replace = self::resolveScalarReplace($replaceVar);
-            $offsetInt = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'substr_replace', 3, 'offset');
+            // php-src string.stub.php: array|int $offset — soft-null DEP type is array|int (#29396).
+            $offsetInt = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[2],
+                'substr_replace',
+                3,
+                'offset',
+                $frame,
+                'array|int'
+            );
             $length = self::resolveScalarLength($lengthVar, $stringVar->toString());
             $frame->returnVar->string(VmString::substr_replace(
                 $stringVar->toString(),
@@ -79,10 +87,6 @@ final class substr_replace extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
         $argc = \count($args);
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
-        }
-
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $lengthVal = $i64->constInt(0, false);
@@ -109,7 +113,20 @@ final class substr_replace extends Internal
                 JITVariable::TYPE_VALUE === $args[0]->type
                 && !JitStrReplaceSubject::isKnownArray($args[0])
             );
-        $offset = $this->jitLong($context, $args[2], 'substr_replace() offset');
+        // php-src string.stub.php: array|int $offset — soft-null DEP type array|int (#29396).
+        if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                throw new \LogicException(
+                    'substr_replace(): Argument #3 ($offset) must be of type array|int, null given'
+                );
+            }
+            JitIntdiv::emitNullIntDeprecation($context, 'substr_replace', 3, 'offset', 'array|int');
+            $offset = $i64->constInt(0, false);
+        } elseif (JITVariable::TYPE_NATIVE_LONG === $args[2]->type) {
+            $offset = $this->jitLong($context, $args[2], 'substr_replace() offset');
+        } else {
+            throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
+        }
         // php-src string.c: scalar $string + array $replace → first element via convert_to_string (#29309).
         $replace = self::jitScalarReplaceArg($context, $args[1]);
         if ($stringIsStringish) {
@@ -299,7 +316,14 @@ final class substr_replace extends Internal
         $replaceIsArray = Variable::TYPE_ARRAY === $replaceVar->type;
         $scalarOffset = $offsetIsArray
             ? null
-            : VmMath::parseIntBuiltinArg($offsetVar, 'substr_replace', 3, 'offset');
+            : VmMath::parseIntBuiltinArg(
+                $offsetVar,
+                'substr_replace',
+                3,
+                'offset',
+                null,
+                'array|int'
+            );
         $scalarLength = null;
         $lengthIsNull = !$hasLength;
         if ($hasLength && !$lengthIsArray) {
