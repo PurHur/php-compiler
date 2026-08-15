@@ -121,6 +121,8 @@
             <file>./test/compliance/InOperatorPhpSrcReject31158JITTest.php</file>
             <file>./test/compliance/TrueFalseParamReturnTypeErrorActual31160VMTest.php</file>
             <file>./test/compliance/TrueFalseParamReturnTypeErrorActual31160JITTest.php</file>
+            <file>./test/compliance/StaticVarFccInit31168VMTest.php</file>
+            <file>./test/compliance/StaticVarFccInit31168JITTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameVMTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameJITTest.php</file>
             <file>./test/compliance/SelfReturnTypeerrorResolvedNameVMTest.php</file>
