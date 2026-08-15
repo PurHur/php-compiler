@@ -265,6 +265,8 @@ final class BuiltinInternalArgInfo
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
             'mb_ucfirst', 'mb_lcfirst' => 'string',
+            // ext/mbstring/mbstring.stub.php — PHP 8.3+; InternalArgInfo omits types (#27618, re-#23805)
+            'mb_str_pad' => 'string',
             // ext/mbstring/mbstring.stub.php — InternalArgInfo return string (missing array| / |false) (#26466)
             'mb_convert_encoding' => 'array|string|false',
             // ext/mbstring/mbstring.stub.php — InternalArgInfo return int (missing |false) (#28583)
@@ -1199,6 +1201,15 @@ final class BuiltinInternalArgInfo
             'mb_ucfirst', 'mb_lcfirst' => match ($index) {
                 0 => 'string',
                 1 => '?string',
+                default => null,
+            },
+            // ext/mbstring/mbstring.stub.php — string, int, string, int, ?string (#27618, re-#23805)
+            'mb_str_pad' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                2 => 'string',
+                3 => 'int',
+                4 => '?string',
                 default => null,
             },
             // ext/mbstring/mbstring.stub.php — array|string $string; array|string|null $from_encoding (#26466)
