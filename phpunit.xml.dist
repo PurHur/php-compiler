@@ -652,6 +652,8 @@
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785JITTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723JITTest.php</file>
+            <file>./test/compliance/HighlightFileExcessArgc30689VMTest.php</file>
+            <file>./test/compliance/HighlightFileExcessArgc30689JITTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647VMTest.php</file>
             <file>./test/compliance/FuncArgsExcessArgc30647JITTest.php</file>
             <file>./test/compliance/DefineExcessArgc30573VMTest.php</file>
