@@ -32,11 +32,14 @@ final class IconvEncodingState
     }
 
     /**
+     * php-src: omitted $type defaults to "all"; empty string (incl. soft-null coerce) is invalid → false (#31311).
+     *
      * @return array{input_encoding: string, output_encoding: string, internal_encoding: string}|string|false
      */
     public static function getEncoding(?string $type): array|string|false
     {
-        if (null === $type || '' === $type) {
+        // null sentinel = omitted arg (iconv_get_encoding() with argc 0), not soft-null "".
+        if (null === $type) {
             return [
                 'input_encoding' => self::$inputEncoding,
                 'output_encoding' => self::$outputEncoding,
