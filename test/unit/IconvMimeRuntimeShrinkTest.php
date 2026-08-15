@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** iconv_mime_decode() JIT routes through IconvMimeJitHelper PHP (#27424). */
+/** iconv_mime_decode/encode JIT routes through IconvMimeJitHelper PHP (#27424, #31310). */
 final class IconvMimeRuntimeShrinkTest extends TestCase
 {
     public function testIconvMimeDecodeCallUsesJitIconvMime(): void
@@ -16,18 +16,29 @@ final class IconvMimeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('not lowered for JIT/AOT', $source);
     }
 
+    public function testIconvMimeEncodeCallUsesJitIconvMime(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/iconv/iconv_mime_encode.php');
+        $this->assertStringContainsString('JitIconvMime::invokeEncode', $source);
+        $this->assertStringNotContainsString('not lowered for JIT/AOT', $source);
+    }
+
     public function testIconvMimeJitHelperDelegatesToVmIconvMime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/iconv/IconvMimeJitHelper.php');
         $this->assertStringContainsString('VmIconvMime::mimeDecode', $source);
         $this->assertStringContainsString('mimeDecodeArgv', $source);
+        $this->assertStringContainsString('VmIconvMime::mimeEncode', $source);
+        $this->assertStringContainsString('mimeEncodeArgv', $source);
     }
 
     public function testStringIconvMimeUsesJitVmHelperLinkEnsureBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringIconvMime.php');
         $this->assertStringContainsString('::mimeDecodeArgv', $source);
+        $this->assertStringContainsString('::mimeEncodeArgv', $source);
         $this->assertStringContainsString('__compiler_iconv_mime_decode', $source);
+        $this->assertStringContainsString('__compiler_iconv_mime_encode', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);

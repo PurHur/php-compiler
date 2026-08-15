@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\iconv;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringIconvMime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -15,7 +16,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for iconv_mime_decode() (#27424; php-src ext/iconv/iconv.c).
+ * LLVM lowering for iconv_mime_decode/encode (#27424, #31310; php-src ext/iconv/iconv.c).
  */
 final class JitIconvMime
 {
@@ -63,6 +64,60 @@ final class JitIconvMime
         return self::materializeStringOrFalse($context, $result);
     }
 
+    public static function invokeEncode(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('iconv_mime_encode() requires between 2 and 3 arguments');
+        }
+
+        // php-src array $options = [] — explicit null → TypeError (#31310).
+        if ($argc >= 3 && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'iconv_mime_encode(): Argument #3 ($options) must be of type array, null given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'iconv_mime_encode_null_options_dead');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
+        $folded = self::tryCompileTimeFoldEncode($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $fieldName = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_mime_encode', 0, 'field_name')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv_mime_encode', 0, 'field_name');
+        $fieldValue = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv_mime_encode', 1, 'field_value')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'iconv_mime_encode', 1, 'field_value');
+
+        $prefsJson = '';
+        if ($argc >= 3) {
+            if (!\is_array($args[2]->compileTimeAssoc)) {
+                throw new \LogicException(
+                    'iconv_mime_encode() array $options require compile-time constant options in this AOT build (#31310)'
+                );
+            }
+            $prefsJson = \json_encode($args[2]->compileTimeAssoc, \JSON_UNESCAPED_UNICODE);
+            if (!\is_string($prefsJson)) {
+                throw new \LogicException('iconv_mime_encode() failed to encode options for JIT/AOT');
+            }
+        }
+
+        StringIconvMime::ensureEncodeLinked($context);
+        $result = $context->builder->call(
+            $context->lookupFunction('__compiler_iconv_mime_encode'),
+            $fieldName,
+            $fieldValue,
+            $context->builder->load($context->constantStringFromString($prefsJson))
+        );
+
+        return self::materializeStringOrFalse($context, $result);
+    }
+
     /**
      * @param JITVariable[] $args
      */
@@ -92,6 +147,38 @@ final class JitIconvMime
         }
 
         $result = VmIconvMime::mimeDecode($encoded, $mode, $charset, null);
+        if (false === $result) {
+            $slot = JitValueBox::alloc($context);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        $strPtr = $context->builder->load($context->constantStringFromString($result));
+
+        return self::materializeStringOrFalse($context, $strPtr);
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    private static function tryCompileTimeFoldEncode(Context $context, array $args): ?Value
+    {
+        $fieldName = JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        $fieldValue = JitStringBuiltinArg::compileTimeLiteral($args[1]);
+        if (null === $fieldName || null === $fieldValue) {
+            return null;
+        }
+        $preferences = null;
+        if (isset($args[2])) {
+            if (!\is_array($args[2]->compileTimeAssoc)) {
+                return null;
+            }
+            $preferences = $args[2]->compileTimeAssoc;
+        }
+
+        $result = VmIconvMime::mimeEncode($fieldName, $fieldValue, $preferences, null);
         if (false === $result) {
             $slot = JitValueBox::alloc($context);
             $i1 = $context->getTypeFromString('int1');

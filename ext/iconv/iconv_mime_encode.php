@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 
 /**
  * iconv_mime_encode() — encode RFC 2047 header fields (php-src ext/iconv/iconv.c; #6364).
+ *
+ * php-src stub: array $options = [] (not nullable) — explicit null → TypeError (#31310).
  */
 final class iconv_mime_encode extends Internal
 {
@@ -50,25 +52,24 @@ final class iconv_mime_encode extends Internal
         $preferences = null;
         if ($argc >= 3) {
             $arg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $arg->type) {
-                if (Variable::TYPE_ARRAY !== $arg->type) {
-                    throw new \TypeError(\sprintf(
-                        'iconv_mime_encode(): Argument #3 ($options) must be of type array, %s given',
-                        self::typeLabel($arg)
-                    ));
+            // php-src Z_PARAM_ARRAY — null is not “omit”; TypeError (#31310).
+            if (Variable::TYPE_ARRAY !== $arg->type) {
+                throw new \TypeError(\sprintf(
+                    'iconv_mime_encode(): Argument #3 ($options) must be of type array, %s given',
+                    self::typeLabel($arg)
+                ));
+            }
+            $preferences = [];
+            foreach ($arg->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                if (Variable::TYPE_STRING !== $keyVar->type) {
+                    continue;
                 }
-                $preferences = [];
-                foreach ($arg->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
-                    if (Variable::TYPE_STRING !== $keyVar->type) {
-                        continue;
-                    }
-                    $key = $keyVar->toString();
-                    $valueVar = $valueVar->resolveIndirect();
-                    if (Variable::TYPE_STRING === $valueVar->type) {
-                        $preferences[$key] = $valueVar->toString();
-                    } elseif (Variable::TYPE_INTEGER === $valueVar->type) {
-                        $preferences[$key] = $valueVar->toInt();
-                    }
+                $key = $keyVar->toString();
+                $valueVar = $valueVar->resolveIndirect();
+                if (Variable::TYPE_STRING === $valueVar->type) {
+                    $preferences[$key] = $valueVar->toString();
+                } elseif (Variable::TYPE_INTEGER === $valueVar->type) {
+                    $preferences[$key] = $valueVar->toInt();
                 }
             }
         }
@@ -85,9 +86,7 @@ final class iconv_mime_encode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'iconv_mime_encode() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitIconvMime::invokeEncode($context, ...$args);
     }
 
     private static function typeLabel(Variable $var): string
