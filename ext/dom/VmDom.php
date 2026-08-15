@@ -9196,7 +9196,9 @@ final class VmDom
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         // Include nsDef xmlns / xmlns:* like saveXML — libxml htmlNodeDump (#30350).
-        $attrPart = self::serializeElementAttributes($entry, false, $htmlEscapeMode);
+        // Living Dom\HTMLDocument HTML serialize omits default XHTML xmlns (lexbor; #31304).
+        $omitDefaultXhtmlNs = self::elementOwnerIsLivingHtmlDocument($entry);
+        $attrPart = self::serializeElementAttributes($entry, false, $htmlEscapeMode, $omitDefaultXhtmlNs);
         $childIds = self::elementSerializationChildIds($entry);
         if ([] === $childIds) {
             if ($emptySelfClosing) {
@@ -9614,13 +9616,15 @@ final class VmDom
      * Emit attributes plus synthetic xmlns from createElementNS / loadXML nsDef (php-src/libxml; #19397).
      *
      * Shared by saveXML and saveHTML — libxml htmlNodeDump also dumps nsDef (#30350).
+     * Living Dom\HTMLDocument HTML dumps omit the default XHTML xmlns (#31304; re-#22773/#26924).
      *
      * @return non-empty-string|''
      */
     private static function serializeElementAttributes(
         ObjectEntry $entry,
         bool $redeclarableNsRoot = false,
-        int $htmlEscapeMode = self::HTML_ESCAPE_UTF8
+        int $htmlEscapeMode = self::HTML_ESCAPE_UTF8,
+        bool $omitDefaultXhtmlNs = false
     ): string {
         $state = DomRegistry::state($entry);
         $parts = [];
@@ -9641,6 +9645,10 @@ final class VmDom
             }
             // Dump roots redeclare even when a non-serialized ancestor already holds the ns (#26025).
             if (!$redeclarableNsRoot && self::parentNamespaceUri($entry, $prefix) === $uri) {
+                continue;
+            }
+            // Dom\HTMLDocument HTML serializer: no default xmlns=XHTML (php-src living; #31304).
+            if ($omitDefaultXhtmlNs && '' === $prefix && VmDomLiving::HTML_NS === $uri) {
                 continue;
             }
             $parts[] = self::escapeName($attrName).'="'.self::escapeHtmlAttrForMode($uri, $htmlEscapeMode).'"';
@@ -13400,6 +13408,12 @@ final class VmDom
         }
 
         return VmDomLiving::CLASS_HTML_DOCUMENT === strtolower($ownerDocument->class->name);
+    }
+
+    /** True when the element's owner document is living Dom\HTMLDocument (#31304). */
+    private static function elementOwnerIsLivingHtmlDocument(ObjectEntry $element): bool
+    {
+        return self::isLivingHtmlDocument(self::ownerDocumentEntry($element));
     }
 
     /**
