@@ -263,6 +263,8 @@
             <file>./test/compliance/DirnameNullLevelsStrictJITTest.php</file>
             <file>./test/compliance/IntvalNullBaseStrictVMTest.php</file>
             <file>./test/compliance/IntvalNullBaseStrictJITTest.php</file>
+            <file>./test/compliance/StrncmpNullLengthStrict31265VMTest.php</file>
+            <file>./test/compliance/StrncmpNullLengthStrict31265JITTest.php</file>
             <file>./test/compliance/TokenGetAllNullStrictVMTest.php</file>
             <file>./test/compliance/TokenGetAllNullStrictJITTest.php</file>
             <file>./test/compliance/FscanfNullFormatStrictVMTest.php</file>
