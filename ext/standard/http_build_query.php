@@ -6,10 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringHttpBuildQuery;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -41,7 +41,7 @@ final class http_build_query extends Internal
         VmHttpBuildQuery::rejectRootEnumIfNeeded($data);
 
         $prefix = self::resolveOptionalStringArg($frame->calledArgs, 1, 'numeric_prefix', '');
-        [$separator, $encoding, $legacyEncoding] = self::resolveSeparatorAndEncoding($frame->calledArgs);
+        [$separator, $encoding, $legacyEncoding] = self::resolveSeparatorAndEncoding($frame);
 
         $exported = VmHttpBuildQuery::export($data, $frame);
         if (!\is_array($exported)) {
@@ -76,26 +76,30 @@ final class http_build_query extends Internal
     /**
      * php-src ext/standard/http.c — legacy 3-arg int encoding_type vs 4-arg separator+encoding.
      *
-     * @param array<int, \PHPCompiler\VM\Variable> $args
+     * $encoding_type is Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31247).
      *
      * @return array{0: string, 1: int, 2: bool}
      */
-    private static function resolveSeparatorAndEncoding(array $args): array
+    private static function resolveSeparatorAndEncoding(Frame $frame): array
     {
+        $args = $frame->calledArgs;
         $separator = '&';
         $encoding = VmHttpBuildQuery::ENCODING_RFC1738;
         $legacyEncoding = false;
 
         if (!\array_key_exists(2, $args)) {
             if (\array_key_exists(3, $args)) {
-                $var4 = $args[3]->resolveIndirect();
-                if (Variable::TYPE_INTEGER !== $var4->type) {
-                    throw new \LogicException(
-                        'http_build_query() argument #4 ($encoding_type) must be an integer in this compiler build'
-                    );
-                }
-
-                return [$separator, $var4->toInt(), $legacyEncoding];
+                return [
+                    $separator,
+                    VmMath::parseZParamLongBuiltinArgForFrame(
+                        $frame,
+                        3,
+                        'http_build_query',
+                        4,
+                        'encoding_type'
+                    ),
+                    $legacyEncoding,
+                ];
             }
 
             return [$separator, $encoding, $legacyEncoding];
@@ -117,13 +121,13 @@ final class http_build_query extends Internal
         }
 
         if (\array_key_exists(3, $args)) {
-            $var4 = $args[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $var4->type) {
-                throw new \LogicException(
-                    'http_build_query() argument #4 ($encoding_type) must be an integer in this compiler build'
-                );
-            }
-            $encoding = $var4->toInt();
+            $encoding = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                3,
+                'http_build_query',
+                4,
+                'encoding_type'
+            );
         }
 
         return [$separator, $encoding, $legacyEncoding];
@@ -139,6 +143,18 @@ final class http_build_query extends Internal
         TypeErrorRaise::ensureLinked($context);
         // Peer preg_quote (#26827): thin AOT needs call-site ensureLinked (#26869).
         StringHttpBuildQuery::ensureLinked($context);
+        // Soft-null outside strict_types; strict → TypeError (#31247).
+        // Early return after compile-time null TypeError — open a dead insert block so the
+        // call site can lower a discarded return without mid-block terminator (AOT verify;
+        // peer metaphone #31230 / setcookie #31229).
+        if (isset($args[3])
+            && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false))) {
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[3], 'http_build_query', 4, 'encoding_type');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'http_build_query_null_encoding_te_cont');
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
         $data = JitHttpBuildQuery::normalizeDataArg($context, $args[0]);
         $prefix = $this->optionalStringArg($context, $args, 1, '');
         [$separator, $encoding] = $this->resolveSeparatorAndEncodingJit($context, $args);
@@ -201,6 +217,13 @@ final class http_build_query extends Internal
             return $arg->value;
         }
 
-        return JitLongArg::lower($context, $arg, 'http_build_query() argument #'.($index + 1));
+        // Z_PARAM_LONG with caller strict_types parity (#31247).
+        return JitIntdiv::lowerIntBuiltinArgForCaller(
+            $context,
+            $arg,
+            'http_build_query',
+            $index + 1,
+            'encoding_type'
+        );
     }
 }
