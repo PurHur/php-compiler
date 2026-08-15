@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * socket_cmsg_space() — CMSG_SPACE for ancillary buffers (php-src sendrecvmsg.c; #6333).
+ * socket_cmsg_space() — CMSG_SPACE for ancillary buffers (php-src sendrecvmsg.c; #6333 / #31345).
  */
 final class socket_cmsg_space extends Internal
 {
@@ -47,6 +47,6 @@ final class socket_cmsg_space extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_cmsg_space() JIT lowering not implemented (#6333)');
+        return JitSocketCmsgSpace::invoke($context, ...$args);
     }
 }
