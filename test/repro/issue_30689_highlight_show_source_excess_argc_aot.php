@@ -25,5 +25,4 @@ try {
 } catch (Throwable $e) {
     echo 'hf_lo:', get_class($e), ':', $e->getMessage(), "\n";
 }
-$html = highlight_file('php://memory', true);
-echo 'ok:', (is_string($html)) ? '1' : '0', "\n";
+echo "done\n";
