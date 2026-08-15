@@ -47,6 +47,6 @@ final class socket_listen extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_listen() JIT lowering not implemented (#6176)');
+        return JitSocketListen::invoke($context, ...$args);
     }
 }

@@ -126,6 +126,80 @@ final class SocketCreateJitHelper
         return self::$readFailed ? 1 : 0;
     }
 
+    /**
+     * socket_bind() — same NestedJIT unit as registerOwnedArgv so pair/create fds resolve (#31241).
+     *
+     * @return int 1 on success, 0 on failure
+     */
+    public static function bindArgv(int $handle, string $addr, int $port): int
+    {
+        $domain = VmSocket::domainForLookupKey($handle);
+        if (null === $domain) {
+            $domain = ('' !== $addr && false === \strpos($addr, '/'))
+                ? VmSockets::AF_INET
+                : VmSockets::AF_UNIX;
+        }
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return 0;
+        }
+        if (VmSockets::AF_UNIX === $domain) {
+            if (\strlen($addr) >= SocketsLibcThinAbi::UNIX_PATH_MAX) {
+                throw new \ValueError(
+                    'socket_bind(): Argument #2 ($address) must be less than '
+                    .SocketsLibcThinAbi::UNIX_PATH_MAX
+                );
+            }
+            $rc = SocketsLibcThinAbi::bindUnix($fd, $addr);
+        } elseif (VmSockets::AF_INET === $domain) {
+            $rc = SocketsLibcThinAbi::bindInet($fd, $addr, $port);
+        } else {
+            throw new \ValueError(
+                'socket_bind(): Argument #1 ($socket) must be one of AF_UNIX, AF_INET, or AF_INET6'
+            );
+        }
+        // NestedJIT FFI may leave bind(2) as float 0.0 — use == not === (#31241).
+        if (0 == $rc) {
+            VmSockets::clearErrorForLookupKey($handle);
+
+            return 1;
+        }
+        $hostErr = SocketsLibcThinAbi::consumeHostLookupError();
+        if (null !== $hostErr) {
+            VmSockets::recordErrorForLookupKey($handle, $hostErr);
+
+            return 0;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        VmSockets::recordErrorForLookupKey($handle, $errno);
+
+        return 0;
+    }
+
+    /**
+     * socket_listen() — same NestedJIT unit as registerOwnedArgv (#31241).
+     *
+     * @return int 1 on success, 0 on failure
+     */
+    public static function listenArgv(int $handle, int $backlog): int
+    {
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return 0;
+        }
+        $rc = SocketsLibcThinAbi::listen($fd, $backlog);
+        // NestedJIT FFI may leave listen(2) as float 0.0 — use == not === (#31241).
+        if (0 == $rc) {
+            VmSockets::clearErrorForLookupKey($handle);
+
+            return 1;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        VmSockets::recordErrorForLookupKey($handle, $errno);
+
+        return 0;
+    }
+
     private static function fdForHandle(int $handle): ?int
     {
         if ($handle > 0 && $handle === self::$pairFdByHandle0 && self::$pairFd0 >= 0) {

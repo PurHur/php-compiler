@@ -50,6 +50,6 @@ final class socket_bind extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_bind() JIT lowering not implemented (#6176)');
+        return JitSocketBind::invoke($context, ...$args);
     }
 }
