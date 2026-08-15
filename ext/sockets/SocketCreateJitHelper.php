@@ -225,6 +225,84 @@ final class SocketCreateJitHelper
     }
 
     /**
+     * socket_send() — send(2)/write(2) with flags (#31294).
+     *
+     * @return int bytes written, or -1 on failure
+     */
+    public static function sendArgv(int $handle, string $data, int $length, int $flags): int
+    {
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return -1;
+        }
+        if ($length < 0) {
+            throw new \ValueError('socket_send(): Argument #3 ($length) must be greater than or equal to 0');
+        }
+        $data = (string) $data;
+        if ($length > \strlen($data)) {
+            $length = \strlen($data);
+        }
+        $n = SocketsLibcThinAbi::send($fd, $data, $length, $flags);
+        $n = (int) $n;
+        if ($n < 0) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return -1;
+        }
+        VmSockets::clearErrorForLookupKey($handle);
+
+        return $n;
+    }
+
+    /**
+     * socket_recv() — recv(2)/read(2); stash buffer for by-ref LLVM write (#31294).
+     *
+     * @return int bytes (>=0), -1 on error, -2 when length < 1 (false, no data touch)
+     */
+    public static function recvArgv(int $handle, int $length, int $flags): int
+    {
+        self::$lastRecvData = '';
+        self::$lastRecvEof = false;
+        if ($length < 1) {
+            return -2;
+        }
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return -1;
+        }
+        $data = SocketsLibcThinAbi::recv($fd, $length, $flags);
+        // NestedJIT FFI may yield null instead of false under thin AOT (#31294).
+        if (false === $data || null === $data) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return -1;
+        }
+        VmSockets::clearErrorForLookupKey($handle);
+        $data = (string) $data;
+        if ('' === $data) {
+            self::$lastRecvEof = true;
+
+            return 0;
+        }
+        self::$lastRecvData = $data;
+
+        return \strlen($data);
+    }
+
+    public static function recvDataArgv(): string
+    {
+        return self::$lastRecvData;
+    }
+
+    /** 1 when last recv was EOF (null &$data, return 0). */
+    public static function recvEofArgv(): int
+    {
+        return self::$lastRecvEof ? 1 : 0;
+    }
+
+    /**
      * socket_getsockname() — stash AF_INET name; LLVM reads via nameAddr/namePort (#31293).
      *
      * @return int 1 on success, 0 on failure
@@ -403,6 +481,10 @@ final class SocketCreateJitHelper
     }
 
     private static bool $readFailed = false;
+
+    private static string $lastRecvData = '';
+
+    private static bool $lastRecvEof = false;
 
     private static string $lastNameAddr = '';
 

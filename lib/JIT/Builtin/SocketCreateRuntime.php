@@ -44,6 +44,10 @@ final class SocketCreateRuntime
         self::H.'::getpeernameOkArgv',
         self::H.'::nameAddrArgv',
         self::H.'::namePortArgv',
+        self::H.'::sendArgv',
+        self::H.'::recvArgv',
+        self::H.'::recvDataArgv',
+        self::H.'::recvEofArgv',
     ];
 
     /** @var list<string> */

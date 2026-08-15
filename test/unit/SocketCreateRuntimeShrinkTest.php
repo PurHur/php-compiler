@@ -264,6 +264,51 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringSocketGetSockname.php', $spine);
     }
 
+    public function testSocketSendCallUsesJitSocketSend(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_send.php');
+        $this->assertStringContainsString('JitSocketSend::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketRecvCallUsesJitSocketRecv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_recv.php');
+        $this->assertStringContainsString('JitSocketRecv::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketSendRecvJitHelperExposesSendRecvArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCreateJitHelper.php');
+        $this->assertStringContainsString('function sendArgv', $source);
+        $this->assertStringContainsString('function recvArgv', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::send', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::recv', $source);
+    }
+
+    public function testSocketSendRecvRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketSendRecvRuntime.php');
+        $this->assertStringContainsString('::sendArgv', $source);
+        $this->assertStringContainsString('::recvArgv', $source);
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_send', $source);
+        $this->assertStringContainsString('__compiler_socket_recv', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketSendRecvHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketSend.php', $spine);
+        $this->assertStringContainsString('JitSocketRecv.php', $spine);
+        $this->assertStringContainsString('SocketSendRecvRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketSendRecv.php', $spine);
+    }
+
     public function testSpineBundleIncludesSocketSendtoHelpers(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
