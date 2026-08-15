@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
@@ -22,7 +22,8 @@ final class linkinfo extends Internal
     {
         // php-src link.c / basic_functions.stub.php — exactly 1 (#30553).
         $this->requireExactArgCount($frame, 'linkinfo', 1);
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'linkinfo', 0, 'path');
+        // Z_PARAM_PATH: TypeError under caller strict_types; soft-null DEP+coerce otherwise (#31262 / peer readlink #30168).
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'linkinfo', 0, 'path', $frame);
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,7 +48,17 @@ final class linkinfo extends Internal
 
             return JitValueBox::pointer($context, $slot);
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'linkinfo', 0, 'path');
+        // Soft-null outside strict_types; strict → TypeError (#31262).
+        // Early return after compile-time null TypeError — no linkinfo helper after abort
+        // (AOT module verify: terminator mid-block; peer getopt #30358 / dirname #31210).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+            JitFilestatArg::lowerFilename($context, $args[0], 'linkinfo', 0, 'path');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'linkinfo_null_path_te_cont');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'linkinfo', 0, 'path');
 
         return JitLinkinfo::invoke($context, $path);
     }
