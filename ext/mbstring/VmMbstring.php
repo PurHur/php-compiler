@@ -3771,7 +3771,10 @@ final class VmMbstring
             return false;
         }
 
-        $parts = preg_split($regex, $string, $limit > 0 ? $limit : -1);
+        // php-src php_mbregex.c: count is zend_ulong; limit 0 skips the split loop (same as 1);
+        // negative limit becomes a huge unsigned count → unlimited (#31312 / #77367).
+        $pregLimit = $limit < 0 ? -1 : ($limit === 0 ? 1 : $limit);
+        $parts = preg_split($regex, $string, $pregLimit);
         if (false === $parts) {
             return false;
         }
