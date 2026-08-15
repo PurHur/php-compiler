@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMCharacterData::replaceData() — VM (#17514, php-src ext/dom/characterdata.c). */
+/**
+ * DOMCharacterData::replaceData() — VM (#17514, php-src ext/dom/characterdata.c).
+ *
+ * Exact user arity 3 — Zend ArgumentCountError (#31091; re-#31011 / #30616).
+ */
 final class CharacterDataReplaceData extends DomClassMethod
 {
     public function __construct()
@@ -17,12 +21,10 @@ final class CharacterDataReplaceData extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMCharacterData::replaceData', 3);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMCharacterData::replaceData()');
         if (!VmDom::isCharacterData($receiver)) {
             throw new \TypeError('DOMCharacterData::replaceData() must be called on a character data node');
-        }
-        if (\count($frame->calledArgs) < 4) {
-            throw new \LogicException('DOMCharacterData::replaceData() expects at least 3 arguments');
         }
         $offset = $this->intArg($frame->calledArgs[1], 'DOMCharacterData::replaceData()', 0, 'offset');
         $count = $this->intArg($frame->calledArgs[2], 'DOMCharacterData::replaceData()', 1, 'count');

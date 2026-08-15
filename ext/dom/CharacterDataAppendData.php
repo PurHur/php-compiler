@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMCharacterData::appendData() — VM (#17514, php-src ext/dom/characterdata.c). */
+/**
+ * DOMCharacterData::appendData() — VM (#17514, php-src ext/dom/characterdata.c).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31091; re-#31011 / #30616).
+ */
 final class CharacterDataAppendData extends DomClassMethod
 {
     public function __construct()
@@ -16,12 +20,10 @@ final class CharacterDataAppendData extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMCharacterData::appendData', 1);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMCharacterData::appendData()');
         if (!VmDom::isCharacterData($receiver)) {
             throw new \TypeError('DOMCharacterData::appendData() must be called on a character data node');
-        }
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMCharacterData::appendData() expects at least 1 argument');
         }
         $arg = $this->stringArg($frame->calledArgs[1], 'DOMCharacterData::appendData()', 0, $frame, 'data');
         VmDom::characterDataAppendData($receiver, $arg);

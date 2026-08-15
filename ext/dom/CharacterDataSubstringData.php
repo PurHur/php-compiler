@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMCharacterData::substringData() — VM (#6250, php-src ext/dom/characterdata.c). */
+/**
+ * DOMCharacterData::substringData() — VM (#6250, php-src ext/dom/characterdata.c).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31091; re-#31011 / #30616).
+ */
 final class CharacterDataSubstringData extends DomClassMethod
 {
     public function __construct()
@@ -17,12 +21,10 @@ final class CharacterDataSubstringData extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMCharacterData::substringData', 2);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMCharacterData::substringData()');
         if (!VmDom::isCharacterData($receiver)) {
             throw new \TypeError('DOMCharacterData::substringData() must be called on a character data node');
-        }
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMCharacterData::substringData() expects at least 2 arguments');
         }
         $offsetVar = $frame->calledArgs[1]->resolveIndirect();
         $countVar = $frame->calledArgs[2]->resolveIndirect();
