@@ -558,11 +558,14 @@ final class VmPgsqlNative
 
     /**
      * PQescapeByteaConn — hex/escape text for bytea literals (includes leading \\x when applicable).
+     *
+     * Keep the unsigned-char buffer alive across the libpq call — casting a temporary and
+     * returning the pointer lets PHP free the owner before PQescapeBytea* runs (#31184).
      */
     public static function escapeByteaConn(\FFI\CData $conn, string $value): string
     {
         $ffi = self::requireFfi();
-        $from = self::bytesToUnsignedChar($ffi, $value);
+        $from = self::ownedUnsignedCharBuffer($ffi, $value);
         $toLen = $ffi->new('size_t');
         $escaped = $ffi->PQescapeByteaConn($conn, $from, \strlen($value), \FFI::addr($toLen));
         if (null === $escaped) {
@@ -580,7 +583,7 @@ final class VmPgsqlNative
     public static function escapeBytea(string $value): string
     {
         $ffi = self::requireFfi();
-        $from = self::bytesToUnsignedChar($ffi, $value);
+        $from = self::ownedUnsignedCharBuffer($ffi, $value);
         $toLen = $ffi->new('size_t');
         $escaped = $ffi->PQescapeBytea($from, \strlen($value), \FFI::addr($toLen));
         if (null === $escaped) {
@@ -597,7 +600,7 @@ final class VmPgsqlNative
     public static function unescapeBytea(string $value): string
     {
         $ffi = self::requireFfi();
-        $from = self::bytesToUnsignedChar($ffi, $value);
+        $from = self::ownedUnsignedCharBuffer($ffi, $value);
         $toLen = $ffi->new('size_t');
         $raw = $ffi->PQunescapeBytea($from, \FFI::addr($toLen));
         if (null === $raw) {
@@ -609,20 +612,22 @@ final class VmPgsqlNative
         return $out;
     }
 
-    /** @return \FFI\CData unsigned char* */
-    private static function bytesToUnsignedChar(\FFI $ffi, string $value): \FFI\CData
+    /**
+     * Owned unsigned-char buffer for libpq bytea APIs (must stay live for the call duration).
+     *
+     * @return \FFI\CData unsigned char[]
+     */
+    private static function ownedUnsignedCharBuffer(\FFI $ffi, string $value): \FFI\CData
     {
         $len = \strlen($value);
+        $buf = $ffi->new('unsigned char['.\max(1, $len).']');
         if (0 === $len) {
-            $buf = $ffi->new('unsigned char[1]');
             $buf[0] = 0;
-
-            return $ffi->cast('unsigned char*', $buf);
+        } else {
+            \FFI::memcpy($buf, $value, $len);
         }
-        $buf = $ffi->new('unsigned char['.$len.']');
-        \FFI::memcpy($buf, $value, $len);
 
-        return $ffi->cast('unsigned char*', $buf);
+        return $buf;
     }
 
     /**
