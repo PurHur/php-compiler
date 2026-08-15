@@ -278,8 +278,8 @@ final class BuiltinInternalArgInfo
             // ext/session/session.stub.php — InternalArgInfo empty / absent return; Zend bool / void (#28464)
             'session_write_close', 'session_commit', 'session_abort', 'session_reset', 'session_unset' => 'bool',
             'session_register_shutdown' => 'void',
-            // ext/iconv/iconv.stub.php — InternalArgInfo return int (missing |false) (#27629)
-            'iconv_strlen' => 'int|false',
+            // ext/iconv/iconv.stub.php — InternalArgInfo return int (missing |false) (#27629, #28586)
+            'iconv_strlen', 'iconv_strpos', 'iconv_strrpos' => 'int|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
             // ext/openssl/openssl.stub.php — InternalArgInfo return int (missing |false) (#28754)
@@ -845,8 +845,10 @@ final class BuiltinInternalArgInfo
             },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
-            // ext/iconv/iconv.stub.php — ?string $encoding = null (InternalArgInfo string) (#27629)
+            // ext/iconv/iconv.stub.php — ?string $encoding = null (InternalArgInfo string) (#27629, #28586)
             'iconv_strlen' => 1 === $index ? '?string' : null,
+            'iconv_strpos' => 3 === $index ? '?string' : null,
+            'iconv_strrpos' => 2 === $index ? '?string' : null,
             // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25587)
             'resourcebundle_create' => ($index === 0 || $index === 1) ? '?string' : null,
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
