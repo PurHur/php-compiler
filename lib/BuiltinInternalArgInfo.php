@@ -185,6 +185,8 @@ final class BuiltinInternalArgInfo
             'inet_pton', 'inet_ntop' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28000)
             'gethostname' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28334)
+            'nl_langinfo' => 'string|false',
             // ext/standard/link.stub.php — InternalArgInfo return int; Zend bool (#26323)
             'symlink' => 'bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#26058)
