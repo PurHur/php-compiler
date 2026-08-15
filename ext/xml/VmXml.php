@@ -477,9 +477,19 @@ final class VmXml
      *
      * Reports every record from {@see validationErrorRecords} (e.g. tag mismatch 76 + premature
      * end 77) so SimpleXML matches DOM / libxml2 under libxml_use_internal_errors (#28658 / #25064).
+     *
+     * When $callerLabel is set (e.g. simplexml_load_string), emit php_libxml_error_handler's
+     * three-line warning surface instead of a bare message (#31183).
+     *
+     * @param null|string $sourceFile When set, locus is "file:line" (simplexml_load_file); else Entity form
      */
-    public static function validateAndReport(Context $ctx, string $data, ?Frame $frame = null): bool
-    {
+    public static function validateAndReport(
+        Context $ctx,
+        string $data,
+        ?Frame $frame = null,
+        ?string $callerLabel = null,
+        ?string $sourceFile = null
+    ): bool {
         $records = self::validationErrorRecords($data);
         if ([] === $records) {
             $element = self::stripDocumentMiscEnvelope(trim($data));
@@ -495,7 +505,21 @@ final class VmXml
         }
 
         foreach ($records as $error) {
-            \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+            if (null !== $callerLabel) {
+                $location = null !== $sourceFile
+                    ? $sourceFile.':'.$error['line']
+                    : null;
+                \PHPCompiler\ext\libxml\VmLibxml::handleParserError(
+                    $ctx,
+                    $error,
+                    $data,
+                    $callerLabel,
+                    $frame,
+                    $location
+                );
+            } else {
+                \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+            }
         }
 
         return false;

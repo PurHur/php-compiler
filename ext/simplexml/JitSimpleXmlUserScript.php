@@ -85,20 +85,29 @@ final class JitSimpleXmlUserScript
             }
         }
         $prevInternal = null;
+        $hostErrors = [];
         if (\function_exists('libxml_use_internal_errors')) {
             $prevInternal = \libxml_use_internal_errors(true);
             \libxml_clear_errors();
         }
         try {
             $tree = \simplexml_load_string($lit);
+            if (\function_exists('libxml_get_errors')) {
+                $hostErrors = \libxml_get_errors();
+            }
         } catch (\Throwable) {
             $tree = false;
+            if (\function_exists('libxml_get_errors')) {
+                $hostErrors = \libxml_get_errors();
+            }
         } finally {
             if (null !== $prevInternal && \function_exists('libxml_use_internal_errors')) {
                 \libxml_use_internal_errors($prevInternal);
             }
         }
         if (false === $tree || !($tree instanceof \SimpleXMLElement)) {
+            // php-src php_libxml_error_handler surface — not a silent false fold (#31183).
+            self::emitLoadStringParserWarnings($context, $lit, $hostErrors);
             $slot = JitValueBox::alloc($context);
             JitValueBox::writeBool(
                 $context,
@@ -1027,6 +1036,39 @@ final class JitSimpleXmlUserScript
         }
 
         return null;
+    }
+
+    /**
+     * Bake php_libxml_error_handler's three-line warning surface into user-script AOT (#31183).
+     *
+     * @param list<\LibXMLError> $hostErrors
+     */
+    private static function emitLoadStringParserWarnings(Context $context, string $source, array $hostErrors): void
+    {
+        $snippet = trim($source);
+        $prefix = 'simplexml_load_string(): ';
+        if ([] === $hostErrors) {
+            JitBuiltinWarning::emit(
+                $context,
+                $prefix.'Entity: line 1: parser error : StartTag: invalid element name'
+            );
+            JitBuiltinWarning::emit($context, $prefix.$snippet);
+            JitBuiltinWarning::emit($context, $prefix.str_repeat(' ', max(0, \strlen($snippet) > 0 ? 1 : 0)).'^');
+
+            return;
+        }
+
+        foreach ($hostErrors as $err) {
+            $line = (int) $err->line;
+            $message = rtrim((string) $err->message);
+            $column = max(0, (int) $err->column - 1);
+            JitBuiltinWarning::emit(
+                $context,
+                $prefix.'Entity: line '.$line.': parser error : '.$message
+            );
+            JitBuiltinWarning::emit($context, $prefix.$snippet);
+            JitBuiltinWarning::emit($context, $prefix.str_repeat(' ', $column).'^');
+        }
     }
 
     private static function nullValue(Context $context): Value

@@ -200,8 +200,9 @@ final class pg_escape_string extends Internal
             return;
         }
         if (1 === $argc) {
+            // php-src FETCH_DEFAULT_LINK — E_DEPRECATED then PQescapeString{,Conn} (#31184).
             $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_escape_string', 0, 'data');
-            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
+            $connObj = VmPgsqlConnection::fetchDefaultLinkDeprecated($frame, 'pg_escape_string');
             if (null === $connObj) {
                 $frame->returnVar->string(VmPgsqlNative::escapeString($data));
 
@@ -234,13 +235,24 @@ final class pg_escape_literal extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (2 !== $argc) {
+        if ($argc < 1 || $argc > 2) {
             throw new \ArgumentCountError(\sprintf(
-                'pg_escape_literal() expects exactly 2 arguments, %d given',
+                'pg_escape_literal() expects 1 or 2 arguments, %d given',
                 $argc
             ));
         }
         if (null === $frame->returnVar) {
+            return;
+        }
+        if (1 === $argc) {
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31184).
+            $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_escape_literal', 0, 'data');
+            $connObj = VmPgsqlConnection::fetchDefaultLinkDeprecated($frame, 'pg_escape_literal');
+            if (null === $connObj) {
+                throw new \Error('No PostgreSQL connection opened yet');
+            }
+            $frame->returnVar->string(VmPgsqlNative::escapeLiteral(VmPgsqlConnection::native($connObj), $data));
+
             return;
         }
         $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_escape_literal', 1);
@@ -264,13 +276,24 @@ final class pg_escape_identifier extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (2 !== $argc) {
+        if ($argc < 1 || $argc > 2) {
             throw new \ArgumentCountError(\sprintf(
-                'pg_escape_identifier() expects exactly 2 arguments, %d given',
+                'pg_escape_identifier() expects 1 or 2 arguments, %d given',
                 $argc
             ));
         }
         if (null === $frame->returnVar) {
+            return;
+        }
+        if (1 === $argc) {
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31184).
+            $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_escape_identifier', 0, 'data');
+            $connObj = VmPgsqlConnection::fetchDefaultLinkDeprecated($frame, 'pg_escape_identifier');
+            if (null === $connObj) {
+                throw new \Error('No PostgreSQL connection opened yet');
+            }
+            $frame->returnVar->string(VmPgsqlNative::escapeIdentifier(VmPgsqlConnection::native($connObj), $data));
+
             return;
         }
         $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_escape_identifier', 1);
@@ -304,8 +327,9 @@ final class pg_escape_bytea extends Internal
             return;
         }
         if (1 === $argc) {
+            // php-src FETCH_DEFAULT_LINK — E_DEPRECATED then PQescapeBytea{,Conn} (#31184).
             $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_escape_bytea', 0, 'data');
-            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
+            $connObj = VmPgsqlConnection::fetchDefaultLinkDeprecated($frame, 'pg_escape_bytea');
             if (null === $connObj) {
                 $frame->returnVar->string(VmPgsqlNative::escapeBytea($data));
 

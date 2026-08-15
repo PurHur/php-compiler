@@ -1531,6 +1531,7 @@ require_once __DIR__.'/../../../ext/pgsql/PgsqlExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/pgsql/PgsqlSerializeDeny.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlArg.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlConnection.php';
+require_once __DIR__.'/../../../ext/pgsql/VmPgsqlDefaultLinkDeprecation.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlCore.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlNative.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlResult.php';

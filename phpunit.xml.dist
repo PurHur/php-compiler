@@ -111,6 +111,8 @@
             <file>./test/compliance/AnonymousClassImplementsNameJITTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
+            <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>
+            <file>./test/compliance/FilterVarNullOptions31209JITTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153JITTest.php</file>
             <file>./test/compliance/TryCatchElsePhpSrcStrict31159VMTest.php</file>
@@ -425,6 +427,8 @@
             <file>./test/compliance/SimpleXmlExcessArgc30828JITTest.php</file>
             <file>./test/compliance/SxeAsxmlMixedContent31049VMTest.php</file>
             <file>./test/compliance/SxeAsxmlMixedContent31049JITTest.php</file>
+            <file>./test/compliance/SimplexmlLoadStringParserWarn31183VMTest.php</file>
+            <file>./test/compliance/SimplexmlLoadStringParserWarn31183JITTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648VMTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648JITTest.php</file>
             <file>./test/compliance/ReflectionEnumExcessArgc30865VMTest.php</file>

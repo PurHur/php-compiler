@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\pgsql;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
@@ -197,6 +198,19 @@ final class VmPgsqlConnection
         }
 
         return $row['object'];
+    }
+
+    /**
+     * 1-arg form: emit E_DEPRECATED then return default link (may be null).
+     *
+     * php-src FETCH_DEFAULT_LINK() always documents the deprecation when the connection
+     * argument is omitted (#31184 / ext/pgsql/pgsql.c).
+     */
+    public static function fetchDefaultLinkDeprecated(?Frame $frame, string $functionName): ?ObjectEntry
+    {
+        VmPgsqlDefaultLinkDeprecation::emit($frame, $functionName);
+
+        return self::resolveOptionalConnection(null);
     }
 
     /**
