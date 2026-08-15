@@ -124,6 +124,8 @@
             <file>./test/compliance/MysqliExecuteQueryReflectionVMTest.php</file>
             <file>./test/compliance/ScandirNullSortingOrder31244VMTest.php</file>
             <file>./test/compliance/ScandirNullSortingOrder31244JITTest.php</file>
+            <file>./test/compliance/StreamSetTimeoutNullSeconds31263VMTest.php</file>
+            <file>./test/compliance/StreamSetTimeoutNullSeconds31263JITTest.php</file>
             <file>./test/compliance/ObStartNullChunkSize31228VMTest.php</file>
             <file>./test/compliance/ObStartNullChunkSize31228JITTest.php</file>
             <file>./test/compliance/VfscanfPhantom26758VMTest.php</file>
