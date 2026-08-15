@@ -54,6 +54,12 @@ final class JitXsltUserScript
 
     public static function tryHasExsltSupport(Context $context, JITVariable ...$args): ?Value
     {
+        // Exact user arity 0 — Zend ArgumentCountError (#30993; php-src ext/xsl/xsl.stub.php).
+        if (\count($args) > 1) {
+            throw new \ArgumentCountError(
+                'XSLTProcessor::hasExsltSupport() expects exactly 0 arguments, '.(\count($args) - 1).' given'
+            );
+        }
         $proc = self::requireProcessor($args[0] ?? null);
         if (null === $proc) {
             return null;
