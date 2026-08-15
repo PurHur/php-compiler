@@ -290,6 +290,13 @@ final class BuiltinInternalDefaultValues
         'pcntl_async_signals' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/mysqli/mysqli.stub.php — ?array $params = null (#27712)
+        'mysqli_execute_query' => [
+            2 => ['kind' => 'null'],
+        ],
+        'mysqli::execute_query' => [
+            1 => ['kind' => 'null'],
+        ],
         'preg_filter' => [
             3 => ['kind' => 'int', 'value' => -1],
             4 => ['kind' => 'null'],

@@ -356,6 +356,8 @@ final class BuiltinInternalArgInfo
             'stream_isatty' => 'bool',
             // ext/pcntl/pcntl.stub.php — absent from InternalArgInfo; Zend : bool (#28843)
             'pcntl_async_signals' => 'bool',
+            // ext/mysqli/mysqli.stub.php — absent from InternalArgInfo; Zend : mysqli_result|bool (#27712)
+            'mysqli_execute_query' => 'mysqli_result|bool',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; Zend : string (#26375)
             'get_debug_type' => 'string',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend string|false (#27902)
@@ -1151,6 +1153,13 @@ final class BuiltinInternalArgInfo
             'pcntl_signal' => 1 === $index ? '' : null,
             // ext/pcntl/pcntl.stub.php — ?bool $enable = null (absent from InternalArgInfo) (#28843)
             'pcntl_async_signals' => 0 === $index ? '?bool' : null,
+            // ext/mysqli/mysqli.stub.php — mysqli $mysql, string $query, ?array $params = null (#27712)
+            'mysqli_execute_query' => match ($index) {
+                0 => 'mysqli',
+                1 => 'string',
+                2 => '?array',
+                default => null,
+            },
             // ext/standard/streamsfuncs.stub.php — ?int $crypto_method = null (#27684)
             'stream_socket_enable_crypto' => 2 === $index ? '?int' : null,
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)
@@ -1371,6 +1380,12 @@ final class BuiltinInternalArgInfo
             // ext/intl/spoofchecker/spoofchecker.stub.php — string $string / $string1/$string2 (#25055)
             'spoofchecker::issuspicious' => 0 === $index ? 'string' : null,
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
+            // ext/mysqli/mysqli.stub.php — string $query, ?array $params = null (#27712)
+            'mysqli::execute_query' => match ($index) {
+                0 => 'string',
+                1 => '?array',
+                default => null,
+            },
             // ext/intl/calendar/calendar.stub.php — ?string $locale = null; $timezone untyped (#28482)
             'intlcalendar::createinstance' => 1 === $index ? '?string' : null,
             // ext/spl/spl_directory.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)

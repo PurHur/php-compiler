@@ -51,6 +51,8 @@ final class BuiltinParamNames
             'pdo::query' => ['query', 'fetchMode=', '...fetchModeArgs'],
             // php-src ext/pdo/pdo_dbh.stub.php — PHP 8.4+; missing from InternalArgInfo (#26223)
             'pdo::connect' => ['dsn', 'username=', 'password=', 'options='],
+            // php-src ext/mysqli/mysqli.stub.php — absent from InternalArgInfo (#27712)
+            'mysqli::execute_query' => ['query', 'params='],
             'datetimezone::__construct' => ['timezone'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still snake_case + phantom object (#23666)
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
@@ -812,6 +814,9 @@ final class BuiltinParamNames
                 return ['mysql', 'query'];
             case 'mysqli_real_escape_string':
                 return ['mysql', 'string'];
+            // php-src ext/mysqli/mysqli.stub.php — absent from InternalArgInfo (#27712)
+            case 'mysqli_execute_query':
+                return ['mysql', 'query', 'params='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still pathname/proj (#26117)
             case 'ftok':
                 return ['filename', 'project_id'];

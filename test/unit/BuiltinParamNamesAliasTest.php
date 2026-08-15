@@ -4917,6 +4917,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+    /** @covers issue #27712 — php-src ext/mysqli/mysqli.stub.php */
+    public function testMysqliExecuteQueryNamedParamsAndDefaults(): void
+    {
+        $names = BuiltinParamNames::forFunction('mysqli_execute_query');
+        self::assertSame(['mysql', 'query', 'params='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'mysql', 'mysqli_execute_query'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'query', 'mysqli_execute_query'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'params', 'mysqli_execute_query'));
+        $methodNames = BuiltinParamNames::forClassMethod('mysqli::execute_query');
+        self::assertSame(['query', 'params='], $methodNames);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($methodNames, 'query', 'mysqli::execute_query'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($methodNames, 'params', 'mysqli::execute_query'));
+        $params = BuiltinInternalArgInfo::paramInfoForFunction('mysqli_execute_query', 2);
+        self::assertNotNull($params);
+        self::assertSame('params', $params['name']);
+        self::assertSame('?array', $params['type']);
+        self::assertTrue($params['isOptional']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('mysqli_execute_query', 2, $params, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'mysqli_execute_query', 2, $params));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
     /** @covers issue #27849 — php-src ext/pcntl/pcntl.stub.php */
     public function testPcntlWaitpidNamedParamsResolve(): void
     {
