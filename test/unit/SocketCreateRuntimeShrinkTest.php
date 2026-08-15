@@ -524,6 +524,48 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringSocketCmsgSpace.php', $spine);
     }
 
+    public function testSocketSelectCallUsesJitSocketSelect(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_select.php');
+        $this->assertStringContainsString('JitSocketSelect::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketSelectJitHelperUsesPollAndArrayRewrite(): void
+    {
+        // Select slots live in SocketCreateJitHelper (same NestedJIT TU as fd maps).
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCreateJitHelper.php');
+        $this->assertStringContainsString('selectRunArgv', $source);
+        $this->assertStringContainsString('selectAddArgv', $source);
+        $this->assertStringContainsString('selectMarkReadyArgv', $source);
+        $this->assertStringContainsString('private static int $e0fd', $source);
+        $this->assertStringNotContainsString('SocketSelectJitHelper::', $source);
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketSelectRuntime.php');
+        $this->assertStringContainsString("lookupFunction('poll')", $runtime);
+        $this->assertStringContainsString('ensureLibcPoll', $runtime);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/sockets/JitSocketSelect.php');
+        $this->assertStringContainsString('__hashtable__setObjectAt', $jit);
+    }
+
+    public function testSocketSelectRuntimeUsesJitVmHelperLinkEnsureBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketSelectRuntime.php');
+        $this->assertStringContainsString('::selectRunArgv', $source);
+        $this->assertStringContainsString('__compiler_socket_select_run', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketSelectHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketSelect.php', $spine);
+        $this->assertStringContainsString('SocketSelectRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketSelect.php', $spine);
+        $this->assertStringNotContainsString('SocketSelectJitHelper.php', $spine);
+    }
+
     public function testSocketSendmsgCallUsesJitSocketSendmsg(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_sendmsg.php');
