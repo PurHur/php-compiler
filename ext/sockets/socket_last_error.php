@@ -45,6 +45,6 @@ final class socket_last_error extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_last_error() JIT lowering not implemented (#6227)');
+        return JitSocketLastError::invoke($context, ...$args);
     }
 }

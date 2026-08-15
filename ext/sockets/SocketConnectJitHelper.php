@@ -67,13 +67,13 @@ final class SocketConnectJitHelper
             );
         }
         if (0 === $rc) {
-            VmSockets::clearErrorForLookupKey($handle);
+            VmSocket::clearErrorForLookupKey($handle);
 
             return 1;
         }
         $hostErr = SocketsLibcThinAbi::consumeHostLookupError();
         if (null !== $hostErr) {
-            VmSockets::recordErrorForLookupKey($handle, $hostErr);
+            VmSocket::recordErrorForLookupKey($handle, $hostErr);
             self::emitConnectWarning(
                 'socket_connect(): Host lookup failed ['.$hostErr.']: '
                 .SocketsLibcThinAbi::strerror($hostErr)
@@ -82,7 +82,7 @@ final class SocketConnectJitHelper
             return 0;
         }
         $errno = SocketsLibcThinAbi::readErrno();
-        VmSockets::recordErrorForLookupKey($handle, $errno);
+        VmSocket::recordErrorForLookupKey($handle, $errno);
         self::emitConnectWarning(
             'socket_connect(): unable to connect ['.$errno.']: '
             .SocketsLibcThinAbi::strerror($errno)

@@ -42,6 +42,6 @@ final class socket_strerror extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_strerror() JIT lowering not implemented (#6227)');
+        return JitSocketStrerror::invoke($context, ...$args);
     }
 }
