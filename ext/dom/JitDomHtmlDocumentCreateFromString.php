@@ -72,7 +72,15 @@ final class JitDomHtmlDocumentCreateFromString
             $optionsLit = (int) $opt;
         }
 
-        if (0 === $optionsLit && null !== $sourceLit && '' !== $sourceLit
+        // Remember CFS source for Dom\HTMLDocument::saveHtml AOT fold (#31324).
+        if (null !== $sourceLit && '' !== $sourceLit) {
+            JitDomHtmlDocumentSaveHtml::rememberCreateFromString($sourceLit, $optionsLit);
+        }
+
+        // LIBXML_NOERROR-only options still match options=0 tree — allow US materialize
+        // so #31304 / compliance fixtures reach the thin path (#31324).
+        if (JitDomHtmlDocumentSaveHtml::optionsAllowUserScriptMaterialize($optionsLit)
+            && null !== $sourceLit && '' !== $sourceLit
             && JitDomDocumentMethodKernel::shouldUse($context)
             && CompilerVersion::supportsDomLivingStandardNamespace()
         ) {

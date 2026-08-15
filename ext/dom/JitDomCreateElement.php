@@ -100,6 +100,8 @@ final class JitDomCreateElement
                 return self::invokeViaHelper($context, ...$args);
             }
             $tag = $htmlUppercase ? strtoupper($nameLit) : $nameLit;
+            // Local name for living saveHtml($node) compile-time fold (#31324).
+            JitDomHtmlDocumentSaveHtml::rememberCreateElementTag($nameLit);
             $obj = self::materializeElementFromLiteral($context, $tag, $elementClass);
             self::initTextContentSlot($context, $obj, $args[2] ?? null, $elementClass);
             self::storeOwnerAndNullParent($context, $obj, $args[0], $elementClass);

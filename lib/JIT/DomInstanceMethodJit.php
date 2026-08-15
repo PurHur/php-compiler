@@ -433,6 +433,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('dom\\htmldocument::savehtml' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomHtmlDocumentSaveHtml();
+
+                return;
+            }
             if ('domdocument::savehtmlfile' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentSaveHTMLFile();
 
@@ -658,7 +663,6 @@ final class DomInstanceMethodJit
                 || 'dom\\xmldocument::queryselector' === $lc
                 || 'dom\\xmldocument::queryselectorall' === $lc
                 || 'dom\\htmldocument::getelementbyid' === $lc
-                || 'dom\\htmldocument::savehtml' === $lc
                 || 'dom\\element::rename' === $lc
                 || 'dom\\htmlelement::rename' === $lc
                 || 'dom\\element::hasattributens' === $lc
