@@ -35,9 +35,11 @@ final class mb_strtolower extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        // php-src ?string $encoding = null — explicit null uses internal encoding (#31312).
+        $internal = MbstringState::internalEncoding();
         $encoding = $argc >= 2
-            ? VmMbstring::coerceMbEncodingNameArg($frame->calledArgs[1], 'mb_strtolower', 1)
-            : MbstringState::internalEncoding();
+            ? VmMbstring::resolveValidatedEncodingArg($frame->calledArgs[1], 'mb_strtolower', 1, $internal)
+            : $internal;
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmMbstring::strtolower($string, $encoding))
@@ -55,17 +57,21 @@ final class mb_strtolower extends Internal
             JITVariable::TYPE_STRING === $args[0]->type
             && null !== ($args[0]->compileTimeString ?? null)
         ) {
-            $encoding = 'UTF-8';
+            $encoding = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
             if ($argc >= 2) {
-                if (
-                    JITVariable::TYPE_STRING !== $args[1]->type
-                    || null === ($args[1]->compileTimeString ?? null)
+                $encNull = JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant;
+                if ($encNull) {
+                    // Same as omitted — internal encoding (#31312).
+                } elseif (
+                    JITVariable::TYPE_STRING === $args[1]->type
+                    && null !== ($args[1]->compileTimeString ?? null)
                 ) {
+                    $encoding = $args[1]->compileTimeString;
+                } else {
                     throw new \LogicException(
                         'mb_strtolower() JIT requires a compile-time encoding literal in this compiler build'
                     );
                 }
-                $encoding = $args[1]->compileTimeString;
             }
             $result = VmMbstring::strtolower($args[0]->compileTimeString, $encoding);
 
