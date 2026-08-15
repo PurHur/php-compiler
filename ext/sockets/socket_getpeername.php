@@ -63,6 +63,6 @@ final class socket_getpeername extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_getpeername() JIT lowering not implemented (#6248)');
+        return JitSocketGetpeername::invoke($context, ...$args);
     }
 }
