@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_pad() ValueError when pad amount exceeds 1048576 (#26658, ext/standard/array.c)
+stdlib array_pad() ValueError when pad exceeds max allowed size (#26658/#29342, ext/standard/array.c)
 --FILE--
 <?php
 foreach (
@@ -19,7 +19,7 @@ foreach (
 }
 ?>
 --EXPECT--
-0: array_pad(): Argument #2 ($length) must be less than or equal to 1048576
-1: array_pad(): Argument #2 ($length) must be less than or equal to 1048576
-2: array_pad(): Argument #2 ($length) must be less than or equal to 1048576
-3: array_pad(): Argument #2 ($length) must be less than or equal to 1048576
+0: array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size
+1: array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size
+2: array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size
+3: array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size

@@ -113,6 +113,7 @@
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209JITTest.php</file>
+            <file>./test/compliance/ArrayPadOversizeValueError29342VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153JITTest.php</file>
             <file>./test/compliance/TryCatchElsePhpSrcStrict31159VMTest.php</file>
