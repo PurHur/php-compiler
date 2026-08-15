@@ -25,7 +25,7 @@ final class ArrayPadBuiltinTest extends TestCase
 
         $this->expectException(\ValueError::class);
         $this->expectExceptionMessage(
-            'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+            'array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size'
         );
         VmArray::rejectOversizedPad(1, 1048578);
     }
@@ -34,9 +34,19 @@ final class ArrayPadBuiltinTest extends TestCase
     {
         $this->expectException(\ValueError::class);
         $this->expectExceptionMessage(
-            'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+            'array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size'
         );
         VmArray::rejectOversizedPad(1, -1048578);
+    }
+
+    /** Issue #29342 — Zend abstract wording for PHP_INT_MAX length (repro). */
+    public function testRejectOversizedPadPhpIntMaxWording(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(
+            'array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size'
+        );
+        VmArray::rejectOversizedPad(1, \PHP_INT_MAX);
     }
 
     public function testPadRightAndLeft(): void

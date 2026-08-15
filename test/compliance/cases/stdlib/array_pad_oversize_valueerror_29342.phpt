@@ -1,9 +1,9 @@
 --TEST--
-stdlib array_pad() ValueError when pad exceeds max allowed size JIT (#26658/#29342, ext/standard/array.c)
+stdlib array_pad() oversize ValueError wording matches Zend (#29342, ext/standard/array.c)
 --FILE--
 <?php
 try {
-    array_pad([1], 1048578, 0);
+    array_pad([1], PHP_INT_MAX, 0);
     echo "ok\n";
 } catch (ValueError $e) {
     echo $e->getMessage(), "\n";
