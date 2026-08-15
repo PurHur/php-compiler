@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * vfscanf() — formatted stream input (php-src ext/standard/scanf.c; issue #6174).
+ * vfscanf() — retired public API (#26758; was #6174).
+ *
+ * php-src only ships sscanf()/fscanf() (shared php_sscanf_internal). Class retained so
+ * Module can re-enable behind CompilerVersion::supportsVfscanf() if ever needed; fscanf()
+ * uses VmVfscanf / JitVfscanf helpers directly.
  */
 final class vfscanf extends Internal
 {

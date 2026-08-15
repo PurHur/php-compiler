@@ -282,7 +282,7 @@ class Module extends ModuleAbstract
             new fprintf_(),
             new vsprintf(),
             new sscanf(),
-            new vfscanf(),
+            ...(CompilerVersion::supportsVfscanf() ? [new vfscanf()] : []),
             new fscanf(),
             new array_values(),
             new array_keys(),

@@ -1374,6 +1374,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/getmygrgid.php',
         ],
         [
+            'names' => ['vfscanf'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsVfscanf'],
+            'since' => '8.0.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/vfscanf.php',
+        ],
+        [
             'names' => ['crc32c'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsCrc32c'],
             'since' => '8.3.0',

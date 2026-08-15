@@ -3832,6 +3832,24 @@ final class CompilerVersion
     }
 
     /**
+     * vfscanf() — absent from php-src (sscanf/fscanf only share php_sscanf_internal;
+     * ext/standard/scanf.c, string.stub.php).
+     *
+     * Never register or advertise on php-src-strict profiles. Public symbol from #6174
+     * retired by #26758 — keep VmVfscanf/JitVfscanf for fscanf() only.
+     */
+    public static function supportsVfscanf(): bool
+    {
+        return false;
+    }
+
+    /** vfscanf() visible to function_exists() — never (php-src absent, #26758). */
+    public static function advertisesVfscanf(): bool
+    {
+        return false;
+    }
+
+    /**
      * disktotalspace() legacy alias of disk_total_space() (ext/standard/filestat.c, #11922, #18017).
      *
      * Removed from php-src 8.2 reference profile — use disk_total_space(). Not registered here.

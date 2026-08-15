@@ -204,6 +204,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'getmygrgid_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsVfscanf()
+                && str_contains($name, 'vfscanf')
+                && !str_contains($name, 'vfscanf_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsCrc32c()
                 && str_contains($name, 'crc32c')
                 && !str_contains($name, 'crc32c_phantom')) {
