@@ -24,9 +24,8 @@ final class strcmp extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('strcmp() requires exactly two arguments');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#30702).
+        $this->requireExactArgCount($frame, 'strcmp', 2);
         $a = self::vmStringArg($frame, 0, 'string1');
         $b = self::vmStringArg($frame, 1, 'string2');
         if (null === $frame->returnVar) {
@@ -40,8 +39,8 @@ final class strcmp extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('strcmp() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'strcmp', 2)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $left = self::jitStringArg($context, $args[0], 0, 'string1');
         $right = self::jitStringArg($context, $args[1], 1, 'string2');
