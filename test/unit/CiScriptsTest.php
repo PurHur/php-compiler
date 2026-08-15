@@ -2265,8 +2265,31 @@ final class CiScriptsTest extends TestCase
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-preflight.sh');
         $this->assertStringContainsString('docker info', $body);
         $this->assertStringContainsString('flock -n 200', $body);
+        $this->assertStringContainsString('flock -w', $body);
+        $this->assertStringContainsString('PHP_COMPILER_CI_LOCK_WAIT_SEC', $body);
         $this->assertStringContainsString('.php-compiler-ci.lock', $body);
         $this->assertStringContainsString('PHP_COMPILER_CI_SINGLE_CONTAINER', $body);
+    }
+
+    public function testPhpunitShDoesNotReenterDockerExecWhenAlreadyInContainer(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/phpunit.sh');
+        $this->assertStringContainsString('/.dockerenv', $body);
+        $this->assertStringContainsString('PHP_COMPILER_IN_DOCKER', $body);
+        $this->assertStringContainsString('docker-exec.sh', $body);
+    }
+
+    public function testApplyPatchesShHasGitExecutableBit(): void
+    {
+        $path = dirname(__DIR__, 2).'/script/apply-patches.sh';
+        $this->assertTrue(is_executable($path), 'apply-patches.sh must be executable (git 100755)');
+    }
+
+    public function testBootstrapSelfhostLinkInvokesApplyPatchesViaBash(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/bootstrap-selfhost-link.sh');
+        $this->assertStringContainsString('bash "${ROOT}/script/apply-patches.sh"', $body);
+        $this->assertStringContainsString('chmod +x "${ROOT}/script/apply-patches.sh"', $body);
     }
 
     public function testSelfhostPreflightScriptDefinesModesAndDockerPath(): void

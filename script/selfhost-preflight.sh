@@ -152,7 +152,7 @@ selfhost_apply_patches_if_needed() {
   if [[ "${SELFHOST_APPLY_PATCHES_DONE:-0}" == "1" ]]; then
     return 0
   fi
-  if [[ ! -x "${root}/script/apply-patches.sh" ]]; then
+  if [[ ! -f "${root}/script/apply-patches.sh" ]]; then
     export SELFHOST_APPLY_PATCHES_DONE=1
     return 0
   fi
@@ -161,7 +161,10 @@ selfhost_apply_patches_if_needed() {
     export SELFHOST_APPLY_PATCHES_DONE=1
     return 0
   fi
+  chmod +x "${root}/script/apply-patches.sh" 2>/dev/null || true
   # Redirect stderr of the *invoking shell* too, so a crashing subprocess doesn't spam bootstrap logs.
-  { "${root}/script/apply-patches.sh" >/dev/null; } 2>/dev/null || true
+  # Invoke via bash: some clones lose the git executable bit (100644) and `./apply-patches.sh` then
+  # fails with Permission denied, aborting bootstrap-selfhost-link.
+  { bash "${root}/script/apply-patches.sh" >/dev/null; } 2>/dev/null || true
   export SELFHOST_APPLY_PATCHES_DONE=1
 }

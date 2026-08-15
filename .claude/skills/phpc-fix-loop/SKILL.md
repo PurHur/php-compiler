@@ -7,7 +7,8 @@ description: The smallest-gate-first edit→verify→PR loop for a php-compiler 
 
 ## Loop shape (fast feedback first)
 
-1. **Repro first**: write/locate a minimal repro under `test/repro/` (or a failing `--filter` PHPUnit case). Run it on the VM: `php bin/vm.php test/repro/<x>.php`. Seconds.
+1. **Repro first**: write/locate a minimal repro under `test/repro/` (or a failing `--filter` PHPUnit case). Run it on the VM via Docker (RunForge forbids host PHP):
+   `./script/docker-exec.sh -- bash -lc 'php bin/vm.php test/repro/<x>.php'`. Seconds.
 2. **Edit** the narrowest layer: prefer PHP lowering (`lib/`) / module registration (`ext/<mod>/`) over C runtime branches.
 3. **Verify inner loop**: re-run the repro + targeted `./script/phpunit.sh --filter <Class>` (or `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit --filter …'`). **Never** bare `php vendor/bin/phpunit` on Runforge — host PHP has unlimited memory and can OOM the machine. Iterate here — never iterate on full gates.
 4. **Resync generated docs** (see table below) or the fast gate will go red for the *next* agent.

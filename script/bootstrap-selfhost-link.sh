@@ -58,7 +58,8 @@ fi
 
 if [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE}" == "zend" && -d "${ROOT}/vendor" ]]; then
   patch_log="$(mktemp)"
-  if ! "${ROOT}/script/apply-patches.sh" >"${patch_log}" 2>&1; then
+  chmod +x "${ROOT}/script/apply-patches.sh" 2>/dev/null || true
+  if ! bash "${ROOT}/script/apply-patches.sh" >"${patch_log}" 2>&1; then
     echo "bootstrap-selfhost-link: apply-patches failed (#2806)" >&2
     cat "${patch_log}" >&2
     rm -f "${patch_log}"

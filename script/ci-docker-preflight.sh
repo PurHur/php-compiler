@@ -43,7 +43,8 @@ ci_docker_acquire_single_ci_lock() {
   # leaving an empty file that can persist and confuse subsequent runs (#2975).
   touch "$lockfile"
   exec 200<>"$lockfile"
-  if flock -n 200; then
+
+  _ci_docker_lock_mark_held() {
     printf '%s %s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$lockfile"
     # Best-effort hygiene: ensure an interrupted wrapper does not leave a confusing lock file behind.
     # The actual lock is held by the file descriptor and is released automatically on process exit.
@@ -55,6 +56,19 @@ ci_docker_acquire_single_ci_lock() {
     if [[ "${PHP_COMPILER_CI_VERBOSE:-0}" = "1" ]]; then
       echo "ci-docker-preflight: acquired CI lock (${lockfile})" >&2
     fi
+  }
+
+  if flock -n 200; then
+    _ci_docker_lock_mark_held
+    return 0
+  fi
+
+  # RunForge agents often fire two docker-exec/phpunit.sh calls in parallel.
+  # Wait instead of failing instantly so the second wrapper serializes.
+  local wait_sec="${PHP_COMPILER_CI_LOCK_WAIT_SEC:-120}"
+  echo "ci-docker-preflight: CI lock busy; waiting up to ${wait_sec}s (${lockfile})" >&2
+  if flock -w "${wait_sec}" 200; then
+    _ci_docker_lock_mark_held
     return 0
   fi
 

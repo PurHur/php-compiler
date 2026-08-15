@@ -29,12 +29,12 @@ Never run raw `docker run -v "$(pwd):/compiler"` — always `./script/docker-exe
 ## Smoke-verify the env
 
 ```bash
-php bin/vm.php examples/000-HelloWorld/example.php                      # host VM: "Hello World"
+./script/docker-exec.sh -- bash -lc 'php bin/vm.php examples/000-HelloWorld/example.php'   # pinned VM: "Hello World"
 ./script/docker-exec.sh -- bash -lc \
   './phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello'   # Docker AOT
 ```
 
-Both green → environment is good. `./phpc doctor` diagnoses further.
+Both green → environment is good. `./phpc doctor` diagnoses further. On RunForge / agent-harness, **never** use bare host `php bin/vm.php` — always `docker-exec.sh`.
 
 ## Fast cold starts (committed caches)
 

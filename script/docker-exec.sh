@@ -12,6 +12,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 IMAGE="${PHP_COMPILER_DEV_IMAGE:-php-compiler:22.04-dev}"
+# Workspace checkouts sometimes lose the git executable bit on apply-patches.sh (100644).
+chmod +x "${REPO_ROOT}/script/apply-patches.sh" 2>/dev/null || true
 
 # shellcheck source=selfhost-preflight.sh
 source "$(dirname "$0")/selfhost-preflight.sh"
