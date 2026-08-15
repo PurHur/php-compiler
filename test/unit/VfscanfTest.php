@@ -4,34 +4,34 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #6174 */
+/** @covers issue #26758 (retired public vfscanf from #6174) */
 final class VfscanfTest extends TestCase
 {
-    public function testVfscanfBuiltinRegisteredOnVm(): void
+    public function testVfscanfNotRegisteredOnVm(): void
     {
+        $this->assertFalse(CompilerVersion::supportsVfscanf());
         $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['vfscanf']));
+        $this->assertTrue(isset($runtime->vmContext->functions['fscanf']));
+        $this->assertTrue(isset($runtime->vmContext->functions['sscanf']));
+
         $code = <<<'PHP'
 <?php
 var_export(function_exists('vfscanf'));
 echo "\n";
-$fp = fopen('php://memory', 'r+');
-fwrite($fp, '7');
-rewind($fp);
-$n = 0;
-var_export(vfscanf($fp, '%d', $n));
-echo "\n";
-var_export($n);
+var_export(function_exists('fscanf'));
 echo "\n";
 PHP;
         ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'vfscanf_vm.php'));
-        $this->assertSame("true\n1\n7\n", ob_get_clean());
+        $runtime->run($runtime->parseAndCompile($code, 'vfscanf_phantom_vm.php'));
+        $this->assertSame("false\ntrue\n", ob_get_clean());
     }
 
-    public function testVfscanfExistsAotLint(): void
+    public function testVfscanfAbsentAotLint(): void
     {
         $root = dirname(__DIR__, 2);
         $bin = realpath($root.'/bin/compile.php');
@@ -53,7 +53,7 @@ PHP;
         $this->assertSame(
             0,
             $exit,
-            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for vfscanf exists probe (#6174)'
+            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for vfscanf phantom probe (#26758)'
         );
     }
 }

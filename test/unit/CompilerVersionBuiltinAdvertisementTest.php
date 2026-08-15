@@ -892,6 +892,33 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testVfscanfNeverAdvertised(): void
+    {
+        // php-src: sscanf / fscanf only (#26758, re-#6174).
+        $this->assertFalse(CompilerVersion::supportsVfscanf());
+        $this->assertFalse(CompilerVersion::advertisesVfscanf());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach ([false, '8.4', '8.5'] as $profile) {
+            if (false === $profile) {
+                putenv('PHP_COMPILER_PROFILE');
+                $label = 'default';
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$profile);
+                $label = $profile;
+            }
+            $this->assertFalse(CompilerVersion::supportsVfscanf(), $label);
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['vfscanf']), $label);
+            $this->assertTrue(isset($runtime->vmContext->functions['fscanf']), $label);
+            $this->assertTrue(isset($runtime->vmContext->functions['sscanf']), $label);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
+    }
+
     public function testDisktotalspaceNotAdvertisedOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsDisktotalspace());

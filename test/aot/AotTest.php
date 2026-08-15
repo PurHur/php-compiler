@@ -227,6 +227,11 @@ class AotTest extends BaseTest
             if (!CompilerVersion::supportsGetmygrgid() && str_contains($name, 'getmygrgid')) {
                 continue;
             }
+            if (!CompilerVersion::supportsVfscanf()
+                && str_contains($name, 'vfscanf')
+                && !str_contains($name, 'vfscanf_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsCrc32c() && str_contains($name, 'crc32c')) {
                 continue;
             }
