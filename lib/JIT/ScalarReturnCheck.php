@@ -325,12 +325,14 @@ final class ScalarReturnCheck
 
     private static function givenLabel(Variable $return): string
     {
-        if (Variable::TYPE_NATIVE_BOOL === $return->type) {
+        if (Variable::TYPE_NATIVE_BOOL === $return->type
+            && \PHPCompiler\CompilerVersion::supportsTrueFalseZvalTypeName()
+        ) {
             $value = $return->value;
             if (method_exists($value, 'isConstant') && $value->isConstant()
                 && method_exists($value, 'getConstantValue')
             ) {
-                // zend_execute.c — true/false returned (#29097).
+                // GH-8385 — true/false returned on PROFILE≥8.4 (#29097 / #31160).
                 return 0 !== (int) $value->getConstantValue() ? 'true' : 'false';
             }
         }

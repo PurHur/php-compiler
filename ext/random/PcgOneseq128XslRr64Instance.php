@@ -39,7 +39,15 @@ final class PcgOneseq128XslRr64Instance
             throw new \ValueError('Random\\Engine\\PcgOneseq128XslRr64::__construct(): Argument #1 ($seed) must be a 16 byte (128 bit) string');
         }
         $parts = \unpack('P2', $bytes);
-        $this->seed128(RandomUint128::constant(0, (int) ($parts[2] ?? 0), 0, (int) ($parts[1] ?? 0)));
+        $hi = (int) ($parts[1] ?? 0);
+        $lo = (int) ($parts[2] ?? 0);
+        // php_random_uint128_constant(t[0], t[1]): first 8 bytes = hi, second 8 = lo (#31054).
+        $this->seed128(RandomUint128::constant(
+            ($hi >> 32) & 0xFFFFFFFF,
+            $hi & 0xFFFFFFFF,
+            ($lo >> 32) & 0xFFFFFFFF,
+            $lo & 0xFFFFFFFF
+        ));
     }
 
     public function seedRandom(): void

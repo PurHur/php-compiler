@@ -1,24 +1,21 @@
 --TEST--
-Language: `new Class()->method()` works on default 8.4.0-dev profile (#30207, re-#24883 / #24755, Zend/zend_language_parser.y)
+Language: `new Class()->method()` parse-error on default 8.4.0-dev profile (phpversion 8.2.31, #31164, re-#24883, Zend/zend_language_parser.y)
 --SKIPIF--
 <?php
-// Explicit PROFILE < 8.4 disables dereferencable new — separate test covers that case.
-$raw = getenv('PHP_COMPILER_PROFILE');
-if (is_string($raw) && '' !== trim($raw)) {
-    $v = trim($raw);
-    if (preg_match('/^\d+\.\d+$/', $v)) {
-        $v .= '.0';
-    }
-    if (version_compare($v, '8.4.0', '<')) {
-        die('skip dereferencable new disabled on pre-8.4 forward profile');
-    }
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+putenv('PHP_COMPILER_PROFILE');
+if (PHPCompiler\CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+    die('skip default profile unexpectedly enables dereferencable new (#31164)');
 }
 ?>
 --FILE--
 <?php
-class Builder {
-    public function build(): string { return 'built'; }
-}
-echo new Builder()->build(), "\n";
---EXPECT--
-built
+class C { function m() { return 2; } }
+echo new C()->m(), "\n";
+echo PHP_VERSION, "\n";
+--EXPECT_EXIT--
+255
+--EXPECTF--
+Parse error: syntax error, unexpected token "->", expecting "," or ";" in %s on line %d

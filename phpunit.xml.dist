@@ -32,6 +32,8 @@
             <file>./test/compliance/VMTest.php</file>
             <file>./test/compliance/DuplicateFunctionRedeclare31109VMTest.php</file>
             <file>./test/compliance/DuplicateFunctionRedeclare31109JITTest.php</file>
+            <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013VMTest.php</file>
+            <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013JITTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedVMTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedJITTest.php</file>
             <file>./test/compliance/DeclareTicksEchoCadenceVMTest.php</file>
@@ -61,6 +63,8 @@
             <file>./test/compliance/ArraySpreadNonTraversableGiven30055VMTest.php</file>
             <file>./test/compliance/RedundantDnfArmVMTest.php</file>
             <file>./test/compliance/PropertyDefaultClassPseudoConstVMTest.php</file>
+            <file>./test/compliance/StaticScopeCompileTimeConstVMTest.php</file>
+            <file>./test/compliance/StaticScopeCompileTimeConstJITTest.php</file>
             <file>./test/compliance/TraitSelfClassStaticComposingVMTest.php</file>
             <file>./test/compliance/MagicConstClassInTraitVMTest.php</file>
             <file>./test/compliance/LspSelfResolveVMTest.php</file>
@@ -105,6 +109,22 @@
             <file>./test/compliance/ClosureDynpropErrorThrowSiteVMTest.php</file>
             <file>./test/compliance/AnonymousClassImplementsNameVMTest.php</file>
             <file>./test/compliance/AnonymousClassImplementsNameJITTest.php</file>
+            <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
+            <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
+            <file>./test/compliance/FinalPromotedCtorParamParse31153VMTest.php</file>
+            <file>./test/compliance/FinalPromotedCtorParamParse31153JITTest.php</file>
+            <file>./test/compliance/TryCatchElsePhpSrcStrict31159VMTest.php</file>
+            <file>./test/compliance/TryCatchElsePhpSrcStrict31159JITTest.php</file>
+            <file>./test/compliance/TypedPropCoalesceUninit31146VMTest.php</file>
+            <file>./test/compliance/TypedPropCoalesceUninit31146JITTest.php</file>
+            <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
+            <file>./test/compliance/VarDumpUninitTypedProperty31147JITTest.php</file>
+            <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
+            <file>./test/compliance/InOperatorPhpSrcReject31158JITTest.php</file>
+            <file>./test/compliance/TrueFalseParamReturnTypeErrorActual31160VMTest.php</file>
+            <file>./test/compliance/TrueFalseParamReturnTypeErrorActual31160JITTest.php</file>
+            <file>./test/compliance/StaticVarFccInit31168VMTest.php</file>
+            <file>./test/compliance/StaticVarFccInit31168JITTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameVMTest.php</file>
             <file>./test/compliance/ParentReturnTypeerrorResolvedNameJITTest.php</file>
             <file>./test/compliance/SelfReturnTypeerrorResolvedNameVMTest.php</file>
@@ -144,6 +164,7 @@
             <file>./test/compliance/FileReflectionReturnVMTest.php</file>
             <file>./test/compliance/TmpfileFopenReflectionVMTest.php</file>
             <file>./test/compliance/IconvStrlenReflectionVMTest.php</file>
+            <file>./test/compliance/IconvStrposStrrposReflectionVMTest.php</file>
             <file>./test/compliance/MbCaseInvalidUtf8SubstVMTest.php</file>
             <file>./test/compliance/StreamCopyToStreamReflectionVMTest.php</file>
             <file>./test/compliance/StreamBucketReflectionStreamBucketVMTest.php</file>
@@ -311,6 +332,8 @@
             <file>./test/compliance/MbSubstituteCharacterNullGetterJITTest.php</file>
             <file>./test/compliance/CollatorCreateNullTypeErrorVMTest.php</file>
             <file>./test/compliance/CollatorCreateNullTypeErrorJITTest.php</file>
+            <file>./test/compliance/IntlCalendarCreateInstanceNamed28482VMTest.php</file>
+            <file>./test/compliance/IntlCalendarCreateInstanceNamed28482JITTest.php</file>
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorVMTest.php</file>
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorJITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
@@ -327,6 +350,8 @@
             <file>./test/compliance/DateTimeZoneGetLocationCoords30953JITTest.php</file>
             <file>./test/compliance/CreateFromFormatClockOverflow30972VMTest.php</file>
             <file>./test/compliance/CreateFromFormatClockOverflow30972JITTest.php</file>
+            <file>./test/compliance/CreateFromFormatBangTrailing31169VMTest.php</file>
+            <file>./test/compliance/CreateFromFormatBangTrailing31169JITTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictVMTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictJITTest.php</file>
             <file>./test/compliance/OpcacheIsScriptCachedInFileCacheVMTest.php</file>
@@ -388,6 +413,8 @@
             <file>./test/compliance/XmlWriterExcessArgc30818JITTest.php</file>
             <file>./test/compliance/SimpleXmlExcessArgc30828VMTest.php</file>
             <file>./test/compliance/SimpleXmlExcessArgc30828JITTest.php</file>
+            <file>./test/compliance/SxeAsxmlMixedContent31049VMTest.php</file>
+            <file>./test/compliance/SxeAsxmlMixedContent31049JITTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648VMTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648JITTest.php</file>
             <file>./test/compliance/ReflectionEnumExcessArgc30865VMTest.php</file>
@@ -421,12 +448,22 @@
             <file>./test/compliance/AttributeMarkerCtorExcessArgc31089VMTest.php</file>
             <file>./test/compliance/WeakMapExcessArgc30909VMTest.php</file>
             <file>./test/compliance/WeakMapExcessArgc30909JITTest.php</file>
+            <file>./test/compliance/WeakMapCountExcessArgc31129VMTest.php</file>
+            <file>./test/compliance/WeakMapCountExcessArgc31129JITTest.php</file>
             <file>./test/compliance/ReflectionClassExcessArgc30888VMTest.php</file>
             <file>./test/compliance/ReflectionClassExcessArgc30888JITTest.php</file>
             <file>./test/compliance/ReflectionClassFilterNullableInt30897VMTest.php</file>
             <file>./test/compliance/ReflectionClassFilterNullableInt30897JITTest.php</file>
             <file>./test/compliance/ReflectionClassGetMethodsExcessArgc31033VMTest.php</file>
             <file>./test/compliance/ReflectionClassGetMethodsExcessArgc31033JITTest.php</file>
+            <file>./test/compliance/ReflectionClassKindExcessArgc31126VMTest.php</file>
+            <file>./test/compliance/ReflectionClassKindExcessArgc31126JITTest.php</file>
+            <file>./test/compliance/ReflectionMethodKindExcessArgc31127VMTest.php</file>
+            <file>./test/compliance/ReflectionMethodKindExcessArgc31127JITTest.php</file>
+            <file>./test/compliance/ReflectionParameterQueryExcessArgc31128VMTest.php</file>
+            <file>./test/compliance/ReflectionParameterQueryExcessArgc31128JITTest.php</file>
+            <file>./test/compliance/ReflectionParameterDefaultSelfParent31149VMTest.php</file>
+            <file>./test/compliance/ReflectionParameterDefaultSelfParent31149JITTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653VMTest.php</file>
             <file>./test/compliance/GcRestoreExcessArgc30653JITTest.php</file>
             <file>./test/compliance/SessionDestroyTmpfileExcessArgc30676VMTest.php</file>
@@ -443,6 +480,8 @@
             <file>./test/compliance/PasswordGetInfoExcessArgc30712JITTest.php</file>
             <file>./test/compliance/StrpbrkStrrchrStrtokExcessArgc30703VMTest.php</file>
             <file>./test/compliance/StrpbrkStrrchrStrtokExcessArgc30703JITTest.php</file>
+            <file>./test/compliance/ClassAliasExcessArgc30783VMTest.php</file>
+            <file>./test/compliance/ClassAliasExcessArgc30783JITTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690VMTest.php</file>
             <file>./test/compliance/UserErrorExcessArgc30690JITTest.php</file>
             <file>./test/compliance/SizeofExcessArgc30686VMTest.php</file>
@@ -475,6 +514,18 @@
             <file>./test/compliance/DateStaticExcessArgc30898JITTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampGetLastErrorsExcessArgc30991VMTest.php</file>
             <file>./test/compliance/DateTimeSetTimestampGetLastErrorsExcessArgc30991JITTest.php</file>
+            <file>./test/compliance/DateTimeDiffDstHours30970VMTest.php</file>
+            <file>./test/compliance/DateTimeDiffDstHours30970JITTest.php</file>
+            <file>./test/compliance/Xoshiro256StarStarGenerate31053VMTest.php</file>
+            <file>./test/compliance/Xoshiro256StarStarGenerate31053JITTest.php</file>
+            <file>./test/compliance/PcgOneseq128XslRr64Generate31054VMTest.php</file>
+            <file>./test/compliance/PcgOneseq128XslRr64Generate31054JITTest.php</file>
+            <file>./test/compliance/RandomizerExcessArgc31092VMTest.php</file>
+            <file>./test/compliance/RandomizerExcessArgc31092JITTest.php</file>
+            <file>./test/compliance/RandomEngineGenerateExcessArgc31096VMTest.php</file>
+            <file>./test/compliance/RandomEngineGenerateExcessArgc31096JITTest.php</file>
+            <file>./test/compliance/RandomEngineJumpExcessArgc31097VMTest.php</file>
+            <file>./test/compliance/RandomEngineJumpExcessArgc31097JITTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994VMTest.php</file>
             <file>./test/compliance/PdoGetAvailableDriversExcessArgc30994JITTest.php</file>
             <file>./test/compliance/DatePeriodAccessorsExcessArgc30934VMTest.php</file>
@@ -536,6 +587,8 @@
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageJITTest.php</file>
+            <file>./test/compliance/MbStrPadPhantomCallVMTest.php</file>
+            <file>./test/compliance/MbStrPadPhantomCallJITTest.php</file>
             <file>./test/compliance/MbSplitEmptyPatternVMTest.php</file>
             <file>./test/compliance/GraphemePosEmptyNeedleVMTest.php</file>
             <file>./test/compliance/MbStrstrFamilyReflectionVMTest.php</file>

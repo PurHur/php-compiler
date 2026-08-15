@@ -29,12 +29,12 @@ final class Xoshiro256StarStarInstance
             throw new \ValueError('Random\\Engine\\Xoshiro256StarStar::__construct(): Argument #1 ($seed) must be a 32 byte (256 bit) string');
         }
         $parts = \unpack('P4', $bytes);
-        $this->state = [
-            RandomU64::fromParts(0, (int) ($parts[1] ?? 0)),
-            RandomU64::fromParts(0, (int) ($parts[2] ?? 0)),
-            RandomU64::fromParts(0, (int) ($parts[3] ?? 0)),
-            RandomU64::fromParts(0, (int) ($parts[4] ?? 0)),
-        ];
+        $this->state = [];
+        for ($i = 1; $i <= 4; ++$i) {
+            $word = (int) ($parts[$i] ?? 0);
+            // unpack('P') is a full uint64 bit-pattern; fromParts(0, $word) truncated to 32 bits (#31053).
+            $this->state[] = RandomU64::fromParts(($word >> 32) & 0xFFFFFFFF, $word & 0xFFFFFFFF);
+        }
     }
 
     public function seedRandom(): void

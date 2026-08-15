@@ -209,14 +209,14 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'in_operator',
-            'construct' => 'PHP 8.3+ `in` operator (`$needle in $haystack`)',
-            'opcodes' => ['TYPE_IN'],
-            'issue' => 4682,
+            'construct' => '`in` operator (`$needle in $haystack`) — not in php-src',
+            'opcodes' => [],
+            'issue' => 31158,
             'notes' => [
-                'Ast\\InOperatorDesugar + InOperatorResolver (#4682); VM InOperator::contains (===)',
-                'JIT TYPE_IN via InArrayRuntime PHP bridge (#4716, #18153); EnumInOperatorJitCompileTest',
+                'php-src has no in operator (Zend/zend_language_parser.y); InOperatorDesugar::reject Parse error (#31158)',
+                'Previously desugared as PHP 8.3 enum contains (#4682) — retracted for php-src-strict',
             ],
-            'probe' => 'enum E: string { case A = "a"; case B = "b"; } echo (E::A in [E::A, E::B]) ? "yes" : "no";',
+            'probe' => 'echo 1 in [1,2] ? "yes" : "no";',
         ],
         [
             'id' => 'match_expr',

@@ -877,7 +877,7 @@ final class DateTimeSupport
     /** php-src zim_DateTime_setMicrosecond — mutable in-place (#7082). */
     public static function setMicrosecond(ObjectEntry $dt, int $microsecond): void
     {
-        self::validateMicrosecond($microsecond);
+        self::validateMicrosecond($microsecond, self::classLabel($dt));
         self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))
             ->int($microsecond);
     }
@@ -983,7 +983,7 @@ final class DateTimeSupport
     /** php-src zim_DateTimeImmutable_setMicrosecond — returns new instance (#7082). */
     public static function withMicrosecond(ObjectEntry $dt, int $microsecond): ObjectEntry
     {
-        self::validateMicrosecond($microsecond);
+        self::validateMicrosecond($microsecond, self::classLabel($dt));
         $clone = self::cloneDateTimeObject($dt);
         self::requireIntProperty($clone, self::MICROSECOND_PROPERTY, self::classLabel($clone))
             ->int($microsecond);
@@ -1131,12 +1131,22 @@ final class DateTimeSupport
         return $clone;
     }
 
-    private static function validateMicrosecond(int $microsecond): void
+    /**
+     * php-src ext/date/php_date.c — PHP_METHOD(DateTime, setMicrosecond) /
+     * PHP_METHOD(DateTimeImmutable, setMicrosecond) (#31118).
+     *
+     * zend_argument_error(date_ce_date_range_error, 1, "must be between 0 and 999999, " ZEND_LONG_FMT " given", us)
+     */
+    public static function setMicrosecondRangeErrorMessage(string $className, int $microsecond): string
+    {
+        return $className.'::setMicrosecond(): Argument #1 ($microsecond) must be between 0 and 999999, '
+            .$microsecond.' given';
+    }
+
+    private static function validateMicrosecond(int $microsecond, string $className): void
     {
         if ($microsecond < 0 || $microsecond > 999_999) {
-            throw new \ValueError(
-                'DateTime::setMicrosecond(): Argument #1 ($microsecond) must be between 0 and 999999'
-            );
+            self::throwDateRangeError(self::setMicrosecondRangeErrorMessage($className, $microsecond));
         }
     }
 

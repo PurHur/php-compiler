@@ -619,6 +619,63 @@ PHP;
         }
     }
 
+    /**
+     * Issue #31168: FCC in function-static init is not a const expr on PROFILE≤8.2.
+     * On 8.3+ arbitrary static initializers, FCC is legal (php-src zend_compile_static_var).
+     */
+    public function testVmFunctionStaticFirstClassCallableCompileErrorOn82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $code = <<<'PHP'
+<?php
+function f() {
+    static $x = strlen(...);
+    echo "ok\n";
+}
+PHP;
+            $rt = new Runtime();
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Constant expression contains invalid operations');
+            $rt->parseAndCompile($code, 'fcc_static_82.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** PROFILE=8.3: function-static FCC evaluates once like Zend (#31168). */
+    public function testVmFunctionStaticFirstClassCallableOn83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $code = <<<'PHP'
+<?php
+function f() {
+    static $x = strlen(...);
+    return $x('ab');
+}
+echo f(), ",", f();
+PHP;
+            $rt = new Runtime();
+            $block = $rt->parseAndCompile($code, 'fcc_static_83.php');
+            ob_start();
+            $rt->run($block);
+            $this->assertSame('2,2', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** Issue #10472: inline parenthesized builtin FCC invoke `(strlen(...))($arg)`. */
     public function testVmInlineBuiltinFirstClassCallableInvoke(): void
     {

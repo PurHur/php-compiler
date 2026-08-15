@@ -18,6 +18,8 @@ final class ReflectionParameterIsDefaultValueAvailable extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionParameter_isDefaultValueAvailable — ZEND_PARSE_PARAMETERS (0 args) (#31128)
+        $this->requireExactUserArgCount($frame, 'ReflectionParameter::isDefaultValueAvailable', 0);
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {

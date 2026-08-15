@@ -19,6 +19,8 @@ final class ReflectionMethodIsStatic extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionFunctionAbstract_isStatic — ZEND_PARSE_PARAMETERS (0 args) (#31127)
+        $this->requireExactUserArgCount($frame, 'ReflectionFunctionAbstract::isStatic', 0);
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $flags = ReflectionSupport::reflectedMethodCfgFlags($ctx, $receiver);

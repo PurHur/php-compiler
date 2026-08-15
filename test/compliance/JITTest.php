@@ -254,11 +254,13 @@ class JITTest extends BaseTest {
             }
             // hebrevc removed in php-src 8.0 (#20354): functional cases use PROFILE=7.4 via --ENV--;
             // phantom_* cases assert absence on 8.2/8.4 — always include (do not gate on supportsHebrevc()).
-            // Functional mb_str_pad_*_forward* cases set PROFILE via --ENV--; always include (#22373).
+            // Functional mb_str_pad_*_forward* / empty_pad / named_args cases set PROFILE via --ENV--; always include (#22373, #31174).
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
                 && !str_contains($name, 'mb_str_pad_phantom')
-                && !str_contains($name, 'forward')) {
+                && !str_contains($name, 'forward')
+                && !str_contains($name, 'empty_pad')
+                && !str_contains($name, 'named_args_mb_str_pad')) {
                 continue;
             }
             if (CompilerVersion::supportsMbStrPad()
@@ -1420,11 +1422,8 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'clone_with_paren')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when try/catch/else enabled (#15817, #19128).
-            if (CompilerVersion::supportsTryCatchElse()
-                && str_contains($name, 'try_catch_else_reference_profile')) {
-                continue;
-            }
+            // php-src never shipped try/catch/else (#31159) — reject cases always run.
+            // Execute fixtures skipped while the gate is false (defense if re-enabled).
             if (!CompilerVersion::supportsTryCatchElse()
                 && str_contains($name, 'try_catch_else')
                 && !str_contains($name, 'try_catch_else_reference_profile')) {
@@ -1480,9 +1479,10 @@ class JITTest extends BaseTest {
                 continue;
             }
             // 8.2 reject gate; skipped when arbitrary static initializers enabled (#22923).
-            // static_var_param_init_83 sets PROFILE via --ENV--; always include.
+            // static_var_param_init_83 / static_var_fcc_init_83 set PROFILE via --ENV--; always include.
             if (CompilerVersion::supportsArbitraryStaticVariableInitializers()
-                && str_contains($name, 'static_var_param_init_fatal')) {
+                && (str_contains($name, 'static_var_param_init_fatal')
+                    || str_contains($name, 'static_var_fcc_init_fatal'))) {
                 continue;
             }
             // 8.3-target reject gate; skipped when file/namespace typed constants enabled (#16651, #7081).

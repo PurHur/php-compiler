@@ -132,6 +132,8 @@ final class SecureGenerate extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::SECURE_LC, 'generate');
+        // php-src engine_secure.c generate() — ZEND_PARSE_PARAMETERS exactly 0 (#31096).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\Secure::generate', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(RandomEngineStorage::secure($object)->generate());
         }
@@ -159,6 +161,8 @@ final class XoshiroGenerate extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::XOSHIRO_LC, 'generate');
+        // php-src engine_xoshiro256starstar.c generate() — ZEND_PARSE_PARAMETERS exactly 0 (#31096).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\Xoshiro256StarStar::generate', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(RandomEngineStorage::xoshiro($object)->generate());
         }
@@ -170,7 +174,10 @@ final class XoshiroJump extends VmClassMethod
     public function __construct(private readonly bool $long) { parent::__construct($long ? 'jumpLong' : 'jump'); }
     public function execute(Frame $frame): void
     {
-        $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::XOSHIRO_LC, $this->long ? 'jumpLong' : 'jump');
+        $method = $this->long ? 'jumpLong' : 'jump';
+        $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::XOSHIRO_LC, $method);
+        // php-src engine_xoshiro256starstar.c jump/jumpLong — ZEND_PARSE_PARAMETERS exactly 0 (#31097).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\Xoshiro256StarStar::'.$method, 0);
         $engine = RandomEngineStorage::xoshiro($object);
         $this->long ? $engine->jumpLong() : $engine->jump();
     }
@@ -219,6 +226,8 @@ final class PcgGenerate extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::PCG_LC, 'generate');
+        // php-src engine_pcgoneseq128xslrr64.c generate() — ZEND_PARSE_PARAMETERS exactly 0 (#31096).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\PcgOneseq128XslRr64::generate', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(RandomEngineStorage::pcg($object)->generate());
         }
@@ -231,9 +240,8 @@ final class PcgJump extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = AdditionalEnginesBuiltin::receiver($frame, AdditionalEnginesBuiltin::PCG_LC, 'jump');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('Random\\Engine\\PcgOneseq128XslRr64::jump() expects exactly 1 argument, '.(\count($frame->calledArgs) - 1).' given');
-        }
+        // php-src engine_pcgoneseq128xslrr64.c jump(int $advance) — ZEND_PARSE_PARAMETERS exactly 1 (#31097).
+        $this->requireExactUserArgCount($frame, 'Random\\Engine\\PcgOneseq128XslRr64::jump', 1);
         RandomEngineStorage::pcg($object)->jump(VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'Random\\Engine\\PcgOneseq128XslRr64::jump', 0, 'advance'));
     }
 }

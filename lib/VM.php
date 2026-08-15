@@ -1180,13 +1180,13 @@ class VM {
         }
         $backing = $this->hookedStaticPropertyBackingValue($classLc, $propNameRaw);
         if (false !== $backing) {
-            $dst->copyFromForClone($backing);
+            $this->copyPropertyValueForIsMode($dst, $backing);
 
             return;
         }
         $storage = $this->resolveStaticPropertyStorage($classLc, strtolower($propNameRaw));
         if (null !== $storage) {
-            $dst->copyFromForClone($storage);
+            $this->copyPropertyValueForIsMode($dst, $storage);
 
             return;
         }
@@ -1412,8 +1412,11 @@ class VM {
             return false;
         }
         $value = $storage->resolveIndirect();
+        if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+            return false;
+        }
 
-        return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
+        return Variable::TYPE_NULL !== $value->type;
     }
 
     /**
@@ -1574,7 +1577,8 @@ class VM {
             }
         }
         if ($object->hasProperty($propName)) {
-            $dst->copyFrom($object->getProperty($propName));
+            // Plain typed slots: BP_VAR_IS must not Error (#31146, zend_object_handlers.c).
+            $this->copyPropertyValueForIsMode($dst, $object->getProperty($propName));
         } else {
             $dst->undefined();
         }
@@ -2742,22 +2746,44 @@ class VM {
                 // Backed hooked property: dump raw backing, never invoke get (#29379).
                 if (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc) {
                     if (!$object->hasPropertyForMeta($meta)) {
+                        // Typed hooked slot still absent → var_dump shows uninitialized(T) (#31147).
+                        if ($meta->prototype->hasDeclaredTypeConstraint() || $meta->prototype->isUndefined()) {
+                            $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+                            $result[$key] = $this->copyUninitializedDebugPropertySlot(
+                                $meta->prototype,
+                                $object,
+                                $meta->name
+                            );
+                        }
+
                         continue;
                     }
                     $value = $object->getPropertyForMeta($meta)->resolveIndirect();
-                    if (VM\TypedPropertyCheck::isUninitialized($value)) {
-                        continue;
-                    }
                     $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
-                    $copy = new Variable();
-                    $copy->copyFrom($value);
-                    $result[$key] = $copy;
+                    if (VM\TypedPropertyCheck::isUninitialized($value)) {
+                        $result[$key] = $this->copyUninitializedDebugPropertySlot($value, $object, $meta->name);
+                        $copy = $result[$key];
+                        if (null === $copy->declaredTypeLabel && null !== $meta->prototype->declaredTypeLabel) {
+                            $copy->declaredTypeLabel = $meta->prototype->declaredTypeLabel;
+                        }
+                    } else {
+                        $copy = new Variable();
+                        $copy->copyFrom($value);
+                        $result[$key] = $copy;
+                    }
 
                     continue;
                 }
                 if (!$object->hasPropertyForMeta($meta)) {
-                    if (!$meta->prototype->hasDeclaredTypeConstraint()) {
-                        $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+                    $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+                    if ($meta->prototype->hasDeclaredTypeConstraint() || $meta->prototype->isUndefined()) {
+                        // Absent typed slot: Zend still dumps uninitialized(T) (#31147).
+                        $result[$key] = $this->copyUninitializedDebugPropertySlot(
+                            $meta->prototype,
+                            $object,
+                            $meta->name
+                        );
+                    } else {
                         $copy = new Variable();
                         $copy->null();
                         $result[$key] = $copy;
@@ -2767,13 +2793,24 @@ class VM {
                 }
                 $value = $object->getPropertyForMeta($meta)->resolveIndirect();
                 if (VM\TypedPropertyCheck::isUninitialized($value)) {
-                    if ($meta->prototype->hasDeclaredTypeConstraint()) {
-                        continue;
-                    }
                     $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
-                    $copy = new Variable();
-                    $copy->null();
-                    $result[$key] = $copy;
+                    if ($meta->prototype->hasDeclaredTypeConstraint() || $meta->prototype->isUndefined()) {
+                        // Include uninitialized typed slots for var_dump / debug_zval_dump (#31147).
+                        // print_r skips them in VmPrintR; object header count excludes them.
+                        // Must not use Variable::copyFrom — it assertReadable()s (#31147).
+                        $copy = $this->copyUninitializedDebugPropertySlot($value, $object, $meta->name);
+                        if (null === $copy->declaredTypeLabel && null !== $meta->prototype->declaredTypeLabel) {
+                            $copy->declaredTypeLabel = $meta->prototype->declaredTypeLabel;
+                        }
+                        if (null === $copy->typeConstraint && null !== $meta->prototype->typeConstraint) {
+                            $copy->typeConstraint = $meta->prototype->typeConstraint;
+                        }
+                        $result[$key] = $copy;
+                    } else {
+                        $copy = new Variable();
+                        $copy->null();
+                        $result[$key] = $copy;
+                    }
 
                     continue;
                 }
@@ -2798,6 +2835,27 @@ class VM {
         }
 
         return $result;
+    }
+
+    /**
+     * DEBUG property bag entry for an uninitialized typed slot — never assertReadable (#31147).
+     */
+    private function copyUninitializedDebugPropertySlot(
+        Variable $source,
+        ObjectEntry $object,
+        string $propertyName
+    ): Variable {
+        $copy = new Variable();
+        $copy->copyUninitializedStaticPropertySlot($source);
+        $copy->objectPropertyOwner = $object;
+        $copy->objectPropertyName = $propertyName;
+        if (null === $copy->declaredTypeLabel && Variable::TYPE_UNDEFINED === $source->resolveIndirect()->type
+            && !$source->resolveIndirect()->hasDeclaredTypeConstraint()) {
+            // Explicit mixed: typed UNDEFINED without label/constraint.
+            $copy->declaredTypeLabel = 'mixed';
+        }
+
+        return $copy;
     }
 
     /**
@@ -11349,7 +11407,8 @@ restart:
     /**
      * Zend {@code zend_zval_value_name()} labels for method-on-non-object Errors (#4241, #30054).
      *
-     * Booleans use {@code true}/{@code false}, not {@code bool}.
+     * Booleans use {@code true}/{@code false}, not {@code bool} (distinct from TypeError
+     * {@code zend_zval_type_name} spelling gated in {@see VM\EnumCaseSupport::typeNameForTypeErrorActual()}).
      */
     private function valueDebugTypeLabel(Variable $value): string
     {
@@ -11357,7 +11416,7 @@ restart:
             return 'object';
         }
 
-        return VM\EnumCaseSupport::typeNameForTypeErrorActual($value);
+        return VM\EnumCaseSupport::typeNameForZvalValueName($value);
     }
 
     /**

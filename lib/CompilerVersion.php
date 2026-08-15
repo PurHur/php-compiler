@@ -187,8 +187,9 @@ final class CompilerVersion
     /**
      * PHP 8.3+ dynamic class constant fetch (`C::{$name}`, `$cls::{$name}`).
      *
-     * Enabled by default when VERSION >= 8.3 (#30181). Explicit `PHP_COMPILER_PROFILE` overrides:
-     * PROFILE < 8.3 disables; PROFILE >= 8.3 enables.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#24823, #31182).
+     * Same withhold shape as {@see supportsClassConstBraceDeref()} / {@see supportsTypedClassConstants()}.
      * php-src: Zend/zend_language_parser.y class_constant; Zend/zend_compile.c.
      */
     public static function supportsDynamicClassConstFetch(): bool
@@ -197,12 +198,16 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
         }
 
-        return true;
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
@@ -920,6 +925,23 @@ final class CompilerVersion
      * {@code PHP_COMPILER_PROFILE=8.4}/{@code 8.5}.
      */
     public static function supportsUnpackTypeErrorGivenSuffix(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ {@code zend_zval_type_name()} prints {@code true}/{@code false} for IS_TRUE/IS_FALSE
+     * (GH-8385, #31160). User TypeError “given”/“returned” follows that spelling.
+     *
+     * Zend 8.2/8.3 still print {@code bool}. Withheld on the 8.4.0-dev reference profile (matches
+     * Zend 8.2); enable via stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4}/{@code 8.5}.
+     * Same withhold as {@see supportsHexFloatLiterals()} — do not use
+     * {@see isForwardProfileAtLeast()} (that would re-enable on unset PROFILE).
+     *
+     * Distinct from {@see supportsClassPseudoConstValueNameTypeError()} (8.3+
+     * {@code zend_zval_value_name} for {@code $expr::class}).
+     */
+    public static function supportsTrueFalseZvalTypeName(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
@@ -1656,9 +1678,9 @@ final class CompilerVersion
      * PHP 8.5+ `final` on constructor-promoted properties (RFC final_promotion, #27123).
      *
      * Plain `final` properties are 8.4+ ({@see supportsFinalProperties()}); promotion of
-     * `final` on a ctor parameter landed in 8.5. Zend ≤8.4 compiles
-     * `function __construct(public final string $x)` as
-     * {@code Cannot use the final modifier on a parameter}.
+     * `final` on a ctor parameter landed in 8.5. Zend ≤8.3 parse-errors
+     * `function __construct(final public int $x)` ({@code unexpected token "final"});
+     * Zend 8.4 compiles it as {@code Cannot use the final modifier on a parameter} (#31153).
      *
      * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5}.
      * php-src: Zend/zend_language_parser.y property_modifier; Zend/zend_compile.c.
@@ -1743,33 +1765,31 @@ final class CompilerVersion
     /**
      * PHP 8.4+ dereferencable `new` without outer parentheses (`new Class()->m()`, RFC new_without_parentheses).
      *
-     * Enabled by default when VERSION_ID >= 80400 (#30207). The compiler IS version 8.4 and should
-     * support 8.4 language features. Explicit `PHP_COMPILER_PROFILE` overrides: PROFILE < 8.4
-     * disables; PROFILE >= 8.4 enables.
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile parse-rejects like Zend 8.2
+     * (`unexpected token "->"`) while {@see phpversion()} still reports {@see REFERENCE_PHP_VERSION}
+     * (#31164, re-#24883). `version_compare` treats `8.4.0-dev` as below `8.4.0`, so unset
+     * `PHP_COMPILER_PROFILE` keeps this false. Forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     * Do not use VERSION_ID / isForwardProfileAtLeast here — that re-enabled acceptance on default
+     * after #30207 and broke Zend 8.2 advertisement parity (#31164).
      * php-src: Zend/zend_language_parser.y — new_dereferenceable / new_non_dereferenceable.
      */
     public static function supportsDereferencableNewWithoutOuterParens(): bool
     {
-        if (self::VERSION_ID >= 80400) {
-            $raw = getenv('PHP_COMPILER_PROFILE');
-            if (!\is_string($raw) || '' === trim($raw)) {
-                return true;
-            }
-        }
-
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
-     * PHP 8.4+ try/catch/else — else runs when no exception was thrown (#15817).
+     * Whether `try { } catch { } else { }` is accepted.
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * parse error. Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
-     * php-src: Zend/zend_language_parser.y try_catch_list else; zend_compile.c zend_compile_try.
+     * Always false: php-src never shipped try/catch/else on any version. The production is
+     * `T_TRY '{' inner_statement_list '}' catch_list finally_statement` only — `else` after
+     * catch/finally is a Parse error (`unexpected token "else"`) on Zend 8.2 through master
+     * ({@see Zend/zend_language_parser.y}; {@see Zend/zend_compile.c} zend_compile_try).
+     * Prior PROFILE≥8.4 enables (#15817 / #19225) were incorrect vs php-src-strict (#31159).
      */
     public static function supportsTryCatchElse(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
@@ -2683,11 +2703,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ mb_str_pad() (ext/mbstring/mbstring.c, issue #11964, #4006, #21790, #22373).
+     * PHP 8.3+ mb_str_pad() (ext/mbstring/mbstring.c, issue #11964, #4006, #21790, #22373, #31174).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate — reported
-     * PHP_VERSION is {@see REFERENCE_PHP_VERSION}). Enable via stable 8.4.0+ or explicit
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — no such function, not merely
+     * hidden from function_exists). Enable via stable 8.4.0+ or explicit
      * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     *
+     * Do not use {@see isForwardProfileAtLeast()} here — that would re-register on unset PROFILE
+     * while {@see phpversion()} still reports {@see REFERENCE_PHP_VERSION} (#16776 / #31174).
      */
     public static function supportsMbStrPad(): bool
     {
@@ -2695,22 +2718,8 @@ final class CompilerVersion
             return false;
         }
 
-        // VERSION '8.4.0-dev' fails version_compare(..., '8.4.0', '>=') due to -dev suffix.
-        // mb_str_pad is a PHP 8.3 feature; any VERSION >= 8.3 has it unconditionally.
-        return true;
-    }
-
-    /**
-     * mb_str_pad() visible to function_exists() — stable runtime or forward 8.3+ (#16086, #16776, #21790, #22373).
-     */
-    public static function advertisesMbStrPad(): bool
-    {
         if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
-        }
-
-        if (!self::supportsMbStrPad()) {
-            return false;
         }
 
         $raw = getenv('PHP_COMPILER_PROFILE');
@@ -2719,6 +2728,16 @@ final class CompilerVersion
         }
 
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * mb_str_pad() visible to function_exists() — same gate as registration (#16086, #16776, #21790, #22373, #31174).
+     *
+     * Withheld on 8.4.0-dev reference harness (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
+     */
+    public static function advertisesMbStrPad(): bool
+    {
+        return self::supportsMbStrPad();
     }
 
     /**

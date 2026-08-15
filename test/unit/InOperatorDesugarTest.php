@@ -8,16 +8,25 @@ use PHPUnit\Framework\TestCase;
 /** @group compliance */
 final class InOperatorDesugarTest extends TestCase
 {
-    public function testDesugarsEnumInArrayLiteral(): void
+    public function testDesugarDoesNotRewriteInfixIn(): void
     {
         $code = <<<'PHP'
 <?php
-enum E: string { case A = 'a'; case B = 'b'; }
-$e = E::A;
-var_dump($e in [E::A, E::B]);
+echo 1 in [1, 2];
 PHP;
-        $out = InOperatorDesugar::desugar($code);
-        $this->assertStringContainsString('__phpcLangIn($e, [E::A, E::B])', $out);
-        $this->assertStringNotContainsString(' in ', $out);
+        $this->assertSame($code, InOperatorDesugar::desugar($code));
+        $this->assertStringContainsString(' in ', InOperatorDesugar::desugar($code));
+        $this->assertStringNotContainsString('__phpcLangIn', InOperatorDesugar::desugar($code));
+    }
+
+    public function testDesugarLeavesForeachAndInArray(): void
+    {
+        $code = <<<'PHP'
+<?php
+foreach ($a as $k => $v) {
+    var_dump(in_array($v, [1, 2], true));
+}
+PHP;
+        $this->assertSame($code, InOperatorDesugar::desugar($code));
     }
 }

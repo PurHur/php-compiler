@@ -253,6 +253,10 @@ final class WeakMapMethod implements Call
         if ([] === $args) {
             throw new \LogicException('WeakMap::count() requires the map receiver');
         }
+        // php-src Zend/zend_weakrefs.stub.php — count(): int (#31129)
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'WeakMap::count', 0)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         $ht = self::backingHashtable($context, $args[0]);
         $map = $context->structFieldMap['__hashtable__'];
         $num = $context->builder->load($context->builder->structGep($ht, $map['numElements']));

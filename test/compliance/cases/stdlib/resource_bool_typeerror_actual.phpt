@@ -1,5 +1,7 @@
 --TEST--
 fclose/fread/get_resource_id TypeError actual false|true not bool (#30118)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['fclose', 'fread', 'get_resource_id'] as $fn) {

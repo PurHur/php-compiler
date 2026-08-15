@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -128,6 +129,61 @@ PHP, 'const_closure_fcc_85.php');
             ob_start();
             $runtime->run($block);
             $this->assertSame('3,2,3,2', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** First-class callable in class/enum/file const rejected on PROFILE≤8.4 (#31167). */
+    public function testFccInClassEnumFileConstCompileErrorsOn84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+class C { public const X = strlen(...); }
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testFccInEnumConstCompileErrorsOn82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+enum E { const X = strlen(...); }
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testFccInGlobalConstCompileErrorsOn84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+const X = strlen(...);
+PHP);
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -410,6 +466,20 @@ function f(): int {
 }
 PHP, 'throw_expr_ok.php');
         $this->assertNotNull($block);
+    }
+
+    public function testStaticScopeClassConstIsCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(ThrowInClassConstCompileCheck::STATIC_SCOPE_MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    const X = 1;
+    const Y = static::X;
+}
+PHP, 'static_scope_class_const.php');
     }
 
     private function expectCompileError(string $code): void

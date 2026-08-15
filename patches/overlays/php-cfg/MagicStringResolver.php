@@ -140,6 +140,17 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = true;
+        } elseif ($node instanceof Node\Expr\ClassConstFetch) {
+            // Stamp source self::/parent::/static:: spelling before the Name child is
+            // rewritten to the FQCN. ReflectionParameter::getDefaultValueConstantName()
+            // must report the lexical keyword (php-src php_reflection.c, #31149).
+            if ($node->class instanceof Node\Name) {
+                $orig = $node->class->toString();
+                $lc = strtolower($orig);
+                if ('self' === $lc || 'parent' === $lc || 'static' === $lc) {
+                    $node->setAttribute('phpcLexicalScopeKeyword', $orig);
+                }
+            }
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
                 if ($this->propertyStack === []) {

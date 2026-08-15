@@ -3160,6 +3160,7 @@ require_once __DIR__.'/../../../ext/standard/ReadonlyRaiseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RealpathJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReflectionClassIsFinalJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReflectionClassIsIterateableJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ReflectionClassKindJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RenameJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RequestMethodEnumData.php';
 require_once __DIR__.'/../../../ext/standard/RequestParseBodyEngine.php';

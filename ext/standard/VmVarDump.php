@@ -241,13 +241,27 @@ final class VmVarDump
         $visited->attach($object);
         try {
             $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
-            $count = \count($props);
+            // php-src php_var_dump object count: initialized props only; uninit typed still dumped (#31147).
+            $count = 0;
+            foreach ($props as $value) {
+                if (!TypedPropertyCheck::isUninitializedDebugSlot($value)) {
+                    ++$count;
+                }
+            }
             $className = VmObjectDebugType::fromClassName($object->class->name);
             self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
             foreach ($props as $name => $value) {
                 // php-src php_object_property_dump: "%*c" with level+1; recurse level+2 (#23726).
                 self::write(self::spaces($level + 1));
                 self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
+                if (TypedPropertyCheck::isUninitializedDebugSlot($value)) {
+                    // Do not assertReadable — Zend prints uninitialized(T) (#31147, ext/standard/var.c).
+                    // Indent matches dumpNested($level+2): spaces(($level+2)-1) = spaces($level+1).
+                    self::write(self::spaces($level + 1));
+                    self::write('uninitialized('.TypedPropertyCheck::uninitializedTypeString($value).")\n");
+
+                    continue;
+                }
                 self::dumpNested($vm, $value, $level + 2, true, $frame, $visited);
             }
             if ($level > 1) {

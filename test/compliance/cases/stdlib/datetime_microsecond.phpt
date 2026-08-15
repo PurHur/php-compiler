@@ -17,7 +17,7 @@ echo $updated->getMicrosecond(), "\n";
 try {
     $dt->setMicrosecond(1_000_000);
     echo "no-throw\n";
-} catch (ValueError $e) {
+} catch (DateRangeError $e) {
     echo "range\n";
 }
 --EXPECT--

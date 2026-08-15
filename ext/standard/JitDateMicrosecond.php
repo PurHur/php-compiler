@@ -6,8 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
@@ -107,15 +108,16 @@ final class JitDateMicrosecond
     private static function lowerMicrosecondArg(Context $context, JITVariable $arg, string $function): Value
     {
         $i64 = $context->getTypeFromString('int64');
+        $className = str_starts_with($function, 'DateTimeImmutable::')
+            ? 'DateTimeImmutable'
+            : 'DateTime';
         $lit = self::tryCompileTimeLong($context, $arg);
         if (null !== $lit) {
             if ($lit < 0 || $lit > 999999) {
-                TypeErrorRaise::ensureLinked($context);
-                TypeErrorRaise::emitValueError(
+                self::emitDateRangeErrorAndContinue(
                     $context,
-                    'DateTime::setMicrosecond(): Argument #1 ($microsecond) must be between 0 and 999999'
+                    DateTimeSupport::setMicrosecondRangeErrorMessage($className, $lit)
                 );
-                $context->builder->call($context->lookupFunction('abort'));
 
                 return $i64->constInt(0, false);
             }
@@ -125,7 +127,14 @@ final class JitDateMicrosecond
 
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             $value = $context->helper->loadValue($arg);
-            self::emitRangeGuard($context, $value, $function);
+            self::emitRangeGuard($context, $value, $className);
+
+            return $value;
+        }
+
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            $value = JitStrictIntArg::lower($context, $arg, $function, 1, 'microsecond');
+            self::emitRangeGuard($context, $value, $className);
 
             return $value;
         }
@@ -135,10 +144,8 @@ final class JitDateMicrosecond
         );
     }
 
-    private static function emitRangeGuard(Context $context, Value $value, string $function): void
+    private static function emitRangeGuard(Context $context, Value $value, string $className): void
     {
-        unset($function);
-        TypeErrorRaise::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $okBlock = BasicBlockHelper::append($context, 'set_us_ok');
         $badBlock = BasicBlockHelper::append($context, 'set_us_bad');
@@ -155,13 +162,20 @@ final class JitDateMicrosecond
         $bad = $context->builder->or($lt0, $gtMax);
         $context->builder->branchIf($bad, $badBlock, $okBlock);
         $context->builder->positionAtEnd($badBlock);
-        TypeErrorRaise::emitValueError(
+        // Runtime i64: class qualifier is known; `, <value> given` is on the compile-time path (#31118).
+        ExceptionBridge::emitDateRangeErrorAndAbort(
             $context,
-            'DateTime::setMicrosecond(): Argument #1 ($microsecond) must be between 0 and 999999'
+            $className.'::setMicrosecond(): Argument #1 ($microsecond) must be between 0 and 999999'
         );
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->unreachable();
+        BasicBlockHelper::sealOpenBlock($context, $badBlock);
         $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function emitDateRangeErrorAndContinue(Context $context, string $message): void
+    {
+        ExceptionBridge::emitDateRangeErrorAndAbort($context, $message);
+        $dead = BasicBlockHelper::append($context, 'set_us_range_dead');
+        $context->builder->positionAtEnd($dead);
     }
 
     private static function tryCompileTimeLong(Context $context, JITVariable $var): ?int

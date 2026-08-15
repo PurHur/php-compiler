@@ -59,13 +59,13 @@
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>79</strong> / 89 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 6 gaps</p>
+          <strong>78</strong> / 89 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 7 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>1113</strong> / 1378 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">231 partial · 34 gaps</p>
+          <strong>1112</strong> / 1378 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">231 partial · 35 gaps</p>
         </article>
         <article>
           <div>Legend</div>
@@ -107,7 +107,7 @@
 <tr data-support="full"><td><code>Native user-class link (`phpc build --project`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/764">#764</a></td></tr>
 <tr data-support="full"><td><code>`instanceof`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/138">#138</a></td></tr>
 <tr data-support="gap"><td><code>`instanceof` union RHS `(A</code></td><td class="status-yes">yes</td><td class="">B)`</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>yes</td></tr>
-<tr data-support="full"><td><code>PHP 8.3+ `in` operator (`$needle in $haystack`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/4682">#4682</a></td></tr>
+<tr data-support="gap"><td><code>`in` operator (`$needle in $haystack`) — not in php-src</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/31158">#31158</a></td></tr>
 <tr data-support="full"><td><code>`match` expression</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/143">#143</a></td></tr>
 <tr data-support="full"><td><code>Closures `function () { }` / `use ($var)`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/72">#72</a></td></tr>
 <tr data-support="full"><td><code>Arrow functions `fn () =&gt;`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/142">#142</a></td></tr>
@@ -873,7 +873,7 @@
 <tr data-support="full"><td><code>`mb_scrub`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_send_mail`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_split`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`mb_str_pad`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`mb_str_pad`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_str_split`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strcut`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strimwidth`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>

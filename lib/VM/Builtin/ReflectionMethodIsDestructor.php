@@ -17,6 +17,8 @@ final class ReflectionMethodIsDestructor extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        // php-src: zim_ReflectionMethod_isDestructor — ZEND_PARSE_PARAMETERS (0 args) (#31127)
+        $this->requireExactUserArgCount($frame, 'ReflectionMethod::isDestructor', 0);
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(ReflectionSupport::isReflectionMethodDestructor($receiver));

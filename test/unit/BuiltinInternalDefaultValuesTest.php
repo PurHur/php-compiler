@@ -487,6 +487,21 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         }
     }
 
+    /** @covers issue #25013 */
+    public function testClassExistsAutoloadDefaultIsTrue(): void
+    {
+        $info = ['name' => 'autoload', 'type' => 'bool', 'isOptional' => true];
+        self::assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('class_exists', 1, $info, false)
+        );
+        $dest = new Variable();
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($dest, 'class_exists', 1, $info)
+        );
+        self::assertSame(Variable::TYPE_BOOLEAN, $dest->type);
+        self::assertTrue($dest->toBool());
+    }
+
     /** @covers issue #25388 */
     public function testClassAliasAutoloadDefaultIsTrue(): void
     {

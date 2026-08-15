@@ -392,6 +392,7 @@ class Runtime {
         CloneWithSyntaxRejector::reject($code, $filename);
         NewDereferenceableSyntaxRejector::reject($code, $filename);
         PipeOperatorSyntaxRejector::reject($code, $filename);
+        InOperatorDesugar::reject($code, $filename);
         ListSpreadAssignSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
         // Before DnfParenIntersection: catch `((A&B) $e)` must ParseError with Zend's

@@ -476,6 +476,11 @@ final class BuiltinInternalDefaultValues
         'class_alias' => [
             2 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — bool $autoload = true (#25013)
+        // InternalArgInfo `autoload=` bool infers false; runtime already defaults true.
+        'class_exists' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src Zend/zend_builtin_functions.stub.php — bool $allow_string = true (#25439)
         // Contrast is_a(..., bool $allow_string = false) which inference already matches.
         'is_subclass_of' => [
@@ -881,6 +886,10 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             3 => ['kind' => 'null'],
             4 => ['kind' => 'null'],
+        ],
+        // php-src ext/intl/calendar/calendar.stub.php — $timezone = null (untyped; no infer) (#28482)
+        'intlcalendar::createinstance' => [
+            0 => ['kind' => 'null'],
         ],
     ];
 

@@ -118,27 +118,19 @@ PHP;
         }
     }
 
-    /** Issue #30181: default profile (no PHP_COMPILER_PROFILE) allows dynamic class const fetch. */
-    public function testDefaultProfileAllowsDynamicFetch(): void
+    /** Issue #31182: default/unset PROFILE rejects dynamic class const fetch like Zend 8.2. */
+    public function testDefaultProfileRejectsDynamicFetch(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
-            $code = <<<'PHP'
-<?php
-class F { const B = 42; }
-$n = 'B';
-echo F::{$n}, "\n";
-$bad = 'MISSING';
-try { F::{$bad}; } catch (Error $e) { echo get_class($e), ': ', $e->getMessage(), "\n"; }
-PHP;
-            $runtime = new Runtime();
-            $block = $runtime->parseAndCompile($code, 'issue_30181.php');
-            $this->assertNotNull($block);
-            ob_start();
-            $runtime->run($block);
-            $this->assertSame("42\nError: Undefined constant F::MISSING\n", ob_get_clean());
+            $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage('unexpected token ","');
+            ClassConstDynamicFetchRejector::reject(
+                "<?php\nclass F { const B = 42; }\n\$n = 'B';\necho F::{\$n}, \"\\n\";\n",
+                'issue_31182.php'
+            );
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -2794,6 +2794,37 @@ class Compiler {
                         }
                         break;
                     } elseif (
+                        $child instanceof Op\Expr\StaticPropertyFetch
+                        && null !== ($coalesceMatch = $this->findCoalesceUsingStaticPropertyFetchLeft($child, $ops, $i))
+                    ) {
+                        // php-cfg hoists StaticPropertyFetch before ?? / ??=; skip the R-mode
+                        // fetch so uninitialized typed statics stay BP_VAR_IS (#31146).
+                        /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
+                        [$coalesce, $coalesceIndex] = $coalesceMatch;
+                        $resultOverride = null;
+                        if (
+                            $coalesceIndex + 1 < $opCount
+                            && $ops[$coalesceIndex + 1] instanceof Op\Expr\Assign
+                            && $this->isCoalesceAssignTail($ops[$coalesceIndex + 1], $coalesce)
+                            && $this->operandsChainEqual($ops[$coalesceIndex + 1]->var, $child->result)
+                        ) {
+                            /** @var Op\Expr\Assign $tailAssign */
+                            $tailAssign = $ops[$coalesceIndex + 1];
+                            $resultOverride = $tailAssign->var;
+                        }
+                        if ($this->isCoalesceLoweredByFollowingEchoConcat($ops, $coalesceIndex)) {
+                            $i = $coalesceIndex;
+                            break;
+                        }
+                        $block = null !== $resultOverride
+                            ? $this->compileCoalesceForAssign($coalesce, $block, $resultOverride)
+                            : $this->compileCoalesce($coalesce, $block);
+                        $i = $coalesceIndex;
+                        if (null !== $resultOverride) {
+                            ++$i;
+                        }
+                        break;
+                    } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
                         && ($ops[$i + 1] instanceof Op\Expr\FuncCall || $ops[$i + 1] instanceof Op\Expr\NsFuncCall)
@@ -3635,6 +3666,62 @@ class Compiler {
         }
 
         return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg emits StaticPropertyFetch as its own stmt before ?? / ??= (#31146).
+     */
+    private function isStaticPropertyFetchOnlyCoalesceLeft(
+        Op\Expr\StaticPropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        $left = $next->left;
+        while ($left instanceof Temporary) {
+            if ($left === $fetch->result) {
+                return true;
+            }
+            if (null === $left->original) {
+                break;
+            }
+            $left = $left->original;
+        }
+
+        return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg emits StaticPropertyFetch as its own stmt before ?? / ??= (#31146).
+     *
+     * @param Op[] $ops
+     *
+     * @return ?array{0: Op\Expr\BinaryOp\Coalesce, 1: int}
+     */
+    private function findCoalesceUsingStaticPropertyFetchLeft(
+        Op\Expr\StaticPropertyFetch $fetch,
+        array $ops,
+        int $index
+    ): ?array {
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                if (!$this->isStaticPropertyFetchOnlyCoalesceLeft($fetch, $next)) {
+                    return null;
+                }
+
+                return [$next, $j];
+            }
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     /**
@@ -8949,6 +9036,7 @@ class Compiler {
 
     protected function compileClassConstDeclaration(Op\Terminal\Const_ $child, Block $result): void
     {
+        $this->rejectStaticScopeInCompileTimeConstExpr($child->valueBlock, $child, $child->value);
         $constName = $this->staticNameFromOperand($child->name);
         if (null !== $constName && null !== $this->compilingClassLc) {
             // Case-sensitive — const A and const a are distinct (#25929).
@@ -9643,7 +9731,7 @@ class Compiler {
         $declare->propertyFinal = $explicitFinal
             || PropertyVisibility::isImplicitlyFinalFromPrivateSet((int) $declare->propertySetVisibility);
         if ($explicitFinal && !CompilerVersion::supportsFinalPromotedProperties()) {
-            // php-src Zend/zend_compile.c — final on parameter rejected until 8.5 (#27123).
+            // php-src: ≤8.3 parse error; 8.4 zend_compile.c fatal until 8.5 (#27123, #31153).
             $sourceFile = $param->getFile();
             if ('' === $sourceFile) {
                 $sourceFile = 'unknown';
@@ -9651,7 +9739,7 @@ class Compiler {
             throw new CompileFatal(
                 $sourceFile,
                 max(1, $param->getLine()),
-                \PHPCompiler\Ast\FinalPromotedPropertyRewriter::REFERENCE_PROFILE_FINAL_ON_PARAMETER
+                \PHPCompiler\Ast\FinalPromotedPropertyRewriter::referenceProfileRejectMessage()
             );
         }
         $declare->propertyAsymmetricExplicitRead = Ast\AsymmetricVisibilityRewriter::hasExplicitReadModifierFromAttributes(
@@ -9896,6 +9984,7 @@ class Compiler {
         if (null === $param->defaultVar) {
             return null;
         }
+        $this->rejectStaticScopeInCompileTimeConstExpr($param->defaultBlock, $param, $param->defaultVar);
         $folded = $this->tryFoldParamDefaultSlot($param, $block);
         if (null !== $folded) {
             return $folded;
@@ -11575,36 +11664,96 @@ class Compiler {
     }
 
     /**
-     * Zend message when {@code static::class} appears in a property default (#26629).
+     * Zend message when {@code static::} appears in a property default (#26629, #31145).
+     *
+     * {@code static::class} keeps the more specific zend_compile.c diagnostic; other
+     * {@code static::CONST} fetches use {@see ThrowInClassConstCompileCheck::STATIC_SCOPE_MESSAGE}.
      */
     protected function propertyDefaultStaticClassRejectMessage(Op\Stmt\Property $prop): ?string
     {
-        $expr = null;
-        if (null !== $prop->defaultBlock && [] !== $prop->defaultBlock->children) {
-            $last = $prop->defaultBlock->children[\count($prop->defaultBlock->children) - 1];
-            if ($last instanceof Op\Expr\ClassConstFetch) {
-                $expr = $last;
-            }
-        }
-        if (null === $expr) {
+        $fetch = $this->findStaticScopeClassConstFetchInBlock($prop->defaultBlock);
+        if (null === $fetch) {
             $root = null !== $prop->defaultVar ? $this->unwrapOperandChain($prop->defaultVar) : null;
             if ($root instanceof Op\Expr\ClassConstFetch) {
-                $expr = $root;
+                $fetch = $root;
             }
         }
-        if (null === $expr) {
-            return null;
-        }
-        $constName = $this->staticNameFromOperand($expr->name);
-        $className = $this->staticNameFromOperand($expr->class);
-        if (null === $constName || null === $className) {
-            return null;
-        }
-        if ('class' !== strtolower($constName) || 'static' !== strtolower($className)) {
+        if (null === $fetch) {
             return null;
         }
 
-        return 'static::class cannot be used for compile-time class name resolution';
+        return ThrowInClassConstCompileCheck::staticScopeRejectMessage($fetch);
+    }
+
+    /**
+     * Reject {@code static::} in class-const / param-default / property-default const-exprs (#31145).
+     */
+    protected function rejectStaticScopeInCompileTimeConstExpr(
+        ?CfgBlock $block,
+        Op $site,
+        ?Operand $value = null
+    ): void {
+        $fetch = $this->findStaticScopeClassConstFetchInBlock($block);
+        if (null === $fetch && null !== $value) {
+            $root = $this->unwrapOperandChain($value);
+            if ($root instanceof Op\Expr\ClassConstFetch) {
+                $fetch = $root;
+            }
+        }
+        if (null === $fetch) {
+            return;
+        }
+        $msg = ThrowInClassConstCompileCheck::staticScopeRejectMessage($fetch);
+        if (null === $msg) {
+            return;
+        }
+        $sourceFile = $fetch->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = $site->getFile();
+        }
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $line = $fetch->getLine();
+        if ($line < 1) {
+            $line = $site->getLine();
+        }
+        throw new CompileFatal($sourceFile, max(1, $line), $msg);
+    }
+
+    protected function findStaticScopeClassConstFetchInBlock(?CfgBlock $block): ?Op\Expr\ClassConstFetch
+    {
+        if (null === $block) {
+            return null;
+        }
+        $queue = [$block];
+        $seen = new SplObjectStorage();
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            if ($seen->contains($current)) {
+                continue;
+            }
+            $seen->attach($current);
+            foreach ($current->children ?? [] as $op) {
+                if (!$op instanceof Op) {
+                    continue;
+                }
+                if ($op instanceof Op\Expr\ClassConstFetch
+                    && null !== ThrowInClassConstCompileCheck::staticScopeRejectMessage($op)
+                ) {
+                    return $op;
+                }
+                if ($op instanceof Op\Expr\Assign
+                    && $op->expr instanceof Op\Expr\ClassConstFetch
+                    && null !== ThrowInClassConstCompileCheck::staticScopeRejectMessage($op->expr)
+                ) {
+                    return $op->expr;
+                }
+                OpSubBlockAccess::enqueueSubBlocks($op, $queue);
+            }
+        }
+
+        return null;
     }
 
     protected function compileTimeClassConstFetchCallerLc(Block $block): ?string
@@ -12110,6 +12259,7 @@ class Compiler {
     /**
      * Constant-fetch default name for ReflectionParameter (#22026, zim_reflection_parameter_*).
      * true/false/null and ::class are not constant defaults (php-src).
+     * self::/parent:: keep source spelling (#31149, ext/reflection/php_reflection.c).
      */
     protected function paramDefaultConstantName(Op\Expr\Param $param): ?string
     {
@@ -12136,8 +12286,17 @@ class Compiler {
             if ('class' === strtolower($constName)) {
                 return null;
             }
+            $className = ltrim($className, '\\');
+            $lcClass = strtolower($className);
+            if ('self' === $lcClass || 'parent' === $lcClass || 'static' === $lcClass) {
+                return $className.'::'.$constName;
+            }
+            $scopeKeyword = $expr->getAttribute('phpcLexicalScopeKeyword');
+            if (is_string($scopeKeyword) && '' !== $scopeKeyword) {
+                return $scopeKeyword.'::'.$constName;
+            }
 
-            return ltrim($className, '\\').'::'.$constName;
+            return $className.'::'.$constName;
         }
 
         return null;
@@ -16620,17 +16779,23 @@ class Compiler {
     }
 
     /**
-     * Reject non-constant function-static initializers on PHP &lt; 8.3 (#22923, #4352, #5478).
+     * Reject non-constant function-static initializers on PHP &lt; 8.3 (#22923, #4352, #5478, #31168).
      *
      * php-cfg often places a bare `$param` on {@see Op\Terminal\StaticVar::$defaultVar} with an
      * empty {@see $defaultBlock}; walking children alone missed that shape and accepted it as a
      * runtime init (undefined-constant → string) on the 8.2 reference profile.
+     *
+     * First-class callables (`strlen(...)`) are not constant expressions on ≤8.2
+     * ({@see Op\Expr\FirstClassCallable}); on 8.3+ they are legal arbitrary static initializers
+     * (php-src `zend_compile_static_var` → `zend_compile_expr`, verified 8.3/8.4/8.5).
      *
      * @param Op\Terminal\StaticVar $terminal
      */
     protected function assertFunctionStaticRuntimeInitAllowed(Op\Terminal $terminal): void
     {
         // PHP 8.3+ RFC: arbitrary static variable initializers (Zend/zend_compile.c).
+        // FCC / closures / runtime exprs are allowed here — not gated on closures-in-const-expr
+        // (that RFC is for const/attr/param/property defaults, not function-static on 8.3+).
         if (CompilerVersion::supportsArbitraryStaticVariableInitializers()) {
             return;
         }
@@ -16657,6 +16822,10 @@ class Compiler {
     protected function functionStaticInitReferencesLocal(Op $op): bool
     {
         if ($op instanceof Op\Expr\Closure || $op instanceof Op\Expr\ArrowFunction) {
+            return true;
+        }
+        // FCC is ZEND_AST_CALLABLE_CONVERT — not a const expr on ≤8.2 (#31168 / zend_compile.c).
+        if ($op instanceof Op\Expr\FirstClassCallable) {
             return true;
         }
         if ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\MethodCall) {

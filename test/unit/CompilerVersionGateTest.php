@@ -67,6 +67,64 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    /** Issue #31160: GH-8385 true/false zend_zval_type_name withheld on 8.4.0-dev (Zend 8.2 bool). */
+    public function testSupportsTrueFalseZvalTypeNameFalseOnDefault84DevProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsTrueFalseZvalTypeName());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #31160: PROFILE=8.2 / 8.3 keep zend_zval_type_name "bool". */
+    public function testSupportsTrueFalseZvalTypeNameFalseOnPhp82And83Profiles(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        try {
+            foreach (['8.2', '8.3'] as $profile) {
+                putenv('PHP_COMPILER_PROFILE='.$profile);
+                $this->assertFalse(
+                    CompilerVersion::supportsTrueFalseZvalTypeName(),
+                    'PROFILE='.$profile
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #31160: PROFILE=8.4 / 8.5 enable GH-8385 true/false TypeError actuals. */
+    public function testSupportsTrueFalseZvalTypeNameTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        try {
+            foreach (['8.4', '8.5'] as $profile) {
+                putenv('PHP_COMPILER_PROFILE='.$profile);
+                $this->assertTrue(
+                    CompilerVersion::supportsTrueFalseZvalTypeName(),
+                    'PROFILE='.$profile
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsStrIncrementFalseOnPhp82Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -473,10 +531,20 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** Issue #30181: default enables dynamic Class::{$expr}; PROFILE=8.2 withholds it. */
-    public function testSupportsDynamicClassConstFetchDefaultTrueAndProfile82False(): void
+    /** Issue #31182: unset PROFILE withholds dynamic Class::{$expr} (Zend 8.2); PROFILE=8.2 too. */
+    public function testSupportsDynamicClassConstFetchFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
 
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.2');
@@ -681,6 +749,21 @@ final class CompilerVersionGateTest extends TestCase
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbStrPad());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsMbStrPadTrueOn83Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
         try {
             $this->assertTrue(CompilerVersion::supportsMbStrPad());
         } finally {
@@ -2264,12 +2347,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDereferencableNewWithoutOuterParensTrueOnDefault84DevReference(): void
+    public function testSupportsDereferencableNewWithoutOuterParensFalseOnDefault84DevReference(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
+            $this->assertFalse(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2881,6 +2964,67 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsTryCatchElseFalseOnReferenceProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsTryCatchElse());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsTryCatchElseFalseWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsTryCatchElse());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsTryCatchElseFalseWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            // php-src never shipped try/catch/else (#31159).
+            $this->assertFalse(CompilerVersion::supportsTryCatchElse());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsTryCatchElseFalseWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertFalse(CompilerVersion::supportsTryCatchElse());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsInterfaceTypedConstantsFalseOnDefaultDevProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -3228,6 +3372,22 @@ final class CompilerVersionGateTest extends TestCase
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersMbStrPadOn83Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
         try {
             $runtime = new Runtime();
             $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));

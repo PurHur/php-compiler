@@ -707,17 +707,40 @@ final class EnumCaseSupport
     }
 
     /**
-     * Zend TypeError actual-value label ("… given" / "… returned") (#29097).
+     * Zend {@code zend_zval_value_name()} spelling — bools are always {@code true}/{@code false}.
      *
-     * Booleans use literal {@code true}/{@code false} (zend_execute.c), not {@code bool}.
-     * Same spelling as php-src {@code zend_zval_value_name()} for non-object scalars.
-     * Anonymous class names strip NUL+filepath provenance (C %s stops at NUL; #29569 / #26031).
+     * Used by 8.3+ {@code $expr::class} TypeErrors and method-on-non-object Errors (#29576 / #30054).
+     * Distinct from user TypeError “given”/“returned”, which follow {@code zend_zval_type_name}
+     * ({@see typeNameForTypeErrorActual()}).
+     */
+    public static function typeNameForZvalValueName(Variable $value): string
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? 'true' : 'false';
+        }
+
+        return \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
+            self::typeNameForVariable($value)
+        );
+    }
+
+    /**
+     * Zend TypeError actual-value label ("… given" / "… returned") (#29097 / #31160).
+     *
+     * Follows {@code zend_zval_type_name()}: {@code bool} on unset / PROFILE≤8.3 (Zend 8.2/8.3);
+     * {@code true}/{@code false} on PROFILE≥8.4 (GH-8385). Anonymous class names strip NUL+filepath
+     * provenance (C %s stops at NUL; #29569 / #26031).
      */
     public static function typeNameForTypeErrorActual(Variable $value): string
     {
         $value = $value->resolveIndirect();
         if (Variable::TYPE_BOOLEAN === $value->type) {
-            return $value->toBool() ? 'true' : 'false';
+            if (CompilerVersion::supportsTrueFalseZvalTypeName()) {
+                return $value->toBool() ? 'true' : 'false';
+            }
+
+            return 'bool';
         }
 
         return \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage(
@@ -734,7 +757,7 @@ final class EnumCaseSupport
     public static function classPseudoConstTypeErrorMessage(Variable $value): string
     {
         if (CompilerVersion::supportsClassPseudoConstValueNameTypeError()) {
-            return 'Cannot use "::class" on '.self::typeNameForTypeErrorActual($value);
+            return 'Cannot use "::class" on '.self::typeNameForZvalValueName($value);
         }
 
         return 'Cannot use "::class" on value of type '.self::typeNameForVariable($value);
