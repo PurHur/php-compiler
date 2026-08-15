@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -28,13 +29,9 @@ final class error_log extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src basic_functions.c — split under/over arity (#31193; peer #31192 / #30677).
+        $this->requireArgCountRange($frame, 'error_log', 1, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 4) {
-            throw new \ArgumentCountError(\sprintf(
-                'error_log() expects between 1 and 4 arguments, %d given',
-                $argc
-            ));
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -67,13 +64,11 @@ final class error_log extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 4) {
-            return JitErrorLog::emitArgumentCountError(
-                $context,
-                \sprintf('error_log() expects between 1 and 4 arguments, %d given', $argc)
-            );
+        // Catchable ACE + Zend under/over wording (#31193; peer #31192 / #27763).
+        if (!$this->requireArgCountRangeJit($context, $args, 'error_log', 1, 4)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
+        $argc = \count($args);
 
         $messageType = $argc >= 2 ? $args[1] : null;
         $destination = $argc >= 3 ? $args[2] : null;
