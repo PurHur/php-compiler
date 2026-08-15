@@ -531,10 +531,20 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** Issue #30181: default enables dynamic Class::{$expr}; PROFILE=8.2 withholds it. */
-    public function testSupportsDynamicClassConstFetchDefaultTrueAndProfile82False(): void
+    /** Issue #31182: unset PROFILE withholds dynamic Class::{$expr} (Zend 8.2); PROFILE=8.2 too. */
+    public function testSupportsDynamicClassConstFetchFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
 
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.2');
