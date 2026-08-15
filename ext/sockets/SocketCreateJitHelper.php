@@ -468,6 +468,54 @@ final class SocketCreateJitHelper
     }
 
     /**
+     * socket_recvfrom() — recvfrom(2) AF_INET; stash data/addr/port for by-ref LLVM (#31332).
+     *
+     * @return int bytes (>=0), -1 on error, -2 when length < 1 (false, no out-arg touch)
+     */
+    public static function recvfromArgv(int $handle, int $length, int $flags): int
+    {
+        self::$lastRecvfromData = '';
+        self::$lastRecvfromAddr = '';
+        self::$lastRecvfromPort = 0;
+        if ($length < 1) {
+            return -2;
+        }
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return -1;
+        }
+        $got = SocketsLibcThinAbi::recvfromInet($fd, $length, $flags);
+        // NestedJIT FFI may yield null instead of false under thin AOT (#31294/#31332).
+        if (false === $got || null === $got) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return -1;
+        }
+        VmSockets::clearErrorForLookupKey($handle);
+        self::$lastRecvfromData = (string) $got[0];
+        self::$lastRecvfromAddr = (string) $got[1];
+        self::$lastRecvfromPort = (int) $got[2];
+
+        return \strlen(self::$lastRecvfromData);
+    }
+
+    public static function recvfromDataArgv(): string
+    {
+        return self::$lastRecvfromData;
+    }
+
+    public static function recvfromAddrArgv(): string
+    {
+        return self::$lastRecvfromAddr;
+    }
+
+    public static function recvfromPortArgv(): int
+    {
+        return self::$lastRecvfromPort;
+    }
+
+    /**
      * socket_accept() — returns client fd, or -1 on failure (#31242).
      * Caller allocates Socket + {@see registerOwnedArgv} (mirror create).
      */
@@ -554,6 +602,12 @@ final class SocketCreateJitHelper
     private static string $lastNameAddr = '';
 
     private static int $lastNamePort = 0;
+
+    private static string $lastRecvfromData = '';
+
+    private static string $lastRecvfromAddr = '';
+
+    private static int $lastRecvfromPort = 0;
 
     private static int $pairFdByHandle0 = 0;
 

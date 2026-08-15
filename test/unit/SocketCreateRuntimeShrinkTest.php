@@ -353,6 +353,40 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringSocketGetSetOption.php', $spine);
     }
 
+
+    public function testSocketRecvfromCallUsesJitSocketRecvfrom(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_recvfrom.php');
+        $this->assertStringContainsString('JitSocketRecvfrom::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketRecvfromJitHelperExposesRecvfromArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCreateJitHelper.php');
+        $this->assertStringContainsString('function recvfromArgv', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::recvfromInet', $source);
+    }
+
+    public function testSocketRecvfromRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketRecvfromRuntime.php');
+        $this->assertStringContainsString('::recvfromArgv', $source);
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_recvfrom', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketRecvfromHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketRecvfrom.php', $spine);
+        $this->assertStringContainsString('SocketRecvfromRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketRecvfrom.php', $spine);
+    }
+
     public function testSpineBundleIncludesSocketSendtoHelpers(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
