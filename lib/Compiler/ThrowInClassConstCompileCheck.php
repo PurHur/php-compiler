@@ -14,6 +14,7 @@ use PHPCfg\Op\Expr\BinaryOp\Identical;
 use PHPCfg\Op\Expr\Cast;
 use PHPCfg\Op\Expr\ClassConstFetch;
 use PHPCfg\Op\Expr\Closure;
+use PHPCfg\Op\Expr\FirstClassCallable;
 use PHPCfg\Op\Expr\FuncCall;
 use PHPCfg\Op\Expr\MethodCall;
 use PHPCfg\Op\Expr\Param;
@@ -47,7 +48,8 @@ use PHPCompiler\CompilerVersion;
  *
  * PHP 8.5+ allows {@code static} Closures / arrow functions (no {@code use}) and first-class
  * callables ({@see CompilerVersion::supportsClosuresInConstantExpressions}); ordinary
- * {@see FuncCall}/{@see MethodCall}/{@see StaticCall} remain invalid.
+ * {@see FuncCall}/{@see MethodCall}/{@see StaticCall} remain invalid. FCC is
+ * {@see FirstClassCallable}, not {@see FuncCall} — PROFILE≤8.4 must reject it (#31167).
  */
 final class ThrowInClassConstCompileCheck
 {
@@ -218,6 +220,10 @@ final class ThrowInClassConstCompileCheck
                 ($op instanceof Closure || $op instanceof ArrowFunction)
                 && !self::isAllowedConstExprClosure($op)
             ) {
+                throw new \CompileError(self::MESSAGE);
+            }
+            // FCC is not FuncCall — must match Op\Expr\FirstClassCallable (#31167 / #26240).
+            if ($op instanceof FirstClassCallable && !self::isAllowedConstExprFirstClassCallable()) {
                 throw new \CompileError(self::MESSAGE);
             }
             if ($op instanceof Cast) {
@@ -401,5 +407,15 @@ final class ThrowInClassConstCompileCheck
         }
 
         return true;
+    }
+
+    /**
+     * PHP 8.5+ first-class callables in constant expressions (#31167 / #26240).
+     *
+     * @see CompilerVersion::supportsClosuresInConstantExpressions()
+     */
+    private static function isAllowedConstExprFirstClassCallable(): bool
+    {
+        return CompilerVersion::supportsClosuresInConstantExpressions();
     }
 }

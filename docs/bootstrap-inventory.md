@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7449 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23970 |
+| Source constructs flagged (warnings) | 23971 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5300,7 +5300,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/RedundantDnfArmSubsetCompileCheck.php` | 0 | 1 |
 | `lib/Compiler/RedundantObjectClassUnionCompileCheck.php` | 0 | 1 |
 | `lib/Compiler/SourceLocation.php` | 0 | 3 |
-| `lib/Compiler/ThrowInClassConstCompileCheck.php` | 0 | 11 |
+| `lib/Compiler/ThrowInClassConstCompileCheck.php` | 0 | 12 |
 | `lib/Compiler/TraitClassConstConflictCheck.php` | 0 | 4 |
 | `lib/Compiler/TraitCollisionCheck.php` | 0 | 3 |
 | `lib/Compiler/TraitComposedMethodResolver.php` | 0 | 1 |
@@ -47055,16 +47055,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/ThrowInClassConstCompileCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 64)
-- new CompileError (line 155)
-- new CompileFatal (line 197)
-- new CompileError (line 207)
-- new CompileError (line 215)
-- new CompileError (line 221)
-- new CompileError (line 227)
-- new CompileError (line 231)
-- new CompileError (line 238)
-- 17 class method(s)
+- new self (line 65)
+- new CompileError (line 156)
+- new CompileFatal (line 198)
+- new CompileError (line 208)
+- new CompileError (line 216)
+- new CompileError (line 222)
+- new CompileError (line 226)
+- new CompileError (line 232)
+- new CompileError (line 236)
+- new CompileError (line 243)
+- 18 class method(s)
 - 1 closure(s)
 
 ### `lib/Compiler/TraitClassConstConflictCheck.php`

@@ -138,6 +138,61 @@ PHP, 'const_closure_fcc_85.php');
         }
     }
 
+    /** First-class callable in class/enum/file const rejected on PROFILE≤8.4 (#31167). */
+    public function testFccInClassEnumFileConstCompileErrorsOn84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+class C { public const X = strlen(...); }
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testFccInEnumConstCompileErrorsOn82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+enum E { const X = strlen(...); }
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testFccInGlobalConstCompileErrorsOn84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+const X = strlen(...);
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testStaticClosureUseInConstCompileErrorsOn85(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
