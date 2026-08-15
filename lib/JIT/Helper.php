@@ -210,7 +210,8 @@ return_string:
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
         // Operand eval (fromLiteral / value_copy) can leave insert cleared after const-string
         // builder swaps; reload must not create parentless loads (#26756).
-        BasicBlockHelper::ensureOpenInsertBlock($this->context, 'binary_op_load_cont');
+        // Prefer void-ret rewrite so compare after value-box assign is not orphaned (#31101).
+        BasicBlockHelper::ensureOpenInsertBlockReplacingVoidReturn($this->context, 'binary_op_load_cont');
         JitEnumNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right);
         if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
             JitShiftOperandGuard::guardOperands($this->context, $opcode->type, $left, $right);

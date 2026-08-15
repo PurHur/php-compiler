@@ -8087,9 +8087,14 @@ class JIT {
                         && '' !== $paramName
                         && $this->context->hasVariableOp($param->result)
                     ) {
-                        $this->context->bindVariableByName(
-                            $paramName,
-                            $this->context->getVariableFromOp($param->result)
+                        $paramVar = $this->context->getVariableFromOp($param->result);
+                        $this->context->bindVariableByName($paramName, $paramVar);
+                        // Typed string formals may skip ARG_RECV overwrite (#24137); still
+                        // mark assigned so undef-var guards stay quiet (#31101 MiniWebApp).
+                        JIT\UndefinedVariableHelper::markAssigned(
+                            $this->context,
+                            $param->result,
+                            $paramVar
                         );
                         // Always mark formals assigned after prologue bind — identity
                         // assignOperand / string ARG_RECV skip can omit the flag and AOT
@@ -10792,6 +10797,10 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $coalesceResult = $block->getOperand($op->arg1);
                     $this->context->coalesceAssignTargets[$coalesceResult] = true;
+                    // Pre-allocate one stack slot before branches so left/right/merge all write
+                    // the same alloca — otherwise AOT ?? + === / == on the merge reads a bad
+                    // temp and MiniWebApp AOT exits with empty stdout (#31101 / #26818).
+                    $this->ensureCoalesceMergeStackSlot($coalesceResult);
                     $mergeSlot = $block->slotForOperand($coalesceResult);
                     if (null !== $mergeSlot) {
                         $this->context->coalesceMergeSlotOperands[$mergeSlot] = $coalesceResult;
@@ -13183,6 +13192,8 @@ class JIT {
         ) {
             $builder->positionAtEnd($tail);
             $this->context->freeDeadVariables($func, $tail, $block);
+            // Orphan auto-link emptied json_encode HT overlays (#31101); binaryOp uses
+            // ensureOpenInsertBlockReplacingVoidReturn for value-box === reachability.
             $this->context->builder->returnVoid();
         }
 
@@ -23180,10 +23191,10 @@ class JIT {
             : $this->context->scope->variables[$op];
         $name = JIT\OperandName::resolve($op);
         if (null !== $name && '' !== $name) {
-            $resolved = $this->context->resolveRefAliasName($name);
-            if (isset($this->context->namedVariableBindings[$resolved])) {
-                return;
-            }
+            // Named locals/params must survive identical/not-identical (#31101 MiniWebApp
+            // $route after !== "api/status"). Only anonymous temps are statement-end released
+            // for WeakReference::get (#27118).
+            return;
         }
         if (
             Variable::TYPE_VALUE !== $var->type

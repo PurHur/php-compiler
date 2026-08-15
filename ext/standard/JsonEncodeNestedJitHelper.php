@@ -58,12 +58,15 @@ final class JsonEncodeNestedJitHelper
         if (0 !== ($flags & 16)) {
             $packed = false;
         }
+        // NestedJIT foreach does not reliably mutate bare int counters ($n++ → commas
+        // dropped: [1,2] → "[12]"). Use a string latch instead (#31101).
         $out = $packed ? '[' : '{';
-        $n = 0;
+        $needComma = '0';
         foreach ($ht->exportKeyValuePairs(true) as $pair) {
-            if ($n > 0) {
+            if ('1' === $needComma) {
                 $out .= ',';
             }
+            $needComma = '1';
             if (!$packed) {
                 $key = $pair[0];
                 $kt = $key->type & 0x7f;
@@ -93,11 +96,12 @@ final class JsonEncodeNestedJitHelper
                 // #27182: helper-runtime array_chunk nested HTs often lack type 6/7.
                 // Value-foreach walks packed chunks (quote/toInt yielded "" / 0).
                 $inner = '[';
-                $m = 0;
+                $innerNeed = '0';
                 foreach ($val as $elem) {
-                    if ($m > 0) {
+                    if ('1' === $innerNeed) {
                         $inner .= ',';
                     }
+                    $innerNeed = '1';
                     $et = $elem->type & 0x7f;
                     if (1 === $et) {
                         $inner .= (string) $elem->toInt();
@@ -106,12 +110,10 @@ final class JsonEncodeNestedJitHelper
                     } else {
                         $inner .= (string) $elem->toInt();
                     }
-                    ++$m;
                 }
                 $inner .= ']';
-                $out .= $m > 0 ? $inner : (string) $val->toInt();
+                $out .= '1' === $innerNeed ? $inner : (string) $val->toInt();
             }
-            ++$n;
         }
         $out .= $packed ? ']' : '}';
 

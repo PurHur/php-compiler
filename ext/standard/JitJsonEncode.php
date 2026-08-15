@@ -8,7 +8,6 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringJsonEncode;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableReplaceRecursiveLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -33,9 +32,10 @@ final class JitJsonEncode
             $ht = JITVariable::TYPE_HASHTABLE === $arg->type
                 ? $context->helper->loadValue($arg)
                 : ArrayBuiltinHelper::loadHashTable($context, $arg);
-            // gov / string-key HTs: rematerialize so NestedJIT export is non-empty (#28638 / #26977).
-            $ht = HashTableReplaceRecursiveLlvm::replaceSingle($context, $ht);
-
+            // Rematerialize only when NestedJIT export would see an empty Cow/view HT.
+            // Unconditional alloc+overlay was emptying ordinary packed HTs under #31101
+            // BB ownership (json_encode([1,2]) → "{}"). Prefer direct encode; overlay
+            // remains available via replaceRecursiveCopy for true Cow cases (#26977).
             return self::stringOrFalse(
                 $context,
                 $context->builder->call(
@@ -83,8 +83,7 @@ final class JitJsonEncode
             $context->lookupFunction('__value__readHashtable'),
             $boxed
         );
-        // get_object_vars HTs are dim/count-green but NestedJIT export-empty (#28638 / #26977).
-        $ht = HashTableReplaceRecursiveLlvm::replaceSingle($context, $ht);
+        // Skip unconditional overlay — see encode() (#31101). FORCE_OBJECT still applied.
         $force = $context->getTypeFromString('int64')->constInt(VmJsonFlags::FORCE_OBJECT, false);
         $flagsObj = $context->builder->or($flags, $force);
 
@@ -131,7 +130,7 @@ final class JitJsonEncode
             $context->lookupFunction('__value__readHashtable'),
             $valuePtr
         );
-        $ht = HashTableReplaceRecursiveLlvm::replaceSingle($context, $ht);
+        // Skip unconditional overlay — see encode() (#31101).
         $htResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $ht,
