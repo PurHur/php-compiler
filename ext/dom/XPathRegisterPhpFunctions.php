@@ -12,6 +12,8 @@ use PHPCompiler\VM\Variable;
  *
  * php-src: ext/dom/xpath.c — DOMXPath::registerPhpFunctions /
  * ext/dom/xpath_callbacks.c — php_dom_xpath_callbacks_update_method_handler
+ *
+ * At most 1 user arg — Zend ArgumentCountError (#31251; re-#31011).
  */
 final class XPathRegisterPhpFunctions extends DomClassMethod
 {
@@ -22,6 +24,7 @@ final class XPathRegisterPhpFunctions extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtMostUserArgCount($frame, 'DOMXPath::registerPhpFunctions', 1);
         $xpath = $this->xpathReceiver($frame, 'DOMXPath::registerPhpFunctions()');
         $restrict = null;
         if (isset($frame->calledArgs[1])) {

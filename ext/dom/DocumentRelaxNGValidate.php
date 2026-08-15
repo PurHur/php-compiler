@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::relaxNGValidate() — RelaxNG validation (php-src ext/dom/document.c; #14370). */
+/**
+ * DOMDocument::relaxNGValidate() — RelaxNG validation (php-src ext/dom/document.c; #14370).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentRelaxNGValidate extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentRelaxNGValidate extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::relaxNGValidate', 1);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::relaxNGValidate()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('DOMDocument::relaxNGValidate() expects exactly 1 argument, 0 given');
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::relaxNGValidate() requires VM context in this compiler build');
         }

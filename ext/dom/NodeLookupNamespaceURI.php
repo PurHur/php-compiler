@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMNode::lookupNamespaceURI() — VM (#14313, php-src ext/dom/node.c). */
+/**
+ * DOMNode::lookupNamespaceURI() — VM (#14313, php-src ext/dom/node.c).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class NodeLookupNamespaceURI extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class NodeLookupNamespaceURI extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMNode::lookupNamespaceURI', 1);
         $node = $this->domRegistryNodeReceiver($frame, 'DOMNode::lookupNamespaceURI()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMNode::lookupNamespaceURI() expects at least 1 argument');
-        }
         $prefix = $this->nullableStringArg($frame->calledArgs[1], 'DOMNode::lookupNamespaceURI()', 0);
         if (null === $frame->returnVar) {
             return;

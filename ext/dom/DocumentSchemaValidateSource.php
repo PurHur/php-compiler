@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::schemaValidateSource() — in-memory XSD validation (php-src ext/dom/document.c; #18748). */
+/**
+ * DOMDocument::schemaValidateSource() — in-memory XSD validation (php-src ext/dom/document.c; #18748).
+ *
+ * User arity 1–2 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentSchemaValidateSource extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentSchemaValidateSource extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::schemaValidateSource', 1, 2);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::schemaValidateSource()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('DOMDocument::schemaValidateSource() expects at least 1 argument, 0 given');
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::schemaValidateSource() requires VM context in this compiler build');
         }
