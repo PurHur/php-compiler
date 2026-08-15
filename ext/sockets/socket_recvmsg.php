@@ -151,6 +151,6 @@ final class socket_recvmsg extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_recvmsg() JIT lowering not implemented (#6333)');
+        return JitSocketRecvmsg::invoke($context, ...$args);
     }
 }
