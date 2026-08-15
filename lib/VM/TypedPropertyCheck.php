@@ -72,6 +72,62 @@ final class TypedPropertyCheck
         return false;
     }
 
+    /**
+     * DEBUG-bag slot for var_dump / debug_zval_dump (#31147).
+     *
+     * Prefer {@see isUninitialized()}; also accept TYPE_UNDEFINED copies that still carry a
+     * declared type label/constraint (copyUninitializedStaticPropertySlot without owner).
+     */
+    public static function isUninitializedDebugSlot(Variable $var): bool
+    {
+        if (self::isUninitialized($var)) {
+            return true;
+        }
+        $target = $var->resolveIndirect();
+        if (Variable::TYPE_UNDEFINED !== $target->type) {
+            return false;
+        }
+
+        return $target->hasDeclaredTypeConstraint() || null !== $target->declaredTypeLabel;
+    }
+
+    /**
+     * php-src zend_uninitialized_prop_type_string() — type text inside uninitialized(%s) (#31147).
+     */
+    public static function uninitializedTypeString(Variable $var): string
+    {
+        $target = $var->resolveIndirect();
+        $label = (string) ($target->declaredTypeLabel ?? '');
+        if ('' !== $label) {
+            return $label;
+        }
+        $class = (string) ($target->classConstraint ?? '');
+        if ('' !== $class) {
+            return $class;
+        }
+        if (null !== $target->literalBoolType) {
+            return $target->literalBoolType;
+        }
+        if (Variable::TYPE_UNDEFINED === $target->type && !$target->hasDeclaredTypeConstraint()) {
+            // Explicit mixed: typed UNDEFINED without label/constraint.
+            return 'mixed';
+        }
+        if (null !== $target->typeConstraint) {
+            return TypeCheck::typeNameForConstraint((int) $target->typeConstraint, $target->literalBoolType);
+        }
+        if (null !== $target->objectPropertyOwner && null !== $target->objectPropertyName) {
+            foreach ($target->objectPropertyOwner->class->properties as $property) {
+                if ($property->name !== $target->objectPropertyName) {
+                    continue;
+                }
+
+                return self::uninitializedTypeString($property->prototype);
+            }
+        }
+
+        return 'mixed';
+    }
+
     public static function errorMessage(Variable $var): string
     {
         $target = $var->resolveIndirect();

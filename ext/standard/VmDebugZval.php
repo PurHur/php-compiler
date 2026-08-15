@@ -281,12 +281,24 @@ final class VmDebugZval
         $visited->attach($object);
         try {
             $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
-            $count = \count($props);
+            // Same initialized-only count as var_dump (#31147 / #31165).
+            $count = 0;
+            foreach ($props as $value) {
+                if (!TypedPropertyCheck::isUninitializedDebugSlot($value)) {
+                    ++$count;
+                }
+            }
             $className = VmObjectDebugType::fromClassName($object->class->name);
             self::write('object('.$className.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
             foreach ($props as $name => $value) {
                 self::write(self::indent($level + 1));
                 self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
+                if (TypedPropertyCheck::isUninitializedDebugSlot($value)) {
+                    self::write(self::indent($level + 1));
+                    self::write('uninitialized('.TypedPropertyCheck::uninitializedTypeString($value).")\n");
+
+                    continue;
+                }
                 self::dumpNested($vm, $value, $level + 1, true, $frame, $visited);
             }
             if ($level > 0) {

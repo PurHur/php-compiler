@@ -171,6 +171,10 @@ final class VmPrintR
             $className = VmObjectDebugType::fromClassName($object->class->name);
             $lines = ["{$className} Object\n", "{$openSpaces}(\n"];
             foreach ($props as $name => $value) {
+                // php-src php_array_element_dump / print_r: skip IS_UNDEF typed slots (#31147).
+                if (TypedPropertyCheck::isUninitializedDebugSlot($value)) {
+                    continue;
+                }
                 $formatted = self::formatNested($vm, $value->resolveIndirect(), $level + 1, $frame, $visited);
                 $propLabel = VmDebugPropertyName::formatForPrintR($name);
                 $lines[] = "{$keySpaces}{$propLabel} => ".$formatted."\n";
