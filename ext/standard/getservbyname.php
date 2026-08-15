@@ -16,6 +16,7 @@ use PHPLLVM\Value;
  * getservbyname() — service port by name+protocol (JIT/AOT via libc, issue #4024, #30281).
  *
  * Z_PARAM_STR: strict_types → TypeError on null; soft path DEP+coerce (#30281).
+ * Excess/missing argc → Zend ArgumentCountError (#30567).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/network.c PHP_FUNCTION(getservbyname)
  * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.stub.php string $service, string $protocol
@@ -29,9 +30,8 @@ final class getservbyname extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('getservbyname() requires exactly two arguments in this compiler build');
-        }
+        // php-src stub arity: exactly 2 (#30567; ext/standard/network.c).
+        $this->requireExactArgCount($frame, 'getservbyname', 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -49,8 +49,9 @@ final class getservbyname extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('getservbyname() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30567).
+        if (!$this->requireExactJitArgCount($context, $args, 'getservbyname', 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         // Soft-null outside strict_types; strict → TypeError (#30281).
