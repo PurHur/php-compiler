@@ -27,6 +27,10 @@ final class VmAddressInfo
     /** @var array<int, AddrinfoSnapshot> */
     private static array $snapshots = [];
 
+    /** NestedJIT / thin AOT — keyed by object address (peer {@see VmSocket}; #31357). */
+    /** @var array<int, AddrinfoSnapshot> */
+    private static array $jitSnapshots = [];
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])) {
@@ -53,6 +57,19 @@ final class VmAddressInfo
         return $object;
     }
 
+    /**
+     * AddressInfo under NestedJIT — snapshot keyed by object address (#31357).
+     *
+     * @param AddrinfoSnapshot $snapshot
+     */
+    public static function registerJitSnapshot(int $objAddr, array $snapshot): void
+    {
+        if ($objAddr <= 0) {
+            return;
+        }
+        self::$jitSnapshots[$objAddr] = $snapshot;
+    }
+
     public static function isAddressInfoObject(?ObjectEntry $object): bool
     {
         return null !== $object && 0 === \strcasecmp($object->class->name, 'AddressInfo');
@@ -63,11 +80,39 @@ final class VmAddressInfo
      */
     public static function snapshotFor(ObjectEntry $object): ?array
     {
-        return self::$snapshots[$object->id] ?? null;
+        return self::$snapshots[$object->id]
+            ?? self::$jitSnapshots[$object->id]
+            ?? null;
+    }
+
+    /**
+     * @return AddrinfoSnapshot|null
+     */
+    public static function snapshotForLookupKey(int $key): ?array
+    {
+        if ($key <= 0) {
+            return null;
+        }
+
+        return self::$jitSnapshots[$key] ?? self::$snapshots[$key] ?? null;
+    }
+
+    /** @var array{ai_flags: int, ai_family: int, ai_socktype: int, ai_protocol: int, ai_addr: array<string, int|string>}|null */
+    private static ?array $lastExplain = null;
+
+    public static function setLastExplain(array $explain): void
+    {
+        self::$lastExplain = $explain;
+    }
+
+    /** @return array{ai_flags: int, ai_family: int, ai_socktype: int, ai_protocol: int, ai_addr: array<string, int|string>}|null */
+    public static function lastExplain(): ?array
+    {
+        return self::$lastExplain;
     }
 
     public static function release(ObjectEntry $object): void
     {
-        unset(self::$snapshots[$object->id]);
+        unset(self::$snapshots[$object->id], self::$jitSnapshots[$object->id]);
     }
 }

@@ -570,4 +570,66 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SocketSendRecvMsgRuntime.php', $spine);
         $this->assertStringContainsString('StringSocketSendRecvMsg.php', $spine);
     }
+
+    public function testSocketAddrinfoLookupCallUsesJitSocketAddrinfoLookup(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_addrinfo_lookup.php');
+        $this->assertStringContainsString('JitSocketAddrinfoLookup::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketAddrinfoExplainCallUsesJitSocketAddrinfoExplain(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_addrinfo_explain.php');
+        $this->assertStringContainsString('JitSocketAddrinfoExplain::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketAddrinfoConnectCallUsesJitSocketAddrinfoConnect(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_addrinfo_connect.php');
+        $this->assertStringContainsString('JitSocketAddrinfoConnect::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketAddrinfoBindCallUsesJitSocketAddrinfoBind(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_addrinfo_bind.php');
+        $this->assertStringContainsString('JitSocketAddrinfoBind::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketAddrinfoJitHelperExposesLookupArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketAddrinfoJitHelper.php');
+        $this->assertStringContainsString('function lookupCountConstArgv', $source);
+        $this->assertStringContainsString('function registerArgv', $source);
+        $this->assertStringContainsString('function socketFdArgv', $source);
+        $this->assertStringContainsString('function syntheticIpv4Count', $source);
+        $this->assertStringContainsString('VmAddressInfo::registerJitSnapshot', $source);
+    }
+
+    public function testSocketAddrinfoRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketAddrinfoRuntime.php');
+        $this->assertStringContainsString('::lookupCountConstArgv', $source);
+        $this->assertStringContainsString('SocketAddrinfoJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_addrinfo_lookup', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('__hashtable__setObjectAt', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketAddrinfoHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketAddrinfoLookup.php', $spine);
+        $this->assertStringContainsString('JitSocketAddrinfoExplain.php', $spine);
+        $this->assertStringContainsString('JitSocketAddrinfoConnect.php', $spine);
+        $this->assertStringContainsString('JitSocketAddrinfoBind.php', $spine);
+        $this->assertStringContainsString('SocketAddrinfoJitHelper.php', $spine);
+        $this->assertStringContainsString('SocketAddrinfoRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketAddrinfo.php', $spine);
+    }
 }

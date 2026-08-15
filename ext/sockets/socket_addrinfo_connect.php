@@ -57,6 +57,6 @@ final class socket_addrinfo_connect extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_addrinfo_connect() JIT lowering not implemented (#6064)');
+        return JitSocketAddrinfoConnect::invoke($context, ...$args);
     }
 }
