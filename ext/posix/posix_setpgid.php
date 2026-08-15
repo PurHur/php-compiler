@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** posix_setpgid() — set process group (php-src ext/posix/posix.c; #6505). */
+/** posix_setpgid() — set process group (VM VmPosix; JIT/AOT PosixSetpgidJitHelper via PosixSetpgidJit, #31235/#6505). */
 final class posix_setpgid extends Internal
 {
     public function __construct()
