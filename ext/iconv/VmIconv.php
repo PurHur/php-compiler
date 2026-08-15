@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\iconv;
 
+use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -28,6 +29,7 @@ final class VmIconv
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19387, re-#18993; iconv.c).
+            // Default profile: soft-null E_DEPRECATED then coerce to "" (#31309).
             if (
                 VmString::requiresZparamStrStrictNullOnForwardProfile()
                 || (null !== $frame && InternalStrictArg::isCallerStrict($frame))
@@ -39,6 +41,7 @@ final class VmIconv
                     $param
                 ));
             }
+            VmNullStringParamDeprecation::emit($frame, $function, $argIndex, $param);
 
             return '';
         }
