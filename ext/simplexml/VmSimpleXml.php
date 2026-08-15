@@ -133,7 +133,9 @@ final class VmSimpleXml
         Context $ctx,
         string $data,
         ?Frame $frame = null,
-        ?ClassEntry $class = null
+        ?ClassEntry $class = null,
+        string $callerLabel = 'simplexml_load_string',
+        ?string $sourceFile = null
     ): ?ObjectEntry {
         $trimmed = trim($data);
         // php-src: empty/whitespace-only after Z_PARAM_STR coerce → false with no warning
@@ -143,13 +145,14 @@ final class VmSimpleXml
             return null;
         }
 
-        if (!VmXml::validateAndReport($ctx, $trimmed, $frame)) {
+        // php-src php_libxml_error_handler: Entity + snippet + caret (#31183).
+        if (!VmXml::validateAndReport($ctx, $trimmed, $frame, $callerLabel, $sourceFile)) {
             return null;
         }
 
         $root = self::parseDocumentRoot($trimmed);
         if (null === $root) {
-            self::warn($ctx, 'simplexml_load_string(): Entity: line 1: parser error', $frame);
+            self::warn($ctx, $callerLabel.'(): Entity: line 1: parser error', $frame);
 
             return null;
         }
@@ -183,7 +186,8 @@ final class VmSimpleXml
             throw new \Exception('String could not be parsed as XML');
         }
 
-        if (!VmXml::validateAndReport($ctx, $trimmed, $frame)) {
+        // php-src php_libxml_error_handler via zim_simplexmlelement___construct (#31183).
+        if (!VmXml::validateAndReport($ctx, $trimmed, $frame, 'SimpleXMLElement::__construct')) {
             throw new \Exception('String could not be parsed as XML');
         }
 
@@ -222,7 +226,8 @@ final class VmSimpleXml
             return null;
         }
 
-        return self::loadString($ctx, $contents, $frame, $class);
+        // php-src: locus is "path:line" rather than "Entity: line N" (#31183 sibling).
+        return self::loadString($ctx, $contents, $frame, $class, 'simplexml_load_file', $filename);
     }
 
     public static function requireElement(ObjectEntry $entry, string $label): ObjectEntry

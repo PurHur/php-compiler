@@ -372,6 +372,46 @@ final class VmLibxml
     }
 
     /**
+     * php_libxml_error_handler default-warning surface (php-src ext/libxml/libxml.c; #31183).
+     *
+     * Under libxml_use_internal_errors(true): record the error once (#28658). Otherwise emit
+     * three E_WARNINGs — Entity/file location + source snippet + caret — with "$callerLabel(): ".
+     *
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int} $record
+     * @param null|string                                                                          $location Override for the locus token (default "Entity: line N"; load_file uses "path:N")
+     */
+    public static function handleParserError(
+        Context $ctx,
+        array $record,
+        string $source,
+        string $callerLabel,
+        ?Frame $frame = null,
+        ?string $location = null
+    ): void {
+        if (LibxmlInternalErrorsJitHelper::using()) {
+            LibxmlInternalErrorsJitHelper::record($record);
+
+            return;
+        }
+
+        $prefix = $callerLabel.'(): ';
+        $location ??= 'Entity: line '.$record['line'];
+        self::handleError(
+            $ctx,
+            $record,
+            $frame,
+            null,
+            $prefix.$location.': parser error : '.$record['message']
+        );
+
+        $snippet = trim($source);
+        self::handleError($ctx, $record, $frame, null, $prefix.$snippet);
+
+        $caretColumn = '' === $snippet ? 0 : max(0, $record['column'] - 1);
+        self::handleError($ctx, $record, $frame, null, $prefix.str_repeat(' ', $caretColumn).'^');
+    }
+
+    /**
      * @param array{level: int, code: int, column: int, message: string, file: string, line: int} $record
      */
     public static function createErrorObject(Context $ctx, array $record): Variable
