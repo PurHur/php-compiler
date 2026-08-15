@@ -153,17 +153,45 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitSocketStrerror.php', $spine);
         $this->assertStringContainsString('JitSocketLastError.php', $spine);
         $this->assertStringContainsString('JitSocketClearError.php', $spine);
+        $this->assertStringContainsString('JitSocketShutdown.php', $spine);
         $this->assertStringContainsString('SocketCreateRuntime.php', $spine);
         $this->assertStringContainsString('SocketCloseRuntime.php', $spine);
         $this->assertStringContainsString('SocketConnectRuntime.php', $spine);
         $this->assertStringContainsString('SocketBindListenRuntime.php', $spine);
         $this->assertStringContainsString('SocketErrorRuntime.php', $spine);
+        $this->assertStringContainsString('SocketShutdownRuntime.php', $spine);
         $this->assertStringContainsString('StringSocketConnect.php', $spine);
         $this->assertStringContainsString('StringSocketBind.php', $spine);
         $this->assertStringContainsString('StringSocketListen.php', $spine);
         $this->assertStringContainsString('StringSocketAccept.php', $spine);
         $this->assertStringContainsString('StringSocketCreateListen.php', $spine);
         $this->assertStringContainsString('StringSocketError.php', $spine);
+        $this->assertStringContainsString('StringSocketShutdown.php', $spine);
+    }
+
+    public function testSocketShutdownCallUsesJitSocketShutdown(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_shutdown.php');
+        $this->assertStringContainsString('JitSocketShutdown::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketShutdownJitHelperExposesShutdownArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCreateJitHelper.php');
+        $this->assertStringContainsString('function shutdownArgv', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::shutdown', $source);
+    }
+
+    public function testSocketShutdownRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketShutdownRuntime.php');
+        $this->assertStringContainsString('::shutdownArgv', $source);
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_shutdown', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
     }
 
     public function testSocketStrerrorCallUsesJitSocketStrerror(): void
