@@ -432,6 +432,8 @@
             <file>./test/compliance/DomResidualExcessArgc31251JITTest.php</file>
             <file>./test/compliance/XsltHasExsltSupportExcessArgc30993VMTest.php</file>
             <file>./test/compliance/XsltHasExsltSupportExcessArgc30993JITTest.php</file>
+            <file>./test/compliance/MiscExcessArgc30575VMTest.php</file>
+            <file>./test/compliance/MiscExcessArgc30575JITTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641VMTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641JITTest.php</file>
             <file>./test/compliance/XmlWriterExcessArgc30818VMTest.php</file>
