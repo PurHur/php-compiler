@@ -78,6 +78,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/pg_copy_meta_builtins.php';
         require_once __DIR__.'/pg_async_builtins.php';
         require_once __DIR__.'/pg_dml_builtins.php';
+        require_once __DIR__.'/VmPgsqlDefaultLinkDeprecation.php';
         require_once __DIR__.'/pg_params_escape_builtins.php';
         require_once __DIR__.'/pg_connection_info_builtins.php';
         require_once __DIR__.'/pg_fetch_extra_builtins.php';
