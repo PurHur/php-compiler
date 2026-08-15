@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringStrWordCount;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -22,6 +23,7 @@ use PHPLLVM\Value;
  * JIT/AOT: {@see StringStrWordCount} → StrWordCountJitHelper PHP (#14651).
  *
  * Excess/missing argc → Zend ArgumentCountError (#30720; php-src ext/standard/string.c).
+ * Z_PARAM_LONG $format null under strict_types → TypeError (#31287).
  */
 final class str_word_count extends Internal
 {
@@ -38,11 +40,14 @@ final class str_word_count extends Internal
         $string = self::vmStringArg($frame, 0, 'string');
         $format = 0;
         if ($argc >= 2) {
-            $formatArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $formatArg->type) {
-                throw new \LogicException('str_word_count() argument #2 must be an integer in this compiler build');
-            }
-            $format = $formatArg->toInt();
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+0 (#31287).
+            $format = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
+                'str_word_count',
+                2,
+                'format'
+            );
         }
         $chars = '';
         if (3 === $argc) {
@@ -82,6 +87,15 @@ final class str_word_count extends Internal
         }
         $argc = \count($args);
 
+        // Early return after compile-time null TypeError (AOT verify; peer scandir #31244).
+        if ($argc >= 2 && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            JitSleep::zParamLong($context, $args[1], 'str_word_count', 2, 'format');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'str_word_count_null_format_te_cont');
+
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
+
         $literal = $args[0]->compileTimeString ?? null;
         $formatCt = null;
         if ($argc >= 2) {
@@ -97,6 +111,7 @@ final class str_word_count extends Internal
 
         // Fold when the string is a compile-time literal and format/chars are known
         // (1-arg defaults format=0; #27019 also covers the runtime NestedJIT path).
+        // Do not fold soft-null $format here — runtime DEP+coerce via zParamLong (#31287).
         if (null !== $literal && (1 === $argc || (null !== $formatCt && (2 === $argc || null !== $charsCt)))) {
             $format = 1 === $argc ? 0 : (int) $formatCt;
             $chars = $charsCt ?? '';
@@ -117,9 +132,13 @@ final class str_word_count extends Internal
             ? $context->getTypeFromString('int64')->constInt(0, false)
             : (null !== $formatCt
                 ? $context->getTypeFromString('int64')->constInt((int) $formatCt, false)
-                : StringStrWordCount::jitFormatArg($context, $args[1]));
+                : JitSleep::zParamLong($context, $args[1], 'str_word_count', 2, 'format'));
 
-        if (1 === $argc || (null !== $formatCt && 0 === (int) $formatCt)) {
+        $softNullFormat = $argc >= 2
+            && !$context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false));
+
+        if (1 === $argc || (null !== $formatCt && 0 === (int) $formatCt) || $softNullFormat) {
             return $context->builder->call(
                 $context->lookupFunction('phpc_str_word_count_count'),
                 $str

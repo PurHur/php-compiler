@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -127,19 +126,21 @@ final class StringStrWordCount
         return $jit->value;
     }
 
+    /**
+     * Z_PARAM_LONG $format — strict null → TypeError; soft null → 0 (#31287).
+     *
+     * Prefer {@see \PHPCompiler\ext\standard\JitSleep::zParamLong} at call sites;
+     * kept for NestedJIT / legacy callers.
+     */
     public static function jitFormatArg(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
-        }
-
-        return JitLongArg::lower($context, $arg, 'str_word_count() argument #2 ($format)');
+        return \PHPCompiler\ext\standard\JitSleep::zParamLong(
+            $context,
+            $arg,
+            'str_word_count',
+            2,
+            'format'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
