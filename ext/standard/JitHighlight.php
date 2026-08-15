@@ -64,10 +64,8 @@ final class JitHighlight
 
     public static function highlightFile(Context $context, string $functionName, JITVariable ...$args): Value
     {
+        // Arity guarded by highlight_file/show_source::call via requireArgCountRangeJit (#30689).
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($functionName.'() expects 1 or 2 arguments in this compiler build');
-        }
 
         $pathStr = JitStreamPath::lowerNonEmptyPath($context, $args[0], $functionName, 0, 'filename');
         StringFileGetContents::implement($context);

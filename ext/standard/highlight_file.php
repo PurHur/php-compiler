@@ -7,12 +7,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * highlight_file() — read file and emit syntax-highlighted HTML (VM: HighlightEngine, #4824).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30689; peer highlight_string #30723).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/url.c PHP_FUNCTION(highlight_file)
  */
@@ -20,15 +22,14 @@ final class highlight_file extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 1..2 (#30689; ext/standard/basic_functions.stub.php).
+        $this->requireArgCountRange($frame, $this->getName(), 1, 2);
         self::run($frame, $this->getName());
     }
 
     public static function run(Frame $frame, string $functionName): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($functionName.'() expects 1 or 2 arguments in this compiler build');
-        }
         $path = VmStreamPath::coerceNonEmptyPathArgForFrame(
             $frame,
             0,
@@ -74,6 +75,11 @@ final class highlight_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError under AOT try/catch (#30689; peer #30723 / #27763).
+        if (!$this->requireArgCountRangeJit($context, $args, $this->getName(), 1, 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
         return JitHighlight::highlightFile($context, $this->getName(), ...$args);
     }
 }
