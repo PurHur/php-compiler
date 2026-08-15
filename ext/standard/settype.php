@@ -38,8 +38,9 @@ final class settype extends Internal
         // php-src ext/standard/type.c — ArgumentCountError (#21964).
         $this->requireExactArgCount($frame, 'settype', 2);
         $slot = $frame->calledArgs[0];
-        // Z_PARAM_STR — include ", <Type> given" with concrete class (#25724, zend_API.c).
-        $typeName = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'settype', 1, 'type');
+        // Z_PARAM_STR: soft-null DEP+coerce outside strict_types, then valid-type table
+        // (#30506); objects still TypeError with concrete class (#25724, zend_API.c).
+        $typeName = VmString::stringBuiltinArgForFrame($frame, 1, 'settype', 1, 'type', false);
         VmSettype::apply($slot, $typeName, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -51,14 +52,34 @@ final class settype extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'settype', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        $typeArg = $args[1];
+        $typeIsNull = JITVariable::TYPE_NULL === $typeArg->type || ($typeArg->isNullConstant ?? false);
+        // Soft-null outside strict_types → Deprecated then ValueError (empty type); strict → TypeError (#30506).
+        if ($typeIsNull) {
+            if ($context->callerStrictTypes) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'settype(): Argument #2 ($type) must be of type string, null given'
+                );
+            } else {
+                JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'settype', 1, 'type');
+                ExceptionBridge::emitValueErrorAndAbort(
+                    $context,
+                    'settype(): Argument #2 ($type) must be a valid type'
+                );
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'settype_null_type_cont');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
         // Reject non-string type names with Zend-shaped TypeError before literal lowering (#25724).
-        if (JITVariable::TYPE_STRING !== $args[1]->type) {
-            if (JITVariable::TYPE_OBJECT === $args[1]->type) {
-                $objectGiven = JitOperandTypeLabel::givenLabel($context, $args[1]);
+        if (JITVariable::TYPE_STRING !== $typeArg->type) {
+            if (JITVariable::TYPE_OBJECT === $typeArg->type) {
+                $objectGiven = JitOperandTypeLabel::givenLabel($context, $typeArg);
                 if ('object' === $objectGiven || 'mixed' === $objectGiven) {
                     JitStringBuiltinArg::emitObjectTypeErrorReject(
                         $context,
-                        $args[1],
+                        $typeArg,
                         'settype',
                         1,
                         'type',
@@ -78,7 +99,7 @@ final class settype extends Internal
                     $context,
                     sprintf(
                         'settype(): Argument #2 ($type) must be of type string, %s given',
-                        JitOperandTypeLabel::givenLabel($context, $args[1])
+                        JitOperandTypeLabel::givenLabel($context, $typeArg)
                     )
                 );
             }
@@ -88,6 +109,6 @@ final class settype extends Internal
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
-        return JitSettype::invoke($context, $args[0], $args[1]);
+        return JitSettype::invoke($context, $args[0], $typeArg);
     }
 }
