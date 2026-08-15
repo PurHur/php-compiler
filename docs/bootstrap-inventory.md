@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7450 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23979 |
+| Source constructs flagged (warnings) | 23980 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1853,7 +1853,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/PgsqlSerializeDeny.php` | 0 | 3 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
-| `ext/pgsql/VmPgsqlConnection.php` | 0 | 6 |
+| `ext/pgsql/VmPgsqlConnection.php` | 0 | 7 |
 | `ext/pgsql/VmPgsqlCore.php` | 0 | 27 |
 | `ext/pgsql/VmPgsqlDefaultLinkDeprecation.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
@@ -18601,9 +18601,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 233)
 - new HashTable (line 307)
 - new Variable (line 320)
-- new ObjectEntry (line 384)
-- new Variable (line 393)
-- 21 class method(s)
+- new ObjectEntry (line 424)
+- new Variable (line 433)
+- 22 class method(s)
 
 ### `ext/libxml/libxml_clear_errors.php`
 
@@ -22328,7 +22328,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 74)
 - new HashTable (line 137)
 - new Variable (line 139)
-- 19 class method(s)
+- new Error (line 231)
+- 20 class method(s)
 
 ### `ext/pgsql/VmPgsqlCore.php`
 
@@ -22439,14 +22440,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
-- new ArgumentCountError (line 68)
-- new ArgumentCountError (line 113)
-- new ArgumentCountError (line 231)
-- new ArgumentCountError (line 271)
-- new ArgumentCountError (line 309)
-- new ArgumentCountError (line 338)
-- new ArgumentCountError (line 367)
-- new ArgumentCountError (line 396)
+- new ArgumentCountError (line 64)
+- new ArgumentCountError (line 105)
+- new ArgumentCountError (line 219)
+- new ArgumentCountError (line 255)
+- new ArgumentCountError (line 289)
+- new ArgumentCountError (line 318)
+- new ArgumentCountError (line 347)
+- new ArgumentCountError (line 376)
 - 25 class method(s)
 
 ### `ext/pgsql/pg_copy_meta_builtins.php`
@@ -24515,12 +24516,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new SimpleXMLElement (line 132)
-- new JITVariable (line 308)
-- new JITVariable (line 331)
-- new JITVariable (line 732)
-- new JITVariable (line 801)
-- 36 class method(s)
+- new SimpleXMLElement (line 141)
+- new JITVariable (line 317)
+- new JITVariable (line 340)
+- new JITVariable (line 741)
+- new JITVariable (line 810)
+- 37 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -24721,41 +24722,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SimpleXmlElementGetDocNamespaces (line 95)
 - new SimpleXmlElementGetNamespaces (line 98)
 - new SimpleXmlElementRegisterXPathNamespace (line 101)
-- new Exception (line 183)
-- new Exception (line 187)
-- new Exception (line 194)
-- new SimpleXmlNodeState (line 541)
-- new Variable (line 634)
-- new Variable (line 640)
-- new Variable (line 647)
-- new Variable (line 653)
-- new Variable (line 668)
-- new Error (line 888)
-- new SimpleXmlNodeState (line 989)
-- new SimpleXmlNodeState (line 1025)
-- new SimpleXmlNodeState (line 1140)
-- new HashTable (line 1211)
-- new Variable (line 1254)
-- new Variable (line 1263)
-- new Variable (line 1324)
-- new Variable (line 1350)
-- new SimpleXmlNodeState (line 1464)
-- new ObjectEntry (line 1488)
-- new SimpleXmlNodeState (line 1583)
-- new SimpleXmlNodeState (line 1593)
-- new SimpleXmlNodeState (line 1596)
-- new ObjectEntry (line 1617)
-- new ObjectEntry (line 1638)
-- new ObjectEntry (line 1728)
-- new SimpleXmlNodeState (line 1732)
-- new ObjectEntry (line 1750)
-- new ObjectEntry (line 1766)
-- new Error (line 1904)
-- new ObjectEntry (line 1916)
-- new HashTable (line 2299)
-- new Variable (line 2301)
-- new SimpleXmlNodeState (line 2580)
-- new SimpleXmlNodeState (line 2589)
+- new Exception (line 186)
+- new Exception (line 191)
+- new Exception (line 198)
+- new SimpleXmlNodeState (line 546)
+- new Variable (line 639)
+- new Variable (line 645)
+- new Variable (line 652)
+- new Variable (line 658)
+- new Variable (line 673)
+- new Error (line 893)
+- new SimpleXmlNodeState (line 994)
+- new SimpleXmlNodeState (line 1030)
+- new SimpleXmlNodeState (line 1145)
+- new HashTable (line 1216)
+- new Variable (line 1259)
+- new Variable (line 1268)
+- new Variable (line 1329)
+- new Variable (line 1355)
+- new SimpleXmlNodeState (line 1469)
+- new ObjectEntry (line 1493)
+- new SimpleXmlNodeState (line 1588)
+- new SimpleXmlNodeState (line 1598)
+- new SimpleXmlNodeState (line 1601)
+- new ObjectEntry (line 1622)
+- new ObjectEntry (line 1643)
+- new ObjectEntry (line 1733)
+- new SimpleXmlNodeState (line 1737)
+- new ObjectEntry (line 1755)
+- new ObjectEntry (line 1771)
+- new Error (line 1909)
+- new ObjectEntry (line 1921)
+- new HashTable (line 2304)
+- new Variable (line 2306)
+- new SimpleXmlNodeState (line 2585)
+- new SimpleXmlNodeState (line 2594)
 - 96 class method(s)
 - 2 closure(s)
 

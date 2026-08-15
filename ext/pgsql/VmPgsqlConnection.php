@@ -214,7 +214,30 @@ final class VmPgsqlConnection
     }
 
     /**
+     * Explicit connection, or FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31220).
+     *
+     * When {@see $provided} is null, emits E_DEPRECATED then throws {@see \Error} if no default link.
+     */
+    public static function connectionOrDefaultDeprecated(
+        ?ObjectEntry $provided,
+        ?Frame $frame,
+        string $functionName
+    ): ObjectEntry {
+        if (null !== $provided) {
+            return $provided;
+        }
+        $conn = self::fetchDefaultLinkDeprecated($frame, $functionName);
+        if (null === $conn) {
+            throw new \Error('No PostgreSQL connection opened yet');
+        }
+
+        return $conn;
+    }
+
+    /**
      * Optional connection or default link; warn when none (php-src CHECK_DEFAULT_LINK; #20680).
+     *
+     * Prefer {@see connectionOrDefaultDeprecated()} for FETCH_DEFAULT_LINK call sites (#31220).
      */
     public static function requireOptionalOrDefault(?ObjectEntry $provided, string $functionName): ?ObjectEntry
     {
