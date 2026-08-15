@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
+use PHPCompiler\VM\NativeDateRangeError;
 use PHPLLVM\Value;
 
 /**
@@ -39,7 +42,16 @@ final class JitDateCreateFromTimestamp
             );
         }
 
-        $parts = DateTimeSupport::splitTimestampNumber($timestamp);
+        try {
+            $parts = DateTimeSupport::splitTimestampNumber($timestamp, $function);
+        } catch (NativeDateRangeError $e) {
+            // Compile-time NAN/INF/out-of-range — emit catchable DateRangeError IR (#31119).
+            ExceptionBridge::emitDateRangeErrorAndAbort($context, $e->getMessage());
+            $dead = BasicBlockHelper::append($context, 'create_from_ts_range_dead');
+            $context->builder->positionAtEnd($dead);
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
         $tzName = VmDate::defaultTimezoneGet();
 
         return self::materializeDateTimeLike(

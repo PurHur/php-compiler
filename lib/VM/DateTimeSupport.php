@@ -726,7 +726,10 @@ final class DateTimeSupport
         } catch (NativeDateInvalidTimeZoneException) {
             self::throwDateInvalidTimeZoneException($tzName);
         }
-        $parts = self::splitTimestampNumber($timestamp);
+        $parts = self::splitTimestampNumber(
+            $timestamp,
+            self::classLabel($dt).'::createFromTimestamp'
+        );
         $seconds = $parts['timestamp'];
         if (4 === \PHP_INT_SIZE) {
             if ($seconds > \PHP_INT_MAX || $seconds < \PHP_INT_MIN) {
@@ -743,17 +746,59 @@ final class DateTimeSupport
     }
 
     /**
-     * php-src ext/date/php_date.c — float timestamp → epoch seconds + usec (#9984).
+     * php-src ext/date/php_date.c — php_date_initialize_from_ts_double() (#31119).
+     *
+     * zend_argument_error(date_ce_date_range_error, 1,
+     *   "must be a finite number between " TIMELIB_LONG_FMT " and " TIMELIB_LONG_FMT ".999999, %g given", …)
+     */
+    public static function createFromTimestampRangeErrorMessage(string $function, float $timestamp): string
+    {
+        return $function.'(): Argument #1 ($timestamp) must be a finite number between '
+            .\PHP_INT_MIN.' and '.\PHP_INT_MAX.'.999999, '
+            .self::formatTimestampGiven($timestamp).' given';
+    }
+
+    /** Match php-src `%g` for specials; finite floats use sprintf('%g'). */
+    private static function formatTimestampGiven(float $timestamp): string
+    {
+        if (\is_nan($timestamp)) {
+            return 'NAN';
+        }
+        if (\is_infinite($timestamp)) {
+            return $timestamp > 0.0 ? 'INF' : '-INF';
+        }
+
+        return \sprintf('%g', $timestamp);
+    }
+
+    /**
+     * php-src PHP_DATE_DOUBLE_FITS_LONG — TIMELIB long is PHP int width (#31119).
+     */
+    public static function timestampDoubleFitsLong(float $timestamp): bool
+    {
+        if (4 === \PHP_INT_SIZE) {
+            return !($timestamp > (float) \PHP_INT_MAX || $timestamp < (float) \PHP_INT_MIN);
+        }
+
+        // 8-byte: (double)TIMELIB_LONG_MAX is outside signed range → use >=
+        return !($timestamp >= (float) \PHP_INT_MAX || $timestamp < (float) \PHP_INT_MIN);
+    }
+
+    /**
+     * php-src ext/date/php_date.c — float timestamp → epoch seconds + usec (#9984, #31119).
+     *
+     * @param ?string $function Qualified createFromTimestamp name for DateRangeError wording; null for @ts parse
      *
      * @return array{timestamp: int, microsecond: int}
      */
-    public static function splitTimestampNumber(int|float $timestamp): array
+    public static function splitTimestampNumber(int|float $timestamp, ?string $function = null): array
     {
         if (\is_int($timestamp)) {
             return ['timestamp' => $timestamp, 'microsecond' => 0];
         }
-        if (!\is_finite($timestamp)) {
-            throw new \ValueError('Invalid timestamp');
+        if (!\is_finite($timestamp) || !self::timestampDoubleFitsLong($timestamp)) {
+            $fn = $function ?? 'DateTime::createFromTimestamp';
+            self::throwDateRangeError(self::createFromTimestampRangeErrorMessage($fn, $timestamp));
         }
         $seconds = (int) $timestamp;
         $fraction = $timestamp - $seconds;
