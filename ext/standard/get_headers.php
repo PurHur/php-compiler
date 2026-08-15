@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
@@ -30,12 +31,9 @@ final class get_headers extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src head.c / basic_functions.stub.php — split under/over arity (#31192; peer #30677).
+        $this->requireArgCountRange($frame, 'get_headers', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \ArgumentCountError(
-                'get_headers() expects at least 1 argument, '.\max(0, $argc).' given'
-            );
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -84,12 +82,11 @@ final class get_headers extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException(
-                'get_headers() expects at least 1 argument, '.\max(0, $argc).' given'
-            );
+        // Catchable ACE + Zend under/over wording (#31192; peer #30677 / #27763).
+        if (!$this->requireArgCountRangeJit($context, $args, 'get_headers', 1, 3)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
+        $argc = \count($args);
 
         $url = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'get_headers', 0, 'url');
         $associative = $context->constantFromBool(false);
