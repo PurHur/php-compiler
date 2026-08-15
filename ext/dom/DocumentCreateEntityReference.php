@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::createEntityReference() — VM (#15240, php-src ext/dom/document.c). */
+/**
+ * DOMDocument::createEntityReference() — VM (#15240, php-src ext/dom/document.c).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentCreateEntityReference extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentCreateEntityReference extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::createEntityReference', 1);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createEntityReference()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::createEntityReference() expects exactly 1 argument');
-        }
         VmDom::ensureDocument($document);
         $name = $this->stringArg($frame->calledArgs[1], 'DOMDocument::createEntityReference()', 0, $frame, 'name');
         if (null === $frame->vmContext) {

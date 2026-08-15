@@ -11,6 +11,8 @@ use PHPCompiler\Frame;
  *
  * php-src: ext/dom/document.c PHP_METHOD(DOMDocument, createCDATASection)
  * (follow_spec + HTML document → NOT_SUPPORTED_ERR).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31251; re-#31011).
  */
 final class DocumentCreateCDATASection extends DomClassMethod
 {
@@ -21,10 +23,8 @@ final class DocumentCreateCDATASection extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::createCDATASection', 1);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createCDATASection()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::createCDATASection() expects at least 1 argument');
-        }
         // Pass $frame so caller strict_types rejects null like Zend (#29985, re-#29942).
         $data = $this->stringArg(
             $frame->calledArgs[1],

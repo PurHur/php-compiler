@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation (php-src ext/dom/document.c; #18748, #20235). */
+/**
+ * DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation (php-src ext/dom/document.c; #18748, #20235).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31251; re-#31011 / #25323).
+ */
 final class DocumentRelaxNGValidateSource extends DomClassMethod
 {
     public function __construct()
@@ -16,11 +20,8 @@ final class DocumentRelaxNGValidateSource extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::relaxNGValidateSource', 1);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::relaxNGValidateSource()');
-        if (\count($frame->calledArgs) < 2) {
-            // Fixed arity 1 → Zend "exactly" (php-src php_dom.stub.php / #25323)
-            throw new \ArgumentCountError('DOMDocument::relaxNGValidateSource() expects exactly 1 argument, 0 given');
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::relaxNGValidateSource() requires VM context in this compiler build');
         }

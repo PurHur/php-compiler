@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::load() — VM (#15336, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument::load() — VM (#15336, php-src ext/dom/php_dom.c).
+ *
+ * User arity 1–2 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentLoad extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentLoad extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::load', 1, 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::load()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::load() expects at least 1 argument');
-        }
         $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::load()', 0);
         $options = 0;
         if (isset($frame->calledArgs[2])) {

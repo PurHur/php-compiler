@@ -111,6 +111,7 @@ final class VmDomJitDispatch
      */
     public static function load(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExtraArgCountRange('DOMDocument::load', $extra, 1, 2);
         $filename = VmString::coerceStringBuiltinArg(
             ($extra[0] ?? self::missingArg('load', 0))->resolveIndirect(),
             'DOMDocument::load',
@@ -665,6 +666,8 @@ final class VmDomJitDispatch
      */
     public static function createDocumentFragment(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
+        self::requireExactExtraArgCount('DOMDocument::createDocumentFragment', $extra, 0);
+
         return VmDom::createDocumentFragment($ctx, $document);
     }
 
@@ -1413,6 +1416,7 @@ final class VmDomJitDispatch
      */
     public static function xpathRegisterPhpFunctions(ObjectEntry $xpath, array $extra): Variable
     {
+        self::requireAtMostExtraArgCount('DOMXPath::registerPhpFunctions', $extra, 1);
         VmDomXPath::registerPhpFunctions($xpath, $extra[0] ?? null);
         $result = new Variable(Variable::TYPE_NULL);
         $result->null();
