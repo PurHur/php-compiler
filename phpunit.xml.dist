@@ -575,6 +575,8 @@
             <file>./test/compliance/NetworkExcessArgc30546JITTest.php</file>
             <file>./test/compliance/ChdirDnsExcessArgc30585VMTest.php</file>
             <file>./test/compliance/ChdirDnsExcessArgc30585JITTest.php</file>
+            <file>./test/compliance/GetservExcessArgc30567VMTest.php</file>
+            <file>./test/compliance/GetservExcessArgc30567JITTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720VMTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720JITTest.php</file>
             <file>./test/compliance/StripcslashesExcessArgc30704VMTest.php</file>
