@@ -876,6 +876,17 @@ final class BuiltinInternalDefaultValues
         'libxml_disable_entity_loader' => [
             0 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/dom/php_dom.stub.php — bool $registerNodeNS = true (bool infer → false) (#31348)
+        // Construct's 2nd param is stub-only (InternalArgInfo omits it); query/evaluate infer false.
+        'domxpath::__construct' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
+        'domxpath::query' => [
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
+        'domxpath::evaluate' => [
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/imap/php_imap.stub.php — int $timeout = -1 (int infer → 0) (#27680)
         'imap_timeout' => [
             1 => ['kind' => 'int', 'value' => -1],

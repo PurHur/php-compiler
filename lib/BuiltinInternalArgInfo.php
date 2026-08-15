@@ -1382,6 +1382,11 @@ final class BuiltinInternalArgInfo
             // InternalArgInfo omits the optional $options param (load/loadXML already have int).
             'domdocument::loadhtml',
             'domdocument::loadhtmlfile' => 1 === $index ? 'int' : null,
+            // ext/dom/php_dom.stub.php — __construct(..., bool $registerNodeNS = true) omitted from
+            // InternalArgInfo; query/evaluate $contextNode is ?DOMNode (InternalArgInfo omits ?) (#31348).
+            'domxpath::__construct' => 1 === $index ? 'bool' : null,
+            'domxpath::query',
+            'domxpath::evaluate' => 1 === $index ? '?DOMNode' : null,
             // ext/intl/spoofchecker/spoofchecker.stub.php — string $string / $string1/$string2 (#25055)
             'spoofchecker::issuspicious' => 0 === $index ? 'string' : null,
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
