@@ -10,14 +10,14 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for socket_send()/socket_recv() via SocketCreateJitHelper (#31294).
+ * JIT/AOT link for socket_recvfrom() via SocketCreateJitHelper (#31332).
  *
- * Same NestedJIT unit as create/pair so owned fds resolve under thin AOT.
- * Recv buffer is stashed (NestedJIT cannot return string+int together); LLVM writes by-ref.
+ * Same NestedJIT unit as create/pair/sendto so owned fds resolve under thin AOT.
+ * Data/addr/port are stashed (NestedJIT cannot return string+int together); LLVM writes by-ref.
  *
- * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_send|socket_recv)
+ * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_recvfrom)
  */
-final class SocketSendRecvRuntime
+final class SocketRecvfromRuntime
 {
     private const HELPER_PATH = '/ext/sockets/SocketCreateJitHelper.php';
 
@@ -59,15 +59,15 @@ final class SocketSendRecvRuntime
 
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
-        '__compiler_socket_send',
-        '__compiler_socket_recv',
-        '__compiler_socket_recv_data',
-        '__compiler_socket_recv_eof',
+        '__compiler_socket_recvfrom',
+        '__compiler_socket_recvfrom_data',
+        '__compiler_socket_recvfrom_addr',
+        '__compiler_socket_recvfrom_port',
     ];
 
     public static function ensureLinked(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_socket_send');
+        $probe = $context->module->getNamedFunction('__compiler_socket_recvfrom');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
@@ -82,10 +82,10 @@ final class SocketSendRecvRuntime
 
         SocketCreateRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
-        self::implementSendBridge($context);
-        self::implementRecvBridge($context);
-        self::implementRecvDataBridge($context);
-        self::implementRecvEofBridge($context);
+        self::implementRecvfromBridge($context);
+        self::implementStringBridge($context, '__compiler_socket_recvfrom_data', self::H.'::recvfromDataArgv', 'socket_recvfrom_data_entry');
+        self::implementStringBridge($context, '__compiler_socket_recvfrom_addr', self::H.'::recvfromAddrArgv', 'socket_recvfrom_addr_entry');
+        self::implementPortBridge($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -95,42 +95,9 @@ final class SocketSendRecvRuntime
         }
     }
 
-    private static function implementSendBridge(Context $context): void
+    private static function implementRecvfromBridge(Context $context): void
     {
-        $abiName = '__compiler_socket_send';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($i64, false, $i64, $strPtr, $i64, $i64)
-            );
-
-        $entry = $fn->appendBasicBlock('socket_send_entry');
-        $context->builder->positionAtEnd($entry);
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::H.'::sendArgv'),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
-        );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
-        );
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementRecvBridge(Context $context): void
-    {
-        $abiName = '__compiler_socket_recv';
+        $abiName = '__compiler_socket_recvfrom';
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -146,11 +113,11 @@ final class SocketSendRecvRuntime
                 $context->context->functionType($i64, false, $i64, $i64, $i64)
             );
 
-        $entry = $fn->appendBasicBlock('socket_recv_entry');
+        $entry = $fn->appendBasicBlock('socket_recvfrom_entry');
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::recvArgv'),
+            self::helperFunction($context, self::H.'::recvfromArgv'),
             [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
         );
         $context->builder->returnValue(
@@ -160,9 +127,12 @@ final class SocketSendRecvRuntime
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementRecvDataBridge(Context $context): void
-    {
-        $abiName = '__compiler_socket_recv_data';
+    private static function implementStringBridge(
+        Context $context,
+        string $abiName,
+        string $helper,
+        string $entryName
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -178,11 +148,11 @@ final class SocketSendRecvRuntime
                 $context->context->functionType($strPtr, false)
             );
 
-        $entry = $fn->appendBasicBlock('socket_recv_data_entry');
+        $entry = $fn->appendBasicBlock($entryName);
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::recvDataArgv'),
+            self::helperFunction($context, $helper),
             []
         );
         $context->builder->returnValue(
@@ -192,9 +162,9 @@ final class SocketSendRecvRuntime
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementRecvEofBridge(Context $context): void
+    private static function implementPortBridge(Context $context): void
     {
-        $abiName = '__compiler_socket_recv_eof';
+        $abiName = '__compiler_socket_recvfrom_port';
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -210,11 +180,11 @@ final class SocketSendRecvRuntime
                 $context->context->functionType($i64, false)
             );
 
-        $entry = $fn->appendBasicBlock('socket_recv_eof_entry');
+        $entry = $fn->appendBasicBlock('socket_recvfrom_port_entry');
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::recvEofArgv'),
+            self::helperFunction($context, self::H.'::recvfromPortArgv'),
             []
         );
         $context->builder->returnValue(
@@ -228,7 +198,7 @@ final class SocketSendRecvRuntime
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#31294');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#31332');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -237,7 +207,7 @@ final class SocketSendRecvRuntime
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#31294'
+            '#31332'
         );
     }
 
@@ -246,7 +216,7 @@ final class SocketSendRecvRuntime
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after SocketSendRecvRuntime link (#31294)');
+                throw new \LogicException($name.' missing after SocketRecvfromRuntime link (#31332)');
             }
             $context->registerFunction($name, $fn);
         }

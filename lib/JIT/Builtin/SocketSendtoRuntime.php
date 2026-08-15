@@ -51,6 +51,10 @@ final class SocketSendtoRuntime
         self::H.'::setOptionIntArgv',
         self::H.'::getOptionIntOkArgv',
         self::H.'::getOptionValueArgv',
+        self::H.'::recvfromArgv',
+        self::H.'::recvfromDataArgv',
+        self::H.'::recvfromAddrArgv',
+        self::H.'::recvfromPortArgv',
     ];
 
     /** @var list<string> */

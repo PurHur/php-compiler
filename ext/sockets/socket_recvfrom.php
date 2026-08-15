@@ -6,14 +6,16 @@ namespace PHPCompiler\ext\sockets;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * socket_recvfrom() — recvfrom(2) AF_INET (php-src ext/sockets/sockets.c; #6248).
+ * socket_recvfrom() — recvfrom(2) AF_INET (php-src ext/sockets/sockets.c; #6248 / #31332).
  *
  * @see https://github.com/php/php-src/blob/master/ext/sockets/sockets.c PHP_FUNCTION(socket_recvfrom)
  */
@@ -68,6 +70,20 @@ final class socket_recvfrom extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_recvfrom() JIT lowering not implemented (#6248)');
+        $argc = \count($args);
+        if ($argc < 5 || $argc > 6) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                $argc < 5
+                    ? 'socket_recvfrom() expects at least 5 arguments, '.$argc.' given'
+                    : 'socket_recvfrom() expects at most 6 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitSocketRecvfrom::invoke($context, ...$args);
     }
 }
