@@ -13,7 +13,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ob_start() (issue #118, #1056, #8818, #30121, #30508). */
+/** LLVM lowering for ob_start() (issue #118, #1056, #8818, #30121, #30508, #31228). */
 final class JitObStart
 {
     /** @return Value */
@@ -33,7 +33,30 @@ final class JitObStart
             return $context->constantFromBool(false);
         }
 
-        if (1 === $argc) {
+        // Z_PARAM_LONG $chunk_size / $flags — type-check before start (output.c; #31228).
+        // Chunked flush / flag bits are not lowered yet; values are ignored after coercion.
+        if ($argc >= 2) {
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+                JitSleep::zParamLong($context, $args[1], 'ob_start', 2, 'chunk_size');
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'ob_start_null_chunk_size_te_cont');
+
+                return $context->constantFromBool(false);
+            }
+            JitSleep::zParamLong($context, $args[1], 'ob_start', 2, 'chunk_size');
+        }
+        if ($argc >= 3) {
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false))) {
+                JitSleep::zParamLong($context, $args[2], 'ob_start', 3, 'flags');
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'ob_start_null_flags_te_cont');
+
+                return $context->constantFromBool(false);
+            }
+            JitSleep::zParamLong($context, $args[2], 'ob_start', 3, 'flags');
+        }
+
+        if ($argc >= 1) {
             $callback = $args[0];
             // php-src `?callable $callback = null` — null is equivalent to omitted (#30121).
             if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
@@ -49,10 +72,6 @@ final class JitObStart
             throw new \LogicException(
                 'ob_start() callback "'.$literal.'" not supported in this compiler build; only ob_gzhandler is implemented for JIT'
             );
-        }
-        if ($argc > 1) {
-            // chunk_size / flags not lowered yet — distinct from excess-argc ACE (#30508).
-            throw new \LogicException('ob_start() accepts at most one callback argument in this compiler build');
         }
 
         return self::startPlain($context);

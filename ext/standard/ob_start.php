@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * ob_start() — begin output buffering (VM; JIT scaffold {@see JitObStart}, #118, #1056).
  *
  * Excess argc → Zend ArgumentCountError (#30508; php-src ext/standard/output.c).
+ * Z_PARAM_LONG $chunk_size / $flags — strict_types null → TypeError (#31228).
  */
 final class ob_start extends Internal
 {
@@ -30,6 +31,25 @@ final class ob_start extends Internal
         // php-src stub arity: at most 3 (callback, chunk_size, flags) — #30508.
         $this->requireAtMostArgCount($frame, 'ob_start', 3);
         $argc = \count($frame->calledArgs);
+        // Z_PARAM_LONG before starting the buffer (output.c / basic_functions.stub.php; #31228).
+        if ($argc >= 2) {
+            VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
+                'ob_start',
+                2,
+                'chunk_size'
+            );
+        }
+        if ($argc >= 3) {
+            VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'ob_start',
+                3,
+                'flags'
+            );
+        }
         $handler = null;
         if ($argc >= 1) {
             $handler = VmObOutput::resolveHandler($frame);
