@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block as CompilerBlock;
+use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\ext\standard\VmScope;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -85,6 +86,11 @@ final class ScopeBuiltinHelper
             $prefixStr = JitStringBuiltinArg::lowerRequiredString($context, $prefixArg, 'extract', 2, 'prefix');
         }
 
+        // Soft-null $flags coerces to EXTR_OVERWRITE — use the same thin-AOT LLVM path as omitted flags (#31194, #27520).
+        $defaultOverwrite = null === $flagsArg
+            || Variable::TYPE_NULL === $flagsArg->type
+            || ($flagsArg->isNullConstant ?? false);
+
         ScopeBuiltinEmitHelper::walkStringKeyNodes(
             $context,
             $ht,
@@ -92,7 +98,7 @@ final class ScopeBuiltinHelper
             $flags,
             $countSlot,
             $prefixStr,
-            null === $flagsArg
+            $defaultOverwrite
         );
 
         return $context->builder->load($countSlot);
@@ -184,6 +190,17 @@ final class ScopeBuiltinHelper
     {
         $i64 = $context->getTypeFromString('int64');
         if (null === $flagsArg) {
+            return $i64->constInt(VmScope::EXTR_OVERWRITE, false);
+        }
+        // Z_PARAM_LONG soft-null → EXTR_OVERWRITE (0); strict_types → TypeError (#31194).
+        if (Variable::TYPE_NULL === $flagsArg->type || ($flagsArg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                InternalStrictArg::requireInt($context, $flagsArg, 'extract', 'flags', 2);
+            } elseif (!$context->isUserScriptAot()) {
+                // Skip DEP IR on user-script AOT (#21593); coerce still applies.
+                JitIntdiv::emitNullIntDeprecation($context, 'extract', 2, 'flags');
+            }
+
             return $i64->constInt(VmScope::EXTR_OVERWRITE, false);
         }
 

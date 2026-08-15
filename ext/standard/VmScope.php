@@ -85,13 +85,10 @@ final class VmScope
         $caller = self::requireCaller($frame);
         $ht = VmArray::requireArray($frame->calledArgs[0], 'extract');
 
+        // php-src: int $flags = EXTR_OVERWRITE — Z_PARAM_LONG soft-null DEP then 0 (#31194).
         $flags = self::EXTR_OVERWRITE;
         if ($argc >= 2) {
-            $flagsArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-                throw new \LogicException('extract() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsArg->toInt();
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, 'extract', 2, 'flags');
         }
 
         $refs = 0 !== ($flags & self::EXTR_REFS);
