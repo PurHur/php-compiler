@@ -55,6 +55,17 @@ final class SocketShutdownRuntime
         self::H.'::recvfromDataArgv',
         self::H.'::recvfromAddrArgv',
         self::H.'::recvfromPortArgv',
+        self::H.'::selectResetArgv',
+        self::H.'::selectAddArgv',
+        self::H.'::selectRunArgv',
+        self::H.'::selectTimeoutMsArgv',
+        self::H.'::selectEntryFdArgv',
+        self::H.'::selectEntryEvArgv',
+        self::H.'::selectMarkReadyArgv',
+        self::H.'::selectReadyCountArgv',
+        self::H.'::selectReadyHandleArgv',
+        self::H.'::selectReadyKindArgv',
+        self::H.'::selectReadyKeyArgv',
     ];
 
     /** @var list<string> */

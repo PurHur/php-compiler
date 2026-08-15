@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7509 |
-| Phase A inventory files (M2 ratio SSOT) | 7509 |
+| PHP files on vm.php path | 7512 |
+| Phase A inventory files (M2 ratio SSOT) | 7512 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24033 |
+| Source constructs flagged (warnings) | 24036 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2211,6 +2211,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketRead.php` | 0 | 1 |
 | `ext/sockets/JitSocketRecv.php` | 0 | 1 |
 | `ext/sockets/JitSocketRecvfrom.php` | 0 | 1 |
+| `ext/sockets/JitSocketSelect.php` | 0 | 1 |
 | `ext/sockets/JitSocketSend.php` | 0 | 1 |
 | `ext/sockets/JitSocketSendto.php` | 0 | 1 |
 | `ext/sockets/JitSocketSetBlock.php` | 0 | 1 |
@@ -5807,6 +5808,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SocketImportStreamRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketPairIoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketRecvfromRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SocketSelectRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSendRecvRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSendtoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSetBlockRuntime.php` | 0 | 1 |
@@ -6016,6 +6018,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSocketListen.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketPairIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketRecvfrom.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketSelect.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSendRecv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSendto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSetBlock.php` | 0 | 1 |
@@ -25504,6 +25507,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/sockets/JitSocketSelect.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/sockets/JitSocketSend.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25614,7 +25622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketCreateJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 32 class method(s)
+- 55 class method(s)
 
 ### `ext/sockets/SocketErrorJitHelper.php`
 
@@ -36197,107 +36205,107 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 86)
 - new ArgumentCountError (line 146)
 - new ArgumentCountError (line 157)
-- new ArgumentCountError (line 225)
-- new ArgumentCountError (line 231)
-- new Variable (line 366)
-- new Variable (line 397)
-- new Variable (line 414)
-- new Variable (line 445)
-- new Variable (line 481)
-- new Variable (line 504)
-- new Variable (line 590)
-- new Variable (line 594)
-- new Variable (line 600)
-- new Variable (line 607)
-- new Variable (line 1521)
-- new Variable (line 1626)
-- new Variable (line 1630)
-- new Variable (line 1647)
-- new Variable (line 1659)
-- new Variable (line 1677)
-- new Variable (line 1688)
-- new Variable (line 1706)
-- new Variable (line 1710)
-- new Variable (line 1820)
-- new Variable (line 1824)
-- new Variable (line 1984)
-- new Variable (line 1988)
-- new Variable (line 1998)
-- new Variable (line 2002)
-- new Variable (line 2041)
-- new Variable (line 2045)
-- new Variable (line 2090)
-- new Variable (line 2101)
-- new Variable (line 2105)
-- new Variable (line 2131)
-- new Variable (line 2145)
-- new Variable (line 2163)
-- new Variable (line 2293)
-- new Variable (line 2310)
-- new Variable (line 2319)
-- new Variable (line 2362)
-- new Variable (line 2520)
-- new Variable (line 2531)
-- new Variable (line 2535)
-- new Variable (line 2672)
-- new Variable (line 2693)
-- new Variable (line 2712)
-- new Variable (line 2728)
-- new Variable (line 2738)
-- new Variable (line 2757)
-- new Variable (line 2778)
-- new Variable (line 3033)
-- new Variable (line 3037)
-- new Error (line 3054)
-- new Error (line 3060)
-- new Error (line 3087)
-- new Error (line 3090)
-- new Variable (line 3176)
-- new Variable (line 3181)
-- new Variable (line 3236)
-- new Variable (line 3255)
-- new Variable (line 3681)
-- new ClassProperty (line 3683)
-- new Variable (line 3706)
-- new ClassProperty (line 3708)
-- new Variable (line 3948)
-- new Variable (line 3952)
-- new Variable (line 3972)
-- new Variable (line 3983)
-- new Variable (line 4008)
-- new Variable (line 4023)
-- new Variable (line 4048)
-- new Variable (line 4064)
-- new Variable (line 4078)
-- new Variable (line 4176)
-- new Variable (line 4190)
-- new Variable (line 4368)
-- new Variable (line 4373)
-- new Error (line 4393)
-- new Error (line 4397)
-- new Variable (line 4477)
-- new Variable (line 4483)
-- new Variable (line 4489)
-- new Variable (line 4535)
-- new Variable (line 4540)
-- new Variable (line 4568)
-- new Variable (line 4578)
-- new Variable (line 4584)
-- new Variable (line 4606)
-- new Variable (line 4627)
-- new HashTable (line 4661)
-- new Variable (line 4678)
+- new ArgumentCountError (line 227)
+- new ArgumentCountError (line 233)
+- new Variable (line 368)
+- new Variable (line 399)
+- new Variable (line 416)
+- new Variable (line 447)
+- new Variable (line 483)
+- new Variable (line 506)
+- new Variable (line 592)
+- new Variable (line 596)
+- new Variable (line 602)
+- new Variable (line 609)
+- new Variable (line 1523)
+- new Variable (line 1628)
+- new Variable (line 1632)
+- new Variable (line 1649)
+- new Variable (line 1661)
+- new Variable (line 1679)
+- new Variable (line 1690)
+- new Variable (line 1708)
+- new Variable (line 1712)
+- new Variable (line 1822)
+- new Variable (line 1826)
+- new Variable (line 1986)
+- new Variable (line 1990)
+- new Variable (line 2000)
+- new Variable (line 2004)
+- new Variable (line 2043)
+- new Variable (line 2047)
+- new Variable (line 2092)
+- new Variable (line 2103)
+- new Variable (line 2107)
+- new Variable (line 2133)
+- new Variable (line 2147)
+- new Variable (line 2165)
+- new Variable (line 2295)
+- new Variable (line 2312)
+- new Variable (line 2321)
+- new Variable (line 2364)
+- new Variable (line 2522)
+- new Variable (line 2533)
+- new Variable (line 2537)
+- new Variable (line 2674)
+- new Variable (line 2695)
+- new Variable (line 2714)
+- new Variable (line 2730)
+- new Variable (line 2740)
+- new Variable (line 2759)
+- new Variable (line 2780)
+- new Variable (line 3035)
+- new Variable (line 3039)
+- new Error (line 3056)
+- new Error (line 3062)
+- new Error (line 3089)
+- new Error (line 3092)
+- new Variable (line 3178)
+- new Variable (line 3183)
+- new Variable (line 3238)
+- new Variable (line 3257)
+- new Variable (line 3683)
+- new ClassProperty (line 3685)
+- new Variable (line 3708)
+- new ClassProperty (line 3710)
+- new Variable (line 3950)
+- new Variable (line 3954)
+- new Variable (line 3974)
+- new Variable (line 3985)
+- new Variable (line 4010)
+- new Variable (line 4025)
+- new Variable (line 4050)
+- new Variable (line 4066)
+- new Variable (line 4080)
+- new Variable (line 4178)
+- new Variable (line 4192)
+- new Variable (line 4370)
+- new Variable (line 4375)
+- new Error (line 4395)
+- new Error (line 4399)
+- new Variable (line 4479)
+- new Variable (line 4485)
+- new Variable (line 4491)
+- new Variable (line 4537)
+- new Variable (line 4542)
+- new Variable (line 4570)
+- new Variable (line 4580)
+- new Variable (line 4586)
+- new Variable (line 4608)
+- new Variable (line 4629)
+- new HashTable (line 4663)
 - new Variable (line 4680)
-- new HashTable (line 4781)
-- new Variable (line 4813)
+- new Variable (line 4682)
+- new HashTable (line 4783)
 - new Variable (line 4815)
-- new HashTable (line 4828)
-- new Variable (line 4835)
-- new Variable (line 4846)
-- new HashTable (line 4861)
-- new Variable (line 4864)
-- new HashTable (line 4883)
-- new Variable (line 4886)
+- new Variable (line 4817)
+- new HashTable (line 4830)
+- new Variable (line 4837)
+- new Variable (line 4848)
+- new HashTable (line 4863)
+- new Variable (line 4866)
+- new HashTable (line 4885)
+- new Variable (line 4888)
 - 207 class method(s)
 - 2 closure(s)
 
@@ -39527,8 +39535,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 35)
 - new ArgumentCountError (line 41)
-- new ArgumentCountError (line 71)
-- new ArgumentCountError (line 77)
+- new ArgumentCountError (line 72)
+- new ArgumentCountError (line 78)
 - 4 class method(s)
 
 ### `ext/standard/is_callable.php`
@@ -39614,8 +39622,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 35)
 - new ArgumentCountError (line 41)
-- new ArgumentCountError (line 72)
-- new ArgumentCountError (line 78)
+- new ArgumentCountError (line 79)
+- new ArgumentCountError (line 85)
 - 4 class method(s)
 
 ### `ext/standard/is_uploaded_file.php`
@@ -50005,6 +50013,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/SocketSelectRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `lib/JIT/Builtin/SocketSendRecvRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51050,6 +51063,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSocketRecvfrom.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StringSocketSelect.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)

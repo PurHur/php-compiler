@@ -14,9 +14,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * socket_select() — multiplex Socket objects via poll(2) (php-src ext/sockets/sockets.c; #6395).
+ * socket_select() — multiplex Socket objects via poll(2) (php-src ext/sockets/sockets.c; #6395 / #31355).
  *
- * VM-first; JIT deferred like sister set_block/set_nonblock builtins.
+ * Thin AOT/JIT via {@see JitSocketSelect} + SocketCreateJitHelper select slots (#31355).
  *
  * @see https://github.com/php/php-src/blob/master/ext/sockets/sockets.c PHP_FUNCTION(socket_select)
  */
@@ -90,7 +90,7 @@ final class socket_select extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_select() JIT lowering not implemented (#6395)');
+        return JitSocketSelect::invoke($context, ...$args);
     }
 
     /**
