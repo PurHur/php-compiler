@@ -9,7 +9,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for http_get_last_response_headers() / get_last_response_headers() (#7236, #21172).
+ * LLVM lowering for http_get_last_response_headers() (#7236, #21172; alias retired #28412).
  *
  * JIT/AOT standalone has no HTTP wrapper state yet — idle returns null like Zend php-src (#8769).
  */

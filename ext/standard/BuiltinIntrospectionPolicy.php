@@ -130,9 +130,11 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['get_error_handler', 'get_exception_handler'], true)) {
             return CompilerVersion::advertisesGetHandlerIntrospection();
         }
+        if ('get_last_response_headers' === $lc) {
+            return CompilerVersion::advertisesGetLastResponseHeadersAlias();
+        }
         if (\in_array($lc, [
             'http_get_last_response_headers',
-            'get_last_response_headers',
             'http_clear_last_response_headers',
         ], true)) {
             return CompilerVersion::advertisesHttpLastResponseHeaders();

@@ -69,7 +69,7 @@ final class SelfHostBuiltinPolicy
         'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'ob_implicit_flush' => 'output',
         'ob_flush' => 'output', 'ob_clean' => 'output', 'ob_list_handlers' => 'output',
         'flush' => 'output',
-        'http_get_last_response_headers' => 'output', 'get_last_response_headers' => 'output',
+        'http_get_last_response_headers' => 'output',
         'http_clear_last_response_headers' => 'output',
         'headers_sent' => 'output', 'header_register_callback' => 'output',
         'register_shutdown_function' => 'output',

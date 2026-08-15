@@ -1,12 +1,11 @@
 --TEST--
-AOT http_get_last_response_headers() returns null without HTTP fetch (#8769, #21172)
+AOT http_get_last_response_headers() returns null without HTTP fetch (#8769, #21172, #28412)
 --FILE--
 <?php
 $h = http_get_last_response_headers();
 echo null === $h ? "null\n" : "bad\n";
 http_clear_last_response_headers();
-$g = get_last_response_headers();
-echo null === $g ? "null\n" : "bad\n";
+echo function_exists('get_last_response_headers') ? "alias-bad\n" : "alias-ok\n";
 --EXPECT--
 null
-null
+alias-ok

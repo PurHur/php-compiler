@@ -251,15 +251,22 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsHttpLastResponseHeaders());
             $this->assertTrue(CompilerVersion::advertisesHttpLastResponseHeaders());
-            foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
+            foreach (['http_get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
                 $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
             }
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('get_last_response_headers'));
+            $this->assertFalse(CompilerVersion::supportsGetLastResponseHeadersAlias());
+            $this->assertFalse(CompilerVersion::advertisesGetLastResponseHeadersAlias());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->functions['http_get_last_response_headers']));
+            $this->assertFalse(isset($ctx->functions['get_last_response_headers']));
             $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'http_get_last_response_headers')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'get_last_response_headers')
             );
         } finally {
             if (false === $prev) {

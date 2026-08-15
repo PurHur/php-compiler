@@ -1,5 +1,5 @@
 --TEST--
-stdlib HTTP last response headers — not advertised on PHP 8.2 reference profile (#12855, ext/standard/http.c)
+stdlib HTTP last response headers — not advertised on PHP 8.2 reference profile (#12855, #28412)
 --FILE--
 <?php
 declare(strict_types=1);

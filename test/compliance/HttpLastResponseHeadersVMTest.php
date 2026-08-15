@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for http_get_last_response_headers() / get_last_response_headers() (#7236, #8769). */
+/** VM compliance for http_get_last_response_headers() (#7236, #8769; alias retired #28412). */
 final class HttpLastResponseHeadersVMTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
