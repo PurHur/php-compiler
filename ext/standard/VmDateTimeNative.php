@@ -1611,13 +1611,8 @@ final class VmDateTimeNative
     private static function matchFormatComponents(string $format, string $time): array|false
     {
         self::$createFromFormatTrailingData = false;
-        $bangReset = false;
         $pipeReset = false;
         $allowTrailing = false;
-        if (\str_starts_with($format, '!')) {
-            $bangReset = true;
-            $format = \substr($format, 1);
-        }
         $pos = 0;
         $timeLen = \strlen($time);
         $formatHasFractionToken = false;
@@ -1646,6 +1641,19 @@ final class VmDateTimeNative
                 continue;
             }
             switch ($fc) {
+                case '!':
+                    // timelib: reset ALL fields to Unix epoch at this format position (#31169).
+                    // Unlike `|`, previously parsed values are wiped (Y-m-d! → 1970-01-01).
+                    $components['year'] = 1970;
+                    $components['month'] = 1;
+                    $components['day'] = 1;
+                    $components['hour'] = 0;
+                    $components['minute'] = 0;
+                    $components['second'] = 0;
+                    $components['fraction'] = false;
+                    unset($components['timezone'], $components['timezone_kind'], $components['timezone_abbr']);
+
+                    break;
                 case '|':
                     // timelib: reset unparsed fields to Unix epoch after a successful parse (#22836).
                     $pipeReset = true;
@@ -1831,7 +1839,7 @@ final class VmDateTimeNative
             }
             // `+`: ignore trailing input after a successful format match (#22836).
         }
-        if ($bangReset || $pipeReset) {
+        if ($pipeReset) {
             foreach ([
                 'year' => 1970,
                 'month' => 1,
