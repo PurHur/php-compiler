@@ -265,6 +265,8 @@
             <file>./test/compliance/IntvalNullBaseStrictJITTest.php</file>
             <file>./test/compliance/HtmlspecialcharsNullFlagsStrictVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsNullFlagsStrictJITTest.php</file>
+            <file>./test/compliance/ClearstatcacheNullStrict31245VMTest.php</file>
+            <file>./test/compliance/ClearstatcacheNullStrict31245JITTest.php</file>
             <file>./test/compliance/StrncmpNullLengthStrict31265VMTest.php</file>
             <file>./test/compliance/StrncmpNullLengthStrict31265JITTest.php</file>
             <file>./test/compliance/TokenGetAllNullStrictVMTest.php</file>

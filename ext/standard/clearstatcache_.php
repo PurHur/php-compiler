@@ -29,11 +29,13 @@ final class clearstatcache_ extends Internal
         if (!$hasClearRealpath && !$hasFilename) {
             VmStatCache::clear();
         } elseif ($hasFilename) {
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31245).
             $clearRealpath = $hasClearRealpath
-                ? VmMath::parseBoolBuiltinArg(
-                    $frame->calledArgs[0],
-                    'clearstatcache',
+                ? VmMath::parseBoolBuiltinArgForFrame(
+                    $frame,
                     0,
+                    'clearstatcache',
+                    1,
                     'clear_realpath_cache'
                 )
                 : false;
@@ -45,10 +47,12 @@ final class clearstatcache_ extends Internal
             );
             VmStatCache::clear($clearRealpath, '' !== $filename ? $filename : null);
         } else {
-            $clearRealpath = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0],
-                'clearstatcache',
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31245).
+            $clearRealpath = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
                 0,
+                'clearstatcache',
+                1,
                 'clear_realpath_cache'
             );
             VmStatCache::clear($clearRealpath);
