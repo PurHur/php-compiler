@@ -1,5 +1,7 @@
 --TEST--
-Stdlib: assert() — enum case description TypeError with default zend.assertions (#9550 / #28823)
+Stdlib: assert() — enum case description TypeError with zend.assertions=1 (#9550 / #28823 / #31195)
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 enum E: string { case A = 'x'; }

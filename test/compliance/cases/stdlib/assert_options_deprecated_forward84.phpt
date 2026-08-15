@@ -2,6 +2,8 @@
 assert_options + ASSERT_EXCEPTION E_DEPRECATED under PROFILE=8.4 (#29209)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 error_reporting(E_ALL);

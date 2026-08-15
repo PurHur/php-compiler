@@ -1,5 +1,7 @@
 --TEST--
-zend.assertions compiled default is 1; assert(false) throws (#28823, Zend/zend_ini.c)
+zend.assertions=1 at startup: assert(false) throws (#28823 / #31195, Zend/zend_ini.c)
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 error_reporting(E_ALL);

@@ -12,8 +12,12 @@ namespace PHPCompiler\ext\standard;
  */
 final class AssertOptionsJitHelper
 {
-    /** php-src Zend/zend_ini.c compiled default (`php -n`) is 1 — not distro php.ini (-1) (#28823). */
-    private static int $zendAssertions = 1;
+    /**
+     * Fallback before CLI host sync / {@code -d} / PHPT {@code --INI--}.
+     * Production php.ini is typically {@code -1}; {@see php_compiler_cli_sync_host_zend_assertions}
+     * mirrors the host process (#31195). Explicit startup {@code 1} enables assert() (#28823).
+     */
+    private static int $zendAssertions = -1;
 
     private static bool $active = true;
 
