@@ -411,6 +411,8 @@
             <file>./test/compliance/DomLoadHtmlNodelistExcessArgc30835JITTest.php</file>
             <file>./test/compliance/DomResidualExcessArgc31011VMTest.php</file>
             <file>./test/compliance/DomResidualExcessArgc31011JITTest.php</file>
+            <file>./test/compliance/DomCharacterDataExcessArgc31091VMTest.php</file>
+            <file>./test/compliance/DomCharacterDataExcessArgc31091JITTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641VMTest.php</file>
             <file>./test/compliance/XmlReaderExcessArgc30641JITTest.php</file>
             <file>./test/compliance/XmlWriterExcessArgc30818VMTest.php</file>

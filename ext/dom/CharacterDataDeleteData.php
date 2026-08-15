@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMCharacterData::deleteData() — VM (#17514, php-src ext/dom/characterdata.c). */
+/**
+ * DOMCharacterData::deleteData() — VM (#17514, php-src ext/dom/characterdata.c).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31091; re-#31011 / #30616).
+ */
 final class CharacterDataDeleteData extends DomClassMethod
 {
     public function __construct()
@@ -17,12 +21,10 @@ final class CharacterDataDeleteData extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMCharacterData::deleteData', 2);
         $receiver = $this->domRegistryNodeReceiver($frame, 'DOMCharacterData::deleteData()');
         if (!VmDom::isCharacterData($receiver)) {
             throw new \TypeError('DOMCharacterData::deleteData() must be called on a character data node');
-        }
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('DOMCharacterData::deleteData() expects at least 2 arguments');
         }
         $offset = $this->intArg($frame->calledArgs[1], 'DOMCharacterData::deleteData()', 0, 'offset');
         $count = $this->intArg($frame->calledArgs[2], 'DOMCharacterData::deleteData()', 1, 'count');
