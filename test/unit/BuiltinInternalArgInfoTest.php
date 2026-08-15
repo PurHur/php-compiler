@@ -60,6 +60,21 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['stream'], BuiltinParamNames::forFunction('stream_isatty'));
     }
 
+    /** ext/pcntl/pcntl.stub.php — pcntl_async_signals(?bool $enable = null): bool (#28843). */
+    public function testPcntlAsyncSignalsReflectionReturnBool(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('pcntl_async_signals'));
+        $this->assertSame(['enable='], BuiltinParamNames::forFunction('pcntl_async_signals'));
+        $this->assertSame('?bool', BuiltinInternalArgInfo::stubParamTypeOverride('pcntl_async_signals', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('pcntl_async_signals', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('enable', $info['name']);
+        $this->assertSame('?bool', $info['type']);
+        $this->assertTrue($info['isOptional']);
+        $this->assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('pcntl_async_signals'));
+        $this->assertSame(1, BuiltinParamNames::paramCountForInternalFunction('pcntl_async_signals'));
+    }
+
     public function testArrayMapParamCount(): void
     {
         $this->assertSame(3, BuiltinInternalArgInfo::paramCountForFunction('array_map'));

@@ -286,6 +286,10 @@ final class BuiltinInternalDefaultValues
         'pcntl_signal' => [
             2 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/pcntl/pcntl.stub.php — ?bool $enable = null (absent from InternalArgInfo) (#28843)
+        'pcntl_async_signals' => [
+            0 => ['kind' => 'null'],
+        ],
         'preg_filter' => [
             3 => ['kind' => 'int', 'value' => -1],
             4 => ['kind' => 'null'],

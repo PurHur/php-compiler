@@ -348,6 +348,8 @@ final class BuiltinInternalArgInfo
             'get_resource_id' => 'int',
             // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : bool (#27774)
             'stream_isatty' => 'bool',
+            // ext/pcntl/pcntl.stub.php — absent from InternalArgInfo; Zend : bool (#28843)
+            'pcntl_async_signals' => 'bool',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; Zend : string (#26375)
             'get_debug_type' => 'string',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend string|false (#27902)
@@ -1135,6 +1137,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/pcntl/pcntl.stub.php — $handler untyped (callable|int at runtime; InternalArgInfo callable) (#28898)
             'pcntl_signal' => 1 === $index ? '' : null,
+            // ext/pcntl/pcntl.stub.php — ?bool $enable = null (absent from InternalArgInfo) (#28843)
+            'pcntl_async_signals' => 0 === $index ? '?bool' : null,
             // ext/standard/streamsfuncs.stub.php — ?int $crypto_method = null (#27684)
             'stream_socket_enable_crypto' => 2 === $index ? '?int' : null,
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)

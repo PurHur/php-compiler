@@ -4896,6 +4896,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertTrue($dest->toBool());
     }
 
+    /** @covers issue #28843 — php-src ext/pcntl/pcntl.stub.php: (?bool $enable = null): bool */
+    public function testPcntlAsyncSignalsReflectionEnableNullDefault(): void
+    {
+        $names = BuiltinParamNames::forFunction('pcntl_async_signals');
+        self::assertSame(['enable='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'enable', 'pcntl_async_signals'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('pcntl_async_signals'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('pcntl_async_signals'));
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('pcntl_async_signals'));
+        self::assertSame('?bool', BuiltinInternalArgInfo::stubParamTypeOverride('pcntl_async_signals', 0));
+        $enable = BuiltinInternalArgInfo::paramInfoForFunction('pcntl_async_signals', 0);
+        self::assertNotNull($enable);
+        self::assertSame('enable', $enable['name']);
+        self::assertSame('?bool', $enable['type']);
+        self::assertTrue($enable['isOptional']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('pcntl_async_signals', 0, $enable, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'pcntl_async_signals', 0, $enable));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
     /** @covers issue #27849 — php-src ext/pcntl/pcntl.stub.php */
     public function testPcntlWaitpidNamedParamsResolve(): void
     {
