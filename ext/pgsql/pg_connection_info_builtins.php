@@ -39,12 +39,8 @@ final class pg_version extends Internal
         if (1 === $argc) {
             $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[0], 'pg_version', 1);
         }
-        $connObj = VmPgsqlConnection::requireOptionalOrDefault($provided, 'pg_version');
-        if (null === $connObj) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
+        // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31220).
+        $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated($provided, $frame, 'pg_version');
         $frame->returnVar->array(VmPgsqlCore::version($connObj));
     }
 
@@ -75,15 +71,11 @@ final class pg_parameter_status extends Internal
         }
         if (1 === $argc) {
             $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_parameter_status', 1, 'name');
-            $connObj = VmPgsqlConnection::requireOptionalOrDefault(null, 'pg_parameter_status');
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31220).
+            $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated(null, $frame, 'pg_parameter_status');
         } else {
             $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_parameter_status', 1);
             $name = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_parameter_status', 2, 'name');
-        }
-        if (null === $connObj) {
-            $frame->returnVar->bool(false);
-
-            return;
         }
         $status = VmPgsqlNative::parameterStatus(VmPgsqlConnection::native($connObj), $name);
         if (null === $status) {
@@ -123,12 +115,8 @@ abstract class pg_link_info_string extends Internal
         if (1 === $argc) {
             $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[0], $name, 1);
         }
-        $connObj = VmPgsqlConnection::requireOptionalOrDefault($provided, $name);
-        if (null === $connObj) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
+        // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31220).
+        $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated($provided, $frame, $name);
         $frame->returnVar->string($this->fetch(VmPgsqlConnection::native($connObj)));
     }
 
@@ -238,15 +226,11 @@ final class pg_set_client_encoding extends Internal
         }
         if (1 === $argc) {
             $encoding = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_set_client_encoding', 1, 'encoding');
-            $connObj = VmPgsqlConnection::requireOptionalOrDefault(null, 'pg_set_client_encoding');
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31220).
+            $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated(null, $frame, 'pg_set_client_encoding');
         } else {
             $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_set_client_encoding', 1);
             $encoding = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_set_client_encoding', 2, 'encoding');
-        }
-        if (null === $connObj) {
-            $frame->returnVar->int(-1);
-
-            return;
         }
         $frame->returnVar->int(VmPgsqlNative::setClientEncoding(VmPgsqlConnection::native($connObj), $encoding));
     }
@@ -280,12 +264,8 @@ final class pg_ping extends Internal
         if (1 === $argc) {
             $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[0], 'pg_ping', 1);
         }
-        $connObj = VmPgsqlConnection::requireOptionalOrDefault($provided, 'pg_ping');
-        if (null === $connObj) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
+        // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31220).
+        $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated($provided, $frame, 'pg_ping');
         $frame->returnVar->bool(VmPgsqlCore::ping($connObj));
     }
 

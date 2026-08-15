@@ -36,13 +36,8 @@ final class pg_untrace extends Internal
         if (1 === $argc) {
             $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[0], 'pg_untrace', 1);
         }
-        $connObj = VmPgsqlConnection::resolveOptionalConnection($provided);
-        if (null === $connObj) {
-            @\trigger_error('pg_untrace(): No PostgreSQL connection opened yet', \E_USER_WARNING);
-            $frame->returnVar->bool(false);
-
-            return;
-        }
+        // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31221).
+        $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated($provided, $frame, 'pg_untrace');
         VmPgsqlNative::untrace(VmPgsqlConnection::native($connObj));
         VmPgsqlConnection::clearTraceFp($connObj);
         // php-src stub: pg_untrace(): true

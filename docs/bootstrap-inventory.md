@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7452 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23981 |
+| Source constructs flagged (warnings) | 23982 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1853,7 +1853,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/PgsqlSerializeDeny.php` | 0 | 3 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
-| `ext/pgsql/VmPgsqlConnection.php` | 0 | 6 |
+| `ext/pgsql/VmPgsqlConnection.php` | 0 | 7 |
 | `ext/pgsql/VmPgsqlCore.php` | 0 | 27 |
 | `ext/pgsql/VmPgsqlDefaultLinkDeprecation.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
@@ -22330,7 +22330,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 74)
 - new HashTable (line 137)
 - new Variable (line 139)
-- 19 class method(s)
+- new Error (line 231)
+- 20 class method(s)
 
 ### `ext/pgsql/VmPgsqlCore.php`
 
@@ -22399,17 +22400,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 132)
 - new ArgumentCountError (line 175)
 - new ArgumentCountError (line 226)
-- new ArgumentCountError (line 280)
-- new ArgumentCountError (line 332)
-- new ArgumentCountError (line 395)
-- new ArgumentCountError (line 428)
-- new ArgumentCountError (line 462)
-- new ArgumentCountError (line 496)
-- new ArgumentCountError (line 530)
-- new ArgumentCountError (line 572)
-- new ArgumentCountError (line 604)
-- new ArgumentCountError (line 667)
-- new ArgumentCountError (line 724)
+- new ArgumentCountError (line 275)
+- new ArgumentCountError (line 322)
+- new ArgumentCountError (line 385)
+- new ArgumentCountError (line 418)
+- new ArgumentCountError (line 452)
+- new ArgumentCountError (line 486)
+- new ArgumentCountError (line 520)
+- new ArgumentCountError (line 562)
+- new ArgumentCountError (line 594)
+- new ArgumentCountError (line 657)
+- new ArgumentCountError (line 714)
 - 34 class method(s)
 
 ### `ext/pgsql/pg_change_password.php`
@@ -22441,14 +22442,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
-- new ArgumentCountError (line 68)
-- new ArgumentCountError (line 113)
-- new ArgumentCountError (line 231)
-- new ArgumentCountError (line 271)
-- new ArgumentCountError (line 309)
-- new ArgumentCountError (line 338)
-- new ArgumentCountError (line 367)
-- new ArgumentCountError (line 396)
+- new ArgumentCountError (line 64)
+- new ArgumentCountError (line 105)
+- new ArgumentCountError (line 219)
+- new ArgumentCountError (line 255)
+- new ArgumentCountError (line 289)
+- new ArgumentCountError (line 318)
+- new ArgumentCountError (line 347)
+- new ArgumentCountError (line 376)
 - 25 class method(s)
 
 ### `ext/pgsql/pg_copy_meta_builtins.php`
@@ -22519,17 +22520,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 32)
-- new ArgumentCountError (line 97)
-- new ArgumentCountError (line 141)
-- new ArgumentCountError (line 198)
-- new ArgumentCountError (line 230)
-- new ArgumentCountError (line 270)
-- new ArgumentCountError (line 310)
-- new ArgumentCountError (line 351)
-- new ArgumentCountError (line 383)
-- new ArgumentCountError (line 412)
-- new ArgumentCountError (line 444)
-- new ArgumentCountError (line 490)
+- new ArgumentCountError (line 88)
+- new ArgumentCountError (line 127)
+- new ArgumentCountError (line 184)
+- new ArgumentCountError (line 216)
+- new ArgumentCountError (line 256)
+- new ArgumentCountError (line 296)
+- new ArgumentCountError (line 337)
+- new ArgumentCountError (line 369)
+- new ArgumentCountError (line 398)
+- new ArgumentCountError (line 430)
+- new ArgumentCountError (line 471)
 - 26 class method(s)
 
 ### `ext/pgsql/pg_num_rows.php`
