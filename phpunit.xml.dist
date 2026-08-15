@@ -385,6 +385,8 @@
             <file>./test/compliance/IconvNullEncodingDep31309JITTest.php</file>
             <file>./test/compliance/IconvEncodingNullType31311VMTest.php</file>
             <file>./test/compliance/IconvEncodingNullType31311JITTest.php</file>
+            <file>./test/compliance/IconvMimeEncodeNullOptions31310VMTest.php</file>
+            <file>./test/compliance/IconvMimeEncodeNullOptions31310JITTest.php</file>
             <file>./test/compliance/MbChrOrdNullStrictVMTest.php</file>
             <file>./test/compliance/MbChrOrdNullStrictJITTest.php</file>
             <file>./test/compliance/MbDetectOrderNullGetterVMTest.php</file>
