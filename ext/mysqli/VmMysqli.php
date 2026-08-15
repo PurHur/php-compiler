@@ -12,6 +12,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -113,6 +114,12 @@ final class VmMysqli
         }
         // mysqli::poll is static (php-src mysqli.stub.php; #22163).
         $entry->methodVisibility['poll'] = CfgFunc::FLAG_STATIC | $pub;
+
+        // php-src ext/mysqli/mysqli.stub.php — execute_query(): mysqli_result|bool (#27712)
+        $executeQueryRet = ReflectionTypeSupport::cfgTypeFromLabel('mysqli_result|bool');
+        if (null !== $executeQueryRet) {
+            $entry->methodReturnDeclaredTypes['execute_query'] = $executeQueryRet;
+        }
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }

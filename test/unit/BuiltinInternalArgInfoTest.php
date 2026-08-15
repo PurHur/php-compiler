@@ -75,6 +75,23 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(1, BuiltinParamNames::paramCountForInternalFunction('pcntl_async_signals'));
     }
 
+    /** ext/mysqli/mysqli.stub.php — mysqli_execute_query / mysqli::execute_query (#27712). */
+    public function testMysqliExecuteQueryReflectionStubs(): void
+    {
+        $this->assertSame('mysqli_result|bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('mysqli_execute_query'));
+        $this->assertSame(['mysql', 'query', 'params='], BuiltinParamNames::forFunction('mysqli_execute_query'));
+        $this->assertSame(['query', 'params='], BuiltinParamNames::forClassMethod('mysqli::execute_query'));
+        $this->assertSame('mysqli', BuiltinInternalArgInfo::stubParamTypeOverride('mysqli_execute_query', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('mysqli_execute_query', 1));
+        $this->assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('mysqli_execute_query', 2));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('mysqli', 'execute_query', 0));
+        $this->assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('mysqli', 'execute_query', 1));
+        $this->assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('mysqli_execute_query'));
+        $this->assertSame(3, BuiltinParamNames::paramCountForInternalFunction('mysqli_execute_query'));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('mysqli', 'execute_query'));
+        $this->assertSame(2, BuiltinParamNames::paramCountForInternalMethod('mysqli', 'execute_query'));
+    }
+
     public function testArrayMapParamCount(): void
     {
         $this->assertSame(3, BuiltinInternalArgInfo::paramCountForFunction('array_map'));
