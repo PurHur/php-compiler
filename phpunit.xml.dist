@@ -425,6 +425,8 @@
             <file>./test/compliance/SimpleXmlExcessArgc30828JITTest.php</file>
             <file>./test/compliance/SxeAsxmlMixedContent31049VMTest.php</file>
             <file>./test/compliance/SxeAsxmlMixedContent31049JITTest.php</file>
+            <file>./test/compliance/SimplexmlLoadStringParserWarn31183VMTest.php</file>
+            <file>./test/compliance/SimplexmlLoadStringParserWarn31183JITTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648VMTest.php</file>
             <file>./test/compliance/GetCalledClassExcessArgc30648JITTest.php</file>
             <file>./test/compliance/ReflectionEnumExcessArgc30865VMTest.php</file>
