@@ -117,6 +117,8 @@
             <file>./test/compliance/MkdirNullPermissions31211JITTest.php</file>
             <file>./test/compliance/ChmodNullPermissions31213VMTest.php</file>
             <file>./test/compliance/ChmodNullPermissions31213JITTest.php</file>
+            <file>./test/compliance/SetcookieNullExpires31229VMTest.php</file>
+            <file>./test/compliance/SetcookieNullExpires31229JITTest.php</file>
             <file>./test/compliance/MysqliExecuteQueryReflectionVMTest.php</file>
             <file>./test/compliance/ScandirNullSortingOrder31244VMTest.php</file>
             <file>./test/compliance/ScandirNullSortingOrder31244JITTest.php</file>

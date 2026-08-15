@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -88,15 +90,28 @@ final class setcookie extends Internal
         }
         $expiresI64 = $i64->constInt(0, false);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            // Soft-null outside strict_types; strict → TypeError (#31229). Early return after
+            // compile-time null TypeError — open a dead insert block for the call site (peer dirname #31210).
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false))) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'setcookie(): Argument #3 ($expires_or_options) must be of type array|int, null given'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'setcookie_null_expires_te_cont');
+
+                return $context->constantFromBool(false);
+            }
             if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
-                if ($context->callerStrictTypes) {
-                    throw new \LogicException(
-                        'setcookie(): Argument #3 ($expires_or_options) must be of type array|int, null given'
-                    );
-                }
                 JitIntdiv::emitNullIntDeprecation($context, 'setcookie', 3, 'expires_or_options', 'array|int');
             } else {
-                $expiresI64 = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'setcookie', 3, 'expires_or_options');
+                $expiresI64 = JitIntdiv::lowerIntBuiltinArgForCaller(
+                    $context,
+                    $args[2],
+                    'setcookie',
+                    3,
+                    'expires_or_options'
+                );
             }
         }
         $pathPtr = $context->builder->load($context->constantStringFromString(''));

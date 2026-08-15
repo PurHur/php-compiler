@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -117,7 +118,11 @@ final class SetcookieOptions
         if (isset($args[2])) {
             $third = $args[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $third->type) {
-                if (VmMath::requiresForwardProfileStrictLongNull()) {
+                // Z_PARAM_ARRAY_OR_LONG: caller strict_types → TypeError; else soft-null DEP (#31229 / #31286).
+                if (
+                    (null !== $frame && InternalStrictArg::isCallerStrict($frame))
+                    || VmMath::requiresForwardProfileStrictLongNull()
+                ) {
                     throw new \TypeError(sprintf(
                         '%s(): Argument #3 ($expires_or_options) must be of type array|int, null given',
                         $function
@@ -126,7 +131,14 @@ final class SetcookieOptions
                 VmNullNumberParamDeprecation::emit($frame, $function, 3, 'expires_or_options', 'array|int');
                 $expires = 0;
             } else {
-                $expires = VmMath::parseIntBuiltinArg($args[2], $function, 3, 'expires_or_options', $frame);
+                $expires = VmMath::parseIntBuiltinArg(
+                    $args[2],
+                    $function,
+                    3,
+                    'expires_or_options',
+                    $frame,
+                    'array|int'
+                );
             }
         }
         $path = '';
