@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -14,6 +15,14 @@ final class VmEngineBuiltinDeprecation
 {
     public static function functionMessage(string $function): string
     {
+        // php-src ext/standard/datetime.stub.php — #[\Deprecated(since: '8.1', message: …)] (#29321).
+        if ('strftime' === $function || 'gmstrftime' === $function) {
+            return (new DeprecatedMetadata(
+                'use IntlDateFormatter::format() instead',
+                '8.1'
+            ))->formatFunction($function);
+        }
+
         return 'Function '.$function.'() is deprecated';
     }
 
