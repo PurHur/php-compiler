@@ -16779,17 +16779,23 @@ class Compiler {
     }
 
     /**
-     * Reject non-constant function-static initializers on PHP &lt; 8.3 (#22923, #4352, #5478).
+     * Reject non-constant function-static initializers on PHP &lt; 8.3 (#22923, #4352, #5478, #31168).
      *
      * php-cfg often places a bare `$param` on {@see Op\Terminal\StaticVar::$defaultVar} with an
      * empty {@see $defaultBlock}; walking children alone missed that shape and accepted it as a
      * runtime init (undefined-constant → string) on the 8.2 reference profile.
+     *
+     * First-class callables (`strlen(...)`) are not constant expressions on ≤8.2
+     * ({@see Op\Expr\FirstClassCallable}); on 8.3+ they are legal arbitrary static initializers
+     * (php-src `zend_compile_static_var` → `zend_compile_expr`, verified 8.3/8.4/8.5).
      *
      * @param Op\Terminal\StaticVar $terminal
      */
     protected function assertFunctionStaticRuntimeInitAllowed(Op\Terminal $terminal): void
     {
         // PHP 8.3+ RFC: arbitrary static variable initializers (Zend/zend_compile.c).
+        // FCC / closures / runtime exprs are allowed here — not gated on closures-in-const-expr
+        // (that RFC is for const/attr/param/property defaults, not function-static on 8.3+).
         if (CompilerVersion::supportsArbitraryStaticVariableInitializers()) {
             return;
         }
@@ -16816,6 +16822,10 @@ class Compiler {
     protected function functionStaticInitReferencesLocal(Op $op): bool
     {
         if ($op instanceof Op\Expr\Closure || $op instanceof Op\Expr\ArrowFunction) {
+            return true;
+        }
+        // FCC is ZEND_AST_CALLABLE_CONVERT — not a const expr on ≤8.2 (#31168 / zend_compile.c).
+        if ($op instanceof Op\Expr\FirstClassCallable) {
             return true;
         }
         if ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\MethodCall) {

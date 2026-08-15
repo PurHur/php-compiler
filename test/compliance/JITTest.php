@@ -1479,9 +1479,10 @@ class JITTest extends BaseTest {
                 continue;
             }
             // 8.2 reject gate; skipped when arbitrary static initializers enabled (#22923).
-            // static_var_param_init_83 sets PROFILE via --ENV--; always include.
+            // static_var_param_init_83 / static_var_fcc_init_83 set PROFILE via --ENV--; always include.
             if (CompilerVersion::supportsArbitraryStaticVariableInitializers()
-                && str_contains($name, 'static_var_param_init_fatal')) {
+                && (str_contains($name, 'static_var_param_init_fatal')
+                    || str_contains($name, 'static_var_fcc_init_fatal'))) {
                 continue;
             }
             // 8.3-target reject gate; skipped when file/namespace typed constants enabled (#16651, #7081).
