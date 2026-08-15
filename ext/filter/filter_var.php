@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\JitBuiltinWarning;
+use PHPCompiler\ext\standard\JitIntdiv;
+use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\ext\standard\JitBuiltinWarning;
-use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -44,8 +47,17 @@ final class filter_var extends Internal
         $options = null;
         if (3 === $argc) {
             $options = $frame->calledArgs[2]->resolveIndirect();
-            if (!$options->isUndefined()
-                && Variable::TYPE_NULL !== $options->type
+            // php-src filter.stub.php: array|int $options = 0 (not nullable).
+            // Explicit null: TypeError under caller strict_types; else E_DEPRECATED + default (#31209).
+            if (Variable::TYPE_NULL === $options->type) {
+                if (InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(
+                        'filter_var(): Argument #3 ($options) must be of type array|int, null given'
+                    );
+                }
+                VmNullNumberParamDeprecation::emit($frame, 'filter_var', 3, 'options', 'array|int');
+                $options = null;
+            } elseif (!$options->isUndefined()
                 && Variable::TYPE_INTEGER !== $options->type
                 && Variable::TYPE_ARRAY !== $options->type) {
                 throw new \LogicException('filter_var() options must be an integer flag bitmask or array');
@@ -81,8 +93,22 @@ final class filter_var extends Internal
             throw new \ArgumentCountError('filter_var() expects at most 3 arguments, '.$argc.' given');
         }
         $optionsArg = $argc > 2 ? $args[2] : null;
+        // php-src array|int $options — null TypeError under caller strict_types (#31209).
         if (null !== $optionsArg
-            && JITVariable::TYPE_NULL !== $optionsArg->type
+            && (JITVariable::TYPE_NULL === $optionsArg->type || $optionsArg->isNullConstant)) {
+            if ($context->callerStrictTypes) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'filter_var(): Argument #3 ($options) must be of type array|int, null given'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'filter_var_null_options_strict_dead');
+
+                return JitFilter::boxedNull($context);
+            }
+            JitIntdiv::emitNullIntDeprecation($context, 'filter_var', 3, 'options', 'array|int');
+            $optionsArg = null;
+        }
+        if (null !== $optionsArg
             && JITVariable::TYPE_NATIVE_LONG !== $optionsArg->type
             && JITVariable::TYPE_VALUE !== $optionsArg->type
             && JITVariable::TYPE_HASHTABLE !== ($optionsArg->type & ~JITVariable::IS_NATIVE_ARRAY)
