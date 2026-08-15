@@ -137,10 +137,10 @@ class Router
     {
         header('Content-Type: application/json');
         http_response_code(200);
-        echo json_encode([
-            'ok' => true,
-            'service' => '003-MiniWebApp',
-            'app' => $this->resolveAppName(),
-        ]);
+        // Manual JSON compose — NestedJIT assoc-array json_encode and json_encode()
+        // of method-returned strings still misbehave on thin AOT (#31101). App name is
+        // a trusted config string (no quote escaping required for the demo).
+        $app = $this->resolveAppName();
+        echo '{"ok":true,"service":"003-MiniWebApp","app":"', $app, '"}';
     }
 }

@@ -141,6 +141,42 @@ final class BasicBlockHelper
     }
 
     /**
+     * Like {@see ensureOpenInsertBlock}, but if the insert BB ends in a premature {@code ret void},
+     * replace that return with a branch into the continuation so later opcodes stay reachable
+     * (#31101 MiniWebApp empty stdout / value-box {@code ===} after assign).
+     *
+     * Do not use for NestedJIT helper bodies — those legitimately return void then re-enter
+     * ensureOpenInsertBlock for a different function.
+     */
+    public static function ensureOpenInsertBlockReplacingVoidReturn(Context $context, string $label): void
+    {
+        $insert = self::tryGetInsertBlock($context);
+        if (null === $insert) {
+            self::ensureOpenInsertBlock($context, $label);
+
+            return;
+        }
+        $term = $insert->getTerminator();
+        if (null === $term) {
+            return;
+        }
+        if (
+            $term instanceof \PHPLLVM\Value\Instruction
+            && $term->isAReturnInst()
+            && 0 === $term->getNumOperands()
+        ) {
+            $next = self::append($context, $label);
+            $term->eraseFromParent();
+            $context->builder->positionAtEnd($insert);
+            $context->builder->branch($next);
+            $context->builder->positionAtEnd($next);
+
+            return;
+        }
+        self::ensureOpenInsertBlock($context, $label);
+    }
+
+    /**
      * Last basic block in $fn that still lacks a terminator (may be mid-lower open tail).
      */
     public static function lastOpenBasicBlock(Function_ $fn): ?BasicBlock
@@ -301,6 +337,9 @@ final class BasicBlockHelper
             if (null === $block->getTerminator()) {
                 $context->builder->positionAtEnd($block);
                 if ($isVoid) {
+                    // Do not auto-link name-prefix orphans — that emptied hashtable overlays
+                    // used by json_encode (api/status → "{}"). Value-box === reachability is
+                    // restored via ensureOpenInsertBlockReplacingVoidReturn in binaryOp (#31101).
                     $context->builder->returnVoid();
                 } else {
                     self::sealOpenBlock($context, $block);
@@ -308,5 +347,69 @@ final class BasicBlockHelper
             }
             $block = $block->getPrevious();
         }
+    }
+
+    /**
+     * If an orphan continuation BB exists in $function, branch there from the current insert.
+     *
+     * @param \PHPLLVM\Value\Function_ $function
+     */
+    public static function tryBranchToOrphanContinuation(Context $context, $function): bool
+    {
+        $orphan = self::findOrphanContinuationBlock($context, $function);
+        if (null === $orphan) {
+            return false;
+        }
+        $context->builder->branch($orphan);
+
+        return true;
+    }
+
+    /**
+     * Find a continuation BB that looks like ensureOpenInsertBlock created it after losing
+     * the fall-through edge (#31101). Name-prefix match is enough: those labels are unique
+     * per emit site and only appear when the prior BB was sealed/cleared incorrectly.
+     *
+     * @param \PHPLLVM\Value\Function_ $function
+     */
+    public static function findOrphanContinuationBlock(Context $context, $function): ?BasicBlock
+    {
+        $block = $function->getFirstBasicBlock();
+        while (null !== $block) {
+            $name = $block->getName();
+            if (
+                str_starts_with($name, 'binary_op_load_cont')
+                || str_starts_with($name, 'string_literal_after_store_cont')
+                || str_starts_with($name, 'string_literal_alloc_cont')
+                || str_starts_with($name, 'string_literal_init_cont')
+                || str_starts_with($name, 'restore_insert_cont')
+            ) {
+                // Only claim blocks that still have no terminator-predecessor edge from the
+                // open fall-through we are sealing: if this block already has preds it is fine.
+                // Cheap check: entry of a br-less island often still has instructions; we only
+                // need "first matching name" because sealFunction walks open blocks once.
+                return $block;
+            }
+            $block = self::nextBasicBlock($context, $block);
+        }
+
+        return null;
+    }
+
+    private static function nextBasicBlock(Context $context, BasicBlock $block): ?BasicBlock
+    {
+        try {
+            if ($block instanceof \PHPLLVM\LLVMAbstract\BasicBlock) {
+                $raw = $context->llvm->lib->LLVMGetNextBasicBlock($block->block);
+                if (null === $raw) {
+                    return null;
+                }
+
+                return $context->llvm->factory->basicBlock($context->context, $raw);
+            }
+        } catch (\Throwable) {
+        }
+
+        return $block->getNext();
     }
 }

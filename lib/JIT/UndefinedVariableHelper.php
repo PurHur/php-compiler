@@ -16,7 +16,11 @@ final class UndefinedVariableHelper
 {
     public static function resolveTrackableName(Operand $op, Variable $var): ?string
     {
-        if (Variable::TYPE_VALUE !== $var->type) {
+        // VALUE boxes and native STRING slots (typed formals) — #10360 / #31101 MiniWebApp $route.
+        if (
+            Variable::TYPE_VALUE !== $var->type
+            && Variable::TYPE_STRING !== $var->type
+        ) {
             return null;
         }
         if (Variable::KIND_VARIABLE !== $var->kind && !$var->functionStaticGlobal) {
@@ -53,8 +57,19 @@ final class UndefinedVariableHelper
         if (self::shouldSkipGuards()) {
             return;
         }
+        // Inlined include bindings inherit the caller's locals (PHP include scope) — do not
+        // re-warn as undefined (#31101 MiniWebApp layout $title after Router::renderHome).
+        if ($var->includeBinding) {
+            return;
+        }
         $name = self::resolveTrackableName($op, $var);
         if (null === $name) {
+            return;
+        }
+        $resolved = $context->resolveRefAliasName($name);
+        // Name already bound in this function (param/local) — treat as assigned even when
+        // the init flag global was missed (typed string formals / include inlines) (#31101).
+        if (isset($context->namedVariableBindings[$resolved])) {
             return;
         }
         UndefinedVariableRuntime::ensureLinked($context);

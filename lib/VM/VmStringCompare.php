@@ -707,10 +707,32 @@ final class VmStringCompare
             $boxedStr,
             $nullStr
         );
-        $same = self::identical($context, $boxedStr, $nativeStr);
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        // Branch — do not select()+eager identical(): LLVM evaluates both select arms, so a
+        // null boxedStr would structGep in identical() (#31101 MiniWebApp / value-box ===).
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $cmpBb = BasicBlockHelper::append($context, 'jit_strcmp_value_has_string');
+        $noBb = BasicBlockHelper::append($context, 'jit_strcmp_value_not_string');
+        $mergeBb = BasicBlockHelper::append($context, 'jit_strcmp_value_to_string_done');
+        $context->builder->branchIf($hasString, $cmpBb, $noBb);
 
-        return $context->builder->select($hasString, $same, $falseVal);
+        $context->builder->positionAtEnd($noBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($cmpBb);
+        $same = self::identical($context, $boxedStr, $nativeStr);
+        $cmpDone = BasicBlockHelper::tryGetInsertBlock($context) ?? $cmpBb;
+        $context->builder->positionAtEnd($cmpDone);
+        if (null === $cmpDone->getTerminator()) {
+            $context->builder->branch($mergeBb);
+        }
+
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $noBb);
+        $phi->addIncoming($same, $cmpDone);
+
+        return $phi;
     }
 
     public static function identicalStringToValue(

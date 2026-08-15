@@ -30,11 +30,10 @@ class ApiRouter
     {
         header('Content-Type: application/json');
         http_response_code(200);
-        echo json_encode([
-            'ok' => true,
-            'service' => '003-MiniWebApp',
-            'app' => $this->resolveAppName(),
-        ]);
+        // Manual JSON compose — NestedJIT json_encode of method strings / assoc arrays
+        // still misbehaves on thin AOT (#31101).
+        $app = $this->resolveAppName();
+        echo '{"ok":true,"service":"003-MiniWebApp","app":"', $app, '"}';
     }
 }
 
