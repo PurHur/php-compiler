@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\sockets;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -48,6 +50,18 @@ final class socket_set_block extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_set_block() JIT lowering not implemented (#6289)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'socket_set_block() expects exactly 1 argument, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitSocketSetBlock::invoke($context, $args[0]);
     }
 }
