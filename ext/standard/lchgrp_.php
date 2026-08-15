@@ -8,10 +8,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** lchgrp() — VM via VmFs; JIT/AOT via __compiler_chgrp (php-src ext/standard/filestat.c). */
+/**
+ * lchgrp() — VM via VmFs; JIT/AOT via __compiler_chgrp (php-src ext/standard/filestat.c).
+ * Excess/missing argc → Zend ArgumentCountError (#30568).
+ */
 final class lchgrp_ extends Internal
 {
     public function __construct()
@@ -21,9 +23,8 @@ final class lchgrp_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('lchgrp() requires exactly two arguments in this compiler build');
-        }
+        // php-src stub arity: exactly 2 (#30568; ext/standard/filestat.c).
+        $this->requireExactArgCount($frame, 'lchgrp', 2);
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'lchgrp');
         $groupVar = VmFilestatArg::requireIntOrStringArgForFrame($frame, 1, 'lchgrp', 'group');
         if (null === $frame->returnVar) {
@@ -38,8 +39,9 @@ final class lchgrp_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('lchgrp() requires exactly two arguments in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30568).
+        if (!$this->requireExactJitArgCount($context, $args, 'lchgrp', 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'lchgrp');
         $groupPtr = JitFilestatArg::valuePtrAfterIntOrStringGuard($context, $args[1], 'lchgrp', 1, 'group');

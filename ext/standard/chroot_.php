@@ -11,7 +11,10 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** chroot() — VM via VmChrootNative; JIT/AOT via ChrootJitHelper (#3500, #30558). */
+/**
+ * chroot() — VM via VmChrootNative; JIT/AOT via ChrootJitHelper (#3500, #30558).
+ * Excess/missing argc → Zend ArgumentCountError (#30568).
+ */
 final class chroot_ extends Internal
 {
     public function __construct()
@@ -21,9 +24,8 @@ final class chroot_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('chroot() requires exactly one argument in this compiler build');
-        }
+        // php-src stub arity: exactly 1 (#30568; ext/standard/dir.c).
+        $this->requireExactArgCount($frame, 'chroot', 1);
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'chroot', 0, 'directory');
         $ok = VmChrootNative::chroot($path);
         if (!$ok) {
@@ -38,8 +40,9 @@ final class chroot_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('chroot() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError under AOT try/catch (#30568).
+        if (!$this->requireExactJitArgCount($context, $args, 'chroot', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         return JitChroot::invoke(
