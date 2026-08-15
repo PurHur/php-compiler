@@ -603,6 +603,8 @@
             <file>./test/compliance/SubstrCountEmptyNeedleMessageJITTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageVMTest.php</file>
             <file>./test/compliance/MbStrPadEmptyPadMessageJITTest.php</file>
+            <file>./test/compliance/MbStrPadReflectionDefaults27618VMTest.php</file>
+            <file>./test/compliance/MbStrPadReflectionDefaults27618JITTest.php</file>
             <file>./test/compliance/MbStrPadPhantomCallVMTest.php</file>
             <file>./test/compliance/MbStrPadPhantomCallJITTest.php</file>
             <file>./test/compliance/MbSplitEmptyPatternVMTest.php</file>
