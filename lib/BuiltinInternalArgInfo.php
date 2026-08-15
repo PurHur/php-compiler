@@ -326,6 +326,8 @@ final class BuiltinInternalArgInfo
             'json_encode' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return empty (#23260)
             'unserialize' => 'mixed',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#30243)
+            'call_user_func', 'call_user_func_array' => 'mixed',
             // ext/json/json.stub.php — PHP 8.3+; InternalArgInfo omits function entirely (#26211)
             'json_validate' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo return int; Zend bool (#26107)
@@ -1155,6 +1157,8 @@ final class BuiltinInternalArgInfo
             'header_remove' => 0 === $index ? '?string' : null,
             // ext/standard/head.stub.php — &$filename / &$line untyped (InternalArgInfo string/int) (#25381)
             'headers_sent' => ($index >= 0 && $index <= 1) ? '' : null,
+            // ext/standard/basic_functions.stub.php — mixed ...$args (InternalArgInfo untyped) (#30243)
+            'call_user_func' => 1 === $index ? 'mixed' : null,
             // ext/standard/head.stub.php — callable $callback (InternalArgInfo empty) (#25381)
             'header_register_callback' => 0 === $index ? 'callable' : null,
             // ext/standard/basic_functions.stub.php — ?array $options = null (InternalArgInfo array) (#25381)

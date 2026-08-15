@@ -164,6 +164,22 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['position'], BuiltinParamNames::forFunction('func_get_arg'));
     }
 
+    /** ext/standard/basic_functions.stub.php — call_user_func*: mixed return + mixed ...$args (#30243). */
+    public function testCallUserFuncReflectionReturnAndVariadicMixed(): void
+    {
+        foreach (['call_user_func', 'call_user_func_array'] as $fn) {
+            $this->assertSame('mixed', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('call_user_func', 1));
+        $args = BuiltinInternalArgInfo::paramInfoForFunction('call_user_func', 1);
+        $this->assertNotNull($args);
+        $this->assertSame('mixed', $args['type']);
+        $cufaArgs = BuiltinInternalArgInfo::paramInfoForFunction('call_user_func_array', 1);
+        $this->assertNotNull($cufaArgs);
+        $this->assertSame('array', $cufaArgs['type']);
+    }
+
     /** Zend/zend_builtin_functions.stub.php — gc_disable/enable void; gc_mem_caches int (#28022). */
     public function testGcControlReflectionReturnTypes(): void
     {
