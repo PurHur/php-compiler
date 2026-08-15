@@ -356,6 +356,8 @@
             <file>./test/compliance/CreateFromFormatPlusTrailing31170JITTest.php</file>
             <file>./test/compliance/StrftimeDeprecatedMessage29321VMTest.php</file>
             <file>./test/compliance/StrftimeDeprecatedMessage29321JITTest.php</file>
+            <file>./test/compliance/FilterHasVarInputArgc30711VMTest.php</file>
+            <file>./test/compliance/FilterHasVarInputArgc30711JITTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictVMTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictJITTest.php</file>
             <file>./test/compliance/OpcacheIsScriptCachedInFileCacheVMTest.php</file>

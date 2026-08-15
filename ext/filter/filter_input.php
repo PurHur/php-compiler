@@ -26,8 +26,15 @@ final class filter_input extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('filter_input() requires two to four arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'filter_input() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(
+                'filter_input() expects at most 4 arguments, '.$argc.' given'
+            );
         }
         $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input');
         // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
@@ -81,8 +88,25 @@ final class filter_input extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2 || \count($args) > 4) {
-            throw new \LogicException('filter_input() requires two to four arguments in this compiler build');
+        $argc = \count($args);
+        // Catchable ArgumentCountError under JIT/AOT try/catch (#30711; peer #30991).
+        if ($argc < 2) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'filter_input() expects at least 2 arguments, '.$argc.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'filter_input_argc_lo_cont');
+
+            return JitFilter::boxedNull($context);
+        }
+        if ($argc > 4) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'filter_input() expects at most 4 arguments, '.$argc.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'filter_input_argc_hi_cont');
+
+            return JitFilter::boxedNull($context);
         }
         if (\count($args) >= 3) {
             $filterArg = $args[2];

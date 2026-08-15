@@ -23,8 +23,11 @@ final class filter_has_var extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2 || \count($frame->calledArgs) > 2) {
-            throw new \LogicException('filter_has_var() requires exactly two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(
+                'filter_has_var() expects exactly 2 arguments, '.$argc.' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -47,8 +50,16 @@ final class filter_has_var extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('filter_has_var() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        // Catchable ArgumentCountError under JIT/AOT try/catch (#30711; peer #30991).
+        if (2 !== $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'filter_has_var() expects exactly 2 arguments, '.$argc.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'filter_has_var_argc_cont');
+
+            return JitFilter::boxedFalse($context);
         }
         $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);
         // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
