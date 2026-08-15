@@ -1983,12 +1983,14 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsHeaderListTrueWhenProfile84(): void
+    public function testSupportsHeaderListFalseWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsHeaderList());
+            // php-src never ships header_list() — only headers_list() (#28404).
+            $this->assertFalse(CompilerVersion::supportsHeaderList());
+            $this->assertFalse(CompilerVersion::advertisesHeaderList());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -3960,9 +3962,12 @@ final class CompilerVersionGateTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            $this->assertTrue(isset($ctx->functions['array_replace_key']));
-            $this->assertTrue(isset($ctx->functions['class_constants']));
-            $this->assertTrue(isset($ctx->functions['header_list']));
+            // Phantoms vs php-src stay off even on forward profiles (#24002 / #28404).
+            $this->assertFalse(isset($ctx->functions['array_replace_key']));
+            $this->assertFalse(isset($ctx->functions['class_constants']));
+            $this->assertFalse(isset($ctx->functions['header_list']));
+            $this->assertTrue(isset($ctx->functions['headers_list']));
+            $this->assertTrue(isset($ctx->functions['header']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

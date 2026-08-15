@@ -5,7 +5,7 @@ GATEWAY_INTERFACE=CGI/1.1
 --FILE--
 <?php
 session_start();
-$headers = header_list();
+$headers = headers_list();
 echo substr($headers[0], 0, 22) === 'Set-Cookie: PHPSESSID=' ? 'cookie' : 'nocookie', "\n";
 --EXPECT--
 cookie

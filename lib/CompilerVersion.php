@@ -2597,23 +2597,21 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ header_list() (ext/standard/head.c, #12546, #17791).
+     * header_list() — absent from php-src (headers_list() only; ext/standard/head.stub.php /
+     * basic_functions.stub.php). Prior forward-profile gate (#12546 / #17791) was wrong-direction.
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * Never register or advertise on php-src-strict profiles (#28404). Keep header_list class as
+     * shared implementation for headers_list / apache_response_headers.
      */
     public static function supportsHeaderList(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
+        return false;
+    }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    /** header_list() visible to function_exists() — never (php-src absent, #28404). */
+    public static function advertisesHeaderList(): bool
+    {
+        return false;
     }
 
     /**

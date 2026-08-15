@@ -6,6 +6,6 @@ GATEWAY_INTERFACE=CGI/1.1
 <?php
 // Thu, 15-Jan-2026 12:30:45 GMT
 setcookie('sid', 'x', 1768480245);
-echo header_list()[0], "\n";
+echo headers_list()[0], "\n";
 --EXPECT--
 Set-Cookie: sid=x; expires=Thu, 15-Jan-2026 12:30:45 GMT

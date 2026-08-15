@@ -5,7 +5,7 @@ GATEWAY_INTERFACE=CGI/1.1
 --FILE--
 <?php
 echo setcookie('sid', 'abc') ? 'ok' : 'no', "\n";
-echo header_list()[0], "\n";
+echo headers_list()[0], "\n";
 --EXPECT--
 ok
 Set-Cookie: sid=abc

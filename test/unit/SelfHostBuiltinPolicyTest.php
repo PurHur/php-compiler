@@ -87,7 +87,6 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'get_debug_type',
             'var_export',
             'headers_list',
-            'header_list',
             'getallheaders',
             'apache_request_headers',
         ] as $fn) {
