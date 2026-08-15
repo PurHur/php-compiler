@@ -3626,6 +3626,8 @@ require_once __DIR__.'/../../../ext/standard/VmUnserializeFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmUrlRewriterOb.php';
 require_once __DIR__.'/../../../ext/standard/UrlScannerEx.php';
 require_once __DIR__.'/../../../ext/standard/VmUrlRewriterFlush.php';
+require_once __DIR__.'/../../../ext/standard/VmUrlRewriterHrefApply.php';
+require_once __DIR__.'/../../../ext/standard/UrlRewriterApplyJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmOpenBasedir.php';
 require_once __DIR__.'/../../../ext/standard/VmUserCall.php';
 require_once __DIR__.'/../../../ext/standard/VmUserStream.php';
