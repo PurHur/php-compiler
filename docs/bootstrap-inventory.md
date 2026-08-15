@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7467 |
-| Phase A inventory files (M2 ratio SSOT) | 7467 |
+| PHP files on vm.php path | 7471 |
+| Phase A inventory files (M2 ratio SSOT) | 7471 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23992 |
+| Source constructs flagged (warnings) | 23996 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2190,11 +2190,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/soap/use_soap_error_handler.php` | 0 | 3 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
+| `ext/sockets/JitSocketAccept.php` | 0 | 1 |
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
 | `ext/sockets/JitSocketBind.php` | 0 | 1 |
 | `ext/sockets/JitSocketClose.php` | 0 | 1 |
 | `ext/sockets/JitSocketConnect.php` | 0 | 1 |
 | `ext/sockets/JitSocketCreate.php` | 0 | 1 |
+| `ext/sockets/JitSocketCreateListen.php` | 0 | 1 |
 | `ext/sockets/JitSocketCreatePair.php` | 0 | 1 |
 | `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
@@ -5970,11 +5972,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringShmop.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketAccept.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketBind.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketConnect.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketCreate.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketCreateListen.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketExportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketImportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketListen.php` | 0 | 1 |
@@ -20107,115 +20111,115 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/VmMysqli.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 52)
-- new MysqliConstruct (line 56)
-- new MysqliQuery (line 61)
-- new MysqliExecuteQuery (line 62)
-- new MysqliClose (line 63)
-- new MysqliRealEscapeString (line 64)
-- new MysqliPrepare (line 65)
-- new MysqliAutocommit (line 66)
-- new MysqliBeginTransaction (line 67)
-- new MysqliCommit (line 68)
-- new MysqliRollback (line 69)
-- new MysqliSavepoint (line 70)
-- new MysqliReleaseSavepoint (line 71)
-- new MysqliRefresh (line 72)
-- new MysqliGetConnectionStats (line 73)
-- new MysqliRealConnect (line 74)
-- new MysqliOptions (line 75)
-- new MysqliSetCharset (line 76)
-- new MysqliMultiQuery (line 77)
-- new MysqliRealQuery (line 78)
-- new MysqliNextResult (line 79)
-- new MysqliMoreResults (line 80)
-- new MysqliStoreResult (line 81)
-- new MysqliUseResult (line 82)
-- new MysqliPoll (line 83)
-- new MysqliReapAsyncQuery (line 84)
-- new MysqliInsertId (line 85)
-- new MysqliFieldCountMethod (line 86)
-- new MysqliSqlstateMethod (line 87)
-- new MysqliWarningCountMethod (line 88)
-- new MysqliCharacterSetName (line 89)
-- new MysqliGetCharset (line 90)
-- new MysqliGetServerInfo (line 91)
-- new MysqliGetHostInfo (line 92)
-- new MysqliGetProtoInfo (line 93)
-- new MysqliGetServerVersion (line 94)
-- new MysqliGetClientInfoMethod (line 95)
-- new MysqliSslSet (line 96)
-- new MysqliPing (line 97)
-- new MysqliSelectDb (line 98)
-- new MysqliChangeUser (line 99)
-- new MysqliThreadId (line 100)
-- new MysqliKill (line 101)
-- new MysqliStmtInit (line 102)
-- new MysqliDumpDebugInfo (line 103)
-- new MysqliGetWarnings (line 104)
-- new mysqli (line 143)
-- new ObjectEntry (line 180)
-- new MysqliState (line 181)
-- new ObjectEntry (line 197)
-- new MysqliState (line 198)
-- new mysqli_sql_exception (line 454)
-- new HashTable (line 464)
-- new Variable (line 466)
-- new MysqliState (line 483)
-- new ArgumentCountError (line 669)
-- new HashTable (line 793)
-- new Variable (line 803)
-- new Variable (line 808)
-- new mysqli (line 1175)
-- new ClassEntry (line 1209)
-- new MysqliResultFetchAssoc (line 1214)
-- new MysqliResultFetchArray (line 1215)
-- new MysqliResultFetchRow (line 1216)
-- new MysqliResultFetchColumn (line 1217)
-- new MysqliResultFree (line 1218)
-- new MysqliResultFree (line 1219)
-- new MysqliResultFree (line 1220)
-- new MysqliResultFetchAll (line 1221)
-- new MysqliResultFetchObject (line 1222)
-- new MysqliResultFetchField (line 1223)
-- new MysqliResultFetchFields (line 1224)
-- new MysqliResultFetchFieldDirect (line 1225)
-- new MysqliResultFetchLengths (line 1226)
-- new MysqliResultDataSeek (line 1227)
-- new MysqliResultFieldSeek (line 1228)
-- new MysqliResultFieldTell (line 1229)
-- new ObjectEntry (line 1251)
-- new HashTable (line 1290)
-- new Variable (line 1292)
-- new ObjectEntry (line 1438)
-- new MysqliResultState (line 1439)
-- new mysqli_sql_exception (line 1506)
-- new mysqli (line 1521)
-- new mysqli_sql_exception (line 1526)
-- new MysqliState (line 1529)
-- new ArgumentCountError (line 1568)
-- new ArgumentCountError (line 1603)
-- new ArgumentCountError (line 1662)
-- new ArgumentCountError (line 1684)
-- new ArgumentCountError (line 1775)
-- new ArgumentCountError (line 1911)
-- new ArgumentCountError (line 1932)
-- new ArgumentCountError (line 1953)
-- new ArgumentCountError (line 2037)
-- new ArgumentCountError (line 2059)
-- new ArgumentCountError (line 2080)
-- new ArgumentCountError (line 2101)
-- new ArgumentCountError (line 2439)
-- new ArgumentCountError (line 2493)
-- new ArgumentCountError (line 2515)
-- new ArgumentCountError (line 2571)
-- new HashTable (line 2788)
-- new Variable (line 2790)
-- new ArgumentCountError (line 2811)
-- new HashTable (line 2844)
-- new Variable (line 2846)
-- new ArgumentCountError (line 2867)
-- new ArgumentCountError (line 2888)
+- new ClassEntry (line 53)
+- new MysqliConstruct (line 57)
+- new MysqliQuery (line 62)
+- new MysqliExecuteQuery (line 63)
+- new MysqliClose (line 64)
+- new MysqliRealEscapeString (line 65)
+- new MysqliPrepare (line 66)
+- new MysqliAutocommit (line 67)
+- new MysqliBeginTransaction (line 68)
+- new MysqliCommit (line 69)
+- new MysqliRollback (line 70)
+- new MysqliSavepoint (line 71)
+- new MysqliReleaseSavepoint (line 72)
+- new MysqliRefresh (line 73)
+- new MysqliGetConnectionStats (line 74)
+- new MysqliRealConnect (line 75)
+- new MysqliOptions (line 76)
+- new MysqliSetCharset (line 77)
+- new MysqliMultiQuery (line 78)
+- new MysqliRealQuery (line 79)
+- new MysqliNextResult (line 80)
+- new MysqliMoreResults (line 81)
+- new MysqliStoreResult (line 82)
+- new MysqliUseResult (line 83)
+- new MysqliPoll (line 84)
+- new MysqliReapAsyncQuery (line 85)
+- new MysqliInsertId (line 86)
+- new MysqliFieldCountMethod (line 87)
+- new MysqliSqlstateMethod (line 88)
+- new MysqliWarningCountMethod (line 89)
+- new MysqliCharacterSetName (line 90)
+- new MysqliGetCharset (line 91)
+- new MysqliGetServerInfo (line 92)
+- new MysqliGetHostInfo (line 93)
+- new MysqliGetProtoInfo (line 94)
+- new MysqliGetServerVersion (line 95)
+- new MysqliGetClientInfoMethod (line 96)
+- new MysqliSslSet (line 97)
+- new MysqliPing (line 98)
+- new MysqliSelectDb (line 99)
+- new MysqliChangeUser (line 100)
+- new MysqliThreadId (line 101)
+- new MysqliKill (line 102)
+- new MysqliStmtInit (line 103)
+- new MysqliDumpDebugInfo (line 104)
+- new MysqliGetWarnings (line 105)
+- new mysqli (line 150)
+- new ObjectEntry (line 187)
+- new MysqliState (line 188)
+- new ObjectEntry (line 204)
+- new MysqliState (line 205)
+- new mysqli_sql_exception (line 461)
+- new HashTable (line 471)
+- new Variable (line 473)
+- new MysqliState (line 490)
+- new ArgumentCountError (line 676)
+- new HashTable (line 800)
+- new Variable (line 810)
+- new Variable (line 815)
+- new mysqli (line 1182)
+- new ClassEntry (line 1216)
+- new MysqliResultFetchAssoc (line 1221)
+- new MysqliResultFetchArray (line 1222)
+- new MysqliResultFetchRow (line 1223)
+- new MysqliResultFetchColumn (line 1224)
+- new MysqliResultFree (line 1225)
+- new MysqliResultFree (line 1226)
+- new MysqliResultFree (line 1227)
+- new MysqliResultFetchAll (line 1228)
+- new MysqliResultFetchObject (line 1229)
+- new MysqliResultFetchField (line 1230)
+- new MysqliResultFetchFields (line 1231)
+- new MysqliResultFetchFieldDirect (line 1232)
+- new MysqliResultFetchLengths (line 1233)
+- new MysqliResultDataSeek (line 1234)
+- new MysqliResultFieldSeek (line 1235)
+- new MysqliResultFieldTell (line 1236)
+- new ObjectEntry (line 1258)
+- new HashTable (line 1297)
+- new Variable (line 1299)
+- new ObjectEntry (line 1445)
+- new MysqliResultState (line 1446)
+- new mysqli_sql_exception (line 1513)
+- new mysqli (line 1528)
+- new mysqli_sql_exception (line 1533)
+- new MysqliState (line 1536)
+- new ArgumentCountError (line 1575)
+- new ArgumentCountError (line 1610)
+- new ArgumentCountError (line 1669)
+- new ArgumentCountError (line 1691)
+- new ArgumentCountError (line 1782)
+- new ArgumentCountError (line 1918)
+- new ArgumentCountError (line 1939)
+- new ArgumentCountError (line 1960)
+- new ArgumentCountError (line 2044)
+- new ArgumentCountError (line 2066)
+- new ArgumentCountError (line 2087)
+- new ArgumentCountError (line 2108)
+- new ArgumentCountError (line 2446)
+- new ArgumentCountError (line 2500)
+- new ArgumentCountError (line 2522)
+- new ArgumentCountError (line 2578)
+- new HashTable (line 2795)
+- new Variable (line 2797)
+- new ArgumentCountError (line 2818)
+- new HashTable (line 2851)
+- new Variable (line 2853)
+- new ArgumentCountError (line 2874)
+- new ArgumentCountError (line 2895)
 - 158 class method(s)
 
 ### `ext/mysqli/VmMysqliStmt.php`
@@ -25354,6 +25358,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 64)
 - 3 class method(s)
 
+### `ext/sockets/JitSocketAccept.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/sockets/JitSocketAtmark.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25378,6 +25387,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/sockets/JitSocketCreateListen.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/sockets/JitSocketCreatePair.php`
 
@@ -25474,7 +25488,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketCreateJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 14 class method(s)
 
 ### `ext/sockets/SocketExportStreamJitHelper.php`
 
@@ -46083,7 +46097,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1718)
+- new InternalArgInfo (line 1737)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46099,8 +46113,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2419)
-- new ArgumentCountError (line 2430)
+- new ArgumentCountError (line 2424)
+- new ArgumentCountError (line 2435)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -49803,7 +49817,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SocketBindListenRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 12 class method(s)
 
 ### `lib/JIT/Builtin/SocketCloseRuntime.php`
 
@@ -50784,6 +50798,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Builtin/StringSocketAccept.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/StringSocketAtmark.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50805,6 +50824,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSocketCreate.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StringSocketCreateListen.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)

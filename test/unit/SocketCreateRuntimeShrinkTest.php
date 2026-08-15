@@ -110,12 +110,30 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketBindListenRuntime.php');
         $this->assertStringContainsString('::bindArgv', $source);
         $this->assertStringContainsString('::listenArgv', $source);
+        $this->assertStringContainsString('::acceptArgv', $source);
+        $this->assertStringContainsString('::createListenFdArgv', $source);
         $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
         $this->assertStringContainsString('__compiler_socket_bind', $source);
         $this->assertStringContainsString('__compiler_socket_listen', $source);
+        $this->assertStringContainsString('__compiler_socket_accept', $source);
+        $this->assertStringContainsString('__compiler_socket_create_listen_fd', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSocketAcceptCallUsesJitSocketAccept(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_accept.php');
+        $this->assertStringContainsString('JitSocketAccept::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketCreateListenCallUsesJitSocketCreateListen(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_create_listen.php');
+        $this->assertStringContainsString('JitSocketCreateListen::invoke', $source);
+        $this->assertStringNotContainsString('not implemented for JIT', $source);
     }
 
     public function testSpineBundleIncludesSocketCreateCloseHelpers(): void
@@ -129,6 +147,8 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitSocketConnect.php', $spine);
         $this->assertStringContainsString('JitSocketBind.php', $spine);
         $this->assertStringContainsString('JitSocketListen.php', $spine);
+        $this->assertStringContainsString('JitSocketAccept.php', $spine);
+        $this->assertStringContainsString('JitSocketCreateListen.php', $spine);
         $this->assertStringContainsString('SocketCreateRuntime.php', $spine);
         $this->assertStringContainsString('SocketCloseRuntime.php', $spine);
         $this->assertStringContainsString('SocketConnectRuntime.php', $spine);
@@ -136,5 +156,7 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringSocketConnect.php', $spine);
         $this->assertStringContainsString('StringSocketBind.php', $spine);
         $this->assertStringContainsString('StringSocketListen.php', $spine);
+        $this->assertStringContainsString('StringSocketAccept.php', $spine);
+        $this->assertStringContainsString('StringSocketCreateListen.php', $spine);
     }
 }

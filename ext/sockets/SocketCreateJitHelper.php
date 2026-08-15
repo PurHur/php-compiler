@@ -200,6 +200,70 @@ final class SocketCreateJitHelper
         return 0;
     }
 
+    /**
+     * socket_accept() — returns client fd, or -1 on failure (#31242).
+     * Caller allocates Socket + {@see registerOwnedArgv} (mirror create).
+     */
+    public static function acceptArgv(int $handle): int
+    {
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return -1;
+        }
+        $client = SocketsLibcThinAbi::accept($fd);
+        // NestedJIT FFI may leave accept(2) as float — normalize (#31241/#31242).
+        $client = (int) $client;
+        if ($client < 0) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return -1;
+        }
+
+        return $client;
+    }
+
+    /** AF_* for NestedJIT handle, or AF_INET if unknown (#31242). */
+    public static function domainForHandleArgv(int $handle): int
+    {
+        $domain = VmSocket::domainForLookupKey($handle);
+
+        return null === $domain ? VmSockets::AF_INET : $domain;
+    }
+
+    /**
+     * socket_create_listen() — AF_INET listener fd, or -1 (#31242).
+     * Caller allocates Socket + registerOwnedArgv(AF_INET).
+     */
+    public static function createListenFdArgv(int $port, int $backlog): int
+    {
+        $port = $port & 0xffff;
+        if (!SocketsLibcThinAbi::available()) {
+            return -1;
+        }
+        $fd = SocketsLibcThinAbi::socket(VmSockets::AF_INET, SocketConstants::SOCK_STREAM, 0);
+        if ($fd < 0) {
+            VmSockets::recordLibcErrno(null);
+
+            return -1;
+        }
+        // NestedJIT FFI may leave bind/listen as float 0.0 — use == (#31241).
+        if (0 != SocketsLibcThinAbi::bindInet($fd, '0.0.0.0', $port)) {
+            VmSockets::recordLibcErrno(null);
+            SocketsLibcThinAbi::close($fd);
+
+            return -1;
+        }
+        if (0 != SocketsLibcThinAbi::listen($fd, $backlog)) {
+            VmSockets::recordLibcErrno(null);
+            SocketsLibcThinAbi::close($fd);
+
+            return -1;
+        }
+
+        return $fd;
+    }
+
     private static function fdForHandle(int $handle): ?int
     {
         if ($handle > 0 && $handle === self::$pairFdByHandle0 && self::$pairFd0 >= 0) {
