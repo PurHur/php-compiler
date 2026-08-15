@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7485 |
-| Phase A inventory files (M2 ratio SSOT) | 7485 |
+| PHP files on vm.php path | 7488 |
+| Phase A inventory files (M2 ratio SSOT) | 7488 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24006 |
+| Source constructs flagged (warnings) | 24008 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2204,6 +2204,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketLastError.php` | 0 | 1 |
 | `ext/sockets/JitSocketListen.php` | 0 | 1 |
 | `ext/sockets/JitSocketRead.php` | 0 | 1 |
+| `ext/sockets/JitSocketSendto.php` | 0 | 1 |
 | `ext/sockets/JitSocketSetBlock.php` | 0 | 1 |
 | `ext/sockets/JitSocketSetNonblock.php` | 0 | 1 |
 | `ext/sockets/JitSocketShutdown.php` | 0 | 1 |
@@ -4041,7 +4042,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/enum_exists_.php` | 0 | 1 |
 | `ext/standard/error_clear_last.php` | 0 | 1 |
 | `ext/standard/error_get_last.php` | 0 | 1 |
-| `ext/standard/error_log.php` | 0 | 2 |
+| `ext/standard/error_log.php` | 0 | 1 |
 | `ext/standard/error_reporting.php` | 0 | 1 |
 | `ext/standard/escapeshellarg.php` | 0 | 4 |
 | `ext/standard/escapeshellcmd.php` | 0 | 4 |
@@ -5792,6 +5793,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SocketExportStreamRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketImportStreamRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketPairIoRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SocketSendtoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSetBlockRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketShutdownRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SortRuntime.php` | 0 | 1 |
@@ -5995,6 +5997,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSocketImportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketListen.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketPairIo.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketSendto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSetBlock.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketShutdown.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSodium.php` | 0 | 1 |
@@ -11249,61 +11252,61 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 8338)
 - new DomNodeState (line 8340)
 - new DOMException (line 9144)
-- new Variable (line 9223)
-- new DOMException (line 9519)
-- new DOMException (line 9740)
-- new DOMException (line 9785)
-- new ObjectEntry (line 9889)
-- new DomNodeState (line 9893)
-- new Variable (line 9900)
-- new ObjectEntry (line 9918)
-- new DomNodeState (line 9922)
-- new Variable (line 9929)
-- new ObjectEntry (line 9947)
-- new DomNodeState (line 9951)
-- new Variable (line 9958)
-- new DOMException (line 10041)
-- new ObjectEntry (line 10366)
-- new DomNodeState (line 10370)
-- new Variable (line 10379)
-- new ObjectEntry (line 10423)
-- new DomNodeState (line 10426)
-- new Variable (line 10434)
-- new Variable (line 10679)
-- new Variable (line 10701)
-- new Variable (line 10718)
-- new Variable (line 10731)
-- new Variable (line 10749)
-- new DOMException (line 10940)
-- new DOMException (line 10949)
-- new DOMException (line 10984)
-- new Variable (line 11095)
-- new DOMException (line 12179)
-- new DOMException (line 12247)
-- new Variable (line 12414)
-- new Variable (line 12437)
-- new Variable (line 12466)
-- new Error (line 12484)
-- new Variable (line 12510)
-- new DOMException (line 12521)
-- new Variable (line 12523)
-- new DOMException (line 12697)
-- new DOMException (line 12724)
-- new DOMException (line 12760)
-- new DOMException (line 12990)
+- new Variable (line 9225)
+- new DOMException (line 9521)
+- new DOMException (line 9748)
+- new DOMException (line 9793)
+- new ObjectEntry (line 9897)
+- new DomNodeState (line 9901)
+- new Variable (line 9908)
+- new ObjectEntry (line 9926)
+- new DomNodeState (line 9930)
+- new Variable (line 9937)
+- new ObjectEntry (line 9955)
+- new DomNodeState (line 9959)
+- new Variable (line 9966)
+- new DOMException (line 10049)
+- new ObjectEntry (line 10374)
+- new DomNodeState (line 10378)
+- new Variable (line 10387)
+- new ObjectEntry (line 10431)
+- new DomNodeState (line 10434)
+- new Variable (line 10442)
+- new Variable (line 10687)
+- new Variable (line 10709)
+- new Variable (line 10726)
+- new Variable (line 10739)
+- new Variable (line 10757)
+- new DOMException (line 10948)
+- new DOMException (line 10957)
+- new DOMException (line 10992)
+- new Variable (line 11103)
+- new DOMException (line 12187)
+- new DOMException (line 12255)
+- new Variable (line 12422)
+- new Variable (line 12445)
+- new Variable (line 12474)
+- new Error (line 12492)
+- new Variable (line 12518)
+- new DOMException (line 12529)
+- new Variable (line 12531)
+- new DOMException (line 12705)
+- new DOMException (line 12732)
+- new DOMException (line 12768)
 - new DOMException (line 12998)
-- new Variable (line 13010)
-- new DOMException (line 13032)
-- new DOMException (line 13051)
-- new DOMException (line 13062)
-- new DOMException (line 13067)
-- new DOMException (line 13093)
-- new DOMException (line 13114)
-- new DOMException (line 13174)
-- new DOMException (line 13226)
-- new Error (line 14839)
-- new Error (line 14843)
-- 557 class method(s)
+- new DOMException (line 13006)
+- new Variable (line 13018)
+- new DOMException (line 13040)
+- new DOMException (line 13059)
+- new DOMException (line 13070)
+- new DOMException (line 13075)
+- new DOMException (line 13101)
+- new DOMException (line 13122)
+- new DOMException (line 13182)
+- new DOMException (line 13234)
+- new Error (line 14853)
+- new Error (line 14857)
+- 558 class method(s)
 - 4 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -25442,6 +25445,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/sockets/JitSocketSendto.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/sockets/JitSocketSetBlock.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25532,7 +25540,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketCreateJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `ext/sockets/SocketErrorJitHelper.php`
 
@@ -25849,7 +25857,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/socket_sendto.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 34)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -33729,14 +33737,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SetcookieOptions.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 43)
-- new ArgumentCountError (line 56)
-- new ArgumentCountError (line 79)
-- new Variable (line 237)
-- new Variable (line 239)
-- new HashTable (line 241)
-- new Variable (line 242)
-- new Variable (line 245)
+- new ArgumentCountError (line 44)
+- new ArgumentCountError (line 57)
+- new ArgumentCountError (line 80)
+- new Variable (line 249)
+- new Variable (line 251)
+- new HashTable (line 253)
+- new Variable (line 254)
+- new Variable (line 257)
 - 6 class method(s)
 
 ### `ext/standard/SettypeJitHelper.php`
@@ -38239,7 +38247,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/error_log.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
 - 3 class method(s)
 
 ### `ext/standard/error_reporting.php`
@@ -40842,7 +40849,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/setcookie.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 162)
+- new JITVariable (line 177)
 - 5 class method(s)
 
 ### `ext/standard/setlocale.php`
@@ -40854,7 +40861,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/setrawcookie.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 162)
+- new JITVariable (line 176)
 - 5 class method(s)
 
 ### `ext/standard/settype.php`
@@ -46147,7 +46154,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1737)
+- new InternalArgInfo (line 1742)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46163,8 +46170,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2424)
-- new ArgumentCountError (line 2435)
+- new ArgumentCountError (line 2430)
+- new ArgumentCountError (line 2441)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -49904,6 +49911,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `lib/JIT/Builtin/SocketSendtoRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/JIT/Builtin/SocketSetBlockRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50919,6 +50931,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSocketPairIo.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StringSocketSendto.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)

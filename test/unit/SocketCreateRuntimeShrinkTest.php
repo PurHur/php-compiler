@@ -194,6 +194,39 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('parseAndCompile', $source);
     }
 
+    public function testSocketSendtoCallUsesJitSocketSendto(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_sendto.php');
+        $this->assertStringContainsString('JitSocketSendto::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketSendtoJitHelperExposesSendtoArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCreateJitHelper.php');
+        $this->assertStringContainsString('function sendtoArgv', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::sendtoInet', $source);
+    }
+
+    public function testSocketSendtoRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketSendtoRuntime.php');
+        $this->assertStringContainsString('::sendtoArgv', $source);
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_sendto', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketSendtoHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketSendto.php', $spine);
+        $this->assertStringContainsString('SocketSendtoRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketSendto.php', $spine);
+    }
+
     public function testSocketStrerrorCallUsesJitSocketStrerror(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_strerror.php');

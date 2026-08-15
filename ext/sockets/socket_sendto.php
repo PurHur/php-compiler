@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\sockets;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -64,6 +66,20 @@ final class socket_sendto extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_sendto() JIT lowering not implemented (#6248)');
+        $argc = \count($args);
+        if ($argc < 5 || $argc > 6) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                $argc < 5
+                    ? 'socket_sendto() expects at least 5 arguments, '.$argc.' given'
+                    : 'socket_sendto() expects at most 6 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitSocketSendto::invoke($context, ...$args);
     }
 }
