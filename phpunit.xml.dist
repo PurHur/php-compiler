@@ -347,6 +347,8 @@
             <file>./test/compliance/CreateFromFormatClockOverflow30972JITTest.php</file>
             <file>./test/compliance/CreateFromFormatBangTrailing31169VMTest.php</file>
             <file>./test/compliance/CreateFromFormatBangTrailing31169JITTest.php</file>
+            <file>./test/compliance/CreateFromFormatPlusTrailing31170VMTest.php</file>
+            <file>./test/compliance/CreateFromFormatPlusTrailing31170JITTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictVMTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictJITTest.php</file>
             <file>./test/compliance/OpcacheIsScriptCachedInFileCacheVMTest.php</file>

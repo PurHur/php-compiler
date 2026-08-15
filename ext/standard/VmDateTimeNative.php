@@ -47,6 +47,15 @@ final class VmDateTimeNative
     private static bool $createFromFormatTrailingData = false;
 
     /**
+     * Offset of leftover input when format `+` allows trailing data (#31170).
+     * Null when the last match had no trailing leftover (or failed hard).
+     */
+    private static ?int $createFromFormatTrailingWarningAt = null;
+
+    /** End offset of the last successful createFromFormat token match (excludes leftover under `+`). */
+    private static int $createFromFormatMatchEnd = 0;
+
+    /**
      * timezone_version_get() — IANA tzdata version for the zoneinfo tree we actually use (#29386).
      *
      * php-src returns `DATE_TIMEZONEDB->version` (bundled timezonedb) or `0.system` under
@@ -1144,11 +1153,25 @@ final class VmDateTimeNative
 
             return self::failedParseResult($failure['errors'], $failure['error_count']);
         }
+        // `+` trailing warning first so a same-offset calendar warning overwrites the bag
+        // entry while warning_count still counts both (timelib / #31170).
+        $warnings = [];
+        $warningCount = 0;
+        if (null !== self::$createFromFormatTrailingWarningAt) {
+            $at = self::$createFromFormatTrailingWarningAt;
+            self::$createFromFormatTrailingWarningAt = null;
+            $warnings[$at] = 'Trailing data';
+            ++$warningCount;
+        }
         $normalized = self::warnInvalidCalendarComponents($matched, $time);
+        foreach ($normalized['warnings'] as $offset => $message) {
+            $warnings[$offset] = $message;
+        }
+        $warningCount += $normalized['warning_count'];
         $result = self::parseResultFromComponents($normalized['components']);
-        if ($normalized['warning_count'] > 0) {
-            $result['warning_count'] = $normalized['warning_count'];
-            $result['warnings'] = $normalized['warnings'];
+        if ($warningCount > 0) {
+            $result['warning_count'] = $warningCount;
+            $result['warnings'] = $warnings;
         }
 
         // php-src PHP_FUNCTION(date_parse_from_format) — emit zone_* from format tokens T/e/O/P (#25487).
@@ -1611,6 +1634,8 @@ final class VmDateTimeNative
     private static function matchFormatComponents(string $format, string $time): array|false
     {
         self::$createFromFormatTrailingData = false;
+        self::$createFromFormatTrailingWarningAt = null;
+        self::$createFromFormatMatchEnd = 0;
         $pipeReset = false;
         $allowTrailing = false;
         $pos = 0;
@@ -1837,8 +1862,10 @@ final class VmDateTimeNative
 
                 return false;
             }
-            // `+`: ignore trailing input after a successful format match (#22836).
+            // `+`: leftover is TIMELIB_WARN_TRAILING_DATA, not an error (#22836, #31170).
+            self::$createFromFormatTrailingWarningAt = $pos;
         }
+        self::$createFromFormatMatchEnd = $pos;
         if ($pipeReset) {
             foreach ([
                 'year' => 1970,
@@ -1883,7 +1910,10 @@ final class VmDateTimeNative
     {
         $warnings = [];
         $warningCount = 0;
-        $offset = \strlen($time);
+        // Prefer match-end so leftover under `+` does not shift the warning key (#31170).
+        $offset = self::$createFromFormatMatchEnd > 0
+            ? self::$createFromFormatMatchEnd
+            : \strlen($time);
         // Time first, then date — same-offset date overwrites the bag entry like timelib.
         if (self::clockComponentsAreInvalid($components)) {
             $warnings[$offset] = 'The parsed time was invalid';
