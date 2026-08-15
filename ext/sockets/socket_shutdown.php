@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\sockets;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -49,6 +51,20 @@ final class socket_shutdown extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_shutdown() JIT lowering not implemented (#6533)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                $argc < 1
+                    ? 'socket_shutdown() expects at least 1 argument, '.$argc.' given'
+                    : 'socket_shutdown() expects at most 2 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitSocketShutdown::invoke($context, ...$args);
     }
 }

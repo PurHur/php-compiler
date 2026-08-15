@@ -201,6 +201,30 @@ final class SocketCreateJitHelper
     }
 
     /**
+     * socket_shutdown() — same NestedJIT unit as registerOwnedArgv so pair fds resolve (#31292).
+     *
+     * @return int 1 on success, 0 on failure
+     */
+    public static function shutdownArgv(int $handle, int $how): int
+    {
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return 0;
+        }
+        $rc = SocketsLibcThinAbi::shutdown($fd, $how);
+        // NestedJIT FFI may leave shutdown(2) as float 0.0 — use == (#31241/#31292).
+        if (0 == $rc) {
+            VmSockets::clearErrorForLookupKey($handle);
+
+            return 1;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        VmSockets::recordErrorForLookupKey($handle, $errno);
+
+        return 0;
+    }
+
+    /**
      * socket_accept() — returns client fd, or -1 on failure (#31242).
      * Caller allocates Socket + {@see registerOwnedArgv} (mirror create).
      */
