@@ -40,10 +40,9 @@ final class iterator_to_array extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/spl/iterator.c — ArgumentCountError (#30575).
+        $this->requireArgCountRange($frame, 'iterator_to_array', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('iterator_to_array() requires one or two arguments in this compiler build');
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('iterator_to_array() requires VM context in this compiler build');
         }
@@ -60,10 +59,11 @@ final class iterator_to_array extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('iterator_to_array() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT/JIT) — #30575.
+        if (!$this->requireArgCountRangeJit($context, $args, 'iterator_to_array', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
         ExceptionBridge::ensureLinked($context);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             // Always TypeError — typed Traversable|array (php-src-strict; #21893).

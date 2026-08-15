@@ -21,12 +21,9 @@ final class preg_split extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/pcre/php_pcre.c — ArgumentCountError (#30575).
+        $this->requireArgCountRange($frame, 'preg_split', 2, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException(
-                'preg_split() expects 2 to 4 arguments in this compiler build'
-            );
-        }
         // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226 TypeError).
         // $subject soft-null: E_DEPRECATED + '' on 8.4 (php-src php_pcre.c / #21318, re-#21198).
         $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'preg_split', 0, 'pattern');
@@ -55,12 +52,11 @@ final class preg_split extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException(
-                'preg_split() expects 2 to 4 arguments in this compiler build'
-            );
+        // Catchable ArgumentCountError (AOT/JIT) — #30575.
+        if (!$this->requireArgCountRangeJit($context, $args, 'preg_split', 2, 4)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
         $limitLit = null;
         $flagsLit = null;
         if ($argc >= 3) {

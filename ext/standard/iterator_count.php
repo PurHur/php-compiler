@@ -25,9 +25,8 @@ final class iterator_count extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('iterator_count() requires exactly one argument');
-        }
+        // php-src ext/spl/php_spl.c — ArgumentCountError (#30575).
+        $this->requireExactArgCount($frame, 'iterator_count', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,8 +38,9 @@ final class iterator_count extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('iterator_count() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #30575.
+        if (!$this->requireExactJitArgCount($context, $args, 'iterator_count', 1)) {
+            return $context->getTypeFromString('int64')->constInt(0, true);
         }
 
         return JitIteratorWalk::count($context, $args[0]);
