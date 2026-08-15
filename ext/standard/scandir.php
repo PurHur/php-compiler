@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFsGlob;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -32,8 +33,10 @@ final class scandir extends Internal
         VmString::rejectEmptyBuiltinStringArg($path, 'scandir', 0, 'directory', true);
         $sortingOrder = \SCANDIR_SORT_ASCENDING;
         if ($argc >= 2) {
-            $sortingOrder = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31244).
+            $sortingOrder = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'scandir',
                 2,
                 'sorting_order'
@@ -72,6 +75,15 @@ final class scandir extends Internal
         $i32 = $context->getTypeFromString('int32');
         $sort = $i32->constInt(0, false);
         if ($argc >= 2) {
+            // Early return after compile-time null TypeError (AOT verify; peer dirname #31210 / chmod #31211).
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+                JitSleep::zParamLong($context, $args[1], 'scandir', 2, 'sorting_order');
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'scandir_null_sorting_order_te_cont');
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
             $sortLong = JitSleep::zParamLong($context, $args[1], 'scandir', 2, 'sorting_order');
             $sort = $context->builder->truncOrBitCast($sortLong, $i32);
         }

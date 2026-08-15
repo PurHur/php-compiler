@@ -116,6 +116,8 @@
             <file>./test/compliance/MkdirNullPermissions31211VMTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211JITTest.php</file>
             <file>./test/compliance/MysqliExecuteQueryReflectionVMTest.php</file>
+            <file>./test/compliance/ScandirNullSortingOrder31244VMTest.php</file>
+            <file>./test/compliance/ScandirNullSortingOrder31244JITTest.php</file>
             <file>./test/compliance/ArrayPadOversizeValueError29342VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153JITTest.php</file>
