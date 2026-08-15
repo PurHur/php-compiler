@@ -187,6 +187,42 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JIT lowering not implemented', $source);
     }
 
+    public function testSocketSetBlockCallUsesJitSocketSetBlock(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_set_block.php');
+        $this->assertStringContainsString('JitSocketSetBlock::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketSetNonblockCallUsesJitSocketSetNonblock(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_set_nonblock.php');
+        $this->assertStringContainsString('JitSocketSetNonblock::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketSetBlockJitHelperDelegatesToVmSockets(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketSetBlockJitHelper.php');
+        $this->assertStringContainsString('SocketCreateJitHelper::fdForHandleArgv', $source);
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketSetBlockRuntime.php');
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $runtime);
+        $this->assertStringContainsString('StringSocketPairIo::ensureLinked', $runtime);
+    }
+
+    public function testSocketSetBlockRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketSetBlockRuntime.php');
+        $this->assertStringContainsString('::fdForHandleArgv', $source);
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_set_block', $source);
+        $this->assertStringContainsString('__compiler_socket_set_nonblock', $source);
+        $this->assertStringContainsString('lookupFunction(\'fcntl\')', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
     public function testSocketErrorJitHelperDelegatesToVmSockets(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketErrorJitHelper.php');
@@ -208,5 +244,15 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketSetBlockHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('SocketSetBlockJitHelper.php', $spine);
+        $this->assertStringContainsString('JitSocketSetBlock.php', $spine);
+        $this->assertStringContainsString('JitSocketSetNonblock.php', $spine);
+        $this->assertStringContainsString('SocketSetBlockRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketSetBlock.php', $spine);
     }
 }
