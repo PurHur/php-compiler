@@ -233,13 +233,8 @@ final class pg_put_line extends Internal
         }
         if (1 === $argc) {
             $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_put_line', 1, 'query');
-            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
-            if (null === $connObj) {
-                @\trigger_error('pg_put_line(): No PostgreSQL connection opened yet', \E_USER_WARNING);
-                $frame->returnVar->bool(false);
-
-                return;
-            }
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31221).
+            $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated(null, $frame, 'pg_put_line');
         } else {
             $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_put_line', 1);
             $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_put_line', 2, 'query');
@@ -289,13 +284,8 @@ final class pg_end_copy extends Internal
         if (1 === $argc) {
             $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[0], 'pg_end_copy', 1);
         }
-        $connObj = VmPgsqlConnection::resolveOptionalConnection($provided);
-        if (null === $connObj) {
-            @\trigger_error('pg_end_copy(): No PostgreSQL connection opened yet', \E_USER_WARNING);
-            $frame->returnVar->bool(false);
-
-            return;
-        }
+        // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31221).
+        $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated($provided, $frame, 'pg_end_copy');
         $native = VmPgsqlConnection::native($connObj);
         $ok = VmPgsqlNative::endCopy($native);
         if (!$ok) {
