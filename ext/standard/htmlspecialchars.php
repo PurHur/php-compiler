@@ -13,11 +13,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringHtmlspecialchars;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -43,12 +43,13 @@ final class htmlspecialchars extends Internal
         $encoding = 'UTF-8';
         $doubleEncode = true;
         if (isset($frame->calledArgs[1])) {
-            $flags = VmMath::parseZParamLongBuiltinArg(
-                $frame->calledArgs[1],
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31212).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'htmlspecialchars',
                 2,
-                'flags',
-                $frame
+                'flags'
             );
         }
         if (isset($frame->calledArgs[2])) {
@@ -119,12 +120,28 @@ final class htmlspecialchars extends Internal
             );
         }
 
+        // Soft-null outside strict_types; strict → TypeError (#31212 / peer dirname #31210).
+        if ($argc >= 2
+            && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'htmlspecialchars', 2, 'flags');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'htmlspecialchars_null_flags_te_cont');
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
         StringHtmlspecialchars::ensureLinked($context);
 
         $str = self::jitStringArg($context, $args[0], 0, 'string');
         $flags = $context->getTypeFromString('int64')->constInt(self::DEFAULT_FLAGS, false);
         if ($effectiveFlagsArgc >= 2 || $argc >= 2) {
-            $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
+            $flags = JitIntdiv::lowerIntBuiltinArgForCaller(
+                $context,
+                $args[1],
+                'htmlspecialchars',
+                2,
+                'flags'
+            );
         }
 
         if (!$hasDoubleEncode) {
@@ -298,6 +315,10 @@ final class htmlspecialchars extends Internal
 
         $flags = self::DEFAULT_FLAGS;
         if ($argc >= 2) {
+            // Null flags need runtime DEP / strict TypeError — do not fold (#31212).
+            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+                return null;
+            }
             $flagsVal = self::compileTimeLong($context, $args[1]);
             if (null === $flagsVal) {
                 return null;

@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -36,12 +36,13 @@ final class html_entity_decode extends Internal
         $encoding = 'UTF-8';
         $argc = \count($frame->calledArgs);
         if ($argc >= 2) {
-            $flags = VmMath::parseZParamLongBuiltinArg(
-                $frame->calledArgs[1],
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31212).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'html_entity_decode',
                 2,
-                'flags',
-                $frame
+                'flags'
             );
         }
         if ($argc >= 3) {
@@ -70,12 +71,21 @@ final class html_entity_decode extends Internal
         }
 
         $effectiveArgc = self::jitEffectiveArgc($argc, $args);
+        // Soft-null outside strict_types; strict → TypeError (#31212).
+        if ($argc >= 2
+            && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'html_entity_decode', 2, 'flags');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'html_entity_decode_null_flags_te_cont');
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         if ($effectiveArgc >= 3) {
             return JitHtmlEntityDecode::decodeWithEncoding(
                 $context,
                 JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'html_entity_decode', 0, 'string'),
                 $argc >= 2
-                    ? JitLongArg::lower($context, $args[1], 'html_entity_decode() flags')
+                    ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'html_entity_decode', 2, 'flags')
                     : $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false),
                 JitStringBuiltinArg::lower($context, $args[2], 'html_entity_decode', 2, 'encoding')
             );
@@ -85,10 +95,14 @@ final class html_entity_decode extends Internal
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $flagsKnown = $argc < 2;
         if ($argc >= 2) {
-            $ct = self::tryCompileTimeFlags($context, $args[1]);
-            if (null !== $ct) {
-                $flags = $ct;
-                $flagsKnown = true;
+            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+                $flagsKnown = false;
+            } else {
+                $ct = self::tryCompileTimeFlags($context, $args[1]);
+                if (null !== $ct) {
+                    $flags = $ct;
+                    $flagsKnown = true;
+                }
             }
         }
         if (null !== $literal && $flagsKnown) {
@@ -103,7 +117,13 @@ final class html_entity_decode extends Internal
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && !$flagsKnown) {
-            $flagsVal = JitLongArg::lower($context, $args[1], 'html_entity_decode() flags');
+            $flagsVal = JitIntdiv::lowerIntBuiltinArgForCaller(
+                $context,
+                $args[1],
+                'html_entity_decode',
+                2,
+                'flags'
+            );
         }
 
         return JitHtmlEntityDecode::decode($context, $str, $flagsVal);
