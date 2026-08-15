@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -34,12 +34,13 @@ final class htmlentities extends Internal
         $encoding = 'UTF-8';
         $doubleEncode = true;
         if (isset($frame->calledArgs[1])) {
-            $flags = VmMath::parseZParamLongBuiltinArg(
-                $frame->calledArgs[1],
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31212).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'htmlentities',
                 2,
-                'flags',
-                $frame
+                'flags'
             );
         }
         if (isset($frame->calledArgs[2])) {
@@ -85,8 +86,20 @@ final class htmlentities extends Internal
             );
         }
 
+        // Soft-null outside strict_types; strict → TypeError (#31212 / peer htmlspecialchars).
+        if ($argc >= 2
+            && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'htmlentities', 2, 'flags');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'htmlentities_null_flags_te_cont');
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
         if ($argc >= 2 && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type
-            && JITVariable::TYPE_VALUE !== $args[1]->type) {
+            && JITVariable::TYPE_VALUE !== $args[1]->type
+            && JITVariable::TYPE_NULL !== $args[1]->type
+            && !($args[1]->isNullConstant ?? false)) {
             throw new \LogicException('htmlentities() flags must be an integer in this compiler build');
         }
 
@@ -102,10 +115,15 @@ final class htmlentities extends Internal
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $flagsKnown = $argc < 2;
         if ($argc >= 2) {
-            $flagsVal = self::compileTimeLong($context, $args[1]);
-            if (null !== $flagsVal) {
-                $flags = $flagsVal;
-                $flagsKnown = true;
+            // Null flags need runtime DEP / strict TypeError — do not fold (#31212).
+            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+                $flagsKnown = false;
+            } else {
+                $flagsVal = self::compileTimeLong($context, $args[1]);
+                if (null !== $flagsVal) {
+                    $flags = $flagsVal;
+                    $flagsKnown = true;
+                }
             }
         }
         if (null !== $literal && $flagsKnown && self::jitEffectiveArgc($argc, $args) <= 2) {
@@ -122,7 +140,13 @@ final class htmlentities extends Internal
         if ($argc >= 2) {
             $flagsLlvm = $flagsKnown
                 ? $context->getTypeFromString('int64')->constInt($flags, false)
-                : JitLongArg::lower($context, $args[1], 'htmlentities() flags');
+                : JitIntdiv::lowerIntBuiltinArgForCaller(
+                    $context,
+                    $args[1],
+                    'htmlentities',
+                    2,
+                    'flags'
+                );
         }
 
         return JitHtmlentities::escape($context, $str, $flagsLlvm);

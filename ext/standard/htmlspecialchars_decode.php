@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -39,12 +39,13 @@ final class htmlspecialchars_decode extends Internal
         }
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         if ($argc >= 2) {
-            $flags = VmMath::parseZParamLongBuiltinArg(
-                $frame->calledArgs[1],
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31212).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'htmlspecialchars_decode',
                 2,
-                'flags',
-                $frame
+                'flags'
             );
         }
         $frame->returnVar->string(VmString::htmlspecialchars_decode($string, $flags));
@@ -76,13 +77,24 @@ final class htmlspecialchars_decode extends Internal
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $flagsKnown = $argc < 2;
         if ($argc >= 2) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('htmlspecialchars_decode() flags must be an integer in this compiler build');
+            // Soft-null outside strict_types; strict → TypeError (#31212).
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+                JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'htmlspecialchars_decode', 2, 'flags');
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'htmlspecialchars_decode_null_flags_te_cont');
+
+                return $context->getTypeFromString('__string__*')->constNull();
             }
-            $ct = $args[1]->compileTimeLong ?? null;
-            if (null !== $ct) {
-                $flags = (int) $ct;
-                $flagsKnown = true;
+            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+                $flagsKnown = false;
+            } elseif (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+                throw new \LogicException('htmlspecialchars_decode() flags must be an integer in this compiler build');
+            } else {
+                $ct = $args[1]->compileTimeLong ?? null;
+                if (null !== $ct) {
+                    $flags = (int) $ct;
+                    $flagsKnown = true;
+                }
             }
         }
         if (null !== $literal && $flagsKnown) {
@@ -96,7 +108,17 @@ final class htmlspecialchars_decode extends Internal
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'htmlspecialchars_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
-        if ($argc >= 2 && null === ($args[1]->compileTimeLong ?? null)) {
+        if ($argc >= 2 && !$flagsKnown) {
+            $flagsVal = JitIntdiv::lowerIntBuiltinArgForCaller(
+                $context,
+                $args[1],
+                'htmlspecialchars_decode',
+                2,
+                'flags'
+            );
+        } elseif ($argc >= 2 && null === ($args[1]->compileTimeLong ?? null)
+            && JITVariable::TYPE_NULL !== $args[1]->type
+            && !($args[1]->isNullConstant ?? false)) {
             $flagsVal = $context->helper->loadValue($args[1]);
         }
 
