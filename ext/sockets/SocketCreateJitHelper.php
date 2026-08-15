@@ -303,6 +303,69 @@ final class SocketCreateJitHelper
     }
 
     /**
+     * socket_set_option() int path (SO_REUSEADDR, …) — NestedJIT (#31295).
+     * Timeval/linger array options stay VM-only (NestedJIT cannot take HT args).
+     *
+     * @return int 1 on success, 0 on failure
+     */
+    public static function setOptionIntArgv(int $handle, int $level, int $option, int $value): int
+    {
+        if (13 === $option || 20 === $option || 21 === $option) {
+            // SO_LINGER / SO_RCVTIMEO / SO_SNDTIMEO require array — reject int path.
+            throw new \TypeError(
+                'socket_set_option(): Argument #4 ($value) must be of type array when option is SO_LINGER, SO_RCVTIMEO, or SO_SNDTIMEO'
+            );
+        }
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return 0;
+        }
+        $rc = SocketsLibcThinAbi::setsockoptInt($fd, $level, $option, $value);
+        if (0 == $rc) {
+            VmSockets::clearErrorForLookupKey($handle);
+
+            return 1;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        VmSockets::recordErrorForLookupKey($handle, $errno);
+
+        return 0;
+    }
+
+    /**
+     * socket_get_option() int path — stash value; LLVM reads via getOptionValueArgv (#31295).
+     *
+     * @return int 1 on success, 0 on failure (linger/timeval → fail under NestedJIT)
+     */
+    public static function getOptionIntOkArgv(int $handle, int $level, int $option): int
+    {
+        self::$lastGetOptionValue = 0;
+        if (13 === $option || 20 === $option || 21 === $option) {
+            return 0;
+        }
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return 0;
+        }
+        $val = SocketsLibcThinAbi::getsockoptInt($fd, $level, $option);
+        if (false === $val) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return 0;
+        }
+        VmSockets::clearErrorForLookupKey($handle);
+        self::$lastGetOptionValue = (int) $val;
+
+        return 1;
+    }
+
+    public static function getOptionValueArgv(): int
+    {
+        return self::$lastGetOptionValue;
+    }
+
+    /**
      * socket_getsockname() — stash AF_INET name; LLVM reads via nameAddr/namePort (#31293).
      *
      * @return int 1 on success, 0 on failure
@@ -485,6 +548,8 @@ final class SocketCreateJitHelper
     private static string $lastRecvData = '';
 
     private static bool $lastRecvEof = false;
+
+    private static int $lastGetOptionValue = 0;
 
     private static string $lastNameAddr = '';
 

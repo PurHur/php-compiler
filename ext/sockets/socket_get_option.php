@@ -72,6 +72,6 @@ class socket_get_option extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_get_option() JIT lowering not implemented (#6176)');
+        return JitSocketGetOption::invoke($context, ...$args);
     }
 }

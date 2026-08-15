@@ -48,6 +48,9 @@ final class SocketGetSocknameRuntime
         self::H.'::recvArgv',
         self::H.'::recvDataArgv',
         self::H.'::recvEofArgv',
+        self::H.'::setOptionIntArgv',
+        self::H.'::getOptionIntOkArgv',
+        self::H.'::getOptionValueArgv',
     ];
 
     /** @var list<string> */

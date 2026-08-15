@@ -309,6 +309,50 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringSocketSendRecv.php', $spine);
     }
 
+    public function testSocketSetOptionCallUsesJitSocketSetOption(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_set_option.php');
+        $this->assertStringContainsString('JitSocketSetOption::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketGetOptionCallUsesJitSocketGetOption(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_get_option.php');
+        $this->assertStringContainsString('JitSocketGetOption::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketGetSetOptionJitHelperExposesOptionArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCreateJitHelper.php');
+        $this->assertStringContainsString('function setOptionIntArgv', $source);
+        $this->assertStringContainsString('function getOptionIntOkArgv', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::setsockoptInt', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::getsockoptInt', $source);
+    }
+
+    public function testSocketGetSetOptionRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketGetSetOptionRuntime.php');
+        $this->assertStringContainsString('::setOptionIntArgv', $source);
+        $this->assertStringContainsString('::getOptionIntOkArgv', $source);
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_set_option_int', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketGetSetOptionHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketSetOption.php', $spine);
+        $this->assertStringContainsString('JitSocketGetOption.php', $spine);
+        $this->assertStringContainsString('SocketGetSetOptionRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketGetSetOption.php', $spine);
+    }
+
     public function testSpineBundleIncludesSocketSendtoHelpers(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
