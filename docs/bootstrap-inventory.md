@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7505 |
-| Phase A inventory files (M2 ratio SSOT) | 7505 |
+| PHP files on vm.php path | 7509 |
+| Phase A inventory files (M2 ratio SSOT) | 7509 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24027 |
+| Source constructs flagged (warnings) | 24031 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2196,6 +2196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketBind.php` | 0 | 1 |
 | `ext/sockets/JitSocketClearError.php` | 0 | 1 |
 | `ext/sockets/JitSocketClose.php` | 0 | 1 |
+| `ext/sockets/JitSocketCmsgSpace.php` | 0 | 1 |
 | `ext/sockets/JitSocketConnect.php` | 0 | 1 |
 | `ext/sockets/JitSocketCreate.php` | 0 | 1 |
 | `ext/sockets/JitSocketCreateListen.php` | 0 | 1 |
@@ -2221,6 +2222,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/Module.php` | 0 | 38 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketCloseJitHelper.php` | 0 | 1 |
+| `ext/sockets/SocketCmsgSpaceJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConnectJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
 | `ext/sockets/SocketCreateJitHelper.php` | 0 | 1 |
@@ -5795,6 +5797,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SocketAtmarkRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketBindListenRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketCloseRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SocketCmsgSpaceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketConnectRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketCreateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketErrorRuntime.php` | 0 | 1 |
@@ -6001,6 +6004,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketBind.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketClose.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketCmsgSpace.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketConnect.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketCreate.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketCreateListen.php` | 0 | 1 |
@@ -25423,6 +25427,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `ext/sockets/JitSocketCmsgSpace.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/sockets/JitSocketConnect.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25584,6 +25593,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/sockets/SocketCmsgSpaceJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/sockets/SocketConnectJitHelper.php`
 
@@ -38729,7 +38743,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/get_browser.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 36)
 - 2 class method(s)
 - 4 closure(s)
 
@@ -49939,6 +49953,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/SocketCmsgSpaceRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/SocketConnectRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50969,6 +50988,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSocketClose.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StringSocketCmsgSpace.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)

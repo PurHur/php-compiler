@@ -484,4 +484,43 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SocketSetBlockRuntime.php', $spine);
         $this->assertStringContainsString('StringSocketSetBlock.php', $spine);
     }
+
+    public function testSocketCmsgSpaceCallUsesJitSocketCmsgSpace(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_cmsg_space.php');
+        $this->assertStringContainsString('JitSocketCmsgSpace::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketCmsgSpaceJitHelperIsPureMath(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCmsgSpaceJitHelper.php');
+        $this->assertStringContainsString('cmsgSpaceArgv', $source);
+        $this->assertStringContainsString('cmsgAlign', $source);
+        $this->assertStringNotContainsString('VmSocketMsg::', $source);
+        $this->assertStringNotContainsString('SocketsLibcThinAbi::', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\FFI::/', $source);
+        $got = \PHPCompiler\ext\sockets\SocketCmsgSpaceJitHelper::cmsgSpaceArgv(1, 1, 0);
+        $this->assertSame(16, $got);
+        $this->assertSame(24, \PHPCompiler\ext\sockets\SocketCmsgSpaceJitHelper::cmsgSpaceArgv(1, 1, 1));
+    }
+
+    public function testSocketCmsgSpaceRuntimeUsesJitVmHelperLinkEnsureBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketCmsgSpaceRuntime.php');
+        $this->assertStringContainsString('::cmsgSpaceArgv', $source);
+        $this->assertStringContainsString('__compiler_socket_cmsg_space', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketCmsgSpaceHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketCmsgSpace.php', $spine);
+        $this->assertStringContainsString('SocketCmsgSpaceJitHelper.php', $spine);
+        $this->assertStringContainsString('SocketCmsgSpaceRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketCmsgSpace.php', $spine);
+    }
 }
