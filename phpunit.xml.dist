@@ -583,6 +583,8 @@
             <file>./test/compliance/GetservExcessArgc30567JITTest.php</file>
             <file>./test/compliance/LchownChrootExcessArgc30568VMTest.php</file>
             <file>./test/compliance/LchownChrootExcessArgc30568JITTest.php</file>
+            <file>./test/compliance/ClassParentsUsesApplyExcessArgc30603VMTest.php</file>
+            <file>./test/compliance/ClassParentsUsesApplyExcessArgc30603JITTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720VMTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720JITTest.php</file>
             <file>./test/compliance/StripcslashesExcessArgc30704VMTest.php</file>
