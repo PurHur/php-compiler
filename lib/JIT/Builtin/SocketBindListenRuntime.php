@@ -37,6 +37,8 @@ final class SocketBindListenRuntime
         self::H.'::acceptArgv',
         self::H.'::domainForHandleArgv',
         self::H.'::createListenFdArgv',
+        self::H.'::shutdownArgv',
+        self::H.'::sendtoArgv',
     ];
 
     /** @var list<string> */

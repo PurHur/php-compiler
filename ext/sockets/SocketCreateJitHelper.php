@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\sockets;
 
 /**
- * Owned-socket NestedJIT helpers for create/pair/write/read (#27394, #27423).
+ * Owned-socket NestedJIT helpers for create/pair/write/read/sendto (#27394, #27423, #31308).
  *
  * One NestedJIT unit so {@see SocketsLibcThinAbi} FFI statics stay shared under thin AOT.
  * php-src: ext/sockets/sockets.c
  *
  * Note: socketpair(2) itself is invoked from LLVM (libc) in {@see \PHPCompiler\JIT\Builtin\SocketPairIoRuntime}
  * because NestedJIT cannot reliably read FFI out-params (#27423). This helper only registers
- * fds and performs write/read.
+ * fds and performs write/read/sendto.
  */
 final class SocketCreateJitHelper
 {
@@ -222,6 +222,49 @@ final class SocketCreateJitHelper
         VmSockets::recordErrorForLookupKey($handle, $errno);
 
         return 0;
+    }
+
+    /**
+     * socket_sendto() — AF_INET sendto(2); same NestedJIT unit so owned fds resolve (#31308).
+     *
+     * @return int bytes written, or -1 on failure
+     */
+    public static function sendtoArgv(
+        int $handle,
+        string $data,
+        int $length,
+        int $flags,
+        string $addr,
+        int $port
+    ): int {
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return -1;
+        }
+        if ($length < 0) {
+            $length = 0;
+        }
+        if ($length > \strlen($data)) {
+            $length = \strlen($data);
+        }
+        $n = SocketsLibcThinAbi::sendtoInet($fd, $data, $length, $flags, $addr, $port);
+        // NestedJIT FFI may leave sendto as float — normalize (#31241/#31308).
+        $n = (int) $n;
+        if ($n < 0) {
+            $hostErr = SocketsLibcThinAbi::consumeHostLookupError();
+            if (null !== $hostErr) {
+                VmSockets::recordErrorForLookupKey($handle, $hostErr);
+
+                return -1;
+            }
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return -1;
+        }
+        VmSockets::clearErrorForLookupKey($handle);
+
+        return $n;
     }
 
     /**
