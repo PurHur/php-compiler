@@ -51,16 +51,35 @@ final class BasicBlockHelper
     public static function parentFunction(Context $context): Function_
     {
         $insert = self::tryGetInsertBlock($context);
+        $insertParent = null;
         if (null !== $insert) {
             $parent = $insert->getParent();
             if ($parent instanceof Function_) {
-                return $parent;
+                $insertParent = $parent;
             }
         }
-        if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
-            $fn = $context->functions[$context->activeFunction];
-            if ($fn instanceof Function_) {
-                return $fn;
+        // Prefer in-flight lowering owner when insert is parked elsewhere (#31101).
+        // Helpers that emit their own LLVM fn must set loweringLlvmFunction to that fn
+        // (see HashTableReplaceRecursiveLlvm) so this does not steal their appends.
+        if (
+            $context->loweringLlvmFunction instanceof Function_
+            && !NestedJitCompileScope::isActive()
+            && (
+                !$insertParent instanceof Function_
+                || !TryCatchHelper::sameLlvmFunction($insertParent, $context->loweringLlvmFunction)
+            )
+        ) {
+            return $context->loweringLlvmFunction;
+        }
+        if ($insertParent instanceof Function_) {
+            return $insertParent;
+        }
+        if ('' !== $context->activeFunction) {
+            $active = $context->functions[$context->activeFunction]
+                ?? $context->functionScope[$context->activeFunction]
+                ?? null;
+            if ($active instanceof Function_) {
+                return $active;
             }
         }
         if ($context->main instanceof Function_) {

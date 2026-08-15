@@ -54,6 +54,7 @@ final class HashTableUnionRuntime
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $ft = $context->context->functionType($htPtr, false, $htPtr, $htPtr);
@@ -64,16 +65,20 @@ final class HashTableUnionRuntime
         $entry = $fn->appendBasicBlock('hashtable_union_entry');
         $context->registerFunction(self::ABI_UNION, $fn);
         $context->activeFunction = self::ABI_UNION;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
         $context->builder->positionAtEnd($entry);
-        $result = HashTableCowLlvm::union($context, $fn->getParam(0), $fn->getParam(1));
-        $context->builder->returnValue($result);
-        self::registerLinkedRuntime($context);
-
-        $context->activeFunction = $savedActive;
-        if (null !== $savedBlock) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        try {
+            $result = HashTableCowLlvm::union($context, $fn->getParam(0), $fn->getParam(1));
+            $context->builder->returnValue($result);
+            self::registerLinkedRuntime($context);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 

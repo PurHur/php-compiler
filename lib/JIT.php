@@ -404,7 +404,16 @@ class JIT {
                     }
                 }
             }
-            $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
+            $savedLoweringLlvm = $this->context->loweringLlvmFunction;
+            if ($llvmFunc instanceof \PHPLLVM\Value\Function_) {
+                $this->context->loweringLlvmFunction = $llvmFunc;
+                $this->bindBlockStorageForFunc($llvmFunc);
+            }
+            try {
+                $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
+            } finally {
+                $this->context->loweringLlvmFunction = $savedLoweringLlvm;
+            }
         }
     }
 
@@ -1099,14 +1108,59 @@ class JIT {
         }
     }
 
-    /** Branch targets must use CFG entry BBs, not include-updated resume slots (#866, #878). */
-    private function jitBranchEntryBlock(Block $branch): PHPLLVM\BasicBlock
+    /**
+     * Branch targets must use CFG entry BBs, not include-updated resume slots (#866, #878).
+     * Storage is per-LLVM-function ({@see bindBlockStorageForFunc}). When a CFG Block was
+     * previously lowered into another LLVM function, re-lower into {@see $func} once —
+     * parent checks use {@see TryCatchHelper::sameLlvmFunction} (wrapper === is unstable; #31101).
+     */
+    private function jitBranchEntryBlock(Block $branch, PHPLLVM\Value\Function_ $func): PHPLLVM\BasicBlock
     {
+        $this->bindBlockStorageForFunc($func);
         if ($this->context->scope->blockEntryStorage->contains($branch)) {
-            return $this->context->scope->blockEntryStorage[$branch];
+            $entry = $this->context->scope->blockEntryStorage[$branch];
+            $entryParent = $entry->getParent();
+            if ($entryParent instanceof PHPLLVM\Value\Function_
+                && JIT\TryCatchHelper::sameLlvmFunction($entryParent, $func)) {
+                return $entry;
+            }
+        }
+        if ($this->context->scope->blockStorage->contains($branch)) {
+            $cached = $this->context->scope->blockStorage[$branch];
+            $cachedParent = $cached->getParent();
+            if ($cachedParent instanceof PHPLLVM\Value\Function_
+                && JIT\TryCatchHelper::sameLlvmFunction($cachedParent, $func)) {
+                return $cached;
+            }
         }
 
-        return $this->context->scope->blockStorage[$branch];
+        // Missing or foreign-function mapping: lower into $func (per-func map prevents clobber).
+        return $this->compileBlockInternal($func, $branch);
+    }
+
+    /**
+     * Select (or create) CFG→LLVM BB maps for {@see $func}.
+     * php-cfg Block object identity is reused across LLVM functions; a single SplObjectStorage
+     * therefore leaks branch targets across functions (MiniWebApp #31101).
+     */
+    private function bindBlockStorageForFunc(PHPLLVM\Value $func): void
+    {
+        if (!$func instanceof PHPLLVM\Value\Function_) {
+            return;
+        }
+        foreach ($this->context->blockStorageByLlvmFunc as $slot) {
+            if (JIT\TryCatchHelper::sameLlvmFunction($slot[0], $func)) {
+                $this->context->scope->blockStorage = $slot[1];
+                $this->context->scope->blockEntryStorage = $slot[2];
+
+                return;
+            }
+        }
+        $blockStorage = new \SplObjectStorage();
+        $blockEntryStorage = new \SplObjectStorage();
+        $this->context->blockStorageByLlvmFunc[] = [$func, $blockStorage, $blockEntryStorage];
+        $this->context->scope->blockStorage = $blockStorage;
+        $this->context->scope->blockEntryStorage = $blockEntryStorage;
     }
 
     /** Self-host AOT sets PHP_COMPILER_SELFHOST_AOT=1 (#816, #557). */
@@ -7820,6 +7874,21 @@ class JIT {
         bool $allowRecompile = false,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
+        $this->bindBlockStorageForFunc($func);
+        // Builder may still be parked in another LLVM function after NestedJIT / helper emit
+        // (#31101). Clear it so we do not continue a foreign instruction stream into $func.
+        if ($func instanceof PHPLLVM\Value\Function_) {
+            $insert = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
+            if (null !== $insert) {
+                $insertParent = $insert->getParent();
+                if (
+                    $insertParent instanceof PHPLLVM\Value\Function_
+                    && !JIT\TryCatchHelper::sameLlvmFunction($insertParent, $func)
+                ) {
+                    $this->context->builder->clearInsertionPosition();
+                }
+            }
+        }
         if (
             null !== $block->func
             && '{main}' === $block->func->name
@@ -7842,7 +7911,14 @@ class JIT {
         }
         if (!$allowRecompile && $this->context->scope->blockStorage->contains($block)) {
             $cached = $this->context->scope->blockStorage[$block];
-            if (null === $entryBlock || $cached === $entryBlock) {
+            $cachedParent = $cached->getParent();
+            // Same CFG Block object may already map to another LLVM function's BB (#31101).
+            // Compare via sameLlvmFunction — PHPLLVM wrappers are not ===-stable.
+            if (
+                $cachedParent instanceof PHPLLVM\Value\Function_
+                && JIT\TryCatchHelper::sameLlvmFunction($cachedParent, $func)
+                && (null === $entryBlock || $cached === $entryBlock)
+            ) {
                 return $cached;
             }
         }
@@ -7855,10 +7931,20 @@ class JIT {
             self::$blockNumber++;
             $origBasicBlock = $basicBlock = $func->appendBasicBlock('block_' . self::$blockNumber);
         }
-        if (!$this->context->scope->blockStorage->contains($block) || null === $entryBlock) {
+        $storageStale = false;
+        if ($this->context->scope->blockStorage->contains($block)) {
+            $existingParent = $this->context->scope->blockStorage[$block]->getParent();
+            $storageStale = !($existingParent instanceof PHPLLVM\Value\Function_
+                && JIT\TryCatchHelper::sameLlvmFunction($existingParent, $func));
+        }
+        if (!$this->context->scope->blockStorage->contains($block) || null === $entryBlock || $storageStale) {
             $this->context->scope->blockStorage[$block] = $basicBlock;
         }
-        if (!$this->context->scope->blockEntryStorage->contains($block) || null === $entryBlock) {
+        if (
+            !$this->context->scope->blockEntryStorage->contains($block)
+            || null === $entryBlock
+            || $storageStale
+        ) {
             $this->context->scope->blockEntryStorage[$block] = $basicBlock;
         }
         $builder = $this->context->builder;
@@ -8005,6 +8091,14 @@ class JIT {
                             $paramName,
                             $this->context->getVariableFromOp($param->result)
                         );
+                        // Always mark formals assigned after prologue bind — identity
+                        // assignOperand / string ARG_RECV skip can omit the flag and AOT
+                        // then warns on every read (MiniWebApp Router::dispatch $route, #31101).
+                        JIT\UndefinedVariableHelper::markAssigned(
+                            $this->context,
+                            $param->result,
+                            $this->context->getVariableFromOp($param->result)
+                        );
                     }
                 }
                 $captureSlots = JIT\ClosureHelper::orderedCaptureSlots($block);
@@ -8080,12 +8174,19 @@ class JIT {
                         // LLVM function signature (AOT) or prepareNestedJitCalleeParamArgument
                         // (NestedJIT). Re-assigning the raw LLVM formal here empties heap
                         // __string__* content (length ok, bytes gone / UAF) — #24137, #24723.
-                        // Skip ARG_RECV overwrite when the recv op is already bound.
+                        // Skip ARG_RECV overwrite when the recv op is already bound — but still
+                        // markAssigned so undefined-variable guards stay quiet (#31101 MiniWebApp
+                        // `$route` warnings on stderr after string formal prologue bind).
                         $recvOp = $block->getOperand($op->arg1);
                         if (
                             Variable::TYPE_STRING === $args[$recvSlot]->type
                             && $this->context->hasVariableOp($recvOp)
                         ) {
+                            JIT\UndefinedVariableHelper::markAssigned(
+                                $this->context,
+                                $recvOp,
+                                $this->context->getVariableFromOp($recvOp)
+                            );
                             break;
                         }
                         $this->assignOperand(
@@ -8498,7 +8599,7 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $jumpKey = $block->constants[$op->arg2]->toString();
                     $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
-                    $skipEntry = $this->jitBranchEntryBlock($op->block1);
+                    $skipEntry = $this->jitBranchEntryBlock($op->block1, $func);
                     $initPathBb = JIT\BasicBlockHelper::append($this->context, 'fn_static_init_path');
                     $builder->positionAtEnd($branchBlock);
                     $builder->branchIf(
@@ -10642,7 +10743,7 @@ class JIT {
                         $this->context->helper->loadValue($matchVar)
                     );
                     $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
-                    $caseEntry = $this->jitBranchEntryBlock($op->block1);
+                    $caseEntry = $this->jitBranchEntryBlock($op->block1, $func);
                     $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
@@ -10672,7 +10773,7 @@ class JIT {
                     $this->context->listUnpackAssignCallerBlock = $block;
                     $this->compileBlockInternal($func, $op->block1, null, $mergeLlvm, 0, $allowRecompile, ...$args);
                     $this->context->listUnpackAssignCallerBlock = null;
-                    $targetEntry = $this->jitBranchEntryBlock($op->block1);
+                    $targetEntry = $this->jitBranchEntryBlock($op->block1, $func);
                     if ($this->context->inlineIncludeDepth > 0) {
                         // Use the merge block itself (not getInsertBlock — callee may be cached) (#846, #784).
                         $this->context->inlineIncludeExitBlock = $targetEntry;
@@ -10711,8 +10812,8 @@ class JIT {
                         $coalesceVar->compileTimeConstantName = null;
                         $coalesceVar->compileTimeEnumCase = null;
                     }
-                    $leftEntry = $this->context->scope->blockStorage[$op->block1];
-                    $rightEntry = $this->context->scope->blockStorage[$op->block2];
+                    $leftEntry = $this->jitBranchEntryBlock($op->block1, $func);
+                    $rightEntry = $this->jitBranchEntryBlock($op->block2, $func);
                     $builder->positionAtEnd($coalesceTestBlock);
                     // Do not free php-cfg "dead" operands here; ?? temps are used on branch/merge blocks (#99).
                     $builder->branchIf($condition, $leftEntry, $rightEntry);
@@ -10789,8 +10890,8 @@ class JIT {
                         $nullsafeVar->compileTimeConstantName = null;
                         $nullsafeVar->compileTimeEnumCase = null;
                     }
-                    $nullEntry = $this->context->scope->blockStorage[$op->block1];
-                    $fetchEntry = $this->context->scope->blockStorage[$op->block2];
+                    $nullEntry = $this->jitBranchEntryBlock($op->block1, $func);
+                    $fetchEntry = $this->jitBranchEntryBlock($op->block2, $func);
                     $builder->positionAtEnd($branchBlock);
                     // Do not free php-cfg "dead" operands here; ?-> temps are used on branch/merge blocks (#3219).
                     $builder->branchIf($isNull, $nullEntry, $fetchEntry);
@@ -11008,8 +11109,8 @@ class JIT {
                             $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
                             $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
                         }
-                        $ifEntry = $this->jitBranchEntryBlock($op->block1);
-                        $elseEntry = $this->jitBranchEntryBlock($op->block2);
+                        $ifEntry = $this->jitBranchEntryBlock($op->block1, $func);
+                        $elseEntry = $this->jitBranchEntryBlock($op->block2, $func);
                         $builder->positionAtEnd($branchBlock);
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -11037,8 +11138,8 @@ class JIT {
                             ?? $this->context->inlineIncludeExitBlock
                             ?? $savedIncludeExit;
                     }
-                    $ifEntry = $this->jitBranchEntryBlock($op->block1);
-                    $elseEntry = $this->jitBranchEntryBlock($op->block2);
+                    $ifEntry = $this->jitBranchEntryBlock($op->block1, $func);
+                    $elseEntry = $this->jitBranchEntryBlock($op->block2, $func);
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -16240,6 +16341,7 @@ class JIT {
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $value);
             }
+            $this->markScopeVariableAssignedIfTracked($resultOp, $value);
 
             return;
         }
@@ -16278,6 +16380,9 @@ class JIT {
                 if (null !== $resolved && '' !== $resolved) {
                     $this->context->bindVariableByName($resolved, $var);
                 }
+                // Method formals with `__value__` ABI (e.g. Router::dispatch $route) bind here
+                // without falling through to the markAssigned path (#31101 MiniWebApp stderr).
+                $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
             } else {
@@ -16293,6 +16398,7 @@ class JIT {
                 // mis-stores __value__ returns into __value__** (#23973, e20_closure).
                 // Also bind by name so `$f = function() use ($n) {}` keeps captures (#24106).
                 $this->preserveClosureInvokeMetadata($resultOp, $var, $value);
+                $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
             }
@@ -16348,6 +16454,11 @@ class JIT {
             return;
         }
         if ($result === $value) {
+            // Param prologue can bind the LLVM formal Variable as the CV then re-assign
+            // the same object — still mark assigned so undefined-variable guards stay quiet
+            // (Router::dispatch $route as `__value__` ABI, #31101).
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
             return;
         }
         // Foreach by-ref must use hashtable index writes, not valueBoxAliasPtr (#4364, AOT {main}).

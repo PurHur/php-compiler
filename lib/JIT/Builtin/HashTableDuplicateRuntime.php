@@ -53,6 +53,7 @@ final class HashTableDuplicateRuntime
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $ft = $context->context->functionType($htPtr, false, $htPtr);
@@ -63,16 +64,20 @@ final class HashTableDuplicateRuntime
         $entry = $fn->appendBasicBlock('hashtable_duplicate_entry');
         $context->registerFunction(self::ABI_DUPLICATE, $fn);
         $context->activeFunction = self::ABI_DUPLICATE;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
         $context->builder->positionAtEnd($entry);
-        $result = HashTableCowLlvm::duplicate($context, $fn->getParam(0));
-        $context->builder->returnValue($result);
-        self::registerLinkedRuntime($context);
-
-        $context->activeFunction = $savedActive;
-        if (null !== $savedBlock) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        try {
+            $result = HashTableCowLlvm::duplicate($context, $fn->getParam(0));
+            $context->builder->returnValue($result);
+            self::registerLinkedRuntime($context);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
