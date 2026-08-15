@@ -358,6 +358,8 @@
             <file>./test/compliance/StrftimeDeprecatedMessage29321JITTest.php</file>
             <file>./test/compliance/FilterHasVarInputArgc30711VMTest.php</file>
             <file>./test/compliance/FilterHasVarInputArgc30711JITTest.php</file>
+            <file>./test/compliance/SettypeNullType30506VMTest.php</file>
+            <file>./test/compliance/SettypeNullType30506JITTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictVMTest.php</file>
             <file>./test/compliance/SplAutoloadCallNullStrictJITTest.php</file>
             <file>./test/compliance/OpcacheIsScriptCachedInFileCacheVMTest.php</file>
