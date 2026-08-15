@@ -36,12 +36,13 @@ final class get_html_translation_table extends Internal
         $table = HTML_SPECIALCHARS;
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
+        // userArgIndex is 1-based for DEP/TypeError (VmNullNumberParamDeprecation); slot 0 cited #0 (#29395).
         if ($argc >= 1) {
             $table = VmMath::parseIntBuiltinArgForFrame(
                 $frame,
                 0,
                 'get_html_translation_table',
-                0,
+                1,
                 'table'
             );
         }
@@ -50,7 +51,7 @@ final class get_html_translation_table extends Internal
                 $frame,
                 1,
                 'get_html_translation_table',
-                1,
+                2,
                 'flags'
             );
         }
