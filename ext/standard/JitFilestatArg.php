@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -160,6 +161,18 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
+        // Z_PARAM_LONG: caller strict_types → TypeError on null (#31211 / #31213).
+        // Catchable via ExceptionBridge; callers early-return so no mkdir/chmod invoke follows.
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false))) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                self::intTypeError($function, $argIndex, $paramName, 'null')
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_null_mode_te_cont');
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         self::guardFileModeString($context, $arg, $function, $argIndex, $paramName);
         if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
             $i64 = $context->getTypeFromString('int64');
