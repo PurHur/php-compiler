@@ -63,6 +63,6 @@ final class socket_getsockname extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_getsockname() JIT lowering not implemented (#6248)');
+        return JitSocketGetsockname::invoke($context, ...$args);
     }
 }

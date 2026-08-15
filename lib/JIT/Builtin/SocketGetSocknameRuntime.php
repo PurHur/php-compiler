@@ -10,12 +10,14 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for socket_create() via SocketCreateJitHelper PHP (#27394).
+ * JIT/AOT link for socket_getsockname()/socket_getpeername() via SocketCreateJitHelper (#31293).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SocketImport #25211).
- * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_create)
+ * Same NestedJIT unit as create/pair/bind so owned fds resolve under thin AOT.
+ * Name outs are stashed (NestedJIT cannot return arrays); LLVM writes by-ref args.
+ *
+ * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_getsockname|socket_getpeername)
  */
-final class SocketCreateRuntime
+final class SocketGetSocknameRuntime
 {
     private const HELPER_PATH = '/ext/sockets/SocketCreateJitHelper.php';
 
@@ -25,14 +27,12 @@ final class SocketCreateRuntime
     private const COMPILED_HELPERS = [
         self::H.'::createFdArgv',
         self::H.'::registerOwnedArgv',
-        // Same NestedJIT unit as #27423 — compile pair/io too if create runs first.
         self::H.'::fdForHandleArgv',
         self::H.'::writeArgv',
         self::H.'::readArgv',
         self::H.'::readFailedArgv',
         self::H.'::markReadFailedArgv',
         self::H.'::clearReadFailedArgv',
-        // bind/listen/accept/create_listen share this unit so pair fds resolve (#31241/#31242).
         self::H.'::bindArgv',
         self::H.'::listenArgv',
         self::H.'::acceptArgv',
@@ -48,13 +48,15 @@ final class SocketCreateRuntime
 
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
-        '__compiler_socket_create_fd',
-        '__compiler_socket_create_register',
+        '__compiler_socket_getsockname',
+        '__compiler_socket_getpeername',
+        '__compiler_socket_name_addr',
+        '__compiler_socket_name_port',
     ];
 
     public static function ensureLinked(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_socket_create_fd');
+        $probe = $context->module->getNamedFunction('__compiler_socket_getsockname');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
@@ -67,9 +69,12 @@ final class SocketCreateRuntime
         } catch (\Throwable) {
         }
 
+        SocketCreateRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
-        self::implementCreateFdBridge($context);
-        self::implementRegisterBridge($context);
+        self::implementOkBridge($context, '__compiler_socket_getsockname', 'getsocknameOkArgv', 'socket_getsockname_entry');
+        self::implementOkBridge($context, '__compiler_socket_getpeername', 'getpeernameOkArgv', 'socket_getpeername_entry');
+        self::implementAddrBridge($context);
+        self::implementPortBridge($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -79,9 +84,12 @@ final class SocketCreateRuntime
         }
     }
 
-    private static function implementCreateFdBridge(Context $context): void
-    {
-        $abiName = '__compiler_socket_create_fd';
+    private static function implementOkBridge(
+        Context $context,
+        string $abiName,
+        string $method,
+        string $entryLabel
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -94,15 +102,15 @@ final class SocketCreateRuntime
             ? $probe
             : $context->module->addFunction(
                 $abiName,
-                $context->context->functionType($i64, false, $i64, $i64, $i64)
+                $context->context->functionType($i64, false, $i64)
             );
 
-        $entry = $fn->appendBasicBlock('socket_create_fd_entry');
+        $entry = $fn->appendBasicBlock($entryLabel);
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::createFdArgv'),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
+            self::helperFunction($context, self::H.'::'.$method),
+            [$fn->getParam(0)]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
@@ -111,9 +119,41 @@ final class SocketCreateRuntime
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementRegisterBridge(Context $context): void
+    private static function implementAddrBridge(Context $context): void
     {
-        $abiName = '__compiler_socket_create_register';
+        $abiName = '__compiler_socket_name_addr';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false)
+            );
+
+        $entry = $fn->appendBasicBlock('socket_name_addr_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::H.'::nameAddrArgv'),
+            []
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementPortBridge(Context $context): void
+    {
+        $abiName = '__compiler_socket_name_port';
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -122,23 +162,23 @@ final class SocketCreateRuntime
         }
 
         $i64 = $context->getTypeFromString('int64');
-        $voidTy = $context->getTypeFromString('void');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
                 $abiName,
-                $context->context->functionType($voidTy, false, $i64, $i64, $i64)
+                $context->context->functionType($i64, false)
             );
 
-        $entry = $fn->appendBasicBlock('socket_create_register_entry');
+        $entry = $fn->appendBasicBlock('socket_name_port_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(
-            self::helperFunction($context, self::H.'::registerOwnedArgv'),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2)
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::H.'::namePortArgv'),
+            []
         );
-        $context->builder->returnVoid();
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -147,7 +187,7 @@ final class SocketCreateRuntime
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#27394');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#31293');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -156,7 +196,7 @@ final class SocketCreateRuntime
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27394'
+            '#31293'
         );
     }
 
@@ -165,7 +205,7 @@ final class SocketCreateRuntime
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after SocketCreateRuntime link (#27394)');
+                throw new \LogicException($name.' missing after SocketGetSocknameRuntime link (#31293)');
             }
             $context->registerFunction($name, $fn);
         }

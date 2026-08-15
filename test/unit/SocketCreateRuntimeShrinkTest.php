@@ -219,6 +219,51 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('parseAndCompile', $source);
     }
 
+    public function testSocketGetsocknameCallUsesJitSocketGetsockname(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_getsockname.php');
+        $this->assertStringContainsString('JitSocketGetsockname::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketGetpeernameCallUsesJitSocketGetpeername(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_getpeername.php');
+        $this->assertStringContainsString('JitSocketGetpeername::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketGetSocknameJitHelperExposesNameArgv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketCreateJitHelper.php');
+        $this->assertStringContainsString('function getsocknameOkArgv', $source);
+        $this->assertStringContainsString('function getpeernameOkArgv', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::getsocknameInet', $source);
+        $this->assertStringContainsString('SocketsLibcThinAbi::getpeernameInet', $source);
+    }
+
+    public function testSocketGetSocknameRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketGetSocknameRuntime.php');
+        $this->assertStringContainsString('::getsocknameOkArgv', $source);
+        $this->assertStringContainsString('::getpeernameOkArgv', $source);
+        $this->assertStringContainsString('SocketCreateJitHelper.php', $source);
+        $this->assertStringContainsString('__compiler_socket_getsockname', $source);
+        $this->assertStringContainsString('__compiler_socket_getpeername', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketGetSocknameHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketGetsockname.php', $spine);
+        $this->assertStringContainsString('JitSocketGetpeername.php', $spine);
+        $this->assertStringContainsString('SocketGetSocknameRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketGetSockname.php', $spine);
+    }
+
     public function testSpineBundleIncludesSocketSendtoHelpers(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');

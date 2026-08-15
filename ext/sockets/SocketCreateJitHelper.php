@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\sockets;
 
 /**
- * Owned-socket NestedJIT helpers for create/pair/write/read/sendto (#27394, #27423, #31308).
+ * Owned-socket NestedJIT helpers for create/pair/write/read/sendto/name (#27394, #27423, #31308, #31293).
  *
  * One NestedJIT unit so {@see SocketsLibcThinAbi} FFI statics stay shared under thin AOT.
  * php-src: ext/sockets/sockets.c
@@ -225,6 +225,65 @@ final class SocketCreateJitHelper
     }
 
     /**
+     * socket_getsockname() — stash AF_INET name; LLVM reads via nameAddr/namePort (#31293).
+     *
+     * @return int 1 on success, 0 on failure
+     */
+    public static function getsocknameOkArgv(int $handle): int
+    {
+        return self::nameOkArgv($handle, 'getsockname');
+    }
+
+    /**
+     * socket_getpeername() — stash AF_INET peer; LLVM reads via nameAddr/namePort (#31293).
+     *
+     * @return int 1 on success, 0 on failure
+     */
+    public static function getpeernameOkArgv(int $handle): int
+    {
+        return self::nameOkArgv($handle, 'getpeername');
+    }
+
+    /** Last successful {@see getsocknameOkArgv}/{@see getpeernameOkArgv} address. */
+    public static function nameAddrArgv(): string
+    {
+        return self::$lastNameAddr;
+    }
+
+    /** Last successful {@see getsocknameOkArgv}/{@see getpeernameOkArgv} port. */
+    public static function namePortArgv(): int
+    {
+        return self::$lastNamePort;
+    }
+
+    /**
+     * @param 'getsockname'|'getpeername' $which
+     */
+    private static function nameOkArgv(int $handle, string $which): int
+    {
+        self::$lastNameAddr = '';
+        self::$lastNamePort = 0;
+        $fd = self::fdForHandle($handle);
+        if (null === $fd) {
+            return 0;
+        }
+        $name = 'getpeername' === $which
+            ? SocketsLibcThinAbi::getpeernameInet($fd)
+            : SocketsLibcThinAbi::getsocknameInet($fd);
+        if (false === $name) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            VmSockets::recordErrorForLookupKey($handle, $errno);
+
+            return 0;
+        }
+        VmSockets::clearErrorForLookupKey($handle);
+        self::$lastNameAddr = $name[0];
+        self::$lastNamePort = (int) $name[1];
+
+        return 1;
+    }
+
+    /**
      * socket_sendto() — AF_INET sendto(2); same NestedJIT unit so owned fds resolve (#31308).
      *
      * @return int bytes written, or -1 on failure
@@ -344,6 +403,10 @@ final class SocketCreateJitHelper
     }
 
     private static bool $readFailed = false;
+
+    private static string $lastNameAddr = '';
+
+    private static int $lastNamePort = 0;
 
     private static int $pairFdByHandle0 = 0;
 
