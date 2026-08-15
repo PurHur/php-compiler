@@ -8091,6 +8091,14 @@ class JIT {
                             $paramName,
                             $this->context->getVariableFromOp($param->result)
                         );
+                        // Always mark formals assigned after prologue bind — identity
+                        // assignOperand / string ARG_RECV skip can omit the flag and AOT
+                        // then warns on every read (MiniWebApp Router::dispatch $route, #31101).
+                        JIT\UndefinedVariableHelper::markAssigned(
+                            $this->context,
+                            $param->result,
+                            $this->context->getVariableFromOp($param->result)
+                        );
                     }
                 }
                 $captureSlots = JIT\ClosureHelper::orderedCaptureSlots($block);
@@ -8166,12 +8174,19 @@ class JIT {
                         // LLVM function signature (AOT) or prepareNestedJitCalleeParamArgument
                         // (NestedJIT). Re-assigning the raw LLVM formal here empties heap
                         // __string__* content (length ok, bytes gone / UAF) — #24137, #24723.
-                        // Skip ARG_RECV overwrite when the recv op is already bound.
+                        // Skip ARG_RECV overwrite when the recv op is already bound — but still
+                        // markAssigned so undefined-variable guards stay quiet (#31101 MiniWebApp
+                        // `$route` warnings on stderr after string formal prologue bind).
                         $recvOp = $block->getOperand($op->arg1);
                         if (
                             Variable::TYPE_STRING === $args[$recvSlot]->type
                             && $this->context->hasVariableOp($recvOp)
                         ) {
+                            JIT\UndefinedVariableHelper::markAssigned(
+                                $this->context,
+                                $recvOp,
+                                $this->context->getVariableFromOp($recvOp)
+                            );
                             break;
                         }
                         $this->assignOperand(
@@ -16326,6 +16341,7 @@ class JIT {
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $value);
             }
+            $this->markScopeVariableAssignedIfTracked($resultOp, $value);
 
             return;
         }
@@ -16364,6 +16380,9 @@ class JIT {
                 if (null !== $resolved && '' !== $resolved) {
                     $this->context->bindVariableByName($resolved, $var);
                 }
+                // Method formals with `__value__` ABI (e.g. Router::dispatch $route) bind here
+                // without falling through to the markAssigned path (#31101 MiniWebApp stderr).
+                $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
             } else {
@@ -16379,6 +16398,7 @@ class JIT {
                 // mis-stores __value__ returns into __value__** (#23973, e20_closure).
                 // Also bind by name so `$f = function() use ($n) {}` keeps captures (#24106).
                 $this->preserveClosureInvokeMetadata($resultOp, $var, $value);
+                $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
             }
@@ -16434,6 +16454,11 @@ class JIT {
             return;
         }
         if ($result === $value) {
+            // Param prologue can bind the LLVM formal Variable as the CV then re-assign
+            // the same object — still mark assigned so undefined-variable guards stay quiet
+            // (Router::dispatch $route as `__value__` ABI, #31101).
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
             return;
         }
         // Foreach by-ref must use hashtable index writes, not valueBoxAliasPtr (#4364, AOT {main}).

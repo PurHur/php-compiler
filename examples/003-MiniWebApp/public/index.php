@@ -18,16 +18,18 @@ require_once __DIR__ . '/../src/Router.php';
 
 $route = 'home';
 $pathInfo = $_SERVER['PATH_INFO'] ?? '';
-if ('' !== $pathInfo) {
+// Use strlen — AOT `'' !== $cgiString` can plant strcmp in an unreachable BB after
+// coalesce/echo and sealFunction `ret void` on the live path (#31101 / empty stdout).
+if (strlen($pathInfo) > 0) {
     if (0 === strpos($pathInfo, '/')) {
         $pathInfo = substr($pathInfo, 1);
     }
-    if ('' !== $pathInfo) {
+    if (strlen($pathInfo) > 0) {
         $route = $pathInfo;
     }
 } else {
     $queryRoute = $_GET['route'] ?? '';
-    if ('' !== $queryRoute) {
+    if (strlen($queryRoute) > 0) {
         $route = $queryRoute;
     }
 }
