@@ -12,14 +12,15 @@ use PHPLLVM\Value;
 
 /**
  * Shared VM/JIT wiring for ctype builtins (php-src ext/ctype/ctype.c; #7253).
+ *
+ * Excess/missing argc → Zend ArgumentCountError (#30602).
  */
 abstract class CtypeFunction extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException($this->getName().'() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/ctype/ctype.c — ZEND_PARSE_PARAMETERS → ArgumentCountError (#30602).
+        $this->requireExactArgCount($frame, $this->getName(), 1);
         $spec = VmCtype::specForFunction($this->getName());
         $result = VmCtype::evaluate(
             $frame->calledArgs[0],
@@ -36,8 +37,9 @@ abstract class CtypeFunction extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException($this->getName().'() requires exactly one argument in this compiler build');
+        // php-src ext/ctype/ctype.c — ArgumentCountError (#30602).
+        if (!$this->requireExactJitArgCount($context, $args, $this->getName(), 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         return JitCtype::invoke($context, $args[0], $this->getName());
