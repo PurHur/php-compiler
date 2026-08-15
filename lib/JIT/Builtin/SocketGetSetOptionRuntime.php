@@ -10,14 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for socket_shutdown() via SocketCreateJitHelper (#31292).
+ * JIT/AOT link for socket_get/set_option() int path via SocketCreateJitHelper (#31295).
  *
- * Same NestedJIT unit as create/pair/bind so owned fds resolve under thin AOT
- * (peer SocketBindListenRuntime #31241).
- *
- * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_shutdown)
+ * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_get_option|socket_set_option)
  */
-final class SocketShutdownRuntime
+final class SocketGetSetOptionRuntime
 {
     private const HELPER_PATH = '/ext/sockets/SocketCreateJitHelper.php';
 
@@ -55,12 +52,14 @@ final class SocketShutdownRuntime
 
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
-        '__compiler_socket_shutdown',
+        '__compiler_socket_set_option_int',
+        '__compiler_socket_get_option_int',
+        '__compiler_socket_get_option_value',
     ];
 
     public static function ensureLinked(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_socket_shutdown');
+        $probe = $context->module->getNamedFunction('__compiler_socket_set_option_int');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
@@ -75,7 +74,9 @@ final class SocketShutdownRuntime
 
         SocketCreateRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
-        self::implementShutdownBridge($context);
+        self::implementSetBridge($context);
+        self::implementGetOkBridge($context);
+        self::implementGetValueBridge($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -85,9 +86,9 @@ final class SocketShutdownRuntime
         }
     }
 
-    private static function implementShutdownBridge(Context $context): void
+    private static function implementSetBridge(Context $context): void
     {
-        $abiName = '__compiler_socket_shutdown';
+        $abiName = '__compiler_socket_set_option_int';
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -100,15 +101,79 @@ final class SocketShutdownRuntime
             ? $probe
             : $context->module->addFunction(
                 $abiName,
-                $context->context->functionType($i64, false, $i64, $i64)
+                $context->context->functionType($i64, false, $i64, $i64, $i64, $i64)
             );
 
-        $entry = $fn->appendBasicBlock('socket_shutdown_entry');
+        $entry = $fn->appendBasicBlock('socket_set_option_entry');
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::shutdownArgv'),
-            [$fn->getParam(0), $fn->getParam(1)]
+            self::helperFunction($context, self::H.'::setOptionIntArgv'),
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementGetOkBridge(Context $context): void
+    {
+        $abiName = '__compiler_socket_get_option_int';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false, $i64, $i64, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('socket_get_option_ok_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::H.'::getOptionIntOkArgv'),
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementGetValueBridge(Context $context): void
+    {
+        $abiName = '__compiler_socket_get_option_value';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false)
+            );
+
+        $entry = $fn->appendBasicBlock('socket_get_option_value_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::H.'::getOptionValueArgv'),
+            []
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
@@ -121,7 +186,7 @@ final class SocketShutdownRuntime
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#31292');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#31295');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -130,7 +195,7 @@ final class SocketShutdownRuntime
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#31292'
+            '#31295'
         );
     }
 
@@ -139,7 +204,7 @@ final class SocketShutdownRuntime
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after SocketShutdownRuntime link (#31292)');
+                throw new \LogicException($name.' missing after SocketGetSetOptionRuntime link (#31295)');
             }
             $context->registerFunction($name, $fn);
         }
