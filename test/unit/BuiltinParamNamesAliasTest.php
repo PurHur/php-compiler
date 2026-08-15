@@ -3611,6 +3611,45 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('sodium_crypto_pwhash_str'));
     }
 
+    /** @covers issue #28753 */
+    public function testSodiumSignDetachedBoxSealZendStubNamedParams(): void
+    {
+        $detached = BuiltinParamNames::forFunction('sodium_crypto_sign_detached');
+        self::assertSame(['message', 'secret_key'], $detached);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($detached, 'message', 'sodium_crypto_sign_detached'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($detached, 'secret_key', 'sodium_crypto_sign_detached'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('sodium_crypto_sign_detached'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('sodium_crypto_sign_detached'));
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_crypto_sign_detached'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_sign_detached', 0));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_sign_detached', 1));
+        self::assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('sodium_crypto_sign_detached', 0)['type'] ?? null);
+        self::assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('sodium_crypto_sign_detached', 1)['type'] ?? null);
+
+        $verify = BuiltinParamNames::forFunction('sodium_crypto_sign_verify_detached');
+        self::assertSame(['signature', 'message', 'public_key'], $verify);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($verify, 'signature', 'sodium_crypto_sign_verify_detached'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($verify, 'message', 'sodium_crypto_sign_verify_detached'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($verify, 'public_key', 'sodium_crypto_sign_verify_detached'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('sodium_crypto_sign_verify_detached'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('sodium_crypto_sign_verify_detached'));
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_crypto_sign_verify_detached'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_sign_verify_detached', 0));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_sign_verify_detached', 1));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_sign_verify_detached', 2));
+
+        $seal = BuiltinParamNames::forFunction('sodium_crypto_box_seal');
+        self::assertSame(['message', 'public_key'], $seal);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($seal, 'message', 'sodium_crypto_box_seal'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($seal, 'public_key', 'sodium_crypto_box_seal'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('sodium_crypto_box_seal'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('sodium_crypto_box_seal'));
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_crypto_box_seal'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_box_seal', 0));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_box_seal', 1));
+        self::assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('sodium_crypto_box_seal', 1)['type'] ?? null);
+    }
+
     /** @covers issue #23290 / #25018 */
     public function testHashHkdfZendStubNamedParams(): void
     {

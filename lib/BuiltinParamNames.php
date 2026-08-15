@@ -2085,6 +2085,13 @@ final class BuiltinParamNames
                 return ['message', 'nonce', 'key_pair'];
             case 'sodium_crypto_sign':
                 return ['message', 'secret_key'];
+            // php-src ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#28753)
+            case 'sodium_crypto_sign_detached':
+                return ['message', 'secret_key'];
+            case 'sodium_crypto_sign_verify_detached':
+                return ['signature', 'message', 'public_key'];
+            case 'sodium_crypto_box_seal':
+                return ['message', 'public_key'];
             case 'sodium_crypto_pwhash_str':
                 return ['password', 'opslimit', 'memlimit'];
             // php-src ext/exif/exif.stub.php — InternalArgInfo still says filename/sections_needed/sub_arrays (#23605)
