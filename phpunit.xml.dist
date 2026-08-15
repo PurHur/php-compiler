@@ -115,6 +115,8 @@
             <file>./test/compliance/FilterVarNullOptions31209JITTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211VMTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211JITTest.php</file>
+            <file>./test/compliance/ChmodNullPermissions31213VMTest.php</file>
+            <file>./test/compliance/ChmodNullPermissions31213JITTest.php</file>
             <file>./test/compliance/MysqliExecuteQueryReflectionVMTest.php</file>
             <file>./test/compliance/ScandirNullSortingOrder31244VMTest.php</file>
             <file>./test/compliance/ScandirNullSortingOrder31244JITTest.php</file>
