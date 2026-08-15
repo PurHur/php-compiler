@@ -278,6 +278,8 @@
             <file>./test/compliance/IntvalNullBaseStrictJITTest.php</file>
             <file>./test/compliance/MetaphoneNullMaxPhonemesStrictVMTest.php</file>
             <file>./test/compliance/MetaphoneNullMaxPhonemesStrictJITTest.php</file>
+            <file>./test/compliance/TempnamNullPrefixStrictVMTest.php</file>
+            <file>./test/compliance/TempnamNullPrefixStrictJITTest.php</file>
             <file>./test/compliance/HtmlspecialcharsNullFlagsStrictVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsNullFlagsStrictJITTest.php</file>
             <file>./test/compliance/ClearstatcacheNullStrict31245VMTest.php</file>
