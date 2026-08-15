@@ -42,13 +42,8 @@ final class pg_trace extends Internal
         if ($argc >= 3) {
             $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[2], 'pg_trace', 3);
         }
-        $connObj = VmPgsqlConnection::resolveOptionalConnection($provided);
-        if (null === $connObj) {
-            @\trigger_error('pg_trace(): No PostgreSQL connection opened yet', \E_USER_WARNING);
-            $frame->returnVar->bool(false);
-
-            return;
-        }
+        // Omitted connection → FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31221).
+        $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated($provided, $frame, 'pg_trace');
         $fp = VmPgsqlNative::trace(VmPgsqlConnection::native($connObj), $pathname, $mode);
         if (null === $fp) {
             @\trigger_error(

@@ -35,11 +35,6 @@ final class pg_lo_create extends Internal
             return;
         }
         $connObj = self::resolveConn($frame, $argc, 0, 'pg_lo_create');
-        if (null === $connObj) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
         $native = VmPgsqlConnection::native($connObj);
         $oid = VmPgsqlNative::INVALID_OID;
         if ($argc >= 2) {
@@ -67,19 +62,15 @@ final class pg_lo_create extends Internal
         throw new \LogicException('pg_lo_create() is not implemented for JIT (#20587)');
     }
 
-    private static function resolveConn(Frame $frame, int $argc, int $idx, string $fn): ?ObjectEntry
+    private static function resolveConn(Frame $frame, int $argc, int $idx, string $fn): ObjectEntry
     {
         if ($argc > $idx) {
             $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[$idx], $fn, $idx + 1);
 
-            return VmPgsqlConnection::resolveOptionalConnection($provided);
-        }
-        $conn = VmPgsqlConnection::resolveOptionalConnection(null);
-        if (null === $conn) {
-            @\trigger_error($fn.'(): No PostgreSQL connection opened yet', \E_USER_WARNING);
+            return VmPgsqlConnection::connectionOrDefaultDeprecated($provided, $frame, $fn);
         }
 
-        return $conn;
+        return VmPgsqlConnection::connectionOrDefaultDeprecated(null, $frame, $fn);
     }
 }
 
@@ -101,17 +92,12 @@ final class pg_lo_unlink extends Internal
         }
         // Forms: unlink(oid) | unlink(connection, oid)
         if (1 === $argc) {
-            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31221).
+            $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated(null, $frame, 'pg_lo_unlink');
             $oid = $frame->calledArgs[0]->resolveIndirect()->toInt();
         } else {
             $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_lo_unlink', 1);
             $oid = $frame->calledArgs[1]->resolveIndirect()->toInt();
-        }
-        if (null === $connObj) {
-            @\trigger_error('pg_lo_unlink(): No PostgreSQL connection opened yet', \E_USER_WARNING);
-            $frame->returnVar->bool(false);
-
-            return;
         }
         $native = VmPgsqlConnection::native($connObj);
         $ok = -1 !== VmPgsqlNative::loUnlink($native, $oid);
@@ -447,17 +433,12 @@ final class pg_lo_import extends Internal
             return;
         }
         if (1 === $argc) {
-            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31221).
+            $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated(null, $frame, 'pg_lo_import');
             $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_lo_import', 0, 'pathname');
         } else {
             $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_lo_import', 1);
             $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_lo_import', 1, 'pathname');
-        }
-        if (null === $connObj) {
-            @\trigger_error('pg_lo_import(): No PostgreSQL connection opened yet', \E_USER_WARNING);
-            $frame->returnVar->bool(false);
-
-            return;
         }
         $native = VmPgsqlConnection::native($connObj);
         $oid = VmPgsqlNative::loImport($native, $path);
@@ -493,19 +474,14 @@ final class pg_lo_export extends Internal
             return;
         }
         if (2 === $argc) {
-            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
+            // FETCH_DEFAULT_LINK + CHECK_DEFAULT_LINK (#31221).
+            $connObj = VmPgsqlConnection::connectionOrDefaultDeprecated(null, $frame, 'pg_lo_export');
             $oid = $frame->calledArgs[0]->resolveIndirect()->toInt();
             $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_lo_export', 1, 'pathname');
         } else {
             $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_lo_export', 1);
             $oid = $frame->calledArgs[1]->resolveIndirect()->toInt();
             $path = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'pg_lo_export', 2, 'pathname');
-        }
-        if (null === $connObj) {
-            @\trigger_error('pg_lo_export(): No PostgreSQL connection opened yet', \E_USER_WARNING);
-            $frame->returnVar->bool(false);
-
-            return;
         }
         $ok = -1 !== VmPgsqlNative::loExport(VmPgsqlConnection::native($connObj), $oid, $path);
         $frame->returnVar->bool($ok);
