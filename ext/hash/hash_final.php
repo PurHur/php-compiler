@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\hash;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -25,11 +26,8 @@ final class hash_final extends HashFunction
         $ctx = VmHashContext::requireHashContext($frame->calledArgs[0], 'hash_final', 1);
         $raw = false;
         if (2 === $argc) {
-            $rawArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
-                throw new \LogicException('hash_final() binary must be boolean in this compiler build');
-            }
-            $raw = $rawArg->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31288).
+            $raw = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'hash_final', 2, 'binary');
         }
         $digest = VmHashContext::final($ctx, $raw);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($digest): void {

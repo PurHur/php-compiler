@@ -41,7 +41,8 @@ final class hash_hmac extends Internal
         $key = self::vmZparamStrArg($frame, 2, 'key');
         $raw = false;
         if (4 === $argc) {
-            $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[3], 'hash_hmac', 4, 'binary');
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31288).
+            $raw = VmMath::parseBoolBuiltinArgForFrame($frame, 3, 'hash_hmac', 4, 'binary');
         }
         $frame->returnVar->string(VmHash::hashHmac($algo, $data, $key, $raw));
     }
@@ -63,7 +64,8 @@ final class hash_hmac extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[3])) {
-            $raw = JitBoolArg::lower($context, $args[3], 'hash_hmac(): Argument #4 ($binary)');
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31288).
+            $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[3], 'hash_hmac', 'binary', 4);
         }
         return JitHash::hashHmac(
             $context,
