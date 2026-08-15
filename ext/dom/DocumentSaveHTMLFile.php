@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::saveHTMLFile() — VM (#15333, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument::saveHTMLFile() — VM (#15333, php-src ext/dom/php_dom.c).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentSaveHTMLFile extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentSaveHTMLFile extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::saveHTMLFile', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::saveHTMLFile()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::saveHTMLFile() expects exactly 1 argument');
-        }
         $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::saveHTMLFile()', 0);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(VmDom::saveHTMLFile($receiver, $filename));

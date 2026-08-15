@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMNode::C14NFile() — canonical XML to file (php-src ext/dom/node.c; #14409). */
+/**
+ * DOMNode::C14NFile() — canonical XML to file (php-src ext/dom/node.c; #14409).
+ *
+ * User arity 1–5 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class NodeC14NFile extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class NodeC14NFile extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMNode::C14NFile', 1, 5);
         $node = $this->domRegistryNodeReceiver($frame, 'DOMNode::C14NFile()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('DOMNode::C14NFile() expects at least 1 argument, 0 given');
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMNode::C14NFile() requires VM context in this compiler build');
         }

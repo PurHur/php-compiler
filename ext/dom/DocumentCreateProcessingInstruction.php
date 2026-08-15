@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::createProcessingInstruction() — VM (#6318, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument::createProcessingInstruction() — VM (#6318, php-src ext/dom/php_dom.c).
+ *
+ * User arity 1–2 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentCreateProcessingInstruction extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentCreateProcessingInstruction extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::createProcessingInstruction', 1, 2);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createProcessingInstruction()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMDocument::createProcessingInstruction() expects at least 1 argument');
-        }
         $target = $this->stringArg(
             $frame->calledArgs[1],
             'DOMDocument::createProcessingInstruction()',

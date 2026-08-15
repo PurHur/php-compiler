@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -39,6 +40,14 @@ final class chmod_ extends Internal
     {
         // Catchable ArgumentCountError under AOT try/catch (#30551 / peer #30544).
         if (!$this->requireExactJitArgCount($context, $args, 'chmod', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        // Early return after compile-time null TypeError — no chmod invoke after abort (#31211 twin #31213).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            JitFilestatArg::lowerChmodMode($context, $args[1], 'chmod', 1, 'permissions');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'chmod_null_permissions_te_cont');
+
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $modeI64 = JitFilestatArg::lowerChmodMode($context, $args[1], 'chmod', 1, 'permissions');

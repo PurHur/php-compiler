@@ -3454,6 +3454,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($pad, 'encoding', 'mb_str_pad'));
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('mb_str_pad'));
         self::assertSame(5, BuiltinParamNames::paramCountForInternalFunction('mb_str_pad'));
+        // #27618 — restore stub types omitted from InternalArgInfo (re-#23805).
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('mb_str_pad'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('mb_str_pad', 0));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('mb_str_pad', 1));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('mb_str_pad', 2));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('mb_str_pad', 3));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('mb_str_pad', 4));
+        $infoPad = ['name' => 'pad_string', 'type' => 'string', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('mb_str_pad', 2, $infoPad, false));
+        $padString = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($padString, 'mb_str_pad', 2, $infoPad));
+        self::assertSame(Variable::TYPE_STRING, $padString->type);
+        self::assertSame(' ', $padString->toString());
+        $infoPadType = ['name' => 'pad_type', 'type' => 'int', 'isOptional' => true];
+        $padType = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($padType, 'mb_str_pad', 3, $infoPadType));
+        self::assertSame(Variable::TYPE_INTEGER, $padType->type);
+        self::assertSame(1, $padType->toInt());
+        $infoEncoding = ['name' => 'encoding', 'type' => '?string', 'isOptional' => true];
+        $encoding = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($encoding, 'mb_str_pad', 4, $infoEncoding));
+        self::assertSame(Variable::TYPE_NULL, $encoding->type);
 
         $lc = BuiltinParamNames::forFunction('mb_lcfirst');
         self::assertSame(['string', 'encoding='], $lc);
@@ -4872,6 +4894,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'pcntl_signal', 2, $restart));
         self::assertSame(Variable::TYPE_BOOLEAN, $dest->type);
         self::assertTrue($dest->toBool());
+    }
+
+    /** @covers issue #28843 — php-src ext/pcntl/pcntl.stub.php: (?bool $enable = null): bool */
+    public function testPcntlAsyncSignalsReflectionEnableNullDefault(): void
+    {
+        $names = BuiltinParamNames::forFunction('pcntl_async_signals');
+        self::assertSame(['enable='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'enable', 'pcntl_async_signals'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('pcntl_async_signals'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('pcntl_async_signals'));
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('pcntl_async_signals'));
+        self::assertSame('?bool', BuiltinInternalArgInfo::stubParamTypeOverride('pcntl_async_signals', 0));
+        $enable = BuiltinInternalArgInfo::paramInfoForFunction('pcntl_async_signals', 0);
+        self::assertNotNull($enable);
+        self::assertSame('enable', $enable['name']);
+        self::assertSame('?bool', $enable['type']);
+        self::assertTrue($enable['isOptional']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('pcntl_async_signals', 0, $enable, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'pcntl_async_signals', 0, $enable));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
     /** @covers issue #27849 — php-src ext/pcntl/pcntl.stub.php */

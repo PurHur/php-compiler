@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** posix_setsid() — create session (php-src ext/posix/posix.c; #7173). */
+/** posix_setsid() — create session (VM VmPosix; JIT/AOT PosixSetsidJitHelper via PosixSetsidJit, #31235/#7173). */
 final class posix_setsid extends Internal
 {
     public function __construct()

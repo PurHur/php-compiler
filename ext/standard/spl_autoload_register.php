@@ -30,12 +30,9 @@ final class spl_autoload_register extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/spl/php_spl.c — ArgumentCountError (#30575).
+        $this->requireAtMostArgCount($frame, 'spl_autoload_register', 3);
         $argc = \count($frame->calledArgs);
-        if ($argc > 3) {
-            throw new \LogicException(
-                'spl_autoload_register() accepts zero to three arguments in this compiler build'
-            );
-        }
         $ctx = VmReflection::requireContext($frame);
         $callback = null;
         if ($argc >= 1) {
@@ -84,10 +81,9 @@ final class spl_autoload_register extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc > 3) {
-            throw new \LogicException(
-                'spl_autoload_register() accepts zero to three arguments in this compiler build'
-            );
+        // Catchable ArgumentCountError (AOT/JIT) — #30575.
+        if (!$this->requireAtMostJitArgCount($context, $args, 'spl_autoload_register', 3)) {
+            return $context->constantFromBool(false);
         }
         if ($argc < 1) {
             throw new \LogicException(

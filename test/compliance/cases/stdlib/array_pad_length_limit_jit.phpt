@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_pad() ValueError when pad amount exceeds 1048576 JIT (#26658, ext/standard/array.c)
+stdlib array_pad() ValueError when pad exceeds max allowed size JIT (#26658/#29342, ext/standard/array.c)
 --FILE--
 <?php
 try {
@@ -10,4 +10,4 @@ try {
 }
 ?>
 --EXPECT--
-array_pad(): Argument #2 ($length) must be less than or equal to 1048576
+array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size

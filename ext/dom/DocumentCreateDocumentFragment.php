@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::createDocumentFragment() — VM (#6317, php-src ext/dom/document.c). */
+/**
+ * DOMDocument::createDocumentFragment() — VM (#6317, php-src ext/dom/document.c).
+ *
+ * Exact user arity 0 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentCreateDocumentFragment extends DomClassMethod
 {
     public function __construct()
@@ -16,6 +20,7 @@ final class DocumentCreateDocumentFragment extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMDocument::createDocumentFragment', 0);
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createDocumentFragment()');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createDocumentFragment() requires VM context in this compiler build');

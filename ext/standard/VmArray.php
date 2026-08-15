@@ -906,22 +906,22 @@ final class VmArray
     /**
      * Throw Zend ValueError when pad amount would exceed {@see ARRAY_PAD_MAX_PAD_SIZE}.
      *
-     * php-src 8.2: if (pad_size_abs < 0 || pad_size_abs - input_size > 1048576).
+     * php-src 8.2+: if (pad_size_abs - input_size > limit) / HT_MAX_SIZE check.
      * pad_size_abs < 0 covers ZEND_ABS(ZEND_LONG_MIN) overflow; in PHP abs(PHP_INT_MIN)
      * is a float, so treat PHP_INT_MIN as oversized.
+     * Message matches Zend 8.4 abstract wording (#29342); numeric gate stays #26658.
      */
     public static function rejectOversizedPad(int $inputSize, int $length): void
     {
+        // php-src wording (8.3+ / Zend 8.4): abstract limit text, not the raw 1048576 (#29342).
+        // Numeric guard remains ARRAY_PAD_MAX_PAD_SIZE from #26658.
+        $zendMsg = 'array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size';
         if (\PHP_INT_MIN === $length) {
-            throw new \ValueError(
-                'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
-            );
+            throw new \ValueError($zendMsg);
         }
         $padSizeAbs = abs($length);
         if ($padSizeAbs - $inputSize > self::ARRAY_PAD_MAX_PAD_SIZE) {
-            throw new \ValueError(
-                'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
-            );
+            throw new \ValueError($zendMsg);
         }
     }
 

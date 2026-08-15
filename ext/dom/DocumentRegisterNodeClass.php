@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMDocument::registerNodeClass() — VM (#15334, php-src ext/dom/document.c). */
+/**
+ * DOMDocument::registerNodeClass() — VM (#15334, php-src ext/dom/document.c).
+ *
+ * Exact user arity 2 — Zend ArgumentCountError (#31251; re-#31011 / #26061).
+ */
 final class DocumentRegisterNodeClass extends DomClassMethod
 {
     public function __construct()
@@ -19,12 +23,11 @@ final class DocumentRegisterNodeClass extends DomClassMethod
     {
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::registerNodeClass()');
         // Living Dom\* receivers share this handler; error labels follow php-src (#26061).
-        $label = VmDomLiving::isLivingDocument($document)
-            ? 'Dom\\Document::registerNodeClass()'
-            : 'DOMDocument::registerNodeClass()';
-        if (\count($frame->calledArgs) < 3) {
-            throw new \ArgumentCountError($label.' expects exactly 2 arguments, 1 given');
-        }
+        $function = VmDomLiving::isLivingDocument($document)
+            ? 'Dom\\Document::registerNodeClass'
+            : 'DOMDocument::registerNodeClass';
+        $this->requireExactUserArgCount($frame, $function, 2);
+        $label = $function.'()';
         if (null === $frame->vmContext) {
             throw new \LogicException($label.' requires VM context in this compiler build');
         }

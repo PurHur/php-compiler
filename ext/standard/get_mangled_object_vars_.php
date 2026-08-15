@@ -24,9 +24,8 @@ final class get_mangled_object_vars_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('get_mangled_object_vars() requires exactly one argument');
-        }
+        // php-src Zend/zend_builtin_functions.c — ArgumentCountError (#30575).
+        $this->requireExactArgCount($frame, 'get_mangled_object_vars', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -37,8 +36,9 @@ final class get_mangled_object_vars_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('get_mangled_object_vars() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #30575.
+        if (!$this->requireExactJitArgCount($context, $args, 'get_mangled_object_vars', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         return JitGetObjectVars::invoke($context, $args[0], true);

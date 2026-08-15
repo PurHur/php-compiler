@@ -195,6 +195,13 @@ final class BuiltinInternalDefaultValues
         'mb_lcfirst' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/mbstring/mbstring.stub.php — pad_string=" ", pad_type=STR_PAD_RIGHT, encoding=null (#27618)
+        // string does not infer; int infer → 0 (wrong vs STR_PAD_RIGHT=1).
+        'mb_str_pad' => [
+            2 => ['kind' => 'string', 'value' => ' '],
+            3 => ['kind' => 'int', 'value' => 1],
+            4 => ['kind' => 'null'],
+        ],
         'json_encode' => [
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'int', 'value' => 512],
@@ -278,6 +285,10 @@ final class BuiltinInternalDefaultValues
         // php-src ext/pcntl/pcntl.stub.php — bool $restart_syscalls = true (bool infer → false) (#28898)
         'pcntl_signal' => [
             2 => ['kind' => 'bool', 'value' => true],
+        ],
+        // php-src ext/pcntl/pcntl.stub.php — ?bool $enable = null (absent from InternalArgInfo) (#28843)
+        'pcntl_async_signals' => [
+            0 => ['kind' => 'null'],
         ],
         'preg_filter' => [
             3 => ['kind' => 'int', 'value' => -1],

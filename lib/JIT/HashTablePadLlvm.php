@@ -237,11 +237,13 @@ final class HashTablePadLlvm
         $intMin = $i64->constInt(\PHP_INT_MIN, true);
 
         $notIntMin = $context->builder->icmp(Builder::INT_NE, $length, $intMin);
+        // Zend 8.4 wording (#29342); numeric guard still ARRAY_PAD_MAX_PAD_SIZE (#26658).
+        $zendMsg = 'array_pad(): Argument #2 ($length) must not exceed the maximum allowed array size';
         TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
             $context,
             $notIntMin,
             $prefix.'_intmin',
-            'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+            $zendMsg
         );
 
         $negLen = $context->builder->icmp(Builder::INT_SLT, $length, $zero64);
@@ -262,7 +264,7 @@ final class HashTablePadLlvm
             $context,
             $within,
             $prefix.'_padmax',
-            'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+            $zendMsg
         );
     }
 

@@ -7,7 +7,11 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMElement::removeAttributeNode() — VM (#14455, php-src ext/dom/attr.c). */
+/**
+ * DOMElement::removeAttributeNode() — VM (#14455, php-src ext/dom/attr.c).
+ *
+ * Exact user arity 1 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class ElementRemoveAttributeNode extends DomClassMethod
 {
     public function __construct()
@@ -17,10 +21,8 @@ final class ElementRemoveAttributeNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireExactUserArgCount($frame, 'DOMElement::removeAttributeNode', 1);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::removeAttributeNode()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMElement::removeAttributeNode() expects at least 1 argument');
-        }
         $attrVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $attrVar->type) {
             throw new \TypeError('DOMElement::removeAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');

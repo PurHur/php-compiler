@@ -6,7 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::save() — VM (#18435, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument::save() — VM (#18435, php-src ext/dom/php_dom.c).
+ *
+ * User arity 1–2 — Zend ArgumentCountError (#31251; re-#31011).
+ */
 final class DocumentSave extends DomClassMethod
 {
     public function __construct()
@@ -16,10 +20,8 @@ final class DocumentSave extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
+        $this->requireUserArgCountRange($frame, 'DOMDocument::save', 1, 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::save()');
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('DOMDocument::save() expects exactly 1 argument, 0 given');
-        }
         $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::save()', 0, $frame, 'filename');
         $options = 0;
         if (isset($frame->calledArgs[2])) {

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -88,6 +89,15 @@ final class mkdir_ extends Internal
         $i64 = $context->getTypeFromString('int64');
         $mode = $i64->constInt(0777, false);
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
+            // Early return after compile-time null TypeError — no mkdir invoke after abort
+            // (AOT module verify; peer getprotobynumber #30283 / dirname #31210).
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+                JitFilestatArg::lowerFileMode($context, $args[1], 'mkdir', 1, 'permissions');
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'mkdir_null_permissions_te_cont');
+
+                return $context->constantFromBool(false);
+            }
             $mode = JitFilestatArg::lowerFileMode($context, $args[1], 'mkdir', 1, 'permissions');
         }
         $recursive = $context->constantFromBool(false);

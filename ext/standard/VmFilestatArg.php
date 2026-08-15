@@ -308,6 +308,12 @@ final class VmFilestatArg
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_LONG: caller strict_types → TypeError; else soft-null DEP+coerce (#31211 / #31213).
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'null'));
+            }
+            VmNullNumberParamDeprecation::emit($frame, $function, $argIndex + 1, $paramName, 'int');
+
             return 0;
         }
         if (Variable::TYPE_STRING === $var->type) {

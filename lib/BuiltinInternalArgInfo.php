@@ -185,6 +185,8 @@ final class BuiltinInternalArgInfo
             'inet_pton', 'inet_ntop' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28000)
             'gethostname' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28334)
+            'nl_langinfo' => 'string|false',
             // ext/standard/link.stub.php — InternalArgInfo return int; Zend bool (#26323)
             'symlink' => 'bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#26058)
@@ -265,6 +267,8 @@ final class BuiltinInternalArgInfo
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
             'mb_ucfirst', 'mb_lcfirst' => 'string',
+            // ext/mbstring/mbstring.stub.php — PHP 8.3+; InternalArgInfo omits types (#27618, re-#23805)
+            'mb_str_pad' => 'string',
             // ext/mbstring/mbstring.stub.php — InternalArgInfo return string (missing array| / |false) (#26466)
             'mb_convert_encoding' => 'array|string|false',
             // ext/mbstring/mbstring.stub.php — InternalArgInfo return int (missing |false) (#28583)
@@ -344,6 +348,8 @@ final class BuiltinInternalArgInfo
             'get_resource_id' => 'int',
             // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : bool (#27774)
             'stream_isatty' => 'bool',
+            // ext/pcntl/pcntl.stub.php — absent from InternalArgInfo; Zend : bool (#28843)
+            'pcntl_async_signals' => 'bool',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; Zend : string (#26375)
             'get_debug_type' => 'string',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend string|false (#27902)
@@ -1131,6 +1137,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/pcntl/pcntl.stub.php — $handler untyped (callable|int at runtime; InternalArgInfo callable) (#28898)
             'pcntl_signal' => 1 === $index ? '' : null,
+            // ext/pcntl/pcntl.stub.php — ?bool $enable = null (absent from InternalArgInfo) (#28843)
+            'pcntl_async_signals' => 0 === $index ? '?bool' : null,
             // ext/standard/streamsfuncs.stub.php — ?int $crypto_method = null (#27684)
             'stream_socket_enable_crypto' => 2 === $index ? '?int' : null,
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)
@@ -1199,6 +1207,15 @@ final class BuiltinInternalArgInfo
             'mb_ucfirst', 'mb_lcfirst' => match ($index) {
                 0 => 'string',
                 1 => '?string',
+                default => null,
+            },
+            // ext/mbstring/mbstring.stub.php — string, int, string, int, ?string (#27618, re-#23805)
+            'mb_str_pad' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                2 => 'string',
+                3 => 'int',
+                4 => '?string',
                 default => null,
             },
             // ext/mbstring/mbstring.stub.php — array|string $string; array|string|null $from_encoding (#26466)
