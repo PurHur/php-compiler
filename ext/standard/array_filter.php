@@ -14,9 +14,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Func\PHP;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ArrayFilterRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ClosureState;
@@ -30,6 +32,7 @@ use PHPLLVM\Value;
  * php-src: ext/standard/array.c — php_array_filter(), ARRAY_FILTER_USE_* modes (#4243).
  *
  * Excess/missing argc → ArgumentCountError (#28473).
+ * Z_PARAM_LONG $mode null under strict_types → TypeError (#31360).
  */
 final class array_filter extends Internal
 {
@@ -45,9 +48,17 @@ final class array_filter extends Internal
         $out = new HashTable();
         // Named mode: alone leaves a hole at callback (php-src array.stub.php; #24843).
         $callbackArg = \array_key_exists(1, $frame->calledArgs) ? $frame->calledArgs[1] : null;
+        // Z_PARAM_LONG $mode — caller strict_types → TypeError on null; else soft-null DEP+0 (#31360).
+        // Present arg (including Variable TYPE_NULL) must be type-checked — not treated as omitted.
         $mode = 0;
-        if (\array_key_exists(2, $frame->calledArgs) && null !== $frame->calledArgs[2]) {
-            $mode = $frame->calledArgs[2]->resolveIndirect()->toInt();
+        if (isset($frame->calledArgs[2])) {
+            $mode = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'array_filter',
+                3,
+                'mode'
+            );
         }
         if (null === $callbackArg) {
             self::filterDefault($src, $out);
@@ -94,7 +105,22 @@ final class array_filter extends Internal
         $argc = \count($args);
         TypeErrorRaise::ensureLinked($context);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_filter', 1, 'array');
-        // Null / omitted callback → soft falsy filter (mode ignored); php-src array.c (#24843).
+        // Z_PARAM_LONG $mode before soft-null callback short-circuit (#31360 / peer parse_ini #31264).
+        if ($argc >= 3) {
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false))) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'array_filter(): Argument #3 ($mode) must be of type int, null given'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'array_filter_null_mode_te_cont');
+
+                return HashTableHelper::alloc($context);
+            }
+            // Soft path: emit DEP+coerce even when callback is null (mode unused by filterDefault).
+            JitSleep::zParamLong($context, $args[2], 'array_filter', 3, 'mode');
+        }
+        // Null / omitted callback → soft falsy filter; php-src array.c (#24843).
         if ($argc >= 2) {
             $callback = $args[1];
             if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {

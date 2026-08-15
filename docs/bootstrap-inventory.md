@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7512 |
-| Phase A inventory files (M2 ratio SSOT) | 7512 |
+| PHP files on vm.php path | 7516 |
+| Phase A inventory files (M2 ratio SSOT) | 7516 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24036 |
+| Source constructs flagged (warnings) | 24040 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2211,8 +2211,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketRead.php` | 0 | 1 |
 | `ext/sockets/JitSocketRecv.php` | 0 | 1 |
 | `ext/sockets/JitSocketRecvfrom.php` | 0 | 1 |
+| `ext/sockets/JitSocketRecvmsg.php` | 0 | 1 |
 | `ext/sockets/JitSocketSelect.php` | 0 | 1 |
 | `ext/sockets/JitSocketSend.php` | 0 | 1 |
+| `ext/sockets/JitSocketSendmsg.php` | 0 | 1 |
 | `ext/sockets/JitSocketSendto.php` | 0 | 1 |
 | `ext/sockets/JitSocketSetBlock.php` | 0 | 1 |
 | `ext/sockets/JitSocketSetNonblock.php` | 0 | 1 |
@@ -5809,6 +5811,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SocketPairIoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketRecvfromRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSelectRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SocketSendRecvMsgRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSendRecvRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSendtoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketSetBlockRuntime.php` | 0 | 1 |
@@ -6020,6 +6023,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSocketRecvfrom.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSelect.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSendRecv.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketSendRecvMsg.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSendto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketSetBlock.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketShutdown.php` | 0 | 1 |
@@ -14567,7 +14571,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/IconvMimeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/iconv/IconvStringFunction.php`
 
@@ -14588,7 +14592,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/JitIconvMime.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/iconv/JitIconvString.php`
 
@@ -14658,7 +14662,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/iconv_mime_encode.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 32)
 - 3 class method(s)
 - 1 closure(s)
 
@@ -25507,12 +25511,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/sockets/JitSocketRecvmsg.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/sockets/JitSocketSelect.php`
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
 ### `ext/sockets/JitSocketSend.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sockets/JitSocketSendmsg.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -35823,7 +35837,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmParseIni.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/VmParseStr.php`
 
@@ -37294,7 +37308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_filter.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 45)
+- new HashTable (line 48)
 - 4 class method(s)
 
 ### `ext/standard/array_find.php`
@@ -39639,7 +39653,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/iterator_apply.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 69)
+- new JITVariable (line 70)
 - 3 class method(s)
 - 1 closure(s)
 
@@ -40050,13 +40064,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/parse_ini_file.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 36)
 - 4 class method(s)
 
 ### `ext/standard/parse_ini_string.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 33)
 - 4 class method(s)
 
 ### `ext/standard/parse_str.php`
@@ -41161,9 +41175,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_word_count.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 60)
-- new Variable (line 63)
-- new Variable (line 69)
+- new HashTable (line 65)
+- new Variable (line 68)
+- new Variable (line 74)
 - 4 class method(s)
 
 ### `ext/standard/strcasecmp.php`
@@ -50018,6 +50032,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `lib/JIT/Builtin/SocketSendRecvMsgRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/SocketSendRecvRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50704,7 +50723,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringIconvMime.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringIconvSubstr.php`
 
@@ -51077,6 +51096,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Builtin/StringSocketSendRecvMsg.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/StringSocketSendto.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51160,9 +51184,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrWordCount.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 111)
-- new Variable (line 114)
-- new Variable (line 120)
+- new HashTable (line 110)
+- new Variable (line 113)
+- new Variable (line 119)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringStrcasecmp.php`

@@ -6,7 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -43,10 +46,10 @@ final class parse_ini_file extends Internal
         $processSections = false;
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
         if (isset($frame->calledArgs[1])) {
-            $processSections = VmParseIni::resolveProcessSections($frame->calledArgs[1], 'parse_ini_file');
+            $processSections = VmParseIni::resolveProcessSections($frame, 1, 'parse_ini_file');
         }
         if (isset($frame->calledArgs[2])) {
-            $scannerMode = VmParseIni::resolveScannerMode($frame->calledArgs[2], 'parse_ini_file');
+            $scannerMode = VmParseIni::resolveScannerMode($frame, 2, 'parse_ini_file');
         }
         VmParseIni::assignParsedResult(
             $frame->returnVar,
@@ -60,21 +63,73 @@ final class parse_ini_file extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('parse_ini_file() expects between 1 and 3 arguments in this compiler build');
         }
+        // Strict null TypeErrors first — trailing null can make prior bool args non-ConstantInt (#31264).
+        if ($context->callerStrictTypes) {
+            if (isset($args[1])
+                && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'parse_ini_file(): Argument #2 ($process_sections) must be of type bool, null given'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'parse_ini_file_null_sections_te_cont');
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+            if (isset($args[2])
+                && (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false))) {
+                JitIntdiv::lowerIntBuiltinArgForCaller(
+                    $context,
+                    $args[2],
+                    'parse_ini_file',
+                    3,
+                    'scanner_mode'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'parse_ini_file_null_scanner_te_cont');
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+        }
         $processSections = false;
         if (isset($args[1])) {
-            $sections = self::compileTimeBool($context, $args[1]);
-            if (null === $sections) {
-                throw new \LogicException('parse_ini_file() requires compile-time process_sections in this compiler build');
+            // Soft null → DEP+false (#31264 / peer get_browser #31289).
+            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+                JitBoolArg::lowerCoerceZParamBool(
+                    $context,
+                    $args[1],
+                    'parse_ini_file',
+                    'process_sections',
+                    2
+                );
+                $processSections = false;
+            } else {
+                $sections = self::compileTimeBool($context, $args[1]);
+                if (null === $sections) {
+                    throw new \LogicException('parse_ini_file() requires compile-time process_sections in this compiler build');
+                }
+                $processSections = $sections;
             }
-            $processSections = $sections;
         }
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
         if (isset($args[2])) {
-            $mode = self::compileTimeInt($context, $args[2]);
-            if (null === $mode) {
-                throw new \LogicException('parse_ini_file() requires compile-time scanner_mode in this compiler build');
+            // Soft null → DEP+0 (#31264 / peer metaphone #31230).
+            if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+                JitIntdiv::lowerIntBuiltinArgForCaller(
+                    $context,
+                    $args[2],
+                    'parse_ini_file',
+                    3,
+                    'scanner_mode'
+                );
+                $scannerMode = ParseIniEngine::SCANNER_NORMAL;
+            } else {
+                $mode = self::compileTimeInt($context, $args[2]);
+                if (null === $mode) {
+                    throw new \LogicException('parse_ini_file() requires compile-time scanner_mode in this compiler build');
+                }
+                $scannerMode = $mode;
             }
-            $scannerMode = $mode;
         }
         $emptyMsg = VmString::emptyStringArgValueErrorMessageCannot('parse_ini_file', 0, 'filename');
         $pathStr = JitStreamPath::lowerNonEmptyPath(

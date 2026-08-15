@@ -292,6 +292,12 @@
             <file>./test/compliance/HashNullBinaryStrict31288JITTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289VMTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289JITTest.php</file>
+            <file>./test/compliance/ParseIniNullTypedArgsStrict31264VMTest.php</file>
+            <file>./test/compliance/ParseIniNullTypedArgsStrict31264JITTest.php</file>
+            <file>./test/compliance/ArrayFilterNullModeStrict31360VMTest.php</file>
+            <file>./test/compliance/ArrayFilterNullModeStrict31360JITTest.php</file>
+            <file>./test/compliance/StrWordCountNullFormatStrict31287VMTest.php</file>
+            <file>./test/compliance/StrWordCountNullFormatStrict31287JITTest.php</file>
             <file>./test/compliance/LinkinfoNullStrict31262VMTest.php</file>
             <file>./test/compliance/LinkinfoNullStrict31262JITTest.php</file>
             <file>./test/compliance/StrncmpNullLengthStrict31265VMTest.php</file>
@@ -346,6 +352,7 @@
             <file>./test/compliance/DomDocumentLoadReflectionVMTest.php</file>
             <file>./test/compliance/DomGetElementByIdNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementByIdNullStrictJITTest.php</file>
+            <file>./test/compliance/DomGetElementByIdNonIdNullVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictJITTest.php</file>
             <file>./test/compliance/DomCreateNullStrictVMTest.php</file>
@@ -379,6 +386,8 @@
             <file>./test/compliance/IconvNullEncodingDep31309JITTest.php</file>
             <file>./test/compliance/IconvEncodingNullType31311VMTest.php</file>
             <file>./test/compliance/IconvEncodingNullType31311JITTest.php</file>
+            <file>./test/compliance/IconvMimeEncodeNullOptions31310VMTest.php</file>
+            <file>./test/compliance/IconvMimeEncodeNullOptions31310JITTest.php</file>
             <file>./test/compliance/MbChrOrdNullStrictVMTest.php</file>
             <file>./test/compliance/MbChrOrdNullStrictJITTest.php</file>
             <file>./test/compliance/MbDetectOrderNullGetterVMTest.php</file>
@@ -583,6 +592,8 @@
             <file>./test/compliance/GetservExcessArgc30567JITTest.php</file>
             <file>./test/compliance/LchownChrootExcessArgc30568VMTest.php</file>
             <file>./test/compliance/LchownChrootExcessArgc30568JITTest.php</file>
+            <file>./test/compliance/ClassParentsUsesApplyExcessArgc30603VMTest.php</file>
+            <file>./test/compliance/ClassParentsUsesApplyExcessArgc30603JITTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720VMTest.php</file>
             <file>./test/compliance/StrHtmlExcessArgc30720JITTest.php</file>
             <file>./test/compliance/StripcslashesExcessArgc30704VMTest.php</file>

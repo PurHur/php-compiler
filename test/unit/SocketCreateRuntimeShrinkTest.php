@@ -565,4 +565,51 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringSocketSelect.php', $spine);
         $this->assertStringNotContainsString('SocketSelectJitHelper.php', $spine);
     }
+
+    public function testSocketSendmsgCallUsesJitSocketSendmsg(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_sendmsg.php');
+        $this->assertStringContainsString('JitSocketSendmsg::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketRecvmsgCallUsesJitSocketRecvmsg(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_recvmsg.php');
+        $this->assertStringContainsString('JitSocketRecvmsg::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketSendmsgUsesPairIoWriteBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/JitSocketSendmsg.php');
+        $this->assertStringContainsString('__compiler_socket_write', $source);
+        $this->assertStringContainsString('StringSocketSendRecvMsg::ensureLinked', $source);
+        $this->assertStringContainsString('readStringKeyHashtable', $source);
+    }
+
+    public function testSocketRecvmsgUsesPairIoReadBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/JitSocketRecvmsg.php');
+        $this->assertStringContainsString('__compiler_socket_read', $source);
+        $this->assertStringContainsString('StringSocketSendRecvMsg::ensureLinked', $source);
+        $this->assertStringContainsString('__value__writeHashtable', $source);
+    }
+
+    public function testSocketSendRecvMsgRuntimeReusesPairIo(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketSendRecvMsgRuntime.php');
+        $this->assertStringContainsString('SocketPairIoRuntime::ensureLinked', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+    }
+
+    public function testSpineBundleIncludesSocketSendRecvMsgHelpers(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSocketSendmsg.php', $spine);
+        $this->assertStringContainsString('JitSocketRecvmsg.php', $spine);
+        $this->assertStringContainsString('SocketSendRecvMsgRuntime.php', $spine);
+        $this->assertStringContainsString('StringSocketSendRecvMsg.php', $spine);
+    }
 }

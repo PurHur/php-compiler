@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
@@ -72,57 +71,31 @@ final class VmParseIni
         $returnVar->copyFrom(VmJson::import($parsed));
     }
 
-    public static function resolveProcessSections(Variable $var, string $fn): bool
+    /**
+     * Z_PARAM_BOOL $process_sections — caller strict_types → TypeError on null; else soft-null DEP+false (#31264).
+     */
+    public static function resolveProcessSections(Frame $frame, int $argIndex, string $fn): bool
     {
-        $var = $var->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(self::boolTypeError($fn, 1, 'process_sections', $var));
-        }
-        if (Variable::TYPE_BOOLEAN === $var->type) {
-            return $var->toBool();
-        }
-        if (Variable::TYPE_NULL === $var->type) {
-            return false;
-        }
-
-        throw new \TypeError(self::boolTypeError($fn, 1, 'process_sections', $var));
-    }
-
-    public static function resolveScannerMode(Variable $var, string $fn): int
-    {
-        $var = $var->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(self::intTypeError($fn, 2, 'scanner_mode', $var));
-        }
-        if (Variable::TYPE_INTEGER === $var->type) {
-            return $var->toInt();
-        }
-        if (Variable::TYPE_NULL === $var->type) {
-            return ParseIniEngine::SCANNER_NORMAL;
-        }
-
-        throw new \TypeError(self::intTypeError($fn, 2, 'scanner_mode', $var));
-    }
-
-    private static function boolTypeError(string $fn, int $argIndex, string $param, Variable $var): string
-    {
-        return \sprintf(
-            '%s(): Argument #%d ($%s) must be of type bool, %s given',
+        return VmMath::parseBoolBuiltinArgForFrame(
+            $frame,
+            $argIndex,
             $fn,
             $argIndex + 1,
-            $param,
-            EnumCaseSupport::typeNameForVariable($var)
+            'process_sections'
         );
     }
 
-    private static function intTypeError(string $fn, int $argIndex, string $param, Variable $var): string
+    /**
+     * Z_PARAM_LONG $scanner_mode — caller strict_types → TypeError on null; else soft-null DEP+0 (#31264).
+     */
+    public static function resolveScannerMode(Frame $frame, int $argIndex, string $fn): int
     {
-        return \sprintf(
-            '%s(): Argument #%d ($%s) must be of type int, %s given',
+        return VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            $argIndex,
             $fn,
             $argIndex + 1,
-            $param,
-            EnumCaseSupport::typeNameForVariable($var)
+            'scanner_mode'
         );
     }
 
