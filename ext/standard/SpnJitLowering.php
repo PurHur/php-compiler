@@ -14,7 +14,7 @@ use PHPLLVM\Value;
  * JIT lowering for strspn()/strcspn() via length-bounded LLVM (#14700, #27053, #27054).
  *
  * Compile-time literals fold through {@see VmString}; runtime uses {@see StringStrspn}.
- * $characters soft-null DEP+coerce (#29394) — same path as $string (#21195).
+ * $characters soft-null DEP+coerce (#29393/#29394) — same path as $string (#21195).
  */
 final class SpnJitLowering
 {
@@ -34,7 +34,7 @@ final class SpnJitLowering
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $strVal = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $name, 0, 'string');
-        // $characters soft-null like Zend (#29394) — not lowerZparamStr (8.4 null TypeError).
+        // $characters soft-null like Zend (#29393/#29394) — not lowerZparamStr (8.4 null TypeError).
         $maskVal = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], $name, 1, 'characters');
         $offset = $argc >= 3
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], $name, 3, 'offset')
