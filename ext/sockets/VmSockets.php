@@ -1151,6 +1151,23 @@ final class VmSockets
         }
     }
 
+    /** NestedJIT connect/bind — no ObjectEntry, key is object address (#31240). */
+    public static function recordErrorForLookupKey(int $key, int $errno): void
+    {
+        self::$lastError = $errno;
+        if ($key > 0) {
+            self::$socketErrors[$key] = $errno;
+        }
+    }
+
+    public static function clearErrorForLookupKey(int $key): void
+    {
+        self::$lastError = 0;
+        if ($key > 0) {
+            self::$socketErrors[$key] = 0;
+        }
+    }
+
     /**
      * php-src PHP_NORMAL_READ — stop after first newline (included).
      *

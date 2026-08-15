@@ -65,6 +65,6 @@ final class socket_connect extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_connect() JIT lowering not implemented (#19286)');
+        return JitSocketConnect::invoke($context, ...$args);
     }
 }
