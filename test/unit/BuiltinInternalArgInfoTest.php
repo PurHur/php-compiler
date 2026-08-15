@@ -1268,6 +1268,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('readline'));
     }
 
+    /** php-src basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28334). */
+    public function testNlLanginfoReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('nl_langinfo'));
+    }
+
     /** php-src zlib.stub.php — InternalArgInfo omits |false (#26342). */
     public function testGzcompressFamilyReflectionReturnUnions(): void
     {

@@ -160,6 +160,8 @@
             <file>./test/compliance/ExecFamilyReflectionReturnsVMTest.php</file>
             <file>./test/compliance/FsockopenReflectionVMTest.php</file>
             <file>./test/compliance/InetReflection28916VMTest.php</file>
+            <file>./test/compliance/NlLanginfoReflectionReturnVMTest.php</file>
+            <file>./test/compliance/NlLanginfoReflectionReturnJITTest.php</file>
             <file>./test/compliance/FsockopenNullSoftVMTest.php</file>
             <file>./test/compliance/PfsockopenNullSoftVMTest.php</file>
             <file>./test/compliance/PfsockopenNullStrictVMTest.php</file>
