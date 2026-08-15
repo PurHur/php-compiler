@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -17,6 +18,7 @@ use PHPLLVM\Value;
  *
  * Z_PARAM_STR $version1 / $version2 — soft-null DEP+coerce on PROFILE=8.4 (#21556, reverts #20254 TypeError).
  * Optional $operator remains nullable (?string).
+ * Excess/missing argc → Zend ArgumentCountError (#30593).
  */
 final class version_compare extends Internal
 {
@@ -27,10 +29,9 @@ final class version_compare extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src stub arity: 2..3 (#30593; ext/standard/versioning.c).
+        $this->requireArgCountRange($frame, 'version_compare', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('version_compare() expects 2 or 3 arguments');
-        }
         // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21556, Zend 8.4.23 versioning.c).
         $ver1 = VmString::trimFamilyStringArgForFrame($frame, 0, 'version_compare', 0, 'version1');
         $ver2 = VmString::trimFamilyStringArgForFrame($frame, 1, 'version_compare', 1, 'version2');
@@ -58,8 +59,11 @@ final class version_compare extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2 || \count($args) > 3) {
-            throw new \LogicException('version_compare() expects 2 or 3 arguments');
+        // Catchable ArgumentCountError under AOT try/catch (#30593 / peer #30537).
+        if (!$this->requireArgCountRangeJit($context, $args, 'version_compare', 2, 3)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitInfo::version_compare(
