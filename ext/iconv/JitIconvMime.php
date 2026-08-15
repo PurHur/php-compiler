@@ -32,8 +32,8 @@ final class JitIconvMime
         }
 
         $encoded = $context->callerStrictTypes
-            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_mime_decode', 0, 'encoded_string')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv_mime_decode', 0, 'encoded_string');
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_mime_decode', 0, 'string')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv_mime_decode', 0, 'string');
 
         $i64 = $context->getTypeFromString('int64');
         $mode = $i64->constInt(0, false);
@@ -46,8 +46,8 @@ final class JitIconvMime
             $charset = $charsetIsNull
                 ? $context->builder->load($context->constantStringFromString(''))
                 : ($context->callerStrictTypes
-                    ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv_mime_decode', 2, 'charset')
-                    : JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'iconv_mime_decode', 2, 'charset'));
+                    ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv_mime_decode', 2, 'encoding')
+                    : JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'iconv_mime_decode', 2, 'encoding'));
         } else {
             $charset = $context->builder->load($context->constantStringFromString(''));
         }

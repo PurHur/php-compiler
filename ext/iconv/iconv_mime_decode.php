@@ -37,7 +37,7 @@ final class iconv_mime_decode extends Internal
             $frame->calledArgs[0],
             'iconv_mime_decode',
             0,
-            'encoded_string'
+            'string'
         );
         if (null === $frame->returnVar) {
             return;
@@ -50,7 +50,7 @@ final class iconv_mime_decode extends Internal
         if ($argc >= 3) {
             $arg = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $arg->type) {
-                $charset = VmIconv::coerceEncodingArg($frame->calledArgs[2], 'iconv_mime_decode', 2, 'charset');
+                $charset = VmIconv::coerceEncodingArg($frame->calledArgs[2], 'iconv_mime_decode', 2, 'encoding');
             }
         }
         $result = VmIconvMime::mimeDecode($encoded, $mode, $charset, $frame);
