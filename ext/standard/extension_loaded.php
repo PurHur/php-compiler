@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -14,6 +15,7 @@ use PHPLLVM\Value;
  * extension_loaded() — registered extension probe (ext/standard/info.c parity, #3204).
  *
  * Z_PARAM_STR $extension — soft-null DEP+coerce on PHP_COMPILER_PROFILE=8.4 (#21281).
+ * Excess/missing argc → Zend ArgumentCountError (#30593).
  */
 final class extension_loaded extends Internal
 {
@@ -24,9 +26,8 @@ final class extension_loaded extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('extension_loaded() requires exactly one argument');
-        }
+        // php-src stub arity: exactly 1 (#30593; ext/standard/info.c).
+        $this->requireExactArgCount($frame, 'extension_loaded', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -37,9 +38,13 @@ final class extension_loaded extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('extension_loaded() requires exactly one argument');
+        // Catchable ArgumentCountError under AOT try/catch (#30593 / peer #30537).
+        if (!$this->requireExactJitArgCount($context, $args, 'extension_loaded', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
+
         return JitInfo::extension_loaded($context, $args[0]);
     }
 }
