@@ -27,9 +27,7 @@ final class VmSockets
     private const O_NONBLOCK = 2048;
 
     /** @var array<int, int> Socket object id => last errno */
-    private static array $socketErrors = [];
 
-    private static int $lastError = 0;
 
     public static function isAtmarkSupported(): bool
     {
@@ -223,7 +221,7 @@ final class VmSockets
             return false;
         }
         if (0 === SocketsLibcThinAbi::shutdown($fd, $how)) {
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return true;
         }
@@ -264,7 +262,7 @@ final class VmSockets
         }
 
         $object = VmSocket::wrapOwnedFd($fd, $ctx, $domain);
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $object;
     }
@@ -298,8 +296,8 @@ final class VmSockets
 
         $a = VmSocket::wrapOwnedFd($fds[0], $ctx, $domain);
         $b = VmSocket::wrapOwnedFd($fds[1], $ctx, $domain);
-        self::$socketErrors[$a->id] = 0;
-        self::$socketErrors[$b->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($a->id);
+        VmSocket::clearErrorOptionalForLookupKey($b->id);
 
         return [$a, $b];
     }
@@ -368,7 +366,7 @@ final class VmSockets
         }
 
         $object = VmSocket::wrapOwnedFd($fd, $ctx, self::AF_INET);
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $object;
     }
@@ -398,7 +396,7 @@ final class VmSockets
             );
         }
         if (0 === $rc) {
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return true;
         }
@@ -458,7 +456,7 @@ final class VmSockets
             );
         }
         if (0 === $rc) {
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return true;
         }
@@ -502,7 +500,7 @@ final class VmSockets
         }
         $rc = SocketsLibcThinAbi::listen($fd, $backlog);
         if (0 === $rc) {
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return true;
         }
@@ -549,7 +547,7 @@ final class VmSockets
 
         $parentDomain = VmSocket::domainForObject($object);
         $wrapped = VmSocket::wrapOwnedFd($client, $ctx, $parentDomain);
-        self::$socketErrors[$wrapped->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($wrapped->id);
 
         return $wrapped;
     }
@@ -613,7 +611,7 @@ final class VmSockets
         }
 
         if (0 === $rc) {
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return true;
         }
@@ -659,7 +657,7 @@ final class VmSockets
 
                 return false;
             }
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return ['sec' => $tv[0], 'usec' => $tv[1]];
         }
@@ -679,7 +677,7 @@ final class VmSockets
 
                 return false;
             }
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return ['l_onoff' => $lg[0], 'l_linger' => $lg[1]];
         }
@@ -699,7 +697,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $val;
     }
@@ -735,7 +733,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $n;
     }
@@ -777,7 +775,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $n;
     }
@@ -819,7 +817,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
         if ('' === $data) {
             return [null, 0];
         }
@@ -850,7 +848,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $data;
     }
@@ -862,7 +860,7 @@ final class VmSockets
         if (null !== $exportHandle) {
             VmFs::fclose($exportHandle);
             VmSocket::release($object);
-            unset(self::$socketErrors[$object->id]);
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return;
         }
@@ -871,7 +869,7 @@ final class VmSockets
             SocketsLibcThinAbi::close($fd);
         }
         VmSocket::release($object);
-        unset(self::$socketErrors[$object->id]);
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
     }
 
     /** socket_close() for JIT/AOT object handles (ptrToInt) — peer {@see close()} (#27394). */
@@ -884,7 +882,7 @@ final class VmSockets
         if (null !== $exportHandle) {
             VmFs::fclose($exportHandle);
             VmSocket::releaseForLookupKey($key);
-            unset(self::$socketErrors[$key]);
+            VmSocket::clearErrorOptionalForLookupKey($key);
 
             return;
         }
@@ -893,7 +891,7 @@ final class VmSockets
             SocketsLibcThinAbi::close($fd);
         }
         VmSocket::releaseForLookupKey($key);
-        unset(self::$socketErrors[$key]);
+        VmSocket::clearErrorOptionalForLookupKey($key);
     }
 
     /** Record libc errno after a failed socket(2) under NestedJIT (#27394). */
@@ -905,20 +903,20 @@ final class VmSockets
     public static function lastError(?ObjectEntry $object = null): int
     {
         if (null !== $object) {
-            return self::$socketErrors[$object->id] ?? 0;
+            return VmSocket::lastErrorForLookupKey($object->id);
         }
 
-        return self::$lastError;
+        return VmSocket::lastErrorForLookupKey(0);
     }
 
     public static function clearError(?ObjectEntry $object = null): void
     {
         if (null !== $object) {
-            self::$socketErrors[$object->id] = 0;
+            VmSocket::clearErrorOptionalForLookupKey($object->id);
 
             return;
         }
-        self::$lastError = 0;
+        VmSocket::clearErrorOptionalForLookupKey(0);
     }
 
     public static function strerror(int $errno): string
@@ -999,7 +997,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $name;
     }
@@ -1030,7 +1028,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $name;
     }
@@ -1086,7 +1084,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $n;
     }
@@ -1120,7 +1118,7 @@ final class VmSockets
 
             return false;
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $got;
     }
@@ -1145,27 +1143,32 @@ final class VmSockets
     /** @internal shared with {@see VmSocketAddrinfo} */
     public static function recordError(?ObjectEntry $object, int $errno): void
     {
-        self::$lastError = $errno;
-        if (null !== $object) {
-            self::$socketErrors[$object->id] = $errno;
-        }
+        VmSocket::recordErrorForLookupKey(null !== $object ? $object->id : 0, $errno);
     }
 
-    /** NestedJIT connect/bind — no ObjectEntry, key is object address (#31240). */
+    /** NestedJIT connect/bind — no ObjectEntry, key is object address (#31240 / #31270). */
     public static function recordErrorForLookupKey(int $key, int $errno): void
     {
-        self::$lastError = $errno;
-        if ($key > 0) {
-            self::$socketErrors[$key] = $errno;
-        }
+        VmSocket::recordErrorForLookupKey($key, $errno);
     }
 
     public static function clearErrorForLookupKey(int $key): void
     {
-        self::$lastError = 0;
-        if ($key > 0) {
-            self::$socketErrors[$key] = 0;
-        }
+        VmSocket::clearErrorForLookupKey($key);
+    }
+
+    /** NestedJIT socket_last_error — key≤0 → process errno (#31270). */
+    public static function lastErrorForLookupKey(int $key): int
+    {
+        return VmSocket::lastErrorForLookupKey($key);
+    }
+
+    /**
+     * NestedJIT socket_clear_error — matches {@see clearError} (socket-only vs process-only).
+     */
+    public static function clearErrorOptionalForLookupKey(int $key): void
+    {
+        VmSocket::clearErrorOptionalForLookupKey($key);
     }
 
     /**
@@ -1191,7 +1194,7 @@ final class VmSockets
                 break;
             }
         }
-        self::$socketErrors[$object->id] = 0;
+        VmSocket::clearErrorOptionalForLookupKey($object->id);
 
         return $out;
     }

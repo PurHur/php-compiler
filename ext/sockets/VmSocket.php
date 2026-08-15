@@ -49,6 +49,12 @@ final class VmSocket
     /** @var array<int, int> JIT object handle (ptrToInt) => socket fd */
     private static array $jitHandleFds = [];
 
+    /** @var array<int, int> object id / NestedJIT handle => last errno (#31270) */
+    private static array $socketErrors = [];
+
+    /** Process-level last errno (socket_last_error() with no Socket) (#31270) */
+    private static int $lastError = 0;
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])) {
@@ -315,8 +321,47 @@ final class VmSocket
             self::$hostSocketFds[$key],
             self::$ownedFds[$key],
             self::$domains[$key],
-            self::$jitHandleFds[$key]
+            self::$jitHandleFds[$key],
+            self::$socketErrors[$key]
         );
+    }
+
+    /** NestedJIT/VM — record errno on shared handle maps (#31270). */
+    public static function recordErrorForLookupKey(int $key, int $errno): void
+    {
+        self::$lastError = $errno;
+        if ($key > 0) {
+            self::$socketErrors[$key] = $errno;
+        }
+    }
+
+    public static function lastErrorForLookupKey(int $key): int
+    {
+        if ($key <= 0) {
+            return self::$lastError;
+        }
+
+        return self::$socketErrors[$key] ?? 0;
+    }
+
+    /** socket_clear_error NestedJIT — socket-only vs process-only (#31270). */
+    public static function clearErrorOptionalForLookupKey(int $key): void
+    {
+        if ($key <= 0) {
+            self::$lastError = 0;
+
+            return;
+        }
+        self::$socketErrors[$key] = 0;
+    }
+
+    /** Clear both process + socket (successful I/O path). */
+    public static function clearErrorForLookupKey(int $key): void
+    {
+        self::$lastError = 0;
+        if ($key > 0) {
+            self::$socketErrors[$key] = 0;
+        }
     }
 
     public static function existingStreamHandleForLookupKey(int $key): ?int

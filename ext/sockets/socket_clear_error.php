@@ -45,6 +45,6 @@ final class socket_clear_error extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_clear_error() JIT lowering not implemented (#6227)');
+        return JitSocketClearError::invoke($context, ...$args);
     }
 }

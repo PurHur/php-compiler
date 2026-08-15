@@ -142,6 +142,7 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SocketCreateJitHelper.php', $spine);
         $this->assertStringContainsString('SocketCloseJitHelper.php', $spine);
         $this->assertStringContainsString('SocketConnectJitHelper.php', $spine);
+        $this->assertStringContainsString('SocketErrorJitHelper.php', $spine);
         $this->assertStringContainsString('JitSocketCreate.php', $spine);
         $this->assertStringContainsString('JitSocketClose.php', $spine);
         $this->assertStringContainsString('JitSocketConnect.php', $spine);
@@ -149,14 +150,63 @@ final class SocketCreateRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitSocketListen.php', $spine);
         $this->assertStringContainsString('JitSocketAccept.php', $spine);
         $this->assertStringContainsString('JitSocketCreateListen.php', $spine);
+        $this->assertStringContainsString('JitSocketStrerror.php', $spine);
+        $this->assertStringContainsString('JitSocketLastError.php', $spine);
+        $this->assertStringContainsString('JitSocketClearError.php', $spine);
         $this->assertStringContainsString('SocketCreateRuntime.php', $spine);
         $this->assertStringContainsString('SocketCloseRuntime.php', $spine);
         $this->assertStringContainsString('SocketConnectRuntime.php', $spine);
         $this->assertStringContainsString('SocketBindListenRuntime.php', $spine);
+        $this->assertStringContainsString('SocketErrorRuntime.php', $spine);
         $this->assertStringContainsString('StringSocketConnect.php', $spine);
         $this->assertStringContainsString('StringSocketBind.php', $spine);
         $this->assertStringContainsString('StringSocketListen.php', $spine);
         $this->assertStringContainsString('StringSocketAccept.php', $spine);
         $this->assertStringContainsString('StringSocketCreateListen.php', $spine);
+        $this->assertStringContainsString('StringSocketError.php', $spine);
+    }
+
+    public function testSocketStrerrorCallUsesJitSocketStrerror(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_strerror.php');
+        $this->assertStringContainsString('JitSocketStrerror::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketLastErrorCallUsesJitSocketLastError(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_last_error.php');
+        $this->assertStringContainsString('JitSocketLastError::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketClearErrorCallUsesJitSocketClearError(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/socket_clear_error.php');
+        $this->assertStringContainsString('JitSocketClearError::invoke', $source);
+        $this->assertStringNotContainsString('JIT lowering not implemented', $source);
+    }
+
+    public function testSocketErrorJitHelperDelegatesToVmSockets(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/SocketErrorJitHelper.php');
+        $this->assertStringContainsString('VmSocket::lastErrorForLookupKey', $source);
+        $this->assertStringContainsString('VmSocket::clearErrorOptionalForLookupKey', $source);
+        $this->assertStringNotContainsString('SocketsLibcThinAbi', $source);
+        $this->assertStringNotContainsString('strerrorHostLookupArgv', $source);
+    }
+
+    public function testSocketErrorRuntimeUsesJitVmHelperLinkEnsureBridge(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketErrorRuntime.php');
+        $this->assertStringContainsString('::lastErrorForHandle', $source);
+        $this->assertStringContainsString('::clearErrorForHandle', $source);
+        $this->assertStringContainsString('__compiler_socket_strerror', $source);
+        $this->assertStringContainsString('lookupFunction(\'strerror\')', $source);
+        $this->assertStringContainsString('Unknown host', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
     }
 }
