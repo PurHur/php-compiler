@@ -292,6 +292,9 @@ final class BuiltinInternalArgInfo
             'iconv_substr' => 'string|false',
             // ext/iconv/iconv.stub.php — InternalArgInfo return int (missing |false) (#27629, #28586)
             'iconv_strlen', 'iconv_strpos', 'iconv_strrpos' => 'int|false',
+            // ext/iconv/iconv.stub.php — InternalArgInfo return string/array (missing |false) (#24378)
+            'iconv_mime_decode' => 'string|false',
+            'iconv_mime_decode_headers' => 'array|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
             // ext/openssl/openssl.stub.php — InternalArgInfo return int (missing |false) (#28754)
@@ -886,6 +889,8 @@ final class BuiltinInternalArgInfo
                 3 => '?string',
                 default => null,
             },
+            // ext/iconv/iconv.stub.php — ?string $encoding = null (InternalArgInfo string) (#24378)
+            'iconv_mime_decode', 'iconv_mime_decode_headers' => 2 === $index ? '?string' : null,
             // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25587)
             'resourcebundle_create' => ($index === 0 || $index === 1) ? '?string' : null,
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)

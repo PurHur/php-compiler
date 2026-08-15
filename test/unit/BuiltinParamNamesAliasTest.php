@@ -3686,7 +3686,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(5, BuiltinParamNames::paramCountForInternalFunction('hash_hkdf'));
     }
 
-    /** @covers issue #23307, #24364, #24567 */
+    /** @covers issue #23307, #24364, #24567, #24378 */
     public function testIconvFamilyZendStubNamedParams(): void
     {
         $iconv = BuiltinParamNames::forFunction('iconv');
@@ -3747,6 +3747,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($mime, 'field_value', 'iconv_mime_encode'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($mime, 'options', 'iconv_mime_encode'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($mime, 'preference', 'iconv_mime_encode'));
+
+        // php-src iconv.stub.php — string/mode/encoding not encoded_string/charset (#24378)
+        $decode = BuiltinParamNames::forFunction('iconv_mime_decode');
+        self::assertSame(['string', 'mode=', 'encoding='], $decode);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($decode, 'string', 'iconv_mime_decode'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($decode, 'mode', 'iconv_mime_decode'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($decode, 'encoding', 'iconv_mime_decode'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($decode, 'encoded_string', 'iconv_mime_decode'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($decode, 'charset', 'iconv_mime_decode'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv_mime_decode'));
+        $decEnc = BuiltinInternalArgInfo::paramInfoForFunction('iconv_mime_decode', 2);
+        self::assertNotNull($decEnc);
+        self::assertSame('?string', $decEnc['type']);
+        self::assertTrue($decEnc['isOptional']);
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('iconv_mime_decode', 2));
+
+        $decodeHeaders = BuiltinParamNames::forFunction('iconv_mime_decode_headers');
+        self::assertSame(['headers', 'mode=', 'encoding='], $decodeHeaders);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($decodeHeaders, 'encoding', 'iconv_mime_decode_headers'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($decodeHeaders, 'charset', 'iconv_mime_decode_headers'));
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv_mime_decode_headers'));
     }
 
     /** @covers issue #23192 */

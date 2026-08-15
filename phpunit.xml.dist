@@ -180,6 +180,7 @@
             <file>./test/compliance/IconvStrlenReflectionVMTest.php</file>
             <file>./test/compliance/IconvReflectionReturnVMTest.php</file>
             <file>./test/compliance/IconvStrposStrrposReflectionVMTest.php</file>
+            <file>./test/compliance/IconvMimeDecodeReflectionVMTest.php</file>
             <file>./test/compliance/IconvSubstrReflectionVMTest.php</file>
             <file>./test/compliance/MbCaseInvalidUtf8SubstVMTest.php</file>
             <file>./test/compliance/StreamCopyToStreamReflectionVMTest.php</file>

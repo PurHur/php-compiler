@@ -1432,6 +1432,12 @@ final class BuiltinParamNames
             // php-src ext/iconv/iconv.stub.php — InternalArgInfo still says preference (#24567)
             case 'iconv_mime_encode':
                 return ['field_name', 'field_value', 'options='];
+            // php-src ext/iconv/iconv.stub.php — InternalArgInfo still says encoded_string/charset (#24378)
+            case 'iconv_mime_decode':
+                return ['string', 'mode=', 'encoding='];
+            // php-src ext/iconv/iconv.stub.php — InternalArgInfo still says charset (#24378)
+            case 'iconv_mime_decode_headers':
+                return ['headers', 'mode=', 'encoding='];
             case 'base64_decode':
                 return ['string', 'strict'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str (#23257)
