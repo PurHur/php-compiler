@@ -167,8 +167,10 @@ final class VmReflection
      */
     public static function parseAllowStringArg(Frame $frame, string $function, int $argIndex): bool
     {
-        return VmMath::parseBoolBuiltinArg(
-            $frame->calledArgs[$argIndex]->resolveIndirect(),
+        // Z_PARAM_BOOL — strict_types TypeError on null; else null→false + E_DEPRECATED (#31339).
+        return VmMath::parseBoolBuiltinArgForFrame(
+            $frame,
+            $argIndex,
             $function,
             $argIndex + 1,
             'allow_string'

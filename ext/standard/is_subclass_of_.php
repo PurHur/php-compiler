@@ -46,9 +46,16 @@ final class is_subclass_of_ extends Internal
         $ctx = VmReflection::requireContext($frame);
         // php-src zend_builtin_functions.stub.php — string $class (Z_PARAM_STR, #29817).
         $parentName = VmString::trimFamilyStringArgForFrame($frame, 1, 'is_subclass_of', 1, 'class');
+        // Z_PARAM_BOOL $allow_string — strict_types TypeError on null; else null→false + E_DEPRECATED (#31339).
         $allowString = true;
         if (3 === \count($frame->calledArgs)) {
-            $allowString = $frame->calledArgs[2]->resolveIndirect()->toBool();
+            $allowString = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                2,
+                'is_subclass_of',
+                3,
+                'allow_string'
+            );
         }
         $subject = $frame->calledArgs[0]->resolveIndirect();
         $matches = false;
@@ -90,7 +97,14 @@ final class is_subclass_of_ extends Internal
         $allowString = $context->constantFromBool(true);
         $allowStringKnownFalse = false;
         if (3 === \count($args)) {
-            $allowString = JitBoolArg::lower($context, $args[2], 'is_subclass_of() allow_string');
+            // Z_PARAM_BOOL — match VM parseBoolBuiltinArgForFrame (#31339).
+            $allowString = JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $args[2],
+                'is_subclass_of',
+                'allow_string',
+                3
+            );
             $allowStringKnownFalse = self::jitAllowStringKnownFalse($context, $args[2]);
         }
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
