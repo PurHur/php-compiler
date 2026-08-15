@@ -46,9 +46,10 @@ final class is_a_ extends Internal
         $ctx = VmReflection::requireContext($frame);
         // php-src zend_builtin_functions.stub.php — string $class (Z_PARAM_STR, #29817).
         $className = VmString::trimFamilyStringArgForFrame($frame, 1, 'is_a', 1, 'class');
+        // Z_PARAM_BOOL $allow_string — strict_types TypeError on null; else null→false + E_DEPRECATED (#31339).
         $allowString = false;
         if (3 === \count($frame->calledArgs)) {
-            $allowString = $frame->calledArgs[2]->resolveIndirect()->toBool();
+            $allowString = VmMath::parseBoolBuiltinArgForFrame($frame, 2, 'is_a', 3, 'allow_string');
         }
         $subject = $frame->calledArgs[0]->resolveIndirect();
         $matches = false;
@@ -89,7 +90,14 @@ final class is_a_ extends Internal
         $allowString = $context->constantFromBool(false);
         $allowStringKnownFalse = true;
         if (3 === \count($args)) {
-            $allowString = JitBoolArg::lower($context, $args[2], 'is_a() allow_string');
+            // Z_PARAM_BOOL — match VM parseBoolBuiltinArgForFrame (#31339).
+            $allowString = JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $args[2],
+                'is_a',
+                'allow_string',
+                3
+            );
             $allowStringKnownFalse = self::jitAllowStringKnownFalse($context, $args[2]);
         }
         if (!\in_array($args[0]->type, [
