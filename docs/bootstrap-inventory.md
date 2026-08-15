@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7450 |
-| Phase A inventory files (M2 ratio SSOT) | 7450 |
+| PHP files on vm.php path | 7452 |
+| Phase A inventory files (M2 ratio SSOT) | 7452 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23980 |
+| Source constructs flagged (warnings) | 23982 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3456,6 +3456,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/UnserializeJitHelper.php` | 0 | 2 |
 | `ext/standard/UnserializeObjectNestedJitHelper.php` | 0 | 1 |
 | `ext/standard/UploadTempJitHelper.php` | 0 | 1 |
+| `ext/standard/UrlRewriterApplyJitHelper.php` | 0 | 1 |
 | `ext/standard/UrlScannerEx.php` | 0 | 1 |
 | `ext/standard/UrldecodeJitHelper.php` | 0 | 1 |
 | `ext/standard/UrlencodeJitHelper.php` | 0 | 1 |
@@ -3801,6 +3802,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmUnamePure.php` | 0 | 1 |
 | `ext/standard/VmUnserializeFormat.php` | 0 | 38 |
 | `ext/standard/VmUrlRewriterFlush.php` | 0 | 1 |
+| `ext/standard/VmUrlRewriterHrefApply.php` | 0 | 1 |
 | `ext/standard/VmUrlRewriterOb.php` | 0 | 1 |
 | `ext/standard/VmUserCall.php` | 0 | 7 |
 | `ext/standard/VmUserStream.php` | 0 | 30 |
@@ -22398,17 +22400,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 132)
 - new ArgumentCountError (line 175)
 - new ArgumentCountError (line 226)
-- new ArgumentCountError (line 280)
-- new ArgumentCountError (line 332)
-- new ArgumentCountError (line 395)
-- new ArgumentCountError (line 428)
-- new ArgumentCountError (line 462)
-- new ArgumentCountError (line 496)
-- new ArgumentCountError (line 530)
-- new ArgumentCountError (line 572)
-- new ArgumentCountError (line 604)
-- new ArgumentCountError (line 667)
-- new ArgumentCountError (line 724)
+- new ArgumentCountError (line 275)
+- new ArgumentCountError (line 322)
+- new ArgumentCountError (line 385)
+- new ArgumentCountError (line 418)
+- new ArgumentCountError (line 452)
+- new ArgumentCountError (line 486)
+- new ArgumentCountError (line 520)
+- new ArgumentCountError (line 562)
+- new ArgumentCountError (line 594)
+- new ArgumentCountError (line 657)
+- new ArgumentCountError (line 714)
 - 34 class method(s)
 
 ### `ext/pgsql/pg_change_password.php`
@@ -22518,17 +22520,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 32)
-- new ArgumentCountError (line 97)
-- new ArgumentCountError (line 141)
-- new ArgumentCountError (line 198)
-- new ArgumentCountError (line 230)
-- new ArgumentCountError (line 270)
-- new ArgumentCountError (line 310)
-- new ArgumentCountError (line 351)
-- new ArgumentCountError (line 383)
-- new ArgumentCountError (line 412)
-- new ArgumentCountError (line 444)
-- new ArgumentCountError (line 490)
+- new ArgumentCountError (line 88)
+- new ArgumentCountError (line 127)
+- new ArgumentCountError (line 184)
+- new ArgumentCountError (line 216)
+- new ArgumentCountError (line 256)
+- new ArgumentCountError (line 296)
+- new ArgumentCountError (line 337)
+- new ArgumentCountError (line 369)
+- new ArgumentCountError (line 398)
+- new ArgumentCountError (line 430)
+- new ArgumentCountError (line 471)
 - 26 class method(s)
 
 ### `ext/pgsql/pg_num_rows.php`
@@ -34134,6 +34136,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/standard/UrlRewriterApplyJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/UrlScannerEx.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36736,6 +36743,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/standard/VmUrlRewriterHrefApply.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/VmUrlRewriterOb.php`
 
@@ -51338,7 +51350,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/UrlRewriterApplyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/UsortRuntime.php`
 

@@ -167,6 +167,9 @@ final class HelperRuntimeCache
         // #30813 — prelinked Nl2brJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // VmNl2br (strlen/substr) into the user module (peer #30812 / #30859).
         'phpcompiler\\ext\\standard\\nl2brjithelper::nl2brargv' => true,
+        // #31099 — NestedJIT UrlRewriterApply during emitAdd only (not Context init);
+        // prelinked unit.o not used for user-script rewrite apply.
+        'phpcompiler\\ext\\standard\\urlrewriterapplyjithelper::applyargv' => true,
     ];
 
     private static bool $loggedHit = false;

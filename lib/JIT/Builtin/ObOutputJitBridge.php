@@ -163,6 +163,9 @@ final class ObOutputJitBridge
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__phpc_ob_start_with_url_rewriter', $probe);
             self::registerLinkedRuntime($context, false);
+            // Ob stack may already exist from Context init — still NestedJIT apply here
+            // (user-script rewrite path). Init-time NestedJIT of apply is forbidden (#31099).
+            UrlRewriterApplyRuntime::ensureNestedJitBridge($context);
 
             return;
         }
@@ -174,7 +177,8 @@ final class ObOutputJitBridge
         self::ensureLibc($context);
         self::ensureValueHelpers($context);
         StringTriggerErrorJit::implement($context);
-        UrlRewriterApplyRuntime::ensureLinked($context);
+        // NestedJIT apply during user-script rewrite path only — not Context init (#31099).
+        UrlRewriterApplyRuntime::ensureNestedJitBridge($context);
         // Rewrite-vars NestedJIT only (not ObOutput string stack) — module-global TU dedupe (#27566).
         self::ensureJitHelperCompiled($context, true);
         ObOutputEchoJitEmit::implementAll($context);
