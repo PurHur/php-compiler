@@ -57,6 +57,6 @@ final class socket_send extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_send() JIT lowering not implemented (#20238)');
+        return JitSocketSend::invoke($context, ...$args);
     }
 }
