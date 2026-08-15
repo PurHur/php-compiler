@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7509 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24031 |
+| Source constructs flagged (warnings) | 24033 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -985,11 +985,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/iconv/VmIconv.php` | 0 | 1 |
 | `ext/iconv/VmIconvMime.php` | 0 | 2 |
 | `ext/iconv/iconv.php` | 0 | 3 |
-| `ext/iconv/iconv_get_encoding.php` | 0 | 3 |
+| `ext/iconv/iconv_get_encoding.php` | 0 | 4 |
 | `ext/iconv/iconv_mime_decode.php` | 0 | 3 |
 | `ext/iconv/iconv_mime_decode_headers.php` | 0 | 7 |
 | `ext/iconv/iconv_mime_encode.php` | 0 | 3 |
-| `ext/iconv/iconv_set_encoding.php` | 0 | 3 |
+| `ext/iconv/iconv_set_encoding.php` | 0 | 4 |
 | `ext/iconv/iconv_strlen.php` | 0 | 1 |
 | `ext/iconv/iconv_strpos.php` | 0 | 1 |
 | `ext/iconv/iconv_strrpos.php` | 0 | 1 |
@@ -14552,8 +14552,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/IconvEncodingState.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 97)
-- new Variable (line 99)
+- new HashTable (line 100)
+- new Variable (line 102)
 - 6 class method(s)
 
 ### `ext/iconv/IconvJitHelper.php`
@@ -14629,8 +14629,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/iconv_get_encoding.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- 2 class method(s)
+- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 73)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/iconv/iconv_mime_decode.php`
@@ -14661,7 +14662,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/iconv_set_encoding.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 69)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -46226,7 +46228,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1742)
+- new InternalArgInfo (line 1747)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
