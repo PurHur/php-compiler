@@ -288,6 +288,8 @@
             <file>./test/compliance/ClearstatcacheNullStrict31245JITTest.php</file>
             <file>./test/compliance/HashNullBinaryStrict31288VMTest.php</file>
             <file>./test/compliance/HashNullBinaryStrict31288JITTest.php</file>
+            <file>./test/compliance/GetBrowserNullReturnArrayStrict31289VMTest.php</file>
+            <file>./test/compliance/GetBrowserNullReturnArrayStrict31289JITTest.php</file>
             <file>./test/compliance/LinkinfoNullStrict31262VMTest.php</file>
             <file>./test/compliance/LinkinfoNullStrict31262JITTest.php</file>
             <file>./test/compliance/StrncmpNullLengthStrict31265VMTest.php</file>

@@ -7,8 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -48,7 +51,14 @@ final class get_browser extends Internal
             }
         }
         if ($argc >= 2) {
-            $returnArray = VmMath::parseBoolBuiltinArg($frame->calledArgs[1], 'get_browser', 1, 'return_array');
+            // Z_PARAM_BOOL — strict_types TypeError on null (#31289); soft null → DEP + false.
+            $returnArray = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                1,
+                'get_browser',
+                2,
+                'return_array'
+            );
         }
 
         if (!VmBrowser::browscapConfigured($frame->vmContext)) {
@@ -95,7 +105,28 @@ final class get_browser extends Internal
             JitStringBuiltinArg::lower($context, $args[0], 'get_browser', 0, 'browser_name');
         }
         if ($argc >= 2) {
-            JitBoolArg::lower($context, $args[1], 'get_browser(): Argument #2 ($return_array)');
+            // Compile-time null under strict: catchable TypeError then stop IR (#31289 / peer hash #31288).
+            if ($context->callerStrictTypes && (
+                JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
+            )) {
+                JitNativeString::ensureInsertBlock($context);
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'get_browser(): Argument #2 ($return_array) must be of type bool, null given'
+                );
+                JitNativeString::ensureInsertBlock($context);
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+            // Z_PARAM_BOOL — soft null → false + E_DEPRECATED (#31289).
+            JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $args[1],
+                'get_browser',
+                'return_array',
+                2
+            );
         }
 
         return JitGetBrowser::invoke($context);
