@@ -49,7 +49,8 @@ final class hash_pbkdf2 extends Internal
         }
         $raw = false;
         if (isset($frame->calledArgs[5])) {
-            $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[5], 'hash_pbkdf2', 6, 'binary');
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31288).
+            $raw = VmMath::parseBoolBuiltinArgForFrame($frame, 5, 'hash_pbkdf2', 6, 'binary');
         }
         if (isset($frame->calledArgs[6])) {
             // Z_PARAM_ARRAY $options — stub parity; unused for sha256/sha1/md5 (#23595).
@@ -101,7 +102,8 @@ final class hash_pbkdf2 extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[5])) {
-            $raw = JitBoolArg::lower($context, $args[5], 'hash_pbkdf2(): Argument #6 ($binary)');
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31288).
+            $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[5], 'hash_pbkdf2', 'binary', 6);
         }
         if (isset($args[6])) {
             // Z_PARAM_ARRAY $options — type-checked; unused for sha256/sha1/md5 (#23595).

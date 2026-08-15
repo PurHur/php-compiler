@@ -7,8 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
@@ -43,7 +46,8 @@ final class hash_ extends Internal
         $data = self::vmDataArg($frame);
         $raw = false;
         if (isset($frame->calledArgs[2])) {
-            $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[2], 'hash', 3, 'binary');
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31288).
+            $raw = VmMath::parseBoolBuiltinArgForFrame($frame, 2, 'hash', 3, 'binary');
         }
         if (isset($frame->calledArgs[3])) {
             VmArray::requireArrayParam($frame->calledArgs[3], 'hash', 4, 'options');
@@ -71,7 +75,22 @@ final class hash_ extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[2])) {
-            $raw = JitBoolArg::lower($context, $args[2], 'hash(): Argument #3 ($binary)');
+            // Compile-time null under strict: catchable TypeError then stop IR (#31288 / peer #31245).
+            if ($context->callerStrictTypes && (
+                JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)
+            )) {
+                JitNativeString::ensureInsertBlock($context);
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'hash(): Argument #3 ($binary) must be of type bool, null given'
+                );
+                JitNativeString::ensureInsertBlock($context);
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31288).
+            $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[2], 'hash', 'binary', 3);
         }
 
         return JitHash::hash(

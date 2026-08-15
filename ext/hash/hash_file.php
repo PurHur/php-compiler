@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\JitHashFile;
 use PHPCompiler\ext\standard\JitStreamPath;
 use PHPCompiler\ext\standard\VmArray;
 use PHPCompiler\ext\standard\VmHashFile;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamOpenFailure;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
@@ -20,7 +21,6 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -49,11 +49,8 @@ final class hash_file extends Internal
         $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 1, 'hash_file', 'filename');
         $raw = false;
         if ($argc >= 3) {
-            $rawArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
-                throw new \LogicException('hash_file() raw_output must be boolean in this compiler build');
-            }
-            $raw = $rawArg->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31288).
+            $raw = VmMath::parseBoolBuiltinArgForFrame($frame, 2, 'hash_file', 3, 'binary');
         }
         if (4 === $argc) {
             // Z_PARAM_ARRAY $options — stub parity; unused for sha256/sha1/md5 (#28315).
@@ -86,7 +83,8 @@ final class hash_file extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[2])) {
-            $raw = JitBoolArg::lower($context, $args[2], 'hash_file() raw_output');
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31288).
+            $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[2], 'hash_file', 'binary', 3);
         }
         if (isset($args[3])) {
             // Z_PARAM_ARRAY $options — type-checked; unused for sha256/sha1/md5 (#28315).

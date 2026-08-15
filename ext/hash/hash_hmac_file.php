@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\JitHashFile;
 use PHPCompiler\ext\standard\JitStreamPath;
 use PHPCompiler\ext\standard\VmHash;
 use PHPCompiler\ext\standard\VmHashFile;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -18,7 +19,6 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -49,11 +49,8 @@ final class hash_hmac_file extends Internal
         $key = VmString::trimFamilyStringArgForFrame($frame, 2, 'hash_hmac_file', 2, 'key');
         $raw = false;
         if (4 === $argc) {
-            $rawArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
-                throw new \LogicException('hash_hmac_file() raw_output must be boolean in this compiler build');
-            }
-            $raw = $rawArg->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31288).
+            $raw = VmMath::parseBoolBuiltinArgForFrame($frame, 3, 'hash_hmac_file', 4, 'binary');
         }
         $result = VmHashFile::hashHmacFile($algo, $path, $key, $raw);
         if (false === $result) {
@@ -81,7 +78,8 @@ final class hash_hmac_file extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[3])) {
-            $raw = JitBoolArg::lower($context, $args[3], 'hash_hmac_file() raw_output');
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31288).
+            $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[3], 'hash_hmac_file', 'binary', 4);
         }
         $algo = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_hmac_file', 0, 'algo')

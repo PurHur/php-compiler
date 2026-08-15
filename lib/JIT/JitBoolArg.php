@@ -38,13 +38,28 @@ final class JitBoolArg
         string $paramName,
         int $argNumber
     ): Value {
-        if ($context->callerStrictTypes) {
-            InternalStrictArg::requireBool($context, $arg, $function, $paramName, $argNumber);
-        }
+        // Compile-time null: strict TypeError then reopen insert (AOT try/catch verify; #31288 / #31245).
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    sprintf(
+                        '%s(): Argument #%d ($%s) must be of type bool, null given',
+                        $function,
+                        $argNumber,
+                        $paramName
+                    )
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'zparam_bool_null_te_cont');
+
+                return $context->constantFromBool(false);
+            }
             self::emitNullBoolParamDeprecation($context, $function, $argNumber, $paramName);
 
             return $context->constantFromBool(false);
+        }
+        if ($context->callerStrictTypes) {
+            InternalStrictArg::requireBool($context, $arg, $function, $paramName, $argNumber);
         }
 
         return self::lowerCoerce(
