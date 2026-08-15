@@ -16,9 +16,7 @@ final class JitObGetContents
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('ob_get_contents() takes no arguments');
-        }
+        // Arity gated in ob_get_contents::call via requireExactJitArgCount (#30683).
         ObOutputRuntime::ensureObStackLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

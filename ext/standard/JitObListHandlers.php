@@ -16,9 +16,7 @@ final class JitObListHandlers
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('ob_list_handlers() takes no arguments');
-        }
+        // Arity gated in ob_list_handlers::call via requireExactJitArgCount (#30683).
         ObStatusRuntime::ensureLinked($context);
 
         $slot = JitValueBox::alloc($context);
