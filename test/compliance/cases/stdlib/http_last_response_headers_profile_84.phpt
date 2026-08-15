@@ -1,5 +1,5 @@
 --TEST--
-stdlib PHP 8.4 profile — http_get_last_response_headers() registered (#16494, ext/standard/http.c)
+stdlib PHP 8.4 profile — http_* registered; get_last_response_headers phantom (#16494, #28412)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -15,5 +15,5 @@ var_export(null === http_get_last_response_headers());
 --EXPECT--
 true
 true
-true
+false
 true

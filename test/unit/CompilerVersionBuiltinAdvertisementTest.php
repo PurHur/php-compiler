@@ -919,6 +919,37 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testGetLastResponseHeadersAliasNeverAdvertised(): void
+    {
+        // php-src: http_get_last_response_headers / http_clear only (#28412).
+        $this->assertFalse(CompilerVersion::supportsGetLastResponseHeadersAlias());
+        $this->assertFalse(CompilerVersion::advertisesGetLastResponseHeadersAlias());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach ([false, '8.4', '8.5'] as $profile) {
+            if (false === $profile) {
+                putenv('PHP_COMPILER_PROFILE');
+                $label = 'default';
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$profile);
+                $label = $profile;
+            }
+            $this->assertFalse(CompilerVersion::supportsGetLastResponseHeadersAlias(), $label);
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['get_last_response_headers']), $label);
+            $expectHttp = CompilerVersion::supportsHttpLastResponseHeaders();
+            $this->assertSame(
+                $expectHttp,
+                isset($runtime->vmContext->functions['http_get_last_response_headers']),
+                $label
+            );
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
+    }
+
     public function testDisktotalspaceNotAdvertisedOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsDisktotalspace());

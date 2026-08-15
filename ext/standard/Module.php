@@ -449,7 +449,7 @@ class Module extends ModuleAbstract
             ] : []),
             ...(CompilerVersion::supportsHttpLastResponseHeaders() ? [
                 new http_get_last_response_headers(),
-                new get_last_response_headers(),
+                ...(CompilerVersion::supportsGetLastResponseHeadersAlias() ? [new get_last_response_headers()] : []),
                 new http_clear_last_response_headers(),
             ] : []),
             new get_headers(),

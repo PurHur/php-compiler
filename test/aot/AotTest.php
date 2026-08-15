@@ -410,7 +410,8 @@ class AotTest extends BaseTest
                 || str_contains($name, 'http_clear_last_response_headers');
             if (!CompilerVersion::supportsHttpLastResponseHeaders()
                 && $usesHttpLastResponseHeaders
-                && !str_contains($name, 'http_last_response_headers_phantom')) {
+                && !str_contains($name, 'http_last_response_headers_phantom')
+                && !str_contains($name, 'get_last_response_headers_phantom')) {
                 continue;
             }
             if (CompilerVersion::supportsHttpLastResponseHeaders()

@@ -1381,6 +1381,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/vfscanf.php',
         ],
         [
+            'names' => ['get_last_response_headers'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGetLastResponseHeadersAlias'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/get_last_response_headers.php',
+        ],
+        [
             'names' => ['crc32c'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsCrc32c'],
             'since' => '8.3.0',

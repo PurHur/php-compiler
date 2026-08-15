@@ -95,6 +95,8 @@
             <file>./test/compliance/GethostnameJITTest.php</file>
             <file>./test/compliance/HttpLastResponseHeadersVMTest.php</file>
             <file>./test/compliance/HttpLastResponseHeadersJITTest.php</file>
+            <file>./test/compliance/GetLastResponseHeadersPhantom28412VMTest.php</file>
+            <file>./test/compliance/GetLastResponseHeadersPhantom28412JITTest.php</file>
             <file>./test/compliance/JitMcjitExecuteSmokeTest.php</file>
             <file>./test/compliance/ImageTtfTextVMTest.php</file>
             <file>./test/compliance/ForeachByrefAppendResidualVMTest.php</file>

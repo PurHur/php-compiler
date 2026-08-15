@@ -2627,14 +2627,32 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
-     * (ext/standard/http.c, issue #12855, #12948).
+     * PHP 8.4+ http_get_last_response_headers()/http_clear_last_response_headers()
+     * (ext/standard/http.c / basic_functions.stub.php, issue #12855, #12948).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#14122, #15706).
+     * Alias get_last_response_headers() is absent from php-src — see {@see supportsGetLastResponseHeadersAlias()}.
      */
     public static function supportsHttpLastResponseHeaders(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * get_last_response_headers() — never a php-src symbol (basic_functions.stub.php has http_* only).
+     *
+     * Historical alias from #7236/#12855 retired by #28412. Keep http_get_last_response_headers /
+     * http_clear_last_response_headers behind {@see supportsHttpLastResponseHeaders()}.
+     */
+    public static function supportsGetLastResponseHeadersAlias(): bool
+    {
+        return false;
+    }
+
+    /** get_last_response_headers() visible to function_exists() — never (php-src absent, #28412). */
+    public static function advertisesGetLastResponseHeadersAlias(): bool
+    {
+        return false;
     }
 
     /**
@@ -2649,8 +2667,9 @@ final class CompilerVersion
     }
 
     /**
-     * http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
+     * http_get_last_response_headers()/http_clear_last_response_headers()
      * visible to function_exists() — stable runtime or forward 8.4+ profile (#16346, #16494).
+     * Does not advertise phantom get_last_response_headers() (#28412).
      */
     public static function advertisesHttpLastResponseHeaders(): bool
     {
