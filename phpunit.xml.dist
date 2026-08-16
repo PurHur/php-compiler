@@ -221,6 +221,7 @@
             <file>./test/compliance/HashHmacAlgosReflectionReturnVMTest.php</file>
             <file>./test/compliance/HashFileReflectionReturnVMTest.php</file>
             <file>./test/compliance/Md5Sha1FileReflectionReturnVMTest.php</file>
+            <file>./test/compliance/GetrusageReflectionReturnVMTest.php</file>
             <file>./test/compliance/IsStarReflectionMixedVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictJITTest.php</file>

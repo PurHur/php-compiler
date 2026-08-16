@@ -770,6 +770,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('sha1_file'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28841). */
+    public function testGetrusageReflectionReturnUnion(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getrusage'));
+    }
+
     /** php-src ext/hash/hash.stub.php — HashContext on hash_copy (#27745). */
     public function testHashCopyReflectionStubTypes(): void
     {
