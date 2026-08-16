@@ -1567,8 +1567,8 @@ final class VmSoapClient
             if ('' === $name) {
                 continue;
             }
-            // php-src soap.c function_to_string — display strings for __getFunctions (#31473).
-            $state->functions[] = self::wsdlFunctionToString($op, $name, $messages);
+            // php-src soap.c function_to_string — display strings for __getFunctions (#31473 / #31570).
+            $state->functions[] = self::wsdlFunctionToString($op, $name, $messages, $schemaElements);
             $state->functionIndex[\strtolower($name)] = $name;
         }
         foreach ($xpath->query('//soap:address') ?: [] as $addr) {
@@ -1836,19 +1836,21 @@ final class VmSoapClient
     }
 
     /**
-     * php-src soap.c function_to_string — display string for SoapClient::__getFunctions (#31473).
+     * php-src soap.c function_to_string — display string for SoapClient::__getFunctions (#31473, #31570).
      *
      * @param array<string, \DOMElement> $messages
+     * @param array<string, \DOMElement> $schemaElements global xsd:element[@name]
      */
     private static function wsdlFunctionToString(
         \DOMElement $op,
         string $opName,
-        array $messages
+        array $messages,
+        array $schemaElements = []
     ): string {
         $inputMsg = self::wsdlOperationMessage($op, 'input', $messages);
         $outputMsg = self::wsdlOperationMessage($op, 'output', $messages);
-        $requestParams = null !== $inputMsg ? self::wsdlMessageEncodeParams($inputMsg) : [];
-        $responseParams = null !== $outputMsg ? self::wsdlMessageEncodeParams($outputMsg) : [];
+        $requestParams = null !== $inputMsg ? self::wsdlMessageEncodeParams($inputMsg, $schemaElements) : [];
+        $responseParams = null !== $outputMsg ? self::wsdlMessageEncodeParams($outputMsg, $schemaElements) : [];
 
         $buf = '';
         $respCount = \count($responseParams);
@@ -1906,9 +1908,14 @@ final class VmSoapClient
     /**
      * SDL request/response params: type_str + paramName (php-src encode->details.type_str).
      *
+     * Document/literal `element=` parts resolve through the global element to its `@type`
+     * (or keep the element local name when the element has an inline complexType) (#31570).
+     *
+     * @param array<string, \DOMElement> $schemaElements
+     *
      * @return list<array{type: string, name: string}>
      */
-    private static function wsdlMessageEncodeParams(\DOMElement $msg): array
+    private static function wsdlMessageEncodeParams(\DOMElement $msg, array $schemaElements = []): array
     {
         $params = [];
         foreach ($msg->childNodes as $part) {
@@ -1922,7 +1929,16 @@ final class VmSoapClient
             $elRef = $part->getAttribute('element');
             $typeRef = $part->getAttribute('type');
             if ('' !== $elRef) {
-                $typeStr = self::xsdLocalName($elRef);
+                $elLocal = self::xsdLocalName($elRef);
+                $typeStr = $elLocal;
+                $elDef = $schemaElements[$elLocal] ?? null;
+                if ($elDef instanceof \DOMElement) {
+                    $elType = $elDef->getAttribute('type');
+                    if ('' !== $elType) {
+                        // php-src: encode type_str is the named XSD type, not the element name (#31570).
+                        $typeStr = self::xsdLocalName($elType);
+                    }
+                }
             } elseif ('' !== $typeRef) {
                 $typeStr = self::xsdLocalName($typeRef);
             } else {
