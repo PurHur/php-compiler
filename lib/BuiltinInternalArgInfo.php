@@ -1566,6 +1566,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/intl/calendar/calendar.stub.php — ?string $locale = null; $timezone untyped (#28482)
             'intlcalendar::createinstance' => 1 === $index ? '?string' : null,
+            // ext/intl/collator/collator.stub.php — getSortKey(string $string); InternalArgInfo coll/str (#28785)
+            'collator::getsortkey' => 0 === $index ? 'string' : null,
             // ext/spl/spl_directory.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
             'splfileobject::fputcsv' => 4 === $index ? 'string' : null,
             // ext/spl/spl_heap.stub.php — mixed $value1/$value2 / $priority1/$priority2 (#25555)
