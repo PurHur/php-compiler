@@ -31,21 +31,21 @@ final class error_log extends Internal
     {
         // php-src basic_functions.c — split under/over arity (#31193; peer #31192 / #30677).
         $this->requireArgCountRange($frame, 'error_log', 1, 4);
-        $argc = \count($frame->calledArgs);
         if (null === $frame->returnVar) {
             return;
         }
 
         $message = VmString::trimFamilyStringArgForFrame($frame, 0, 'error_log', 0, 'message');
         $messageType = 0;
-        if ($argc >= 2) {
+        if (\array_key_exists(1, $frame->calledArgs) && null !== $frame->calledArgs[1]) {
             $messageType = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'error_log', 1, 'message_type');
         }
         $destination = null;
-        if ($argc >= 3) {
+        // Named args may skip optional $destination while filling $additional_headers (#23341).
+        if (\array_key_exists(2, $frame->calledArgs) && null !== $frame->calledArgs[2]) {
             $destination = self::coerceOptionalPathArg($frame->calledArgs[2], 'error_log', 2, 'destination');
         }
-        if ($argc >= 4) {
+        if (\array_key_exists(3, $frame->calledArgs) && null !== $frame->calledArgs[3]) {
             $headersArg = $frame->calledArgs[3]->resolveIndirect();
             if (EnumCaseSupport::isEnumCaseVariable($headersArg)) {
                 throw new \TypeError(\sprintf(

@@ -1354,6 +1354,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('fmod'));
     }
 
+    /** @covers issue #23341 — error_log Zend stub names (InternalArgInfo still extra_headers) */
+    public function testErrorLogZendStubNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('error_log');
+        self::assertSame(
+            ['message', 'message_type=', 'destination=', 'additional_headers='],
+            $names
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'message', 'error_log'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'message_type', 'error_log'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'destination', 'error_log'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'additional_headers', 'error_log'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'extra_headers', 'error_log'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('error_log'));
+    }
+
     /** @covers issue #11576 */
     public function testStreamSocketClientNamedTimeoutParamResolves(): void
     {

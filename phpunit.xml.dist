@@ -126,6 +126,8 @@
             <file>./test/compliance/ArrayFillReverseNamed23305JITTest.php</file>
             <file>./test/compliance/PowSqrtFmodNamed23306VMTest.php</file>
             <file>./test/compliance/PowSqrtFmodNamed23306JITTest.php</file>
+            <file>./test/compliance/ErrorLogNamed23341VMTest.php</file>
+            <file>./test/compliance/ErrorLogNamed23341JITTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508VMTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508JITTest.php</file>
             <file>./test/compliance/PasswordNullOptions31421VMTest.php</file>
