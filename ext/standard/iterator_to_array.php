@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitIterableArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,10 +27,11 @@ use PHPLLVM\Value;
  * VM: {@see VM::iteratorToArray()}; JIT: {@see JitIteratorToArray}.
  * Default preserve_keys=true matches Zend/php-src (ext/spl/iterator.c).
  *
- * Null always TypeError (typed Traversable|array; not string soft-null) — #21893.
+ * Null iterator always TypeError (typed Traversable|array; not string soft-null) — #21893.
+ * Null $preserve_keys: Z_PARAM_BOOL — strict TypeError; else DEP+coerce (#31340).
  *
  * php-src: ext/spl/iterator.c — PHP_FUNCTION(iterator_to_array)
- * php-src: ext/spl/spl.stub.php — Traversable|array $iterator
+ * php-src: ext/spl/spl.stub.php — Traversable|array $iterator, bool $preserve_keys = true
  */
 final class iterator_to_array extends Internal
 {
@@ -49,7 +51,14 @@ final class iterator_to_array extends Internal
         $iterator = $frame->calledArgs[0]->resolveIndirect();
         $preserveKeys = true;
         if (2 === $argc) {
-            $preserveKeys = $frame->calledArgs[1]->resolveIndirect()->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31340).
+            $preserveKeys = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                1,
+                'iterator_to_array',
+                2,
+                'preserve_keys'
+            );
         }
         $out = $frame->vmContext->runtime->vm->iteratorToArray($iterator, $preserveKeys, $frame);
         if (null !== $frame->returnVar) {
@@ -83,12 +92,32 @@ final class iterator_to_array extends Internal
             return $context->getTypeFromString('__value__*')->constNull();
         }
         if (2 === $argc) {
+            // Compile-time null under strict: catchable TypeError then stop IR (#31340 / peer #31358).
+            if ($context->callerStrictTypes && (
+                JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
+            )) {
+                JitNativeString::ensureInsertBlock($context);
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'iterator_to_array(): Argument #2 ($preserve_keys) must be of type bool, null given'
+                );
+                JitNativeString::ensureInsertBlock($context);
+
+                return $context->getTypeFromString('__value__*')->constNull();
+            }
             $preserveConst = self::compileTimePreserveKeys($context, $args[1]);
             if (null !== $preserveConst) {
                 // Avoid diamond CFG when preserve_keys is a literal (#26802).
                 return JitIteratorToArray::invoke($context, $args[0], $preserveConst);
             }
-            $preserveKeys = JitBoolArg::lower($context, $args[1], 'iterator_to_array() preserve_keys');
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31340).
+            $preserveKeys = JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $args[1],
+                'iterator_to_array',
+                'preserve_keys',
+                2
+            );
 
             return JitIteratorToArray::invokeWithPreserveKeysFlag($context, $args[0], $preserveKeys);
         }
