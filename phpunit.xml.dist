@@ -686,6 +686,8 @@
             <file>./test/compliance/CachingIteratorExcessArgc30948JITTest.php</file>
             <file>./test/compliance/SplHeapExcessArgc30955VMTest.php</file>
             <file>./test/compliance/SplHeapExcessArgc30955JITTest.php</file>
+            <file>./test/compliance/CallbackFilterIteratorReflectionNamed28721VMTest.php</file>
+            <file>./test/compliance/CallbackFilterIteratorReflectionNamed28721JITTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785VMTest.php</file>
             <file>./test/compliance/StreamContextGetOptionsExcessArgc30785JITTest.php</file>
             <file>./test/compliance/HighlightMetaExcessArgc30723VMTest.php</file>
