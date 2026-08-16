@@ -629,6 +629,26 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('', $dest->toString());
     }
 
+    /** php-src ext/sodium/libsodium.stub.php — message/nonce/counter/key → string (#27917). */
+    public function testSodiumCryptoStreamXchacha20XorIcReflectionStubTypes(): void
+    {
+        $fn = 'sodium_crypto_stream_xchacha20_xor_ic';
+        $this->assertSame(['message', 'nonce', 'counter', 'key'], BuiltinParamNames::forFunction($fn));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 2));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 3));
+
+        foreach ([0 => 'message', 1 => 'nonce', 2 => 'counter', 3 => 'key'] as $i => $name) {
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($fn, $i);
+            $this->assertNotNull($info);
+            $this->assertSame($name, $info['name']);
+            $this->assertSame(2 === $i ? 'int' : 'string', $info['type']);
+            $this->assertFalse($info['isOptional']);
+        }
+    }
+
     /** php-src ext/sodium/libsodium.stub.php — (): bool (#27775). */
     public function testSodiumCryptoAeadAes256gcmIsAvailableReflectionReturnBool(): void
     {
