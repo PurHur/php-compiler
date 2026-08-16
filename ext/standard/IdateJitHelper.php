@@ -49,9 +49,19 @@ final class IdateJitHelper
         $second = $rem - ($minute * 60);
 
         $ymd = self::civilYmdPacked($days);
-        $year = intdiv($ymd, 10000);
-        $month = intdiv($ymd % 10000, 100);
+        // Euclidean unpack — year < 0 must not use toward-zero intdiv (#31620).
         $day = $ymd % 100;
+        $tmp = intdiv($ymd, 100);
+        if ($day < 0) {
+            $day += 100;
+            --$tmp;
+        }
+        $month = $tmp % 100;
+        $year = intdiv($tmp, 100);
+        if ($month < 0) {
+            $month += 100;
+            --$year;
+        }
         $wday = self::weekday($year, $month, $day);
 
         if ('d' === $ch || 'j' === $ch) {

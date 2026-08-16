@@ -46,10 +46,20 @@ final class DateTimeFormatJitHelper
         $second = $rem - ($minute * 60);
 
         // Packed yyyymmdd — NestedJIT rejects array/by-ref civil returns (#26772).
+        // Unpack with Euclidean rem so year < 0 (e.g. -0001-12-26) is not 0000--87--74 (#31620).
         $ymd = self::civilYmdPacked($days);
-        $year = intdiv($ymd, 10000);
-        $month = intdiv($ymd % 10000, 100);
         $day = $ymd % 100;
+        $tmp = intdiv($ymd, 100);
+        if ($day < 0) {
+            $day += 100;
+            --$tmp;
+        }
+        $month = $tmp % 100;
+        $year = intdiv($tmp, 100);
+        if ($month < 0) {
+            $month += 100;
+            --$year;
+        }
 
         if ('Y-m-d' === $format) {
             return self::digits4($year).'-'.self::digits2($month).'-'.self::digits2($day);

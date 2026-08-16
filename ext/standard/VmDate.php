@@ -1234,14 +1234,17 @@ final class VmDate
         return [$week, $isoYear];
     }
 
+    /** Zero-pad absolute value; keep leading '-' for BC years (php-src date 'Y', #31620). */
     private static function padInt(int $value, int $width): string
     {
+        $negative = $value < 0;
+        $value = \abs($value);
         $s = (string) $value;
         if (\strlen($s) >= $width) {
-            return $s;
+            return ($negative ? '-' : '').$s;
         }
 
-        return \str_repeat('0', $width - \strlen($s)).$s;
+        return ($negative ? '-' : '').\str_repeat('0', $width - \strlen($s)).$s;
     }
 
     /**
