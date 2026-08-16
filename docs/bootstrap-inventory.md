@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7552 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24097 |
+| Source constructs flagged (warnings) | 24099 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2477,7 +2477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
 | `ext/spl/RegexIteratorBuiltin.php` | 0 | 24 |
-| `ext/spl/SplArraySerializeSupport.php` | 0 | 8 |
+| `ext/spl/SplArraySerializeSupport.php` | 0 | 9 |
 | `ext/spl/SplArraySortMethod.php` | 0 | 3 |
 | `ext/spl/SplArrayStorage.php` | 0 | 25 |
 | `ext/spl/SplArrayUserSortMethod.php` | 0 | 1 |
@@ -3852,7 +3852,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmTmpfilePure.php` | 0 | 1 |
 | `ext/standard/VmUnameNative.php` | 0 | 1 |
 | `ext/standard/VmUnamePure.php` | 0 | 1 |
-| `ext/standard/VmUnserializeFormat.php` | 0 | 38 |
+| `ext/standard/VmUnserializeFormat.php` | 0 | 39 |
 | `ext/standard/VmUrlRewriterFlush.php` | 0 | 1 |
 | `ext/standard/VmUrlRewriterHrefApply.php` | 0 | 1 |
 | `ext/standard/VmUrlRewriterOb.php` | 0 | 1 |
@@ -27510,31 +27510,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 351)
 - new Variable (line 372)
 - new ArgumentCountError (line 491)
-- new ArgumentCountError (line 742)
-- new ArgumentCountError (line 797)
-- new ArgumentCountError (line 852)
-- new ClassEntry (line 885)
-- new RecursiveRegexIteratorConstruct (line 896)
-- new RecursiveRegexIteratorHasChildren (line 899)
-- new RecursiveRegexIteratorGetChildren (line 902)
-- new RecursiveRegexIteratorAccept (line 906)
-- new ObjectEntry (line 933)
-- new Variable (line 943)
-- new ArgumentCountError (line 966)
-- new UnexpectedValueException (line 1065)
+- new ArgumentCountError (line 744)
+- new ArgumentCountError (line 801)
+- new ArgumentCountError (line 858)
+- new ClassEntry (line 891)
+- new RecursiveRegexIteratorConstruct (line 902)
+- new RecursiveRegexIteratorHasChildren (line 905)
+- new RecursiveRegexIteratorGetChildren (line 908)
+- new RecursiveRegexIteratorAccept (line 912)
+- new ObjectEntry (line 939)
+- new Variable (line 949)
+- new ArgumentCountError (line 972)
+- new UnexpectedValueException (line 1071)
 - 48 class method(s)
 
 ### `ext/spl/SplArraySerializeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 74)
-- new UnexpectedValueException (line 84)
-- new ObjectEntry (line 147)
-- new SplArraySerialize (line 167)
-- new SplArrayUnserialize (line 169)
-- new ParameterMetadata (line 175)
-- new ArgumentCountError (line 224)
-- 8 class method(s)
+- new UnexpectedValueException (line 75)
+- new UnexpectedValueException (line 85)
+- new UnexpectedValueException (line 260)
+- new ObjectEntry (line 285)
+- new SplArraySerialize (line 305)
+- new SplArrayUnserialize (line 307)
+- new ParameterMetadata (line 313)
+- new ArgumentCountError (line 362)
+- 11 class method(s)
 
 ### `ext/spl/SplArraySortMethod.php`
 
@@ -27734,44 +27735,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ParameterMetadata (line 130)
 - new ParameterMetadata (line 131)
 - new Variable (line 164)
-- new Variable (line 197)
-- new Variable (line 211)
-- new Variable (line 252)
-- new Variable (line 257)
-- new HashTable (line 304)
-- new Variable (line 306)
-- new Variable (line 310)
-- new Variable (line 316)
-- new Variable (line 320)
-- new HashTable (line 321)
-- new ClassEntry (line 455)
-- new SplMinHeapConstruct (line 467)
-- new SplMinHeapCompare (line 470)
-- new ClassEntry (line 495)
-- new SplMaxHeapConstruct (line 506)
-- new SplMaxHeapCompare (line 509)
-- new ClassEntry (line 544)
-- new SplPriorityQueueConstruct (line 550)
-- new SplPriorityQueueDebugInfo (line 581)
+- new Variable (line 196)
+- new Variable (line 210)
+- new Variable (line 250)
+- new Variable (line 255)
+- new HashTable (line 302)
+- new Variable (line 304)
+- new Variable (line 308)
+- new Variable (line 314)
+- new Variable (line 318)
+- new HashTable (line 319)
+- new ClassEntry (line 453)
+- new SplMinHeapConstruct (line 465)
+- new SplMinHeapCompare (line 468)
+- new ClassEntry (line 493)
+- new SplMaxHeapConstruct (line 504)
+- new SplMaxHeapCompare (line 507)
+- new ClassEntry (line 542)
+- new SplPriorityQueueConstruct (line 548)
+- new SplPriorityQueueDebugInfo (line 579)
+- new Variable (line 628)
 - new Variable (line 630)
-- new Variable (line 632)
-- new Variable (line 702)
-- new HashTable (line 756)
-- new Variable (line 758)
-- new Variable (line 762)
-- new HashTable (line 768)
-- new Variable (line 769)
-- new Variable (line 772)
-- new Variable (line 775)
-- new Variable (line 779)
-- new HashTable (line 780)
-- new Variable (line 795)
-- new HashTable (line 801)
+- new Variable (line 699)
+- new HashTable (line 754)
+- new Variable (line 756)
+- new Variable (line 760)
+- new HashTable (line 766)
+- new Variable (line 767)
+- new Variable (line 770)
+- new Variable (line 773)
+- new Variable (line 777)
+- new HashTable (line 778)
+- new Variable (line 793)
+- new HashTable (line 799)
+- new Variable (line 800)
 - new Variable (line 802)
-- new Variable (line 804)
-- new Variable (line 808)
-- new Variable (line 813)
-- new Error (line 969)
+- new Variable (line 806)
+- new Variable (line 811)
+- new Error (line 967)
 - 93 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
@@ -27784,10 +27785,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplLegacySerializableMethods.php`
 
 **Warnings** (review for bootstrap subset):
-- new SplLegacySerializableSerialize (line 28)
-- new SplLegacySerializableUnserialize (line 30)
-- new ParameterMetadata (line 35)
-- new VmSerializeRefState (line 79)
+- new SplLegacySerializableSerialize (line 29)
+- new SplLegacySerializableUnserialize (line 31)
+- new ParameterMetadata (line 36)
+- new VmSerializeRefState (line 81)
 - 4 class method(s)
 
 ### `ext/spl/SplObjectStorageBuiltin.php`
@@ -35014,11 +35015,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 169)
-- new RecursiveIteratorIterator (line 4077)
-- new RecursiveDirectoryIterator (line 4078)
-- new RecursiveIteratorIterator (line 4184)
-- new RecursiveDirectoryIterator (line 4185)
-- 140 class method(s)
+- new RecursiveIteratorIterator (line 4106)
+- new RecursiveDirectoryIterator (line 4107)
+- new RecursiveIteratorIterator (line 4213)
+- new RecursiveDirectoryIterator (line 4214)
+- 141 class method(s)
 - 14 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -37074,44 +37075,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmUnserializeFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 132)
-- new Variable (line 134)
-- new self (line 137)
-- new VmUnserializeCell (line 138)
-- new VmUnserializeRootObject (line 139)
-- new self (line 180)
-- new VmUnserializeCell (line 331)
-- new VmUnserializeObjectPayload (line 332)
-- new VmUnserializeCell (line 352)
-- new VmUnserializeEnumPayload (line 353)
-- new VmUnserializeCell (line 385)
-- new VmUnserializeCell (line 401)
-- new VmUnserializeCell (line 417)
-- new VmUnserializeCell (line 450)
-- new VmUnserializeCell (line 470)
-- new VmUnserializeCell (line 497)
-- new Variable (line 566)
-- new Variable (line 574)
-- new HashTable (line 577)
-- new Variable (line 598)
-- new Variable (line 624)
-- new Variable (line 639)
-- new Variable (line 664)
-- new HashTable (line 731)
-- new Variable (line 748)
-- new ObjectEntry (line 753)
-- new Variable (line 755)
-- new Variable (line 778)
-- new Variable (line 789)
-- new HashTable (line 792)
-- new Variable (line 819)
-- new ObjectEntry (line 849)
-- new Variable (line 853)
-- new Error (line 909)
-- new HashTable (line 915)
-- new Variable (line 932)
-- new Variable (line 998)
-- 42 class method(s)
+- new self (line 133)
+- new ObjectEntry (line 171)
+- new Variable (line 173)
+- new self (line 176)
+- new VmUnserializeCell (line 177)
+- new VmUnserializeRootObject (line 178)
+- new self (line 219)
+- new VmUnserializeCell (line 370)
+- new VmUnserializeObjectPayload (line 371)
+- new VmUnserializeCell (line 391)
+- new VmUnserializeEnumPayload (line 392)
+- new VmUnserializeCell (line 424)
+- new VmUnserializeCell (line 440)
+- new VmUnserializeCell (line 456)
+- new VmUnserializeCell (line 489)
+- new VmUnserializeCell (line 509)
+- new VmUnserializeCell (line 536)
+- new Variable (line 605)
+- new Variable (line 613)
+- new HashTable (line 616)
+- new Variable (line 637)
+- new Variable (line 663)
+- new Variable (line 678)
+- new Variable (line 703)
+- new HashTable (line 770)
+- new Variable (line 787)
+- new ObjectEntry (line 792)
+- new Variable (line 794)
+- new Variable (line 817)
+- new Variable (line 828)
+- new HashTable (line 831)
+- new Variable (line 858)
+- new ObjectEntry (line 888)
+- new Variable (line 892)
+- new Error (line 948)
+- new HashTable (line 954)
+- new Variable (line 971)
+- new Variable (line 1037)
+- 43 class method(s)
 
 ### `ext/standard/VmUrlRewriterFlush.php`
 
@@ -44715,17 +44717,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 218)
 - new Error (line 242)
 - new Error (line 255)
-- new Error (line 1363)
-- new Error (line 1367)
-- 69 class method(s)
+- new Error (line 1373)
+- new Error (line 1377)
+- 70 class method(s)
 
 ### `ext/xmlwriter/XmlWriterClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 48)
-- new ArgumentCountError (line 60)
-- new ArgumentCountError (line 73)
-- new ArgumentCountError (line 76)
+- new ArgumentCountError (line 50)
+- new ArgumentCountError (line 62)
+- new ArgumentCountError (line 75)
+- new ArgumentCountError (line 78)
 - 10 class method(s)
 
 ### `ext/xmlwriter/XmlWriterEndAttribute.php`
@@ -44821,7 +44823,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/XmlWriterProceduralFunction.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 96)
+- new ObjectEntry (line 103)
 - 5 class method(s)
 
 ### `ext/xmlwriter/XmlWriterRegistry.php`
@@ -46407,7 +46409,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1953)
+- new InternalArgInfo (line 1985)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46423,8 +46425,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2570)
-- new ArgumentCountError (line 2581)
+- new ArgumentCountError (line 2583)
+- new ArgumentCountError (line 2594)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -60597,8 +60599,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 35)
 - new JITVariable (line 50)
-- new JITVariable (line 379)
-- new JITVariable (line 439)
+- new JITVariable (line 362)
+- new JITVariable (line 422)
 - 20 class method(s)
 
 ### `lib/VM/SplHtPosIteratorJitHelper.php`
@@ -60627,9 +60629,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 41)
 - new JITVariable (line 42)
-- new JITVariable (line 325)
-- new JITVariable (line 337)
-- new JITVariable (line 383)
+- new JITVariable (line 314)
+- new JITVariable (line 326)
+- new JITVariable (line 372)
 - 21 class method(s)
 
 ### `lib/VM/StringOffsetJitHelper.php`
