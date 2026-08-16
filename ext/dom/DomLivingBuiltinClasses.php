@@ -126,6 +126,10 @@ final class DomLivingBuiltinClasses
         if (CompilerVersion::supportsDomNodeIsConnected()) {
             $node->properties[] = new ClassProperty(VmDom::PROP_IS_CONNECTED, null, new Variable(Variable::TYPE_BOOLEAN));
         }
+        // Engine DomRegistry id — C-only; living hierarchy is separate from DOMNode (#31439).
+        $livingRegistryId = new ClassProperty(VmDom::PROP_REGISTRY_ID, null, new Variable(Variable::TYPE_INTEGER));
+        $livingRegistryId->phpInvisible = true;
+        $node->properties[] = $livingRegistryId;
         self::copyMethods($ctx->classes[VmDom::CLASS_NODE] ?? null, $node);
         // DOCUMENT_POSITION_* live on Dom\Node as well as DOMNode (php_dom.stub.php; #26060).
         self::copyClassConstants($ctx->classes[VmDom::CLASS_NODE] ?? null, $node);
@@ -448,6 +452,10 @@ final class DomLivingBuiltinClasses
         $document->parentLc = VmDomLiving::CLASS_NODE;
         $document->interfaces[] = VmDomLiving::CLASS_PARENT_NODE;
         $document->properties[] = new ClassProperty(VmDomLiving::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        // Element-id map — phpInvisible engine storage on living documents (#31439).
+        $livingElementIdMap = new ClassProperty(VmDom::PROP_ELEMENT_ID_MAP, $nullProto, new Variable(Variable::TYPE_ARRAY));
+        $livingElementIdMap->phpInvisible = true;
+        $document->properties[] = $livingElementIdMap;
         // ParentNode::$children — PHP 8.5+ only (Zend 8.4.23 undefined; #21559, re-#21033).
         if (CompilerVersion::supportsDomParentNodeChildren()) {
             $document->properties[] = new ClassProperty(VmDom::PROP_CHILDREN, $nullProto, $objProto);

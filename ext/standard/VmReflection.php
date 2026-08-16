@@ -3876,6 +3876,15 @@ final class VmReflection
         string $property,
         int $filter = 0
     ): bool {
+        $prop = self::findClassProperty($entry, $property, $ctx);
+        if (null !== $prop) {
+            // C-only engine storage is absent from Zend's PHP property table (#22513, #31439).
+            if ($prop->phpInvisible) {
+                return false;
+            }
+
+            return self::matchesReflectionVisibilityFilter($prop->visibility, $filter);
+        }
         $meta = self::propertyVisibilityMeta($entry, $property, $ctx);
         if (null === $meta) {
             return false;
@@ -4032,6 +4041,11 @@ final class VmReflection
             foreach ($instance->propertiesWithNames() as $name => $_) {
                 $lc = strtolower($name);
                 if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                // Declared slots (incl. phpInvisible engine storage) are not dynamics
+                // (#22513, #31439 — WeakMap / DOM __phpc* must not reappear via ReflectionObject).
+                if (null !== self::findClassPropertyExact($entry, $name, $ctx)) {
                     continue;
                 }
                 if (self::propertyExistsOnClass($entry, $name, $ctx)) {

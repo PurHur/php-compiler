@@ -269,6 +269,10 @@ final class VmDom
         if (CompilerVersion::supportsDomParentElement()) {
             $node->properties[] = new ClassProperty(self::PROP_PARENT_ELEMENT, $nullProto, $objProto);
         }
+        // Engine DomRegistry id — C-only storage; not in Zend PHP property table (#31439, #22513).
+        $registryIdProp = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
+        $registryIdProp->phpInvisible = true;
+        $node->properties[] = $registryIdProp;
         $node->methods['clonenode'] = new NodeCloneNode();
         $node->methodVisibility['clonenode'] = $pub;
         $node->methods['appendchild'] = new NodeAppendChild();
@@ -617,8 +621,13 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_CONFIG, $nullProto, $nullProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
-        $document->properties[] = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
-        $document->properties[] = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
+        // Element-id map + registry id — phpInvisible engine slots (#31439, peer WeakMap #22513).
+        $elementIdMapProp = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
+        $elementIdMapProp->phpInvisible = true;
+        $document->properties[] = $elementIdMapProp;
+        $documentRegistryIdProp = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
+        $documentRegistryIdProp->phpInvisible = true;
+        $document->properties[] = $documentRegistryIdProp;
         // ParentNode on Document (php-src ext/dom/parentnode.c; #19431).
         $document->properties[] = new ClassProperty(self::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
         $document->properties[] = new ClassProperty(self::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);

@@ -2522,11 +2522,12 @@ class VM {
         $seenDeclaredLc = [];
         foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
             foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                // Track phpInvisible before skip so raw instance slots are not re-listed (#31439).
+                $seenDeclaredLc[$lc] = true;
                 if ($meta->phpInvisible) {
                     continue;
                 }
-                $lc = strtolower($meta->name);
-                $seenDeclaredLc[$lc] = true;
                 $isPrivate = ($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
                 if ($isPrivate) {
                     $privKey = ($meta->declaringClassLc !== '' ? $meta->declaringClassLc : strtolower($class->name))."\0".$lc;
@@ -14562,7 +14563,12 @@ restart:
             }
         }
         if ([] === $matches) {
-            return null;
+            // Ancestor-declared slots (e.g. phpInvisible DomRegistry id on DOMNode; #31439).
+            return ext\standard\VmReflection::findClassPropertyExact(
+                $object->class,
+                $propertyName,
+                $this->context
+            );
         }
         if (1 === \count($matches)) {
             return $matches[0];
