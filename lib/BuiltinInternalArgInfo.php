@@ -284,6 +284,9 @@ final class BuiltinInternalArgInfo
             'pg_field_table' => 'string|int|false',
             // ext/pgsql/pgsql.stub.php — InternalArgInfo resource + garbled arity; Zend PgSql\Connection|false (#27811)
             'pg_connect', 'pg_pconnect' => 'PgSql\\Connection|false',
+            // ext/pgsql/pgsql.stub.php — InternalArgInfo resource/array; Zend PgSql\Result|false / array|false (#28782)
+            'pg_query', 'pg_exec' => 'PgSql\\Result|false',
+            'pg_fetch_assoc', 'pg_fetch_row' => 'array|false',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
@@ -941,6 +944,21 @@ final class BuiltinInternalArgInfo
                 1 => 'int',
                 default => null,
             },
+            // ext/pgsql/pgsql.stub.php — query/fetch/close Reflection types (#28782)
+            // pg_query/$connection stays untyped (PgSql\Connection|string in @param)
+            'pg_query', 'pg_exec' => 1 === $index ? 'string' : null,
+            'pg_fetch_assoc' => match ($index) {
+                0 => 'PgSql\\Result',
+                1 => '?int',
+                default => null,
+            },
+            'pg_fetch_row' => match ($index) {
+                0 => 'PgSql\\Result',
+                1 => '?int',
+                2 => 'int',
+                default => null,
+            },
+            'pg_close' => 0 === $index ? '?PgSql\\Connection' : null,
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
             // ext/session/session.stub.php — ?string $name = null (InternalArgInfo string) (#31423)

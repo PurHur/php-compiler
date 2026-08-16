@@ -1003,6 +1003,16 @@ final class BuiltinParamNames
             case 'pg_connect':
             case 'pg_pconnect':
                 return ['connection_string', 'flags='];
+            // php-src ext/pgsql/pgsql.stub.php — connection/query; result/row/mode; connection= (#28782)
+            case 'pg_query':
+            case 'pg_exec':
+                return ['connection', 'query='];
+            case 'pg_fetch_assoc':
+                return ['result', 'row='];
+            case 'pg_fetch_row':
+                return ['result', 'row=', 'mode='];
+            case 'pg_close':
+                return ['connection='];
             // php-src ext/standard/array.stub.php — array ...$arrays (0 required); InternalArgInfo still arr1+... (#25382)
             case 'array_merge':
             case 'array_merge_recursive':
