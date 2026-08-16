@@ -278,6 +278,10 @@ final class SimpleXmlRegistry
 
     public static function registerXPathNamespace(ObjectEntry $entry, string $prefix, string $namespaceUri): bool
     {
+        // php-src sxe.c / xmlXPathRegisterNs — empty prefix fails and returns false (#31656).
+        if ('' === $prefix) {
+            return false;
+        }
         $key = self::documentKey($entry);
         self::$xpathNamespaces[$key][$prefix] = $namespaceUri;
 
