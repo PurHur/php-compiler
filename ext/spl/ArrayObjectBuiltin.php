@@ -143,7 +143,7 @@ final class ArrayObjectConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        // php-src zim_ArrayObject___construct — array + optional flags/iterator class (#31071).
+        // php-src zim_ArrayObject___construct — array|object + optional flags/iterator class (#31071, #31539).
         $this->requireAtMostUserArgCount($frame, 'ArrayObject::__construct', 3);
         $object = SplIteratorSupport::receiverIsA(
             $frame,
@@ -151,17 +151,21 @@ final class ArrayObjectConstruct extends VmClassMethod
             'ArrayObject::__construct()'
         );
         $table = new HashTable();
+        $flags = 0;
+        $hasFlagsArg = isset($frame->calledArgs[2]);
+        if ($hasFlagsArg) {
+            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+        }
         if (isset($frame->calledArgs[1])) {
-            $table = SplIteratorSupport::requireArrayArg(
+            // php-src spl_array_set_array — array copy; ArrayObject/object share (#31539 / #23886).
+            // just_array=(ZEND_NUM_ARGS()==1): inherit flags from ArrayObject when flags omitted.
+            [$table, $flags] = SplIteratorSupport::requireArrayOrObjectConstructArg(
                 $frame->calledArgs[1],
                 'ArrayObject::__construct',
-                1
-            )->duplicate();
-        }
-        $flags = 0;
-        if (isset($frame->calledArgs[2])) {
-            $flagsVar = $frame->calledArgs[2]->resolveIndirect();
-            $flags = $flagsVar->toInt();
+                1,
+                $flags,
+                !$hasFlagsArg
+            );
         }
         $iteratorClass = null;
         if (isset($frame->calledArgs[3])) {
