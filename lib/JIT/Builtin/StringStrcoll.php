@@ -6,18 +6,18 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for strcoll via libc trampoline (#13566, #27059).
+ * JIT/AOT link for strcoll via libc trampoline (#13566, #27059, #31498).
  *
  * NestedJIT {@see \PHPCompiler\ext\standard\StrcollJitHelper} mis-reads {@see __string__*}
  * under thin AOT (silent 0 — peer {@see StringStrspn} / #27051 / #27053). php-src calls
  * libc strcoll(3) on C strings; keep that on the i8* ABI and avoid NestedJIT strlen.
  *
  * PHP bridge uses `__compiler_strcoll` so AOT does not export libc `strcoll` (#26861).
+ * Libc `strcoll(3)` is declared module-locally (LibcExtern always-on drop #31498 / peer #31458).
  * VM SSOT remains {@see \PHPCompiler\ext\standard\VmLocaleCollate}.
  */
 final class StringStrcoll
@@ -54,13 +54,31 @@ final class StringStrcoll
         } catch (\Throwable) {
         }
 
-        LibcExtern::register($context);
+        self::ensureLibcStrcoll($context);
         self::implementLibcTrampoline($context, $probe);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * Module-local strcoll(3) after LibcExtern always-on drop (#31498).
+     */
+    private static function ensureLibcStrcoll(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strcoll');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $fn = $context->module->addFunction(
+                'strcoll',
+                $context->context->functionType($i32, false, $i8p, $i8p)
+            );
+            $context->registerFunction('strcoll', $fn);
         }
     }
 

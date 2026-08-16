@@ -993,6 +993,8 @@ class Module extends ModuleAbstract
         }
         StringCaseCompare::ensureStrcasecmpLinked($context);
         StringCaseCompare::ensureStrncasecmpLinked($context);
+        // strcoll(3) not always-on in Module/LibcExtern (#31498 / #31458 peer):
+        // StringStrcoll declares libc strcoll module-locally for __compiler_strcoll.
         StringStrcoll::ensureLinked($context);
         try {
             $context->lookupFunction('substr_compare');
