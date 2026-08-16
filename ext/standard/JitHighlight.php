@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Highlight;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -46,8 +47,17 @@ final class JitHighlight
             // Soft-null on 8.2 profile — coerce to '' and const-fold when $return is known (#20262).
             $codeLit = '';
         }
-        if (null !== $codeLit) {
+        // Const-fold HTML only when $return is known (or omitted). Null/$mixed needs Z_PARAM_BOOL (#31383).
+        if (null !== $codeLit && (1 === $argc || null !== $returnLit)) {
             return self::materializeHtml($context, HighlightEngine::render($codeLit), $returnLit ?? false);
+        }
+        if (null !== $codeLit) {
+            $htmlStr = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load($context->constantStringFromString(HighlightEngine::render($codeLit)))
+            );
+
+            return self::emitResult($context, $htmlStr, $args, $argc, 'highlight_string');
         }
 
         $codeStr = JitStringBuiltinArg::lowerZparamStr(
@@ -279,17 +289,7 @@ final class JitHighlight
 
     private static function boolValForBranch(Context $context, JITVariable $arg, string $functionName): Value
     {
-        if (JITVariable::TYPE_VALUE !== $arg->type) {
-            throw new \LogicException($functionName.'() expects bool for argument 2 in this compiler build');
-        }
-        $boolVal = $context->castToBool(JitValueBox::valuePtrFromVariable($context, $arg));
-        if (JITVariable::KIND_VALUE !== $arg->kind) {
-            return $boolVal;
-        }
-        $i1 = $context->getTypeFromString('int1');
-        $slot = $context->builder->alloca($i1, 1, 'highlight_bool_tmp');
-        $context->builder->store($boolVal, $slot);
-
-        return $context->builder->load($slot);
+        // Z_PARAM_BOOL: strict TypeError on null; else soft-null DEP+coerce (#31383 / peer print_r #31337).
+        return JitBoolArg::lowerCoerceZParamBool($context, $arg, $functionName, 'return', 2);
     }
 }

@@ -296,6 +296,8 @@
             <file>./test/compliance/Md5Sha1NullBinaryStrict31358JITTest.php</file>
             <file>./test/compliance/PrintRVarExportNullReturnStrict31337VMTest.php</file>
             <file>./test/compliance/PrintRVarExportNullReturnStrict31337JITTest.php</file>
+            <file>./test/compliance/HighlightStringNullReturnStrict31383VMTest.php</file>
+            <file>./test/compliance/HighlightStringNullReturnStrict31383JITTest.php</file>
             <file>./test/compliance/FileGetContentsNullUseIncludePathStrict31338VMTest.php</file>
             <file>./test/compliance/FileGetContentsNullUseIncludePathStrict31338JITTest.php</file>
             <file>./test/compliance/TrimFamilyNullCharactersStrict31386VMTest.php</file>

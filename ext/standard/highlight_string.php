@@ -34,7 +34,8 @@ final class highlight_string extends Internal
         );
         $return = false;
         if ($argc >= 2) {
-            $return = VmHighlight::resolveReturnFlag($frame->calledArgs[1], $this->getName());
+            // Z_PARAM_BOOL: strict TypeError on null; else soft-null DEP+coerce (#31383).
+            $return = VmHighlight::resolveReturnFlag($frame, $this->getName());
         }
         $result = VmHighlight::highlightString($code, $return);
         if (null === $frame->returnVar) {

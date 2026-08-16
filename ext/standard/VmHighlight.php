@@ -14,22 +14,13 @@ use PHPCompiler\VM\OutputBuffer;
 final class VmHighlight
 {
     /**
-     * Resolve highlight_string()/highlight_file() $return flag (php-src zend_parse_parameters "b", #9140).
+     * Resolve highlight_string()/highlight_file() $return flag (php-src Z_PARAM_BOOL, #9140 / #31383).
+     *
+     * Caller strict_types → TypeError on null; else soft-null DEP+coerce to false.
      */
-    public static function resolveReturnFlag(\PHPCompiler\VM\Variable $var, string $functionName): bool
+    public static function resolveReturnFlag(\PHPCompiler\Frame $frame, string $functionName): bool
     {
-        $var = $var->resolveIndirect();
-        if (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $var->type) {
-            return $var->toBool();
-        }
-        if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $var->type) {
-            $iv = $var->toInt();
-            if (0 === $iv || 1 === $iv) {
-                return 0 !== $iv;
-            }
-        }
-
-        throw new \LogicException($functionName.'() expects bool for argument 2 in this compiler build');
+        return VmMath::parseBoolBuiltinArgForFrame($frame, 1, $functionName, 2, 'return');
     }
 
     /**
