@@ -1144,8 +1144,9 @@ final class BuiltinParamNames
             case 'stream_set_blocking':
             case 'socket_set_blocking': // PHP_FALIAS
                 return ['stream', 'enable'];
+            // php-src ext/standard/basic_functions.stub.php — $user_agent not $browser_name (#23382)
             case 'get_browser':
-                return ['browser_name', 'return_array'];
+                return ['user_agent=', 'return_array='];
             case 'get_defined_constants':
                 // php-src Zend/zend_builtin_functions.stub.php — arity 1 on every version (#28522).
                 return ['categorize'];
