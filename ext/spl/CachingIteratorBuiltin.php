@@ -122,6 +122,38 @@ final class CachingIteratorBuiltin
         )
             && $entry->constructor instanceof CachingIteratorConstruct;
     }
+
+    /**
+     * php-src spl_cit_check_flags — at most one of CALL_TOSTRING / TOSTRING_USE_* (#31551).
+     *
+     * Zero TOSTRING bits is allowed (e.g. FULL_CACHE alone). Messages cite CachingIterator::
+     * constant names even when thrown from RecursiveCachingIterator::__construct.
+     *
+     * @throws \ValueError
+     */
+    public static function assertExclusiveToStringFlags(int $flags, string $function, int $argNum): void
+    {
+        $cnt = 0;
+        if (0 !== ($flags & self::CALL_TOSTRING)) {
+            ++$cnt;
+        }
+        if (0 !== ($flags & self::TOSTRING_USE_KEY)) {
+            ++$cnt;
+        }
+        if (0 !== ($flags & self::TOSTRING_USE_CURRENT)) {
+            ++$cnt;
+        }
+        if (0 !== ($flags & self::TOSTRING_USE_INNER)) {
+            ++$cnt;
+        }
+        if ($cnt > 1) {
+            throw new \ValueError(
+                $function.'(): Argument #'.$argNum.' ($flags) must contain only one of CachingIterator::CALL_TOSTRING, '
+                .'CachingIterator::TOSTRING_USE_KEY, CachingIterator::TOSTRING_USE_CURRENT, '
+                .'or CachingIterator::TOSTRING_USE_INNER'
+            );
+        }
+    }
 }
 
 /** @internal */
@@ -175,11 +207,13 @@ final class SplCachingIteratorStorage
     }
 
     /**
-     * php-src CachingIterator::setFlags — once CIT_CALL_TOSTRING is set it cannot
-     * be cleared ("Unsetting flag CALL_TO_STRING is not possible"; #24252).
+     * php-src CachingIterator::setFlags — exclusive TOSTRING bits first (#31551), then
+     * once CIT_CALL_TOSTRING is set it cannot be cleared (#24252).
      */
     public static function setFlags(ObjectEntry $object, int $flags): void
     {
+        // php-src zim_CachingIterator_setFlags — spl_cit_check_flags before CALL_TOSTRING guard.
+        CachingIteratorBuiltin::assertExclusiveToStringFlags($flags, 'CachingIterator::setFlags', 1);
         $current = self::$store[$object->id]['flags'];
         if (0 !== ($current & CachingIteratorBuiltin::CALL_TOSTRING)
             && 0 === ($flags & CachingIteratorBuiltin::CALL_TOSTRING)) {
@@ -621,6 +655,8 @@ final class CachingIteratorConstruct extends VmClassMethod
         );
         // php-src: int $flags = self::CALL_TOSTRING; explicit null → 0 (Z_PARAM_LONG_OR_NULL).
         $flags = self::resolveConstructFlags($flagsArg, 'CachingIterator::__construct');
+        // php-src spl_cit_check_flags — exclusive TOSTRING bits (#31551).
+        CachingIteratorBuiltin::assertExclusiveToStringFlags($flags, 'CachingIterator::__construct', 2);
         // php-src zim_cachingiterator_construct — store iterator only; first rewind is on
         // iteration (foreach / explicit rewind). Construct-time rewind breaks Generators (#22876).
         SplCachingIteratorStorage::init($object, $inner, $flags);

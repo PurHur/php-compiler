@@ -164,6 +164,12 @@ final class RecursiveCachingIteratorConstruct extends VmClassMethod
             $frame->calledArgs[2] ?? null,
             'RecursiveCachingIterator::__construct'
         );
+        // php-src spl_cit_check_flags — method name is RecursiveCachingIterator (#31551).
+        CachingIteratorBuiltin::assertExclusiveToStringFlags(
+            $flags,
+            'RecursiveCachingIterator::__construct',
+            2
+        );
         // Match CachingIterator: no construct-time rewind (#22876).
         SplCachingIteratorStorage::init($object, $inner, $flags);
     }
