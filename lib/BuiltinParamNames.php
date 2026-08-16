@@ -2177,6 +2177,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says additional_parameters (#23605)
             case 'mail':
                 return ['to', 'subject', 'message', 'additional_headers=', 'additional_params='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still extra_headers (#23341)
+            case 'error_log':
+                return ['message', 'message_type=', 'destination=', 'additional_headers='];
             // php-src ext/sodium/sodium.stub.php — missing from InternalArgInfo (#23605)
             case 'sodium_memzero':
                 return ['&string'];
