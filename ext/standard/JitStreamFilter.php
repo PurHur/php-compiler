@@ -157,7 +157,23 @@ final class JitStreamFilter
             JitLongArg::lower($context, $args[0], $functionName.'() stream'),
             $context->getTypeFromString('int64')
         );
-        $filterName = JitStringBuiltinArg::lower($context, $args[1], $functionName, 1, 'filtername');
+        // Z_PARAM_STR $filter_name — TypeError under declare(strict_types=1) (#31408).
+        $filterName = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            $functionName,
+            1,
+            'filter_name'
+        );
+        // Catchable TypeError seals the insert block; open a dead BB so later attach
+        // IR does not land after a terminator (#31408 / peer #30250 JitDl).
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+        ) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, $functionName.'_strict_null_dead');
+
+            return self::boolBox($context, $context->getTypeFromString('int1')->constInt(0, false));
+        }
         $i64 = $context->getTypeFromString('int64');
         $readWrite = $i64->constInt(VmStreamFilterChain::ALL, false);
         if ($argc >= 3) {
