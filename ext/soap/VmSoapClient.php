@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\soap;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\BuiltinExceptionSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -217,6 +219,20 @@ final class VmSoapClient
         $entry->methodNames['__getcookies'] = '__getCookies';
         $entry->methodNames['__setlocation'] = '__setLocation';
         $entry->methodNames['__setsoapheaders'] = '__setSoapHeaders';
+
+        // php-src soap.stub.php — LSP/Reflection for __doRequest (#31568).
+        // InternalArgInfo historically omitted $location and used one_way:int.
+        $entry->methodParameterMetadata['__dorequest'] = [
+            new ParameterMetadata('request', [], false, false, false, false, 'string', null),
+            new ParameterMetadata('location', [], false, false, false, false, 'string', null),
+            new ParameterMetadata('action', [], false, false, false, false, 'string', null),
+            new ParameterMetadata('version', [], false, false, false, false, 'int', null),
+            new ParameterMetadata('oneWay', [], false, true, false, false, 'bool', 'false'),
+        ];
+        $doRequestReturn = ReflectionTypeSupport::cfgTypeFromLabel('?string');
+        if (null !== $doRequestReturn) {
+            $entry->methodReturnDeclaredTypes['__dorequest'] = $doRequestReturn;
+        }
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
