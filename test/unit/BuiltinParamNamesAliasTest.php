@@ -3693,6 +3693,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_secretbox_open', 2));
         self::assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('sodium_crypto_secretbox_open', 0)['type'] ?? null);
 
+        foreach (['sodium_pad', 'sodium_unpad'] as $padFn) {
+            $pad = BuiltinParamNames::forFunction($padFn);
+            self::assertSame(['string', 'block_size'], $pad, $padFn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($pad, 'string', $padFn), $padFn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pad, 'block_size', $padFn), $padFn);
+            self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction($padFn), $padFn);
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($padFn), $padFn);
+            self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction($padFn), $padFn);
+            self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($padFn, 0), $padFn);
+            self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($padFn, 1), $padFn);
+        }
+
         $box = BuiltinParamNames::forFunction('sodium_crypto_box');
         self::assertSame(['message', 'nonce', 'key_pair'], $box);
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($box, 'key_pair', 'sodium_crypto_box'));

@@ -560,6 +560,26 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_memzero'));
     }
 
+    /** php-src ext/sodium/libsodium.stub.php — string $string, int $block_size → string (#27734). */
+    public function testSodiumPadUnpadReflectionStubTypes(): void
+    {
+        foreach (['sodium_pad', 'sodium_unpad'] as $fn) {
+            $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1), $fn);
+            $p0 = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $p1 = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            $this->assertNotNull($p0, $fn);
+            $this->assertNotNull($p1, $fn);
+            $this->assertSame('string', $p0['name'], $fn);
+            $this->assertSame('string', $p0['type'], $fn);
+            $this->assertSame('block_size', $p1['name'], $fn);
+            $this->assertSame('int', $p1['type'], $fn);
+            $this->assertFalse($p0['isOptional'], $fn);
+            $this->assertFalse($p1['isOptional'], $fn);
+        }
+    }
+
     /** php-src ext/sodium/libsodium.stub.php — (): bool (#27775). */
     public function testSodiumCryptoAeadAes256gcmIsAvailableReflectionReturnBool(): void
     {
