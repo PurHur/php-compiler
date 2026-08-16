@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\spl;
 use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStreamPath;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -377,9 +378,13 @@ final class DirectoryIteratorConstruct extends VmClassMethod
             'DirectoryIterator::__construct()'
         );
         $this->requireExactUserArgCount($frame, 'DirectoryIterator::__construct', 1);
+        // php-src spl_directory.stub.php — string $directory; empty → zend_argument_value_error (#31512).
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
-            'DirectoryIterator::__construct'
+            'DirectoryIterator::__construct',
+            0,
+            'directory',
+            VmString::emptyStringArgValueErrorMessageCannot('DirectoryIterator::__construct', 0, 'directory')
         );
         DirectoryIteratorStorage::open($object, $path);
     }

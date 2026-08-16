@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmStreamPath;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -237,9 +238,13 @@ final class FilesystemIteratorConstruct extends VmClassMethod
         );
         $this->requireUserArgCountRange($frame, 'FilesystemIterator::__construct', 1, 2);
         $argCount = \count($frame->calledArgs);
+        // php-src spl_directory.stub.php — string $directory; empty → zend_argument_value_error (#31512).
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
-            'FilesystemIterator::__construct'
+            'FilesystemIterator::__construct',
+            0,
+            'directory',
+            VmString::emptyStringArgValueErrorMessageCannot('FilesystemIterator::__construct', 0, 'directory')
         );
         $flags = FilesystemIteratorBuiltin::SKIP_DOTS;
         if ($argCount >= 3) {
@@ -270,9 +275,13 @@ final class RecursiveDirectoryIteratorConstruct extends VmClassMethod
         );
         $this->requireUserArgCountRange($frame, 'RecursiveDirectoryIterator::__construct', 1, 2);
         $argCount = \count($frame->calledArgs);
+        // php-src spl_directory.stub.php — string $directory; empty → zend_argument_value_error (#31512).
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
-            'RecursiveDirectoryIterator::__construct'
+            'RecursiveDirectoryIterator::__construct',
+            0,
+            'directory',
+            VmString::emptyStringArgValueErrorMessageCannot('RecursiveDirectoryIterator::__construct', 0, 'directory')
         );
         // php-src RecursiveDirectoryIterator defaults to flags=0 (include dots;
         // CURRENT_AS_FILEINFO / KEY_AS_PATHNAME). Do NOT inherit FilesystemIterator's
