@@ -180,6 +180,7 @@
             <file>./test/compliance/DatePeriodCreateFromISO8601StringReflectionVMTest.php</file>
             <file>./test/compliance/LocaltimeReflectionVMTest.php</file>
             <file>./test/compliance/FuncGetArgReflectionMixedVMTest.php</file>
+            <file>./test/compliance/ArrayPopShiftReflectionMixedVMTest.php</file>
             <file>./test/compliance/GcControlReflectionReturnsVMTest.php</file>
             <file>./test/compliance/HashHmacAlgosReflectionReturnVMTest.php</file>
             <file>./test/compliance/HashFileReflectionReturnVMTest.php</file>
