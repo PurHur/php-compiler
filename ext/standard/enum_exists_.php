@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -28,7 +29,7 @@ final class enum_exists_ extends Internal
         $ctx = VmReflection::requireContext($frame);
         // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, zend_builtin_functions.c).
         $name = VmString::trimFamilyStringArgForFrame($frame, 0, 'enum_exists', 0, 'enum');
-        $autoload = VmReflection::autoloadFlagFromFrame($frame);
+        $autoload = VmReflection::autoloadFlagFromFrame($frame, 'enum_exists');
         $exists = VmReflection::enumExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
@@ -40,6 +41,10 @@ final class enum_exists_ extends Internal
         // Catchable ArgumentCountError (AOT/JIT) — #28475.
         if (!$this->requireArgCountRangeJit($context, $args, 'enum_exists', 1, 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        // Z_PARAM_BOOL $autoload — strict TypeError on null; else null→false + E_DEPRECATED (#31443).
+        if (\count($args) >= 2) {
+            JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'enum_exists', 'autoload', 2);
         }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
