@@ -211,10 +211,11 @@ final class RecursiveArrayIteratorConstruct extends VmClassMethod
             $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
         }
         if (isset($frame->calledArgs[1])) {
-            // php-src spl_array_set_array — array|object (#23886); just_array when flags omitted.
+            // php-src uses zim_ArrayIterator___construct for RAI — TypeError cites parent (#31626).
+            // just_array when flags omitted (#23886).
             [$table, $flags] = SplIteratorSupport::requireArrayOrObjectConstructArg(
                 $frame->calledArgs[1],
-                'RecursiveArrayIterator::__construct',
+                'ArrayIterator::__construct',
                 1,
                 $flags,
                 !$hasFlagsArg
