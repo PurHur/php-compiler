@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7547 |
-| Phase A inventory files (M2 ratio SSOT) | 7547 |
+| PHP files on vm.php path | 7551 |
+| Phase A inventory files (M2 ratio SSOT) | 7551 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24072 |
+| Source constructs flagged (warnings) | 24076 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -688,6 +688,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/FtpNavJitHelper.php` | 0 | 1 |
 | `ext/ftp/FtpQueryJitHelper.php` | 0 | 1 |
 | `ext/ftp/FtpSerializeDeny.php` | 0 | 3 |
+| `ext/ftp/FtpTransferJitHelper.php` | 0 | 1 |
 | `ext/ftp/JitFtpClose.php` | 0 | 1 |
 | `ext/ftp/JitFtpConnect.php` | 0 | 1 |
 | `ext/ftp/JitFtpList.php` | 0 | 1 |
@@ -695,6 +696,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/JitFtpMutate.php` | 0 | 1 |
 | `ext/ftp/JitFtpNav.php` | 0 | 1 |
 | `ext/ftp/JitFtpQuery.php` | 0 | 1 |
+| `ext/ftp/JitFtpTransfer.php` | 0 | 1 |
 | `ext/ftp/Module.php` | 0 | 37 |
 | `ext/ftp/VmFtpArg.php` | 0 | 1 |
 | `ext/ftp/VmFtpConnection.php` | 0 | 2 |
@@ -5571,6 +5573,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FtpMutateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FtpNavRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FtpQueryRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/FtpTransferRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FunctionExistsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 1 |
@@ -5949,6 +5952,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFtpMutate.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFtpNav.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFtpQuery.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFtpTransfer.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFunctionExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetClassMethods.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetClassVars.php` | 0 | 1 |
@@ -12695,6 +12699,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 28)
 - 4 class method(s)
 
+### `ext/ftp/FtpTransferJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 18 class method(s)
+
 ### `ext/ftp/JitFtpClose.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12729,6 +12738,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/ftp/JitFtpTransfer.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/ftp/Module.php`
 
@@ -12852,19 +12866,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ftp/ftp_fget.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_fput.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_get.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 31)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_get_option.php`
@@ -12942,7 +12956,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ftp/ftp_put.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 31)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_pwd.php`
@@ -48800,6 +48814,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `lib/JIT/Builtin/FtpTransferRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
+
 ### `lib/JIT/Builtin/FunctionExistsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50752,6 +50771,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringFtpQuery.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StringFtpTransfer.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
