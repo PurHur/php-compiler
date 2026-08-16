@@ -341,7 +341,10 @@ final class AppendIteratorCurrent extends VmClassMethod
         );
         $inner = AppendIteratorBuiltin::currentIterator($object);
         if (null === $inner) {
-            throw new \RuntimeException('Cannot fetch current() on invalid AppendIterator position');
+            // php-src AppendIterator current when no inner / invalid — return null (#31628).
+            SplIteratorSupport::setReturnNull($frame);
+
+            return;
         }
         SplIteratorSupport::copyReturnFrom(
             $frame,
@@ -366,7 +369,10 @@ final class AppendIteratorKey extends VmClassMethod
         );
         $inner = AppendIteratorBuiltin::currentIterator($object);
         if (null === $inner) {
-            throw new \RuntimeException('Cannot fetch key() on invalid AppendIterator position');
+            // php-src AppendIterator key when no inner / invalid — return null (#31628).
+            SplIteratorSupport::setReturnNull($frame);
+
+            return;
         }
         SplIteratorSupport::copyReturnFrom(
             $frame,
