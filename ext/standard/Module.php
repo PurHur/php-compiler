@@ -1063,6 +1063,7 @@ class Module extends ModuleAbstract
         }
         // realpath(3) dropped from always-on Module decls (#30530): SysGetTempDirRuntime
         // NestedJIT leaf declares realpath module-locally (#29433); StringRealpath is PHP helper.
+        // LibcExtern always-on realpath + dead strdup also dropped (#31534 / #30530 peer).
         // stat(2)/access(2)/lstat(2) dropped (#31403 / #30530 peer): JitStatKernel /
         // TouchLibcRuntime / FtokRuntime / JitFsGlobKernel declare module-locally;
         // StatPathJitHelper owns user-script path predicates (LibcExtern rows also dropped).

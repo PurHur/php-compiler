@@ -47,6 +47,8 @@ final class SysGetTempDirRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureNestedLeafBody', $source);
         $this->assertStringContainsString("lookupFunction('getenv')", $source);
         $this->assertStringContainsString("lookupFunction('realpath')", $source);
+        $this->assertStringContainsString('#31534', $source);
+        $this->assertStringContainsString('ensureLibc', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);

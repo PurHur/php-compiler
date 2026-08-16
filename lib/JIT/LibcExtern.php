@@ -49,7 +49,7 @@ final class LibcExtern
             // NestedJIT JitTempnamKernel + ReflectionSetup declare strrchr(3) module-locally.
             'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],
             'strtod' => [$dbl, false, [$i8p, $i8pp]],
-            'strdup' => [$i8p, false, [$i8p]],
+            // strdup dropped (#31534): no remaining lookupFunction('strdup') consumers.
             // strtok_r dropped (#29091): parse_str AOT kernel uses __compiler_strtok_r.
             'fopen' => [$i8p, false, [$i8p, $i8p]],
             'fread' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
@@ -81,7 +81,10 @@ final class LibcExtern
             'putenv' => [$i32, false, [$i8p]],
             'setenv' => [$i32, false, [$i8p, $i8p, $i32]],
             'unsetenv' => [$i32, false, [$i8p]],
-            'realpath' => [$i8p, false, [$i8p, $i8p]],
+            // realpath dropped (#31534 / #30530 peer): SysGetTempDirRuntime NestedJIT leaf
+            // declares realpath(3) module-locally (#29433); StringRealpath / RealpathJitHelper
+            // own user-script realpath() (VmString PHP — not libc). Module always-on already
+            // dropped realpath (#30530).
             // time dropped (#30332): StringTime + TimeJitHelper; TouchLibcRuntime routes via
             // StringTime::invoke (#30472) — no module-local time(2) decl.
             'printf' => [$i32, true, [$i8p]],

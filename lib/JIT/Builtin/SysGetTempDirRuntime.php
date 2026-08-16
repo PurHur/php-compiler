@@ -130,6 +130,11 @@ final class SysGetTempDirRuntime
         BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
+    /**
+     * Module-local getenv/realpath/strlen after LibcExtern always-on realpath drop (#31534).
+     *
+     * getenv remains in LibcExtern for other NestedJIT consumers; realpath is leaf-only.
+     */
     private static function ensureLibc(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
