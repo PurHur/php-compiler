@@ -5790,6 +5790,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('file'));
     }
 
+    /** @covers issue #27776 */
+    public function testNetGetInterfacesStubReturnArrayFalse(): void
+    {
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('net_get_interfaces'));
+    }
+
     /** @covers issue #28520 */
     public function testTmpfileFopenStubHaveNoReturnType(): void
     {

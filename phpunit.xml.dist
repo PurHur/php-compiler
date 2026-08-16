@@ -226,6 +226,7 @@
             <file>./test/compliance/FsockopenNullStrictVMTest.php</file>
             <file>./test/compliance/FstatReflectionReturnVMTest.php</file>
             <file>./test/compliance/FileReflectionReturnVMTest.php</file>
+            <file>./test/compliance/NetGetInterfacesReflectionReturnVMTest.php</file>
             <file>./test/compliance/TmpfileFopenReflectionVMTest.php</file>
             <file>./test/compliance/IconvStrlenReflectionVMTest.php</file>
             <file>./test/compliance/IconvReflectionReturnVMTest.php</file>
