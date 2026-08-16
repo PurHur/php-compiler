@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\ArrayFindCallbackPolicy;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -42,10 +43,21 @@ final class CallbackFilterIteratorConstruct implements Call
             );
         }
 
+        $callback = $args[2];
+        // php-src Z_PARAM_FUNC (#31508). Compile-time null cannot be lowered through this
+        // thin AOT ctor Call: a null Call arg + void-construct EXEC_RETURN SIGSEGVs in
+        // __value__valueDelref (observed even when the body only emits catchable TypeError
+        // or voidReturns). Fail closed with Zend's TypeError text at compile time; VM/JIT
+        // use CallbackFilterIteratorConstruct builtin requireCallableArg.
+        if (ArrayFindCallbackPolicy::isJitNullCallback($callback)) {
+            throw new \TypeError(
+                'CallbackFilterIterator::__construct(): Argument #2 ($callback) must be a valid callback, no array or string given'
+            );
+        }
+
         NestedClosureInvokeLlvm::ensureLinked($context);
         $receiver = self::objectReceiver($context, $args[0]);
         $inner = self::objectReceiver($context, $args[1]);
-        $callback = $args[2];
         if (null === $callback->closureCall
             && Variable::TYPE_OBJECT !== $callback->type
             && Variable::TYPE_VALUE !== $callback->type) {

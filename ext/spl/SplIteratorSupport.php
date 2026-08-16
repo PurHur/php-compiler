@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectLifetime;
@@ -105,6 +108,30 @@ final class SplIteratorSupport
         $closure = VmClosureCall::isClosure($copy) ? VmClosureCall::resolve($copy) : null;
 
         return [$copy, $closure];
+    }
+
+    /**
+     * Z_PARAM_FUNC — reject null/invalid callback before storing (php-src spl_iterators.c; #31508).
+     */
+    public static function requireCallableArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        Context $ctx
+    ): Variable {
+        $resolved = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
+            throw new \TypeError(
+                $function.'(): Argument #'.$argIndex.' ($callback) must be a valid callback, no array or string given'
+            );
+        }
+        if (!VmCallable::isCallable($ctx, $resolved)) {
+            throw new \TypeError(
+                $function.'(): Argument #'.$argIndex.' ($callback) must be a valid callback, no array or string given'
+            );
+        }
+
+        return $resolved;
     }
 
     public static function requireArrayArg(Variable $var, string $function, int $argIndex): \PHPCompiler\VM\HashTable

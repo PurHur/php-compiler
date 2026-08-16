@@ -11,7 +11,6 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -198,19 +197,7 @@ final class RecursiveCallbackFilterIteratorBuiltin
         int $argIndex,
         Context $ctx
     ): Variable {
-        $resolved = $var->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
-            throw new \TypeError(
-                $function.'(): Argument #'.$argIndex.' ($callback) must be a valid callback, no array or string given'
-            );
-        }
-        if (!VmCallable::isCallable($ctx, $resolved)) {
-            throw new \TypeError(
-                $function.'(): Argument #'.$argIndex.' ($callback) must be a valid callback, no array or string given'
-            );
-        }
-
-        return $resolved;
+        return SplIteratorSupport::requireCallableArg($var, $function, $argIndex, $ctx);
     }
 
     private static function typeLabel(Variable $var): string
