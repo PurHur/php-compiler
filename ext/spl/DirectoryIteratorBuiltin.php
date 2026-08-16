@@ -95,8 +95,10 @@ final class DirectoryIteratorStorage
     {
         $handle = VmDir::opendir($path);
         if (false === $handle) {
-            throw new \RuntimeException(
-                'DirectoryIterator::__construct('.$path.'): Failed to open directory: No such file or directory'
+            // php-src spl_filesystem_object_construct — UnexpectedValueException + concrete class (#31506).
+            $className = $object->class->name;
+            throw new \UnexpectedValueException(
+                $className.'::__construct('.$path.'): Failed to open directory: No such file or directory'
             );
         }
         self::$store[$object->id] = [
