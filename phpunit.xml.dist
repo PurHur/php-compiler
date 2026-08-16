@@ -313,6 +313,8 @@
             <file>./test/compliance/SodiumAes256gcmIsAvailableReflection27775VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340JITTest.php</file>
+            <file>./test/compliance/ArrayPreserveKeysNull31442VMTest.php</file>
+            <file>./test/compliance/ArrayPreserveKeysNull31442JITTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289VMTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289JITTest.php</file>
             <file>./test/compliance/ParseIniNullTypedArgsStrict31264VMTest.php</file>
