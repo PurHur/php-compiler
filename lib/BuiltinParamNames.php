@@ -1161,6 +1161,77 @@ final class BuiltinParamNames
                 return ['num', 'exponent', 'modulus', 'scale'];
             case 'fpow':
                 return ['num', 'exponent'];
+            // php-src ext/gmp/gmp.stub.php — InternalArgInfo still a/b/gmpnumber/exp/round (#28746)
+            case 'gmp_init':
+                return ['num', 'base='];
+            case 'gmp_import':
+                return ['data', 'word_size=', 'flags='];
+            case 'gmp_export':
+                return ['num', 'word_size=', 'flags='];
+            case 'gmp_intval':
+            case 'gmp_neg':
+            case 'gmp_abs':
+            case 'gmp_fact':
+            case 'gmp_sqrt':
+            case 'gmp_sqrtrem':
+            case 'gmp_perfect_square':
+            case 'gmp_perfect_power':
+            case 'gmp_sign':
+            case 'gmp_com':
+            case 'gmp_popcount':
+            case 'gmp_nextprime':
+                return ['num'];
+            case 'gmp_strval':
+                return ['num', 'base='];
+            case 'gmp_add':
+            case 'gmp_sub':
+            case 'gmp_mul':
+            case 'gmp_mod':
+            case 'gmp_divexact':
+            case 'gmp_gcd':
+            case 'gmp_lcm':
+            case 'gmp_invert':
+            case 'gmp_jacobi':
+            case 'gmp_legendre':
+            case 'gmp_kronecker':
+            case 'gmp_cmp':
+            case 'gmp_and':
+            case 'gmp_or':
+            case 'gmp_xor':
+            case 'gmp_hamdist':
+            case 'gmp_gcdext':
+                return ['num1', 'num2'];
+            case 'gmp_div_q':
+            case 'gmp_div_r':
+            case 'gmp_div_qr':
+            case 'gmp_div':
+                return ['num1', 'num2', 'rounding_mode='];
+            case 'gmp_pow':
+                return ['num', 'exponent'];
+            case 'gmp_powm':
+                return ['num', 'exponent', 'modulus'];
+            case 'gmp_prob_prime':
+                return ['num', 'repetitions='];
+            case 'gmp_random_seed':
+                return ['seed'];
+            case 'gmp_random_bits':
+                return ['bits'];
+            case 'gmp_random_range':
+                return ['min', 'max'];
+            case 'gmp_root':
+            case 'gmp_rootrem':
+                return ['num', 'nth'];
+            case 'gmp_setbit':
+                return ['num', 'index', 'value='];
+            case 'gmp_clrbit':
+                return ['num', 'index'];
+            case 'gmp_testbit':
+                return ['num', 'index'];
+            case 'gmp_scan0':
+            case 'gmp_scan1':
+                return ['num1', 'start'];
+            case 'gmp_binomial':
+                return ['n', 'k'];
             case 'intdiv':
                 return ['num1', 'num2'];
             case 'atan2':

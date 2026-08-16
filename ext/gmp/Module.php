@@ -50,6 +50,8 @@ class Module extends ModuleAbstract
             new gmp_pow(),
             new gmp_mod(),
             new gmp_div_q(),
+            // php-src @alias gmp_div_q (#28746, ext/gmp/gmp.stub.php)
+            new gmp_div_q('gmp_div'),
             new gmp_div_r(),
             new gmp_div_qr(),
             new gmp_abs(),

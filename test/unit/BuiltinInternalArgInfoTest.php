@@ -1825,4 +1825,41 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('mode', $mode['name']);
         $this->assertSame('int', $mode['type']);
     }
+
+    /** ext/gmp/gmp.stub.php — Zend num1/num2/num/exponent + gmp_div alias (#28746). */
+    public function testGmpReflectionStubNamesAndTypes(): void
+    {
+        $this->assertSame(['num1', 'num2'], BuiltinParamNames::forFunction('gmp_add'));
+        $this->assertSame(['num', 'base='], BuiltinParamNames::forFunction('gmp_strval'));
+        $this->assertSame(['num', 'exponent'], BuiltinParamNames::forFunction('gmp_pow'));
+        $this->assertSame(
+            ['num1', 'num2', 'rounding_mode='],
+            BuiltinParamNames::forFunction('gmp_div_q')
+        );
+        $this->assertSame(
+            ['num1', 'num2', 'rounding_mode='],
+            BuiltinParamNames::forFunction('gmp_div')
+        );
+        $this->assertSame('GMP|int|string', BuiltinInternalArgInfo::stubParamTypeOverride('gmp_add', 0));
+        $this->assertSame('GMP|int|string', BuiltinInternalArgInfo::stubParamTypeOverride('gmp_strval', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('gmp_pow', 1));
+        $this->assertSame('GMP|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gmp_invert'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('gmp_random_seed'));
+        $add0 = BuiltinInternalArgInfo::paramInfoForFunction('gmp_add', 0);
+        $this->assertNotNull($add0);
+        $this->assertSame('GMP|int|string', $add0['type']);
+        $this->assertSame(
+            0,
+            BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction('gmp_add') ?? [],
+                'num1'
+            )
+        );
+        $this->assertFalse(
+            BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction('gmp_add') ?? [],
+                'a'
+            )
+        );
+    }
 }
