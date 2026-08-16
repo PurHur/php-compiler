@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\simplexml;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
-use PHPCompiler\VM\Variable;
 
-/** SimpleXMLElement::registerXPathNamespace — xpath prefix binding (php-src ext/simplexml/sxe.c; #18038). */
+/** SimpleXMLElement::registerXPathNamespace — xpath prefix binding (php-src ext/simplexml/sxe.c; #18038 / #31656). */
 final class SimpleXmlElementRegisterXPathNamespace extends VmClassMethod
 {
     public function __construct()
@@ -27,19 +27,28 @@ final class SimpleXmlElementRegisterXPathNamespace extends VmClassMethod
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::registerXPathNamespace()'
         );
-        $prefixVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $prefixVar->type) {
-            throw new \TypeError('SimpleXMLElement::registerXPathNamespace(): Argument #1 ($prefix) must be of type string');
-        }
-        $nsVar = $frame->calledArgs[2]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nsVar->type) {
-            throw new \TypeError('SimpleXMLElement::registerXPathNamespace(): Argument #2 ($namespace) must be of type string');
-        }
+        // Z_PARAM_STR — soft-null DEP+coerce; empty prefix → false (php-src sxe.c / #31656).
+        $prefix = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
+            'SimpleXMLElement::registerXPathNamespace',
+            0,
+            'prefix',
+            false
+        );
+        $namespace = VmString::stringBuiltinArgForFrame(
+            $frame,
+            2,
+            'SimpleXMLElement::registerXPathNamespace',
+            1,
+            'namespace',
+            false
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmSimpleXml::registerXPathNamespace(
                 $entry,
-                $prefixVar->toString(),
-                $nsVar->toString()
+                $prefix,
+                $namespace
             ));
         }
     }

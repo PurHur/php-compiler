@@ -586,8 +586,9 @@ final class JitSimpleXmlUserScript
     }
 
     /**
-     * Compile-time SimpleXMLElement::registerXPathNamespace via host php-src (#27534).
+     * Compile-time SimpleXMLElement::registerXPathNamespace via host php-src (#27534 / #31656).
      * Mutates the host tree so a subsequent literal xpath() fold sees registered prefixes.
+     * Soft-null prefix/namespace — E_DEPRECATED then empty-prefix → false (sxe.c).
      */
     public static function tryRegisterXPathNamespace(Context $context, JITVariable ...$args): ?Value
     {
@@ -598,24 +599,51 @@ final class JitSimpleXmlUserScript
         if (null === $tree) {
             return null;
         }
-        $prefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $prefix) {
-            return null;
+        // Soft-null $prefix — E_DEPRECATED then empty → false (#31656 / sxe.c).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[1],
+                'SimpleXMLElement::registerXPathNamespace',
+                0,
+                'prefix'
+            );
+            $prefix = '';
+        } else {
+            $prefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $prefix) {
+                return null;
+            }
         }
-        $namespace = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
-        if (null === $namespace) {
-            return null;
+        // Soft-null $namespace — E_DEPRECATED then register empty URI (#31656 / sxe.c).
+        if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[2],
+                'SimpleXMLElement::registerXPathNamespace',
+                1,
+                'namespace'
+            );
+            $namespace = '';
+        } else {
+            $namespace = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+            if (null === $namespace) {
+                return null;
+            }
         }
-        try {
-            $tree->registerXPathNamespace($prefix, $namespace);
-        } catch (\Throwable) {
-            return null;
+        $ok = false;
+        if ('' !== $prefix) {
+            try {
+                $ok = (bool) $tree->registerXPathNamespace($prefix, $namespace);
+            } catch (\Throwable) {
+                return null;
+            }
         }
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeBool(
             $context,
             $slot,
-            $context->getTypeFromString('int1')->constInt(1, false)
+            $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false)
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
