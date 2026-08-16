@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** doubleval() — PHP alias of floatval(); delegates to native floatval implementation. */
+/**
+ * doubleval() — PHP alias of floatval(); delegates with called-name ACE (#30688).
+ *
+ * php-src: ext/standard/type.c PHP_FUNCTION(doubleval) / floatval
+ */
 final class doubleval extends Internal
 {
     private floatval $delegate;
@@ -18,7 +22,8 @@ final class doubleval extends Internal
     public function __construct()
     {
         parent::__construct('doubleval');
-        $this->delegate = new floatval();
+        // Same floatval impl; name 'doubleval' so excess-argc ACE cites the alias (#30688).
+        $this->delegate = new floatval('doubleval');
     }
 
     public function execute(Frame $frame): void
@@ -28,10 +33,6 @@ final class doubleval extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 === \count($args) && (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type)) {
-            $this->jitString($context, $args[0], 'doubleval() argument #1');
-        }
-
         return $this->delegate->call($context, ...$args);
     }
 }
