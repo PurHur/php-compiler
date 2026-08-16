@@ -60,6 +60,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'popen',
             'pclose',
             'fileno',
+            'getenv',
         ];
     }
 
@@ -70,7 +71,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -85,6 +86,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31558', $source);
         $this->assertStringContainsString('#31582', $source);
         $this->assertStringContainsString('#31606', $source);
+        $this->assertStringContainsString('#31637', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -214,10 +216,10 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc fileno (#31606)'
         );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             "'getenv' =>",
             $source,
-            'LibcExtern must keep live getenv (#31582)'
+            'LibcExtern must not declare libc getenv (#31637)'
         );
     }
 
@@ -236,6 +238,21 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $ob = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObStorageLlvm.php');
         $this->assertStringContainsString("'fflush'", $ob);
         $this->assertStringContainsString('#31606', $ob);
+    }
+
+    public function testStringGetenvDeclaresGetenvModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenv.php');
+        $this->assertStringContainsString('ensureLibcGetenv', $source);
+        $this->assertStringContainsString('#31637', $source);
+        $this->assertStringContainsString("lookupFunction('getenv')", $source);
+        $this->assertMatchesRegularExpression("/addFunction\\(\\s*'getenv'/", $source);
+        $bootstrap = (string) file_get_contents(__DIR__.'/../../lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('ensureLibcGetenv', $bootstrap);
+        $this->assertStringContainsString('StringGetenv::ensureLibcGetenv', $bootstrap);
+        $sys = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SysGetTempDirRuntime.php');
+        $this->assertStringContainsString("['getenv', \$i8p, [\$i8p]]", $sys);
+        $this->assertStringContainsString('#31637', $sys);
     }
 
     public function testBootstrapCompileSmokeM3EmitDeclaresPutenvModuleLocallyAfterLibcExternDrop(): void

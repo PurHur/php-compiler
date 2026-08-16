@@ -23,7 +23,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Putenv overlay helpers remain on {@see GetenvJitHelper} (ensurePutenvLinked).
  * Putenv NestedJIT leaf: libc setenv/unsetenv via {@see invokePutenvNestedLeaf} (#29334);
  * strchr(3) is module-local after LibcExtern always-on drop (#31519);
- * setenv(3)/unsetenv(3) are module-local after LibcExtern always-on drop (#31558).
+ * setenv(3)/unsetenv(3) are module-local after LibcExtern always-on drop (#31558);
+ * getenv(3) is module-local after LibcExtern always-on drop (#31637).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
@@ -248,6 +249,26 @@ final class StringGetenv
     }
 
     /**
+     * Module-local getenv(3) after LibcExtern always-on drop (#31637).
+     *
+     * Shared by NestedJIT leaves, bootstrap smoke, session/CGI kernels, and
+     * SysGetTempDir peer ensureLibc (#31534 already declared getenv leaf-locally).
+     */
+    public static function ensureLibcGetenv(Context $context): void
+    {
+        try {
+            $context->lookupFunction('getenv');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $fn = $context->module->addFunction(
+                'getenv',
+                $context->context->functionType($i8p, false, $i8p)
+            );
+            $context->registerFunction('getenv', $fn);
+        }
+    }
+
+    /**
      * Module-local strchr(3) after LibcExtern always-on drop (#31519).
      */
     private static function ensureLibcStrchr(Context $context): void
@@ -301,6 +322,7 @@ final class StringGetenv
     public static function invokeNestedLeaf(Context $context, Value $nameStr): Value
     {
         LibcExtern::register($context);
+        self::ensureLibcGetenv($context);
 
         $fn = $context->builder->getInsertBlock()->getParent();
         $strMap = $context->structFieldMap['__string__'];

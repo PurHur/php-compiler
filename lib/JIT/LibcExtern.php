@@ -76,7 +76,10 @@ final class LibcExtern
             // GetcwdJitHelper uses @getcwd (never lived in this table — always-on realpath LLVM removed).
             // stat/access/lstat dropped (#31403): JitStatKernel / TouchLibcRuntime / FtokRuntime /
             // JitFsGlobKernel declare module-locally; StatPathJitHelper owns user-script path predicates.
-            'getenv' => [$i8p, false, [$i8p]],
+            // getenv dropped (#31637): StringGetenv::ensureLibcGetenv + SysGetTempDir /
+            // BootstrapCompileSmokeM3Emit / VmDriverExecuteNative / M3EmitTuTrivialEchoAot /
+            // session+CGI kernels declare getenv(3) module-locally; user-script getenv()
+            // stays on GetenvLookupJitHelper / StringGetenv NestedJIT leaf (#29313).
             // putenv dropped (#31582): BootstrapCompileSmokeM3Emit declares putenv(3)
             // module-locally (ensureLibcPutenv); user-script putenv() stays on PutenvJitHelper
             // / NestedJIT invokePutenvNestedLeaf (setenv/unsetenv #31558) — not this row.

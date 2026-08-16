@@ -9,6 +9,7 @@ require_once __DIR__.'/RuntimeEmitTuAlloc.php';
 require_once __DIR__.'/RuntimeEmitTuInit.php';
 
 use PHPCompiler\ext\standard\JitStringSearch;
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -217,6 +218,7 @@ final class BootstrapCompileSmokeM3Emit
 
     private static function getenvAsPhpcString(Context $context, string $envKey): Value
     {
+        StringGetenv::ensureLibcGetenv($context);
         $tag = 'g'.substr(md5($envKey), 0, 6);
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
@@ -344,6 +346,7 @@ final class BootstrapCompileSmokeM3Emit
     private static function emitEnsureRepoRootEnvIfUnset(Context $context): void
     {
         self::ensureLibcPutenv($context);
+        StringGetenv::ensureLibcGetenv($context);
         $charPtr = $context->getTypeFromString('char*');
         $i8p = $context->getTypeFromString('int8*');
         $key = $context->builder->pointerCast(

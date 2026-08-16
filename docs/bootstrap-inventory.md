@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7552 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24099 |
+| Source constructs flagged (warnings) | 24103 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2466,7 +2466,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/InternalIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/InternalIteratorLiveHandler.php` | 0 | 1 |
 | `ext/spl/InternalIteratorSerializeDeny.php` | 0 | 3 |
-| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 17 |
+| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 19 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 9 |
 | `ext/spl/Module.php` | 0 | 2 |
@@ -2482,7 +2482,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplArrayStorage.php` | 0 | 25 |
 | `ext/spl/SplArrayUserSortMethod.php` | 0 | 1 |
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
-| `ext/spl/SplDllistSerializeSupport.php` | 0 | 6 |
+| `ext/spl/SplDllistSerializeSupport.php` | 0 | 7 |
 | `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 25 |
 | `ext/spl/SplFileInfoBuiltin.php` | 0 | 16 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
@@ -2494,9 +2494,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplHeapBuiltin.php` | 0 | 47 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 3 |
-| `ext/spl/SplLegacySerializableMethods.php` | 0 | 5 |
+| `ext/spl/SplLegacySerializableMethods.php` | 0 | 4 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 30 |
-| `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 11 |
+| `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 13 |
 | `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 8 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
 | `ext/spl/VmSplIterators.php` | 0 | 3 |
@@ -27377,13 +27377,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 362)
 - new UnexpectedValueException (line 584)
 - new UnexpectedValueException (line 614)
-- new Variable (line 653)
-- new UnexpectedValueException (line 901)
-- new ArgumentCountError (line 967)
-- new ArgumentCountError (line 999)
-- new ArgumentCountError (line 1207)
-- new Error (line 1221)
-- 80 class method(s)
+- new UnexpectedValueException (line 651)
+- new Variable (line 655)
+- new Variable (line 692)
+- new UnexpectedValueException (line 940)
+- new ArgumentCountError (line 1006)
+- new ArgumentCountError (line 1038)
+- new ArgumentCountError (line 1246)
+- new Error (line 1260)
+- 81 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/JitSplClasses.php`
@@ -27416,17 +27418,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 51)
 - new MultipleIteratorConstruct (line 59)
-- new HashTable (line 217)
-- new Variable (line 225)
-- new HashTable (line 250)
-- new Variable (line 258)
-- new HashTable (line 293)
-- new Variable (line 294)
-- new Variable (line 297)
-- new Variable (line 307)
-- new Variable (line 311)
-- new HashTable (line 312)
-- new HashTable (line 318)
+- new HashTable (line 221)
+- new Variable (line 229)
+- new HashTable (line 258)
+- new Variable (line 266)
+- new HashTable (line 301)
+- new Variable (line 302)
+- new Variable (line 305)
+- new Variable (line 315)
+- new Variable (line 319)
+- new HashTable (line 320)
+- new HashTable (line 326)
 - 32 class method(s)
 
 ### `ext/spl/ParentIteratorBuiltin.php`
@@ -27492,8 +27494,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 39)
 - new RecursiveTreeIteratorConstruct (line 61)
 - new ArgumentCountError (line 227)
-- new ArgumentCountError (line 445)
-- new ArgumentCountError (line 510)
+- new ArgumentCountError (line 447)
+- new ArgumentCountError (line 512)
 - 24 class method(s)
 
 ### `ext/spl/RegexIteratorBuiltin.php`
@@ -27587,12 +27589,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplDllistSerializeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 66)
-- new ObjectEntry (line 97)
-- new SplDllistSerialize (line 106)
-- new SplDllistUnserialize (line 109)
-- new ArgumentCountError (line 153)
-- 8 class method(s)
+- new UnexpectedValueException (line 67)
+- new UnexpectedValueException (line 140)
+- new ObjectEntry (line 160)
+- new SplDllistSerialize (line 169)
+- new SplDllistUnserialize (line 172)
+- new ArgumentCountError (line 216)
+- 11 class method(s)
 
 ### `ext/spl/SplDoublyLinkedListBuiltin.php`
 
@@ -27785,10 +27788,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplLegacySerializableMethods.php`
 
 **Warnings** (review for bootstrap subset):
-- new SplLegacySerializableSerialize (line 29)
-- new SplLegacySerializableUnserialize (line 31)
-- new ParameterMetadata (line 36)
-- new VmSerializeRefState (line 81)
+- new SplLegacySerializableSerialize (line 28)
+- new SplLegacySerializableUnserialize (line 30)
+- new ParameterMetadata (line 35)
 - 4 class method(s)
 
 ### `ext/spl/SplObjectStorageBuiltin.php`
@@ -27836,9 +27838,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new UnexpectedValueException (line 85)
 - new UnexpectedValueException (line 93)
 - new UnexpectedValueException (line 98)
-- new ObjectEntry (line 142)
-- new ObjectEntry (line 179)
-- 7 class method(s)
+- new VmSerializeRefState (line 141)
+- new UnexpectedValueException (line 260)
+- new ObjectEntry (line 276)
+- new ObjectEntry (line 313)
+- 10 class method(s)
 
 ### `ext/spl/SplQueueSplStackBuiltin.php`
 
@@ -34977,9 +34981,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 643)
 - new HashTable (line 777)
 - new HashTable (line 817)
-- new Variable (line 1344)
-- new Variable (line 1351)
-- new Variable (line 1358)
+- new Variable (line 1347)
+- new Variable (line 1354)
+- new Variable (line 1361)
 - 69 class method(s)
 
 ### `ext/standard/VmDateInterval.php`
@@ -34992,7 +34996,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDatePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 19 class method(s)
 
 ### `ext/standard/VmDateSunFunc.php`
 
@@ -35015,11 +35019,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 169)
-- new RecursiveIteratorIterator (line 4106)
-- new RecursiveDirectoryIterator (line 4107)
-- new RecursiveIteratorIterator (line 4213)
-- new RecursiveDirectoryIterator (line 4214)
-- 141 class method(s)
+- new RecursiveIteratorIterator (line 4127)
+- new RecursiveDirectoryIterator (line 4128)
+- new RecursiveIteratorIterator (line 4234)
+- new RecursiveDirectoryIterator (line 4235)
+- 142 class method(s)
 - 14 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -46409,7 +46413,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1985)
+- new InternalArgInfo (line 2000)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46425,8 +46429,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2583)
-- new ArgumentCountError (line 2594)
+- new ArgumentCountError (line 2591)
+- new ArgumentCountError (line 2602)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -47988,8 +47992,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/BootstrapCompileSmokeM3Emit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 770)
-- new Call\Native (line 825)
+- new Call\Native (line 773)
+- new Call\Native (line 828)
 - 27 class method(s)
 
 ### `lib/JIT/BoundMethodCallableHelper.php`
@@ -50841,7 +50845,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetenv.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `lib/JIT/Builtin/StringGetenvAll.php`
 
@@ -54826,7 +54830,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/M3EmitTuTrivialEchoAot.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 233)
+- new Call\Native (line 234)
 - 16 class method(s)
 
 ### `lib/JIT/M5ParserAstPeer.php`
@@ -55437,7 +55441,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/VmDriverExecuteNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 80)
+- new Call\Native (line 81)
 - 7 class method(s)
 
 ### `lib/JIT/VmSpineSmokeNative.php`

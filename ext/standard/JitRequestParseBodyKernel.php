@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MultipartRuntime;
 use PHPCompiler\JIT\Builtin\ParseStrRuntime;
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
@@ -39,6 +40,7 @@ final class JitRequestParseBodyKernel
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         LibcExtern::register($context);
+        StringGetenv::ensureLibcGetenv($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensurePopulateHelperCompiled($context);
         self::emitBridge($context);

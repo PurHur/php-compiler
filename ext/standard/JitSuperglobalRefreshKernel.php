@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin\EnvironMirrorRuntime;
 use PHPCompiler\JIT\Builtin\MultipartRuntime;
 use PHPCompiler\JIT\Builtin\ParseStrRuntime;
 use PHPCompiler\JIT\Builtin\PendingHeadersRuntime;
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
@@ -43,6 +44,7 @@ final class JitSuperglobalRefreshKernel
     public static function ensurePrerequisites(Context $context): void
     {
         LibcExtern::register($context);
+        StringGetenv::ensureLibcGetenv($context);
         self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
@@ -571,6 +573,7 @@ final class JitSuperglobalRefreshKernel
     private static function ensureEmitRefreshPrerequisites(Context $context): void
     {
         LibcExtern::register($context);
+        StringGetenv::ensureLibcGetenv($context);
         self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
@@ -582,6 +585,7 @@ final class JitSuperglobalRefreshKernel
     public static function ensureDeferredEmitPrerequisites(Context $context): void
     {
         LibcExtern::register($context);
+        StringGetenv::ensureLibcGetenv($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptNoOpPopulateStub($context);
         EnvironMirrorRuntime::ensureLinked($context);

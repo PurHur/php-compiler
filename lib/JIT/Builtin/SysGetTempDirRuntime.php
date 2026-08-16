@@ -131,9 +131,8 @@ final class SysGetTempDirRuntime
     }
 
     /**
-     * Module-local getenv/realpath/strlen after LibcExtern always-on realpath drop (#31534).
-     *
-     * getenv remains in LibcExtern for other NestedJIT consumers; realpath is leaf-only.
+     * Module-local getenv/realpath/strlen after LibcExtern always-on drops
+     * (#31534 realpath; #31637 getenv — peer StringGetenv::ensureLibcGetenv).
      */
     private static function ensureLibc(Context $context): void
     {
