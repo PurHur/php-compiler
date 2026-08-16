@@ -183,18 +183,8 @@ final class SplHeapJitHelper
 
     public static function compileRewind(Context $context, JITVariable $receiver): Value
     {
-        $obj = self::loadObject($context, $receiver);
-        $class = self::classNameFromObject($context, $obj);
-        $ht = self::heapPtr($context, $obj);
-        $map = $context->structFieldMap['__hashtable__'];
-        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
-        $sizeT = $context->getTypeFromString('size_t');
-        $i64 = $context->getTypeFromString('int64');
-        $n64 = $context->builder->truncOrBitCast($n, $i64);
-        $pos = $context->builder->sub($n64, $i64->constInt(1, false));
-        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
-        $pos = $context->builder->select($empty, $i64->constInt(-1, true), $pos);
-        self::storeLongPropertyValue($context, $obj, $class, self::PROP_ITER_POS, $pos);
+        // php-src spl_heap_it_rewind is a no-op; valid/key derive from count (#31600).
+        unset($receiver);
 
         return self::voidResult($context);
     }
@@ -202,21 +192,14 @@ final class SplHeapJitHelper
     public static function compileValid(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
-        $class = self::classNameFromObject($context, $obj);
-        $pos = self::loadLongProperty($context, $obj, $class, self::PROP_ITER_POS);
         $ht = self::heapPtr($context, $obj);
         $map = $context->structFieldMap['__hashtable__'];
         $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
         $sizeT = $context->getTypeFromString('size_t');
-        $i64 = $context->getTypeFromString('int64');
-        $n64 = $context->builder->truncOrBitCast($n, $i64);
-        $posOk = $context->builder->icmp(Builder::INT_SGE, $pos, $i64->constInt(0, false));
+        // php-src spl_heap_it_valid: heap->count != 0 (#31600).
         $nonEmpty = $context->builder->icmp(Builder::INT_UGT, $n, $sizeT->constInt(0, false));
-        $valid = $context->builder->and($posOk, $nonEmpty);
-        // n64 unused but keeps signed compare available for future key bounds.
-        unset($n64);
         $slot = JitValueBox::alloc($context);
-        JitValueBox::writeBool($context, $slot, $valid);
+        JitValueBox::writeBool($context, $slot, $nonEmpty);
 
         return $slot;
     }
@@ -263,8 +246,16 @@ final class SplHeapJitHelper
     public static function compileKey(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
-        $class = self::classNameFromObject($context, $obj);
-        $pos = self::loadLongProperty($context, $obj, $class, self::PROP_ITER_POS);
+        $ht = self::heapPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $n64 = $context->builder->truncOrBitCast($n, $i64);
+        // php-src spl_heap_it_get_current_key: count - 1 (#22290 / #31600).
+        $pos = $context->builder->sub($n64, $i64->constInt(1, false));
+        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $pos = $context->builder->select($empty, $i64->constInt(-1, true), $pos);
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeLong($context, $slot, $pos);
 
@@ -275,29 +266,21 @@ final class SplHeapJitHelper
     {
         $obj = self::loadObject($context, $receiver);
         $class = self::classNameFromObject($context, $obj);
-        $pos = self::loadLongProperty($context, $obj, $class, self::PROP_ITER_POS);
-        $i64 = $context->getTypeFromString('int64');
-        $fn = $context->builder->getInsertBlock()->getParent();
+        $ht = self::heapPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $sizeT = $context->getTypeFromString('size_t');
         $skip = BasicBlockHelper::append($context, 'splheap_next_skip');
         $doExtract = BasicBlockHelper::append($context, 'splheap_next_extract');
         $done = BasicBlockHelper::append($context, 'splheap_next_done');
-        $posOk = $context->builder->icmp(Builder::INT_SGE, $pos, $i64->constInt(0, false));
-        $context->builder->branchIf($posOk, $doExtract, $skip);
+        $nonEmpty = $context->builder->icmp(Builder::INT_UGT, $n, $sizeT->constInt(0, false));
+        $context->builder->branchIf($nonEmpty, $doExtract, $skip);
 
         $context->builder->positionAtEnd($skip);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($doExtract);
         self::extractTop($context, $obj, $class);
-        $ht = self::heapPtr($context, $obj);
-        $map = $context->structFieldMap['__hashtable__'];
-        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
-        $sizeT = $context->getTypeFromString('size_t');
-        $n64 = $context->builder->truncOrBitCast($n, $i64);
-        $newPos = $context->builder->sub($n64, $i64->constInt(1, false));
-        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
-        $newPos = $context->builder->select($empty, $i64->constInt(-1, true), $newPos);
-        self::storeLongPropertyValue($context, $obj, $class, self::PROP_ITER_POS, $newPos);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
