@@ -22,7 +22,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * via {@see invokeNestedLeaf} (chdir #29219 shape — kernel deleted).
  * Putenv overlay helpers remain on {@see GetenvJitHelper} (ensurePutenvLinked).
  * Putenv NestedJIT leaf: libc setenv/unsetenv via {@see invokePutenvNestedLeaf} (#29334);
- * strchr(3) is module-local after LibcExtern always-on drop (#31519).
+ * strchr(3) is module-local after LibcExtern always-on drop (#31519);
+ * setenv(3)/unsetenv(3) are module-local after LibcExtern always-on drop (#31558).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
@@ -189,6 +190,7 @@ final class StringGetenv
     {
         LibcExtern::register($context);
         self::ensureLibcStrchr($context);
+        self::ensureLibcSetenvUnsetenv($context);
         $map = $context->structFieldMap['__string__'];
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
@@ -260,6 +262,33 @@ final class StringGetenv
                 $context->context->functionType($i8p, false, $i8p, $i32)
             );
             $context->registerFunction('strchr', $fn);
+        }
+    }
+
+    /**
+     * Module-local setenv(3)/unsetenv(3) after LibcExtern always-on drop (#31558).
+     */
+    private static function ensureLibcSetenvUnsetenv(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('setenv');
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction(
+                'setenv',
+                $context->context->functionType($i32, false, $i8p, $i8p, $i32)
+            );
+            $context->registerFunction('setenv', $fn);
+        }
+        try {
+            $context->lookupFunction('unsetenv');
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction(
+                'unsetenv',
+                $context->context->functionType($i32, false, $i8p)
+            );
+            $context->registerFunction('unsetenv', $fn);
         }
     }
 
