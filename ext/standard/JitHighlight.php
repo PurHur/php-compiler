@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\Highlight;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNativeString;
@@ -14,6 +17,8 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\PathSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -77,7 +82,9 @@ final class JitHighlight
         // Arity guarded by highlight_file/show_source::call via requireArgCountRangeJit (#30689).
         $argc = \count($args);
 
-        $pathStr = JitStreamPath::lowerNonEmptyPath($context, $args[0], $functionName, 0, 'filename');
+        // Z_PARAM_PATH then empty-path: Zend E_WARNING then ValueError (#30514).
+        $pathStr = JitStringBuiltinArg::lowerPath($context, $args[0], $functionName, 0, 'filename');
+        self::rejectEmptyPathWithHighlightWarning($context, $args[0], $pathStr, $functionName);
         StringFileGetContents::implement($context);
         JitNativeString::ensureInsertBlock($context);
         $contents = $context->builder->call(
@@ -285,6 +292,72 @@ final class JitHighlight
         }
 
         return 0 !== (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
+    }
+
+    /**
+     * Empty path: Zend E_WARNING then ValueError (php-src url.c; #30514).
+     * Warning text is always Failed opening '' — path is empty when this fires.
+     */
+    private static function rejectEmptyPathWithHighlightWarning(
+        Context $context,
+        JITVariable $arg,
+        Value $pathStr,
+        string $functionName
+    ): void {
+        $valueError = PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE;
+        $warnMsg = VmStreamOpenFailure::highlightFailedOpeningMessage($functionName, '');
+
+        if (null !== ($arg->compileTimeString ?? null)) {
+            if ('' === $arg->compileTimeString) {
+                // Hybrid JIT: warning + throw when the call site is first lowered (#30514).
+                TriggerErrorJitHelper::warning($warnMsg);
+                throw new \ValueError($valueError);
+            }
+
+            return;
+        }
+
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($pathStr, $map['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $failBb = BasicBlockHelper::append($context, $functionName.'_empty_path');
+        $okBb = BasicBlockHelper::append($context, $functionName.'_path_ok');
+        $context->builder->branchIf($empty, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($failBb);
+        self::emitHighlightFailedOpeningWarning($context, $warnMsg);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, $valueError);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+        $context->builder->positionAtEnd($okBb);
+    }
+
+    private static function emitHighlightFailedOpeningWarning(Context $context, string $message): void
+    {
+        StringTriggerError::ensureLinked($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     private static function boolValForBranch(Context $context, JITVariable $arg, string $functionName): Value
