@@ -1565,6 +1565,24 @@ final class VmSoapClient
             // php-src soap.c type_to_string — struct descriptions for __getTypes (#21089).
             $state->types[] = self::wsdlTypeToString($type, $n);
         }
+        // Element-inline anonymous complexType/simpleType — php-src SDL type_to_string (#31474 / re-#21089).
+        foreach ($schemaElements as $elName => $el) {
+            foreach ($el->childNodes as $child) {
+                if (!$child instanceof \DOMElement) {
+                    continue;
+                }
+                $local = $child->localName ?? $child->nodeName;
+                if ('complexType' !== $local && 'simpleType' !== $local) {
+                    continue;
+                }
+                // Named nested types are already emitted above via //@name queries.
+                if ('' !== $child->getAttribute('name')) {
+                    continue;
+                }
+                $state->types[] = self::wsdlTypeToString($child, $elName);
+                break;
+            }
+        }
         // php-src SDL element → type_str bindings for classmap without xsi:type (#21088).
         foreach ($xpath->query('//xsd:element') ?: [] as $el) {
             if (!$el instanceof \DOMElement) {
