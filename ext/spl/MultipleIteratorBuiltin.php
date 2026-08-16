@@ -213,6 +213,10 @@ final class MultipleIteratorBuiltin
     {
         self::ensureState($object);
         $state = self::$store[$object->id];
+        // php-src zim_MultipleIterator_current — empty attach list → invalid iterator (#31625).
+        if ([] === $state['iterators']) {
+            throw new \RuntimeException('Called current() on an invalid iterator');
+        }
         $assoc = 0 !== ($state['flags'] & self::MIT_KEYS_ASSOC);
         $result = new HashTable();
         foreach ($state['iterators'] as $index => $entry) {
@@ -246,6 +250,10 @@ final class MultipleIteratorBuiltin
     {
         self::ensureState($object);
         $state = self::$store[$object->id];
+        // php-src zim_MultipleIterator_key — empty attach list → invalid iterator (#31625).
+        if ([] === $state['iterators']) {
+            throw new \RuntimeException('Called key() on an invalid iterator');
+        }
         $assoc = 0 !== ($state['flags'] & self::MIT_KEYS_ASSOC);
         $result = new HashTable();
         foreach ($state['iterators'] as $entry) {
