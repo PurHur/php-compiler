@@ -33,7 +33,8 @@ final class print_r extends Internal
         $argc = count($frame->calledArgs);
         $return = false;
         if (2 === $argc) {
-            $return = $frame->calledArgs[1]->resolveIndirect()->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31337).
+            $return = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'print_r', 2, 'return');
         }
         $out = VmPrintR::formatVariable($vm, $frame->calledArgs[0]->resolveIndirect(), 0, $frame);
         if ($return) {

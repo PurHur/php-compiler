@@ -27,7 +27,8 @@ final class var_export extends Internal
         TypedPropertyCheck::assertReadable($v);
         $return = false;
         if (isset($frame->calledArgs[1])) {
-            $return = $frame->calledArgs[1]->resolveIndirect()->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31337).
+            $return = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'var_export', 2, 'return');
         }
         $vm = $frame->vmContext?->runtime->vm;
         if (null === $vm) {
