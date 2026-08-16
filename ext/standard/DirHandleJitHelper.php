@@ -29,8 +29,12 @@ final class DirHandleJitHelper
         return (int) $handle;
     }
 
+    /** @return string|null — handle -1 uses EG(default_directory) (#31450) */
     public static function readdirArgv(int $handle): ?string
     {
+        if (-1 === $handle) {
+            $handle = VmDirArg::requireDefaultDirHandle();
+        }
         $entry = VmDir::readdir($handle);
         if (false === $entry) {
             return null;
