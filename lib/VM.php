@@ -12182,6 +12182,9 @@ restart:
             return $this->dispatchVmRuntimeException($e, $callerFrame);
         } catch (\InvalidArgumentException $e) {
             return $this->dispatchVmInvalidArgumentException($e, $callerFrame);
+        } catch (\OutOfRangeException $e) {
+            // SplDoublyLinkedList OOB — before LogicException (parent) (#31553).
+            return $this->dispatchVmOutOfRangeException($e, $callerFrame);
         } catch (\LogicException $e) {
             return $this->dispatchVmLogicException($e, $callerFrame);
         } catch (VM\NativeRequestParseBodyException $e) {
@@ -12372,6 +12375,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeOutOfBoundsException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge OutOfRangeException from SPL builtins (#31553, ext/spl/spl_dllist.c). */
+    private function dispatchVmOutOfRangeException(\OutOfRangeException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeOutOfRangeException(
             $this->context,
             $error->getMessage(),
             $file,
@@ -12624,6 +12641,14 @@ restart:
             }
 
             return $this->dispatchVmRuntimeException($e, $frame);
+        } catch (\OutOfRangeException $e) {
+            // SplDoublyLinkedList OOB dim — before LogicException (parent) (#31553).
+            $resolved = $dst->resolveIndirect();
+            if ($resolved->isArrayAccessOffset()) {
+                $dst->null();
+            }
+
+            return $this->dispatchVmOutOfRangeException($e, $frame);
         } catch (\LogicException $e) {
             $resolved = $dst->resolveIndirect();
             if ($resolved->isArrayAccessOffset()) {
