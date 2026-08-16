@@ -54,8 +54,9 @@ final class SetcookieOptions
                     }
                 }
                 if ($extra > 0) {
+                    // php-src head.c — php_setcookie() options form (#30713).
                     throw new \ArgumentCountError(
-                        $function.'() expects at most 3 arguments when argument #3 is an array'
+                        $function.'(): Expects exactly 3 arguments when argument #3 ($expires_or_options) is an array'
                     );
                 }
 
@@ -77,7 +78,10 @@ final class SetcookieOptions
             }
         }
         if ($maxIdx > 6) {
-            throw new \ArgumentCountError($function.'() accepts at most seven arguments');
+            // php-src head.c — ZEND_PARSE_PARAMETERS at-most-7 (#30713).
+            throw new \ArgumentCountError(
+                \sprintf('%s() expects at most 7 arguments, %d given', $function, $maxIdx + 1)
+            );
         }
 
         return self::parsePositional($function, $args, $frame);
