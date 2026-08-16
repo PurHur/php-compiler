@@ -123,6 +123,7 @@
             <file>./test/compliance/DirectoryIteratorNullPath31512VMTest.php</file>
             <file>./test/compliance/SplDllistOutOfRangeExceptionClass31553VMTest.php</file>
             <file>./test/compliance/MultipleIteratorKeyDuplication31552VMTest.php</file>
+            <file>./test/compliance/CachingIteratorMultiToStringFlags31551VMTest.php</file>
             <file>./test/compliance/SplObjectStorageOffsetSetNull31509VMTest.php</file>
             <file>./test/compliance/PgsqlConnectReflection27811VMTest.php</file>
             <file>./test/compliance/RegexIteratorEmptyPattern31511VMTest.php</file>
