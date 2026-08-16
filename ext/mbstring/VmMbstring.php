@@ -1198,9 +1198,10 @@ final class VmMbstring
     }
 
     /**
-     * Parse mb_convert_encoding() $from_encoding (array|string) into a non-empty list (#23562).
+     * Parse mb_convert_encoding() $from_encoding (array|string|null) into a non-empty list (#23562, #31488).
      *
      * php-src: php_mb_parse_encoding_array / php_mb_parse_encoding_list (arg_num 3 → $from_encoding).
+     * Explicit null matches omitted arg — current mb_internal_encoding() (mbstring.stub.php).
      *
      * @return list<string>
      */
@@ -1210,6 +1211,10 @@ final class VmMbstring
         int $argIndex = 2
     ): array {
         $var = $var->resolveIndirect();
+        // Z_PARAM_STR_OR_ARRAY_OR_NULL — null → internal encoding (#31488).
+        if (Variable::TYPE_NULL === $var->type) {
+            return [MbstringState::internalEncoding()];
+        }
         if (Variable::TYPE_STRING === $var->type) {
             return self::parseMbConvertFromEncodingString($var->toString(), $function, $argIndex);
         }

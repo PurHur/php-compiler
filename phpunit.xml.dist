@@ -431,6 +431,8 @@
             <file>./test/compliance/MbConvertEncodingQuotedPrintableVMTest.php</file>
             <file>./test/compliance/MbConvertEncodingNullStrictVMTest.php</file>
             <file>./test/compliance/MbConvertEncodingNullStrictJITTest.php</file>
+            <file>./test/compliance/MbConvertEncodingNullFromVMTest.php</file>
+            <file>./test/compliance/MbConvertEncodingNullFromJITTest.php</file>
             <file>./test/compliance/MbstringNullEncodingLimit31312VMTest.php</file>
             <file>./test/compliance/MbstringNullEncodingLimit31312JITTest.php</file>
             <file>./test/compliance/IconvNullEncodingDep31309VMTest.php</file>
