@@ -78,7 +78,9 @@ final class LibcExtern
             // stat/access/lstat dropped (#31403): JitStatKernel / TouchLibcRuntime / FtokRuntime /
             // JitFsGlobKernel declare module-locally; StatPathJitHelper owns user-script path predicates.
             'getenv' => [$i8p, false, [$i8p]],
-            'putenv' => [$i32, false, [$i8p]],
+            // putenv dropped (#31582): BootstrapCompileSmokeM3Emit declares putenv(3)
+            // module-locally (ensureLibcPutenv); user-script putenv() stays on PutenvJitHelper
+            // / NestedJIT invokePutenvNestedLeaf (setenv/unsetenv #31558) — not this row.
             // setenv/unsetenv dropped (#31558): StringGetenv NestedJIT putenv leaf declares
             // setenv(3)/unsetenv(3) module-locally (#29334 / ensureLibcStrchr peer #31519);
             // user-script putenv()/getenv() stay on PutenvJitHelper / GetenvLookupJitHelper.

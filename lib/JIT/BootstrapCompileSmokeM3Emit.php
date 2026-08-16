@@ -322,9 +322,28 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->returnValue($retOk);
     }
 
+    /**
+     * Module-local putenv(3) after LibcExtern always-on drop (#31582).
+     */
+    private static function ensureLibcPutenv(Context $context): void
+    {
+        try {
+            $context->lookupFunction('putenv');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $fn = $context->module->addFunction(
+                'putenv',
+                $context->context->functionType($i32, false, $i8p)
+            );
+            $context->registerFunction('putenv', $fn);
+        }
+    }
+
     /** Default PHP_COMPILER_REPO_ROOT for gen-0 argv drivers when unset (#12486, #3046). */
     private static function emitEnsureRepoRootEnvIfUnset(Context $context): void
     {
+        self::ensureLibcPutenv($context);
         $charPtr = $context->getTypeFromString('char*');
         $i8p = $context->getTypeFromString('int8*');
         $key = $context->builder->pointerCast(
@@ -357,6 +376,7 @@ final class BootstrapCompileSmokeM3Emit
      */
     private static function emitPutenvM3CompileDriverMainForBootstrapSelfhost(Context $context, Value $sourceFile): void
     {
+        self::ensureLibcPutenv($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'csm3_putenv_m3main_entry');
         $charPtr = $context->getTypeFromString('char*');
         $i32 = $context->getTypeFromString('int32');

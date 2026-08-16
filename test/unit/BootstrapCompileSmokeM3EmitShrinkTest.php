@@ -16,6 +16,16 @@ final class BootstrapCompileSmokeM3EmitShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('strstr')", $source);
     }
 
+    public function testBootstrapEmitDeclaresPutenvModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('ensureLibcPutenv', $source);
+        $this->assertStringContainsString('#31582', $source);
+        $this->assertStringContainsString("lookupFunction('putenv')", $source);
+        $this->assertStringContainsString("addFunction(", $source);
+        $this->assertMatchesRegularExpression("/addFunction\\(\\s*'putenv'/", $source);
+    }
+
     public function testModuleJitInitDoesNotRegisterStrstr(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
