@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmSerialize;
+use PHPCompiler\ext\standard\VmUnserializeFormat;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -77,6 +78,68 @@ final class SplDllistSerializeSupport
             1 => SplDoublyLinkedListBuiltin::exportElements($entry),
             2 => [],
         ]);
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_serialize — flags + :elem legacy wire (#31627).
+     */
+    public static function encodeLegacySerializeWire(ObjectEntry $entry): string
+    {
+        $buf = VmSerialize::serializeExported(SplDoublyLinkedListBuiltin::getIteratorMode($entry));
+        foreach (SplDoublyLinkedListBuiltin::exportElements($entry) as $element) {
+            $buf .= ':'.VmSerialize::serializeExported($element);
+        }
+
+        return $buf;
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_unserialize — mutate $this from flags/:elem wire (#31627).
+     */
+    public static function restoreFromLegacySerializeWire(
+        Context $ctx,
+        ObjectEntry $object,
+        string $buf,
+        ?Frame $frame = null
+    ): void {
+        $bufLen = \strlen($buf);
+        if (0 === $bufLen) {
+            return;
+        }
+        $p = 0;
+        $flagsDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx, $frame);
+        if (false === $flagsDecoded || Variable::TYPE_INTEGER !== $flagsDecoded[0]->type) {
+            throw self::legacyUnserializeErrorAt(
+                VmUnserializeFormat::lastErrorOffset() ?? $p,
+                $bufLen
+            );
+        }
+        [$flagsVar, $p] = $flagsDecoded;
+        $mode = $flagsVar->toInt();
+        $elements = [];
+        while ($p < $bufLen && $buf[$p] === ':') {
+            ++$p;
+            $elemDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx, $frame);
+            if (false === $elemDecoded) {
+                throw self::legacyUnserializeErrorAt(
+                    VmUnserializeFormat::lastErrorOffset() ?? $p,
+                    $bufLen
+                );
+            }
+            [$elemVar, $p] = $elemDecoded;
+            $elements[] = VmJson::export($elemVar->resolveIndirect());
+        }
+        if ($p !== $bufLen) {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        SplDoublyLinkedListBuiltin::restoreFromExported($object, $mode, $elements);
+    }
+
+    private static function legacyUnserializeErrorAt(int $offset, int $bufLen): \UnexpectedValueException
+    {
+        return new \UnexpectedValueException(
+            \sprintf('Error at offset %d of %d bytes', $offset, $bufLen)
+        );
     }
 
     /**

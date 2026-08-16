@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\Compiler\ParameterMetadata;
-use PHPCompiler\ext\standard\VmSerializeRefState;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -72,13 +71,12 @@ final class SplLegacySerializableSerialize extends VmClassMethod
             return SplArraySerializeSupport::encodeLegacySerializeWire($object);
         }
         if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
-            return SplDllistSerializeSupport::encodeZendSerializeWire($object);
+            return SplDllistSerializeSupport::encodeLegacySerializeWire($object);
         }
         if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
-            return SplObjectStorageSerializeSupport::encodeZendSerializeWire(
+            return SplObjectStorageSerializeSupport::encodeLegacySerializeWire(
                 $ctx,
                 $object,
-                new VmSerializeRefState(),
                 null
             );
         }
@@ -121,6 +119,22 @@ final class SplLegacySerializableUnserialize extends VmClassMethod
                 $frame->vmContext,
                 $object,
                 $data
+            );
+        } elseif (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+            // php-src zim_SplDoublyLinkedList_unserialize (#31627).
+            SplDllistSerializeSupport::restoreFromLegacySerializeWire(
+                $frame->vmContext,
+                $object,
+                $data,
+                $frame
+            );
+        } elseif (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+            // php-src zim_SplObjectStorage_unserialize (#31627).
+            SplObjectStorageSerializeSupport::restoreFromLegacySerializeWire(
+                $frame->vmContext,
+                $object,
+                $data,
+                $frame
             );
         }
         // Other SPL Serializable types: mutate via dedicated paths when wired (#14164).
