@@ -964,7 +964,16 @@ final class SplFileObjectFgetcsv extends VmClassMethod
                 'escape'
             );
         }
-        VmCsvArg::validateFgetcsvOptions($separator, $enclosure, $escape);
+        // php-src zim_SplFileObject_fgetcsv — method arg indices (no stream), #31540.
+        VmCsvArg::validateFgetcsvOptions(
+            $separator,
+            $enclosure,
+            $escape,
+            'SplFileObject::fgetcsv',
+            1,
+            2,
+            3
+        );
         // php-src SplFileObject::fgetcsv → spl_filesystem_file_read_csv (#24290),
         // not raw stream fgetcsv() which collapses the trailing empty row to false.
         $row = SplFileObjectStorage::fgetcsv($object, $separator, $enclosure, $escape);
@@ -1040,7 +1049,16 @@ final class SplFileObjectFputcsv extends VmClassMethod
                 'escape'
             );
         }
-        VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
+        // php-src zim_SplFileObject_fputcsv — $fields is #1 so separator is #2 (#31540).
+        VmCsvArg::validateFputcsvOptions(
+            $separator,
+            $enclosure,
+            $escape,
+            'SplFileObject::fputcsv',
+            2,
+            3,
+            4
+        );
         $eol = "\n";
         if (isset($frame->calledArgs[5])) {
             $eol = VmString::coerceStringBuiltinArg(
@@ -1103,7 +1121,16 @@ final class SplFileObjectSetCsvControl extends VmClassMethod
                 'escape'
             );
         }
-        VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
+        // php-src zim_SplFileObject_setCsvControl — separator/enclosure/escape are #1/#2/#3.
+        VmCsvArg::validateFputcsvOptions(
+            $separator,
+            $enclosure,
+            $escape,
+            'SplFileObject::setCsvControl',
+            1,
+            2,
+            3
+        );
         SplFileObjectStorage::setCsvControl($object, $separator, $enclosure, $escape);
     }
 }

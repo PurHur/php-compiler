@@ -17,24 +17,44 @@ use PHPCompiler\VM;
  */
 final class VmCsvArg
 {
+    /**
+     * @param string $function  Callee label in ValueError text (e.g. fputcsv / SplFileObject::fputcsv)
+     * @param int    $separatorArg 1-based Argument #N for $separator (free fputcsv = 3; method = 2)
+     * @param int    $enclosureArg 1-based Argument #N for $enclosure
+     * @param int    $escapeArg    1-based Argument #N for $escape
+     */
     public static function validateFputcsvOptions(
         string $separator,
         string $enclosure,
         string $escape,
+        string $function = 'fputcsv',
+        int $separatorArg = 3,
+        int $enclosureArg = 4,
+        int $escapeArg = 5,
     ): void {
-        self::requireSingleChar('fputcsv', $separator, 3, 'separator');
-        self::requireSingleChar('fputcsv', $enclosure, 4, 'enclosure');
-        self::requireEmptyOrSingleChar('fputcsv', $escape, 5, 'escape');
+        self::requireSingleChar($function, $separator, $separatorArg, 'separator');
+        self::requireSingleChar($function, $enclosure, $enclosureArg, 'enclosure');
+        self::requireEmptyOrSingleChar($function, $escape, $escapeArg, 'escape');
     }
 
+    /**
+     * @param string $function  Callee label (e.g. fgetcsv / SplFileObject::fgetcsv)
+     * @param int    $separatorArg 1-based Argument #N for $separator (free fgetcsv = 3; method = 1)
+     * @param int    $enclosureArg 1-based Argument #N for $enclosure
+     * @param int    $escapeArg    1-based Argument #N for $escape
+     */
     public static function validateFgetcsvOptions(
         string $separator,
         string $enclosure,
         string $escape,
+        string $function = 'fgetcsv',
+        int $separatorArg = 3,
+        int $enclosureArg = 4,
+        int $escapeArg = 5,
     ): void {
-        self::requireSingleChar('fgetcsv', $separator, 3, 'separator');
-        self::requireSingleChar('fgetcsv', $enclosure, 4, 'enclosure');
-        self::requireEmptyOrSingleChar('fgetcsv', $escape, 5, 'escape');
+        self::requireSingleChar($function, $separator, $separatorArg, 'separator');
+        self::requireSingleChar($function, $enclosure, $enclosureArg, 'enclosure');
+        self::requireEmptyOrSingleChar($function, $escape, $escapeArg, 'escape');
     }
 
     /**
