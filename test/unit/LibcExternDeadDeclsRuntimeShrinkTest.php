@@ -51,6 +51,8 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'strstr',
             'realpath',
             'strdup',
+            'setenv',
+            'unsetenv',
         ];
     }
 
@@ -61,7 +63,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -73,6 +75,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31498', $source);
         $this->assertStringContainsString('#31519', $source);
         $this->assertStringContainsString('#31534', $source);
+        $this->assertStringContainsString('#31558', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -157,6 +160,16 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strdup (#31534)'
         );
+        $this->assertStringNotContainsString(
+            "'setenv' =>",
+            $source,
+            'LibcExtern must not declare libc setenv (#31558)'
+        );
+        $this->assertStringNotContainsString(
+            "'unsetenv' =>",
+            $source,
+            'LibcExtern must not declare libc unsetenv (#31558)'
+        );
     }
 
     public function testChownRuntimeDoesNotLookupLibcChown(): void
@@ -184,6 +197,16 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("lookupFunction('strchr')", $source);
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitParseStrUserScriptCstrKernel.php');
         $this->assertStringContainsString("'strchr'", $kernel);
+    }
+
+    public function testStringGetenvDeclaresSetenvUnsetenvModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenv.php');
+        $this->assertStringContainsString('ensureLibcSetenvUnsetenv', $source);
+        $this->assertStringContainsString('#31558', $source);
+        $this->assertStringContainsString("lookupFunction('setenv')", $source);
+        $this->assertStringContainsString("lookupFunction('unsetenv')", $source);
+        $this->assertStringContainsString('invokePutenvNestedLeaf', $source);
     }
 
     public function testSysGetTempDirDeclaresRealpathModuleLocallyAfterLibcExternDrop(): void

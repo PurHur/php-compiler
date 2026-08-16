@@ -79,8 +79,9 @@ final class LibcExtern
             // JitFsGlobKernel declare module-locally; StatPathJitHelper owns user-script path predicates.
             'getenv' => [$i8p, false, [$i8p]],
             'putenv' => [$i32, false, [$i8p]],
-            'setenv' => [$i32, false, [$i8p, $i8p, $i32]],
-            'unsetenv' => [$i32, false, [$i8p]],
+            // setenv/unsetenv dropped (#31558): StringGetenv NestedJIT putenv leaf declares
+            // setenv(3)/unsetenv(3) module-locally (#29334 / ensureLibcStrchr peer #31519);
+            // user-script putenv()/getenv() stay on PutenvJitHelper / GetenvLookupJitHelper.
             // realpath dropped (#31534 / #30530 peer): SysGetTempDirRuntime NestedJIT leaf
             // declares realpath(3) module-locally (#29433); StringRealpath / RealpathJitHelper
             // own user-script realpath() (VmString PHP — not libc). Module always-on already

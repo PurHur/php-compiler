@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7552 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24089 |
+| Source constructs flagged (warnings) | 24090 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2466,7 +2466,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/InternalIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/InternalIteratorLiveHandler.php` | 0 | 1 |
 | `ext/spl/InternalIteratorSerializeDeny.php` | 0 | 3 |
-| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 16 |
+| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 17 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 9 |
 | `ext/spl/Module.php` | 0 | 2 |
@@ -16301,59 +16301,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmCollator.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 119)
-- new Variable (line 124)
-- new CollatorConstruct (line 133)
-- new CollatorCreate (line 138)
-- new CollatorCompare (line 139)
-- new CollatorAsort (line 140)
-- new CollatorSort (line 141)
-- new CollatorSortWithSortKeys (line 142)
-- new CollatorGetSortKey (line 143)
-- new CollatorGetStrength (line 144)
-- new CollatorSetStrength (line 145)
-- new CollatorGetAttribute (line 146)
-- new CollatorSetAttribute (line 147)
-- new CollatorGetLocale (line 148)
-- new CollatorGetErrorCode (line 149)
-- new CollatorGetErrorMessage (line 150)
-- new Error (line 168)
-- new ObjectEntry (line 170)
-- new Variable (line 272)
-- new HashTable (line 276)
-- new Variable (line 660)
-- new HashTable (line 664)
-- new Variable (line 895)
-- new Variable (line 897)
-- new HashTable (line 910)
-- new Variable (line 913)
-- new Error (line 920)
-- new ArgumentCountError (line 1005)
-- new ArgumentCountError (line 1059)
-- new ArgumentCountError (line 1110)
-- new Error (line 1118)
-- new ArgumentCountError (line 1153)
-- new Error (line 1161)
-- new ArgumentCountError (line 1187)
-- new Error (line 1195)
-- new ArgumentCountError (line 1221)
-- new Error (line 1229)
-- new ArgumentCountError (line 1251)
-- new Error (line 1259)
-- new ArgumentCountError (line 1288)
-- new Error (line 1296)
-- new ArgumentCountError (line 1317)
-- new Error (line 1325)
-- new ArgumentCountError (line 1348)
-- new Error (line 1356)
-- new ArgumentCountError (line 1384)
-- new Error (line 1392)
-- new ArgumentCountError (line 1416)
-- new Error (line 1424)
-- new ArgumentCountError (line 1452)
-- new Error (line 1460)
-- new ArgumentCountError (line 1481)
-- new Error (line 1489)
+- new ClassEntry (line 120)
+- new Variable (line 125)
+- new CollatorConstruct (line 134)
+- new CollatorCreate (line 139)
+- new CollatorCompare (line 140)
+- new CollatorAsort (line 141)
+- new CollatorSort (line 142)
+- new CollatorSortWithSortKeys (line 143)
+- new CollatorGetSortKey (line 144)
+- new CollatorGetStrength (line 145)
+- new CollatorSetStrength (line 146)
+- new CollatorGetAttribute (line 147)
+- new CollatorSetAttribute (line 148)
+- new CollatorGetLocale (line 149)
+- new CollatorGetErrorCode (line 150)
+- new CollatorGetErrorMessage (line 151)
+- new Error (line 174)
+- new ObjectEntry (line 176)
+- new Variable (line 278)
+- new HashTable (line 282)
+- new Variable (line 666)
+- new HashTable (line 670)
+- new Variable (line 901)
+- new Variable (line 903)
+- new HashTable (line 916)
+- new Variable (line 919)
+- new Error (line 926)
+- new ArgumentCountError (line 1011)
+- new ArgumentCountError (line 1065)
+- new ArgumentCountError (line 1116)
+- new Error (line 1124)
+- new ArgumentCountError (line 1159)
+- new Error (line 1167)
+- new ArgumentCountError (line 1193)
+- new Error (line 1201)
+- new ArgumentCountError (line 1227)
+- new Error (line 1235)
+- new ArgumentCountError (line 1257)
+- new Error (line 1265)
+- new ArgumentCountError (line 1294)
+- new Error (line 1302)
+- new ArgumentCountError (line 1323)
+- new Error (line 1331)
+- new ArgumentCountError (line 1354)
+- new Error (line 1362)
+- new ArgumentCountError (line 1390)
+- new Error (line 1398)
+- new ArgumentCountError (line 1422)
+- new Error (line 1430)
+- new ArgumentCountError (line 1458)
+- new Error (line 1466)
+- new ArgumentCountError (line 1487)
+- new Error (line 1495)
 - 50 class method(s)
 - 2 closure(s)
 
@@ -24716,11 +24716,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new SimpleXMLElement (line 141)
-- new JITVariable (line 317)
-- new JITVariable (line 340)
-- new JITVariable (line 741)
-- new JITVariable (line 810)
+- new SimpleXMLElement (line 154)
+- new JITVariable (line 330)
+- new JITVariable (line 353)
+- new JITVariable (line 766)
+- new JITVariable (line 835)
 - 37 class method(s)
 - 1 closure(s)
 
@@ -24963,9 +24963,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/VmSimpleXmlIterator.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 27)
-- new SimpleXmlIteratorConstruct (line 35)
-- new ArgumentCountError (line 105)
+- new ClassEntry (line 28)
+- new SimpleXmlIteratorConstruct (line 36)
+- new ArgumentCountError (line 106)
 - 12 class method(s)
 
 ### `ext/simplexml/simplexml_import_dom.php`
@@ -27196,7 +27196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 126)
 - new Variable (line 130)
 - new HashTable (line 153)
-- new ArgumentCountError (line 216)
+- new ArgumentCountError (line 220)
 - 16 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -27223,11 +27223,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 544)
 - new Variable (line 550)
 - new BadMethodCallException (line 563)
-- new ArgumentCountError (line 856)
-- new ArgumentCountError (line 968)
-- new ArgumentCountError (line 998)
-- new ArgumentCountError (line 1029)
-- new ArgumentCountError (line 1058)
+- new ArgumentCountError (line 858)
+- new ArgumentCountError (line 970)
+- new ArgumentCountError (line 1000)
+- new ArgumentCountError (line 1031)
+- new ArgumentCountError (line 1060)
 - 51 class method(s)
 
 ### `ext/spl/CallbackFilterIteratorBuiltin.php`
@@ -27243,12 +27243,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/DirectoryIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new DirectoryIteratorConstruct (line 45)
-- new UnexpectedValueException (line 100)
-- new OutOfBoundsException (line 144)
-- new Variable (line 178)
-- new ObjectEntry (line 196)
+- new ClassEntry (line 37)
+- new DirectoryIteratorConstruct (line 46)
+- new UnexpectedValueException (line 101)
+- new OutOfBoundsException (line 145)
+- new Variable (line 179)
+- new ObjectEntry (line 197)
 - 36 class method(s)
 
 ### `ext/spl/DirectoryIteratorSnapshotJitHelper.php`
@@ -27273,19 +27273,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/FilesystemIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 65)
-- new FilesystemIteratorConstruct (line 89)
-- new FilesystemIteratorGetFlags (line 92)
-- new FilesystemIteratorSetFlags (line 95)
-- new FilesystemIteratorKey (line 98)
-- new FilesystemIteratorCurrent (line 100)
-- new ClassEntry (line 181)
-- new RecursiveDirectoryIteratorConstruct (line 193)
-- new RecursiveDirectoryIteratorHasChildren (line 196)
-- new RecursiveDirectoryIteratorGetChildren (line 199)
-- new RecursiveDirectoryIteratorGetSubPath (line 202)
-- new RecursiveDirectoryIteratorGetSubPathname (line 205)
-- new ObjectEntry (line 411)
+- new ClassEntry (line 66)
+- new FilesystemIteratorConstruct (line 90)
+- new FilesystemIteratorGetFlags (line 93)
+- new FilesystemIteratorSetFlags (line 96)
+- new FilesystemIteratorKey (line 99)
+- new FilesystemIteratorCurrent (line 101)
+- new ClassEntry (line 182)
+- new RecursiveDirectoryIteratorConstruct (line 194)
+- new RecursiveDirectoryIteratorHasChildren (line 197)
+- new RecursiveDirectoryIteratorGetChildren (line 200)
+- new RecursiveDirectoryIteratorGetSubPath (line 203)
+- new RecursiveDirectoryIteratorGetSubPathname (line 206)
+- new ObjectEntry (line 420)
 - 18 class method(s)
 
 ### `ext/spl/FilterIteratorBuiltin.php`
@@ -27301,19 +27301,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 159)
 - new Variable (line 162)
 - new ArgumentCountError (line 193)
-- new ArgumentCountError (line 225)
-- new UnexpectedValueException (line 292)
-- new BadMethodCallException (line 318)
+- new ArgumentCountError (line 227)
+- new UnexpectedValueException (line 296)
+- new BadMethodCallException (line 322)
 - 19 class method(s)
 
 ### `ext/spl/GlobIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new GlobIteratorConstruct (line 45)
-- new Variable (line 171)
-- new ObjectEntry (line 189)
-- new ArgumentCountError (line 423)
+- new ClassEntry (line 37)
+- new GlobIteratorConstruct (line 46)
+- new Variable (line 172)
+- new ObjectEntry (line 190)
+- new ArgumentCountError (line 428)
 - 23 class method(s)
 - 1 closure(s)
 
@@ -27368,13 +27368,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 108)
 - new RecursiveIteratorIteratorConstruct (line 117)
 - new Error (line 362)
-- new UnexpectedValueException (line 545)
-- new Variable (line 594)
-- new UnexpectedValueException (line 842)
-- new ArgumentCountError (line 908)
-- new ArgumentCountError (line 940)
-- new ArgumentCountError (line 1148)
-- new Error (line 1162)
+- new UnexpectedValueException (line 584)
+- new UnexpectedValueException (line 614)
+- new Variable (line 653)
+- new UnexpectedValueException (line 901)
+- new ArgumentCountError (line 967)
+- new ArgumentCountError (line 999)
+- new ArgumentCountError (line 1207)
+- new Error (line 1221)
 - 80 class method(s)
 - 1 closure(s)
 
@@ -27394,7 +27395,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OutOfBoundsException (line 180)
 - new OutOfBoundsException (line 186)
 - new Variable (line 246)
-- new ArgumentCountError (line 463)
+- new ArgumentCountError (line 465)
 - 26 class method(s)
 
 ### `ext/spl/Module.php`
@@ -27461,21 +27462,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 37)
-- new RecursiveCallbackFilterIteratorConstruct (line 46)
-- new RecursiveCallbackFilterIteratorAccept (line 50)
-- new RecursiveCallbackFilterIteratorRewind (line 52)
-- new RecursiveCallbackFilterIteratorNext (line 54)
-- new RecursiveCallbackFilterIteratorValid (line 56)
-- new RecursiveCallbackFilterIteratorCurrent (line 58)
-- new RecursiveCallbackFilterIteratorKey (line 60)
-- new RecursiveCallbackFilterIteratorGetInnerIterator (line 62)
-- new RecursiveCallbackFilterIteratorGetChildren (line 65)
-- new RecursiveCallbackFilterIteratorHasChildren (line 68)
-- new Variable (line 129)
-- new ObjectEntry (line 150)
-- new Variable (line 153)
-- new Variable (line 166)
+- new ClassEntry (line 36)
+- new RecursiveCallbackFilterIteratorConstruct (line 45)
+- new RecursiveCallbackFilterIteratorAccept (line 49)
+- new RecursiveCallbackFilterIteratorRewind (line 51)
+- new RecursiveCallbackFilterIteratorNext (line 53)
+- new RecursiveCallbackFilterIteratorValid (line 55)
+- new RecursiveCallbackFilterIteratorCurrent (line 57)
+- new RecursiveCallbackFilterIteratorKey (line 59)
+- new RecursiveCallbackFilterIteratorGetInnerIterator (line 61)
+- new RecursiveCallbackFilterIteratorGetChildren (line 64)
+- new RecursiveCallbackFilterIteratorHasChildren (line 67)
+- new Variable (line 128)
+- new ObjectEntry (line 149)
+- new Variable (line 152)
+- new Variable (line 165)
 - 21 class method(s)
 
 ### `ext/spl/RecursiveTreeIteratorBuiltin.php`
@@ -27491,30 +27492,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/RegexIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 55)
-- new Variable (line 76)
+- new ClassEntry (line 56)
 - new Variable (line 77)
-- new ClassProperty (line 78)
-- new RegexIteratorConstruct (line 88)
-- new RegexIteratorAccept (line 91)
-- new Variable (line 291)
-- new Variable (line 316)
-- new Variable (line 335)
-- new Variable (line 356)
-- new ArgumentCountError (line 469)
-- new ArgumentCountError (line 716)
-- new ArgumentCountError (line 771)
-- new ArgumentCountError (line 826)
-- new ClassEntry (line 859)
-- new RecursiveRegexIteratorConstruct (line 870)
-- new RecursiveRegexIteratorHasChildren (line 873)
-- new RecursiveRegexIteratorGetChildren (line 876)
-- new RecursiveRegexIteratorAccept (line 880)
-- new ObjectEntry (line 907)
-- new Variable (line 917)
-- new ArgumentCountError (line 940)
-- new UnexpectedValueException (line 1037)
-- 47 class method(s)
+- new Variable (line 78)
+- new ClassProperty (line 79)
+- new RegexIteratorConstruct (line 89)
+- new RegexIteratorAccept (line 92)
+- new Variable (line 307)
+- new Variable (line 332)
+- new Variable (line 351)
+- new Variable (line 372)
+- new ArgumentCountError (line 485)
+- new ArgumentCountError (line 736)
+- new ArgumentCountError (line 791)
+- new ArgumentCountError (line 846)
+- new ClassEntry (line 879)
+- new RecursiveRegexIteratorConstruct (line 890)
+- new RecursiveRegexIteratorHasChildren (line 893)
+- new RecursiveRegexIteratorGetChildren (line 896)
+- new RecursiveRegexIteratorAccept (line 900)
+- new ObjectEntry (line 927)
+- new Variable (line 937)
+- new ArgumentCountError (line 960)
+- new UnexpectedValueException (line 1059)
+- 48 class method(s)
 
 ### `ext/spl/SplArraySerializeSupport.php`
 
@@ -27544,24 +27545,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 126)
 - new OutOfBoundsException (line 187)
 - new Variable (line 220)
-- new Variable (line 377)
-- new Variable (line 399)
-- new Variable (line 413)
-- new ObjectEntry (line 429)
-- new Variable (line 443)
-- new Variable (line 465)
-- new Variable (line 471)
-- new Variable (line 578)
-- new Variable (line 580)
-- new HashTable (line 600)
-- new Variable (line 627)
-- new Variable (line 629)
-- new HashTable (line 649)
-- new Variable (line 662)
-- new Variable (line 681)
-- new Variable (line 687)
-- new Variable (line 693)
-- new Variable (line 699)
+- new Variable (line 386)
+- new Variable (line 408)
+- new Variable (line 422)
+- new ObjectEntry (line 438)
+- new Variable (line 452)
+- new Variable (line 474)
+- new Variable (line 480)
+- new Variable (line 587)
+- new Variable (line 589)
+- new HashTable (line 609)
+- new Variable (line 636)
+- new Variable (line 638)
+- new HashTable (line 658)
+- new Variable (line 671)
+- new Variable (line 690)
+- new Variable (line 696)
+- new Variable (line 702)
+- new Variable (line 708)
 - 45 class method(s)
 
 ### `ext/spl/SplArrayUserSortMethod.php`
@@ -27657,8 +27658,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 565)
 - new ArgumentCountError (line 748)
 - new ArgumentCountError (line 812)
-- new ArgumentCountError (line 995)
-- new Variable (line 1134)
+- new ArgumentCountError (line 1004)
+- new Variable (line 1161)
 - 35 class method(s)
 
 ### `ext/spl/SplFileObjectSnapshotJitHelper.php`
@@ -27769,9 +27770,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplIteratorSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 103)
-- new Variable (line 186)
-- 14 class method(s)
+- new Variable (line 106)
+- new Variable (line 215)
+- 15 class method(s)
 
 ### `ext/spl/SplLegacySerializableMethods.php`
 
@@ -27792,27 +27793,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SplObjectStorageUnserialize (line 95)
 - new Variable (line 159)
 - new Variable (line 164)
-- new Variable (line 235)
-- new Variable (line 239)
-- new Variable (line 242)
-- new HashTable (line 288)
-- new Variable (line 289)
-- new Variable (line 292)
-- new Variable (line 295)
-- new Variable (line 299)
-- new HashTable (line 300)
-- new HashTable (line 306)
-- new UnexpectedValueException (line 317)
-- new Variable (line 319)
-- new Variable (line 410)
-- new Variable (line 422)
-- new Variable (line 434)
-- new Variable (line 492)
-- new ArgumentCountError (line 750)
-- new ArgumentCountError (line 774)
-- new ArgumentCountError (line 938)
-- new ArgumentCountError (line 1007)
-- new ArgumentCountError (line 1054)
+- new Variable (line 243)
+- new Variable (line 247)
+- new Variable (line 250)
+- new HashTable (line 296)
+- new Variable (line 297)
+- new Variable (line 300)
+- new Variable (line 303)
+- new Variable (line 307)
+- new HashTable (line 308)
+- new HashTable (line 314)
+- new UnexpectedValueException (line 325)
+- new Variable (line 327)
+- new Variable (line 419)
+- new Variable (line 431)
+- new Variable (line 443)
+- new Variable (line 501)
+- new ArgumentCountError (line 759)
+- new ArgumentCountError (line 783)
+- new ArgumentCountError (line 947)
+- new ArgumentCountError (line 1016)
+- new ArgumentCountError (line 1063)
 - 57 class method(s)
 - 1 closure(s)
 
@@ -36209,7 +36210,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregPattern.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/VmPregPure.php`
 
@@ -46399,7 +46400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1907)
+- new InternalArgInfo (line 1938)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46415,8 +46416,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2513)
-- new ArgumentCountError (line 2524)
+- new ArgumentCountError (line 2557)
+- new ArgumentCountError (line 2568)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -50831,7 +50832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetenv.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/StringGetenvAll.php`
 
@@ -52089,11 +52090,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/CallbackFilterIteratorConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 39)
-- new Variable (line 60)
-- new Variable (line 119)
-- new NestedClosureInvoke (line 125)
-- new Variable (line 168)
+- new ArgumentCountError (line 40)
+- new Variable (line 72)
+- new Variable (line 131)
+- new NestedClosureInvoke (line 137)
+- new Variable (line 180)
 - 4 class method(s)
 
 ### `lib/JIT/Call/ClosureBind.php`
@@ -53514,8 +53515,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/SplObjectStorageMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 223)
-- new Variable (line 269)
+- new Variable (line 273)
+- new Variable (line 319)
 - 11 class method(s)
 
 ### `lib/JIT/Call/SplPriorityQueueMethod.php`
@@ -59580,28 +59581,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 67)
 - new Error (line 88)
-- new Exception (line 165)
-- new DatePeriodIteratorState (line 205)
-- new ObjectEntry (line 346)
-- new ObjectEntry (line 481)
-- new NativeDateMalformedPeriodStringException (line 492)
-- new Variable (line 591)
-- new Variable (line 595)
+- new Exception (line 170)
+- new DatePeriodIteratorState (line 210)
+- new ObjectEntry (line 351)
+- new ObjectEntry (line 486)
+- new NativeDateMalformedPeriodStringException (line 497)
+- new Variable (line 596)
 - new Variable (line 600)
-- new Variable (line 603)
-- new Error (line 620)
-- new Error (line 626)
-- new Error (line 630)
-- new Error (line 634)
-- new Error (line 638)
-- new Error (line 642)
+- new Variable (line 605)
+- new Variable (line 608)
+- new Error (line 625)
+- new Error (line 631)
+- new Error (line 635)
+- new Error (line 639)
+- new Error (line 643)
 - new Error (line 647)
-- new Error (line 651)
-- new Error (line 655)
-- new Error (line 659)
-- new Error (line 663)
-- new ObjectEntry (line 673)
-- new Error (line 706)
+- new Error (line 652)
+- new Error (line 656)
+- new Error (line 660)
+- new Error (line 664)
+- new Error (line 668)
+- new ObjectEntry (line 678)
+- new Error (line 711)
 - 43 class method(s)
 
 ### `lib/VM/DateTimeFormatJitHelper.php`
