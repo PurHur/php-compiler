@@ -12,7 +12,9 @@ use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
- * ftp_login() — USER/PASS auth (php-src ext/ftp/php_ftp.c; #3353, #6762).
+ * ftp_login() — USER/PASS auth (php-src ext/ftp/php_ftp.c; #3353, #6762, #31378).
+ *
+ * JIT/AOT: {@see JitFtpLogin} → NestedJIT {@see FtpLoginJitHelper} (#31378).
  */
 final class ftp_login extends Internal
 {
@@ -42,6 +44,6 @@ final class ftp_login extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_login() is not implemented for JIT in this compiler build (issue #6762)');
+        return JitFtpLogin::invoke($context, ...$args);
     }
 }
