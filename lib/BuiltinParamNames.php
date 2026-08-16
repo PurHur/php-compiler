@@ -1781,6 +1781,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — $iterator not $it (#23423)
             case 'iterator_count':
                 return ['iterator'];
+            // php-src ext/standard/basic_functions.stub.php — iterator/callback/args not it/function/params (#23445)
+            case 'iterator_apply':
+                return ['iterator', 'callback', 'args='];
             case 'generator_to_array':
                 return ['generator', 'preserve_keys'];
             case 'hrtime':
