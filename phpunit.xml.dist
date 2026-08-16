@@ -129,6 +129,7 @@
             <file>./test/compliance/DateTimeImmutableModifyBadTokenWarn31597VMTest.php</file>
             <file>./test/compliance/SplHeapValidAfterInsert31600VMTest.php</file>
             <file>./test/compliance/SplPriorityQueueValidAfterInsert31601VMTest.php</file>
+            <file>./test/compliance/DateTimeModifyNowUtcWs31603VMTest.php</file>
             <file>./test/compliance/SplObjectStorageOffsetSetNull31509VMTest.php</file>
             <file>./test/compliance/PgsqlConnectReflection27811VMTest.php</file>
             <file>./test/compliance/PgsqlQueryFetchCloseReflection28782VMTest.php</file>
