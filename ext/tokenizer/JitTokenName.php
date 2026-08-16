@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\tokenizer;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for token_name() (#3171, #7254, #27278).
+ * LLVM lowering for token_name() (#3171, #7254, #27278, #31407).
  *
  * Compile-time T_* / ConstantInt folding stays as an optional fast path.
  * Runtime ints (e.g. token_get_all()[$i][0]) use an inline id→name select-walk
@@ -23,6 +24,9 @@ final class JitTokenName
 {
     public static function lower(Context $context, JITVariable $arg): Value
     {
+        // Caller strict_types: reject null before coerce-to-0 (#31407; peer image_type_to_mime_type).
+        JitInternalStrictArg::requireInt($context, $arg, 'token_name', 'id', 1);
+
         $folded = self::tryResolveCompileTimeName($context, $arg);
         if (null !== $folded) {
             return $context->builder->load($context->constantStringFromString($folded));

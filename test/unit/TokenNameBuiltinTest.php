@@ -65,4 +65,21 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'aot_token_name_runtime_arg.php'));
         $this->assertSame("5\nT_ECHO\n", ob_get_clean());
     }
+
+    /** Caller strict_types: null must TypeError, not coerce to 0 → UNKNOWN (#31407). */
+    public function testTokenNameNullUnderStrictTypesTypeError(): void
+    {
+        $runtime = new Runtime();
+        $code = file_get_contents(dirname(__DIR__, 2).'/test/repro/maintainer_gap_token_name_null.php');
+        $this->assertNotFalse($code);
+        try {
+            $runtime->run($runtime->parseAndCompile($code, 'token_name_null_strict.php'));
+            $this->fail('expected TypeError for token_name(null) under strict_types');
+        } catch (\TypeError $e) {
+            $this->assertSame(
+                'token_name(): Argument #1 ($id) must be of type int, null given',
+                $e->getMessage()
+            );
+        }
+    }
 }
