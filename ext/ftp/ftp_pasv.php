@@ -41,6 +41,6 @@ final class ftp_pasv extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_pasv() is not implemented for JIT in this compiler build (issue #20033)');
+        return JitFtpNav::invokePasv($context, ...$args);
     }
 }
