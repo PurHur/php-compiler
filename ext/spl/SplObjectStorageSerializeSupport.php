@@ -129,6 +129,140 @@ final class SplObjectStorageSerializeSupport
     }
 
     /**
+     * php-src zim_SplObjectStorage_serialize — x:/m: legacy wire (#31627).
+     */
+    public static function encodeLegacySerializeWire(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?Frame $frame = null
+    ): string {
+        // VmSerializeRefState lives in VmSerialize.php — force autoload before `new`.
+        \class_exists(VmSerialize::class);
+        $state = new VmSerializeRefState();
+        $entries = SplObjectStorageBuiltin::exportSerializeEntries($entry);
+        $buf = 'x:'.VmSerialize::serializeExported(\count($entries));
+        foreach ($entries as [$object, $info]) {
+            $buf .= VmSerialize::encodeVariableWire($ctx, $object, $state, $frame);
+            $buf .= ',';
+            $buf .= VmSerialize::encodeVariableWire($ctx, $info, $state, $frame);
+            $buf .= ';';
+        }
+        $buf .= 'm:'.VmSerialize::serializeExported([]);
+
+        return $buf;
+    }
+
+    /**
+     * php-src zim_SplObjectStorage_unserialize — mutate $this from x:/m: wire (#31627).
+     */
+    public static function restoreFromLegacySerializeWire(
+        Context $ctx,
+        ObjectEntry $object,
+        string $buf,
+        ?Frame $frame = null
+    ): void {
+        $bufLen = \strlen($buf);
+        if (0 === $bufLen) {
+            return;
+        }
+        $p = 0;
+        if ($buf[$p] !== 'x') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+        if ($p >= $bufLen || $buf[$p] !== ':') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+
+        $countDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx, $frame);
+        if (false === $countDecoded || Variable::TYPE_INTEGER !== $countDecoded[0]->type) {
+            throw self::legacyUnserializeErrorAt(
+                VmUnserializeFormat::lastErrorOffset() ?? $p,
+                $bufLen
+            );
+        }
+        [$countVar, $p] = $countDecoded;
+        // php-src: --p then require ';' at each element / before members.
+        if ($p < 1 || $buf[$p - 1] !== ';') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        --$p;
+        $count = $countVar->toInt();
+        if ($count < 0) {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+
+        SplObjectStorageBuiltin::init($object);
+        while ($count-- > 0) {
+            if ($p >= $bufLen || $buf[$p] !== ';') {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            ++$p;
+            if ($p >= $bufLen) {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            $type = $buf[$p];
+            if ('O' !== $type && 'C' !== $type && 'r' !== $type) {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            $entryDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx, $frame);
+            if (false === $entryDecoded) {
+                throw self::legacyUnserializeErrorAt(
+                    VmUnserializeFormat::lastErrorOffset() ?? $p,
+                    $bufLen
+                );
+            }
+            [$entryVar, $p] = $entryDecoded;
+            $infoVar = null;
+            if ($p < $bufLen && $buf[$p] === ',') {
+                ++$p;
+                $infoDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx, $frame);
+                if (false === $infoDecoded) {
+                    throw self::legacyUnserializeErrorAt(
+                        VmUnserializeFormat::lastErrorOffset() ?? $p,
+                        $bufLen
+                    );
+                }
+                [$infoVar, $p] = $infoDecoded;
+            }
+            if (Variable::TYPE_OBJECT !== $entryVar->type) {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            SplObjectStorageBuiltin::attach($object, $entryVar, $infoVar);
+        }
+
+        if ($p >= $bufLen || $buf[$p] !== ';') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+        if ($p >= $bufLen || $buf[$p] !== 'm') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+        if ($p >= $bufLen || $buf[$p] !== ':') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+
+        $membersDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx, $frame);
+        if (false === $membersDecoded || Variable::TYPE_ARRAY !== $membersDecoded[0]->type) {
+            throw self::legacyUnserializeErrorAt(
+                VmUnserializeFormat::lastErrorOffset() ?? $p,
+                $bufLen
+            );
+        }
+        // Members bag accepted for Zend shape parity; dynamic props unused on internal SOS.
+    }
+
+    private static function legacyUnserializeErrorAt(int $offset, int $bufLen): \UnexpectedValueException
+    {
+        return new \UnexpectedValueException(
+            \sprintf('Error at offset %d of %d bytes', $offset, $bufLen)
+        );
+    }
+
+    /**
      * @param array<int|string, mixed> $data
      */
     public static function restoreFromZendSerialize(Context $ctx, array $data): ?ObjectEntry
