@@ -2098,6 +2098,9 @@ final class BuiltinParamNames
                 return ['message', 'key=', 'length='];
             case 'sodium_crypto_secretbox':
                 return ['message', 'nonce', 'key'];
+            // php-src ext/sodium/libsodium.stub.php — ciphertext (not message); absent from InternalArgInfo (#28856)
+            case 'sodium_crypto_secretbox_open':
+                return ['ciphertext', 'nonce', 'key'];
             case 'sodium_crypto_box':
                 return ['message', 'nonce', 'key_pair'];
             case 'sodium_crypto_sign':
