@@ -585,7 +585,14 @@ final class SplFixedArrayFromArray extends VmClassMethod
         $data = VmArray::requireArrayParam($frame->calledArgs[0], 'SplFixedArray::fromArray', 1, 'array');
         $saveIndexes = true;
         if (isset($frame->calledArgs[1])) {
-            $saveIndexes = $frame->calledArgs[1]->resolveIndirect()->toBool();
+            // php-src Z_PARAM_BOOL $preserveKeys — soft-null DEP+false outside strict_types (#31647).
+            $saveIndexes = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                1,
+                'SplFixedArray::fromArray',
+                2,
+                'preserveKeys'
+            );
         }
         $object = SplFixedArrayBuiltin::fromArray($ctx, $data, $saveIndexes);
         $result = new Variable(Variable::TYPE_OBJECT);
