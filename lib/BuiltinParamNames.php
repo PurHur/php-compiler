@@ -2240,6 +2240,11 @@ final class BuiltinParamNames
                 return ['string'];
             case 'sodium_hex2bin':
                 return ['string', 'ignore='];
+            // php-src ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27853)
+            case 'sodium_bin2base64':
+                return ['string', 'id'];
+            case 'sodium_base642bin':
+                return ['string', 'id', 'ignore='];
             // php-src ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27917)
             case 'sodium_crypto_stream_xchacha20_xor_ic':
                 return ['message', 'nonce', 'counter', 'key'];

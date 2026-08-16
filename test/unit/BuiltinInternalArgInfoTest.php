@@ -629,6 +629,51 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('', $dest->toString());
     }
 
+    /** php-src ext/sodium/libsodium.stub.php — bin2base64/base642bin Reflection stubs (#27853). */
+    public function testSodiumBin2base64Base642binReflectionStubTypes(): void
+    {
+        $this->assertSame(['string', 'id'], BuiltinParamNames::forFunction('sodium_bin2base64'));
+        $this->assertSame(['string', 'id', 'ignore='], BuiltinParamNames::forFunction('sodium_base642bin'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_bin2base64'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_base642bin'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_bin2base64', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_bin2base64', 1));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_base642bin', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_base642bin', 1));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_base642bin', 2));
+
+        $b0 = BuiltinInternalArgInfo::paramInfoForFunction('sodium_bin2base64', 0);
+        $b1 = BuiltinInternalArgInfo::paramInfoForFunction('sodium_bin2base64', 1);
+        $this->assertNotNull($b0);
+        $this->assertNotNull($b1);
+        $this->assertSame('string', $b0['name']);
+        $this->assertSame('string', $b0['type']);
+        $this->assertFalse($b0['isOptional']);
+        $this->assertSame('id', $b1['name']);
+        $this->assertSame('int', $b1['type']);
+        $this->assertFalse($b1['isOptional']);
+
+        $d0 = BuiltinInternalArgInfo::paramInfoForFunction('sodium_base642bin', 0);
+        $d1 = BuiltinInternalArgInfo::paramInfoForFunction('sodium_base642bin', 1);
+        $d2 = BuiltinInternalArgInfo::paramInfoForFunction('sodium_base642bin', 2);
+        $this->assertNotNull($d0);
+        $this->assertNotNull($d1);
+        $this->assertNotNull($d2);
+        $this->assertSame('string', $d0['name']);
+        $this->assertSame('string', $d0['type']);
+        $this->assertFalse($d0['isOptional']);
+        $this->assertSame('id', $d1['name']);
+        $this->assertSame('int', $d1['type']);
+        $this->assertFalse($d1['isOptional']);
+        $this->assertSame('ignore', $d2['name']);
+        $this->assertSame('string', $d2['type']);
+        $this->assertTrue($d2['isOptional']);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable('sodium_base642bin', 2, $d2, false));
+        $dest = new \PHPCompiler\VM\Variable();
+        $this->assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'sodium_base642bin', 2, $d2));
+        $this->assertSame('', $dest->toString());
+    }
+
     /** php-src ext/sodium/libsodium.stub.php — message/nonce/counter/key → string (#27917). */
     public function testSodiumCryptoStreamXchacha20XorIcReflectionStubTypes(): void
     {
