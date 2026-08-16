@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmPreg;
 use PHPCompiler\ext\standard\VmPregCompileWarn;
 use PHPCompiler\ext\standard\VmPregMatches;
@@ -509,35 +510,33 @@ final class RegexIteratorConstruct extends VmClassMethod
         $mode = RegexIteratorBuiltin::MATCH;
         $flags = 0;
         $pregFlags = 0;
+        // php-src Z_PARAM_LONG — soft-null DEP+0 outside strict_types (#31650).
         if ($argc >= 4) {
-            $modeVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $modeVar->type) {
-                throw new \TypeError(
-                    'RegexIterator::__construct(): Argument #3 ($mode) must be of type int, '
-                    .RegexIteratorBuiltin::typeLabelFor($modeVar).' given'
-                );
-            }
-            $mode = $modeVar->toInt();
+            $mode = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                3,
+                'RegexIterator::__construct',
+                3,
+                'mode'
+            );
         }
         if ($argc >= 5) {
-            $flagsVar = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \TypeError(
-                    'RegexIterator::__construct(): Argument #4 ($flags) must be of type int, '
-                    .RegexIteratorBuiltin::typeLabelFor($flagsVar).' given'
-                );
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                4,
+                'RegexIterator::__construct',
+                4,
+                'flags'
+            );
         }
         if ($argc >= 6) {
-            $pregVar = $frame->calledArgs[5]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $pregVar->type) {
-                throw new \TypeError(
-                    'RegexIterator::__construct(): Argument #5 ($pregFlags) must be of type int, '
-                    .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
-                );
-            }
-            $pregFlags = $pregVar->toInt();
+            $pregFlags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                5,
+                'RegexIterator::__construct',
+                5,
+                'pregFlags'
+            );
         }
 
         RegexIteratorBuiltin::validateMode($mode);
@@ -988,35 +987,33 @@ final class RecursiveRegexIteratorConstruct extends VmClassMethod
         $mode = RegexIteratorBuiltin::MATCH;
         $flags = 0;
         $pregFlags = 0;
+        // php-src Z_PARAM_LONG — soft-null DEP+0 outside strict_types (#31650 sibling).
         if ($argc >= 4) {
-            $modeVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $modeVar->type) {
-                throw new \TypeError(
-                    'RecursiveRegexIterator::__construct(): Argument #3 ($mode) must be of type int, '
-                    .RegexIteratorBuiltin::typeLabelFor($modeVar).' given'
-                );
-            }
-            $mode = $modeVar->toInt();
+            $mode = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                3,
+                'RecursiveRegexIterator::__construct',
+                3,
+                'mode'
+            );
         }
         if ($argc >= 5) {
-            $flagsVar = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \TypeError(
-                    'RecursiveRegexIterator::__construct(): Argument #4 ($flags) must be of type int, '
-                    .RegexIteratorBuiltin::typeLabelFor($flagsVar).' given'
-                );
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                4,
+                'RecursiveRegexIterator::__construct',
+                4,
+                'flags'
+            );
         }
         if ($argc >= 6) {
-            $pregVar = $frame->calledArgs[5]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $pregVar->type) {
-                throw new \TypeError(
-                    'RecursiveRegexIterator::__construct(): Argument #5 ($pregFlags) must be of type int, '
-                    .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
-                );
-            }
-            $pregFlags = $pregVar->toInt();
+            $pregFlags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                5,
+                'RecursiveRegexIterator::__construct',
+                5,
+                'pregFlags'
+            );
         }
 
         RegexIteratorBuiltin::validateMode($mode);
