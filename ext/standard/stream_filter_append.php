@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** stream_filter_append() — attach a filter to a stream (#3283, ext/standard/streams.c). */
@@ -31,10 +32,11 @@ final class stream_filter_append extends Internal
             'stream_filter_append',
             1
         );
-        $filterName = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'stream_filter_append',
+        // Z_PARAM_STR $filter_name — TypeError under declare(strict_types=1) (#31408).
+        $filterName = InternalStrictArg::resolveCoercibleStringArg(
+            $frame,
             1,
+            'stream_filter_append',
             'filter_name'
         );
         $readWrite = VmStreamFilterChain::ALL;
