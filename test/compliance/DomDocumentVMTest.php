@@ -270,6 +270,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_htmlelement_selector_reflection.phpt',
             'dom_htmlelement_selector_reflection.phpt'
         );
+        yield 'dom_xml_reflection_nullable_residual.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_xml_reflection_nullable_residual.phpt',
+            'dom_xml_reflection_nullable_residual.phpt'
+        );
         yield 'dom_document_schema_validate_arity_message.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_document_schema_validate_arity_message.phpt',
             'dom_document_schema_validate_arity_message.phpt'
