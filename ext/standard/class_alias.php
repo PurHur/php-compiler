@@ -7,10 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -34,14 +34,8 @@ final class class_alias extends Internal
         // Z_PARAM_STR: declare(strict_types=1) → TypeError on null; else soft-null DEP+coerce (#29816 / #29661).
         $original = VmString::trimFamilyStringArgForFrame($frame, 0, 'class_alias', 0, 'class');
         $alias = VmString::trimFamilyStringArgForFrame($frame, 1, 'class_alias', 1, 'alias');
-        $autoload = true;
-        if (3 === \count($frame->calledArgs)) {
-            $autoloadArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $autoloadArg->type) {
-                throw new \LogicException('class_alias() autoload must be a boolean in this compiler build');
-            }
-            $autoload = $autoloadArg->toBool();
-        }
+        // Z_PARAM_BOOL $autoload — strict TypeError on null; else null→false + E_DEPRECATED (#31489).
+        $autoload = VmReflection::autoloadFlagFromFrame($frame, 'class_alias', 2, true);
         $ok = $ctx->registerClassAlias($original, $alias, $autoload, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
@@ -55,6 +49,10 @@ final class class_alias extends Internal
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $autoloadArg = 3 === \count($args) ? $args[2] : null;
+        // Z_PARAM_BOOL $autoload — strict TypeError on null; else null→false + E_DEPRECATED (#31489).
+        if (null !== $autoloadArg) {
+            JitBoolArg::lowerCoerceZParamBool($context, $autoloadArg, 'class_alias', 'autoload', 3);
+        }
         // Under strict_types, force Z_PARAM_STR TypeError before literal fold (#29816).
         if (!$context->callerStrictTypes) {
             $originalLit = JitStringArg::compileTimeLiteral($args[0]);

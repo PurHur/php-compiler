@@ -31,10 +31,14 @@ final class JitClassAlias
     ): Value {
         $autoload = true;
         if (null !== $autoloadArg) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $autoloadArg->type || null === $autoloadArg->value->value) {
+            // Soft-null already DEP'd in class_alias::call via JitBoolArg (#31489).
+            if (JITVariable::TYPE_NULL === $autoloadArg->type || ($autoloadArg->isNullConstant ?? false)) {
+                $autoload = false;
+            } elseif (JITVariable::TYPE_NATIVE_BOOL !== $autoloadArg->type || null === $autoloadArg->value->value) {
                 throw new \LogicException('class_alias() autoload must be a boolean literal in this compiler build');
+            } else {
+                $autoload = 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($autoloadArg->value->value);
             }
-            $autoload = 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($autoloadArg->value->value);
         }
 
         $i1 = $context->getTypeFromString('int1');
