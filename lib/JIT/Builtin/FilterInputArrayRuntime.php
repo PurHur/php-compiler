@@ -31,7 +31,7 @@ final class FilterInputArrayRuntime
     public static function filter(Context $context, JITVariable $type, JITVariable $definition, int $addEmpty): Value
     {
         self::ensureLinked($context);
-        $typeVal = JitFilterInputTypeArg::lower($context, $type);
+        $typeVal = JitFilterInputTypeArg::lower($context, $type, 'filter_input_array');
         $i64 = $context->getTypeFromString('int64');
         if (self::isIntDefinition($definition)) {
             $filterId = JitLongArg::lower($context, $definition, 'filter_input_array() definition');

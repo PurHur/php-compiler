@@ -36,7 +36,7 @@ final class filter_has_var extends Internal
         if (null === $ctx) {
             throw new \LogicException('filter_has_var() requires VM context in this compiler build');
         }
-        $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_has_var');
+        $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_has_var', $frame);
         // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
         $keyStr = VmString::stringBuiltinArgForFrame(
             $frame,
@@ -61,7 +61,7 @@ final class filter_has_var extends Internal
 
             return JitFilter::boxedFalse($context);
         }
-        $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);
+        $typeVal = JitFilterInputTypeArg::lower($context, $args[0], 'filter_has_var');
         // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
         // Early return after TypeError so AOT try/catch does not keep lowering into a terminated block.
         if (
