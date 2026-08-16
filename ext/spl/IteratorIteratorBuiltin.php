@@ -624,6 +624,45 @@ final class SplDualIteratorStorage
         return $object;
     }
 
+    /**
+     * RecursiveTreeIterator::__construct — php-src spl_recursive_it_it_construct RIT_RecursiveTreeIterator (#31596).
+     *
+     * Unwrap IteratorAggregate, then construct-path type check surfaces as
+     * RecursiveCachingIterator::__construct TypeError (not RII InvalidArgumentException).
+     */
+    public static function resolveRecursiveTreeIteratorInner(
+        Context $ctx,
+        Frame $frame,
+        Variable $traversable
+    ): ObjectEntry {
+        $resolved = $traversable->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            throw new \TypeError(
+                'RecursiveTreeIterator::__construct(): Argument #1 ($iterator) must be of type object, '
+                .self::typeLabel($resolved).' given'
+            );
+        }
+        $object = $resolved->toObject();
+        if (InterfaceCheck::entryImplements($object->class, 'iteratoraggregate', $ctx)
+            && !InterfaceCheck::entryImplements($object->class, 'iterator', $ctx)
+        ) {
+            $inner = self::vm($frame)->invokeInstanceMethod($object, 'getIterator')->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $inner->type) {
+                throw new \UnexpectedValueException('IteratorAggregate::getIterator() must return an object');
+            }
+            $object = $inner->toObject();
+        }
+        $asVar = new Variable(Variable::TYPE_OBJECT);
+        $asVar->object($object);
+
+        return RecursiveCachingIteratorBuiltin::requireRecursiveIteratorArg(
+            $asVar,
+            'RecursiveCachingIterator::__construct',
+            1,
+            $ctx
+        );
+    }
+
     /** @return array{inner: ObjectEntry, recursive: bool, mode: int, flags: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool} */
     private static function state(ObjectEntry $object): array
     {
