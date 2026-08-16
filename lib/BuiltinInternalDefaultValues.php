@@ -855,6 +855,10 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/dir.stub.php — $dir_handle = null (#27999)
+        'closedir' => [
+            0 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — bool $associative = false; $context = null (#25780)
         'get_headers' => [
             1 => ['kind' => 'bool', 'value' => false],

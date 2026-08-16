@@ -39,9 +39,12 @@ final class DirHandleJitHelper
         return (string) $entry;
     }
 
-    /** @return 0|1 ABI for __compiler_closedir */
+    /** @return 0|1 ABI for __compiler_closedir — handle -1 uses EG(default_directory) (#27999) */
     public static function closedirArgv(int $handle): int
     {
+        if (-1 === $handle) {
+            $handle = VmDirArg::requireDefaultDirHandle();
+        }
         if (!VmDir::isValidHandle($handle)) {
             return 0;
         }
