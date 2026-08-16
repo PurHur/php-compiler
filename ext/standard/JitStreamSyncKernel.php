@@ -98,6 +98,7 @@ final class JitStreamSyncKernel
 
     private static function ensureLibc(Context $context): void
     {
+        // Module-local fflush/fileno after LibcExtern always-on drop (#31606).
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');

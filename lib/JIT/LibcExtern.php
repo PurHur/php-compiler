@@ -55,9 +55,8 @@ final class LibcExtern
             'fread' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
             'fwrite' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
             'fclose' => [$i32, false, [$i8p]],
-            'fflush' => [$i32, false, [$i8p]],
-            'ferror' => [$i32, false, [$i8p]],
-            'fgets' => [$i8p, false, [$i8p, $i32, $i8p]],
+            // fflush/ferror/fgets dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel /
+            // ObStorageLlvm declare module-locally; user-script builtins stay on PHP helpers.
             'open' => [$i32, false, [$i8p, $i32, $i32]],
             'close' => [$i32, false, [$i32]],
             'read' => [$i64, false, [$i32, $i8p, $i64]],
@@ -92,10 +91,10 @@ final class LibcExtern
             // StringTime::invoke (#30472) — no module-local time(2) decl.
             'printf' => [$i32, true, [$i8p]],
             'snprintf' => [$i32, true, [$i8p, $sizeT, $i8p]],
-            'popen' => [$i8p, false, [$i8p, $i8p]],
-            'pclose' => [$i32, false, [$i8p]],
+            // popen/pclose/fileno dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel
+            // declare module-locally (peer fflush/ferror/fgets above); user-script popen/pclose
+            // stay on PHP helpers (`ext/standard` + `__compiler_*`).
             '__phpc_resolve_stream' => [$i8p, false, [$i64]],
-            'fileno' => [$i32, false, [$i8p]],
             // Math libc decls removed (#28808): userland Math* + NestedJIT helpers are
             // PHP SSOT (MathSqrt #27888 … MathNextafter #28716); stats_standard_deviation
             // routes through MathSqrt::invoke.
