@@ -1354,6 +1354,25 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('fmod'));
     }
 
+    /** @covers issue #23334 — intval/floatval/strval/boolval Zend stub names (InternalArgInfo still var) */
+    public function testIntvalFloatvalStrvalBoolvalZendStubNamedParameters(): void
+    {
+        $intval = BuiltinParamNames::forFunction('intval');
+        self::assertSame(['value', 'base='], $intval);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($intval, 'value', 'intval'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($intval, 'base', 'intval'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($intval, 'var', 'intval'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('intval'));
+
+        foreach (['floatval', 'doubleval', 'strval', 'boolval'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['value'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'value', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'var', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        }
+    }
+
     /** @covers issue #23341 — error_log Zend stub names (InternalArgInfo still extra_headers) */
     public function testErrorLogZendStubNamedParameters(): void
     {

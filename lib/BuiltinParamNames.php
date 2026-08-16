@@ -1912,6 +1912,14 @@ final class BuiltinParamNames
             case 'gettype':
                 // InternalArgInfo still says `var`; Zend stub is value
                 return ['value'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says var (#23334)
+            case 'intval':
+                return ['value', 'base='];
+            case 'floatval':
+            case 'doubleval':
+            case 'strval':
+            case 'boolval':
+                return ['value'];
             // php-src Zend/zend_builtin_functions.stub.php + basic_functions.stub.php (#23263)
             // InternalArgInfo still says `var` (or empty Reflection) for these; Zend stubs use value/num
             case 'get_debug_type':
