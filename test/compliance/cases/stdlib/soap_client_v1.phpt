@@ -20,7 +20,7 @@ $client = new SoapClient($wsdl, [
 $out = $client->__soapCall('echo', [['input' => 'hello']]);
 echo 'out=', $out, "\n";
 $fns = $client->__getFunctions();
-echo 'has_echo=', (is_array($fns) && in_array('echo', $fns, true)) ? 1 : 0, "\n";
+echo 'has_echo=', (is_array($fns) && isset($fns[0]) && $fns[0] === 'echoResponse echo(echo $parameters)') ? 1 : 0, "\n";
 echo 'req_ok=', (is_string($client->__getLastRequest()) && str_contains($client->__getLastRequest(), 'echo')) ? 1 : 0, "\n";
 ?>
 --EXPECT--

@@ -12,4 +12,4 @@ $client = new SoapClient($wsdl, [
 $out = $client->__soapCall('echo', [['input' => 'hello']]);
 echo 'out=', var_export($out, true), "\n";
 $fns = $client->__getFunctions();
-echo 'fns=', is_array($fns) && in_array('echo', $fns, true) ? 1 : 0, "\n";
+echo 'fns=', is_array($fns) && isset($fns[0]) && $fns[0] === 'echoResponse echo(echo $parameters)' ? 1 : 0, "\n";
