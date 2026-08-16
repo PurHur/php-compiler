@@ -41,6 +41,6 @@ final class ftp_rmdir extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_rmdir() is not implemented for JIT in this compiler build (issue #20232)');
+        return JitFtpMutate::invokeRmdir($context, ...$args);
     }
 }

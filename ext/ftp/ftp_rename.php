@@ -42,6 +42,6 @@ final class ftp_rename extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_rename() is not implemented for JIT in this compiler build (issue #20232)');
+        return JitFtpMutate::invokeRename($context, ...$args);
     }
 }
