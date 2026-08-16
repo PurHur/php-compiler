@@ -47,7 +47,7 @@ final class get_browser extends Internal
         if ($argc >= 1) {
             $uaArg = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_NULL !== $uaArg->type) {
-                $ua = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_browser', 0, 'browser_name');
+                $ua = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_browser', 0, 'user_agent');
             }
         }
         if ($argc >= 2) {
@@ -102,7 +102,7 @@ final class get_browser extends Internal
             throw new \LogicException('get_browser() expects at most 2 arguments in this compiler build');
         }
         if ($argc >= 1 && JITVariable::TYPE_NULL !== $args[0]->type) {
-            JitStringBuiltinArg::lower($context, $args[0], 'get_browser', 0, 'browser_name');
+            JitStringBuiltinArg::lower($context, $args[0], 'get_browser', 0, 'user_agent');
         }
         if ($argc >= 2) {
             // Compile-time null under strict: catchable TypeError then stop IR (#31289 / peer hash #31288).
