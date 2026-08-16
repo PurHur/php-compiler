@@ -654,7 +654,6 @@ final class SplPriorityQueueBuiltin
             $state['elements'][0] = $last;
             self::siftDown($object, 0, $frame);
         }
-        $state['iterPos'] = -1;
 
         return self::formatElement($object, $top);
     }
@@ -682,14 +681,14 @@ final class SplPriorityQueueBuiltin
 
     public static function rewind(ObjectEntry $object): void
     {
-        // php-src spl_pqueue_it_get_current_key: key = remaining count − 1 (#22290).
-        $n = self::count($object);
-        self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
+        // php-src spl_heap_it_rewind is a no-op; valid/key derive from count (#31601 / #22290).
+        unset($object);
     }
 
     public static function valid(ObjectEntry $object): bool
     {
-        return self::state($object)['iterPos'] >= 0 && self::count($object) > 0;
+        // php-src spl_heap_it_valid (shared with pqueue): heap->count != 0 (#31601).
+        return self::count($object) > 0;
     }
 
     /** SplPriorityQueue::current() — no corruption gate (php-src). */
@@ -708,17 +707,18 @@ final class SplPriorityQueueBuiltin
 
     public static function key(ObjectEntry $object): int
     {
-        return self::state($object)['iterPos'];
+        // php-src spl_heap_it_get_current_key: count - 1 (#22290 / #31601).
+        $n = self::count($object);
+
+        return $n > 0 ? $n - 1 : -1;
     }
 
     public static function next(ObjectEntry $object, Frame $frame): void
     {
-        if (!self::valid($object)) {
+        if (0 === self::count($object)) {
             return;
         }
         self::extractUnchecked($object, $frame);
-        $n = self::count($object);
-        self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
     }
 
     public static function isCorrupted(ObjectEntry $object): bool
