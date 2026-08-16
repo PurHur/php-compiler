@@ -65,14 +65,39 @@ final class setrawcookie extends Internal
             && !NamedOptionalCallArgs::isOmittedOptional($args[2])
             && JitSetcookieOptions::isOptionsArrayArg($args[2])
         ) {
+            if ($argc > 3) {
+                ExceptionBridge::emitArgumentCountErrorAndAbort(
+                    $context,
+                    'setrawcookie(): Expects exactly 3 arguments when argument #3 ($expires_or_options) is an array'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'setrawcookie_opts_ace_cont');
+
+                return $context->getTypeFromString('int1')->constInt(0, false);
+            }
             $valueArg = (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
                 ? $args[1]
                 : self::emptyStringArg($context);
 
             return JitSetcookieOptions::invoke($context, 'setrawcookie', $args[0], $valueArg, $args[2]);
         }
-        if ($argc < 1 || $argc > 7) {
-            throw new \LogicException('setrawcookie() accepts one to seven arguments');
+        if ($argc < 1) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'setrawcookie() expects at least 1 argument, 0 given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'setrawcookie_min_ace_cont');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        if ($argc > 7) {
+            // php-src head.c — at-most-7 ArgumentCountError (#30713).
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('setrawcookie() expects at most 7 arguments, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'setrawcookie_max_ace_cont');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
