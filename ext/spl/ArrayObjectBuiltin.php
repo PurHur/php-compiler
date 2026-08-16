@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
@@ -154,7 +155,14 @@ final class ArrayObjectConstruct extends VmClassMethod
         $flags = 0;
         $hasFlagsArg = isset($frame->calledArgs[2]);
         if ($hasFlagsArg) {
-            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+            // php-src Z_PARAM_LONG $flags — soft-null DEP+0 outside strict_types (#31648).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'ArrayObject::__construct',
+                2,
+                'flags'
+            );
         }
         if (isset($frame->calledArgs[1])) {
             // php-src spl_array_set_array — array copy; ArrayObject/object share (#31539 / #23886).

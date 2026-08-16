@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -198,7 +199,14 @@ final class ArrayIteratorConstruct extends VmClassMethod
         $flags = 0;
         $hasFlagsArg = isset($frame->calledArgs[2]);
         if ($hasFlagsArg) {
-            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+            // php-src Z_PARAM_LONG $flags — soft-null DEP+0 outside strict_types (#31648).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'ArrayIterator::__construct',
+                2,
+                'flags'
+            );
         }
         if (isset($frame->calledArgs[1])) {
             // php-src spl_array_set_array — array copy (#22020); object|ArrayObject share (#23886).
