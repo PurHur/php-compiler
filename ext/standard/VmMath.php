@@ -635,8 +635,18 @@ final class VmMath
                 if (self::requiresForwardProfileStrictLongNull()) {
                     throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'null'));
                 }
-                // Z_PARAM_LONG: E_DEPRECATED then coerce to 0 (chr/dechex; #19756).
+                // Z_PARAM_LONG / union stubs: caller strict_types → TypeError (#31359 substr_replace $offset).
+                // Soft path: E_DEPRECATED then coerce to 0 (chr/dechex; #19756).
                 // Callers with union stubs (e.g. substr_replace $offset array|int) pass the Zend type label (#29396).
+                if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(\sprintf(
+                        '%s(): Argument #%d ($%s) must be of type %s, null given',
+                        $function,
+                        $argIndex,
+                        $paramName,
+                        $nullDepExpectedType
+                    ));
+                }
                 VmNullNumberParamDeprecation::emit(
                     $frame,
                     $function,
