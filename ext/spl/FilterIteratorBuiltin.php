@@ -337,6 +337,8 @@ final class FilterIteratorRewind extends VmClassMethod
             FilterIteratorBuiltin::CLASS_LC,
             'FilterIterator::rewind()'
         );
+        // php-src zim_FilterIterator_rewind — ZEND_PARSE_PARAMETERS_NONE (#31678).
+        $this->requireExactUserArgCount($frame, 'FilterIterator::rewind', 0);
         SplDualIteratorStorage::rewindSimple($frame, $object);
         FilterIteratorBuiltin::fetch($frame, $object);
     }
@@ -356,6 +358,8 @@ final class FilterIteratorNext extends VmClassMethod
             FilterIteratorBuiltin::CLASS_LC,
             'FilterIterator::next()'
         );
+        // php-src zim_FilterIterator_next — ZEND_PARSE_PARAMETERS_NONE (#31678).
+        $this->requireExactUserArgCount($frame, 'FilterIterator::next', 0);
         $inner = SplDualIteratorStorage::inner($object);
         SplDualIteratorStorage::callInner($frame, $inner, 'next');
         FilterIteratorBuiltin::fetch($frame, $object);
@@ -376,6 +380,8 @@ final class FilterIteratorValid extends VmClassMethod
             FilterIteratorBuiltin::CLASS_LC,
             'FilterIterator::valid()'
         );
+        // Inherited zim_IteratorIterator_valid — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::valid', 0);
         SplIteratorSupport::setReturnBool($frame, SplDualIteratorStorage::validSimple($frame, $object));
     }
 }
@@ -394,6 +400,8 @@ final class FilterIteratorCurrent extends VmClassMethod
             FilterIteratorBuiltin::CLASS_LC,
             'FilterIterator::current()'
         );
+        // Inherited zim_IteratorIterator_current — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::current', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDualIteratorStorage::currentSimple($frame, $object));
     }
 }
@@ -412,6 +420,8 @@ final class FilterIteratorKey extends VmClassMethod
             FilterIteratorBuiltin::CLASS_LC,
             'FilterIterator::key()'
         );
+        // Inherited zim_IteratorIterator_key — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::key', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDualIteratorStorage::keySimple($frame, $object));
     }
 }
@@ -430,6 +440,8 @@ final class FilterIteratorGetInnerIterator extends VmClassMethod
             FilterIteratorBuiltin::CLASS_LC,
             'FilterIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }

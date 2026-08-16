@@ -311,7 +311,8 @@ final class NoRewindIteratorRewind extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        // php-src spl_norewind_iterator_rewind — no-op; inner position preserved (#13170).
+        // php-src zim_NoRewindIterator_rewind — ZEND_PARSE_PARAMETERS_NONE; no-op body (#31678 / #13170).
+        $this->requireExactUserArgCount($frame, 'NoRewindIterator::rewind', 0);
     }
 }
 
@@ -329,6 +330,8 @@ final class NoRewindIteratorValid extends VmClassMethod
             NoRewindIteratorBuiltin::CLASS_LC,
             'NoRewindIterator::valid()'
         );
+        // php-src zim_NoRewindIterator_valid — ZEND_PARSE_PARAMETERS_NONE (#31678).
+        $this->requireExactUserArgCount($frame, 'NoRewindIterator::valid', 0);
         SplIteratorSupport::setReturnBool(
             $frame,
             SplDualIteratorStorage::validSimple($frame, $object)
@@ -350,6 +353,8 @@ final class NoRewindIteratorCurrent extends VmClassMethod
             NoRewindIteratorBuiltin::CLASS_LC,
             'NoRewindIterator::current()'
         );
+        // php-src zim_NoRewindIterator_current — ZEND_PARSE_PARAMETERS_NONE (#31678).
+        $this->requireExactUserArgCount($frame, 'NoRewindIterator::current', 0);
         SplIteratorSupport::copyReturnFrom(
             $frame,
             SplDualIteratorStorage::currentSimple($frame, $object)
@@ -371,6 +376,8 @@ final class NoRewindIteratorKey extends VmClassMethod
             NoRewindIteratorBuiltin::CLASS_LC,
             'NoRewindIterator::key()'
         );
+        // php-src zim_NoRewindIterator_key — ZEND_PARSE_PARAMETERS_NONE (#31678).
+        $this->requireExactUserArgCount($frame, 'NoRewindIterator::key', 0);
         SplIteratorSupport::copyReturnFrom(
             $frame,
             SplDualIteratorStorage::keySimple($frame, $object)
@@ -392,6 +399,8 @@ final class NoRewindIteratorNext extends VmClassMethod
             NoRewindIteratorBuiltin::CLASS_LC,
             'NoRewindIterator::next()'
         );
+        // php-src zim_NoRewindIterator_next — ZEND_PARSE_PARAMETERS_NONE (#31678).
+        $this->requireExactUserArgCount($frame, 'NoRewindIterator::next', 0);
         SplDualIteratorStorage::nextSimple($frame, $object);
     }
 }

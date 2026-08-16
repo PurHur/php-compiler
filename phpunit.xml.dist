@@ -765,6 +765,8 @@
             <file>./test/compliance/DirItExcessArgc31009JITTest.php</file>
             <file>./test/compliance/RiiGlobExcessArgc31010VMTest.php</file>
             <file>./test/compliance/RiiGlobExcessArgc31010JITTest.php</file>
+            <file>./test/compliance/FilterNorewindRewindAce31678VMTest.php</file>
+            <file>./test/compliance/FilterNorewindRewindAce31678JITTest.php</file>
             <file>./test/compliance/SplIteratorExcessArgc30949VMTest.php</file>
             <file>./test/compliance/SplIteratorExcessArgc30949JITTest.php</file>
             <file>./test/compliance/SplDllistExcessArgc30964VMTest.php</file>
