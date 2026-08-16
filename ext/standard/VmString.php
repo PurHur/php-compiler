@@ -640,6 +640,22 @@ final class VmString
     }
 
     /**
+     * str_pad() / mb_str_pad() empty $pad_string ValueError (#29755 / #29292).
+     *
+     * php-src 8.2/8.3: `zend_argument_value_error(3, "must be a non-empty string")`
+     * (ext/standard/string.c PHP_FUNCTION(str_pad)).
+     * php-src 8.4+: `zend_argument_must_not_be_empty_error(3)` → "must not be empty".
+     */
+    public static function strPadEmptyPadStringValueErrorMessage(string $function = 'str_pad'): string
+    {
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            return self::emptyStringArgValueErrorMessage($function, 2, 'pad_string');
+        }
+
+        return sprintf('%s(): Argument #3 ($pad_string) must be a non-empty string', $function);
+    }
+
+    /**
      * Format `fn(): Argument #N ($name) {cannot|must not} be empty` (1-based $argIndex).
      *
      * php-src `zend_argument_must_not_be_empty_error` — profile-gated (#30625).
@@ -2739,8 +2755,8 @@ final class VmString
             return $input;
         }
         if ('' === $padString) {
-            // php-src string.c PHP_FUNCTION(str_pad) — Zend "must not be empty" (#29292)
-            throw new \ValueError(self::emptyStringArgValueErrorMessage('str_pad', 2, 'pad_string'));
+            // php-src string.c PHP_FUNCTION(str_pad) — profile-gated (#29755 / #29292)
+            throw new \ValueError(self::strPadEmptyPadStringValueErrorMessage('str_pad'));
         }
         $need = $padLength - $inputLen;
         if (2 === $padType) {
