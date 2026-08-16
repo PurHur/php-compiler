@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -19,11 +20,11 @@ final class RecursiveTreeIteratorBuiltin
 {
     public const CLASS_LC = 'recursivetreeiterator';
 
-    /** php-src RTIT_BYPASS_KEY */
-    public const BYPASS_KEY = 0x00000001;
+    /** php-src RTIT_BYPASS_CURRENT — 0x00000004 */
+    public const BYPASS_CURRENT = 0x00000004;
 
-    /** php-src RTIT_BYPASS_CURRENT */
-    public const BYPASS_CURRENT = 0x00000002;
+    /** php-src RTIT_BYPASS_KEY — 0x00000008 */
+    public const BYPASS_KEY = 0x00000008;
 
     public static function registerClass(Context $ctx): void
     {
@@ -111,7 +112,8 @@ final class SplTreeIteratorStorage
 
     public static function setFlags(ObjectEntry $object, int $flags): void
     {
-        self::state($object)['flags'] = $flags;
+        // Must write through $store — state() returns by value (#31649).
+        self::$store[$object->id]['flags'] = $flags;
     }
 
     public static function flags(ObjectEntry $object): int
@@ -246,23 +248,33 @@ final class RecursiveTreeIteratorConstruct extends VmClassMethod
         $flags = RecursiveTreeIteratorBuiltin::BYPASS_KEY;
         $cachingFlags = CachingIteratorBuiltin::CATCH_GET_CHILD;
         $mode = IteratorIteratorBuiltin::SELF_FIRST;
+        // php-src Z_PARAM_LONG — soft-null DEP+0 outside strict_types (#31649).
         if (isset($frame->calledArgs[2])) {
-            $arg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $arg->type) {
-                $flags = $arg->toInt();
-            }
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'RecursiveTreeIterator::__construct',
+                2,
+                'flags'
+            );
         }
         if (isset($frame->calledArgs[3])) {
-            $arg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $arg->type) {
-                $cachingFlags = $arg->toInt();
-            }
+            $cachingFlags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                3,
+                'RecursiveTreeIterator::__construct',
+                3,
+                'caching_it_flags'
+            );
         }
         if (isset($frame->calledArgs[4])) {
-            $arg = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $arg->type) {
-                $mode = $arg->toInt();
-            }
+            $mode = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                4,
+                'RecursiveTreeIterator::__construct',
+                4,
+                'mode'
+            );
         }
 
         $cachingVar = RecursiveCachingIteratorBuiltin::createFromInnerAndFlags(
