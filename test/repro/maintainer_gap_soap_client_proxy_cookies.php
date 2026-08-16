@@ -27,4 +27,4 @@ foreach ([
     echo "\n";
 }
 $c->__setCookie('a', '1');
-echo 'cookies_after=', is_array($c->_cookies) && ($c->_cookies['a'] ?? '') === '1' ? '1' : '0', "\n";
+echo 'cookies_after=', is_array($c->_cookies) && is_array($c->_cookies['a'] ?? null) && ($c->_cookies['a'][0] ?? '') === '1' ? '1' : '0', "\n";

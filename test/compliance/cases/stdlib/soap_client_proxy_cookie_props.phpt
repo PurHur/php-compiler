@@ -23,7 +23,7 @@ echo 'digest_null=', (int) (null === $c->_digest), "\n";
 echo 'stream_null=', (int) (null === $c->_stream_context), "\n";
 echo 'cookies_empty=', (int) (is_array($c->_cookies) && [] === $c->_cookies), "\n";
 $c->__setCookie('a', '1');
-echo 'cookies_set=', (int) (is_array($c->_cookies) && ($c->_cookies['a'] ?? '') === '1'), "\n";
+echo 'cookies_set=', (int) (is_array($c->_cookies) && is_array($c->_cookies['a'] ?? null) && ($c->_cookies['a'][0] ?? '') === '1'), "\n";
 $c->__setCookie('a', null);
 echo 'cookies_unset=', (int) (is_array($c->_cookies) && !isset($c->_cookies['a'])), "\n";
 

@@ -17,14 +17,14 @@ echo 'has=', (method_exists($client, '__setCookie') && method_exists($client, '_
 $client->__setCookie('a', '1');
 $client->__setCookie('b', '2');
 $c = $client->__getCookies();
-echo 'map=', ($c['a'] ?? '').','.($c['b'] ?? ''), "\n";
+echo 'map=', (is_array($c['a'] ?? null) ? ($c['a'][0] ?? '') : ($c['a'] ?? '')), ',', (is_array($c['b'] ?? null) ? ($c['b'][0] ?? '') : ($c['b'] ?? '')), "\n";
 $client->__soapCall('echo', [['input' => 'x']]);
 $req = $client->__getLastRequestHeaders();
 echo 'trace_cookie=', (is_string($req) && str_contains($req, 'Cookie: a=1; b=2')) ? 1 : 0, "\n";
 $client->__setCookie('a');
 $c2 = $client->__getCookies();
 echo 'rm=', isset($c2['a']) ? 1 : 0, "\n";
-echo 'keep=', ($c2['b'] ?? '') === '2' ? 1 : 0, "\n";
+echo 'keep=', (is_array($c2['b'] ?? null) ? (($c2['b'][0] ?? '') === '2') : (($c2['b'] ?? '') === '2')) ? 1 : 0, "\n";
 ?>
 --EXPECT--
 has=1
