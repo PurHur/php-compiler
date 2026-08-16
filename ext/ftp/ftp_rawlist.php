@@ -52,6 +52,6 @@ final class ftp_rawlist extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_rawlist() is not implemented for JIT in this compiler build (issue #20033)');
+        return JitFtpList::invokeRawlist($context, ...$args);
     }
 }
