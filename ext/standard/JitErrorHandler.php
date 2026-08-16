@@ -9,7 +9,6 @@ use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ErrorHandlerCallbackPolicy;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -20,10 +19,13 @@ final class JitErrorHandler
     /** @var array<string, Value> per-module error-handler shims */
     private static array $handlerShims = [];
 
+    /**
+     * @param Value|null $maskI32 lowered int32 mask, or null for profile-aware E_ALL (#31465)
+     */
     public static function set(
         Context $context,
         JITVariable $callback,
-        ?JITVariable $maskArg
+        ?Value $maskI32 = null
     ): Value {
         ErrorHandlerJitRuntime::ensureLinked($context);
 
@@ -41,12 +43,6 @@ final class JitErrorHandler
             );
         }
 
-        // Profile-aware E_ALL (30719 on ≥8.4) — not host \E_ALL (#27824).
-        $mask = \PHPCompiler\VM\ErrorReporter::eAll();
-        if (null !== $maskArg) {
-            $mask = JitLongArg::lower($context, $maskArg, 'set_error_handler() error type mask');
-        }
-
         $i8p = $context->getTypeFromString('int8*');
         $shimFn = self::handlerShim($context, $proxy, $name);
         $handlerFnPtr = $context->builder->pointerCast($shimFn, $i8p);
@@ -57,13 +53,17 @@ final class JitErrorHandler
         $namePtr = $context->builder->pointerCast($context->constantFromString($name), $i8p);
         $nameLen = $sizeT->constInt(\strlen($name), false);
         $i32 = $context->getTypeFromString('int32');
+        // Profile-aware E_ALL (30719 on ≥8.4) when mask omitted — not host \E_ALL (#27824).
+        $maskVal = null !== $maskI32
+            ? $maskI32
+            : $i32->constInt(\PHPCompiler\VM\ErrorReporter::eAll(), false);
         $context->builder->call(
             $context->lookupFunction('__phpc_error_handler_set_apply'),
             $ptr,
             $namePtr,
             $nameLen,
             $handlerFnPtr,
-            $i32->constInt($mask, false)
+            $maskVal
         );
 
         return $ptr;

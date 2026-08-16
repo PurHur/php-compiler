@@ -20,11 +20,12 @@ final class VmErrorHandler
 {
     public static function set(
         Context $context,
+        Frame $frame,
         Variable $callback,
         ?Variable $maskVar
     ): Variable {
         $reporter = $context->errors;
-        $mask = self::parseMask($maskVar);
+        $mask = self::parseMask($frame, $maskVar);
         self::assertValidCallback($context, $callback);
         $storedCallback = self::normalizeCallbackForStorage($callback);
         $previous = $reporter->pushHandler($storedCallback, $mask);
@@ -56,20 +57,26 @@ final class VmErrorHandler
         return self::handlerReturnValue($context->errors->getActiveHandler());
     }
 
-    private static function parseMask(?Variable $maskVar): int
+    /**
+     * Zend stub int $error_levels = E_ALL — soft-null DEP+coerce outside strict_types (#31465).
+     *
+     * php-src: Zend/zend_builtin_functions.c PHP_FUNCTION(set_error_handler)
+     */
+    private static function parseMask(Frame $frame, ?Variable $maskVar): int
     {
         if (null === $maskVar) {
             // Profile-aware E_ALL (30719 on ≥8.4) — not host \E_ALL (#27824).
             return ErrorReporter::eAll();
         }
-        $mask = $maskVar->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $mask->type) {
-            throw new \LogicException(
-                'set_error_handler() error type mask must be an integer in this compiler build'
-            );
-        }
 
-        return $mask->toInt();
+        // Arg index 1 in calledArgs; user-facing Argument #2 ($error_levels).
+        return VmMath::parseIntBuiltinArgForFrame(
+            $frame,
+            1,
+            'set_error_handler',
+            2,
+            'error_levels'
+        );
     }
 
     private static function normalizeCallbackForStorage(Variable $callback): Variable
