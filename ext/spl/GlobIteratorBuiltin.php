@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\spl;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmFsGlob;
 use PHPCompiler\ext\standard\VmStreamPath;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -238,9 +239,13 @@ final class GlobIteratorConstruct extends VmClassMethod
         );
         $this->requireUserArgCountRange($frame, 'GlobIterator::__construct', 1, 2);
         $argCount = \count($frame->calledArgs);
+        // php-src spl_directory.stub.php — string $pattern; empty → zend_argument_value_error (#31529).
         $path = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[1],
-            'GlobIterator::__construct'
+            'GlobIterator::__construct',
+            0,
+            'pattern',
+            VmString::emptyStringArgValueErrorMessageCannot('GlobIterator::__construct', 0, 'pattern')
         );
         $flags = FilesystemIteratorBuiltin::KEY_AS_PATHNAME;
         if ($argCount >= 3) {
