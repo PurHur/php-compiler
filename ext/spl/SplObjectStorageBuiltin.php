@@ -225,9 +225,17 @@ final class SplObjectStorageBuiltin
         }
     }
 
-    public static function attach(ObjectEntry $storage, Variable $object, ?Variable $info = null): void
-    {
-        $key = self::storageObjectKey($object, 'attach');
+    /**
+     * @param string $method  TypeError display name — php-src offsetSet/write_dimension cite
+     *                        offsetSet, not attach (#31509 / ext/spl/spl_observer.c).
+     */
+    public static function attach(
+        ObjectEntry $storage,
+        Variable $object,
+        ?Variable $info = null,
+        string $method = 'attach'
+    ): void {
+        $key = self::storageObjectKey($object, $method);
         $state = self::state($storage);
         if (!isset($state['entries'][$key])) {
             self::$store[$storage->id]['order'][] = $key;
@@ -324,7 +332,8 @@ final class SplObjectStorageBuiltin
 
     public static function offsetSet(ObjectEntry $storage, Variable $object, Variable $value): void
     {
-        self::attach($storage, $object, $value);
+        // php-src SPL_METHOD(SplObjectStorage, offsetSet) / write_dimension — TypeError cites offsetSet (#31509).
+        self::attach($storage, $object, $value, 'offsetSet');
     }
 
     public static function offsetExists(ObjectEntry $storage, Variable $object): bool
