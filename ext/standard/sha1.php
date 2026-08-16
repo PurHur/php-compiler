@@ -9,11 +9,11 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** sha1() — hex digest via native __compiler_hash (issue #2160; #21181 null DEP+coerce on 8.4). */
@@ -35,11 +35,8 @@ final class sha1 extends Internal
         $data = self::vmStringArg($frame);
         $raw = false;
         if (2 === $argc) {
-            $rawArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
-                throw new \LogicException('sha1() raw_output must be boolean in this compiler build');
-            }
-            $raw = $rawArg->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31358).
+            $raw = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'sha1', 2, 'binary');
         }
         $result = VmHash::hash('sha1', $data, $raw);
         if (false === $result) {
@@ -67,7 +64,22 @@ final class sha1 extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[1])) {
-            $raw = JitBoolArg::lower($context, $args[1], 'sha1() raw_output');
+            // Compile-time null under strict: catchable TypeError then stop IR (#31358 / peer #31288).
+            if ($context->callerStrictTypes && (
+                JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
+            )) {
+                JitNativeString::ensureInsertBlock($context);
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'sha1(): Argument #2 ($binary) must be of type bool, null given'
+                );
+                JitNativeString::ensureInsertBlock($context);
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31358).
+            $raw = JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'sha1', 'binary', 2);
         }
 
         return JitSha1::digest(
