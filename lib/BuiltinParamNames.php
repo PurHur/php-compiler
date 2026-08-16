@@ -106,6 +106,9 @@ final class BuiltinParamNames
             'splminheap::compare',
             'splmaxheap::compare' => ['value1', 'value2'],
             'splpriorityqueue::compare' => ['priority1', 'priority2'],
+            // php-src ext/spl/spl_iterators.stub.php — InternalArgInfo still it/func (#28721)
+            'callbackfilteriterator::__construct',
+            'recursivecallbackfilteriterator::__construct' => ['iterator', 'callback'],
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
             'collator::asort' => ['array', 'flags'],

@@ -1528,6 +1528,42 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(1, BuiltinInternalArgInfo::requiredParamCountForClassMethod('SplFileObject', 'seek'));
     }
 
+    /** php-src ext/spl/spl_iterators.stub.php — iterator/callback not it/func (#28721). */
+    public function testCallbackFilterIteratorConstructStubParamNames(): void
+    {
+        $this->assertSame(
+            ['iterator', 'callback'],
+            BuiltinParamNames::forClassMethod('callbackfilteriterator::__construct')
+        );
+        $this->assertSame(
+            ['iterator', 'callback'],
+            BuiltinParamNames::forClassMethod('recursivecallbackfilteriterator::__construct')
+        );
+        $this->assertSame(
+            0,
+            BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forClassMethod('callbackfilteriterator::__construct'),
+                'iterator',
+                'callbackfilteriterator::__construct'
+            )
+        );
+        $this->assertSame(
+            1,
+            BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forClassMethod('callbackfilteriterator::__construct'),
+                'callback',
+                'callbackfilteriterator::__construct'
+            )
+        );
+        $this->assertFalse(
+            BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forClassMethod('callbackfilteriterator::__construct'),
+                'it',
+                'callbackfilteriterator::__construct'
+            )
+        );
+    }
+
     /** php-src ext/spl/spl_heap.stub.php — mixed value1/value2; PriorityQueue priority1/2 (#25555). */
     public function testSplHeapCompareStubParamTypesAndNames(): void
     {
