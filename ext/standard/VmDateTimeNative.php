@@ -3657,6 +3657,22 @@ final class VmDateTimeNative
         return $transitions;
     }
 
+    /**
+     * Host mktime/gmmktime map years 0–99 onto 2000–2099 / 1970–1999; timelib (DateTime::setDate)
+     * keeps the literal proleptic year. Shift by one Gregorian 400-year era (146097 days) so the
+     * libc path never sees a two-digit year, then subtract the same span (#31619).
+     *
+     * @return array{0: int, 1: int} year for mktime, seconds to subtract from the result
+     */
+    private static function mktimeYearWithoutTwoDigitMap(int $year): array
+    {
+        if ($year >= 0 && $year <= 99) {
+            return [$year + 400, 146097 * 86400];
+        }
+
+        return [$year, 0];
+    }
+
     private static function mktimeInTimezone(
         int $year,
         int $month,
@@ -3671,20 +3687,24 @@ final class VmDateTimeNative
             return self::mktimeUtc($year, $month, $day, $hour, $minute, $second) - $fixedOffset;
         }
 
+        [$mktimeYear, $shiftSeconds] = self::mktimeYearWithoutTwoDigitMap($year);
+
         return self::withTimezone($tzName, static function () use (
             $year,
+            $mktimeYear,
+            $shiftSeconds,
             $month,
             $day,
             $hour,
             $minute,
             $second
         ): int {
-            $result = VmDatePure::mktime($hour, $minute, $second, $month, $day, $year);
+            $result = VmDatePure::mktime($hour, $minute, $second, $month, $day, $mktimeYear);
             if (false === $result) {
                 self::throwMalformedDateTime("{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}");
             }
 
-            return $result;
+            return $result - $shiftSeconds;
         });
     }
 
@@ -3696,12 +3716,13 @@ final class VmDateTimeNative
         int $minute,
         int $second
     ): int {
-        $result = VmDatePure::gmmktime($hour, $minute, $second, $month, $day, $year);
+        [$mktimeYear, $shiftSeconds] = self::mktimeYearWithoutTwoDigitMap($year);
+        $result = VmDatePure::gmmktime($hour, $minute, $second, $month, $day, $mktimeYear);
         if (false === $result) {
             self::throwMalformedDateTime("{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}");
         }
 
-        return $result;
+        return $result - $shiftSeconds;
     }
 
     /**
