@@ -185,6 +185,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#26320)
             'gethostbynamel' => 'array|false',
             'sys_getloadavg' => 'array|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|false (#27776)
+            'net_get_interfaces' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28916)
             'inet_pton', 'inet_ntop' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28000)
