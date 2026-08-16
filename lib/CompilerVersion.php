@@ -3229,9 +3229,9 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')
-            || str_starts_with(self::VERSION, '8.4.0-')
-        ) {
+        // Stable 8.4.0+ only — do NOT treat 8.4.0-dev as enabled (str_starts_with '8.4.0-'
+        // re-advertised on the reference harness and ignored PROFILE=8.2; #30238 / #24821).
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
         }
 

@@ -358,10 +358,7 @@ class Module extends ModuleAbstract
             new array_combine(),
             new array_map(),
             new array_filter(),
-            new array_find(),
-            new array_find_key(),
-            new array_any(),
-            new array_all(),
+            // PHP 8.4+ only — ungated copies here re-introduced phantoms under PROFILE=8.2 (#30238 / #24821).
             ...(CompilerVersion::supportsPhp84ArraySearchFunctions() ? [
                 new array_find(),
                 new array_find_key(),

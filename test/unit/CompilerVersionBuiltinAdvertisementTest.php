@@ -783,9 +783,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+            $this->assertTrue(CompilerVersion::advertisesPhp84ArraySearchFunctions());
             $this->assertFalse(CompilerVersion::supportsPhp85ArrayFirstLast());
             $this->assertFalse(CompilerVersion::advertisesPhp85ArrayFirstLast());
-            $this->assertTrue(CompilerVersion::supportsGeneratorToArray());
+            // generator_to_array is a permanent phantom (#24001), not an 8.4 PROFILE feature.
+            $this->assertFalse(CompilerVersion::supportsGeneratorToArray());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
