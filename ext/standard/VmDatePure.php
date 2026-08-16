@@ -135,10 +135,9 @@ final class VmDatePure
         $minute = intdiv($rem, 60);
         $second = $rem - ($minute * 60);
 
-        $ymd = self::civilYmdPacked($days);
-        $year = intdiv($ymd, 10000);
-        $month = intdiv($ymd % 10000, 100);
-        $day = $ymd % 100;
+        // Do not pack y*10000+m*100+d — toward-zero intdiv/mod breaks year < 0
+        // (setISODate null → -0001-12-26 formatted as 0000--87--74, #31620).
+        [$year, $month, $day] = self::civilYmd($days);
         $wday = self::civilWeekday($year, $month, $day);
         $yday = self::civilDayOfYear($year, $month, $day);
 
@@ -155,8 +154,12 @@ final class VmDatePure
         ];
     }
 
-    /** Civil yyyymmdd from days since Unix epoch (Howard Hinnant). */
-    private static function civilYmdPacked(int $days): int
+    /**
+     * Civil Y-M-D from days since Unix epoch (Howard Hinnant).
+     *
+     * @return array{0: int, 1: int, 2: int} year, month (1–12), day
+     */
+    private static function civilYmd(int $days): array
     {
         $z = $days + 719468;
         $era = intdiv($z >= 0 ? $z : $z - 146096, 146097);
@@ -171,7 +174,7 @@ final class VmDatePure
             ++$y;
         }
 
-        return $y * 10000 + $m * 100 + $d;
+        return [$y, $m, $d];
     }
 
     private static function civilDayOfYear(int $year, int $mon, int $mday): int
@@ -215,7 +218,7 @@ final class VmDatePure
         return $yday;
     }
 
-    /** Sakamoto — Sunday=0 … Saturday=6. */
+    /** Sakamoto — Sunday=0 … Saturday=6 (floor division for year < 0, #31620). */
     private static function civilWeekday(int $year, int $mon, int $mday): int
     {
         $y = $year;
@@ -247,7 +250,31 @@ final class VmDatePure
             $t = 2;
         }
 
-        return (int) (($y + (int) ($y / 4) - (int) ($y / 100) + (int) ($y / 400) + $t + $mday) % 7);
+        $sum = $y + self::floorDiv($y, 4) - self::floorDiv($y, 100) + self::floorDiv($y, 400) + $t + $mday;
+
+        return self::positiveMod($sum, 7);
+    }
+
+    /** Floor division (toward −∞) — PHP intdiv is toward zero. */
+    private static function floorDiv(int $a, int $b): int
+    {
+        $q = intdiv($a, $b);
+        $r = $a % $b;
+        if (0 !== $r && (($a < 0) !== ($b < 0))) {
+            --$q;
+        }
+
+        return $q;
+    }
+
+    private static function positiveMod(int $x, int $y): int
+    {
+        $tmp = $x % $y;
+        if ($tmp < 0) {
+            $tmp += $y;
+        }
+
+        return $tmp;
     }
 
     public static function mktime(
