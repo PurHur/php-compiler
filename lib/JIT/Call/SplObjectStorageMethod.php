@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -107,7 +109,12 @@ final class SplObjectStorageMethod implements Call
             return VmClassMethod::jitArgcDummyReturn($context);
         }
         $ht = self::backingHashtable($context, $args[0]);
-        $keyObj = self::loadKeyObject($context, $args[1]);
+        $keyObj = self::loadKeyObject($context, $args[1], 'attach');
+        if (null === $keyObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_attach_after_typeerror');
+
+            return self::voidResult($context);
+        }
         if (count($args) >= 3) {
             HashTableHelper::setAtObjectKey($context, $ht, $keyObj, $args[2]);
         } else {
@@ -127,7 +134,13 @@ final class SplObjectStorageMethod implements Call
             throw new \LogicException('SplObjectStorage::offsetSet() requires object key and value');
         }
         $ht = self::backingHashtable($context, $args[0]);
-        $keyObj = self::loadKeyObject($context, $args[1]);
+        // php-src offsetSet / write_dimension — TypeError cites offsetSet (#31509).
+        $keyObj = self::loadKeyObject($context, $args[1], 'offsetSet');
+        if (null === $keyObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_offsetset_after_typeerror');
+
+            return self::voidResult($context);
+        }
         HashTableHelper::setAtObjectKey($context, $ht, $keyObj, $args[2]);
 
         return self::voidResult($context);
@@ -140,7 +153,12 @@ final class SplObjectStorageMethod implements Call
             return VmClassMethod::jitArgcDummyReturn($context);
         }
         $ht = self::backingHashtable($context, $args[0]);
-        $keyObj = self::loadKeyObject($context, $args[1]);
+        $keyObj = self::loadKeyObject($context, $args[1], 'offsetGet');
+        if (null === $keyObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_offsetget_after_typeerror');
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
         $fetched = HashTableHelper::readObjectKeyToValueBox($context, $ht, $keyObj);
 
         return $fetched->value;
@@ -157,7 +175,13 @@ final class SplObjectStorageMethod implements Call
             return VmClassMethod::jitArgcDummyReturn($context);
         }
         $ht = self::backingHashtable($context, $args[0]);
-        $keyObj = self::loadKeyObject($context, $args[1]);
+        $keyMethod = 'offsetexists' === strtolower($this->method) ? 'offsetExists' : 'contains';
+        $keyObj = self::loadKeyObject($context, $args[1], $keyMethod);
+        if (null === $keyObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_contains_after_typeerror');
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
         $isSet = $context->builder->call(
             $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
             $ht,
@@ -187,10 +211,36 @@ final class SplObjectStorageMethod implements Call
         return $slot;
     }
 
-    private static function loadKeyObject(Context $context, Variable $key): Value
+    /**
+     * Object key for SplObjectStorage methods — Zend Z_PARAM_OBJECT TypeError (#31509).
+     *
+     * @param string $methodDisplay  attach / offsetSet / offsetGet / contains / offsetExists
+     *
+     * @return Value|null  null when a TypeError was emitted (caller must not continue in this BB)
+     */
+    private static function loadKeyObject(Context $context, Variable $key, string $methodDisplay): ?Value
     {
         if (Variable::TYPE_OBJECT === $key->type) {
             return self::materializeObjectPointer($context, $key);
+        }
+
+        $rejectCompileTime = Variable::TYPE_NULL === $key->type
+            || !empty($key->isNullConstant)
+            || Variable::TYPE_VALUE !== $key->type;
+        if ($rejectCompileTime) {
+            $given = Variable::TYPE_NULL === $key->type || !empty($key->isNullConstant)
+                ? 'null'
+                : JitOperandTypeLabel::givenLabel($context, $key);
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                \sprintf(
+                    'SplObjectStorage::%s(): Argument #1 ($object) must be of type object, %s given',
+                    $methodDisplay,
+                    $given
+                )
+            );
+
+            return null;
         }
 
         return $context->builder->call(
