@@ -13,15 +13,14 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ArrayCountRecursiveRuntime;
 use PHPCompiler\JIT\Builtin\ArrayCountRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -29,7 +28,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * count() for arrays (subset of PHP; php-src ext/standard/array.c).
+ * count() / sizeof() — php-src Zend/zend_builtin_functions.c PHP_FUNCTION(count).
+ *
+ * Null $mode: Z_PARAM_LONG — soft E_DEPRECATED + coerce to COUNT_NORMAL; strict TypeError (#31463).
  */
 final class array_count extends Internal
 {
@@ -57,11 +58,14 @@ final class array_count extends Internal
         }
         $mode = VmArray::COUNT_NORMAL;
         if (2 === $argc) {
-            $modeArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $modeArg->type) {
-                throw new \TypeError($this->name.'(): Argument #2 ($mode) must be of type int');
-            }
-            $mode = $modeArg->toInt();
+            // Z_PARAM_LONG $mode — soft-null DEP+0 outside strict_types (#31463).
+            $mode = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
+                $this->name,
+                2,
+                'mode'
+            );
             if (VmArray::COUNT_NORMAL !== $mode && VmArray::COUNT_RECURSIVE !== $mode) {
                 throw new \LogicException(
                     $this->name.'(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
@@ -110,16 +114,21 @@ final class array_count extends Internal
         }
         $recursive = false;
         if (2 === $argc) {
-            $modeLit = JitLongArg::compileTimeLiteral($args[1]);
-            if (null === $modeLit) {
+            // Z_PARAM_LONG $mode — soft-null DEP+COUNT_NORMAL; strict TypeError (#31463).
+            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+                JitStrictIntArg::lower($context, $args[1], $this->name, 2, 'mode');
+                // Soft path coerces to 0 / COUNT_NORMAL; strict aborts above.
+            } elseif (null !== $args[1]->compileTimeLong) {
+                $modeLit = (int) $args[1]->compileTimeLong;
+                if (VmArray::COUNT_RECURSIVE === $modeLit) {
+                    $recursive = true;
+                } elseif (VmArray::COUNT_NORMAL !== $modeLit) {
+                    throw new \LogicException(
+                        $this->name.'(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
+                    );
+                }
+            } else {
                 throw new \LogicException($this->name.'() mode must be a compile-time integer in this compiler build');
-            }
-            if (VmArray::COUNT_RECURSIVE === $modeLit) {
-                $recursive = true;
-            } elseif (VmArray::COUNT_NORMAL !== $modeLit) {
-                throw new \LogicException(
-                    $this->name.'(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
-                );
             }
         }
         if ($recursive) {
