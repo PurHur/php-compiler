@@ -42,7 +42,8 @@ final class LibcExtern
             // strcspn dropped (#29050): parse_str AOT kernel + StringStrspn use __compiler_strcspn.
             'strchr' => [$i8p, false, [$i8p, $i32]],
             'strstr' => [$i8p, false, [$i8p, $i8p]],
-            'strrchr' => [$i8p, false, [$i8p, $i32]],
+            // strrchr dropped (#31458): StrrchrJitHelper owns user-script strrchr();
+            // NestedJIT JitTempnamKernel + ReflectionSetup declare strrchr(3) module-locally.
             'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],
             'strtod' => [$dbl, false, [$i8p, $i8pp]],
             'strdup' => [$i8p, false, [$i8p]],
