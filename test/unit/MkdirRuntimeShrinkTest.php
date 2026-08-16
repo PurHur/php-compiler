@@ -47,4 +47,11 @@ final class MkdirRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MkdirJitHelper.php', $spine);
         $this->assertStringContainsString('StringMkdir.php', $spine);
     }
+
+    public function testSessionStorageDeclaresMkdirModuleLocally(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSessionStorageKernel.php');
+        $this->assertStringContainsString('ensureLibcMkdir', $source);
+        $this->assertStringContainsString('#31374', $source);
+    }
 }

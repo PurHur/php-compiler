@@ -1075,6 +1075,7 @@ final class M5TrivialEchoNative
 
         self::ensureFputs($context);
         self::ensureFputc($context);
+        self::ensureChmod($context);
         $i32 = $context->getTypeFromString('int32');
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
@@ -1196,5 +1197,22 @@ final class M5TrivialEchoNative
             $context->context->functionType($i32, false, $i32, $i8p)
         );
         $context->registerFunction('fputc', $fn);
+    }
+
+    /** Module-local chmod(2) after LibcExtern/Module always-on drop (#31374). */
+    private static function ensureChmod(Context $context): void
+    {
+        if (null !== $context->module->getNamedFunction('chmod')) {
+            $context->registerFunction('chmod', $context->module->getNamedFunction('chmod'));
+
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $fn = $context->module->addFunction(
+            'chmod',
+            $context->context->functionType($i32, false, $i8p, $i32)
+        );
+        $context->registerFunction('chmod', $fn);
     }
 }
