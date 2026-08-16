@@ -715,6 +715,12 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says keys/val (#23490)
             case 'array_fill_keys':
                 return ['keys', 'value'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says start_key/num/val (#23305)
+            case 'array_fill':
+                return ['start_index', 'count', 'value'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says input/preserve (#23305)
+            case 'array_reverse':
+                return ['array', 'preserve_keys='];
             case 'array_chunk':
                 return ['array', 'length', 'preserve_keys'];
             case 'similar_text':

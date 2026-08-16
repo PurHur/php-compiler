@@ -1307,6 +1307,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('chmod'));
     }
 
+    /** @covers issue #23305 */
+    public function testArrayFillAndArrayReverseNamedParams(): void
+    {
+        $fill = BuiltinParamNames::forFunction('array_fill');
+        self::assertSame(['start_index', 'count', 'value'], $fill);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fill, 'start_index', 'array_fill'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fill, 'count', 'array_fill'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fill, 'value', 'array_fill'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fill, 'start_key', 'array_fill'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fill, 'num', 'array_fill'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fill, 'val', 'array_fill'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('array_fill'));
+
+        $rev = BuiltinParamNames::forFunction('array_reverse');
+        self::assertSame(['array', 'preserve_keys='], $rev);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($rev, 'array', 'array_reverse'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($rev, 'preserve_keys', 'array_reverse'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($rev, 'input', 'array_reverse'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($rev, 'preserve', 'array_reverse'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_reverse'));
+    }
+
     /** @covers issue #11576 */
     public function testStreamSocketClientNamedTimeoutParamResolves(): void
     {
