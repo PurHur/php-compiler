@@ -14,7 +14,9 @@ use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
- * ftp_fput() — upload from an open stream to remote path (php-src ext/ftp/php_ftp.c; #6762).
+ * ftp_fput() — upload from an open stream to remote path (php-src ext/ftp/php_ftp.c; #6762 / #31429).
+ *
+ * JIT/AOT: {@see JitFtpTransfer} → NestedJIT {@see FtpTransferJitHelper}.
  */
 final class ftp_fput extends Internal
 {
@@ -53,6 +55,6 @@ final class ftp_fput extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_fput() is not implemented for JIT in this compiler build (issue #6762)');
+        return JitFtpTransfer::invokeFput($context, ...$args);
     }
 }

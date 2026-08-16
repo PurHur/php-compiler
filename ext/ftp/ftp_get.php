@@ -13,7 +13,9 @@ use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
- * ftp_get() — php-src ext/ftp/php_ftp.c; issue #20033.
+ * ftp_get() — php-src ext/ftp/php_ftp.c; issue #20033 / #31429.
+ *
+ * JIT/AOT: {@see JitFtpTransfer} → NestedJIT {@see FtpTransferJitHelper}.
  */
 final class ftp_get extends Internal
 {
@@ -53,6 +55,6 @@ final class ftp_get extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_get() is not implemented for JIT in this compiler build (issue #20033)');
+        return JitFtpTransfer::invokeGet($context, ...$args);
     }
 }
