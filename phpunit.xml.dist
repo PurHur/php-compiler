@@ -361,6 +361,8 @@
             <file>./test/compliance/SodiumPadReflection27734JITTest.php</file>
             <file>./test/compliance/SodiumBin2hexReflection27778VMTest.php</file>
             <file>./test/compliance/SodiumBin2hexReflection27778JITTest.php</file>
+            <file>./test/compliance/SodiumStreamXorIcReflection27917VMTest.php</file>
+            <file>./test/compliance/SodiumStreamXorIcReflection27917JITTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340JITTest.php</file>
             <file>./test/compliance/ArrayPreserveKeysNull31442VMTest.php</file>
