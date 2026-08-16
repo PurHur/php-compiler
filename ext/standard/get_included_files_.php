@@ -28,7 +28,10 @@ final class get_included_files_ extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 0) {
-            throw new \ArgumentCountError($this->getName().'() takes no arguments');
+            // Zend: "expects exactly 0 arguments, N given" (#30654)
+            throw new \ArgumentCountError(
+                $this->getName().'() expects exactly 0 arguments, '.$argc.' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -45,7 +48,7 @@ final class get_included_files_ extends Internal
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
                 $context,
-                $this->getName().'() takes no arguments'
+                $this->getName().'() expects exactly 0 arguments, '.$argc.' given'
             );
             $slot = JitValueBox::alloc($context);
 
