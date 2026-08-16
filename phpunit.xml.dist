@@ -123,6 +123,8 @@
             <file>./test/compliance/GzNullLevelSoftJITTest.php</file>
             <file>./test/compliance/UserErrorNullLevelSoftVMTest.php</file>
             <file>./test/compliance/UserErrorNullLevelSoftJITTest.php</file>
+            <file>./test/compliance/SetErrorHandlerNullLevelsSoftVMTest.php</file>
+            <file>./test/compliance/SetErrorHandlerNullLevelsSoftJITTest.php</file>
             <file>./test/compliance/StreamContextSetOptionNullWrapper31422VMTest.php</file>
             <file>./test/compliance/StreamContextSetOptionNullWrapper31422JITTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211VMTest.php</file>
