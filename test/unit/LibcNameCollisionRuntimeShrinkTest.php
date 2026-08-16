@@ -39,12 +39,17 @@ final class LibcNameCollisionRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_strcoll', $source);
     }
 
-    public function testLibcExternDeclaresLiveStrcollNotDeadStrspnStrcspn(): void
+    public function testLibcExternDropsDeadStrspnStrcspnAndStrcoll(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
         // strspn/strcspn dropped — StringStrspn owns __compiler_* ABIs (#28850, #29050)
         $this->assertStringNotContainsString("'strspn' =>", $source);
         $this->assertStringNotContainsString("'strcspn' =>", $source);
-        $this->assertStringContainsString("'strcoll' =>", $source);
+        // strcoll dropped (#31498) — StringStrcoll owns __compiler_strcoll module-local
+        $this->assertStringNotContainsString("'strcoll' =>", $source);
+        $this->assertStringContainsString('#31498', $source);
+        // strncasecmp dropped (#31682) — Object_ / JitFilter use __compiler_strncasecmp
+        $this->assertStringNotContainsString("'strncasecmp' =>", $source);
+        $this->assertStringContainsString('#31682', $source);
     }
 }

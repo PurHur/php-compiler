@@ -63,6 +63,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'getenv',
             'mkstemp',
             'memchr',
+            'strncasecmp',
         ];
     }
 
@@ -73,7 +74,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -90,6 +91,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31606', $source);
         $this->assertStringContainsString('#31637', $source);
         $this->assertStringContainsString('#31655', $source);
+        $this->assertStringContainsString('#31682', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -234,7 +236,33 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc getenv (#31637)'
         );
+        $this->assertStringNotContainsString(
+            "'strncasecmp' =>",
+            $source,
+            'LibcExtern must not declare libc strncasecmp (#31682)'
+        );
         $this->assertStringContainsString('#31655', $source);
+        $this->assertStringContainsString('#31682', $source);
+    }
+
+    public function testObjectTypeRoutesStrncasecmpThroughCompilerAbiAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('#31682', $source);
+        $this->assertStringContainsString('StringCaseCompare::ensureStrncasecmpLinked', $source);
+        $this->assertStringContainsString('StringCaseCompare::ABI_STRNCASECMP', $source);
+        $this->assertStringNotContainsString("lookupFunction('strncasecmp')", $source);
+        $this->assertStringNotContainsString("addFunction('strncasecmp'", $source);
+    }
+
+    public function testJitFilterBooleanTokenUsesCompilerStrncasecmpAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/filter/JitFilter.php');
+        $this->assertStringContainsString('#31682', $source);
+        $this->assertStringContainsString('StringCaseCompare::ensureStrncasecmpLinked', $source);
+        $this->assertStringContainsString('StringCaseCompare::ABI_STRNCASECMP', $source);
+        $this->assertStringNotContainsString("lookupFunction('strncasecmp')", $source);
+        $this->assertStringNotContainsString('LibcExtern::register', $source);
     }
 
     public function testJitTempnamKernelDeclaresMkstempMemchrModuleLocallyAfterLibcExternDrop(): void

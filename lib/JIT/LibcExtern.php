@@ -39,7 +39,10 @@ final class LibcExtern
             'strcmp' => [$i32, false, [$i8p, $i8p]],
             'strncmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
             'strcasecmp' => [$i32, false, [$i8p, $i8p]],
-            'strncasecmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
+            // strncasecmp dropped (#31682): Type/Object_::classIdFromRuntimeName +
+            // JitFilter::parseBooleanStringToken look up __compiler_strncasecmp
+            // (StringCaseCompare::ensureStrncasecmpLinked); user-script strncasecmp()
+            // stays on CaseCompareJitHelper / VmString (#15225 / #26861) — not libc.
             // strcoll dropped (#31498): StringStrcoll declares strcoll(3) module-locally
             // for the __compiler_strcoll trampoline (#27059); no other lookupFunction remains.
             // strcspn dropped (#29050): parse_str AOT kernel + StringStrspn use __compiler_strcspn.

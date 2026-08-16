@@ -615,6 +615,12 @@ class Object_ extends Type {
     /**
      * `new static()` / runtime class operand — dispatch allocate by class_id (#4792).
      */
+    /**
+     * Link `__compiler_strncasecmp` after LibcExtern always-on drop (#31682).
+     *
+     * User-script strncasecmp() stays on CaseCompareJitHelper / VmString (#15225);
+     * classIdFromRuntimeName must not look up libc strncasecmp(3).
+     */
     private static function ensureStrNcasecmp(Context $context): void
     {
         StringCaseCompare::ensureStrncasecmpLinked($context);
@@ -649,7 +655,7 @@ class Object_ extends Type {
             );
             self::ensureStrNcasecmp($this->context);
             $cmp = $this->context->builder->call(
-                $this->context->lookupFunction('strncasecmp'),
+                $this->context->lookupFunction(StringCaseCompare::ABI_STRNCASECMP),
                 $namePtr,
                 $expected,
                 $this->context->builder->zExt($nameLen, $this->context->getTypeFromString('size_t'))

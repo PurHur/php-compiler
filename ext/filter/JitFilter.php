@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\filter;
 use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\StringFilterBoolean;
 use PHPCompiler\JIT\Builtin\StringFilterDomain;
 use PHPCompiler\JIT\Builtin\StringFilterEmail;
@@ -1408,10 +1409,13 @@ final class JitFilter
     /**
      * Inline php_filter_boolean token parse — returns i64 -1/0/1 (#26853).
      * Mirrors {@see VmFilter::parseBooleanString()} (trim + case-insensitive tokens).
+     *
+     * Uses `__compiler_strncasecmp` after LibcExtern always-on drop (#31682); user-script
+     * strncasecmp() stays on CaseCompareJitHelper / VmString.
      */
     private static function parseBooleanStringToken(Context $context, Value $strPtr): Value
     {
-        \PHPCompiler\JIT\LibcExtern::register($context);
+        StringCaseCompare::ensureStrncasecmpLinked($context);
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
@@ -1493,7 +1497,7 @@ final class JitFilter
                 $context->structFieldMap['__string__']['value']
             );
             $cmp = $context->builder->call(
-                $context->lookupFunction('strncasecmp'),
+                $context->lookupFunction(StringCaseCompare::ABI_STRNCASECMP),
                 $tok,
                 $litChars,
                 $i64->constInt($n, false)
