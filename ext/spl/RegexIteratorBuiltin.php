@@ -717,6 +717,8 @@ final class RegexIteratorGetMode extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::getMode()'
         );
+        // php-src zim_RegexIterator_getMode — ZEND_PARSE_PARAMETERS_NONE (#31594).
+        $this->requireExactUserArgCount($frame, 'RegexIterator::getMode', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -772,6 +774,8 @@ final class RegexIteratorGetFlags extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::getFlags()'
         );
+        // php-src zim_RegexIterator_getFlags — ZEND_PARSE_PARAMETERS_NONE (#31594).
+        $this->requireExactUserArgCount($frame, 'RegexIterator::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -827,6 +831,8 @@ final class RegexIteratorGetPregFlags extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::getPregFlags()'
         );
+        // php-src zim_RegexIterator_getPregFlags — ZEND_PARSE_PARAMETERS_NONE (#31594).
+        $this->requireExactUserArgCount($frame, 'RegexIterator::getPregFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
