@@ -115,6 +115,8 @@
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209JITTest.php</file>
+            <file>./test/compliance/PasswordNullOptions31421VMTest.php</file>
+            <file>./test/compliance/PasswordNullOptions31421JITTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211VMTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211JITTest.php</file>
             <file>./test/compliance/ChmodNullPermissions31213VMTest.php</file>

@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** password_needs_rehash() — VM via VmPassword; JIT/AOT via PasswordJitHelper PHP (issue #3279, #6503, #9908, #18655). */
@@ -46,15 +45,10 @@ final class password_needs_rehash extends Internal
         $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_needs_rehash', 1, 'algo');
         $options = [];
         if (3 === $argc) {
-            $optVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $optVar->type) {
-                throw new \LogicException('password_needs_rehash() options must be an array in this compiler build');
-            }
-            $exported = VmJson::export($optVar);
-            if (!\is_array($exported)) {
-                throw new \LogicException('password_needs_rehash() options must be an array in this compiler build');
-            }
-            $options = $exported;
+            // php-src Z_PARAM_ARRAY $options — TypeError on null (password.stub.php; #31421).
+            VmArray::requireArrayParam($frame->calledArgs[2], 'password_needs_rehash', 3, 'options');
+            $exported = VmJson::export($frame->calledArgs[2]->resolveIndirect());
+            $options = \is_array($exported) ? $exported : [];
         }
         if (null === $frame->returnVar) {
             return;
@@ -81,6 +75,8 @@ final class password_needs_rehash extends Internal
         }
         $options = null;
         if (3 === $argc) {
+            // php-src Z_PARAM_ARRAY $options — TypeError on null (#31421).
+            JitArrayElem::requireArrayParam($context, $args[2], 'password_needs_rehash', 3, 'options');
             $options = $args[2];
         }
 
