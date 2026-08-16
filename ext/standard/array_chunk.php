@@ -11,11 +11,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * array_chunk() — packed lists and preserve_keys=true (VM + JIT/AOT).
+ *
+ * Null $preserve_keys: Z_PARAM_BOOL — strict TypeError; else DEP+coerce (#31442, re-#24693).
  */
 final class array_chunk extends Internal
 {
@@ -41,8 +42,10 @@ final class array_chunk extends Internal
         }
         $preserveKeys = false;
         if (3 === $argc) {
-            $preserveKeys = VmMath::parseBoolBuiltinArgStrict(
-                $frame->calledArgs[2],
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31442).
+            $preserveKeys = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                2,
                 'array_chunk',
                 3,
                 'preserve_keys'
@@ -74,8 +77,9 @@ final class array_chunk extends Internal
         JitInternalStrictArg::requireInt($context, $args[1], 'array_chunk', 'length', 2);
         $size = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_chunk', 2, 'length');
         JitArrayChunk::emitRuntimeLengthGuard($context, $size);
+        // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31442).
         $preserveKeys = 3 === $argc
-            ? JitBoolArg::lower($context, $args[2], 'array_chunk() preserve_keys')
+            ? JitBoolArg::lowerCoerceZParamBool($context, $args[2], 'array_chunk', 'preserve_keys', 3)
             : null;
 
         return ArrayChunkRuntime::chunk($context, $args[0], $size, $preserveKeys);

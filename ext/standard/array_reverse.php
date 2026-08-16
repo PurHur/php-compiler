@@ -19,11 +19,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * array_reverse() — packed lists and associative arrays (ext/standard/array.c; #4335).
+ *
+ * Null $preserve_keys: Z_PARAM_BOOL — strict TypeError; else DEP+coerce (#31442, re-#24693).
  */
 final class array_reverse extends Internal
 {
@@ -38,8 +39,10 @@ final class array_reverse extends Internal
         $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_reverse', 1, 'array');
         $preserveKeys = false;
         if (2 === $argc) {
-            $preserveKeys = VmMath::parseBoolBuiltinArgStrict(
-                $frame->calledArgs[1],
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31442).
+            $preserveKeys = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                1,
                 'array_reverse',
                 2,
                 'preserve_keys'
@@ -65,8 +68,9 @@ final class array_reverse extends Internal
         }
         TypeErrorRaise::ensureLinked($context);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_reverse', 1, 'array');
+        // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31442).
         $preserveKeys = 2 === $argc
-            ? JitBoolArg::lower($context, $args[1], 'array_reverse() preserve_keys')
+            ? JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'array_reverse', 'preserve_keys', 2)
             : null;
 
         return ArrayReverseRuntime::reverse($context, $args[0], $preserveKeys);

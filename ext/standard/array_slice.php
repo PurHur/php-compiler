@@ -23,6 +23,8 @@ use PHPLLVM\Value;
 
 /**
  * array_slice() — packed lists and preserve_keys=true (ext/standard/array.c; #4227).
+ *
+ * Null $preserve_keys: Z_PARAM_BOOL — strict TypeError; else DEP+coerce (#31442, re-#24693).
  */
 final class array_slice extends Internal
 {
@@ -55,8 +57,10 @@ final class array_slice extends Internal
         }
         $preserveKeys = false;
         if (isset($frame->calledArgs[3])) {
-            $preserveKeys = VmMath::requireBuiltinBoolArg(
-                $frame->calledArgs[3],
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31442).
+            $preserveKeys = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                3,
                 'array_slice',
                 4,
                 'preserve_keys'
@@ -95,8 +99,9 @@ final class array_slice extends Internal
         $length = $hasExplicitLength
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'array_slice', 3, 'length')
             : $context->getTypeFromString('int64')->constInt(0, false);
+        // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31442).
         $preserveKeys = ($argc >= 4 && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
-            ? JitBoolArg::lowerBuiltinTyped($context, $args[3], 'array_slice', 'preserve_keys', 4)
+            ? JitBoolArg::lowerCoerceZParamBool($context, $args[3], 'array_slice', 'preserve_keys', 4)
             : null;
 
         return ArraySliceRuntime::slice($context, $args[0], $offset, $hasLength, $length, $preserveKeys);
