@@ -298,6 +298,8 @@
             <file>./test/compliance/PrintRVarExportNullReturnStrict31337JITTest.php</file>
             <file>./test/compliance/FileGetContentsNullUseIncludePathStrict31338VMTest.php</file>
             <file>./test/compliance/FileGetContentsNullUseIncludePathStrict31338JITTest.php</file>
+            <file>./test/compliance/TrimFamilyNullCharactersStrict31386VMTest.php</file>
+            <file>./test/compliance/TrimFamilyNullCharactersStrict31386JITTest.php</file>
             <file>./test/compliance/SodiumAes256gcmIsAvailableReflection27775VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340JITTest.php</file>

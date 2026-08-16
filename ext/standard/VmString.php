@@ -3742,15 +3742,19 @@ final class VmString
     }
 
     /**
-     * @param list<Variable> $optionalArgs trim/ltrim/rtrim args after $string (0..1 entries)
+     * Resolve trim/ltrim/rtrim/chop $characters + mode (php-src string.c / string.stub.php).
+     *
+     * Z_PARAM_STR $characters: caller strict_types → TypeError on null; else soft-null DEP+"" (#31386).
+     * Uses {@see stringBuiltinArgForFrame} with soft forward-profile null (same as arg #1 trim family).
      *
      * @return array{0: string, 1: int} character mask and php_trim_int() mode bitmask
      */
     public static function resolveTrimMaskAndMode(
-        array $optionalArgs,
+        Frame $frame,
         string $function,
         int $defaultMode
     ): array {
+        $optionalArgs = \array_slice($frame->calledArgs, 1);
         $argc = \count($optionalArgs);
         if ($argc > 1) {
             // php-src string.stub.php — arity ≤2; no $mode (#28230 / #28202).
@@ -3765,7 +3769,7 @@ final class VmString
         }
 
         return [
-            self::coerceStringBuiltinArg($optionalArgs[0], $function, 1, 'characters'),
+            self::stringBuiltinArgForFrame($frame, 1, $function, 1, 'characters', false),
             $defaultMode,
         ];
     }
