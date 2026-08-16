@@ -291,25 +291,26 @@ final class VmReflection
 
     /**
      * Second parameter for class_exists/interface_exists/trait_exists/enum_exists (php-src zif_* autoload flag).
+     *
+     * Z_PARAM_BOOL: strict_types TypeError on null; else null→false + E_DEPRECATED (#31443).
      */
-    public static function autoloadFlagFromFrame(Frame $frame, int $argIndex = 1, bool $default = true): bool
-    {
+    public static function autoloadFlagFromFrame(
+        Frame $frame,
+        string $function,
+        int $argIndex = 1,
+        bool $default = true
+    ): bool {
         if (\count($frame->calledArgs) <= $argIndex) {
             return $default;
         }
-        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
-        if (Variable::TYPE_BOOLEAN !== $arg->type) {
-            throw new \TypeError(
-                \sprintf(
-                    '%s(): Argument #%d ($autoload) must be of type bool, %s given',
-                    $frame->func->getName(),
-                    $argIndex + 1,
-                    EnumCaseSupport::typeNameForVariable($arg)
-                )
-            );
-        }
 
-        return $arg->toBool();
+        return VmMath::parseBoolBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            $function,
+            $argIndex + 1,
+            'autoload'
+        );
     }
 
     private static function maybeAutoloadClass(Context $ctx, string $className, bool $autoload): void
