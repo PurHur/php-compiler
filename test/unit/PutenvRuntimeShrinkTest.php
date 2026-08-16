@@ -48,6 +48,8 @@ final class PutenvRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('invokePutenvNestedLeaf', $source);
         $this->assertStringContainsString('ensureLibcSetenvUnsetenv', $source);
         $this->assertStringContainsString('#31558', $source);
+        $this->assertStringContainsString('ensureLibcGetenv', $source);
+        $this->assertStringContainsString('#31637', $source);
         $this->assertStringContainsString("lookupFunction('setenv')", $source);
         $this->assertStringContainsString("lookupFunction('unsetenv')", $source);
         $this->assertStringNotContainsString('phpc_putenv_kernel', $source);

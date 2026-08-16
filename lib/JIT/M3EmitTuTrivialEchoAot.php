@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\StringFsDir;
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -352,6 +353,7 @@ final class M3EmitTuTrivialEchoAot
         Value $outFile,
         Value $realStandaloneFn
     ): void {
+        StringGetenv::ensureLibcGetenv($context);
         $charPtr = $context->getTypeFromString('char*');
         $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');

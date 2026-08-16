@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -19,6 +20,7 @@ final class JitRequestBody
 
     public static function readPhpInput(Context $context): Value
     {
+        StringGetenv::ensureLibcGetenv($context);
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__string__'];
         $nameStr = $context->builder->load($context->constantStringFromString('REQUEST_BODY'));

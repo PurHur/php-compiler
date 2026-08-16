@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\PendingHeadersRuntime;
 use PHPCompiler\JIT\Builtin\SessionStorageGlobals;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Builtin\StringFilePutContents;
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Builtin\StringSerialize;
 use PHPCompiler\JIT\Builtin\StringUnserialize;
 use PHPCompiler\JIT\Context;
@@ -508,6 +509,7 @@ final class JitSessionStorageKernel
      */
     private static function emitSessionFilePathString(Context $context, Value $idLen): Value
     {
+        StringGetenv::ensureLibcGetenv($context);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -802,6 +804,7 @@ final class JitSessionStorageKernel
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         self::ensureLibcMkdir($context);
+        StringGetenv::ensureLibcGetenv($context);
         $dirKey = $context->builder->pointerCast(
             $context->constantFromString('PHP_COMPILER_SESSION_DIR'),
             $i8p
@@ -852,6 +855,7 @@ final class JitSessionStorageKernel
     private static function implementApplyCookieBridge(Context $context, LlvmFunction $fn): void
     {
         LibcExtern::register($context);
+        StringGetenv::ensureLibcGetenv($context);
 
         $entry = $fn->appendBasicBlock('ss_cookie_bridge_entry');
         $context->builder->positionAtEnd($entry);

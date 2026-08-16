@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -114,6 +115,7 @@ final class VmDriverExecuteNative
 
     private static function envProbeHandled(Context $context, $i8p, $charPtr): Value
     {
+        StringGetenv::ensureLibcGetenv($context);
         $driverKey = $context->builder->pointerCast(
             $context->constantFromString('PHP_COMPILER_VM_DRIVER_EXECUTE'),
             $charPtr
@@ -176,6 +178,7 @@ final class VmDriverExecuteNative
      */
     private static function emitRunProbeEcho(Context $context, LlvmFunction $func): void
     {
+        StringGetenv::ensureLibcGetenv($context);
         $i8p = $context->getTypeFromString('int8*');
         $charPtr = $context->getTypeFromString('char*');
         $spineKey = $context->builder->pointerCast(
