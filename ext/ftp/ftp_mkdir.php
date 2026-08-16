@@ -48,6 +48,6 @@ final class ftp_mkdir extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_mkdir() is not implemented for JIT in this compiler build (issue #20033)');
+        return JitFtpMutate::invokeMkdir($context, ...$args);
     }
 }
