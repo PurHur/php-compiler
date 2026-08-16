@@ -42,6 +42,6 @@ final class ftp_size extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_size() is not implemented for JIT in this compiler build (issue #20033)');
+        return JitFtpQuery::invokeSize($context, ...$args);
     }
 }

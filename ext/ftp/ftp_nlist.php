@@ -48,6 +48,6 @@ final class ftp_nlist extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_nlist() is not implemented for JIT in this compiler build (issue #20033)');
+        return JitFtpQuery::invokeNlist($context, ...$args);
     }
 }

@@ -87,6 +87,18 @@ final class VmFtpCore
     }
 
     /**
+     * Whether JIT-owned session prefers PASV for data transfers (#31380).
+     */
+    public static function jitPasvEnabled(int $key): bool
+    {
+        if ($key <= 0 || !isset(self::$jitOwned[$key]) || self::$jitOwned[$key]['closed']) {
+            return false;
+        }
+
+        return self::$jitOwned[$key]['pasv'];
+    }
+
+    /**
      * ftp_close() under JIT/AOT — drop owned-fd map entry (#31377).
      */
     public static function releaseJitOwnedForLookupKey(int $key): void

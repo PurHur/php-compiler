@@ -45,6 +45,6 @@ final class ftp_systype extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_systype() is not implemented for JIT in this compiler build (issue #6762)');
+        return JitFtpQuery::invokeSystype($context, ...$args);
     }
 }
