@@ -115,6 +115,15 @@ final class VmMath
         return \sprintf('Implicit conversion from float %s to int loses precision', (string) $value);
     }
 
+    /**
+     * php-src zend_operators.c — float-string → long precision loss (Z_PARAM_LONG; #29706).
+     * Message quotes the original string (including whitespace), not the parsed float.
+     */
+    public static function floatStringToIntPrecisionWarningMessage(string $original): string
+    {
+        return \sprintf('Implicit conversion from float-string "%s" to int loses precision', $original);
+    }
+
     public static function warnFloatToIntPrecisionLoss(
         float $value,
         \PHPCompiler\VM\Context $vmContext,
@@ -130,6 +139,47 @@ final class VmMath
             $vmContext,
             $frame
         );
+    }
+
+    public static function warnFloatStringToIntPrecisionLoss(
+        string $original,
+        float $value,
+        \PHPCompiler\VM\Context $vmContext,
+        ?Frame $frame = null
+    ): void {
+        if (!self::floatLosesIntPrecision($value)) {
+            return;
+        }
+        $vmContext->errors->triggerErrorWithHandlerFirst(
+            self::floatStringToIntPrecisionWarningMessage($original),
+            ErrorReporter::E_DEPRECATED,
+            null !== $frame && '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $vmContext,
+            $frame
+        );
+    }
+
+    /**
+     * Z_PARAM_LONG numeric-string arm — integral strings stay silent; float-strings emit
+     * float-string Implicit conversion Deprecated when precision is lost (#29706).
+     */
+    public static function coerceNumericStringToZendLong(string $s, ?Frame $frame = null): int
+    {
+        if (Variable::isIntegralNumericString($s)) {
+            return (int) $s;
+        }
+        $f = (float) $s;
+        if (self::floatLosesIntPrecision($f)) {
+            $ctx = $frame?->vmContext;
+            if (null === $ctx) {
+                $ctx = \PHPCompiler\VM\VmEngine::running()?->context;
+            }
+            if (null !== $ctx) {
+                self::warnFloatStringToIntPrecisionLoss($s, $f, $ctx, $frame);
+            }
+        }
+
+        return self::floatToZendLong($f);
     }
 
     /**
@@ -344,7 +394,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): ?int {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
@@ -371,7 +422,7 @@ final class VmMath
             return self::floatToZendLong($f);
         }
 
-        return self::parseNullableLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+        return self::parseNullableLongBuiltinArgCore($var, $function, $argIndex, $paramName, $frame);
     }
 
     public static function parseIntBuiltinArg(
@@ -544,7 +595,7 @@ final class VmMath
             self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
         }
 
-        return self::parseNullableIntBuiltinArg($var, $function, $userArgIndex, $paramName);
+        return self::parseNullableIntBuiltinArg($var, $function, $userArgIndex, $paramName, $frame);
     }
 
     /**
@@ -597,7 +648,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int {
         switch ($var->type) {
             case Variable::TYPE_INTEGER:
@@ -610,7 +662,7 @@ final class VmMath
                     throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'string'));
                 }
 
-                return (int) $s;
+                return self::coerceNumericStringToZendLong($s, $frame);
             default:
                 throw new \TypeError(
                     self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, self::vmTypeName($var->type))
@@ -662,7 +714,7 @@ final class VmMath
                     throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'string'));
                 }
 
-                return (int) $s;
+                return self::coerceNumericStringToZendLong($s, $frame);
             default:
                 throw new \TypeError(
                     self::intBuiltinTypeError($function, $argIndex, $paramName, self::vmTypeName($var->type))

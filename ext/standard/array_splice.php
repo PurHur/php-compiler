@@ -100,7 +100,8 @@ final class array_splice extends Internal
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         JitInternalStrictArg::requireInt($context, $args[1], 'array_splice', 'offset', 2);
-        $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_splice', 2, 'offset');
+        // Z_PARAM_LONG: float + float-string precision E_DEPRECATED (#29706).
+        $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_splice', 2, 'offset', true);
         $hasLengthArg = isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2]);
         if ($hasLengthArg) {
             [$hasLength, $length] = JitIntdiv::lowerSpliceLengthArg(

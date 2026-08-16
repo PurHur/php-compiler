@@ -761,6 +761,8 @@
             <file>./test/compliance/EmptyArrFloatDimDepJITTest.php</file>
             <file>./test/compliance/FloatDimCoalesceDepVMTest.php</file>
             <file>./test/compliance/FloatDimCoalesceDepJITTest.php</file>
+            <file>./test/compliance/ArraySpliceFloatStringOffsetDepVMTest.php</file>
+            <file>./test/compliance/ArraySpliceFloatStringOffsetDepJITTest.php</file>
             <file>./test/compliance/AbstractParentMethodCiteEval30022VMTest.php</file>
             <file>./test/compliance/AbstractParentMethodCiteEval30022JITTest.php</file>
             <file>./test/compliance/ClosureTypeerrorLocation84VMTest.php</file>
