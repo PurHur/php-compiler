@@ -1329,6 +1329,31 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_reverse'));
     }
 
+    /** @covers issue #23306 — pow/sqrt/fmod Zend stub names (InternalArgInfo still base/number/x) */
+    public function testPowSqrtFmodZendStubNamedParameters(): void
+    {
+        $pow = BuiltinParamNames::forFunction('pow');
+        self::assertSame(['num', 'exponent'], $pow);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($pow, 'num', 'pow'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pow, 'exponent', 'pow'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($pow, 'base', 'pow'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('pow'));
+
+        $sqrt = BuiltinParamNames::forFunction('sqrt');
+        self::assertSame(['num'], $sqrt);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sqrt, 'num', 'sqrt'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sqrt, 'number', 'sqrt'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('sqrt'));
+
+        $fmod = BuiltinParamNames::forFunction('fmod');
+        self::assertSame(['num1', 'num2'], $fmod);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fmod, 'num1', 'fmod'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fmod, 'num2', 'fmod'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fmod, 'x', 'fmod'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fmod, 'y', 'fmod'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('fmod'));
+    }
+
     /** @covers issue #11576 */
     public function testStreamSocketClientNamedTimeoutParamResolves(): void
     {

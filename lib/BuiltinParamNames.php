@@ -749,6 +749,13 @@ final class BuiltinParamNames
             case 'floor':
             case 'ceil':
                 return ['num'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still base/number/x (#23306)
+            case 'pow':
+                return ['num', 'exponent'];
+            case 'sqrt':
+                return ['num'];
+            case 'fmod':
+                return ['num1', 'num2'];
             case 'round':
                 return ['num', 'precision', 'mode'];
             case 'frexp':
