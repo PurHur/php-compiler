@@ -80,18 +80,25 @@ final class VmStreamOpenFailure
         return 'No such file or directory';
     }
 
+    /**
+     * php-src url.c / highlight helpers — open failure text before empty-path ValueError (#30514).
+     */
+    public static function highlightFailedOpeningMessage(string $function, string $path): string
+    {
+        return \sprintf(
+            '%s(): Failed opening \'%s\' for highlighting',
+            $function,
+            $path
+        );
+    }
+
     public static function warnHighlightFailedOpening(Frame $frame, string $function, string $path): void
     {
         if (null === $frame->vmContext) {
             return;
         }
-        $message = \sprintf(
-            '%s(): Failed opening \'%s\' for highlighting',
-            $function,
-            $path
-        );
         $frame->vmContext->errors->triggerError(
-            $message,
+            self::highlightFailedOpeningMessage($function, $path),
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,

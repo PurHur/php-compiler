@@ -9,6 +9,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\PathSupport;
 use PHPLLVM\Value;
 
 /**
@@ -30,16 +32,26 @@ final class highlight_file extends Internal
     public static function run(Frame $frame, string $functionName): void
     {
         $argc = \count($frame->calledArgs);
-        $path = VmStreamPath::coerceNonEmptyPathArgForFrame(
-            $frame,
-            0,
-            $functionName,
-            'filename'
-        );
+        // Z_PARAM_PATH — empty string: Zend warns "Failed opening '' for highlighting"
+        // then ValueError (php-src url.c; #30514). Do not throw before the warning.
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullString(
+                $frame->calledArgs[0],
+                $functionName,
+                'filename',
+                0,
+                $frame
+            );
+        }
+        $path = VmString::coercePathBuiltinArg($frame->calledArgs[0], $functionName, 0, 'filename');
         $return = false;
         if ($argc >= 2) {
             // Z_PARAM_BOOL: strict TypeError on null; else soft-null DEP+coerce (#31383).
             $return = VmHighlight::resolveReturnFlag($frame, $functionName);
+        }
+        if ('' === $path) {
+            VmStreamOpenFailure::warnHighlightFailedOpening($frame, $functionName, $path);
+            throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
         }
         $contents = VmFs::readPathContentsViaOpen($path, $frame->vmContext);
         if (false === $contents) {
