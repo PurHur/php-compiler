@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\simplexml;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Variable;
 
-/** SimpleXMLElement::addAttribute — add element attribute (php-src ext/simplexml/sxe.c; #19307). */
+/** SimpleXMLElement::addAttribute — add element attribute (php-src ext/simplexml/sxe.c; #19307 / #31554). */
 final class SimpleXmlElementAddAttribute extends VmClassMethod
 {
     public function __construct()
@@ -30,10 +31,15 @@ final class SimpleXmlElementAddAttribute extends VmClassMethod
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::addAttribute()'
         );
-        $nameVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \TypeError('SimpleXMLElement::addAttribute(): Argument #1 ($qualifiedName) must be of type string');
-        }
+        // Z_PARAM_STR $qualifiedName — soft-null DEP+coerce then empty → ValueError (php-src sxe.c / #31554).
+        $name = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
+            'SimpleXMLElement::addAttribute',
+            0,
+            'qualifiedName',
+            false
+        );
         $valueVar = $frame->calledArgs[2]->resolveIndirect();
         if (Variable::TYPE_STRING !== $valueVar->type) {
             throw new \TypeError('SimpleXMLElement::addAttribute(): Argument #2 ($value) must be of type string');
@@ -51,7 +57,7 @@ final class SimpleXmlElementAddAttribute extends VmClassMethod
         VmSimpleXml::addAttribute(
             $frame->vmContext,
             $entry,
-            $nameVar->toString(),
+            $name,
             $valueVar->toString(),
             $namespace,
             $frame

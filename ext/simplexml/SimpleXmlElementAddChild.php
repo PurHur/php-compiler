@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\simplexml;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Variable;
 
-/** SimpleXMLElement::addChild — append element child (php-src ext/simplexml/sxe.c; #18038). */
+/** SimpleXMLElement::addChild — append element child (php-src ext/simplexml/sxe.c; #18038 / #31554). */
 final class SimpleXmlElementAddChild extends VmClassMethod
 {
     public function __construct()
@@ -30,10 +31,15 @@ final class SimpleXmlElementAddChild extends VmClassMethod
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'SimpleXMLElement::addChild()'
         );
-        $nameVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \TypeError('SimpleXMLElement::addChild(): Argument #1 ($qualifiedName) must be of type string');
-        }
+        // Z_PARAM_STR $qualifiedName — soft-null DEP+coerce then empty → ValueError (php-src sxe.c / #31554).
+        $name = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
+            'SimpleXMLElement::addChild',
+            0,
+            'qualifiedName',
+            false
+        );
         $value = null;
         if (\count($frame->calledArgs) >= 3) {
             $valueVar = $frame->calledArgs[2]->resolveIndirect();
@@ -58,7 +64,7 @@ final class SimpleXmlElementAddChild extends VmClassMethod
             $frame->returnVar->object(VmSimpleXml::addChild(
                 $frame->vmContext,
                 $entry,
-                $nameVar->toString(),
+                $name,
                 $value,
                 $namespace
             ));
