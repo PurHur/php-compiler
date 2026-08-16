@@ -428,10 +428,12 @@ final class SplFixedArrayConstruct extends VmClassMethod
         );
         $size = 0;
         if (isset($frame->calledArgs[1])) {
-            $size = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
+            // php-src Z_PARAM_LONG $size — 1-based param index; soft-null DEP outside strict (#31623).
+            $size = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'SplFixedArray::__construct',
-                0,
+                1,
                 'size'
             );
         }
