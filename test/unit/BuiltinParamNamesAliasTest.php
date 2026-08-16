@@ -1354,6 +1354,32 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('fmod'));
     }
 
+    /** @covers issue #23400 — strcspn/strspn/strpbrk Zend stub names (InternalArgInfo still str/mask or haystack) */
+    public function testStrcspnStrspnStrpbrkZendStubNamedParameters(): void
+    {
+        foreach (['strcspn', 'strspn'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string', 'characters', 'offset=', 'length='], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'characters', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', $fn));
+            self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'length', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mask', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'start', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'len', $fn));
+            self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        }
+
+        $strpbrk = BuiltinParamNames::forFunction('strpbrk');
+        self::assertSame(['string', 'characters'], $strpbrk);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($strpbrk, 'string', 'strpbrk'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strpbrk, 'characters', 'strpbrk'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strpbrk, 'haystack', 'strpbrk'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strpbrk, 'char_list', 'strpbrk'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('strpbrk'));
+    }
+
     /** @covers issue #23334 — intval/floatval/strval/boolval Zend stub names (InternalArgInfo still var) */
     public function testIntvalFloatvalStrvalBoolvalZendStubNamedParameters(): void
     {

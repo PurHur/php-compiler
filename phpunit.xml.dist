@@ -130,6 +130,8 @@
             <file>./test/compliance/PowSqrtFmodNamed23306JITTest.php</file>
             <file>./test/compliance/IntvalFloatvalStrvalBoolvalNamed23334VMTest.php</file>
             <file>./test/compliance/IntvalFloatvalStrvalBoolvalNamed23334JITTest.php</file>
+            <file>./test/compliance/StrcspnStrspnStrpbrkNamed23400VMTest.php</file>
+            <file>./test/compliance/StrcspnStrspnStrpbrkNamed23400JITTest.php</file>
             <file>./test/compliance/ErrorLogNamed23341VMTest.php</file>
             <file>./test/compliance/ErrorLogNamed23341JITTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508VMTest.php</file>
