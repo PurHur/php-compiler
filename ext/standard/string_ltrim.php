@@ -34,6 +34,12 @@ final class string_ltrim extends Internal
         // php-src string.stub.php — arity ≤2; no $mode (#28230 / #28202).
         $this->requireArgCountRange($frame, 'ltrim', 1, 2);
         $string = self::vmStringArg($frame, 0, 'string');
+        // Parse $characters before empty short-circuit — Zend parses all params first (#31386).
+        [$mask, $mode] = VmString::resolveTrimMaskAndMode(
+            $frame,
+            'ltrim',
+            VmString::TRIM_SIDE_LEFT
+        );
         if ('' === $string) {
             if (null === $frame->returnVar) {
                 return;
@@ -42,11 +48,6 @@ final class string_ltrim extends Internal
 
             return;
         }
-        [$mask, $mode] = VmString::resolveTrimMaskAndMode(
-            \array_slice($frame->calledArgs, 1),
-            'ltrim',
-            VmString::TRIM_SIDE_LEFT
-        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -81,6 +82,14 @@ final class string_ltrim extends Internal
         $literal = $args[0]->compileTimeString ?? null;
         $optional = \array_slice($args, 1);
         $optCount = \count($optional);
+        // Do not const-fold null $characters under strict_types — TypeError at runtime (#31386).
+        if (
+            1 === $optCount
+            && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $optional[0]->type || $optional[0]->isNullConstant)
+        ) {
+            return JitStringBuiltinArg::lower($context, $optional[0], 'ltrim', 1, 'characters');
+        }
         $maskLiteral = 1 === $optCount ? ($optional[0]->compileTimeString ?? null) : null;
         if (null !== $literal && (0 === $optCount || null !== $maskLiteral)) {
             $mask = null !== $maskLiteral ? $maskLiteral : VmString::TRIM_DEFAULT;
