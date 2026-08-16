@@ -40,6 +40,8 @@ final class utf8_decode extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('utf8_decode() requires exactly one argument in this compiler build');
         }
+        // Before arg TypeError / decode — same order as execute() (#31176, peer strptime #22771).
+        Utf8EndecDeprecation::emitJit($context, 'utf8_decode');
         // Null → TypeError under strict without helper IR after abort (peer quotemeta #21180 / #29889).
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             if ($context->callerStrictTypes) {
