@@ -701,9 +701,21 @@ final class JitSimpleXmlUserScript
         if (null === $tree) {
             return null;
         }
-        $path = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $path) {
-            return null;
+        // Soft-null $expression — E_DEPRECATED then empty → Invalid expression + false (#31530 / sxe.c).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[1],
+                'SimpleXMLElement::xpath',
+                0,
+                'expression'
+            );
+            $path = '';
+        } else {
+            $path = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $path) {
+                return null;
+            }
         }
         $warn = null;
         set_error_handler(static function (int $severity, string $message) use (&$warn): bool {
