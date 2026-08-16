@@ -1410,6 +1410,23 @@ final class BuiltinInternalArgInfo
             'domelement::getattributenodens',
             'domelement::getelementsbytagnamens',
             'domdocument::getelementsbytagnamens' => 0 === $index ? '?string' : null,
+            // ext/dom/php_dom.stub.php — residual stub nullability (#31501, re-#31469)
+            'domnamednodemap::getnameditemns' => 0 === $index ? '?string' : null,
+            'domdocument::registernodeclass' => 1 === $index ? '?string' : null,
+            'domdocument::adoptnode' => 0 === $index ? 'DOMNode' : null,
+            'domdocument::savexml',
+            'domdocument::savehtml' => 0 === $index ? '?DOMNode' : null,
+            'domnode::insertbefore' => 1 === $index ? '?DOMNode' : null,
+            'domimplementation::createdocument' => match ($index) {
+                0 => '?string',
+                2 => '?DOMDocumentType',
+                default => null,
+            },
+            // ext/xmlreader/php_xmlreader.stub.php — expand(?DOMNode $baseNode = null) (#31501)
+            'xmlreader::expand' => 0 === $index ? '?DOMNode' : null,
+            // ext/xmlwriter/php_xmlwriter.stub.php — startDocument/writeElement ?string (#31501)
+            'xmlwriter::startdocument' => ($index === 0 || $index === 1 || $index === 2) ? '?string' : null,
+            'xmlwriter::writeelement' => 1 === $index ? '?string' : null,
             // ext/dom/php_dom.stub.php — loadHTML(string $source, int $options = 0): bool (#28713)
             // InternalArgInfo omits the optional $options param (load/loadXML already have int).
             'domdocument::loadhtml',
