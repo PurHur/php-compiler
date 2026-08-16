@@ -151,6 +151,88 @@ PHP;
         );
     }
 
+    /** Three-arg null $from under strict_types cites array|string (#31409 / re-#30235). */
+    public function testVmStrictNullFromCitesArrayOrString(): void
+    {
+        $code = (string) file_get_contents(
+            dirname(__DIR__, 2).'/test/repro/maintainer_gap_strtr_null_from_strict.php'
+        );
+        $repo = dirname(__DIR__, 2);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_strtr_');
+        $this->assertNotFalse($tmp);
+        file_put_contents($tmp, $code);
+        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $env = $_ENV;
+        LlvmToolchain::applyProcessEnv($env, $repo);
+        $proc = proc_open(['php', $repo.'/bin/vm.php', $tmp], $descriptor, $pipes, $repo, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($tmp);
+        $this->assertNotSame(0, $exit);
+        $combined = $this->normalize($stdout.$stderr);
+        $this->assertStringContainsString(
+            'strtr(): Argument #2 ($from) must be of type array|string, null given',
+            $combined
+        );
+        $this->assertStringNotContainsString(
+            'must be of type string, null given',
+            $combined
+        );
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testJitStrictNullFromCitesArrayOrString(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $code = <<<'PHP'
+declare(strict_types=1);
+try {
+    strtr('a', null, 'b');
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $this->assertSame(
+            "strtr(): Argument #2 (\$from) must be of type array|string, null given\n",
+            $this->runBin('bin/jit.php', $code)
+        );
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotStrictNullFromCitesArrayOrString(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $code = <<<'PHP'
+declare(strict_types=1);
+try {
+    strtr('a', null, 'b');
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $this->assertSame(
+            "strtr(): Argument #2 (\$from) must be of type array|string, null given\n",
+            $this->runAotBinary($code)
+        );
+    }
+
     /**
      * @group llvm
      * @group jit

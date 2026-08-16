@@ -56,8 +56,8 @@ final class strtr extends Internal
             return JitStrtr::translateArray($context, $args[0], $args[1]);
         }
         if (3 === \count($args)) {
-            // Soft-null outside strict_types; strict TypeError uses "string" like Zend (#29308).
-            $fromExpected = $context->callerStrictTypes ? 'string' : 'array|string';
+            // Soft-null outside strict_types (#29308). Strict $from cites array|string
+            // (Z_PARAM_ARRAY_HT_OR_STR / stub; #31409) — not bare "string".
             $toExpected = $context->callerStrictTypes ? 'string' : '?string';
 
             return JitStrtr::translate(
@@ -69,7 +69,7 @@ final class strtr extends Internal
                     'strtr',
                     1,
                     'from',
-                    $fromExpected,
+                    'array|string',
                     null,
                     false,
                     false
@@ -96,15 +96,29 @@ final class strtr extends Internal
     }
 
     /**
-     * php-src ext/standard/string.c — two-arg strtr() expects array replace_pairs; Zend
-     * reports "must be of type array, <actual> given" with zend_zval_value_name (#16772, #29307).
+     * php-src ext/standard/string.c — two-arg strtr() expects array replace_pairs.
+     *
+     * Weak callers: Z_PARAM_ARRAY_HT_OR_STR coerces scalars then the C path hardcodes
+     * "must be of type array, string given"; objects fail the union as array|string (#16772).
+     * Strict callers: union TypeError cites array|string + actual (#16772 / #31409).
      */
     private static function twoArgSecondTypeError(Frame $frame, Variable $value): \TypeError
     {
-        return new \TypeError(\sprintf(
-            'strtr(): Argument #2 ($from) must be of type array, %s given',
-            \PHPCompiler\VM\EnumCaseSupport::typeNameForTypeErrorActual($value)
-        ));
+        $value = $value->resolveIndirect();
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return new \TypeError(\sprintf(
+                'strtr(): Argument #2 ($from) must be of type array|string, %s given',
+                \PHPCompiler\VM\EnumCaseSupport::typeNameForTypeErrorActual($value)
+            ));
+        }
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return new \TypeError(\sprintf(
+                'strtr(): Argument #2 ($from) must be of type array|string, %s given',
+                \PHPCompiler\VM\EnumCaseSupport::typeNameForTypeErrorActual($value)
+            ));
+        }
+
+        return new \TypeError('strtr(): Argument #2 ($from) must be of type array, string given');
     }
 
     /** Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21207, ext/standard/string.c). */
@@ -126,6 +140,7 @@ final class strtr extends Internal
      * Three-arg $from / $to — soft-null with Zend DEP labels; strict_types → TypeError (#29308).
      *
      * php-src: ext/standard/string.c PHP_FUNCTION(strtr); stub array|string $from, ?string $to.
+     * Under strict, $from TypeError cites array|string (Z_PARAM_ARRAY_HT_OR_STR), not bare string (#31409).
      */
     private static function vmThreeArgSpanString(
         Frame $frame,
@@ -134,6 +149,20 @@ final class strtr extends Internal
         string $softExpectedType
     ): string {
         if (InternalStrictArg::isCallerStrict($frame)) {
+            if ('array|string' === $softExpectedType) {
+                $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+                if (Variable::TYPE_STRING !== $arg->type) {
+                    throw new \TypeError(\sprintf(
+                        'strtr(): Argument #%d ($%s) must be of type array|string, %s given',
+                        $argIndex + 1,
+                        $paramName,
+                        \PHPCompiler\VM\EnumCaseSupport::typeNameForTypeErrorActual($arg)
+                    ));
+                }
+
+                return $arg->toString();
+            }
+
             return InternalStrictArg::requireString($frame, $argIndex, 'strtr', $paramName)->toString();
         }
 
