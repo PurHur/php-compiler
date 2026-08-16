@@ -195,6 +195,8 @@ final class JitSessionLifecycleKernel
         $context->builder->branchIf($isActive, $bbRotate, $bbInactive);
 
         $context->builder->positionAtEnd($bbInactive);
+        // php-src PHP_FUNCTION(session_regenerate_id) — E_WARNING when inactive (#31444).
+        JitBuiltinWarning::emit($context, VmSession::REGENERATE_NO_SESSION_WARNING);
         SessionStart::emitWriteBool($context, $outPtr, false);
         $context->builder->branch($bbDone);
 

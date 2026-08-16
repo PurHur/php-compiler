@@ -69,6 +69,9 @@ final class VmSession
     /** php-src ext/session/session.c — php_session_start() when SG(headers_sent). */
     public const HEADERS_SENT_START_WARNING = 'session_start(): Session cannot be started after headers have already been sent';
 
+    /** php-src ext/session/session.c — PHP_FUNCTION(session_regenerate_id) when !PS(session_status) active. */
+    public const REGENERATE_NO_SESSION_WARNING = 'session_regenerate_id(): Session ID cannot be regenerated when there is no active session';
+
     /** php-src ext/session/session.c — PG(session_save_path) default on Linux CLI. */
     public const DEFAULT_SAVE_PATH = '/var/lib/php/sessions';
 

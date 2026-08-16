@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** PHP lowering for session_regenerate_id() — {@see __phpc_session_regenerate_id_apply} (#1186). */
+/** PHP lowering for session_regenerate_id() — {@see __phpc_session_regenerate_id_apply} (#1186, #31444). */
 final class JitSessionRegenerateId
 {
     public static function invoke(Context $context, ?JITVariable $deleteOld = null): Value
@@ -26,7 +26,14 @@ final class JitSessionRegenerateId
         if (null === $deleteOld) {
             $deleteArg = $i8->constInt(0, false);
         } else {
-            $bool = JitBoolArg::lower($context, $deleteOld, 'session_regenerate_id() argument #1');
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31444).
+            $bool = JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $deleteOld,
+                'session_regenerate_id',
+                'delete_old_session',
+                1
+            );
             $deleteArg = $context->builder->zext($bool, $i8);
         }
         $context->builder->call(
