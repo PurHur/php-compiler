@@ -116,6 +116,15 @@ final class MultipleIteratorBuiltin
     public static function attachIterator(ObjectEntry $object, ObjectEntry $inner, int|string|null $info): void
     {
         self::ensureState($object);
+        // php-src zim_MultipleIterator_attachIterator (ext/spl/spl_observer.c): when $info is
+        // non-null, reject an identical info already stored (#31552 — Key duplication error).
+        if (null !== $info) {
+            foreach (self::$store[$object->id]['iterators'] as $entry) {
+                if ($info === $entry['info']) {
+                    throw new \InvalidArgumentException('Key duplication error');
+                }
+            }
+        }
         $index = \count(self::$store[$object->id]['iterators']);
         $pinKey = 'multi:'.$object->id.':'.$index.':'.$inner->id;
         self::$store[$object->id]['iterators'][] = [
