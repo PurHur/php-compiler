@@ -20,9 +20,9 @@ final class XmlWriterStartElementNS extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::startElementNs()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::startElementNs', 3);
-        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::startElementNs()', 0, 'prefix');
-        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::startElementNs()', 1, 'name');
-        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::startElementNs()', 2, 'uri');
+        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::startElementNs()', 0, $frame, 'prefix');
+        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::startElementNs()', 1, $frame, 'name');
+        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::startElementNs()', 2, $frame, 'uri');
         $ok = VmXmlWriter::startElementNS($entry, $prefix, $name, $uri);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

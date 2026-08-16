@@ -21,10 +21,7 @@ final class XmlWriterSetIndentString extends XmlWriterClassMethod
         $entry = $this->receiver($frame, 'XMLWriter::setIndentString()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::setIndentString', 1);
         $indentation = $this->stringArg(
-            $frame->calledArgs[1],
-            'XMLWriter::setIndentString()',
-            0,
-            'indentation'
+            $frame->calledArgs[1], 'XMLWriter::setIndentString()', 0, $frame, 'indentation'
         );
         $ok = VmXmlWriter::setIndentString($entry, $indentation);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

@@ -20,10 +20,10 @@ final class xmlwriter_write_attribute_ns extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_write_attribute_ns', 5);
         $entry = $this->writerArg($frame, 'xmlwriter_write_attribute_ns');
-        $prefix = $this->nullableStringArgAt($frame->calledArgs[1], 'xmlwriter_write_attribute_ns', 2, 'prefix');
-        $name = $this->stringArgAt($frame->calledArgs[2], 'xmlwriter_write_attribute_ns', 3, 'name');
-        $uri = $this->nullableStringArgAt($frame->calledArgs[3], 'xmlwriter_write_attribute_ns', 4, 'namespace');
-        $value = $this->stringArgAt($frame->calledArgs[4], 'xmlwriter_write_attribute_ns', 5, 'value');
+        $prefix = $this->nullableStringArgAt($frame, 1, 'xmlwriter_write_attribute_ns', 2, 'prefix');
+        $name = $this->stringArgAt($frame, 2, 'xmlwriter_write_attribute_ns', 3, 'name');
+        $uri = $this->nullableStringArgAt($frame, 3, 'xmlwriter_write_attribute_ns', 4, 'namespace');
+        $value = $this->stringArgAt($frame, 4, 'xmlwriter_write_attribute_ns', 5, 'value');
         $ok = VmXmlWriter::writeAttributeNS($entry, $prefix, $name, $uri, $value);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

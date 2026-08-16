@@ -20,7 +20,7 @@ final class xmlwriter_start_dtd_entity extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_start_dtd_entity', 3);
         $entry = $this->writerArg($frame, 'xmlwriter_start_dtd_entity');
-        $name = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_start_dtd_entity', 2, 'name');
+        $name = $this->stringArgAt($frame, 1, 'xmlwriter_start_dtd_entity', 2, 'name');
         $isParam = $frame->calledArgs[2]->resolveIndirect()->toBool();
         $ok = VmXmlWriter::startDtdEntity($entry, $name, $isParam);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

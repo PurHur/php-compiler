@@ -344,9 +344,10 @@ final class VmXmlWriter
     {
         $state = self::requireOpen($entry, 'XMLWriter::startElement()');
         if (!self::isValidElementName($name)) {
+            // php-src php_xmlwriter.c — Zend cites Argument #2 without param name (#31610).
             throw new \ValueError(sprintf(
-                'XMLWriter::startElement(): Argument #1 ($name) must be a valid element name, %s given',
-                var_export($name, true)
+                'XMLWriter::startElement(): Argument #2 must be a valid element name, %s given',
+                self::zendQuotedName($name)
             ));
         }
         self::closeStartTagIfOpen($state);
@@ -371,9 +372,10 @@ final class VmXmlWriter
             return false;
         }
         if (!self::isValidAttributeName($name)) {
+            // php-src — Zend cites Argument #2 ($value) for the name check (#31610).
             throw new \ValueError(sprintf(
-                'XMLWriter::writeAttribute(): Argument #1 ($name) must be a valid attribute name, %s given',
-                var_export($name, true)
+                'XMLWriter::writeAttribute(): Argument #2 ($value) must be a valid attribute name, %s given',
+                self::zendQuotedName($name)
             ));
         }
         self::endOpenAttributeIfNeeded($state);
@@ -494,9 +496,10 @@ final class VmXmlWriter
             return false;
         }
         if (!self::isValidAttributeName($name)) {
+            // php-src — Zend cites Argument #2 without param name (#31610).
             throw new \ValueError(sprintf(
-                'XMLWriter::startAttribute(): Argument #1 ($name) must be a valid attribute name, %s given',
-                var_export($name, true)
+                'XMLWriter::startAttribute(): Argument #2 must be a valid attribute name, %s given',
+                self::zendQuotedName($name)
             ));
         }
         self::endOpenAttributeIfNeeded($state);
@@ -524,6 +527,13 @@ final class VmXmlWriter
 
     public static function writeElement(ObjectEntry $entry, string $name, ?string $content = null): bool
     {
+        // Validate under writeElement's Zend message before delegating to startElement (#31610).
+        if (!self::isValidElementName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeElement(): Argument #2 ($content) must be a valid element name, %s given',
+                self::zendQuotedName($name)
+            ));
+        }
         if (!self::startElement($entry, $name)) {
             return false;
         }
@@ -1416,6 +1426,12 @@ final class VmXmlWriter
         }
 
         return true;
+    }
+
+    /** php-src ValueError uses double quotes around the given name (unescaped; #31610). */
+    private static function zendQuotedName(string $name): string
+    {
+        return '"'.$name.'"';
     }
 
     private static function isValidAttributeName(string $name): bool

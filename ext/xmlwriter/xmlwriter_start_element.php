@@ -20,7 +20,7 @@ final class xmlwriter_start_element extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_start_element', 2);
         $entry = $this->writerArg($frame, 'xmlwriter_start_element');
-        $name = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_start_element', 2, 'name');
+        $name = $this->stringArgAt($frame, 1, 'xmlwriter_start_element', 2, 'name');
         $ok = VmXmlWriter::startElement($entry, $name);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

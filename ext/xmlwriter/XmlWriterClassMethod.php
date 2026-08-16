@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlwriter;
 
+use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -110,13 +112,28 @@ abstract class XmlWriterClassMethod extends VmClassMethod
         );
     }
 
-    protected function stringArg(Variable $var, string $label, int $index, string $paramName = 'value'): string
-    {
+    /**
+     * Z_PARAM_STR — soft-null DEP+coerce under php-src-strict (php-src php_xmlwriter.c; #31610).
+     *
+     * $label may include trailing "()" (legacy call sites); deprecation uses the bare Class::method.
+     */
+    protected function stringArg(
+        Variable $var,
+        string $label,
+        int $index,
+        Frame $frame,
+        string $paramName = 'value'
+    ): string {
+        $function = str_ends_with($label, '()') ? substr($label, 0, -2) : $label;
+        $display = str_ends_with($label, '()') ? $label : $label.'()';
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullString($var, $function, $paramName, $index, $frame);
+        }
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT === $var->type) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($%s) must be of type string, %s given',
-                $label,
+                '%s: Argument #%d ($%s) must be of type string, %s given',
+                $display,
                 $index + 1,
                 $paramName,
                 $var->toObject()->class->name
@@ -124,23 +141,34 @@ abstract class XmlWriterClassMethod extends VmClassMethod
         }
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($%s) must be of type string, array given',
-                $label,
+                '%s: Argument #%d ($%s) must be of type string, array given',
+                $display,
                 $index + 1,
                 $paramName
             ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_STR weak: E_DEPRECATED then coerce to '' (#31610).
+            VmNullStringParamDeprecation::emit($frame, $function, $index, $paramName);
+
+            return '';
         }
 
         return $var->toString();
     }
 
-    protected function nullableStringArg(Variable $var, string $label, int $index, string $paramName = 'value'): ?string
-    {
+    protected function nullableStringArg(
+        Variable $var,
+        string $label,
+        int $index,
+        Frame $frame,
+        string $paramName = 'value'
+    ): ?string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             return null;
         }
 
-        return $this->stringArg($var, $label, $index, $paramName);
+        return $this->stringArg($var, $label, $index, $frame, $paramName);
     }
 }

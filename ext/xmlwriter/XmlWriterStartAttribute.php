@@ -20,7 +20,7 @@ final class XmlWriterStartAttribute extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::startAttribute()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::startAttribute', 1);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startAttribute()', 0, 'name');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startAttribute()', 0, $frame, 'name');
         $ok = VmXmlWriter::startAttribute($entry, $name);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

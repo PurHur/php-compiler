@@ -21,14 +21,14 @@ final class XmlWriterStartDtd extends XmlWriterClassMethod
         $entry = $this->receiver($frame, 'XMLWriter::startDtd()');
         $this->requireUserArgCountRange($frame, 'XMLWriter::startDtd', 1, 3);
         $argc = \count($frame->calledArgs);
-        $qualifiedName = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startDtd()', 0, 'qualifiedName');
+        $qualifiedName = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startDtd()', 0, $frame, 'qualifiedName');
         $publicId = null;
         $systemId = null;
         if ($argc >= 3) {
-            $publicId = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::startDtd()', 1, 'publicId');
+            $publicId = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::startDtd()', 1, $frame, 'publicId');
         }
         if ($argc >= 4) {
-            $systemId = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::startDtd()', 2, 'systemId');
+            $systemId = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::startDtd()', 2, $frame, 'systemId');
         }
         $ok = VmXmlWriter::startDtd($entry, $qualifiedName, $publicId, $systemId);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

@@ -22,8 +22,7 @@ final class xmlwriter_start_document extends XmlWriterProceduralFunction
         $entry = $this->writerArg($frame, 'xmlwriter_start_document');
         $version = '1.0';
         if (isset($frame->calledArgs[1])) {
-            $version = $this->nullableStringArgAt(
-                $frame->calledArgs[1],
+            $version = $this->nullableStringArgAt($frame, 1,
                 'xmlwriter_start_document',
                 2,
                 'version'
@@ -31,8 +30,7 @@ final class xmlwriter_start_document extends XmlWriterProceduralFunction
         }
         $encoding = null;
         if (isset($frame->calledArgs[2])) {
-            $encoding = $this->nullableStringArgAt(
-                $frame->calledArgs[2],
+            $encoding = $this->nullableStringArgAt($frame, 2,
                 'xmlwriter_start_document',
                 3,
                 'encoding'

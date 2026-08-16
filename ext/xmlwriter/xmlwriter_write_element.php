@@ -20,11 +20,10 @@ final class xmlwriter_write_element extends XmlWriterProceduralFunction
     {
         $this->requireArgCountRange($frame, 'xmlwriter_write_element', 2, 3);
         $entry = $this->writerArg($frame, 'xmlwriter_write_element');
-        $name = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_write_element', 2, 'name');
+        $name = $this->stringArgAt($frame, 1, 'xmlwriter_write_element', 2, 'name');
         $content = null;
         if (isset($frame->calledArgs[2])) {
-            $content = $this->nullableStringArgAt(
-                $frame->calledArgs[2],
+            $content = $this->nullableStringArgAt($frame, 2,
                 'xmlwriter_write_element',
                 3,
                 'content'

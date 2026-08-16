@@ -22,11 +22,11 @@ final class XmlWriterStartDocument extends XmlWriterClassMethod
         $this->requireAtMostUserArgCount($frame, 'XMLWriter::startDocument', 3);
         $version = '1.0';
         if (isset($frame->calledArgs[1])) {
-            $version = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::startDocument()', 0, 'version');
+            $version = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::startDocument()', 0, $frame, 'version');
         }
         $encoding = null;
         if (isset($frame->calledArgs[2])) {
-            $encoding = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::startDocument()', 1, 'encoding');
+            $encoding = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::startDocument()', 1, $frame, 'encoding');
         }
         $ok = VmXmlWriter::startDocument($entry, $version, $encoding);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

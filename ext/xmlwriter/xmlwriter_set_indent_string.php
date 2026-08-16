@@ -20,8 +20,7 @@ final class xmlwriter_set_indent_string extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_set_indent_string', 2);
         $entry = $this->writerArg($frame, 'xmlwriter_set_indent_string');
-        $indentation = $this->stringArgAt(
-            $frame->calledArgs[1],
+        $indentation = $this->stringArgAt($frame, 1,
             'xmlwriter_set_indent_string',
             2,
             'indentation'

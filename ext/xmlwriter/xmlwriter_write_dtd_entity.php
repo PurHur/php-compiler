@@ -20,8 +20,8 @@ final class xmlwriter_write_dtd_entity extends XmlWriterProceduralFunction
     {
         $this->requireArgCountRange($frame, 'xmlwriter_write_dtd_entity', 3, 7);
         $entry = $this->writerArg($frame, 'xmlwriter_write_dtd_entity');
-        $name = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_write_dtd_entity', 2, 'name');
-        $content = $this->stringArgAt($frame->calledArgs[2], 'xmlwriter_write_dtd_entity', 3, 'content');
+        $name = $this->stringArgAt($frame, 1, 'xmlwriter_write_dtd_entity', 2, 'name');
+        $content = $this->stringArgAt($frame, 2, 'xmlwriter_write_dtd_entity', 3, 'content');
         $isParam = false;
         $publicId = null;
         $systemId = null;
@@ -30,24 +30,21 @@ final class xmlwriter_write_dtd_entity extends XmlWriterProceduralFunction
             $isParam = $frame->calledArgs[3]->resolveIndirect()->toBool();
         }
         if (isset($frame->calledArgs[4])) {
-            $publicId = $this->nullableStringArgAt(
-                $frame->calledArgs[4],
+            $publicId = $this->nullableStringArgAt($frame, 4,
                 'xmlwriter_write_dtd_entity',
                 5,
                 'publicId'
             );
         }
         if (isset($frame->calledArgs[5])) {
-            $systemId = $this->nullableStringArgAt(
-                $frame->calledArgs[5],
+            $systemId = $this->nullableStringArgAt($frame, 5,
                 'xmlwriter_write_dtd_entity',
                 6,
                 'systemId'
             );
         }
         if (isset($frame->calledArgs[6])) {
-            $notationData = $this->nullableStringArgAt(
-                $frame->calledArgs[6],
+            $notationData = $this->nullableStringArgAt($frame, 6,
                 'xmlwriter_write_dtd_entity',
                 7,
                 'notationData'

@@ -20,8 +20,8 @@ final class xmlwriter_write_attribute extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_write_attribute', 3);
         $entry = $this->writerArg($frame, 'xmlwriter_write_attribute');
-        $name = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_write_attribute', 2, 'name');
-        $value = $this->stringArgAt($frame->calledArgs[2], 'xmlwriter_write_attribute', 3, 'value');
+        $name = $this->stringArgAt($frame, 1, 'xmlwriter_write_attribute', 2, 'name');
+        $value = $this->stringArgAt($frame, 2, 'xmlwriter_write_attribute', 3, 'value');
         $ok = VmXmlWriter::writeAttribute($entry, $name, $value);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

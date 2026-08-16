@@ -20,7 +20,7 @@ final class XmlWriterStartPI extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::startPi()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::startPi', 1);
-        $target = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startPi()', 0, 'target');
+        $target = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startPi()', 0, $frame, 'target');
         $ok = VmXmlWriter::startPI($entry, $target);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
