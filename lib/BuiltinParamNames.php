@@ -993,6 +993,10 @@ final class BuiltinParamNames
             // php-src ext/pgsql/pgsql.stub.php — InternalArgInfo still field_number (#27703)
             case 'pg_field_table':
                 return ['result', 'field', 'oid_only='];
+            // php-src ext/pgsql/pgsql.stub.php — InternalArgInfo garbled connect_type]/port/… (#27811)
+            case 'pg_connect':
+            case 'pg_pconnect':
+                return ['connection_string', 'flags='];
             // php-src ext/standard/array.stub.php — array ...$arrays (0 required); InternalArgInfo still arr1+... (#25382)
             case 'array_merge':
             case 'array_merge_recursive':

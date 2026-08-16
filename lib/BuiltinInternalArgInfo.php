@@ -273,6 +273,8 @@ final class BuiltinInternalArgInfo
             'sodium_crypto_aead_aes256gcm_is_available' => 'bool',
             // ext/pgsql/pgsql.stub.php — InternalArgInfo empty return; Zend string|int|false (#27703)
             'pg_field_table' => 'string|int|false',
+            // ext/pgsql/pgsql.stub.php — InternalArgInfo resource + garbled arity; Zend PgSql\Connection|false (#27811)
+            'pg_connect', 'pg_pconnect' => 'PgSql\\Connection|false',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
@@ -910,6 +912,12 @@ final class BuiltinInternalArgInfo
             // ext/pgsql/pgsql.stub.php — ?PgSql\Result $result; InternalArgInfo untyped (#27703)
             'pg_field_table' => match ($index) {
                 0 => '?PgSql\\Result',
+                default => null,
+            },
+            // ext/pgsql/pgsql.stub.php — string $connection_string, int $flags = 0 (#27811)
+            'pg_connect', 'pg_pconnect' => match ($index) {
+                0 => 'string',
+                1 => 'int',
                 default => null,
             },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
