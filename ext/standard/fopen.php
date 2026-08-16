@@ -18,9 +18,14 @@ final class fopen extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
+        if ($argc < 2) {
             throw new \ArgumentCountError(
                 'fopen() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(
+                'fopen() expects at most 4 arguments, '.$argc.' given'
             );
         }
         if (null === $frame->returnVar) {
@@ -66,9 +71,14 @@ final class fopen extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
+        if ($argc < 2) {
             throw new \ArgumentCountError(
                 'fopen() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(
+                'fopen() expects at most 4 arguments, '.$argc.' given'
             );
         }
 
