@@ -156,8 +156,15 @@ final class CallbackFilterIteratorConstruct extends VmClassMethod
             'CallbackFilterIterator::__construct',
             'Iterator'
         );
+        // php-src Z_PARAM_FUNC — TypeError in ctor, not deferred to accept/call_user_func (#31508).
+        $callback = SplIteratorSupport::requireCallableArg(
+            $frame->calledArgs[2],
+            'CallbackFilterIterator::__construct',
+            2,
+            $frame->vmContext
+        );
         SplDualIteratorStorage::initSimple($object, $inner);
-        CallbackFilterIteratorBuiltin::setCallback($object, $frame->calledArgs[2]);
+        CallbackFilterIteratorBuiltin::setCallback($object, $callback);
     }
 }
 
