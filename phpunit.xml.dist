@@ -213,6 +213,7 @@
             <file>./test/compliance/GcControlReflectionReturnsVMTest.php</file>
             <file>./test/compliance/HashHmacAlgosReflectionReturnVMTest.php</file>
             <file>./test/compliance/HashFileReflectionReturnVMTest.php</file>
+            <file>./test/compliance/Md5Sha1FileReflectionReturnVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictJITTest.php</file>
             <file>./test/compliance/HashHmacFileUnknownAlgoNameVMTest.php</file>
