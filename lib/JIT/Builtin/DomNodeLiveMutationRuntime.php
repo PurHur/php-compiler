@@ -6,10 +6,12 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\DomExceptionConstants;
+use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -241,7 +243,10 @@ final class DomNodeLiveMutationRuntime
                     $childObj
                 );
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
-                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+                // Same-parent move: rebuild INNER_XML order — concat would duplicate (#31684).
+                if (!self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0])) {
+                    self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+                }
 
                 return self::nullValuePtr($context);
             }
@@ -761,6 +766,50 @@ final class DomNodeLiveMutationRuntime
             $propVar,
             Variable::TYPE_STRING
         );
+    }
+
+    /**
+     * Same-parent appendChild move: reorder PROP_USER_SCRIPT_INNER_XML (#31684 / re-#28672).
+     *
+     * LiveSlots already rewrites first/last/childNodes; concat would append a fresh
+     * {@code <tag/>} and leave saveXML wrong while childNodes stay correct.
+     */
+    private static function trySyncUserScriptInnerXmlMoveToEnd(
+        Context $context,
+        Variable $receiver,
+        Variable $childArg
+    ): bool {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return false;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === trim($xml)) {
+            return false;
+        }
+        $index = $childArg->compileTimeDomChildIndex ?? null;
+        if (null === $index) {
+            $tag = $childArg->compileTimeDomTagName ?? null;
+            if (null === $tag || '' === $tag) {
+                return false;
+            }
+            foreach (DomParseSimpleXmlJitHelper::directChildNodesArgv($xml) as $i => $node) {
+                if ('element' === $node['kind'] && strtolower($tag) === strtolower($node['data'])) {
+                    $index = $i;
+                    break;
+                }
+            }
+        }
+        if (null === $index) {
+            return false;
+        }
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlMoveChildToEnd($xml, $index);
+        if (null === $inner) {
+            return false;
+        }
+        $receiverObj = self::receiverObject($context, $receiver);
+        JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, $inner);
+
+        return true;
     }
 
     /**
