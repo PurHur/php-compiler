@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\tokenizer;
 
+use PHPCompiler\ext\standard\JitIntdiv;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TokenGetAll;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -57,6 +58,16 @@ final class JitTokenGetAll
         ) {
             // Emit TypeError+abort then return a dummy slot — do not lower the helper after terminator (#30257).
             JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'token_get_all', 0, 'code');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
+        // Soft-null outside strict_types; strict → TypeError (#31361 / peer htmlspecialchars #31212).
+        if ($argc >= 2
+            && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'token_get_all', 2, 'flags');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'token_get_all_null_flags_te_cont');
 
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
@@ -134,6 +145,13 @@ final class JitTokenGetAll
             return $i64->constInt(0, false);
         }
 
-        return JitLongArg::lower($context, $args[1], 'token_get_all() flags argument');
+        // Z_PARAM_LONG — strict TypeError / soft-null DEP+coerce (#31361).
+        return JitIntdiv::lowerIntBuiltinArgForCaller(
+            $context,
+            $args[1],
+            'token_get_all',
+            2,
+            'flags'
+        );
     }
 }

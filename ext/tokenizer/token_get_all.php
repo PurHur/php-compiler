@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\tokenizer;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
@@ -34,7 +35,14 @@ final class token_get_all extends Internal
         $source = VmString::trimFamilyStringArgForFrame($frame, 0, 'token_get_all', 0, 'code');
         $flags = 0;
         if ($argc >= 2) {
-            $flags = $frame->calledArgs[1]->toInt();
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31361).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
+                'token_get_all',
+                2,
+                'flags'
+            );
         }
 
         $tokens = VmTokenizer::tokenize($source, $flags);
