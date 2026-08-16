@@ -293,8 +293,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsBuiltinStubEnums()
-                && (str_contains($name, 'pad_type_enum')
-                    || str_contains($name, 'session_status_enum')
+                && (str_contains($name, 'session_status_enum')
                     || str_contains($name, 'phpinfo_infoview')
                     || str_contains($name, 'filter_input_phpinputfilter')
                     || str_contains($name, 'connection_status_cli')
@@ -314,6 +313,8 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'parse_url_enum')
                 // StringTrimMode phantom retired (#28202) — absence cases always run.
                 && !str_contains($name, 'string_trim_mode')
+                // PadType phantom retired (#28201) — absence cases always run.
+                && !str_contains($name, 'pad_type_enum')
                 // MemoryUsage phantom retired (#28411) — absence cases always run.
                 && !str_contains($name, 'memory_usage_enum')
                 && !str_contains($name, 'memory_get_usage_enum')) {

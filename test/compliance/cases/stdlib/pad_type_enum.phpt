@@ -1,19 +1,18 @@
 --TEST--
-stdlib PadType enum for str_pad() (#7282, ext/standard/string.c)
+PadType enum never registered on PROFILE=8.4 (#28201, re-#7282); str_pad uses STR_PAD_*
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-var_export(enum_exists('PadType', false));
-echo "\n";
-var_export(PadType::Right->name);
-echo "\n";
-var_export(PadType::Left->value);
-echo "\n";
-var_export(PadType::Both->value);
-echo "\n";
-echo str_pad('hi', 5, ' ', 1), "\n";
-echo str_pad('hi', 5, ' ', PadType::Right), "\n";
-echo str_pad('hi', 5, ' ', PadType::Left), "\n";
-echo str_pad('hi', 6, '-', PadType::Both), "\n";
+echo enum_exists('PadType', false) ? "enum=1
+" : "enum=0
+";
+echo class_exists('PadType', false) ? "class=1
+" : "class=0
+";
+echo str_pad('hi', 5, ' ', STR_PAD_RIGHT), "\n";
+echo str_pad('hi', 5, ' ', STR_PAD_LEFT), "\n";
+echo str_pad('hi', 6, '-', STR_PAD_BOTH), "\n";
 enum Es: string { case B = 'hi'; }
 try {
     str_pad('hi', 5, ' ', Es::B);
@@ -22,12 +21,9 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-true
-'Right'
-1
-2
-hi   
+enum=0
+class=0
 hi   
    hi
 --hi--
-str_pad(): Argument #4 ($pad_type) must be of type PadType|int, Es given
+str_pad(): Argument #4 ($pad_type) must be of type int, Es given
