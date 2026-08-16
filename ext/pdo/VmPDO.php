@@ -183,39 +183,70 @@ final class VmPDO
     }
 
     /**
-     * Legacy PDO::pgsql* driver methods (php-src pgsql_driver.stub.php PDO_PGSql_Ext; #20566).
+     * Legacy PDO::pgsql* driver methods (php-src pgsql_driver.stub.php PDO_PGSql_Ext; #20566 / #27850).
      *
-     * Registered on PDO when the pgsql driver is advertised ({@see PdoExtensionPolicy::advertisesPgsqlDriver()})
-     * (PHP 8.4 {@see Pdo\Pgsql} requires the same driver gate — #28158) so method_exists(PDO::class, 'pgsqlGetPid')
-     * matches Zend / #20566. Live libpq I/O remains #3741 — calls without a pgsql handle throw like the Pdo\Pgsql stubs.
-     * Marked methodNotInherited so Pdo\Mysql / Pdo\Sqlite do not advertise them (#21552).
+     * Profile &lt; 8.4: register on base PDO when the pgsql driver is advertised
+     * ({@see PdoExtensionPolicy::advertisesPgsqlDriver()}) so method_exists(PDO::class, 'pgsqlGetPid')
+     * matches Zend with pdo_pgsql (#20566). Marked methodNotInherited so Pdo\Mysql / Pdo\Sqlite
+     * do not advertise them (#21552).
+     *
+     * PROFILE≥8.4 ({@see PdoExtensionPolicy::advertisesPgsqlSubclass()}): legacy names move onto
+     * {@see Pdo\Pgsql} only — do not advertise on base PDO (#27850). Live libpq I/O remains #3741.
      */
     public static function registerPgsqlExtensionMethods(ClassEntry $entry): void
     {
-        if (!PdoExtensionPolicy::advertisesPgsqlDriver()
-            && !PdoExtensionPolicy::advertisesPgsqlSubclass()
-        ) {
+        if (!PdoExtensionPolicy::advertisesPgsqlDriver()) {
+            return;
+        }
+        // PHP 8.4+ subclass owns the pgsql* surface — strip any prior base-PDO registration (#27850).
+        if (PdoExtensionPolicy::advertisesPgsqlSubclass()) {
+            self::stripForeignDriverMethods($entry, self::pgsqlLegacyMethodLcs());
+
             return;
         }
         if (isset($entry->methods['pgsqlgetpid'])) {
-            foreach ([
-                'pgsqlcopyfromarray',
-                'pgsqlcopyfromfile',
-                'pgsqlcopytoarray',
-                'pgsqlcopytofile',
-                'pgsqllobcreate',
-                'pgsqllobopen',
-                'pgsqllobunlink',
-                'pgsqlgetnotify',
-                'pgsqlgetpid',
-            ] as $lc) {
+            foreach (self::pgsqlLegacyMethodLcs() as $lc) {
                 $entry->methodNotInherited[$lc] = true;
             }
 
             return;
         }
         $pub = CfgFunc::FLAG_PUBLIC;
-        $methods = [
+        foreach (self::pgsqlLegacyMethodTable() as $lc => [$method, $display]) {
+            $entry->methods[$lc] = $method;
+            $entry->methodVisibility[$lc] = $pub;
+            $entry->methodNames[$lc] = $display;
+            $entry->methodDeclaringClassLc[$lc] = self::CLASS_LC;
+            $entry->methodNotInherited[$lc] = true;
+        }
+    }
+
+    /**
+     * Legacy PDO_PGSql_Ext method lc names (pgsql_driver.stub.php).
+     *
+     * @return list<string>
+     */
+    private static function pgsqlLegacyMethodLcs(): array
+    {
+        return [
+            'pgsqlcopyfromarray',
+            'pgsqlcopyfromfile',
+            'pgsqlcopytoarray',
+            'pgsqlcopytofile',
+            'pgsqllobcreate',
+            'pgsqllobopen',
+            'pgsqllobunlink',
+            'pgsqlgetnotify',
+            'pgsqlgetpid',
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: object, 1: string}>
+     */
+    private static function pgsqlLegacyMethodTable(): array
+    {
+        return [
             'pgsqlcopyfromarray' => [new PDOPgsqlCopyFromArrayLegacy(), 'pgsqlCopyFromArray'],
             'pgsqlcopyfromfile' => [new PDOPgsqlCopyFromFileLegacy(), 'pgsqlCopyFromFile'],
             'pgsqlcopytoarray' => [new PDOPgsqlCopyToArrayLegacy(), 'pgsqlCopyToArray'],
@@ -226,13 +257,6 @@ final class VmPDO
             'pgsqlgetnotify' => [new PDOPgsqlGetNotifyLegacy(), 'pgsqlGetNotify'],
             'pgsqlgetpid' => [new PDOPgsqlGetPidLegacy(), 'pgsqlGetPid'],
         ];
-        foreach ($methods as $lc => [$method, $display]) {
-            $entry->methods[$lc] = $method;
-            $entry->methodVisibility[$lc] = $pub;
-            $entry->methodNames[$lc] = $display;
-            $entry->methodDeclaringClassLc[$lc] = self::CLASS_LC;
-            $entry->methodNotInherited[$lc] = true;
-        }
     }
 
     /** PHP 8.4 driver-specific subclasses (#20529, #20548). */
@@ -307,18 +331,9 @@ final class VmPDO
             $sqlite->methodDeclaringClassLc[$lc] = self::SQLITE_CLASS_LC;
             unset($sqlite->methodNotInherited[$lc]);
         }
-        self::stripForeignDriverMethods($sqlite, [
-            'pgsqlcopyfromarray',
-            'pgsqlcopyfromfile',
-            'pgsqlcopytoarray',
-            'pgsqlcopytofile',
-            'pgsqllobcreate',
-            'pgsqllobopen',
-            'pgsqllobunlink',
-            'pgsqlgetnotify',
-            'pgsqlgetpid',
+        self::stripForeignDriverMethods($sqlite, array_merge(self::pgsqlLegacyMethodLcs(), [
             'getwarningcount',
-        ]);
+        ]));
     }
 
     /**
@@ -362,20 +377,11 @@ final class VmPDO
         $mysql->methodVisibility['getwarningcount'] = $pub;
         $mysql->methodNames['getwarningcount'] = 'getWarningCount';
         $mysql->methodDeclaringClassLc['getwarningcount'] = self::MYSQL_CLASS_LC;
-        self::stripForeignDriverMethods($mysql, [
+        self::stripForeignDriverMethods($mysql, array_merge([
             'sqlitecreatefunction',
             'sqlitecreateaggregate',
             'sqlitecreatecollation',
-            'pgsqlcopyfromarray',
-            'pgsqlcopyfromfile',
-            'pgsqlcopytoarray',
-            'pgsqlcopytofile',
-            'pgsqllobcreate',
-            'pgsqllobopen',
-            'pgsqllobunlink',
-            'pgsqlgetnotify',
-            'pgsqlgetpid',
-        ]);
+        ], self::pgsqlLegacyMethodLcs()));
     }
 
     /**
@@ -426,11 +432,16 @@ final class VmPDO
             'getpid' => [new PDOPgsqlGetPid(), 'getPid'],
             'setnoticecallback' => [new PDOPgsqlSetNoticeCallback(), 'setNoticeCallback'],
         ];
+        // Legacy PDO_PGSql_Ext names on Pdo\Pgsql under PROFILE≥8.4 (not on base PDO; #27850).
+        foreach (self::pgsqlLegacyMethodTable() as $lc => [$method, $display]) {
+            $methods[$lc] = [$method, $display];
+        }
         foreach ($methods as $lc => [$method, $display]) {
             $pgsql->methods[$lc] = $method;
             $pgsql->methodVisibility[$lc] = $pub;
             $pgsql->methodNames[$lc] = $display;
             $pgsql->methodDeclaringClassLc[$lc] = self::PGSQL_CLASS_LC;
+            unset($pgsql->methodNotInherited[$lc]);
         }
         self::stripForeignDriverMethods($pgsql, [
             'sqlitecreatefunction',
