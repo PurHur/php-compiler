@@ -54,6 +54,12 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'setenv',
             'unsetenv',
             'putenv',
+            'fflush',
+            'ferror',
+            'fgets',
+            'popen',
+            'pclose',
+            'fileno',
         ];
     }
 
@@ -64,7 +70,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -78,6 +84,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31534', $source);
         $this->assertStringContainsString('#31558', $source);
         $this->assertStringContainsString('#31582', $source);
+        $this->assertStringContainsString('#31606', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -177,11 +184,58 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc putenv (#31582)'
         );
+        $this->assertStringNotContainsString(
+            "'fflush' =>",
+            $source,
+            'LibcExtern must not declare libc fflush (#31606)'
+        );
+        $this->assertStringNotContainsString(
+            "'ferror' =>",
+            $source,
+            'LibcExtern must not declare libc ferror (#31606)'
+        );
+        $this->assertStringNotContainsString(
+            "'fgets' =>",
+            $source,
+            'LibcExtern must not declare libc fgets (#31606)'
+        );
+        $this->assertStringNotContainsString(
+            "'popen' =>",
+            $source,
+            'LibcExtern must not declare libc popen (#31606)'
+        );
+        $this->assertStringNotContainsString(
+            "'pclose' =>",
+            $source,
+            'LibcExtern must not declare libc pclose (#31606)'
+        );
+        $this->assertStringNotContainsString(
+            "'fileno' =>",
+            $source,
+            'LibcExtern must not declare libc fileno (#31606)'
+        );
         $this->assertStringContainsString(
             "'getenv' =>",
             $source,
             'LibcExtern must keep live getenv (#31582)'
         );
+    }
+
+    public function testStreamKernelsDeclareStdioModuleLocallyAfterLibcExternDrop(): void
+    {
+        $io = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
+        $this->assertStringContainsString("['popen'", $io);
+        $this->assertStringContainsString("['pclose'", $io);
+        $this->assertStringContainsString("['fgets'", $io);
+        $this->assertStringContainsString("['ferror'", $io);
+        $this->assertStringContainsString('#31606', $io);
+        $sync = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
+        $this->assertStringContainsString("['fflush'", $sync);
+        $this->assertStringContainsString("['fileno'", $sync);
+        $this->assertStringContainsString('#31606', $sync);
+        $ob = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObStorageLlvm.php');
+        $this->assertStringContainsString("'fflush'", $ob);
+        $this->assertStringContainsString('#31606', $ob);
     }
 
     public function testBootstrapCompileSmokeM3EmitDeclaresPutenvModuleLocallyAfterLibcExternDrop(): void
