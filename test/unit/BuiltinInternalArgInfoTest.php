@@ -1359,6 +1359,19 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('nl_langinfo'));
     }
 
+    /**
+     * php-src stubs — gettimeofday/php_sapi_name/mb_list_encodings Reflection returns (#27906).
+     *
+     * @see ext/standard/basic_functions.stub.php
+     * @see ext/mbstring/mbstring.stub.php
+     */
+    public function testGettimeofdayPhpSapiNameMbListEncodingsReflectionReturns(): void
+    {
+        $this->assertSame('array|float', BuiltinInternalArgInfo::returnTypeLabelForFunction('gettimeofday'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('php_sapi_name'));
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('mb_list_encodings'));
+    }
+
     /** php-src zlib.stub.php — InternalArgInfo omits |false (#26342). */
     public function testGzcompressFamilyReflectionReturnUnions(): void
     {

@@ -183,6 +183,8 @@
             <file>./test/compliance/InetReflection28916VMTest.php</file>
             <file>./test/compliance/NlLanginfoReflectionReturnVMTest.php</file>
             <file>./test/compliance/NlLanginfoReflectionReturnJITTest.php</file>
+            <file>./test/compliance/GettimeofdaySapiMbListReflection27906VMTest.php</file>
+            <file>./test/compliance/GettimeofdaySapiMbListReflection27906JITTest.php</file>
             <file>./test/compliance/FsockopenNullSoftVMTest.php</file>
             <file>./test/compliance/PfsockopenNullSoftVMTest.php</file>
             <file>./test/compliance/PfsockopenNullStrictVMTest.php</file>

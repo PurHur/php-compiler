@@ -277,6 +277,8 @@ final class BuiltinInternalArgInfo
             'mb_strpos', 'mb_strrpos', 'mb_stripos', 'mb_strripos' => 'int|false',
             // ext/mbstring/mbstring.stub.php — InternalArgInfo return string (missing |false) (#28584)
             'mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_strrichr' => 'string|false',
+            // ext/mbstring/mbstring.stub.php — InternalArgInfo omits return; Zend array (#27906)
+            'mb_list_encodings' => 'array',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#27726)
@@ -369,6 +371,10 @@ final class BuiltinInternalArgInfo
             'get_parent_class' => 'string|false',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return string (missing |false) (#28004)
             'phpversion' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#27906)
+            'php_sapi_name' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|float (#27906)
+            'gettimeofday' => 'array|float',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend : mixed (#28023)
             'func_get_arg' => 'mixed',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty / absent; Zend void / int (#28022)
