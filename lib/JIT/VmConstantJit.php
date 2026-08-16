@@ -34,11 +34,19 @@ final class VmConstantJit
 
                 return Variable::fromLiteral($context, $lit);
             case VmVariable::TYPE_NULL:
+                // Allocate a real __value__ null box — a null __value__* KIND_VALUE crashes
+                // standalone AOT on post-call delref (LimitIterator literal null args; #31621).
+                // Match Variable::fromLiteral(TYPE_NULL) / #27623 rematerialize intent.
+                $slot = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
                 $nullVar = new Variable(
                     $context,
-                    Variable::TYPE_NULL,
-                    Variable::KIND_VALUE,
-                    $context->getTypeFromString('__value__*')->constNull()
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
                 );
                 $nullVar->isNullConstant = true;
 

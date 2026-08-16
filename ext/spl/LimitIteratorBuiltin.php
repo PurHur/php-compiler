@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -307,16 +308,16 @@ final class LimitIteratorConstruct extends VmClassMethod
             'LimitIterator::__construct',
             'Iterator'
         );
+        // php-src Z_PARAM_LONG $offset / $count — soft-null DEP+0 outside strict_types (#31621).
         $offset = 0;
         if (isset($frame->calledArgs[2])) {
-            $offsetArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offsetArg->type) {
-                throw new \TypeError(
-                    'LimitIterator::__construct(): Argument #2 ($offset) must be of type int, '
-                    .self::typeLabel($offsetArg).' given'
-                );
-            }
-            $offset = $offsetArg->toInt();
+            $offset = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'LimitIterator::__construct',
+                2,
+                'offset'
+            );
             if ($offset < 0) {
                 throw new \ValueError(
                     'LimitIterator::__construct(): Argument #2 ($offset) must be greater than or equal to 0'
@@ -325,14 +326,13 @@ final class LimitIteratorConstruct extends VmClassMethod
         }
         $limit = -1;
         if (isset($frame->calledArgs[3])) {
-            $limitArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $limitArg->type) {
-                throw new \TypeError(
-                    'LimitIterator::__construct(): Argument #3 ($limit) must be of type int, '
-                    .self::typeLabel($limitArg).' given'
-                );
-            }
-            $limit = $limitArg->toInt();
+            $limit = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                3,
+                'LimitIterator::__construct',
+                3,
+                'limit'
+            );
             if ($limit < -1) {
                 throw new \ValueError(
                     'LimitIterator::__construct(): Argument #3 ($limit) must be greater than or equal to -1'
@@ -340,20 +340,6 @@ final class LimitIteratorConstruct extends VmClassMethod
             }
         }
         SplLimitIteratorStorage::init($object, $inner, $offset, $limit);
-    }
-
-    private static function typeLabel(Variable $var): string
-    {
-        return match ($var->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
     }
 }
 
