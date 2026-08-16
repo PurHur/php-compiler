@@ -1097,6 +1097,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_encode'));
     }
 
+    /** php-src session.stub.php — ?string $name = null → string|false (#31423). */
+    public function testSessionNameReflectionStub(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_name'));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('session_name', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('session_name', 0);
+        $this->assertNotNull($info);
+        // php-types still labels the param newname; Reflection uses BuiltinParamNames → name.
+        $this->assertSame('?string', $info['type']);
+        $this->assertTrue($info['isOptional']);
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('session_name', 0, [
+                'name' => 'name',
+                'type' => '?string',
+                'isOptional' => true,
+            ], false)
+        );
+    }
+
     /** php-src session.stub.php — absent InternalArgInfo → int|false (#27855). */
     public function testSessionGcReflectionReturn(): void
     {

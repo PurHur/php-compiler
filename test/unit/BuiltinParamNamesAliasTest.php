@@ -3941,10 +3941,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($er, 'new_error_level', 'error_reporting'));
 
         $sn = BuiltinParamNames::forFunction('session_name');
-        self::assertSame(['name'], $sn);
+        self::assertSame(['name='], $sn);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sn, 'name', 'session_name'));
         // Legacy InternalArgInfo name must not resolve (Zend rejects $newname)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sn, 'newname', 'session_name'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('session_name'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('session_name', 0));
+        self::assertSame('?string', BuiltinInternalArgInfo::paramInfoForFunction('session_name', 0)['type']);
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_name'));
+        $infoName = ['name' => 'name', 'type' => '?string', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('session_name', 0, $infoName, false));
+        $nameDefault = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($nameDefault, 'session_name', 0, $infoName));
+        self::assertSame(Variable::TYPE_NULL, $nameDefault->type);
     }
 
     /** @covers issue #23568 */

@@ -281,6 +281,8 @@ final class BuiltinInternalArgInfo
             'mb_list_encodings' => 'array',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
+            // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#31423)
+            'session_name' => 'string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#27726)
             'session_encode' => 'string|false',
             // ext/session/session.stub.php — absent from InternalArgInfo; Zend int|false (#27855)
@@ -887,6 +889,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
+            // ext/session/session.stub.php — ?string $name = null (InternalArgInfo string) (#31423)
+            'session_name' => 0 === $index ? '?string' : null,
             // ext/iconv/iconv.stub.php — ?string $encoding = null (InternalArgInfo string) (#27629, #28586)
             'iconv_strlen' => 1 === $index ? '?string' : null,
             'iconv_strpos' => 3 === $index ? '?string' : null,

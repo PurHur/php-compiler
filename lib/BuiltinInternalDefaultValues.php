@@ -670,6 +670,10 @@ final class BuiltinInternalDefaultValues
         'session_id' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/session/session.stub.php — ?string $name = null (InternalArgInfo string → no infer) (#31423)
+        'session_name' => [
+            0 => ['kind' => 'null'],
+        ],
         // php-src ext/session/session.stub.php — string $prefix = "" (InternalArgInfo required) (#27725)
         'session_create_id' => [
             0 => ['kind' => 'string', 'value' => ''],
