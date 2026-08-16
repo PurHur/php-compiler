@@ -977,7 +977,9 @@ final class BuiltinParamNames
             case 'defined':
                 return ['constant_name'];
             case 'vsprintf':
-                return ['format', 'args'];
+            case 'vprintf':
+                // php-src basic_functions.stub.php — format + values (array); InternalArgInfo still says args (#23333)
+                return ['format', 'values'];
             case 'sprintf':
             case 'printf':
                 // Zend stub: format + ...values (#22825); arity via zendInternalVariadicReflectionArity.
