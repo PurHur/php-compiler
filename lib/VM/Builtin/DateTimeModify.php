@@ -96,12 +96,16 @@ final class DateTimeModify extends VmClassMethod
     private static function malformedModifyMessage(string $label, string $modifier): string
     {
         // php-src timelib: empty input → position char is a space + "Empty string" (#29301).
-        // Non-empty unparseable modifiers keep the timezone-db wording (matches Zend for e.g. "not a date").
         if ('' === $modifier) {
             return "{$label}::modify(): Failed to parse time string () at position 0 ( ): Empty string";
         }
         $pos = $modifier[0];
+        // Alphabetic tokens try timezone lookup; punctuation/digits/signs → "Unexpected character"
+        // (@@@; #31597 — same mapping as DateInterval::createFromDateString #31575).
+        $reason = \ctype_alpha($pos)
+            ? 'The timezone could not be found in the database'
+            : 'Unexpected character';
 
-        return "{$label}::modify(): Failed to parse time string ({$modifier}) at position 0 ({$pos}): The timezone could not be found in the database";
+        return "{$label}::modify(): Failed to parse time string ({$modifier}) at position 0 ({$pos}): {$reason}";
     }
 }
