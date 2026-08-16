@@ -1026,6 +1026,10 @@ class Context {
             // PosixGetpidJit::invoke / JitGetmypidKernel thin libc getpid(2) leaf
             // (former always-on JitPosix::getpid LLVM; peer getmypid #30623).
             'posix_getpid',
+            // ftok NestedJIT leaf (#31478) — whitelist ftok → ftok::call →
+            // FtokRuntime::invoke / JitFtokKernel thin libc ftok(3) leaf
+            // (former always-on FtokRuntime stat+layout LLVM; peer posix_getpid #30696).
+            'ftok',
             // posix_getppid NestedJIT leaf (#30728) — whitelist posix_getppid → posix_getppid::call →
             // PosixGetppidJit::invoke / JitPosixGetppidKernel thin libc getppid(2) leaf
             // (former always-on JitPosix::getppid LLVM; peer posix_getpid #30696).

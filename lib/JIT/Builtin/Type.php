@@ -1511,6 +1511,7 @@ class Type extends Builtin {
         StringMicrotime::ensureLinked($this->context);
         StringTime::ensureLinked($this->context);
         ProcessIdentityJit::ensureLinked($this->context);
+        FtokRuntime::ensureLinked($this->context);
         PosixGetpidJit::ensureLinked($this->context);
         PosixGetppidJit::ensureLinked($this->context);
         PosixGetuidJit::ensureLinked($this->context);

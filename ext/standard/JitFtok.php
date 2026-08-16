@@ -16,7 +16,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ftok() via __compiler_ftok (issue #6296 / #27389, ext/standard/basic_functions.c). */
+/** LLVM lowering for ftok() via FtokRuntime / FtokJitHelper (#31478, #6296 / #27389). */
 final class JitFtok
 {
     private const PROJ_LEN_ERROR = 'ftok(): Argument #2 ($project_id) must be a single character';
@@ -29,8 +29,6 @@ final class JitFtok
     public static function invoke(Context $context, JITVariable $pathArg, JITVariable $projArg): Value
     {
         // Only FtokRuntime — full StringFsDir pull NestedJITs ResolveSidecar (str_replace) (#27389).
-        FtokRuntime::ensureLinked($context);
-
         $pathStr = JitStringBuiltinArg::lower($context, $pathArg, 'ftok', 0, 'filename');
         $projStr = JitStringBuiltinArg::lower($context, $projArg, 'ftok', 1, 'project_id');
 
@@ -38,11 +36,7 @@ final class JitFtok
         self::validateProjectId($context, $projArg, $projStr);
 
         $projByte = self::projectIdByte($context, $projStr);
-        $key = $context->builder->call(
-            $context->lookupFunction('__compiler_ftok'),
-            $pathStr,
-            $projByte
-        );
+        $key = FtokRuntime::invoke($context, $pathStr, $projByte);
 
         $i64 = $context->getTypeFromString('int64');
         $minusOne = $i64->constInt(-1, true);

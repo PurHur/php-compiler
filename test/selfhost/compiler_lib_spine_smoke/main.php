@@ -2553,6 +2553,7 @@ require_once __DIR__.'/../../../ext/standard/FsDirJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FsGlobJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FstatJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FtokJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JitFtokKernel.php';
 require_once __DIR__.'/../../../ext/standard/FunctionExistsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesNativeScanJitHelper.php';
