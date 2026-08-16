@@ -1,5 +1,5 @@
 --TEST--
-stdlib str_pad() empty $pad_string ValueError — must not be empty (#29292, php-src string.c)
+stdlib str_pad() empty $pad_string ValueError — must be a non-empty string (#29755, php-src string.c)
 --FILE--
 <?php
 try {
@@ -10,4 +10,4 @@ try {
 }
 ?>
 --EXPECT--
-str_pad(): Argument #3 ($pad_string) must not be empty
+str_pad(): Argument #3 ($pad_string) must be a non-empty string

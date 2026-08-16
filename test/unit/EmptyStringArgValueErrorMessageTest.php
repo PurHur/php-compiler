@@ -60,14 +60,26 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             'wordwrap(): Argument #3 ($break) must not be empty',
             VmString::emptyStringArgValueErrorMessage('wordwrap', 2, 'break')
         );
-        self::assertSame(
-            'str_pad(): Argument #3 ($pad_string) must not be empty',
-            VmString::emptyStringArgValueErrorMessage('str_pad', 2, 'pad_string')
-        );
-        self::assertSame(
-            'mb_str_pad(): Argument #3 ($pad_string) must not be empty',
-            VmString::emptyStringArgValueErrorMessage('mb_str_pad', 2, 'pad_string')
-        );
+        $this->withProfile('8.2', function (): void {
+            self::assertSame(
+                'str_pad(): Argument #3 ($pad_string) must be a non-empty string',
+                VmString::strPadEmptyPadStringValueErrorMessage('str_pad')
+            );
+            self::assertSame(
+                'mb_str_pad(): Argument #3 ($pad_string) must be a non-empty string',
+                VmString::strPadEmptyPadStringValueErrorMessage('mb_str_pad')
+            );
+        });
+        $this->withProfile('8.4', function (): void {
+            self::assertSame(
+                'str_pad(): Argument #3 ($pad_string) must not be empty',
+                VmString::strPadEmptyPadStringValueErrorMessage('str_pad')
+            );
+            self::assertSame(
+                'mb_str_pad(): Argument #3 ($pad_string) must not be empty',
+                VmString::strPadEmptyPadStringValueErrorMessage('mb_str_pad')
+            );
+        });
     }
 
     public function test_vm_explode_and_substr_count_empty_messages(): void
@@ -79,6 +91,7 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
             'issue29276_substr_count_empty_needle_message.php' => 'cannot be empty',
             'issue_30340_exec_empty_cannot_be_empty.php' => 'cannot be empty',
             'issue29291_wordwrap_empty_break_message.php' => 'must not be empty',
+            'issue_29755_str_pad_null_message.php' => 'must be a non-empty string',
             'issue29292_str_pad_empty_pad_message.php' => 'must not be empty',
             'issue29422_mb_str_pad_empty_pad_message.php' => 'must not be empty',
         ];
@@ -98,6 +111,11 @@ final class EmptyStringArgValueErrorMessageTest extends TestCase
                 }
             }
             unset($env['PHP_COMPILER_PROFILE']);
+            if ('issue29292_str_pad_empty_pad_message.php' === $name
+                || 'issue29422_mb_str_pad_empty_pad_message.php' === $name
+            ) {
+                $env['PHP_COMPILER_PROFILE'] = '8.4';
+            }
             $proc = proc_open(
                 $cmd,
                 [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
