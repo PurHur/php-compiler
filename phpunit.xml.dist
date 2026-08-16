@@ -117,6 +117,8 @@
             <file>./test/compliance/FilterVarNullOptions31209JITTest.php</file>
             <file>./test/compliance/FilterInputNullType31486VMTest.php</file>
             <file>./test/compliance/FilterInputNullType31486JITTest.php</file>
+            <file>./test/compliance/FilterVarArrayNullOptions31490VMTest.php</file>
+            <file>./test/compliance/FilterVarArrayNullOptions31490JITTest.php</file>
             <file>./test/compliance/PasswordNullOptions31421VMTest.php</file>
             <file>./test/compliance/PasswordNullOptions31421JITTest.php</file>
             <file>./test/compliance/SessionRegenerateIdNullSoftVMTest.php</file>
