@@ -551,6 +551,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_memzero'));
     }
 
+    /** php-src ext/sodium/libsodium.stub.php — (): bool (#27775). */
+    public function testSodiumCryptoAeadAes256gcmIsAvailableReflectionReturnBool(): void
+    {
+        $this->assertSame(
+            'bool',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_crypto_aead_aes256gcm_is_available')
+        );
+    }
+
     /** php-src ext/pgsql/pgsql.stub.php — result/field/oid_only → string|int|false (#27703). */
     public function testPgFieldTableReflectionStubTypes(): void
     {

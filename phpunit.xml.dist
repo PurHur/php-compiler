@@ -294,6 +294,7 @@
             <file>./test/compliance/Md5Sha1NullBinaryStrict31358JITTest.php</file>
             <file>./test/compliance/PrintRVarExportNullReturnStrict31337VMTest.php</file>
             <file>./test/compliance/PrintRVarExportNullReturnStrict31337JITTest.php</file>
+            <file>./test/compliance/SodiumAes256gcmIsAvailableReflection27775VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340JITTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289VMTest.php</file>
@@ -724,6 +725,8 @@
             <file>./test/compliance/InArrayArraySearchStrictNullJITTest.php</file>
             <file>./test/compliance/SubstrReplaceNullReplaceStrictVMTest.php</file>
             <file>./test/compliance/SubstrReplaceNullReplaceStrictJITTest.php</file>
+            <file>./test/compliance/SubstrReplaceNullOffsetStrictVMTest.php</file>
+            <file>./test/compliance/SubstrReplaceNullOffsetStrictJITTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorVMTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorJITTest.php</file>
             <file>./test/compliance/FilePutContentsEmptyPathValueErrorVMTest.php</file>

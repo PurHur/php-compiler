@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\RuntimeStrictness;
@@ -73,6 +75,7 @@ final class substr_replace extends Internal
         }
 
         $frame->returnVar->array(self::replaceOnStringArray(
+            $frame,
             $stringVar,
             $replaceVar,
             $offsetVar,
@@ -113,12 +116,17 @@ final class substr_replace extends Internal
                 JITVariable::TYPE_VALUE === $args[0]->type
                 && !JitStrReplaceSubject::isKnownArray($args[0])
             );
-        // php-src string.stub.php: array|int $offset — soft-null DEP type array|int (#29396).
+        // php-src string.stub.php: array|int $offset — soft-null DEP type array|int (#29396);
+        // strict_types → TypeError (#31359). Emit runtime TE (peer setcookie #31229), not compile LogicException.
         if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
             if ($context->callerStrictTypes) {
-                throw new \LogicException(
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
                     'substr_replace(): Argument #3 ($offset) must be of type array|int, null given'
                 );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_replace_null_offset_te_cont');
+
+                return $context->getTypeFromString('__string__*')->constNull();
             }
             JitIntdiv::emitNullIntDeprecation($context, 'substr_replace', 3, 'offset', 'array|int');
             $offset = $i64->constInt(0, false);
@@ -305,6 +313,7 @@ final class substr_replace extends Internal
      * Array $string path — php-src string.c PHP_FUNCTION(substr_replace) array branch (#4057).
      */
     private static function replaceOnStringArray(
+        Frame $frame,
         Variable $stringVar,
         Variable $replaceVar,
         Variable $offsetVar,
@@ -314,6 +323,7 @@ final class substr_replace extends Internal
         $offsetIsArray = Variable::TYPE_ARRAY === $offsetVar->type;
         $lengthIsArray = $hasLength && Variable::TYPE_ARRAY === $lengthArg->resolveIndirect()->type;
         $replaceIsArray = Variable::TYPE_ARRAY === $replaceVar->type;
+        // Soft-null DEP + strict_types TypeError (#29396 / #31359) — pass $frame.
         $scalarOffset = $offsetIsArray
             ? null
             : VmMath::parseIntBuiltinArg(
@@ -321,7 +331,7 @@ final class substr_replace extends Internal
                 'substr_replace',
                 3,
                 'offset',
-                null,
+                $frame,
                 'array|int'
             );
         $scalarLength = null;

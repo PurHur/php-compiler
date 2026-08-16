@@ -801,6 +801,7 @@ final class JitSessionStorageKernel
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
+        self::ensureLibcMkdir($context);
         $dirKey = $context->builder->pointerCast(
             $context->constantFromString('PHP_COMPILER_SESSION_DIR'),
             $i8p
@@ -829,6 +830,18 @@ final class JitSessionStorageKernel
         $context->builder->branch($bbSkip);
 
         $context->builder->positionAtEnd($bbSkip);
+    }
+
+    /** Module-local mkdir(2) after LibcExtern/Module always-on drop (#31374). */
+    private static function ensureLibcMkdir(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        self::ensureExternal(
+            $context,
+            'mkdir',
+            $context->context->functionType($i32, false, $i8p, $i32)
+        );
     }
 
     /**

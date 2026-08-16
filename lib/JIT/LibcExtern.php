@@ -61,9 +61,11 @@ final class LibcExtern
             'stat' => [$i32, false, [$i8p, $i8p]],
             'access' => [$i32, false, [$i8p, $i32]],
             'lstat' => [$i32, false, [$i8p, $i8p]],
-            'chmod' => [$i32, false, [$i8p, $i32]],
             'mkstemp' => [$i32, false, [$i8p]],
-            'mkdir' => [$i32, false, [$i8p, $i32]],
+            // chmod dropped (#31374): ChmodJitHelper / StringChmod own user-script chmod();
+            // NestedJIT JitTempnamKernel + M5TrivialEchoNative declare chmod(2) module-locally.
+            // mkdir dropped (#31374): MkdirJitHelper / StringMkdir own user-script mkdir();
+            // NestedJIT JitSessionStorageKernel declares mkdir(2) module-locally.
             // rename dropped (#29090): StringRename NestedJIT leaf declares rename(2)
             // module-locally; RenameJitHelper SSOT is VmFs::rename (Unlink #19186 shape).
             // chdir dropped (#29219): StringChdir NestedJIT leaf declares chdir(2)

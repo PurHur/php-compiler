@@ -42,4 +42,13 @@ final class ChmodRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ChmodJitHelper.php', $spine);
         $this->assertStringContainsString('StringChmod.php', $spine);
     }
+
+    public function testNestedConsumersDeclareChmodModuleLocally(): void
+    {
+        $tempnam = (string) file_get_contents(__DIR__.'/../../ext/standard/JitTempnamKernel.php');
+        $this->assertStringContainsString("['chmod', \$i32, [\$i8p, \$i32]]", $tempnam);
+        $m5 = (string) file_get_contents(__DIR__.'/../../lib/JIT/M5TrivialEchoNative.php');
+        $this->assertStringContainsString('ensureChmod', $m5);
+        $this->assertStringContainsString('#31374', $m5);
+    }
 }
