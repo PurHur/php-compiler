@@ -731,6 +731,8 @@
             <file>./test/compliance/DefineNullCaseInsensitive31406JITTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583VMTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
+            <file>./test/compliance/FlockNullOperationSoftVMTest.php</file>
+            <file>./test/compliance/FlockNullOperationSoftJITTest.php</file>
             <file>./test/compliance/StripTagsExcessArgc30592VMTest.php</file>
             <file>./test/compliance/StripTagsExcessArgc30592JITTest.php</file>
             <file>./test/compliance/ReadfileOptionalArgs30582VMTest.php</file>
