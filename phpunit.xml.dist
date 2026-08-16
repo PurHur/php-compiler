@@ -119,6 +119,8 @@
             <file>./test/compliance/PasswordNullOptions31421JITTest.php</file>
             <file>./test/compliance/SessionRegenerateIdNullSoftVMTest.php</file>
             <file>./test/compliance/SessionRegenerateIdNullSoftJITTest.php</file>
+            <file>./test/compliance/GzNullLevelSoftVMTest.php</file>
+            <file>./test/compliance/GzNullLevelSoftJITTest.php</file>
             <file>./test/compliance/StreamContextSetOptionNullWrapper31422VMTest.php</file>
             <file>./test/compliance/StreamContextSetOptionNullWrapper31422JITTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211VMTest.php</file>

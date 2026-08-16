@@ -66,7 +66,7 @@ final class VmZlibArg
     }
 
     /**
-     * Z_PARAM_LONG $encoding — strict_types TypeError before coercion; else null→0 then ValueError (#19915).
+     * Z_PARAM_LONG $encoding — strict_types TypeError before coercion; else null DEP+→0 (#19915, #31445).
      */
     public static function resolveEncodingInt(
         Frame $frame,
@@ -85,6 +85,8 @@ final class VmZlibArg
                     $paramName
                 ));
             }
+            // php-src zend_API.h Z_PARAM_LONG — E_DEPRECATED then coerce (#31445).
+            VmNullNumberParamDeprecation::emit($frame, $function, $position, $paramName, 'int');
 
             return 0;
         }
@@ -113,7 +115,7 @@ final class VmZlibArg
     }
 
     /**
-     * Z_PARAM_LONG — coerce null→0 in non-strict; TypeError in strict (#19948).
+     * Z_PARAM_LONG — coerce null→0 with E_DEPRECATED in non-strict; TypeError in strict (#19948, #31445).
      */
     public static function coerceInt(
         Frame $frame,
@@ -132,6 +134,8 @@ final class VmZlibArg
                     $paramName
                 ));
             }
+            // php-src zend_API.h Z_PARAM_LONG — E_DEPRECATED then coerce to 0 (#31445 level; encoding siblings).
+            VmNullNumberParamDeprecation::emit($frame, $function, $position, $paramName, 'int');
 
             return 0;
         }
