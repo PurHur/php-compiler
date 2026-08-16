@@ -298,10 +298,15 @@ final class VmDateInterval
                 }
             }
             if ($pos >= $len || !\ctype_digit($spec[$pos])) {
+                // php-src timelib: alphabetic tokens try timezone lookup; punctuation/signs/
+                // bare trailing junk → "Unexpected character" (@@@; #31575).
+                $reason = ($pos < $len && \ctype_alpha($spec[$pos]))
+                    ? 'The timezone could not be found in the database'
+                    : 'Unexpected character';
                 $warning = self::fromDateStringWarning(
                     $input,
                     $baseOffset + $pos,
-                    'The timezone could not be found in the database'
+                    $reason
                 );
 
                 return null;
