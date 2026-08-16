@@ -40,6 +40,8 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'rename',
             'chdir',
             'time',
+            'chmod',
+            'mkdir',
         ];
     }
 
@@ -50,18 +52,19 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
         $this->assertStringContainsString('#29050', $source);
         $this->assertStringContainsString('#30332', $source);
+        $this->assertStringContainsString('#31374', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
-        foreach (['chmod', 'syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
+        foreach (['mkstemp', 'syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
             $this->assertStringContainsString(
                 "'{$sym}' =>",
                 $source,
@@ -84,6 +87,16 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             "'time' =>",
             $source,
             'LibcExtern must not declare libc time (#30332)'
+        );
+        $this->assertStringNotContainsString(
+            "'chmod' =>",
+            $source,
+            'LibcExtern must not declare libc chmod (#31374)'
+        );
+        $this->assertStringNotContainsString(
+            "'mkdir' =>",
+            $source,
+            'LibcExtern must not declare libc mkdir (#31374)'
         );
     }
 

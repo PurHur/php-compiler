@@ -1095,24 +1095,9 @@ class Module extends ModuleAbstract
         // statvfs(3) dropped (#30530): disk_free_space/disk_total_space use VmFsDiskPure (#8989).
         // readlink(2)/unlink(2)/rmdir(2) dropped (#30530): StringReadlink / StringUnlink /
         // StringRmdir → *JitHelper PHP; no remaining libc lookupFunction consumers.
-        try {
-            $context->lookupFunction('mkdir');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i32);
-            $fn = $context->module->addFunction('mkdir', $ft);
-            $context->registerFunction('mkdir', $fn);
-        }
-        try {
-            $context->lookupFunction('chmod');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i32);
-            $fn = $context->module->addFunction('chmod', $ft);
-            $context->registerFunction('chmod', $fn);
-        }
+        // mkdir(2)/chmod(2) dropped (#31374 / #30530 peer): MkdirJitHelper / ChmodJitHelper
+        // own user-script paths; NestedJIT JitSessionStorageKernel / JitTempnamKernel /
+        // M5TrivialEchoNative declare module-locally (LibcExtern rows also dropped).
         // nice(3) dropped (#30530 / #30615): StringProcNice NestedJIT leaf declares
         // module-locally; ProcNiceJitHelper uses @proc_nice (always-on JitProcNice LLVM removed).
         try {
