@@ -143,6 +143,10 @@ final class BuiltinInternalDefaultValues
         'sodium_hex2bin' => [
             1 => ['kind' => 'string', 'value' => ''],
         ],
+        // php-src ext/sodium/libsodium.stub.php — string $ignore = "" (#27853)
+        'sodium_base642bin' => [
+            2 => ['kind' => 'string', 'value' => ''],
+        ],
         'show_source' => [
             1 => ['kind' => 'bool', 'value' => false],
         ],

@@ -280,6 +280,8 @@ final class BuiltinInternalArgInfo
             'sodium_pad', 'sodium_unpad' => 'string',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27778)
             'sodium_bin2hex', 'sodium_hex2bin' => 'string',
+            // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27853)
+            'sodium_bin2base64', 'sodium_base642bin' => 'string',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27917)
             'sodium_crypto_stream_xchacha20_xor_ic' => 'string',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27775)
@@ -939,6 +941,17 @@ final class BuiltinInternalArgInfo
             'sodium_bin2hex' => 0 === $index ? 'string' : null,
             'sodium_hex2bin' => match ($index) {
                 0, 1 => 'string',
+                default => null,
+            },
+            // ext/sodium/libsodium.stub.php — string $string, int $id[, string $ignore = ""]; absent from InternalArgInfo (#27853)
+            'sodium_bin2base64' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                default => null,
+            },
+            'sodium_base642bin' => match ($index) {
+                0, 2 => 'string',
+                1 => 'int',
                 default => null,
             },
             // ext/sodium/libsodium.stub.php — message/nonce/counter/key; absent from InternalArgInfo (#27917)
