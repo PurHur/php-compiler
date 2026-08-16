@@ -38,5 +38,6 @@ test/selfhost/compiler_lib_spine_smoke/bisect-*.php
 -.o
 -.o.*
 build/libsodium-aegis/
+build/libsodium-src/
 build/helloworld-aot
 build/compliance-shards
