@@ -10,6 +10,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringHttpBuildQuery;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -40,7 +41,19 @@ final class http_build_query extends Internal
         }
         VmHttpBuildQuery::rejectRootEnumIfNeeded($data);
 
-        $prefix = self::resolveOptionalStringArg($frame->calledArgs, 1, 'numeric_prefix', '');
+        // php-src Z_PARAM_STR $numeric_prefix (default ""): explicit null → E_DEPRECATED + "" (#29721).
+        // Caller strict_types → TypeError. Omitted arg keeps "".
+        $prefix = '';
+        if (\array_key_exists(1, $frame->calledArgs)) {
+            $prefix = VmString::stringBuiltinArgForFrame(
+                $frame,
+                1,
+                'http_build_query',
+                1,
+                'numeric_prefix',
+                false
+            );
+        }
         [$separator, $encoding, $legacyEncoding] = self::resolveSeparatorAndEncoding($frame);
 
         $exported = VmHttpBuildQuery::export($data, $frame);
@@ -50,27 +63,6 @@ final class http_build_query extends Internal
         $frame->returnVar->string(
             VmHttpBuildQuery::build($exported, $prefix, $separator, $encoding, $legacyEncoding)
         );
-    }
-
-    /**
-     * @param array<int, \PHPCompiler\VM\Variable> $args
-     */
-    private static function resolveOptionalStringArg(array $args, int $index, string $paramName, string $default): string
-    {
-        if (!\array_key_exists($index, $args)) {
-            return $default;
-        }
-        $var = $args[$index]->resolveIndirect();
-        if (Variable::TYPE_NULL === $var->type) {
-            return $default;
-        }
-        if (Variable::TYPE_STRING !== $var->type) {
-            throw new \LogicException(
-                'http_build_query() argument #'.($index + 1).' ($'.$paramName.') must be a string in this compiler build'
-            );
-        }
-
-        return $var->toString();
     }
 
     /**
@@ -156,23 +148,40 @@ final class http_build_query extends Internal
             return $context->builder->load($context->constantStringFromString(''));
         }
         $data = JitHttpBuildQuery::normalizeDataArg($context, $args[0]);
-        $prefix = $this->optionalStringArg($context, $args, 1, '');
+        // Soft-null DEP+coerce; strict_types TypeError (#29721; peer basename #29705).
+        if (isset($args[1])) {
+            if ($context->callerStrictTypes
+                && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+                JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $args[1],
+                    'http_build_query',
+                    1,
+                    'numeric_prefix',
+                    'string',
+                    null,
+                    false
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'http_build_query_null_prefix_te_cont');
+
+                return $context->builder->load($context->constantStringFromString(''));
+            }
+            $prefix = JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[1],
+                'http_build_query',
+                1,
+                'numeric_prefix',
+                'string',
+                null,
+                false
+            );
+        } else {
+            $prefix = $context->builder->load($context->constantStringFromString(''));
+        }
         [$separator, $encoding] = $this->resolveSeparatorAndEncodingJit($context, $args);
 
         return JitHttpBuildQuery::build($context, $data, $prefix, $separator, $encoding);
-    }
-
-    private function optionalStringArg(Context $context, array $args, int $index, string $default): Value
-    {
-        if (!isset($args[$index])) {
-            return $context->builder->load($context->constantStringFromString($default));
-        }
-        $arg = $args[$index];
-        if (JITVariable::TYPE_NULL === $arg->type) {
-            return $context->builder->load($context->constantStringFromString($default));
-        }
-
-        return $this->jitString($context, $arg, 'http_build_query() argument #'.($index + 1));
     }
 
     /**

@@ -304,6 +304,10 @@
             <file>./test/compliance/TempnamNullPrefixStrictJITTest.php</file>
             <file>./test/compliance/HttpBuildQueryNullEncodingStrictVMTest.php</file>
             <file>./test/compliance/HttpBuildQueryNullEncodingStrictJITTest.php</file>
+            <file>./test/compliance/HttpBuildQueryNullPrefixSoftVMTest.php</file>
+            <file>./test/compliance/HttpBuildQueryNullPrefixSoftJITTest.php</file>
+            <file>./test/compliance/HttpBuildQueryNullPrefixStrictVMTest.php</file>
+            <file>./test/compliance/HttpBuildQueryNullPrefixStrictJITTest.php</file>
             <file>./test/compliance/HtmlspecialcharsNullFlagsStrictVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsNullFlagsStrictJITTest.php</file>
             <file>./test/compliance/ClearstatcacheNullStrict31245VMTest.php</file>
