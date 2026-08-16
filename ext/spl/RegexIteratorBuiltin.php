@@ -477,7 +477,9 @@ final class RegexIteratorConstruct extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'RegexIterator::__construct',
+            'Iterator'
         );
         SplDualIteratorStorage::initSimple($object, $inner);
 

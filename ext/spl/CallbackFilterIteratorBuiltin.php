@@ -152,7 +152,9 @@ final class CallbackFilterIteratorConstruct extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'CallbackFilterIterator::__construct',
+            'Iterator'
         );
         SplDualIteratorStorage::initSimple($object, $inner);
         CallbackFilterIteratorBuiltin::setCallback($object, $frame->calledArgs[2]);

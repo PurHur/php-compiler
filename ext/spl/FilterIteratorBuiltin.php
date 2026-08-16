@@ -201,7 +201,9 @@ final class FilterIteratorConstruct extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'FilterIterator::__construct',
+            'Iterator'
         );
         SplDualIteratorStorage::initSimple($object, $inner);
     }
@@ -230,10 +232,12 @@ final class RecursiveFilterIteratorConstruct extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('RecursiveFilterIterator::__construct() requires VM context');
         }
-        $inner = SplDualIteratorStorage::resolveRecursiveIterator(
-            $frame->vmContext,
-            $frame,
-            $frame->calledArgs[1]
+        // php-src RecursiveFilterIterator::__construct(RecursiveIterator $iterator) — TypeError (#31513).
+        $inner = RecursiveCachingIteratorBuiltin::requireRecursiveIteratorArg(
+            $frame->calledArgs[1],
+            'RecursiveFilterIterator::__construct',
+            1,
+            $frame->vmContext
         );
         SplDualIteratorStorage::initSimple($object, $inner);
     }

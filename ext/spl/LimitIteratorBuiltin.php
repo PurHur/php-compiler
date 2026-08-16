@@ -303,7 +303,9 @@ final class LimitIteratorConstruct extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'LimitIterator::__construct',
+            'Iterator'
         );
         $offset = 0;
         if (isset($frame->calledArgs[2])) {
