@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableSliceLlvm;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\SplOuterIteratorHt;
@@ -53,11 +53,12 @@ final class LimitIteratorConstruct implements Call
         HashTableHelper::spreadInto($context, $copy, $srcHtVar);
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
+        // Z_PARAM_LONG — soft-null DEP+0; strict_types → TypeError (#31621).
         $offset = isset($args[2])
-            ? self::toI64($context, $args[2])
+            ? JitStrictIntArg::lower($context, $args[2], 'LimitIterator::__construct', 2, 'offset')
             : $i64->constInt(0, false);
         $count = isset($args[3])
-            ? self::toI64($context, $args[3])
+            ? JitStrictIntArg::lower($context, $args[3], 'LimitIterator::__construct', 3, 'limit')
             : $i64->constInt(-1, false);
         $hasLength = $context->builder->icmp(
             Builder::INT_SGE,
@@ -128,32 +129,6 @@ final class LimitIteratorConstruct implements Call
         $context->type->object->propertyStore($slot, $slicedVar, Variable::TYPE_HASHTABLE);
 
         return self::voidResult($context);
-    }
-
-    private static function toI64(Context $context, Variable $arg): Value
-    {
-        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
-            return JitNestedHelperCoerce::scalarToI64(
-                $context,
-                $context->helper->loadValue($arg),
-                $context->getTypeFromString('int64')
-            );
-        }
-        if (Variable::TYPE_VALUE === $arg->type || JitValueBox::isValueOperand($arg)) {
-            return JitNestedHelperCoerce::scalarToI64(
-                $context,
-                $context->builder->call(
-                    $context->lookupFunction('__value__toLong'),
-                    JitValueBox::valuePtrFromVariable($context, $arg)
-                ),
-                $context->getTypeFromString('int64')
-            );
-        }
-
-        throw new \LogicException(
-            'LimitIterator::__construct() offset/count must be int, got '
-            .Variable::getStringType($arg->type)
-        );
     }
 
     private static function objectReceiver(Context $context, Variable $receiver): Variable
