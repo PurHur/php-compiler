@@ -657,7 +657,7 @@ final class VmSoapClient
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, array<int, mixed>>
      */
     public static function getCookies(ObjectEntry $object): array
     {
@@ -670,7 +670,8 @@ final class VmSoapClient
         if (null === $value) {
             unset($state->cookies[$name]);
         } else {
-            $state->cookies[$name] = $value;
+            // php-src soap.c __setCookie — array_init + add_index_str(..., 0, val) (#31569).
+            $state->cookies[$name] = [0 => $value];
         }
         // Keep stub `_cookies` in sync (#23924).
         if (null !== $state->vmContext) {
@@ -1076,7 +1077,13 @@ final class VmSoapClient
     }
 
     /**
-     * @param array<string, string> $cookies
+     * Cookie header from jar — php-src php_http.c (#31569).
+     *
+     * Each cookie is an array; index 0 is the value. Optional path (1), domain (2),
+     * and secure (3) are ignored for path/domain matching in this subset (fixture/HTTP
+     * transport still needs name=value pairs).
+     *
+     * @param array<string, array<int, mixed>|string> $cookies
      */
     private static function formatCookieHeader(array $cookies): string
     {
@@ -1085,7 +1092,18 @@ final class VmSoapClient
         }
         $parts = [];
         foreach ($cookies as $name => $value) {
-            $parts[] = $name.'='.$value;
+            if (\is_array($value)) {
+                if (!isset($value[0]) || !\is_string($value[0])) {
+                    continue;
+                }
+                $parts[] = $name.'='.$value[0];
+            } elseif (\is_string($value)) {
+                // Legacy flat jar (pre-#31569).
+                $parts[] = $name.'='.$value;
+            }
+        }
+        if ($parts === []) {
+            return '';
         }
 
         return \implode('; ', $parts);
@@ -3084,7 +3102,7 @@ final class SoapClientState
 
     public ?string $lastResponseHeaders = null;
 
-    /** @var array<string, string> */
+    /** @var array<string, array<int, mixed>> name → [0=>value, 1=>path?, 2=>domain?, 3=>secure?] (#31569) */
     public array $cookies = [];
 
     /** @var list<ObjectEntry> */
@@ -3461,10 +3479,33 @@ final class SoapClientGetCookies extends SoapClassMethod
             return;
         }
         $ht = new HashTable();
-        foreach (VmSoapClient::getCookies($receiver) as $name => $value) {
-            $slot = new Variable();
-            $slot->string($value);
-            $ht->add((string) $name, $slot);
+        foreach (VmSoapClient::getCookies($receiver) as $name => $entry) {
+            // php-src returns nested jar arrays (index 0 = value) (#31569).
+            $inner = new HashTable();
+            if (\is_array($entry)) {
+                foreach ($entry as $idx => $part) {
+                    $slot = new Variable();
+                    if (\is_string($part)) {
+                        $slot->string($part);
+                    } elseif (\is_int($part)) {
+                        $slot->int($part);
+                    } elseif (\is_bool($part)) {
+                        $slot->bool($part);
+                    } elseif (null === $part) {
+                        $slot->null();
+                    } else {
+                        $slot->string((string) $part);
+                    }
+                    if (\is_int($idx)) {
+                        $inner->addIndex($idx, $slot);
+                    } else {
+                        $inner->add((string) $idx, $slot);
+                    }
+                }
+            }
+            $outer = new Variable();
+            $outer->array($inner);
+            $ht->add((string) $name, $outer);
         }
         $frame->returnVar->array($ht);
     }

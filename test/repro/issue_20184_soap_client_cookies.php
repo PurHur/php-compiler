@@ -15,8 +15,8 @@ $client->__setCookie('sid', 'abc');
 $client->__setCookie('tok', 'xyz');
 $c = $client->__getCookies();
 echo 'count=', count($c), "\n";
-echo 'sid=', $c['sid'] ?? 'missing', "\n";
-echo 'tok=', $c['tok'] ?? 'missing', "\n";
+echo 'sid=', is_array($c['sid'] ?? null) ? ($c['sid'][0] ?? 'missing') : ($c['sid'] ?? 'missing'), "\n";
+echo 'tok=', is_array($c['tok'] ?? null) ? ($c['tok'][0] ?? 'missing') : ($c['tok'] ?? 'missing'), "\n";
 
 $client->__soapCall('echo', [['input' => 'hello']]);
 $req = $client->__getLastRequestHeaders();
@@ -25,4 +25,4 @@ echo 'cookie_in_trace=', (is_string($req) && str_contains($req, 'Cookie: sid=abc
 $client->__setCookie('sid'); // remove
 $c2 = $client->__getCookies();
 echo 'after_rm=', isset($c2['sid']) ? 1 : 0, "\n";
-echo 'tok_kept=', ($c2['tok'] ?? '') === 'xyz' ? 1 : 0, "\n";
+echo 'tok_kept=', is_array($c2['tok'] ?? null) ? ((($c2['tok'][0] ?? '') === 'xyz') ? 1 : 0) : ((($c2['tok'] ?? '') === 'xyz') ? 1 : 0), "\n";
