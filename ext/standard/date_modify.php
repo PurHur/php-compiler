@@ -46,14 +46,20 @@ final class date_modify extends Internal
             'modifier'
         );
         if (!DateTimeSupport::tryModify($dt, $modifier)) {
-            // php-src php_date_modify / timelib: empty → "( ): Empty string"; else timezone-db (#29302).
+            // php-src php_date_modify / timelib: empty → "( ): Empty string"; alpha → timezone-db;
+            // punctuation/digits → Unexpected character (#29302, #31597).
             if ('' === $modifier) {
                 $warning = 'date_modify(): Failed to parse time string () at position 0 ( ): Empty string';
             } else {
+                $ch = $modifier[0];
+                $reason = \ctype_alpha($ch)
+                    ? 'The timezone could not be found in the database'
+                    : 'Unexpected character';
                 $warning = \sprintf(
-                    'date_modify(): Failed to parse time string (%s) at position 0 (%s): The timezone could not be found in the database',
+                    'date_modify(): Failed to parse time string (%s) at position 0 (%s): %s',
                     $modifier,
-                    $modifier[0]
+                    $ch,
+                    $reason
                 );
             }
             $frame->vmContext->errors->triggerError(

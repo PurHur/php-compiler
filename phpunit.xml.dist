@@ -126,6 +126,7 @@
             <file>./test/compliance/CachingIteratorMultiToStringFlags31551VMTest.php</file>
             <file>./test/compliance/CachingIteratorOffsetGetMissingKeyWarn31576VMTest.php</file>
             <file>./test/compliance/DateIntervalCreateFromDateStringBadTokenWarn31575VMTest.php</file>
+            <file>./test/compliance/DateTimeImmutableModifyBadTokenWarn31597VMTest.php</file>
             <file>./test/compliance/SplObjectStorageOffsetSetNull31509VMTest.php</file>
             <file>./test/compliance/PgsqlConnectReflection27811VMTest.php</file>
             <file>./test/compliance/PgsqlQueryFetchCloseReflection28782VMTest.php</file>
