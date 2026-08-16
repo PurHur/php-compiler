@@ -223,6 +223,9 @@ patch_already_applied() {
       grep -qF "'mysqli_fetch_column' => ['null|int|float|string|false', 'result' => 'mysqli_result', 'column=' => 'int']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null \
         && grep -qF "'mysqli_result::fetch_column' => ['null|int|float|string|false', 'column=' => 'int']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-soap-dorequest-arginfo.patch)
+      grep -qF "'SoapClient::__doRequest' => ['?string', 'request' => 'string', 'location' => 'string', 'action' => 'string', 'version' => 'int', 'oneWay=' => 'bool']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-ldap-get-option-byref.patch)
       grep -qF "'ldap_get_option' => ['bool', 'link' => '', 'option' => 'int', '&retval' => '']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -7077,6 +7080,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-openssl-cms-verify-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-intltz-get-iana-id-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-mysqli-fetch-column-arginfo.patch"
+  apply_patch "$PATCH_DIR/php-types-soap-dorequest-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-ldap-get-option-byref.patch"
   apply_patch "$PATCH_DIR/php-types-hash-init-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-json-decode-flags-arginfo.patch"

@@ -51,6 +51,8 @@ final class BuiltinParamNames
             'pdo::query' => ['query', 'fetchMode=', '...fetchModeArgs'],
             // php-src ext/pdo/pdo_dbh.stub.php — PHP 8.4+; missing from InternalArgInfo (#26223)
             'pdo::connect' => ['dsn', 'username=', 'password=', 'options='],
+            // php-src ext/soap/soap.stub.php — InternalArgInfo omits location; one_way→oneWay (#31568)
+            'soapclient::__dorequest' => ['request', 'location', 'action', 'version', 'oneWay='],
             // php-src ext/mysqli/mysqli.stub.php — absent from InternalArgInfo (#27712)
             'mysqli::execute_query' => ['query', 'params='],
             'datetimezone::__construct' => ['timezone'],

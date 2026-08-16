@@ -1712,6 +1712,13 @@ final class BuiltinInternalArgInfo
                 3 => '?string',
                 default => null,
             },
+            // ext/soap/soap.stub.php — __doRequest location + bool oneWay (#31568)
+            'soapclient::__dorequest' => match ($index) {
+                0, 1, 2 => 'string',
+                3 => 'int',
+                4 => 'bool',
+                default => null,
+            },
             // ext/xmlwriter/php_xmlwriter.stub.php — PHP 8.4+ factories (#27922)
             'xmlwriter::touri' => 0 === $index ? 'string' : null,
             // toStream($stream) is untyped (@param resource) — no type override
