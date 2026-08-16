@@ -1008,6 +1008,10 @@ final class BuiltinParamNames
             case 'max':
             case 'min':
                 return ['value', 'values'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says var (#23308)
+            case 'print_r':
+            case 'var_export':
+                return ['value', 'return='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still variable / variable_representation+allowed_classes (#23260)
             case 'serialize':
                 return ['value'];
