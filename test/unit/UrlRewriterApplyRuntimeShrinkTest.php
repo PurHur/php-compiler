@@ -18,6 +18,8 @@ final class UrlRewriterApplyRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmUrlRewriterHrefApply', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
         $this->assertStringContainsString('ensureNestedJitBridge', $source);
+        $this->assertStringContainsString('ensureIdentityStub', $source);
+        $this->assertStringContainsString('ura_identity_stub', $source);
         $this->assertStringContainsString('OutputRewriteVarsStorage::stringFromGlobal', $source);
         $this->assertStringNotContainsString('emitLlvmHrefApplyBody', $source);
         $this->assertStringNotContainsString("lookupFunction('strstr')", $source);
@@ -26,7 +28,7 @@ final class UrlRewriterApplyRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/UrlRewriterApplyJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/VmUrlRewriterHrefApply.php');
         $lines = \substr_count($source, "\n") + 1;
-        $this->assertLessThan(220, $lines, 'UrlRewriterApplyRuntime should stay a thin bridge (#31099)');
+        $this->assertLessThan(280, $lines, 'UrlRewriterApplyRuntime should stay a thin bridge (#31099/#31663)');
     }
 
     public function testObOutputJitBridgeNestedJitsApplyOnRewritePathEvenIfObAlreadyLinked(): void

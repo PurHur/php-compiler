@@ -86,7 +86,7 @@ final class ObStorageLlvm
         self::implementFlush($context);
         self::implementObEndAll($context);
         self::implementObImplicitFlush($context);
-        // URL-Rewriter apply body; gz flush is a thin identity stub unless ObGzhandler linked (#27566).
+        // Identity stubs so thin AOT links: gz flush (#27566) + url_rewriter apply (#31663 / #31099).
         self::ensureGzhandlerFlushStub($context);
         UrlRewriterApplyRuntime::ensureLinked($context);
         self::registerLinkedRuntime($context, true);
