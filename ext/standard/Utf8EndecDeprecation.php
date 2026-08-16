@@ -4,20 +4,30 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\VM;
-use PHPCompiler\VM\ErrorReporter;
 
 /**
- * E_DEPRECATED on utf8_encode()/utf8_decode() call (php-src ext/standard/utf8.c; #18104, #29249).
+ * E_DEPRECATED on utf8_encode()/utf8_decode() call (php-src ext/standard/utf8.c; #18104, #29249, #31176).
  *
- * Zend since 8.2: "Function …() is deprecated since 8.2, visit the php.net documentation for various alternatives"
+ * Reference / PROFILE≤8.3 (ZEND_DEPRECATED_FUNCTION): "Function …() is deprecated"
+ * PROFILE≥8.4 (#[\Deprecated(since: "8.2", message: "…")]): long since/php.net wording
+ *
+ * JIT/AOT: emit via {@see JitBuiltinWarning::emitDeprecated} in the caller module (peer strptime
+ * {@see VmEngineBuiltinDeprecation::emitJitFunction}) — not inside Utf8Latin1JitHelper.
  */
 final class Utf8EndecDeprecation
 {
     public static function message(string $function): string
     {
-        return 'Function '.$function.'() is deprecated since 8.2, visit the php.net documentation for various alternatives';
+        if (CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()) {
+            return 'Function '.$function.'() is deprecated since 8.2, visit the php.net documentation for various alternatives';
+        }
+
+        return 'Function '.$function.'() is deprecated';
     }
 
     public static function emitVm(Frame $frame, string $function): void
@@ -33,23 +43,12 @@ final class Utf8EndecDeprecation
         );
     }
 
-    /** JIT/AOT runtime via Utf8Latin1JitHelper bridge (#9912). */
-    public static function recordCompiled(string $function): void
+    /** JIT/AOT caller-module emission (peer #22771 strptime). */
+    public static function emitJit(Context $context, string $function): void
     {
-        ErrorLastJitHelper::record(
-            ErrorReporter::E_DEPRECATED,
-            self::message($function),
-            '',
-            0
-        );
-        if (!ErrorSilenceJitHelper::shouldDisplayCliError(ErrorReporter::E_DEPRECATED)) {
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
-        TriggerErrorJitHelper::stderrPrintCliError(
-            ErrorReporter::E_DEPRECATED,
-            self::message($function),
-            '',
-            0
-        );
+        JitBuiltinWarning::emitDeprecated($context, self::message($function));
     }
 }
