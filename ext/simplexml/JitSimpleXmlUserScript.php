@@ -533,6 +533,19 @@ final class JitSimpleXmlUserScript
         if (null === $tree) {
             return null;
         }
+        // Soft-null $qualifiedName — E_DEPRECATED then empty → ValueError (#31554 / sxe.c).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[1],
+                'SimpleXMLElement::addChild',
+                0,
+                'qualifiedName'
+            );
+            throw new \ValueError(
+                'SimpleXMLElement::addChild(): Argument #1 ($qualifiedName) cannot be empty'
+            );
+        }
         $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         if (null === $name) {
             return null;
