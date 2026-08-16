@@ -319,6 +319,8 @@
             <file>./test/compliance/TokenGetAllNullFlagsStrict31361JITTest.php</file>
             <file>./test/compliance/PregGrepNullFlagsStrict31385VMTest.php</file>
             <file>./test/compliance/PregGrepNullFlagsStrict31385JITTest.php</file>
+            <file>./test/compliance/DebugPrintBacktraceNullOptionsStrict31384VMTest.php</file>
+            <file>./test/compliance/DebugPrintBacktraceNullOptionsStrict31384JITTest.php</file>
             <file>./test/compliance/FscanfNullFormatStrictVMTest.php</file>
             <file>./test/compliance/FscanfNullFormatStrictJITTest.php</file>
             <file>./test/compliance/SocketCreateListenNullStrictVMTest.php</file>
