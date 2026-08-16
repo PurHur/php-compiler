@@ -20,6 +20,47 @@ final class BuiltinClasses
         DomConstants::registerGlobals($ctx);
         self::registerDomExceptionConstants($ctx);
         self::syncDeclaredMethodNames($ctx);
+        self::stampDeclaringClassOnProperties($ctx);
+    }
+
+    /**
+     * Stamp {@see ClassProperty::$declaringClassLc} on DOM / Dom\ slots that omit it (#31639).
+     *
+     * Empty declaring class makes ReflectionProperty::$class '' and breaks isPublic()/getType().
+     * When a child re-lists a parent property name, stamp the oldest ancestor's lc (Zend declarer).
+     */
+    private static function stampDeclaringClassOnProperties(Context $ctx): void
+    {
+        foreach ($ctx->classes as $lc => $entry) {
+            $name = $entry->name;
+            if (!str_starts_with($name, 'DOM') && !str_starts_with($name, 'Dom\\')) {
+                continue;
+            }
+            foreach ($entry->properties as $prop) {
+                if ('' !== $prop->declaringClassLc) {
+                    continue;
+                }
+                $propLc = strtolower($prop->name);
+                $declLc = $lc;
+                $current = $entry;
+                while (null !== $current->parentLc && isset($ctx->classes[$current->parentLc])) {
+                    $parent = $ctx->classes[$current->parentLc];
+                    $parentHas = false;
+                    foreach ($parent->properties as $pp) {
+                        if (strtolower($pp->name) === $propLc) {
+                            $parentHas = true;
+                            break;
+                        }
+                    }
+                    if (!$parentHas) {
+                        break;
+                    }
+                    $declLc = strtolower(ltrim($parent->name, '\\'));
+                    $current = $parent;
+                }
+                $prop->declaringClassLc = $declLc;
+            }
+        }
     }
 
     /**

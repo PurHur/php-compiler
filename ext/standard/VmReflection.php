@@ -1300,25 +1300,64 @@ final class VmReflection
             $obj,
             $reflectedClassName,
             $prop->name,
-            self::declaringClassDisplay($prop, $ctx)
+            self::declaringClassDisplayForReflectedProperty($ctx, $reflectedClassName, $prop)
         );
 
         return $obj;
     }
 
     /**
-     * Declaring class display name for an instance/static property lookup (#9878).
+     * Declaring class display name for an instance/static property lookup (#9878, #31639).
+     *
+     * When {@see ClassProperty::$declaringClassLc} was never stamped (legacy builtins),
+     * the class that owns the property slot in the hierarchy is the declarer — never `''`
+     * (empty `$class` breaks ReflectionProperty::isPublic / getDeclaringClass).
+     *
+     * Child classes may re-list the same property name for storage (DOMElement::$nodeName);
+     * Zend Reflection reports the oldest ancestor that declares it.
      */
     public static function declaringClassNameForPropertyLookup(
         ClassEntry $class,
         string $property,
         Context $ctx
     ): string {
-        $meta = self::findClassProperty($class, $property, $ctx);
-        if (null !== $meta) {
-            return self::declaringClassDisplay($meta, $ctx);
-        }
         $lc = strtolower($property);
+        $oldest = null;
+        $oldestProp = null;
+        $current = $class;
+        while (true) {
+            foreach ($current->properties as $prop) {
+                if (strtolower($prop->name) !== $lc) {
+                    continue;
+                }
+                $oldest = $current;
+                $oldestProp = $prop;
+                break;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                break;
+            }
+            $parent = $ctx->classes[$current->parentLc];
+            $parentHas = false;
+            foreach ($parent->properties as $prop) {
+                if (strtolower($prop->name) === $lc) {
+                    $parentHas = true;
+                    break;
+                }
+            }
+            if (!$parentHas) {
+                break;
+            }
+            $current = $parent;
+        }
+        if (null !== $oldestProp && null !== $oldest) {
+            $display = self::declaringClassDisplay($oldestProp, $ctx);
+            if ('' !== $display) {
+                return $display;
+            }
+
+            return $oldest->name;
+        }
         $current = $class;
         while (true) {
             if (isset($current->staticProperties[$lc])) {
@@ -1340,6 +1379,26 @@ final class VmReflection
         }
 
         return $class->name;
+    }
+
+    /**
+     * Resolve ReflectionProperty::$class for a collected ClassProperty (#31639).
+     *
+     * Always walk the reflected class hierarchy so child re-declarations
+     * (DOMElement::$nodeName) report the oldest Zend declarer.
+     */
+    private static function declaringClassDisplayForReflectedProperty(
+        Context $ctx,
+        string $reflectedClassName,
+        ClassProperty $prop
+    ): string {
+        $entry = self::resolveClassEntry($ctx, $reflectedClassName);
+        if (null !== $entry) {
+            return self::declaringClassNameForPropertyLookup($entry, $prop->name, $ctx);
+        }
+        $display = self::declaringClassDisplay($prop, $ctx);
+
+        return '' !== $display ? $display : $reflectedClassName;
     }
 
     private static function attachReflectionPropertyState(
@@ -4030,7 +4089,7 @@ final class VmReflection
                 $obj,
                 $reflectedClassName,
                 $prop->name,
-                self::declaringClassDisplay($prop, $ctx)
+                self::declaringClassDisplayForReflectedProperty($ctx, $reflectedClassName, $prop)
             );
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);

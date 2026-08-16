@@ -13,6 +13,7 @@ use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\ObjectEntry;
@@ -151,12 +152,55 @@ final class VmXmlReader
             }
         }
 
+        // php-src php_xmlreader.stub.php — public typed properties for Reflection (#31639).
+        // Runtime reads stay virtual via XmlReaderPropertySupport; slots are metadata only.
+        self::registerReflectionProperties($entry, $pub);
+
         // php-src REGISTER_XMLREADER_CLASS_CONST_LONG — lc keys + constNames for
         // defined()/constant()/ReflectionClass::getConstant (#22349).
         XmlReaderConstants::registerOnClassEntry($entry);
 
         $ctx->classes[self::CLASS_LC] = $entry;
         $ctx->classes[self::CLASS_LC]->isInternal = true;
+    }
+
+    /**
+     * Register XMLReader public properties for Reflection (php-src stub; #31639).
+     */
+    private static function registerReflectionProperties(ClassEntry $entry, int $pub): void
+    {
+        $intProto = new Variable(Variable::TYPE_UNDEFINED);
+        $intProto->declaredTypeLabel = 'int';
+        $strProto = new Variable(Variable::TYPE_UNDEFINED);
+        $strProto->declaredTypeLabel = 'string';
+        $boolProto = new Variable(Variable::TYPE_UNDEFINED);
+        $boolProto->declaredTypeLabel = 'bool';
+
+        foreach ([
+            self::PROP_ATTRIBUTE_COUNT => $intProto,
+            self::PROP_BASE_URI => $strProto,
+            self::PROP_DEPTH => $intProto,
+            self::PROP_HAS_ATTRIBUTES => $boolProto,
+            self::PROP_HAS_VALUE => $boolProto,
+            self::PROP_IS_DEFAULT => $boolProto,
+            self::PROP_IS_EMPTY_ELEMENT => $boolProto,
+            self::PROP_LOCAL_NAME => $strProto,
+            self::PROP_NAME => $strProto,
+            self::PROP_NAMESPACE_URI => $strProto,
+            self::PROP_NODE_TYPE => $intProto,
+            self::PROP_PREFIX => $strProto,
+            self::PROP_VALUE => $strProto,
+            self::PROP_XML_LANG => $strProto,
+        ] as $name => $proto) {
+            $entry->properties[] = new ClassProperty(
+                $name,
+                null,
+                $proto,
+                false,
+                $pub,
+                self::CLASS_LC
+            );
+        }
     }
 
     public static function open(Context $ctx, string $uri, ?Frame $frame = null): ?ObjectEntry
