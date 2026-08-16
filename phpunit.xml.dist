@@ -128,6 +128,7 @@
             <file>./test/compliance/DateIntervalCreateFromDateStringBadTokenWarn31575VMTest.php</file>
             <file>./test/compliance/SplObjectStorageOffsetSetNull31509VMTest.php</file>
             <file>./test/compliance/PgsqlConnectReflection27811VMTest.php</file>
+            <file>./test/compliance/PgsqlQueryFetchCloseReflection28782VMTest.php</file>
             <file>./test/compliance/RegexIteratorEmptyPattern31511VMTest.php</file>
             <file>./test/compliance/RegexIteratorSetModeValueError31573VMTest.php</file>
             <file>./test/compliance/ArrayFillReverseNamed23305VMTest.php</file>

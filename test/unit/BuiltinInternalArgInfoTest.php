@@ -684,6 +684,55 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src ext/pgsql/pgsql.stub.php — pg_query, pg_fetch_assoc, pg_fetch_row, pg_close Reflection (#28782). */
+    public function testPgQueryFetchCloseReflectionStubTypes(): void
+    {
+        $this->assertSame(['connection', 'query='], BuiltinParamNames::forFunction('pg_query'));
+        $this->assertSame('PgSql\\Result|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('pg_query'));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('pg_query', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('pg_query', 1));
+        $this->assertSame(2, BuiltinParamNames::paramCountForInternalFunction('pg_query'));
+        $conn = BuiltinInternalArgInfo::paramInfoForFunction('pg_query', 0);
+        $this->assertNotNull($conn);
+        $this->assertSame('connection', $conn['name']);
+        $query = BuiltinInternalArgInfo::paramInfoForFunction('pg_query', 1);
+        $this->assertNotNull($query);
+        $this->assertSame('string', $query['type']);
+        $this->assertTrue($query['isOptional']);
+
+        $this->assertSame(['result', 'row='], BuiltinParamNames::forFunction('pg_fetch_assoc'));
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('pg_fetch_assoc'));
+        $this->assertSame('PgSql\\Result', BuiltinInternalArgInfo::stubParamTypeOverride('pg_fetch_assoc', 0));
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('pg_fetch_assoc', 1));
+        $fa0 = BuiltinInternalArgInfo::paramInfoForFunction('pg_fetch_assoc', 0);
+        $fa1 = BuiltinInternalArgInfo::paramInfoForFunction('pg_fetch_assoc', 1);
+        $this->assertNotNull($fa0);
+        $this->assertNotNull($fa1);
+        $this->assertSame('PgSql\\Result', $fa0['type']);
+        $this->assertFalse($fa0['isOptional']);
+        $this->assertSame('?int', $fa1['type']);
+        $this->assertTrue($fa1['isOptional']);
+
+        $this->assertSame(['result', 'row=', 'mode='], BuiltinParamNames::forFunction('pg_fetch_row'));
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('pg_fetch_row'));
+        $this->assertSame('PgSql\\Result', BuiltinInternalArgInfo::stubParamTypeOverride('pg_fetch_row', 0));
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('pg_fetch_row', 1));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('pg_fetch_row', 2));
+        $this->assertSame(3, BuiltinParamNames::paramCountForInternalFunction('pg_fetch_row'));
+        $fr2 = BuiltinInternalArgInfo::paramInfoForFunction('pg_fetch_row', 2);
+        $this->assertNotNull($fr2);
+        $this->assertSame('int', $fr2['type']);
+        $this->assertTrue($fr2['isOptional']);
+
+        $this->assertSame(['connection='], BuiltinParamNames::forFunction('pg_close'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('pg_close'));
+        $this->assertSame('?PgSql\\Connection', BuiltinInternalArgInfo::stubParamTypeOverride('pg_close', 0));
+        $close = BuiltinInternalArgInfo::paramInfoForFunction('pg_close', 0);
+        $this->assertNotNull($close);
+        $this->assertSame('?PgSql\\Connection', $close['type']);
+        $this->assertTrue($close['isOptional']);
+    }
+
     /** php-src ext/pgsql/pgsql.stub.php — result/field/oid_only → string|int|false (#27703). */
     public function testPgFieldTableReflectionStubTypes(): void
     {

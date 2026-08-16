@@ -674,6 +674,17 @@ final class BuiltinInternalDefaultValues
         'session_id' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/pgsql/pgsql.stub.php — ?int $row = null; int $mode = PGSQL_NUM (2) (#28782)
+        'pg_fetch_assoc' => [
+            1 => ['kind' => 'null'],
+        ],
+        'pg_fetch_row' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'int', 'value' => 2], // PGSQL_NUM
+        ],
+        'pg_close' => [
+            0 => ['kind' => 'null'],
+        ],
         // php-src ext/session/session.stub.php — ?string $name = null (InternalArgInfo string → no infer) (#31423)
         'session_name' => [
             0 => ['kind' => 'null'],
