@@ -3396,16 +3396,26 @@ final class VmDateTimeNative
     }
 
     /**
-     * php-src date_modify() / timelib_strtotime relative branch (#6132, #14326).
+     * php-src date_modify() / timelib_strtotime relative branch (#6132, #14326, #31603).
      */
     public static function modifyRelative(int $timestamp, string $modifier, string $tzName): int
     {
-        $modifier = trim($modifier);
-        if ('' === $modifier) {
-            self::throwModifyMalformed($modifier);
+        // Whitespace-only → no-op success; empty string stays malformed (php-src timelib; #31603).
+        if ('' === trim($modifier)) {
+            if ('' === $modifier) {
+                self::throwModifyMalformed($modifier);
+            }
+
+            return $timestamp;
         }
+        $modifier = trim($modifier);
 
         return self::withTimezone($tzName, static function () use ($timestamp, $modifier, $tzName): int {
+            // strtotime('now', $base) keeps the base instant — DateTime::modify('now') is a no-op (#31603).
+            if (0 === strcasecmp($modifier, 'now')) {
+                return $timestamp;
+            }
+
             $signed = self::tryApplySignedRelativeDelta($timestamp, $modifier, $tzName);
             if (null !== $signed) {
                 return $signed;
@@ -3416,8 +3426,27 @@ final class VmDateTimeNative
                 return $extended['timestamp'];
             }
 
+            // Bare timezone id / abbreviation → parse success without changing the instant (#31603).
+            if (self::isModifyNoopTimezoneToken($modifier)) {
+                return $timestamp;
+            }
+
             self::throwModifyMalformed($modifier);
         });
+    }
+
+    /**
+     * Tokens timelib accepts as a sole date_modify() operand without shifting the wall clock.
+     *
+     * Zoneinfo ids, numeric offsets, and abbreviation map entries (incl. military letters).
+     */
+    private static function isModifyNoopTimezoneToken(string $token): bool
+    {
+        if (self::timezoneIdIsValid($token)) {
+            return true;
+        }
+
+        return null !== self::abbreviationOffsetAndDst($token);
     }
 
     /**
