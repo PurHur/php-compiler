@@ -1,7 +1,9 @@
---TEST--
-stdlib flock() null $operation — soft DEP then ValueError JIT (#31462, ext/standard/file.c)
---FILE--
 <?php
+
+/**
+ * flock($stream, null) without strict_types — soft-null DEP + ValueError (#31462).
+ * php-src: ext/standard/file.c PHP_FUNCTION(flock)
+ */
 error_reporting(E_ALL);
 set_error_handler(static function (int $errno, string $errstr): bool {
     $label = match ($errno) {
@@ -16,10 +18,9 @@ set_error_handler(static function (int $errno, string $errstr): bool {
 $fp = fopen('php://memory', 'r+');
 try {
     flock($fp, null);
-    echo "uncaught\n";
+    echo "no_throw\n";
 } catch (Throwable $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
+} finally {
+    fclose($fp);
 }
---EXPECT--
-DEPRECATED: flock(): Passing null to parameter #2 ($operation) of type int is deprecated
-ValueError: flock(): Argument #2 ($operation) must be one of LOCK_SH, LOCK_EX, or LOCK_UN

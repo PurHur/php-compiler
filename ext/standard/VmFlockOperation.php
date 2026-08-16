@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** flock() $operation parsing — php-src ext/standard/flock.c (#16575). */
+/**
+ * flock() $operation parsing — php-src ext/standard/file.c PHP_FUNCTION(flock) (#16575, #31462).
+ *
+ * Z_PARAM_LONG: soft-null → E_DEPRECATED + coerce to 0, then LOCK_* ValueError; strict_types → TypeError.
+ */
 final class VmFlockOperation
 {
     public const VALUE_ERROR_MSG = 'flock(): Argument #2 ($operation) must be one of LOCK_SH, LOCK_EX, or LOCK_UN';
@@ -15,47 +20,38 @@ final class VmFlockOperation
 
     private const LOCK_NB = 4;
 
-    public static function parseOperation(Variable $var): int
+    public static function parseOperationForFrame(Frame $frame, int $argIndex = 1): int
     {
+        // Z_PARAM_LONG — Argument #2 ($operation); soft-null DEP+0 then ValueError (#31462).
+        $operation = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            'flock',
+            2,
+            'operation'
+        );
+        self::assertValidOperation($operation);
+
+        return $operation;
+    }
+
+    /** @deprecated Prefer {@see parseOperationForFrame} so soft-null DEP sees the caller frame (#31462). */
+    public static function parseOperation(Variable $var, ?Frame $frame = null): int
+    {
+        if (null !== $frame) {
+            return self::parseOperationForFrame($frame);
+        }
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            throw new \TypeError(self::TYPE_ERROR_NULL_MSG);
-        }
-        if (Variable::TYPE_BOOLEAN === $var->type) {
-            $operation = $var->toBool() ? 1 : 0;
-            self::assertValidOperation($operation);
-
-            return $operation;
-        }
-        if (Variable::TYPE_INTEGER === $var->type) {
-            $operation = $var->toInt();
-            self::assertValidOperation($operation);
-
-            return $operation;
-        }
-        if (Variable::TYPE_FLOAT === $var->type) {
-            $operation = (int) $var->toFloat();
-            self::assertValidOperation($operation);
-
-            return $operation;
-        }
-        if (Variable::TYPE_STRING === $var->type) {
-            $raw = $var->toString();
-            if (!is_numeric($raw)) {
-                throw new \TypeError(\sprintf(
-                    'flock(): Argument #2 ($operation) must be of type int, string given'
-                ));
-            }
-            $operation = (int) $raw;
-            self::assertValidOperation($operation);
-
-            return $operation;
+            // No frame: still emit DEP then ValueError like Z_PARAM_LONG (#31462).
+            VmNullNumberParamDeprecation::emit(null, 'flock', 2, 'operation', 'int');
+            throw new \ValueError(self::VALUE_ERROR_MSG);
         }
 
-        throw new \TypeError(\sprintf(
-            'flock(): Argument #2 ($operation) must be of type int, %s given',
-            VmStreamArg::debugTypeName($var)
-        ));
+        $operation = VmMath::parseIntBuiltinArg($var, 'flock', 2, 'operation');
+        self::assertValidOperation($operation);
+
+        return $operation;
     }
 
     public static function assertValidOperation(int $operation): void

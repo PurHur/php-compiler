@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for flock() via __compiler_flock (issue #3141). */
+/**
+ * LLVM lowering for flock() via __compiler_flock (issue #3141; soft-null $operation #31462).
+ *
+ * Compile-time null: soft DEP + catchable ValueError (null→0 is not LOCK_*); strict TypeError.
+ * Runtime invalid LOCK_* values still raise inside {@see StreamReadJitHelper::flockArgv}.
+ */
 final class JitFlock
 {
     /** @return Value true when flock succeeds */
@@ -33,38 +37,40 @@ final class JitFlock
         return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 
-    public static function emitCompileTimeNullOperationError(Context $context): void
+    /**
+     * Z_PARAM_LONG $operation — strict TypeError on null; else soft-null DEP+coerce (#31462).
+     */
+    public static function lowerOperation(Context $context, JITVariable $arg): Value
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitBranchOrAbortOnFailure(
+        return JitIntdiv::lowerIntBuiltinArgForCaller(
             $context,
-            $context->getTypeFromString('int1')->constInt(0, false),
-            'flock_null_const',
-            VmFlockOperation::TYPE_ERROR_NULL_MSG
+            $arg,
+            'flock',
+            2,
+            'operation'
         );
     }
 
-    public static function guardValueBoxNullOperation(Context $context, JITVariable $arg): void
+    /**
+     * Compile-time null $operation without calling __compiler_flock (#31462).
+     *
+     * Soft: E_DEPRECATED then catchable ValueError (LOCK_* list). Strict: TypeError.
+     *
+     * @return Value false (flock did not succeed)
+     */
+    public static function emitCompileTimeNullOperation(Context $context, JITVariable $arg): Value
     {
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_NULL, false)
-        );
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitBranchOrAbortOnFailure(
-            $context,
-            $context->builder->not($isNull),
-            'flock_op_null',
-            VmFlockOperation::TYPE_ERROR_NULL_MSG
-        );
+        if ($context->callerStrictTypes) {
+            self::lowerOperation($context, $arg);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'flock_null_op_te_cont');
+        } else {
+            // Soft-null DEP then ValueError — same order as Zend Z_PARAM_LONG + php_flock (#31462).
+            JitIntdiv::emitNullIntDeprecation($context, 'flock', 2, 'operation');
+            ExceptionBridge::emitValueErrorAndAbort($context, VmFlockOperation::VALUE_ERROR_MSG);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'flock_null_op_ve_cont');
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt(0, false);
     }
 }
