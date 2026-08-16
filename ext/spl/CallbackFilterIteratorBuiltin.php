@@ -200,6 +200,8 @@ final class CallbackFilterIteratorRewind extends VmClassMethod
             CallbackFilterIteratorBuiltin::CLASS_LC,
             'CallbackFilterIterator::rewind()'
         );
+        // Inherited zim_FilterIterator_rewind — ACE cites FilterIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'FilterIterator::rewind', 0);
         SplDualIteratorStorage::rewindSimple($frame, $object);
         FilterIteratorBuiltin::fetch($frame, $object);
     }
@@ -219,6 +221,8 @@ final class CallbackFilterIteratorNext extends VmClassMethod
             CallbackFilterIteratorBuiltin::CLASS_LC,
             'CallbackFilterIterator::next()'
         );
+        // Inherited zim_FilterIterator_next — ACE cites FilterIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'FilterIterator::next', 0);
         $inner = SplDualIteratorStorage::inner($object);
         SplDualIteratorStorage::callInner($frame, $inner, 'next');
         FilterIteratorBuiltin::fetch($frame, $object);
@@ -239,6 +243,8 @@ final class CallbackFilterIteratorValid extends VmClassMethod
             CallbackFilterIteratorBuiltin::CLASS_LC,
             'CallbackFilterIterator::valid()'
         );
+        // Inherited zim_IteratorIterator_valid — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::valid', 0);
         SplIteratorSupport::setReturnBool($frame, SplDualIteratorStorage::validSimple($frame, $object));
     }
 }
@@ -257,6 +263,8 @@ final class CallbackFilterIteratorCurrent extends VmClassMethod
             CallbackFilterIteratorBuiltin::CLASS_LC,
             'CallbackFilterIterator::current()'
         );
+        // Inherited zim_IteratorIterator_current — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::current', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDualIteratorStorage::currentSimple($frame, $object));
     }
 }
@@ -275,6 +283,8 @@ final class CallbackFilterIteratorKey extends VmClassMethod
             CallbackFilterIteratorBuiltin::CLASS_LC,
             'CallbackFilterIterator::key()'
         );
+        // Inherited zim_IteratorIterator_key — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::key', 0);
         SplIteratorSupport::copyReturnFrom($frame, SplDualIteratorStorage::keySimple($frame, $object));
     }
 }
@@ -293,6 +303,8 @@ final class CallbackFilterIteratorGetInnerIterator extends VmClassMethod
             CallbackFilterIteratorBuiltin::CLASS_LC,
             'CallbackFilterIterator::getInnerIterator()'
         );
+        // Inherited zim_IteratorIterator_getInnerIterator — ACE cites IteratorIterator (#31678).
+        $this->requireExactUserArgCount($frame, 'IteratorIterator::getInnerIterator', 0);
         if (null === $frame->returnVar) {
             return;
         }
