@@ -1,0 +1,16 @@
+--TEST--
+ftp_rawlist/mlsd NestedJIT AOT compile (#31428)
+--FILE--
+<?php
+$c = @ftp_connect("127.0.0.1", 1, 1);
+if ($c) {
+    @ftp_login($c, "u", "p");
+    @ftp_pasv($c, true);
+    var_dump(ftp_rawlist($c, "."));
+    var_dump(ftp_mlsd($c, "."));
+    ftp_close($c);
+} else {
+    echo "refused\n";
+}
+--EXPECT--
+refused

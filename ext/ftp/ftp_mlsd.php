@@ -47,6 +47,6 @@ final class ftp_mlsd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_mlsd() is not implemented for JIT in this compiler build (issue #6762)');
+        return JitFtpList::invokeMlsd($context, ...$args);
     }
 }
