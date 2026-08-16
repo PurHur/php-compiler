@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * gzcompress() — zlib compress (ext/zlib/zlib.c parity, issue #3194).
  *
  * Soft-null $data on forward profile — Zend 8.4 deprecate+coerce (#21280; gzencode sibling: #21210).
+ * Soft-null $level — E_DEPRECATED + coerce (#31445).
  */
 final class gzcompress extends Internal
 {
