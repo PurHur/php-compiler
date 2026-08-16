@@ -57,9 +57,12 @@ final class DirHandleJitHelper
         return 1;
     }
 
-    /** @return 0|1 ABI for __compiler_rewinddir */
+    /** @return 0|1 ABI for __compiler_rewinddir — handle -1 uses EG(default_directory) (#31451) */
     public static function rewinddirArgv(int $handle): int
     {
+        if (-1 === $handle) {
+            $handle = VmDirArg::requireDefaultDirHandle();
+        }
         if (!VmDir::isValidHandle($handle)) {
             return 0;
         }
