@@ -23,14 +23,23 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * floatval() for scalar arguments (subset of PHP standard library).
+ * floatval() / doubleval() for scalar arguments (subset of PHP standard library).
+ *
+ * doubleval is registered as floatval('doubleval') so ArgumentCountError cites the
+ * called alias name (#30688 / re-#15003; php-src ext/standard/type.c).
  */
 final class floatval extends Internal
 {
+    public function __construct(string $name = 'floatval')
+    {
+        parent::__construct($name);
+    }
+
     public function execute(Frame $frame): void
     {
         // php-src ext/standard/type.c — ArgumentCountError (#23165).
-        $this->requireExactArgCount($frame, 'floatval', 1);
+        // Called name so doubleval() ACE cites doubleval(), not floatval() (#30688).
+        $this->requireExactArgCount($frame, $this->name, 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
@@ -72,7 +81,7 @@ final class floatval extends Internal
 
             return;
         }
-        throw new \LogicException('floatval() only supports integers, floats, booleans, strings, and null in this compiler build');
+        throw new \LogicException($this->name.'() only supports integers, floats, booleans, strings, and null in this compiler build');
     }
 
     public Context $context;
@@ -81,8 +90,8 @@ final class floatval extends Internal
     {
         $this->context = $context;
         $double = $context->getTypeFromString('double');
-        // php-src ext/standard/type.c — ArgumentCountError (#23165).
-        if (!$this->requireExactJitArgCount($context, $args, 'floatval', 1)) {
+        // php-src ext/standard/type.c — ArgumentCountError (#23165); called name for doubleval (#30688).
+        if (!$this->requireExactJitArgCount($context, $args, $this->name, 1)) {
             return $double->constReal(0.0);
         }
         $v = $context->helper->loadValue($args[0]);
@@ -94,7 +103,7 @@ final class floatval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->uiToFp($v, $double);
             case JITVariable::TYPE_STRING:
-                $ptr = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'floatval() argument #1'));
+                $ptr = $this->stringDataPtr($context, $this->jitString($context, $args[0], $this->name.'() argument #1'));
                 $endPtr = $context->getTypeFromString('int8**')->constNull();
 
                 return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
@@ -105,7 +114,7 @@ final class floatval extends Internal
             case JITVariable::TYPE_VALUE:
                 return $this->valueToFloat($context, $args[0]);
             default:
-                throw new \LogicException('floatval() only supports integers, floats, booleans, strings, and null in this compiler build');
+                throw new \LogicException($this->name.'() only supports integers, floats, booleans, strings, and null in this compiler build');
         }
     }
 
@@ -198,7 +207,7 @@ final class floatval extends Internal
         $enumDouble = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToDouble(
             $context,
             $objPtr,
-            'floatval',
+            $this->name,
             $afterEnumDispatch
         );
         if (null !== $enumDouble) {
