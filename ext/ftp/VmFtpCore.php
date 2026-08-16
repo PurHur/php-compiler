@@ -40,7 +40,7 @@ final class VmFtpCore
     /**
      * JIT/AOT ftp_connect owned libc fds keyed by object address (#27393).
      *
-     * @var array<int, array{fd: int, port: int, timeout: int, closed: bool}>
+     * @var array<int, array{fd: int, port: int, timeout: int, closed: bool, pasv: bool}>
      */
     private static array $jitOwned = [];
 
@@ -62,6 +62,7 @@ final class VmFtpCore
             'port' => $port,
             'timeout' => $timeout > 0 ? $timeout : 90,
             'closed' => false,
+            'pasv' => false,
         ];
     }
 
@@ -72,6 +73,17 @@ final class VmFtpCore
         }
 
         return self::$jitOwned[$key]['fd'];
+    }
+
+    /**
+     * ftp_pasv() under JIT/AOT — record passive mode on owned session (#31379).
+     */
+    public static function setJitPasvMode(int $key, bool $enable): void
+    {
+        if ($key <= 0 || !isset(self::$jitOwned[$key]) || self::$jitOwned[$key]['closed']) {
+            return;
+        }
+        self::$jitOwned[$key]['pasv'] = $enable;
     }
 
     /**

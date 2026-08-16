@@ -39,6 +39,6 @@ final class ftp_cdup extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_cdup() is not implemented for JIT in this compiler build (issue #20231)');
+        return JitFtpNav::invokeCdup($context, ...$args);
     }
 }

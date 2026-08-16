@@ -45,6 +45,6 @@ final class ftp_pwd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_pwd() is not implemented for JIT in this compiler build (issue #20231)');
+        return JitFtpNav::invokePwd($context, ...$args);
     }
 }
