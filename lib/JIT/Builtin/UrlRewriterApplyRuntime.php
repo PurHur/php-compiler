@@ -19,12 +19,14 @@ use PHPLLVM\Value;
  * emitAdd), not during Context init ObStorage::implement — init-time NestedJIT
  * miscompiles substr and int→string in this helper TU while later StringNl2br
  * NestedJIT in the same module stays correct (#31099).
+ *
+ * Ob flush always calls this ABI, so ObStorage init installs an identity stub
+ * (peer {@see ObStorageLlvm::ensureGzhandlerFlushStub}) for link (#31663). Rewrite
+ * path upgrades the stub to the NestedJIT bridge via {@see ensureNestedJitBridge}.
  */
 final class UrlRewriterApplyRuntime
 {
     private const ABI = '__phpc_url_rewriter_apply';
-
-    private const HELPER_PATH = '/ext/standard/UrlRewriterApplyJitHelper.php';
 
     /** @var list<string> */
     private const HELPER_BUNDLE = [
@@ -40,6 +42,9 @@ final class UrlRewriterApplyRuntime
     ];
 
     private const BRIDGE_ENTRY = 'url_rewriter_apply_bridge_entry';
+
+    /** Identity body until NestedJIT rewrite bridge (#31663). */
+    private const IDENTITY_STUB_ENTRY = 'ura_identity_stub';
 
     /** Declare ABI only (no body) — safe during ObStorage init. */
     public static function declareAbi(Context $context): void
@@ -63,10 +68,13 @@ final class UrlRewriterApplyRuntime
         return $context->builder->call($context->lookupFunction(self::ABI), $contentStr);
     }
 
-    /** Declare-only — ObStorage / init must not NestedJIT (#31099). */
+    /**
+     * Identity stub for ObStorage / init — must not NestedJIT (#31099 / #31663).
+     * Peer: ObStorageLlvm::ensureGzhandlerFlushStub.
+     */
     public static function ensureLinked(Context $context): void
     {
-        self::declareAbi($context);
+        self::ensureIdentityStub($context);
     }
 
     /**
@@ -76,7 +84,7 @@ final class UrlRewriterApplyRuntime
     public static function ensureNestedJitBridge(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
-            self::declareAbi($context);
+            self::ensureIdentityStub($context);
 
             return;
         }
@@ -103,6 +111,25 @@ final class UrlRewriterApplyRuntime
         self::ensureLinked($context);
     }
 
+    /** Identity `__phpc_url_rewriter_apply` so thin AOT links without rewrite NestedJIT (#31663). */
+    private static function ensureIdentityStub(Context $context): void
+    {
+        self::declareAbi($context);
+        $fn = $context->lookupFunction(self::ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($fn, self::BRIDGE_ENTRY)
+            || JitVmHelperLink::hasNamedBridgeEntry($fn, self::IDENTITY_STUB_ENTRY)
+            || $fn->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI, $fn);
+
+            return;
+        }
+        $entry = $fn->appendBasicBlock(self::IDENTITY_STUB_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($fn->getParam(0));
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction(self::ABI, $fn);
+    }
+
     private static function implementBridge(Context $context): void
     {
         OutputRewriteVarsStorage::ensureGlobals($context);
@@ -124,12 +151,9 @@ final class UrlRewriterApplyRuntime
         if (JitVmHelperLink::hasNamedBridgeEntry($fn, self::BRIDGE_ENTRY)) {
             return;
         }
-        if ($fn->countBasicBlocks() > 0) {
-            throw new \LogicException(self::ABI.' already has a non-bridge body (#31099)');
-        }
 
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::APPLY_HELPER, '#31099');
-        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $entry = self::openBridgeEntryBlock($context, $fn);
         $passthrough = $fn->appendBasicBlock('ura_php_passthrough');
         $work = $fn->appendBasicBlock('ura_php_work');
         $context->builder->positionAtEnd($entry);
@@ -165,6 +189,43 @@ final class UrlRewriterApplyRuntime
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
         );
         $context->registerFunction(self::ABI, $fn);
+    }
+
+    /**
+     * Fresh BRIDGE_ENTRY, or upgrade identity stub by erasing its return and branching in (#31663).
+     *
+     * @param \PHPLLVM\Value\Function_ $fn
+     *
+     * @return \PHPLLVM\BasicBlock
+     */
+    private static function openBridgeEntryBlock(Context $context, $fn)
+    {
+        if (0 === $fn->countBasicBlocks()) {
+            return $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        }
+        if (!JitVmHelperLink::hasNamedBridgeEntry($fn, self::IDENTITY_STUB_ENTRY)) {
+            throw new \LogicException(self::ABI.' already has a non-bridge body (#31099/#31663)');
+        }
+        $stub = null;
+        foreach ($fn->getBasicBlocks() as $block) {
+            if ($block->getName() === self::IDENTITY_STUB_ENTRY) {
+                $stub = $block;
+                break;
+            }
+        }
+        if (null === $stub) {
+            throw new \LogicException(self::ABI.' identity stub block missing (#31663)');
+        }
+        $term = $stub->getTerminator();
+        if (null !== $term && $term instanceof \PHPLLVM\Value\Instruction) {
+            $term->eraseFromParent();
+        }
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($stub);
+        $context->builder->branch($entry);
+        $context->builder->clearInsertionPosition();
+
+        return $entry;
     }
 
     private static function ensureStringInit(Context $context): void
