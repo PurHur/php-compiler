@@ -815,6 +815,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('sha1_file'));
     }
 
+    /** php-src ext/standard/link.stub.php — InternalArgInfo omits |false (#28425). */
+    public function testReadlinkLinkinfoReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('readlink'));
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('linkinfo'));
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28841). */
     public function testGetrusageReflectionReturnUnion(): void
     {

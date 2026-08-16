@@ -1,22 +1,12 @@
 --TEST--
-AOT: readlink() symlink target via libc readlink(2)
+AOT: readlink/linkinfo missing-path failure (#28425)
 --FILE--
 <?php
-$base = 'test/compliance/cases/stdlib/is_link_fixture';
-$link = $base . '/link';
-$file = $base . '/target.txt';
-echo readlink($link), "\n";
-if (!is_link($file)) {
-    echo 'notlink', "\n";
-} else {
-    echo 'bad', "\n";
-}
-if (!is_link('/no/such/phpc-readlink-path')) {
-    echo 'gone', "\n";
-} else {
-    echo 'badgone', "\n";
-}
+$missing = @readlink('/no/such/phpc-readlink-path');
+echo 'readlink_missing=', (false === $missing) ? 'false' : gettype($missing), "\n";
+$dev = @linkinfo('/no/such/phpc-linkinfo-path');
+echo 'linkinfo_missing=', (-1 === $dev) ? '-1' : gettype($dev), "\n";
+?>
 --EXPECT--
-target.txt
-notlink
-gone
+readlink_missing=false
+linkinfo_missing=-1

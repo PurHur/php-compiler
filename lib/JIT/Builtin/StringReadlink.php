@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
  * JIT/AOT link for readlink() via ReadlinkJitHelper PHP (#15353).
  *
- * Replaces libc readlink(2)/__string__init LLVM in ext/standard/JitReadlink.php.
+ * Bridge ABI is `__string__*` (null = failure); boxing to string|false happens in the
+ * **caller** frame (#28425) — returning a bridge-local {@see JitValueBox::alloc} pointer
+ * is use-after-return under AOT (always NULL). Peer: {@see StringNlLanginfo}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::readlink()}.
  * php-src: ext/standard/filestat.c — php_readlink
  */
@@ -25,6 +28,8 @@ final class StringReadlink
     private const HELPER_PATH = '/ext/standard/ReadlinkJitHelper.php';
 
     private const RESOLVE_HELPER = 'PHPCompiler\\ext\\standard\\ReadlinkJitHelper::resolveArgv';
+
+    private const BRIDGE_ENTRY = 'readlink_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -41,72 +46,88 @@ final class StringReadlink
         self::ensureLinked($context);
     }
 
+    /** @return Value `__value__*` — string or bool false */
     public static function invoke(Context $context, Value $path): Value
     {
         self::ensureLinked($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'readlink_invoke_cont');
+        $strOrNull = $context->builder->call($context->lookupFunction(self::ABI), $path);
 
-        return $context->builder->call($context->lookupFunction(self::ABI), $path);
+        return self::boxStringOrFalse($context, $strOrNull);
     }
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15353');
-
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($valuePtr, false, $strPtr)
-            );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::RESOLVE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#15353'
+        );
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
 
-        $entry = $fn->appendBasicBlock('readlink_bridge_entry');
-        $failBb = $fn->appendBasicBlock('readlink_bridge_fail');
-        $okBb = $fn->appendBasicBlock('readlink_bridge_ok');
-        $context->builder->positionAtEnd($entry);
+    /** null `__string__*` → bool false box; else string box (caller-frame allocas). */
+    private static function boxStringOrFalse(Context $context, Value $strOrNull): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $strOrNull, $strPtr->constNull());
+        $falseBb = BasicBlockHelper::append($context, 'readlink_box_false');
+        $strBb = BasicBlockHelper::append($context, 'readlink_box_str');
+        $doneBb = BasicBlockHelper::append($context, 'readlink_box_done');
+        $context->builder->branchIf($isNull, $falseBb, $strBb);
 
-        $path = $fn->getParam(0);
-        $isNullPath = $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull());
-        $context->builder->branchIf($isNullPath, $failBb, $okBb);
+        $context->builder->positionAtEnd($falseBb);
+        $falseSlot = JitValueBox::alloc($context);
+        $falsePtr = JitValueBox::pointer($context, $falseSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $falsePtr,
+            $i32->constInt(0, false)
+        );
+        $falseEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($okBb);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::RESOLVE_HELPER, '#15353');
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path]);
-        $isNullResult = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
-        $failResultBb = $fn->appendBasicBlock('readlink_bridge_result_fail');
-        $okResultBb = $fn->appendBasicBlock('readlink_bridge_result_ok');
-        $context->builder->branchIf($isNullResult, $failResultBb, $okResultBb);
-
-        $context->builder->positionAtEnd($failResultBb);
-        $context->builder->branch($failBb);
-
-        $context->builder->positionAtEnd($okResultBb);
-        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->positionAtEnd($strBb);
+        $strSlot = JitValueBox::alloc($context);
+        $strVal = JitValueBox::pointer($context, $strSlot);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $resultStr
+            $strVal,
+            $strOrNull
         );
-        $context->builder->returnValue($ptr);
+        $strEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($failBb);
-        $failSlot = JitValueBox::alloc($context);
-        $failPtr = JitValueBox::pointer($context, $failSlot);
-        $i1 = $context->getTypeFromString('int1');
-        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
-        $context->builder->returnValue($failPtr);
+        $context->builder->positionAtEnd($doneBb);
+        $ptrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($ptrTy);
+        $phi->addIncoming($falsePtr, $falseEnd);
+        $phi->addIncoming($strVal, $strEnd);
 
-        $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+        return $phi;
     }
 }
