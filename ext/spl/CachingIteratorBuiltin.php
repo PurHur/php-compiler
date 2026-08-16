@@ -348,12 +348,23 @@ final class SplCachingIteratorStorage
     /**
      * php-src spl_caching_it_offset_get — FULL_CACHE ArrayAccess (#20143).
      *
+     * Missing keys emit E_WARNING "Undefined array key …" then null (#31576),
+     * matching zend_hash_find on intern->u.caching.zcache (ext/spl/spl_iterators.c).
+     *
      * @throws \BadMethodCallException when FULL_CACHE is not set
      */
-    public static function offsetGet(ObjectEntry $object, Variable $offset): Variable
-    {
+    public static function offsetGet(
+        ObjectEntry $object,
+        Variable $offset,
+        ?Frame $frame = null
+    ): Variable {
         $found = self::findCacheOffset(self::requireFullCache($object), $offset);
-        if (null === $found) {
+        if (null === $found || $found->resolveIndirect()->isUndefined()) {
+            $ctx = $frame?->vmContext;
+            if (null !== $ctx) {
+                $scriptFile = null !== $frame && '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                $ctx->errors->undefinedArrayKey($offset, $ctx, $frame, $scriptFile);
+            }
             $null = new Variable();
             $null->null();
 
@@ -1043,7 +1054,7 @@ final class CachingIteratorOffsetGet extends VmClassMethod
         }
         SplIteratorSupport::copyReturnFrom(
             $frame,
-            SplCachingIteratorStorage::offsetGet($object, $frame->calledArgs[1])
+            SplCachingIteratorStorage::offsetGet($object, $frame->calledArgs[1], $frame)
         );
     }
 }
