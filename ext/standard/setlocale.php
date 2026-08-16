@@ -8,13 +8,14 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * setlocale() — libc setlocale(3) wrapper (issue #6133, #3254).
  *
- * php-src: ext/standard/locale.c — PHP_FUNCTION(setlocale)
+ * php-src: ext/standard/string.c — PHP_FUNCTION(setlocale)
+ *
+ * Null $category: Z_PARAM_LONG — soft E_DEPRECATED + coerce to 0; strict TypeError (#31487).
  */
 final class setlocale extends Internal
 {
@@ -35,13 +36,17 @@ final class setlocale extends Internal
             return;
         }
 
-        $categoryVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $categoryVar->type) {
-            throw new \TypeError(self::categoryTypeError($categoryVar));
-        }
+        // Z_PARAM_LONG $category — soft-null DEP+0 outside strict_types (#31487).
+        $category = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            0,
+            'setlocale',
+            1,
+            'category'
+        );
 
         $result = VmLocale::setlocale(
-            $categoryVar->toInt(),
+            $category,
             \array_slice($frame->calledArgs, 1)
         );
         if (false === $result) {
@@ -54,13 +59,5 @@ final class setlocale extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         return JitLocale::setlocale($context, ...$args);
-    }
-
-    private static function categoryTypeError(Variable $var): string
-    {
-        return \sprintf(
-            'setlocale(): Argument #1 ($category) must be of type int, %s given',
-            VmStreamArg::debugTypeName($var)
-        );
     }
 }
