@@ -6,9 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -37,12 +37,16 @@ final class preg_grep extends Internal
         $src = VmArray::requireArrayParam($frame->calledArgs[1], 'preg_grep', 2, 'array');
         $invert = false;
         if (3 === $argc) {
-            $flags = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flags->type) {
-                throw new \LogicException('preg_grep() flags must be an integer in this compiler build');
-            }
+            // Z_PARAM_LONG: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31385).
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'preg_grep',
+                3,
+                'flags'
+            );
             // php-src php_pcre.c PHP_FUNCTION(preg_grep) — mask PREG_GREP_INVERT; unknown bits ignored (#27946).
-            $invert = 0 !== ($flags->toInt() & StdlibConstants::PREG_GREP_INVERT);
+            $invert = 0 !== ($flags & StdlibConstants::PREG_GREP_INVERT);
         }
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
@@ -93,9 +97,26 @@ final class preg_grep extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
         }
+        // Soft-null outside strict_types; strict → TypeError (#31385 / peer token_get_all #31361).
+        if (3 === $argc
+            && $context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false))) {
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'preg_grep', 3, 'flags');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'preg_grep_null_flags_te_cont');
+
+            return HashTableHelper::emptyVariable($context)->value;
+        }
+
         $invert = $context->constantFromBool(false);
         if (3 === $argc) {
-            $flags = JitLongArg::lower($context, $args[2], 'preg_grep() flags');
+            // Z_PARAM_LONG — strict TypeError / soft-null DEP+coerce (#31385).
+            $flags = JitIntdiv::lowerIntBuiltinArgForCaller(
+                $context,
+                $args[2],
+                'preg_grep',
+                3,
+                'flags'
+            );
             $i64 = $context->getTypeFromString('int64');
             $masked = $context->builder->and($flags, $i64->constInt(StdlibConstants::PREG_GREP_INVERT, true));
             $invert = $context->builder->icmp(
