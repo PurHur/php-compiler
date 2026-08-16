@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * unpack() semantics in PHP (VM + reference for JIT lowering).
  *
@@ -121,12 +123,7 @@ final class UnpackEngine
                 }
 
                 if ($pos + $need > $len) {
-                    self::fail(\sprintf(
-                        'unpack(): Type %s: not enough input, need %d, have %d',
-                        $code,
-                        $need,
-                        $len - $pos
-                    ));
+                    self::fail(self::insufficientInputWarning($code, $need, $len - $pos));
 
                     return false;
                 }
@@ -357,12 +354,7 @@ final class UnpackEngine
         }
 
         if ($pos + $unit > $dataLen) {
-            self::fail(\sprintf(
-                'unpack(): Type %s: not enough input, need %d, have %d',
-                $code,
-                $unit,
-                $dataLen - $pos
-            ));
+            self::fail(self::insufficientInputWarning($code, $unit, $dataLen - $pos));
 
             return false;
         }
@@ -578,6 +570,51 @@ final class UnpackEngine
         }
 
         return 0;
+    }
+
+    /**
+     * Insufficient-input E_WARNING text (php-src pack.c).
+     *
+     * PHP 8.2: "Type %c: not enough input, need %d, have %d"
+     * PHP 8.3+: "Type %c: not enough input values, need %d values but only %d was|were provided"
+     * (#29484 — PROFILE=8.4 / Zend 8.4.24). Withheld on 8.4.0-dev reference (unset PROFILE)
+     * so default harness matches Zend 8.2.
+     */
+    private static function insufficientInputWarning(string $code, int $need, int $have): string
+    {
+        if (self::usesUnpackInsufficientInputValuesWording()) {
+            $verb = 1 === $have ? 'was' : 'were';
+
+            return \sprintf(
+                'unpack(): Type %s: not enough input values, need %d values but only %d %s provided',
+                $code,
+                $need,
+                $have,
+                $verb
+            );
+        }
+
+        return \sprintf(
+            'unpack(): Type %s: not enough input, need %d, have %d',
+            $code,
+            $need,
+            $have
+        );
+    }
+
+    /** True when language profile is PHP 8.3+ (explicit forward PROFILE or stable ≥8.4.0). */
+    private static function usesUnpackInsufficientInputValuesWording(): bool
+    {
+        if (version_compare(CompilerVersion::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.3.0', '>=');
     }
 
     private static function fail(string $message): void
