@@ -261,6 +261,8 @@ final class BuiltinInternalArgInfo
             'sodium_crypto_sign_verify_detached' => 'bool',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27630)
             'sodium_memzero' => 'void',
+            // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27775)
+            'sodium_crypto_aead_aes256gcm_is_available' => 'bool',
             // ext/pgsql/pgsql.stub.php — InternalArgInfo empty return; Zend string|int|false (#27703)
             'pg_field_table' => 'string|int|false',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)

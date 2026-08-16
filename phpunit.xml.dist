@@ -292,6 +292,7 @@
             <file>./test/compliance/HashNullBinaryStrict31288JITTest.php</file>
             <file>./test/compliance/Md5Sha1NullBinaryStrict31358VMTest.php</file>
             <file>./test/compliance/Md5Sha1NullBinaryStrict31358JITTest.php</file>
+            <file>./test/compliance/SodiumAes256gcmIsAvailableReflection27775VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340VMTest.php</file>
             <file>./test/compliance/IteratorToArrayNullPreserveKeysStrict31340JITTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289VMTest.php</file>
