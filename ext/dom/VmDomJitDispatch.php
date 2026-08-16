@@ -140,13 +140,12 @@ final class VmDomJitDispatch
     public static function saveXML(ObjectEntry $document, array $extra): Variable
     {
         self::requireAtMostExtraArgCount('DOMDocument::saveXML', $extra, 2);
-        $node = null;
-        if (isset($extra[0])) {
-            $arg = $extra[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $arg->type) {
-                $node = VariableObject::entry($arg);
-            }
-        }
+        $node = self::optionalSaveDomNodeArg(
+            $extra[0] ?? null,
+            'DOMDocument::saveXML',
+            1,
+            'node'
+        );
         $options = 0;
         if (isset($extra[1])) {
             $options = VmMath::parseZParamLongBuiltinArg(
@@ -263,13 +262,12 @@ final class VmDomJitDispatch
     public static function saveHtml(ObjectEntry $document, array $extra): Variable
     {
         self::requireAtMostExtraArgCount('DOMDocument::saveHTML', $extra, 1);
-        $node = null;
-        if (isset($extra[0])) {
-            $first = $extra[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $first->type) {
-                $node = VariableObject::entry($first);
-            }
-        }
+        $node = self::optionalSaveDomNodeArg(
+            $extra[0] ?? null,
+            'DOMDocument::saveHTML',
+            1,
+            'node'
+        );
         $var = new Variable();
         $var->string(VmDomLiving::saveHtml($document, $node));
 
@@ -1592,6 +1590,47 @@ final class VmDomJitDispatch
     private static function missingArg(string $method, int $index): Variable
     {
         throw new \ArgumentCountError($method.'() expects argument #'.($index + 1));
+    }
+
+    /**
+     * Z_PARAM_OBJECT_OF_CLASS_OR_NULL(DOMNode) for saveXML/saveHTML (#31396).
+     *
+     * $function is Class::method without trailing "()".
+     */
+    private static function optionalSaveDomNodeArg(
+        ?Variable $var,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ?ObjectEntry {
+        if (null === $var) {
+            return null;
+        }
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type ?DOMNode, %s given',
+                $function,
+                $userArgIndex,
+                $paramName,
+                VmDom::typeLabel($var)
+            ));
+        }
+        $object = VariableObject::entry($var);
+        if (!VmDom::isDomNode($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type ?DOMNode, %s given',
+                $function,
+                $userArgIndex,
+                $paramName,
+                $object->class->name
+            ));
+        }
+
+        return $object;
     }
 
     private static function optionalDomNodeArg(?Variable $var, string $label, int $index): ?ObjectEntry
