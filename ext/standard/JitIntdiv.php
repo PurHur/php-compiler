@@ -239,7 +239,7 @@ final class JitIntdiv
             return self::lowerNativeDoubleOperand($context, $arg, $argIndex, $paramName, $function, $nullable, $warnFloatPrecision);
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $function, $nullable);
+            return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $function, $nullable, $warnFloatPrecision);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $function, $nullable, $warnFloatPrecision);
@@ -254,8 +254,42 @@ final class JitIntdiv
         int $argIndex,
         string $paramName,
         string $function,
-        bool $nullable = false
+        bool $nullable = false,
+        bool $warnFloatPrecision = false
     ): Value {
+        if ($warnFloatPrecision && null !== $arg->compileTimeString) {
+            $lit = $arg->compileTimeString;
+            if ('' === $lit || !\is_numeric($lit)) {
+                self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'string', $nullable);
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+            if (!\PHPCompiler\VM\Variable::isIntegralNumericString($lit)) {
+                $f = (float) $lit;
+                $long = VmMath::floatToZendLong($f);
+                // Lower-time: no live VM — bake Zend float-string Deprecated into the IR (#29706).
+                if (VmMath::floatLosesIntPrecision($f)) {
+                    $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+                    \PHPCompiler\JIT\Builtin\StringTriggerErrorJit::implement($context);
+                    if (null !== $savedInsert) {
+                        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+                    } else {
+                        BasicBlockHelper::ensureOpenInsertBlock($context, 'floatstr_int_prec_warn_setup');
+                    }
+                    $i8p = $context->getTypeFromString('int8*');
+                    $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+                    self::emitConstFloatToIntPrecisionDeprecated(
+                        $context,
+                        VmMath::floatStringToIntPrecisionWarningMessage($lit),
+                        $emptyFile
+                    );
+                }
+            } else {
+                $long = (int) $lit;
+            }
+
+            return $context->getTypeFromString('int64')->constInt($long, false);
+        }
         $strPtr = JitStringArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
         $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
         $okBlock = BasicBlockHelper::append($context, 'intdiv_str_ok');
