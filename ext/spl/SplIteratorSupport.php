@@ -111,7 +111,10 @@ final class SplIteratorSupport
     }
 
     /**
-     * Z_PARAM_FUNC — reject null/invalid callback before storing (php-src spl_iterators.c; #31508).
+     * Z_PARAM_FUNC — reject null/invalid callback before storing (php-src spl_iterators.c; #31508, #31574).
+     *
+     * Unknown string function names use Zend's "function \"…\" not found…" text; other invalid
+     * types keep "no array or string given".
      */
     public static function requireCallableArg(
         Variable $var,
@@ -126,6 +129,12 @@ final class SplIteratorSupport
             );
         }
         if (!VmCallable::isCallable($ctx, $resolved)) {
+            if (Variable::TYPE_STRING === $resolved->type) {
+                throw new \TypeError(
+                    $function.'(): Argument #'.$argIndex.' ($callback) must be a valid callback, function "'
+                    .$resolved->toString().'" not found or invalid function name'
+                );
+            }
             throw new \TypeError(
                 $function.'(): Argument #'.$argIndex.' ($callback) must be a valid callback, no array or string given'
             );

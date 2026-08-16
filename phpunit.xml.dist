@@ -146,6 +146,8 @@
             <file>./test/compliance/ErrorLogNamed23341JITTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508VMTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508JITTest.php</file>
+            <file>./test/compliance/CallbackFilterIteratorStringCallbackMsg31574VMTest.php</file>
+            <file>./test/compliance/CallbackFilterIteratorStringCallbackMsg31574JITTest.php</file>
             <file>./test/compliance/PasswordNullOptions31421VMTest.php</file>
             <file>./test/compliance/PasswordNullOptions31421JITTest.php</file>
             <file>./test/compliance/SessionRegenerateIdNullSoftVMTest.php</file>
