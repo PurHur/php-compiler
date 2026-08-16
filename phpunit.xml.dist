@@ -720,6 +720,8 @@
             <file>./test/compliance/InArrayArraySearchStrictNullJITTest.php</file>
             <file>./test/compliance/SubstrReplaceNullReplaceStrictVMTest.php</file>
             <file>./test/compliance/SubstrReplaceNullReplaceStrictJITTest.php</file>
+            <file>./test/compliance/SubstrReplaceNullOffsetStrictVMTest.php</file>
+            <file>./test/compliance/SubstrReplaceNullOffsetStrictJITTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorVMTest.php</file>
             <file>./test/compliance/MetaphoneMaxPhonemesValueErrorJITTest.php</file>
             <file>./test/compliance/FilePutContentsEmptyPathValueErrorVMTest.php</file>
