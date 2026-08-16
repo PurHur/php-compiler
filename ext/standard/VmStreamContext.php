@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -353,17 +355,61 @@ final class VmStreamContext
         'stream_context_set_option(): Argument #4 ($value) cannot be provided when argument #2 ($wrapper_or_options) is an array';
 
     /**
+     * Soft-null `$wrapper_or_options` (array|string) — Zend Z_PARAM_ARRAY_HT_OR_STR (#31422).
+     *
+     * Outside strict_types: E_DEPRECATED then coerce to "". Under caller strict_types: TypeError.
+     */
+    public static function normalizeWrapperOrOptionsArg(Frame $frame, Variable $arg2): Variable
+    {
+        $resolved = $arg2->resolveIndirect();
+        if (Variable::TYPE_NULL !== $resolved->type) {
+            return $arg2;
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            throw new \TypeError(
+                'stream_context_set_option(): Argument #2 ($wrapper_or_options) must be of type array|string, null given'
+            );
+        }
+        VmNullStringParamDeprecation::emit(
+            $frame,
+            'stream_context_set_option',
+            1,
+            'wrapper_or_options',
+            'array|string'
+        );
+        $empty = new Variable();
+        $empty->string('');
+
+        return $empty;
+    }
+
+    /**
      * stream_context_set_option() — singular or batch wrapper option write (ext/standard/streams.c, #3448, #30645).
      *
      * Two-arg array form merges a full options array; four-arg string form sets one wrapper option.
      * Incomplete string form / extra array-form args → Zend ValueError (not LogicException / silent true).
      *
      * $arg3/$arg4 PHP null means the argument was omitted; a Variable (including TYPE_NULL) was passed.
+     * Null `$arg2` must be normalized via {@see normalizeWrapperOrOptionsArg} first (#31422).
      */
     public static function setOption(Variable $context, Variable $arg2, ?Variable $arg3 = null, ?Variable $arg4 = null): bool
     {
         $context = self::requireRepresentation($context, 'stream_context_set_option');
         $resolved2 = $arg2->resolveIndirect();
+        // NestedJIT / helper call sites may still pass null — soft-DEP without a Frame (#31422).
+        if (Variable::TYPE_NULL === $resolved2->type) {
+            VmNullStringParamDeprecation::emit(
+                null,
+                'stream_context_set_option',
+                1,
+                'wrapper_or_options',
+                'array|string'
+            );
+            $empty = new Variable();
+            $empty->string('');
+            $arg2 = $empty;
+            $resolved2 = $empty;
+        }
         $optionIsNull = null === $arg3 || Variable::TYPE_NULL === $arg3->resolveIndirect()->type;
         $valueProvided = null !== $arg4;
 

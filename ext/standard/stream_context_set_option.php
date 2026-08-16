@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  *
  * Excess/missing argc → Zend ArgumentCountError (#30584; php-src stub arity 2..4).
  * Incomplete string form → Zend ValueError (#30645); do not synthesize a null $value.
+ * Soft-null `$wrapper_or_options` → E_DEPRECATED then coerce (#31422).
  */
 final class stream_context_set_option extends Internal
 {
@@ -31,19 +32,23 @@ final class stream_context_set_option extends Internal
         // php-src stub arity: 2..4 (ZEND_PARSE_PARAMETERS_START) — #30584.
         $this->requireArgCountRange($frame, 'stream_context_set_option', 2, 4);
         $argc = \count($frame->calledArgs);
+        $wrapperOrOptions = VmStreamContext::normalizeWrapperOrOptionsArg(
+            $frame,
+            $frame->calledArgs[1]
+        );
         if (2 === $argc) {
-            $ok = VmStreamContext::setOption($frame->calledArgs[0], $frame->calledArgs[1]);
+            $ok = VmStreamContext::setOption($frame->calledArgs[0], $wrapperOrOptions);
         } elseif (3 === $argc) {
             // Omit $value so setOption can distinguish missing arg #4 from an explicit null (#30645).
             $ok = VmStreamContext::setOption(
                 $frame->calledArgs[0],
-                $frame->calledArgs[1],
+                $wrapperOrOptions,
                 $frame->calledArgs[2]
             );
         } else {
             $ok = VmStreamContext::setOption(
                 $frame->calledArgs[0],
-                $frame->calledArgs[1],
+                $wrapperOrOptions,
                 $frame->calledArgs[2],
                 $frame->calledArgs[3]
             );
