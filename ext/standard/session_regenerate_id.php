@@ -8,11 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
-/** session_regenerate_id() — rotate session id (issue #1186). */
+/** session_regenerate_id() — rotate session id (issue #1186; null soft-DEP #31444). */
 class session_regenerate_id extends Internal
 {
     public function __construct()
@@ -30,8 +29,17 @@ class session_regenerate_id extends Internal
         }
         $deleteOld = false;
         if (1 === $argc) {
-            $flag = InternalStrictArg::requireBool($frame, 0, 'session_regenerate_id', 'delete_old_session');
-            $deleteOld = $flag->toBool();
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31444).
+            $deleteOld = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                0,
+                'session_regenerate_id',
+                1,
+                'delete_old_session'
+            );
+        }
+        if (!VmSession::isActive()) {
+            $this->triggerWarning($frame, VmSession::REGENERATE_NO_SESSION_WARNING);
         }
         $ctx = VmReflection::requireContext($frame);
         $result = VmSession::regenerateId($ctx, $deleteOld);
@@ -47,5 +55,19 @@ class session_regenerate_id extends Internal
         }
 
         return JitSessionRegenerateId::invoke($context, $args[0] ?? null);
+    }
+
+    private function triggerWarning(Frame $frame, string $message): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }
