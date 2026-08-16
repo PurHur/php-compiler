@@ -646,6 +646,11 @@ final class BuiltinInternalDefaultValues
         'getopt' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/type.stub.php — bool $syntax_only = false; mixed &$callable_name = null (#28312, #30242)
+        'is_callable' => [
+            1 => ['kind' => 'bool', 'value' => false],
+            2 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/string.stub.php — ?string $token = null (#25171)
         'strtok' => [
             1 => ['kind' => 'null'],

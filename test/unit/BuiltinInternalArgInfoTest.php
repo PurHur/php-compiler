@@ -1984,4 +1984,42 @@ final class BuiltinInternalArgInfoTest extends TestCase
             )
         );
     }
+
+    /** ext/standard/type.stub.php — is_* mixed $value + bool; is_callable untyped &$callable_name (#28312, #30242). */
+    public function testIsStarPredicatesAndIsCallableReflectionStubs(): void
+    {
+        $predicates = [
+            'is_numeric', 'is_string', 'is_int', 'is_integer', 'is_long', 'is_float', 'is_double',
+            'is_bool', 'is_null', 'is_array', 'is_object', 'is_resource', 'is_scalar',
+        ];
+        foreach ($predicates as $f) {
+            $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0), $f);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $this->assertNotNull($info, $f);
+            $this->assertSame('mixed', $info['type'], $f);
+            $this->assertFalse($info['isOptional'], $f);
+            $this->assertSame(['value'], BuiltinParamNames::forFunction($f), $f);
+        }
+
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('is_callable'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('is_callable', 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('is_callable', 2));
+        $value = BuiltinInternalArgInfo::paramInfoForFunction('is_callable', 0);
+        $this->assertNotNull($value);
+        $this->assertSame('mixed', $value['type']);
+        $name = BuiltinInternalArgInfo::paramInfoForFunction('is_callable', 2);
+        $this->assertNotNull($name);
+        $this->assertSame('callable_name', ltrim($name['name'], '&'));
+        $this->assertSame('', $name['type']);
+        $this->assertTrue($name['isOptional']);
+        $this->assertSame(
+            ['value', 'syntax_only=', '&callable_name='],
+            BuiltinParamNames::forFunction('is_callable')
+        );
+        $this->assertSame([2], BuiltinByRefParams::forFunction('is_callable'));
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('is_callable', 2, $name, false)
+        );
+    }
 }

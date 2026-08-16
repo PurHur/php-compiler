@@ -1733,8 +1733,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still function/parameters (#26237)
             case 'forward_static_call_array':
                 return ['callback', 'args'];
+            // php-src ext/standard/type.stub.php — syntax_only=false; &$callable_name=null (#28312, #30242)
             case 'is_callable':
-                return ['value', 'syntax_only', 'callable_name'];
+                return ['value', 'syntax_only=', '&callable_name='];
             // php-src Zend/zend_builtin_functions.stub.php — arity 0–1 on every profile (#23948, #26369, #28310);
             // $allow_string belongs to is_a / is_subclass_of only (not get_class / get_parent_class).
             case 'get_class':
