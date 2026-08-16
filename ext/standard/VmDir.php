@@ -12,18 +12,48 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmDir
 {
+    /**
+     * php-src EG(default_directory) — last successful opendir() / dir() handle (#27999).
+     * Bare readdir()/rewinddir()/closedir() and null $dir_handle use this.
+     */
+    private static ?int $defaultHandle = null;
+
+    public static function defaultHandle(): ?int
+    {
+        return self::$defaultHandle;
+    }
+
+    public static function setDefaultHandle(int $handle): void
+    {
+        self::$defaultHandle = $handle;
+    }
+
+    public static function clearDefaultHandleIf(int $handle): void
+    {
+        if (self::$defaultHandle === $handle) {
+            self::$defaultHandle = null;
+        }
+    }
+
     /** @return int|false */
     public static function opendir(string $path): int|false
     {
         $user = VmUserStream::tryOpendir($path);
         if (null !== $user) {
+            self::$defaultHandle = $user;
+
             return $user;
         }
         if (!VmDirNative::available()) {
             return false;
         }
 
-        return VmDirNative::opendir($path);
+        $handle = VmDirNative::opendir($path);
+        if (false !== $handle) {
+            self::$defaultHandle = $handle;
+        }
+
+        return $handle;
     }
 
     /** @return string|false */
@@ -41,6 +71,8 @@ final class VmDir
 
     public static function closedir(int $handle): void
     {
+        // php-src dir.c — closing the default directory clears EG(default_directory) (#27999).
+        self::clearDefaultHandleIf($handle);
         if (VmUserStream::isValidDirHandle($handle)) {
             VmUserStream::dirClosedir($handle);
 

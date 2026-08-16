@@ -176,6 +176,8 @@ final class BuiltinInternalArgInfo
             'file' => 'array|false',
             // ext/standard/dir.stub.php — InternalArgInfo return string (missing |false) (#26320)
             'readdir' => 'string|false',
+            // ext/standard/dir.stub.php — InternalArgInfo empty return; Zend void (#27999)
+            'closedir' => 'void',
             // ext/standard/file.stub.php — InternalArgInfo return string (missing |false) (#26320)
             'tempnam' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#26320)

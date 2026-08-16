@@ -9,7 +9,7 @@ use PHPCompiler\VM\ResourceState;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
-/** Shared directory-handle argument helpers (issue #3653, #3235). */
+/** Shared directory-handle argument helpers (issue #3653, #3235, #27999). */
 final class VmDirArg
 {
     public static function invalidDirTypeError(string $functionName): \TypeError
@@ -18,6 +18,35 @@ final class VmDirArg
             '%s(): supplied resource is not a valid Directory resource',
             $functionName
         ));
+    }
+
+    /**
+     * Optional $dir_handle for closedir/readdir/rewinddir (php-src dir.c / #27999).
+     *
+     * Omitted argument or null → EG(default_directory); absent/invalid → TypeError
+     * "No resource supplied".
+     */
+    public static function resolveOptionalDirHandle(?Variable $v, string $functionName): int
+    {
+        if (null === $v) {
+            return self::requireDefaultDirHandle();
+        }
+        $v = $v->resolveIndirect();
+        if (Variable::TYPE_NULL === $v->type) {
+            return self::requireDefaultDirHandle();
+        }
+
+        return self::requireDirHandle($v, $functionName);
+    }
+
+    public static function requireDefaultDirHandle(): int
+    {
+        $handle = VmDir::defaultHandle();
+        if (null === $handle || !VmDir::isValidHandle($handle)) {
+            throw new \TypeError('No resource supplied');
+        }
+
+        return $handle;
     }
 
     public static function requireDirHandle(Variable $v, string $functionName, int $argNum = 1): int
