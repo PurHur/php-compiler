@@ -148,9 +148,10 @@ final class SplIteratorSupport
     }
 
     /**
-     * ArrayIterator / RecursiveArrayIterator::__construct(array|object $array, int $flags = 0).
+     * ArrayIterator / RecursiveArrayIterator::__construct and ArrayObject::exchangeArray
+     * (array|object $array, …).
      *
-     * php-src spl_array_set_array (#23886): arrays are copied; ArrayObject/ArrayIterator
+     * php-src spl_array_set_array (#23886, #31528): arrays are copied; ArrayObject/ArrayIterator
      * share the live backing table (SPL_ARRAY_USE_OTHER); plain objects materialize
      * public/dynamic properties. Zend TypeError text still says "array" (param name).
      *
