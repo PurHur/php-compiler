@@ -53,6 +53,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'strdup',
             'setenv',
             'unsetenv',
+            'putenv',
         ];
     }
 
@@ -63,7 +64,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -76,6 +77,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31519', $source);
         $this->assertStringContainsString('#31534', $source);
         $this->assertStringContainsString('#31558', $source);
+        $this->assertStringContainsString('#31582', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -170,6 +172,25 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc unsetenv (#31558)'
         );
+        $this->assertStringNotContainsString(
+            "'putenv' =>",
+            $source,
+            'LibcExtern must not declare libc putenv (#31582)'
+        );
+        $this->assertStringContainsString(
+            "'getenv' =>",
+            $source,
+            'LibcExtern must keep live getenv (#31582)'
+        );
+    }
+
+    public function testBootstrapCompileSmokeM3EmitDeclaresPutenvModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('ensureLibcPutenv', $source);
+        $this->assertStringContainsString('#31582', $source);
+        $this->assertStringContainsString("lookupFunction('putenv')", $source);
+        $this->assertMatchesRegularExpression("/addFunction\\(\\s*'putenv'/", $source);
     }
 
     public function testChownRuntimeDoesNotLookupLibcChown(): void
