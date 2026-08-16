@@ -2652,13 +2652,10 @@ final class VmString
         int $userArgIndex = 4
     ): int {
         $var = $var->resolveIndirect();
-        $padFromEnum = self::tryPadTypeInt($var);
-        if (null !== $padFromEnum) {
-            return $padFromEnum;
-        }
+        // PadType phantom retired (#28201) — php-src accepts int / STR_PAD_* only.
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($pad_type) must be of type PadType|int, %s given',
+                '%s(): Argument #%d ($pad_type) must be of type int, %s given',
                 $function,
                 $userArgIndex,
                 EnumCaseSupport::typeNameForVariable($var)
@@ -2697,6 +2694,9 @@ final class VmString
         return $padType;
     }
 
+    /**
+     * Historical PadType backing map (#7282) — unused under php-src-strict (#28201).
+     */
     public static function padTypeIntFromEnumBacking(int $backing): int
     {
         return match ($backing) {
@@ -2707,6 +2707,9 @@ final class VmString
         };
     }
 
+    /**
+     * Historical PadType case → STR_PAD_* (#7282). Always null when PadType is not registered (#28201).
+     */
     public static function tryPadTypeInt(Variable $var): ?int
     {
         if (!EnumCaseSupport::isEnumCaseVariable($var)) {

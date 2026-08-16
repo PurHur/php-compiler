@@ -23,12 +23,14 @@ final class BuiltinEnums
             self::registerPropertyHookType($ctx);
             // ExitStatus retired — php-src never ships it (#28500, re-#28200 / #7294)
             // StringTrimMode retired — php-src never ships it (#28202, re-#7283); trim arity 2 (#28230)
-            self::registerPadType($ctx);
             // MemoryUsage retired — php-src never ships it (#28411, re-#7247)
             // ConnectionStatus / ResponseCode / RequestMethod retired — php-src never ships them (#28931)
             // Sorting / SortDirection retired — php-src never ships them (#28930, re-#12362 / #7229 / #7261)
             // ParseUrl retired — php-src never ships it (#28536, re-#7260)
             self::registerInfoView($ctx);
+        }
+        if (CompilerVersion::supportsPadTypeEnum()) {
+            self::registerPadType($ctx);
         }
         if (CompilerVersion::supportsClockGettime()) {
             self::registerClockInterface($ctx);
@@ -160,9 +162,11 @@ final class BuiltinEnums
     }
 
     /**
-     * PHP 8.4 PadType: int-backed enum for str_pad() 4th parameter (#7282).
+     * Historical PadType registration (#7282) — never enabled under php-src-strict (#28201).
      *
-     * php-src: ext/standard/basic_functions.stub.php — enum PadType: int
+     * php-src {@code ext/standard/string.stub.php} keeps
+     * {@code str_pad(string $string, int $length, string $pad_string = " ", int $pad_type = STR_PAD_RIGHT): string}
+     * with {@code STR_PAD_*} constants only — no {@code PadType} enum.
      */
     private static function registerPadType(Context $ctx): void
     {

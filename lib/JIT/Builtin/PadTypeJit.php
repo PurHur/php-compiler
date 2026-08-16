@@ -10,10 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * Compile-time PadType lowering for str_pad() / mb_str_pad() (#7282, #27435).
+ * Compile-time str_pad() / mb_str_pad() $pad_type lowering (#7282, #27435, #28201).
  *
- * Accepts named STR_PAD_* constants, PadType enum cases, and LLVM/int literals
- * (AOT often folds STR_PAD_BOTH to the integer 2 without compileTimeConstantName).
+ * Accepts named STR_PAD_* constants and LLVM/int literals (AOT often folds
+ * STR_PAD_BOTH to the integer 2 without compileTimeConstantName).
+ * PadType enum cases are phantoms vs php-src — not registered (#28201).
  */
 final class PadTypeJit
 {

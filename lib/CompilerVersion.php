@@ -2225,15 +2225,27 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ builtin stub enums (StringTrimMode, PadType, MemoryUsage, …).
+     * PHP 8.4+ builtin stub enums still registered under php-src-strict (PropertyHookType, InfoView, …).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13630, #15692).
-     * ExitStatus is not among these — php-src never ships it (#28500, re-#28200 / #7294).
-     * php-src: Zend/zend_enum.def; ext/standard/basic_functions.stub.php
+     * Phantoms retired (never registered): ExitStatus (#28500), StringTrimMode (#28202), PadType (#28201),
+     * MemoryUsage (#28411), ConnectionStatus/ResponseCode/RequestMethod (#28931), Sorting (#28930), ParseUrl (#28536).
+     * php-src: Zend/zend_enum.def; ext/standard/basic_functions.stub.php; ext/reflection/php_reflection.stub.php
      */
     public static function supportsBuiltinStubEnums(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PadType builtin enum for str_pad() pad_type (#7282, #28201).
+     *
+     * php-src never ships PadType ({@code ext/standard/string.stub.php} keeps {@code int $pad_type}
+     * + {@code STR_PAD_*} only). Always false under php-src-strict — including PROFILE=8.4/8.5 (#28201).
+     */
+    public static function supportsPadTypeEnum(): bool
+    {
+        return false;
     }
 
     /**
