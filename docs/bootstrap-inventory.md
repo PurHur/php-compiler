@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7516 |
-| Phase A inventory files (M2 ratio SSOT) | 7516 |
+| PHP files on vm.php path | 7527 |
+| Phase A inventory files (M2 ratio SSOT) | 7527 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24040 |
+| Source constructs flagged (warnings) | 24052 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -678,10 +678,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/filter_var.php` | 0 | 10 |
 | `ext/filter/filter_var_array.php` | 0 | 1 |
 | `ext/ftp/BuiltinClasses.php` | 0 | 1 |
+| `ext/ftp/FtpCloseJitHelper.php` | 0 | 1 |
 | `ext/ftp/FtpConnectJitHelper.php` | 0 | 1 |
 | `ext/ftp/FtpConstants.php` | 0 | 1 |
 | `ext/ftp/FtpExtensionPolicy.php` | 0 | 1 |
 | `ext/ftp/FtpSerializeDeny.php` | 0 | 3 |
+| `ext/ftp/JitFtpClose.php` | 0 | 1 |
 | `ext/ftp/JitFtpConnect.php` | 0 | 1 |
 | `ext/ftp/Module.php` | 0 | 37 |
 | `ext/ftp/VmFtpArg.php` | 0 | 1 |
@@ -2192,6 +2194,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
 | `ext/sockets/JitSocketAccept.php` | 0 | 1 |
+| `ext/sockets/JitSocketAddrinfoBind.php` | 0 | 1 |
+| `ext/sockets/JitSocketAddrinfoConnect.php` | 0 | 1 |
+| `ext/sockets/JitSocketAddrinfoExplain.php` | 0 | 1 |
+| `ext/sockets/JitSocketAddrinfoLookup.php` | 0 | 1 |
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
 | `ext/sockets/JitSocketBind.php` | 0 | 1 |
 | `ext/sockets/JitSocketClearError.php` | 0 | 1 |
@@ -2223,6 +2229,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketStrerror.php` | 0 | 1 |
 | `ext/sockets/JitSocketWrite.php` | 0 | 1 |
 | `ext/sockets/Module.php` | 0 | 38 |
+| `ext/sockets/SocketAddrinfoJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketCloseJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketCmsgSpaceJitHelper.php` | 0 | 1 |
@@ -4030,7 +4037,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/date_timezone_get.php` | 0 | 3 |
 | `ext/standard/date_timezone_set.php` | 0 | 3 |
 | `ext/standard/debug_backtrace.php` | 0 | 2 |
-| `ext/standard/debug_print_backtrace.php` | 0 | 2 |
+| `ext/standard/debug_print_backtrace.php` | 0 | 3 |
 | `ext/standard/debug_zval_dump.php` | 0 | 1 |
 | `ext/standard/decbin.php` | 0 | 1 |
 | `ext/standard/dechex.php` | 0 | 1 |
@@ -5547,6 +5554,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FsDirRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FsGlobVecRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FtokRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/FtpCloseRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FtpConnectRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FunctionExistsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
@@ -5797,6 +5805,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ShmopRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SocketAddrinfoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketAtmarkRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketBindListenRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketCloseRuntime.php` | 0 | 1 |
@@ -5918,6 +5927,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFsDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsGlob.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsGlobVecJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFtpClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFtpConnect.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFunctionExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetClassMethods.php` | 0 | 1 |
@@ -6006,6 +6016,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAccept.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketAddrinfo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketBind.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketClose.php` | 0 | 1 |
@@ -9426,10 +9437,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 402)
-- new ArgumentCountError (line 413)
-- new ArgumentCountError (line 424)
-- new ArgumentCountError (line 427)
+- new ArgumentCountError (line 409)
+- new ArgumentCountError (line 420)
+- new ArgumentCountError (line 431)
+- new ArgumentCountError (line 434)
 - 18 class method(s)
 
 ### `ext/dom/DomCompareDocumentPositionJitHelper.php`
@@ -11361,75 +11372,75 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 74)
 - new Variable (line 103)
 - new Variable (line 131)
-- new Variable (line 160)
-- new Variable (line 180)
-- new Variable (line 199)
-- new Variable (line 234)
-- new Variable (line 252)
-- new Variable (line 273)
-- new ArgumentCountError (line 340)
-- new Variable (line 349)
-- new Variable (line 362)
-- new Variable (line 376)
-- new Variable (line 391)
-- new Error (line 447)
-- new Variable (line 458)
-- new Variable (line 476)
-- new Variable (line 483)
-- new Error (line 489)
-- new Variable (line 509)
-- new Variable (line 521)
-- new Variable (line 533)
-- new Variable (line 545)
-- new Variable (line 557)
-- new Variable (line 585)
-- new Variable (line 597)
-- new ArgumentCountError (line 684)
-- new ArgumentCountError (line 689)
-- new Variable (line 717)
-- new Variable (line 740)
-- new Variable (line 759)
-- new Variable (line 783)
-- new Variable (line 839)
-- new Variable (line 899)
-- new Variable (line 932)
-- new Variable (line 960)
-- new ArgumentCountError (line 974)
-- new Variable (line 978)
-- new Variable (line 990)
-- new Variable (line 1002)
-- new Variable (line 1014)
-- new Error (line 1029)
-- new Error (line 1041)
-- new Variable (line 1052)
-- new Error (line 1076)
-- new Variable (line 1080)
-- new Error (line 1099)
-- new Variable (line 1111)
-- new Variable (line 1129)
-- new Error (line 1146)
-- new Variable (line 1163)
-- new Variable (line 1186)
-- new Variable (line 1207)
-- new Variable (line 1234)
-- new ArgumentCountError (line 1249)
-- new Error (line 1262)
-- new Variable (line 1264)
-- new Variable (line 1290)
-- new Variable (line 1302)
-- new Variable (line 1322)
-- new Variable (line 1334)
-- new Variable (line 1408)
-- new Variable (line 1421)
-- new Variable (line 1438)
-- new Variable (line 1463)
-- new Variable (line 1506)
-- new ArgumentCountError (line 1569)
-- new ArgumentCountError (line 1577)
-- new ArgumentCountError (line 1585)
-- new ArgumentCountError (line 1588)
-- new ArgumentCountError (line 1594)
-- 83 class method(s)
+- new Variable (line 159)
+- new Variable (line 179)
+- new Variable (line 198)
+- new Variable (line 233)
+- new Variable (line 251)
+- new Variable (line 271)
+- new ArgumentCountError (line 338)
+- new Variable (line 347)
+- new Variable (line 360)
+- new Variable (line 374)
+- new Variable (line 389)
+- new Error (line 445)
+- new Variable (line 456)
+- new Variable (line 474)
+- new Variable (line 481)
+- new Error (line 487)
+- new Variable (line 507)
+- new Variable (line 519)
+- new Variable (line 531)
+- new Variable (line 543)
+- new Variable (line 555)
+- new Variable (line 583)
+- new Variable (line 595)
+- new ArgumentCountError (line 682)
+- new ArgumentCountError (line 687)
+- new Variable (line 715)
+- new Variable (line 738)
+- new Variable (line 757)
+- new Variable (line 781)
+- new Variable (line 837)
+- new Variable (line 897)
+- new Variable (line 930)
+- new Variable (line 958)
+- new ArgumentCountError (line 972)
+- new Variable (line 976)
+- new Variable (line 988)
+- new Variable (line 1000)
+- new Variable (line 1012)
+- new Error (line 1027)
+- new Error (line 1039)
+- new Variable (line 1050)
+- new Error (line 1074)
+- new Variable (line 1078)
+- new Error (line 1097)
+- new Variable (line 1109)
+- new Variable (line 1127)
+- new Error (line 1144)
+- new Variable (line 1161)
+- new Variable (line 1184)
+- new Variable (line 1205)
+- new Variable (line 1232)
+- new ArgumentCountError (line 1247)
+- new Error (line 1260)
+- new Variable (line 1262)
+- new Variable (line 1288)
+- new Variable (line 1300)
+- new Variable (line 1320)
+- new Variable (line 1332)
+- new Variable (line 1406)
+- new Variable (line 1419)
+- new Variable (line 1436)
+- new Variable (line 1461)
+- new Variable (line 1504)
+- new ArgumentCountError (line 1567)
+- new ArgumentCountError (line 1575)
+- new ArgumentCountError (line 1583)
+- new ArgumentCountError (line 1586)
+- new ArgumentCountError (line 1592)
+- 84 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
 
@@ -12612,6 +12623,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/ftp/FtpCloseJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/ftp/FtpConnectJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12633,6 +12649,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 21)
 - new Exception (line 28)
 - 4 class method(s)
+
+### `ext/ftp/JitFtpClose.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/ftp/JitFtpConnect.php`
 
@@ -12694,15 +12715,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ftp/VmFtpCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 142)
-- new ObjectEntry (line 143)
-- new HashTable (line 237)
-- new Variable (line 243)
-- new HashTable (line 244)
-- new Variable (line 246)
-- new HashTable (line 731)
-- new Variable (line 733)
-- 57 class method(s)
+- new Variable (line 154)
+- new ObjectEntry (line 155)
+- new HashTable (line 249)
+- new Variable (line 255)
+- new HashTable (line 256)
+- new Variable (line 258)
+- new HashTable (line 743)
+- new Variable (line 745)
+- 58 class method(s)
 
 ### `ext/ftp/ftp_alloc.php`
 
@@ -12737,7 +12758,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ftp/ftp_close.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_connect.php`
@@ -12863,7 +12884,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ftp/ftp_quit.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_raw.php`
@@ -25416,6 +25437,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/sockets/JitSocketAddrinfoBind.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sockets/JitSocketAddrinfoConnect.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/sockets/JitSocketAddrinfoExplain.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `ext/sockets/JitSocketAddrinfoLookup.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/sockets/JitSocketAtmark.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25608,6 +25649,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new socket_clear_error (line 79)
 - 3 class method(s)
 
+### `ext/sockets/SocketAddrinfoJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 15 class method(s)
+
 ### `ext/sockets/SocketAtmarkJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25673,9 +25719,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmAddressInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new ObjectEntry (line 49)
-- 5 class method(s)
+- new ClassEntry (line 40)
+- new ObjectEntry (line 53)
+- 9 class method(s)
 
 ### `ext/sockets/VmSocket.php`
 
@@ -31260,7 +31306,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPrintR.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/JitPrintf.php`
 
@@ -31553,7 +31599,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSessionStorageKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 29 class method(s)
+- 30 class method(s)
 
 ### `ext/standard/JitSessionUnset.php`
 
@@ -33834,13 +33880,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 44)
-- new ArgumentCountError (line 57)
-- new ArgumentCountError (line 80)
-- new Variable (line 249)
-- new Variable (line 251)
-- new HashTable (line 253)
-- new Variable (line 254)
-- new Variable (line 257)
+- new ArgumentCountError (line 58)
+- new ArgumentCountError (line 82)
+- new Variable (line 253)
+- new Variable (line 255)
+- new HashTable (line 257)
+- new Variable (line 258)
+- new Variable (line 261)
 - 6 class method(s)
 
 ### `ext/standard/SettypeJitHelper.php`
@@ -38197,7 +38243,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/debug_print_backtrace.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 32)
+- new JITVariable (line 97)
 - 2 class method(s)
 
 ### `ext/standard/debug_zval_dump.php`
@@ -40397,8 +40444,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_grep.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 47)
-- new Error (line 82)
+- new HashTable (line 51)
+- new Error (line 86)
 - 3 class method(s)
 
 ### `ext/standard/preg_last_error_.php`
@@ -40945,7 +40992,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/setcookie.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 177)
+- new JITVariable (line 202)
 - 5 class method(s)
 
 ### `ext/standard/setlocale.php`
@@ -40957,7 +41004,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/setrawcookie.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 176)
+- new JITVariable (line 201)
 - 5 class method(s)
 
 ### `ext/standard/settype.php`
@@ -41672,9 +41719,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 235)
-- new HashTable (line 350)
-- new Variable (line 394)
+- new Variable (line 243)
+- new HashTable (line 360)
+- new Variable (line 404)
 - 12 class method(s)
 
 ### `ext/standard/symlink_.php`
@@ -43141,7 +43188,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/JitTokenGetAll.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 26)
 - 5 class method(s)
 
 ### `ext/tokenizer/JitTokenName.php`
@@ -46250,7 +46297,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1747)
+- new InternalArgInfo (line 1749)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46266,8 +46313,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2430)
-- new ArgumentCountError (line 2441)
+- new ArgumentCountError (line 2433)
+- new ArgumentCountError (line 2444)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -48648,6 +48695,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/FtpCloseRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/JIT/Builtin/FtpConnectRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49962,6 +50014,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 16 class method(s)
 
+### `lib/JIT/Builtin/SocketAddrinfoRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
+
 ### `lib/JIT/Builtin/SocketAtmarkRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50569,6 +50626,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Builtin/StringFtpClose.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/StringFtpConnect.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51007,6 +51069,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSocketAccept.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StringSocketAddrinfo.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -54599,7 +54666,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Call\Native (line 97)
-- 15 class method(s)
+- 16 class method(s)
 
 ### `lib/JIT/M5TrivialEchoScript.php`
 

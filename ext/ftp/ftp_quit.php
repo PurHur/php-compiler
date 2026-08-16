@@ -11,7 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * ftp_quit() — alias of ftp_close() (php-src PHP_FALIAS; #20233).
+ * ftp_quit() — alias of ftp_close() (php-src PHP_FALIAS; #20233, #31377).
+ *
+ * JIT/AOT: shares {@see JitFtpClose} / {@see FtpCloseJitHelper} with ftp_close().
  */
 final class ftp_quit extends Internal
 {
@@ -39,6 +41,11 @@ final class ftp_quit extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_quit() is not implemented for JIT in this compiler build (issue #20233)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitFtpClose::emitArgumentCountError($context, 'ftp_quit', $argc);
+        }
+
+        return JitFtpClose::invoke($context, 'ftp_quit', $args[0]);
     }
 }
