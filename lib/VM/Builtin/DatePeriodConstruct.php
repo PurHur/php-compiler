@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DateIntervalSupport;
@@ -106,12 +107,14 @@ final class DatePeriodConstruct extends VmClassMethod
 
             return;
         }
-        $recurrences = InternalStrictArg::requireBuiltinTypedInt(
+        // php-src stub: int|DateTimeInterface $end — Z_PARAM_LONG soft-null DEP+0 (#31527).
+        $recurrences = VmMath::parseZParamLongBuiltinArgForFrame(
             $frame,
             3,
             'DatePeriod::__construct',
-            'recurrences'
-        )->toInt();
+            3,
+            'end'
+        );
         DatePeriodSupport::initFromRecurrenceCount($receiver, $start, $interval, $recurrences, $options, $frame->vmContext);
     }
 }

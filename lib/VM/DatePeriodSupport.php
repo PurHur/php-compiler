@@ -131,6 +131,11 @@ final class DatePeriodSupport
                 return;
             }
         }
+        // int|DateTimeInterface $end — non-strict null takes the int Z_PARAM_LONG soft path
+        // (E_DEPRECATED + coerce); strict_types keeps the signature TypeError (#31527).
+        if (Variable::TYPE_NULL === $arg3->type && !InternalStrictArg::isCallerStrict($frame)) {
+            return;
+        }
         throw new \TypeError(self::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
     }
 
