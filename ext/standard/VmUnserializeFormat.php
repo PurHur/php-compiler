@@ -106,6 +106,45 @@ final class VmUnserializeFormat
         );
     }
 
+    /**
+     * Decode one php_var_unserialize value starting at $offset (does not require EOF).
+     * Used by SPL ArrayObject/ArrayIterator::unserialize x:/m: wire (ext/spl/spl_array.c; #31595).
+     *
+     * @param array<string, mixed>|null $options
+     *
+     * @return array{0: Variable, 1: int}|false [value, newOffset] or false (lastErrorOffset set)
+     */
+    public static function decodeOneFrom(
+        string $payload,
+        int $offset = 0,
+        ?array $options = null,
+        ?Context $ctx = null,
+        ?Frame $frame = null
+    ): array|false {
+        self::$lastErrorOffset = null;
+        self::$lastPayloadLength = null;
+        self::$lastMaxDepthExceeded = null;
+        $length = \strlen($payload);
+        if ($offset < 0 || $offset >= $length) {
+            self::recordFailure($offset < 0 ? 0 : $offset, $length);
+
+            return false;
+        }
+        $parser = new self($payload, self::resolveMaxDepth($options));
+        $parser->pos = $offset;
+        $value = $parser->parseValue(0);
+        if (false === $value) {
+            return false;
+        }
+        $canonical = [];
+        $slotForCell = [];
+        $var = null === $ctx
+            ? self::cellToVariable($value, $canonical, $slotForCell)
+            : self::cellToVariableWithContext($ctx, $value, $canonical, $slotForCell, $frame, $options);
+
+        return [self::unwrapUnserializeRoot($var), $parser->pos];
+    }
+
     /** Root array/object values are stored as ISREF wrappers; callers want the concrete zval (#22652). */
     private static function unwrapUnserializeRoot(Variable $var): Variable
     {

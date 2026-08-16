@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\ext\standard\VmSerializeRefState;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -67,7 +68,8 @@ final class SplLegacySerializableSerialize extends VmClassMethod
     {
         $lcClass = strtolower($object->class->name);
         if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
-            return SplArraySerializeSupport::encodeZendSerializeWire($object);
+            // php-src ArrayObject::serialize — x:/m: wire (#31595); O: is global serialize() only.
+            return SplArraySerializeSupport::encodeLegacySerializeWire($object);
         }
         if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
             return SplDllistSerializeSupport::encodeZendSerializeWire($object);
@@ -96,13 +98,31 @@ final class SplLegacySerializableUnserialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        SplIteratorSupport::receiverIsA(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             $this->ownerLc,
             $this->displayName.'::unserialize()'
         );
         // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #30999
         $this->requireExactUserArgCount($frame, $this->displayName.'::unserialize', 1);
-        // Zend mutates $this in place; global serialize()/unserialize() use dedicated SPL wire paths (#14164).
+        $data = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1]->resolveIndirect(),
+            $this->displayName.'::unserialize',
+            0,
+            'data'
+        );
+        if (null === $frame->vmContext) {
+            throw new \LogicException($this->displayName.'::unserialize() without VM context');
+        }
+        $lcClass = strtolower($object->class->name);
+        if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
+            // php-src zim_ArrayObject_unserialize — UnexpectedValueException on malformed (#31595).
+            SplArraySerializeSupport::restoreFromLegacySerializeWire(
+                $frame->vmContext,
+                $object,
+                $data
+            );
+        }
+        // Other SPL Serializable types: mutate via dedicated paths when wired (#14164).
     }
 }

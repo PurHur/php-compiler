@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\spl;
 use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmSerialize;
+use PHPCompiler\ext\standard\VmUnserializeFormat;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Context;
@@ -122,6 +123,143 @@ final class SplArraySerializeSupport
             2 => $state['propList'],
             3 => $state['iteratorClass'],
         ]);
+    }
+
+    /**
+     * php-src ArrayObject/ArrayIterator::serialize — custom x:/m: wire (not O:).
+     * SPL_ARRAY_CLONE_MASK / SPL_ARRAY_IS_SELF from ext/spl/spl_array.h.
+     */
+    private const LEGACY_CLONE_MASK = 0x0100FFFF;
+
+    private const LEGACY_IS_SELF = 0x01000000;
+
+    public static function encodeLegacySerializeWire(ObjectEntry $entry): string
+    {
+        $flags = 0;
+        $storage = [];
+        $propList = [];
+        if (SplArrayStorage::hasState($entry)) {
+            $state = SplArrayStorage::state($entry);
+            $flags = $state['flags'] & self::LEGACY_CLONE_MASK;
+            $storage = SplArrayStorage::hashTableToExportedArray($state['table']);
+            $propList = $state['propList'];
+        }
+        $buf = 'x:'.VmSerialize::serializeExported($flags);
+        if (0 === ($flags & self::LEGACY_IS_SELF)) {
+            $buf .= VmSerialize::serializeExported($storage).';';
+        }
+        $buf .= 'm:'.VmSerialize::serializeExported($propList);
+
+        return $buf;
+    }
+
+    /**
+     * php-src zim_ArrayObject_unserialize — mutate $this from x:/m: wire (#31595).
+     */
+    public static function restoreFromLegacySerializeWire(
+        Context $ctx,
+        ObjectEntry $object,
+        string $buf
+    ): void {
+        $bufLen = \strlen($buf);
+        if (0 === $bufLen) {
+            return;
+        }
+        $p = 0;
+        if ($buf[$p] !== 'x') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+        if ($p >= $bufLen || $buf[$p] !== ':') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+
+        $flagsDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx);
+        if (false === $flagsDecoded || Variable::TYPE_INTEGER !== $flagsDecoded[0]->type) {
+            throw self::legacyUnserializeErrorAt(
+                VmUnserializeFormat::lastErrorOffset() ?? $p,
+                $bufLen
+            );
+        }
+        [$flagsVar, $p] = $flagsDecoded;
+        // php-src: --p then require ';'; decodeOneFrom already consumed the terminator.
+        if ($p < 1 || $buf[$p - 1] !== ';') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        $flags = $flagsVar->toInt() & self::LEGACY_CLONE_MASK;
+
+        $storageExported = [];
+        if (0 !== ($flags & self::LEGACY_IS_SELF)) {
+            // php-src: undef array storage when IS_SELF.
+            $storageExported = [];
+        } else {
+            if ($p >= $bufLen) {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            $type = $buf[$p];
+            if ('a' !== $type && 'O' !== $type && 'C' !== $type && 'r' !== $type) {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            $arrayDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx);
+            if (false === $arrayDecoded) {
+                throw self::legacyUnserializeErrorAt(
+                    VmUnserializeFormat::lastErrorOffset() ?? $p,
+                    $bufLen
+                );
+            }
+            [$arrayVar, $p] = $arrayDecoded;
+            if (Variable::TYPE_ARRAY === $arrayVar->type) {
+                $storageExported = SplArrayStorage::hashTableToExportedArray($arrayVar->toArray());
+            } elseif (Variable::TYPE_OBJECT === $arrayVar->type) {
+                // Object storage via spl_array_set_array — export public props when possible.
+                $storageExported = [];
+            } else {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            if ($p >= $bufLen || $buf[$p] !== ';') {
+                throw self::legacyUnserializeErrorAt($p, $bufLen);
+            }
+            ++$p;
+        }
+
+        if ($p >= $bufLen || $buf[$p] !== 'm') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+        if ($p >= $bufLen || $buf[$p] !== ':') {
+            throw self::legacyUnserializeErrorAt($p, $bufLen);
+        }
+        ++$p;
+
+        $membersDecoded = VmUnserializeFormat::decodeOneFrom($buf, $p, null, $ctx);
+        if (false === $membersDecoded || Variable::TYPE_ARRAY !== $membersDecoded[0]->type) {
+            throw self::legacyUnserializeErrorAt(
+                VmUnserializeFormat::lastErrorOffset() ?? $p,
+                $bufLen
+            );
+        }
+        [$membersVar, $pAfter] = $membersDecoded;
+        unset($pAfter);
+        $propList = SplArrayStorage::hashTableToExportedArray($membersVar->toArray());
+        $iteratorClass = SplArrayStorage::hasState($object)
+            ? SplArrayStorage::state($object)['iteratorClass']
+            : null;
+        SplArrayStorage::restoreFromExported(
+            $ctx,
+            $object,
+            $flags,
+            $storageExported,
+            $propList,
+            $iteratorClass
+        );
+    }
+
+    private static function legacyUnserializeErrorAt(int $offset, int $bufLen): \UnexpectedValueException
+    {
+        return new \UnexpectedValueException(
+            \sprintf('Error at offset %d of %d bytes', $offset, $bufLen)
+        );
     }
 
     /**
