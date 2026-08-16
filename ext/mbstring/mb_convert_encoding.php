@@ -22,7 +22,8 @@ use PHPLLVM\Value;
  * mb_convert_encoding() — charset conversion via native CharsetEngine (#6251, pairs #3222, #23562).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_encoding)
- * $from_encoding is array|string|null — arrays / comma lists use detect-then-convert.
+ * $from_encoding is array|string|null — null / omitted uses internal encoding; arrays /
+ * comma lists use detect-then-convert (#31488).
  *
  * Excess argc → Zend `expects at most` ArgumentCountError (#30891).
  */
@@ -42,6 +43,7 @@ final class mb_convert_encoding extends Internal
             return;
         }
         $to = VmMbstring::coerceEncodingString($frame->calledArgs[1], 'mb_convert_encoding', 1);
+        // Omitted or explicit null $from_encoding → mb_internal_encoding() (#31488).
         $fromList = 2 === $argc
             ? [MbstringState::internalEncoding()]
             : VmMbstring::coerceMbConvertFromEncodingList($frame->calledArgs[2]);
@@ -128,7 +130,15 @@ final class mb_convert_encoding extends Internal
 
         $sourceLit = $sourceIsNull ? '' : JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        $fromLit = 2 === $argc ? 'UTF-8' : JitStringBuiltinArg::compileTimeLiteral($args[2]);
+        // Explicit null $from_encoding folds like omitted — internal encoding (#31488).
+        $fromIsDefault = 2 === $argc
+            || (
+                3 === $argc
+                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
+            );
+        $fromLit = $fromIsDefault
+            ? (MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding())
+            : JitStringBuiltinArg::compileTimeLiteral($args[2]);
         if (null !== $sourceLit && null !== $toLit && null !== $fromLit) {
             $fromList = preg_split('/\s*,\s*/', $fromLit) ?: [];
             $fromList = array_values(array_filter($fromList, static fn (string $p): bool => '' !== $p));
