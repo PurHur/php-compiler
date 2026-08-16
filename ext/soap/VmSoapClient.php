@@ -1503,15 +1503,39 @@ final class VmSoapClient
         $xpath->registerNamespace('soap', 'http://schemas.xmlsoap.org/wsdl/soap/');
         $xpath->registerNamespace('xsd', 'http://www.w3.org/2001/XMLSchema');
 
+        // Message + schema element indexes first — needed for function_to_string (#31473).
+        $messages = [];
+        foreach ($xpath->query('//wsdl:message') ?: [] as $msg) {
+            if (!$msg instanceof \DOMElement) {
+                continue;
+            }
+            $msgName = $msg->getAttribute('name');
+            if ('' !== $msgName) {
+                $messages[self::xsdLocalName($msgName)] = $msg;
+            }
+        }
+        $schemaElements = [];
+        foreach ($xpath->query('//xsd:schema/xsd:element[@name]') ?: [] as $el) {
+            if (!$el instanceof \DOMElement) {
+                continue;
+            }
+            $elName = $el->getAttribute('name');
+            if ('' !== $elName) {
+                $schemaElements[$elName] = $el;
+            }
+        }
+
         foreach ($xpath->query('//wsdl:portType/wsdl:operation') ?: [] as $op) {
             if (!$op instanceof \DOMElement) {
                 continue;
             }
             $name = $op->getAttribute('name');
-            if ('' !== $name) {
-                $state->functions[] = $name;
-                $state->functionIndex[\strtolower($name)] = $name;
+            if ('' === $name) {
+                continue;
             }
+            // php-src soap.c function_to_string — display strings for __getFunctions (#31473).
+            $state->functions[] = self::wsdlFunctionToString($op, $name, $messages);
+            $state->functionIndex[\strtolower($name)] = $name;
         }
         foreach ($xpath->query('//soap:address') ?: [] as $addr) {
             if (!$addr instanceof \DOMElement) {
@@ -1571,26 +1595,6 @@ final class VmSoapClient
             }
         }
         // Operation → output message part/element child types (document/literal SDL) (#21091).
-        $messages = [];
-        foreach ($xpath->query('//wsdl:message') ?: [] as $msg) {
-            if (!$msg instanceof \DOMElement) {
-                continue;
-            }
-            $msgName = $msg->getAttribute('name');
-            if ('' !== $msgName) {
-                $messages[self::xsdLocalName($msgName)] = $msg;
-            }
-        }
-        $schemaElements = [];
-        foreach ($xpath->query('//xsd:schema/xsd:element[@name]') ?: [] as $el) {
-            if (!$el instanceof \DOMElement) {
-                continue;
-            }
-            $elName = $el->getAttribute('name');
-            if ('' !== $elName) {
-                $schemaElements[$elName] = $el;
-            }
-        }
         foreach ($xpath->query('//wsdl:portType/wsdl:operation') ?: [] as $op) {
             if (!$op instanceof \DOMElement) {
                 continue;
@@ -1777,6 +1781,109 @@ final class VmSoapClient
         }
 
         return $fields;
+    }
+
+    /**
+     * php-src soap.c function_to_string — display string for SoapClient::__getFunctions (#31473).
+     *
+     * @param array<string, \DOMElement> $messages
+     */
+    private static function wsdlFunctionToString(
+        \DOMElement $op,
+        string $opName,
+        array $messages
+    ): string {
+        $inputMsg = self::wsdlOperationMessage($op, 'input', $messages);
+        $outputMsg = self::wsdlOperationMessage($op, 'output', $messages);
+        $requestParams = null !== $inputMsg ? self::wsdlMessageEncodeParams($inputMsg) : [];
+        $responseParams = null !== $outputMsg ? self::wsdlMessageEncodeParams($outputMsg) : [];
+
+        $buf = '';
+        $respCount = \count($responseParams);
+        if ($respCount > 0) {
+            if (1 === $respCount) {
+                $buf .= $responseParams[0]['type'].' ';
+            } else {
+                $parts = [];
+                foreach ($responseParams as $p) {
+                    $parts[] = $p['type'].' $'.$p['name'];
+                }
+                $buf .= 'list('.\implode(', ', $parts).') ';
+            }
+        } else {
+            $buf .= 'void ';
+        }
+
+        $buf .= $opName.'(';
+        $reqParts = [];
+        foreach ($requestParams as $p) {
+            $reqParts[] = $p['type'].' $'.$p['name'];
+        }
+        $buf .= \implode(', ', $reqParts);
+        $buf .= ')';
+
+        return $buf;
+    }
+
+    /**
+     * @param array<string, \DOMElement> $messages
+     */
+    private static function wsdlOperationMessage(
+        \DOMElement $op,
+        string $io,
+        array $messages
+    ): ?\DOMElement {
+        $ioEl = null;
+        foreach ($op->childNodes as $child) {
+            if ($child instanceof \DOMElement && $io === ($child->localName ?? $child->nodeName)) {
+                $ioEl = $child;
+                break;
+            }
+        }
+        if (!$ioEl instanceof \DOMElement) {
+            return null;
+        }
+        $msgRef = $ioEl->getAttribute('message');
+        if ('' === $msgRef) {
+            return null;
+        }
+
+        return $messages[self::xsdLocalName($msgRef)] ?? null;
+    }
+
+    /**
+     * SDL request/response params: type_str + paramName (php-src encode->details.type_str).
+     *
+     * @return list<array{type: string, name: string}>
+     */
+    private static function wsdlMessageEncodeParams(\DOMElement $msg): array
+    {
+        $params = [];
+        foreach ($msg->childNodes as $part) {
+            if (!$part instanceof \DOMElement || 'part' !== ($part->localName ?? $part->nodeName)) {
+                continue;
+            }
+            $partName = $part->getAttribute('name');
+            if ('' === $partName) {
+                $partName = 'param';
+            }
+            $elRef = $part->getAttribute('element');
+            $typeRef = $part->getAttribute('type');
+            if ('' !== $elRef) {
+                $typeStr = self::xsdLocalName($elRef);
+            } elseif ('' !== $typeRef) {
+                $typeStr = self::xsdLocalName($typeRef);
+            } else {
+                // Empty part (no element/type) — php-src omits from encode list → void / no args.
+                continue;
+            }
+            if ('' === $typeStr) {
+                $typeStr = 'UNKNOWN';
+            }
+            $params[] = ['type' => $typeStr, 'name' => $partName];
+        }
+
+        return $params;
     }
 
     /**

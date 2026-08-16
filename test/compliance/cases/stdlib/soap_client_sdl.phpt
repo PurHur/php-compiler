@@ -22,7 +22,7 @@ $c = new SoapClient($wsdl);
 echo 'exists=', (int) property_exists($c, 'sdl'), "\n";
 echo 'is_sdl=', (int) ($c->sdl instanceof Soap\Sdl), "\n";
 $fns = $c->__getFunctions();
-echo 'has_ping=', (int) (is_array($fns) && in_array('ping', $fns, true)), "\n";
+echo 'has_ping=', (int) (is_array($fns) && in_array('void ping()', $fns, true)), "\n";
 
 $n = new SoapClient(null, ['location' => 'http://127.0.0.1/', 'uri' => 'http://test/']);
 echo 'non_null=', (int) (null === $n->sdl), "\n";
