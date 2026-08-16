@@ -109,6 +109,9 @@ final class BuiltinParamNames
             // php-src ext/spl/spl_iterators.stub.php — InternalArgInfo still it/func (#28721)
             'callbackfilteriterator::__construct',
             'recursivecallbackfilteriterator::__construct' => ['iterator', 'callback'],
+            // php-src ext/spl/spl_iterators.stub.php — InternalArgInfo still it/regex/preg_flags (#31511)
+            'regexiterator::__construct',
+            'recursiveregexiterator::__construct' => ['iterator', 'pattern', 'mode=', 'flags=', 'pregFlags='],
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
             'collator::asort' => ['array', 'flags'],
