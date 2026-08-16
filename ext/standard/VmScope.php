@@ -78,9 +78,17 @@ final class VmScope
 
     public static function extract(Frame $frame): int
     {
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 3) → ArgumentCountError (#31420).
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('extract() requires one to three arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                \sprintf('extract() expects at least 1 argument, %d given', $argc)
+            );
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                \sprintf('extract() expects at most 3 arguments, %d given', $argc)
+            );
         }
         $caller = self::requireCaller($frame);
         $ht = VmArray::requireArray($frame->calledArgs[0], 'extract');

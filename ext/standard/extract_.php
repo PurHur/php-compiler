@@ -30,8 +30,9 @@ final class extract_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 3) {
-            throw new \LogicException('extract() requires one to three arguments in this compiler build');
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 3) → ArgumentCountError (#31420).
+        if (!$this->requireArgCountRangeJit($context, $args, 'extract', 1, 3)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'extract');
         $flags = 2 <= \count($args) ? $args[1] : null;
