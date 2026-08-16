@@ -233,12 +233,14 @@ final class RecursiveTreeIteratorConstruct extends VmClassMethod
             throw new \LogicException('RecursiveTreeIterator::__construct() requires VM context');
         }
 
-        $userInner = SplDualIteratorStorage::resolveRecursiveIterator(
+        // php-src spl_recursive_it_it_construct RIT_RecursiveTreeIterator (#6273 / #31596):
+        // unwrap IteratorAggregate, then object_init RecursiveCachingIterator — non-RecursiveIterator
+        // surfaces as RCI TypeError, not RII InvalidArgumentException.
+        $userInner = SplDualIteratorStorage::resolveRecursiveTreeIteratorInner(
             $frame->vmContext,
             $frame,
             $frame->calledArgs[1]
         );
-        // php-src spl_recursive_it_it_construct RIT_RecursiveTreeIterator (#6273):
         // flags, caching_it_flags, mode — wrap user iterator in RecursiveCachingIterator
         // so getPrefix() can call hasNext() on each stack level.
         $flags = RecursiveTreeIteratorBuiltin::BYPASS_KEY;
