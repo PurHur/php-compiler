@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -1050,17 +1051,24 @@ final class RecursiveIteratorIteratorConstruct extends VmClassMethod
         );
         $mode = IteratorIteratorBuiltin::LEAVES_ONLY;
         $flags = 0;
+        // php-src Z_PARAM_LONG $mode / $flags — soft-null DEP+0 outside strict_types (#31622).
         if (isset($frame->calledArgs[2])) {
-            $modeArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $modeArg->type) {
-                $mode = $modeArg->toInt();
-            }
+            $mode = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
+                'RecursiveIteratorIterator::__construct',
+                2,
+                'mode'
+            );
         }
         if (isset($frame->calledArgs[3])) {
-            $flagsArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $flagsArg->type) {
-                $flags = $flagsArg->toInt();
-            }
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                3,
+                'RecursiveIteratorIterator::__construct',
+                3,
+                'flags'
+            );
         }
         SplDualIteratorStorage::initRecursive($object, $inner, $mode, $flags);
     }
