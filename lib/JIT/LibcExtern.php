@@ -38,7 +38,8 @@ final class LibcExtern
             'strncmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
             'strcasecmp' => [$i32, false, [$i8p, $i8p]],
             'strncasecmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
-            'strcoll' => [$i32, false, [$i8p, $i8p]],
+            // strcoll dropped (#31498): StringStrcoll declares strcoll(3) module-locally
+            // for the __compiler_strcoll trampoline (#27059); no other lookupFunction remains.
             // strcspn dropped (#29050): parse_str AOT kernel + StringStrspn use __compiler_strcspn.
             'strchr' => [$i8p, false, [$i8p, $i32]],
             'strstr' => [$i8p, false, [$i8p, $i8p]],

@@ -46,6 +46,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'access',
             'lstat',
             'strrchr',
+            'strcoll',
         ];
     }
 
@@ -56,7 +57,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -65,6 +66,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31374', $source);
         $this->assertStringContainsString('#31403', $source);
         $this->assertStringContainsString('#31458', $source);
+        $this->assertStringContainsString('#31498', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -123,6 +125,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             "'strrchr' =>",
             $source,
             'LibcExtern must not declare libc strrchr (#31458)'
+        );
+        $this->assertStringNotContainsString(
+            "'strcoll' =>",
+            $source,
+            'LibcExtern must not declare libc strcoll (#31498)'
         );
     }
 
