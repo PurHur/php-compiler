@@ -333,6 +333,8 @@
             <file>./test/compliance/ArrayPreserveKeysNull31442JITTest.php</file>
             <file>./test/compliance/CountSizeofNullMode31463VMTest.php</file>
             <file>./test/compliance/CountSizeofNullMode31463JITTest.php</file>
+            <file>./test/compliance/SetlocaleNullCategory31487VMTest.php</file>
+            <file>./test/compliance/SetlocaleNullCategory31487JITTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289VMTest.php</file>
             <file>./test/compliance/GetBrowserNullReturnArrayStrict31289JITTest.php</file>
             <file>./test/compliance/ParseIniNullTypedArgsStrict31264VMTest.php</file>

@@ -6,13 +6,18 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for setlocale()/localeconv() — compile-time libc snapshot (#6133). */
+/**
+ * LLVM lowering for setlocale()/localeconv() — compile-time libc snapshot (#6133).
+ *
+ * Null $category: Z_PARAM_LONG soft DEP+0; strict TypeError (#31487).
+ */
 final class JitLocale
 {
     public static function setlocale(Context $context, JITVariable ...$args): Value
@@ -24,7 +29,15 @@ final class JitLocale
             );
         }
 
-        $category = self::compileTimeInt($args[0], 'setlocale(): Argument #1 ($category)');
+        // Z_PARAM_LONG $category — soft-null DEP+0; strict TypeError (#31487).
+        $categoryArg = $args[0];
+        if (JITVariable::TYPE_NULL === $categoryArg->type || ($categoryArg->isNullConstant ?? false)) {
+            JitStrictIntArg::lower($context, $categoryArg, 'setlocale', 1, 'category');
+            // Soft path coerces to 0; strict aborts above.
+            $category = 0;
+        } else {
+            $category = self::compileTimeInt($categoryArg, 'setlocale(): Argument #1 ($category)');
+        }
         $localeArgs = self::compileTimeLocaleArgs(\array_slice($args, 1));
         $result = VmLocale::setlocale($category, $localeArgs);
 
