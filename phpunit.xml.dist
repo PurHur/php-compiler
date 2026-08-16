@@ -117,6 +117,8 @@
             <file>./test/compliance/FilterVarNullOptions31209JITTest.php</file>
             <file>./test/compliance/PasswordNullOptions31421VMTest.php</file>
             <file>./test/compliance/PasswordNullOptions31421JITTest.php</file>
+            <file>./test/compliance/StreamContextSetOptionNullWrapper31422VMTest.php</file>
+            <file>./test/compliance/StreamContextSetOptionNullWrapper31422JITTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211VMTest.php</file>
             <file>./test/compliance/MkdirNullPermissions31211JITTest.php</file>
             <file>./test/compliance/ChmodNullPermissions31213VMTest.php</file>

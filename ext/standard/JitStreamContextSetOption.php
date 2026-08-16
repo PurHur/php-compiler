@@ -9,13 +9,14 @@ use PHPCompiler\JIT\Builtin\StreamContextRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stream_context_set_option() (#3448, #30645). */
+/** LLVM lowering for stream_context_set_option() (#3448, #30645, #31422). */
 final class JitStreamContextSetOption
 {
     private static int $guardSeq = 0;
@@ -28,6 +29,27 @@ final class JitStreamContextSetOption
         StreamContextRuntime::ensureLinked($context);
 
         JitStreamContextRequiredArg::validate($context, $args[0], 'stream_context_set_option', 1);
+
+        // Soft-null `$wrapper_or_options` array|string — peer setcookie expires (#31422).
+        if (self::operandIsNull($args[1])) {
+            if ($context->callerStrictTypes) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'stream_context_set_option(): Argument #2 ($wrapper_or_options) must be of type array|string, null given'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'sctxso_null_wrapper_te_cont');
+
+                return self::emitTrue($context);
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'stream_context_set_option',
+                1,
+                'wrapper_or_options',
+                'array|string'
+            );
+            $args[1] = self::emptyStringArg($context);
+        }
 
         $arg3 = $argc >= 3 ? $args[2] : null;
         $arg4 = $argc >= 4 ? $args[3] : null;
@@ -218,6 +240,19 @@ final class JitStreamContextSetOption
         return null === $arg
             || JITVariable::TYPE_NULL === $arg->type
             || $arg->isNullConstant;
+    }
+
+    private static function emptyStringArg(Context $context): JITVariable
+    {
+        $str = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString(''))
+        );
+        $str->compileTimeString = '';
+
+        return $str;
     }
 
     private static function loadContextArray(Context $context, JITVariable $arg): Value

@@ -113,7 +113,7 @@ final class StreamContextJitHelper
     }
 
     /**
-     * Singular stream_context_set_option($ctx, $wrapper, $option, $value) (#3448).
+     * Singular stream_context_set_option($ctx, $wrapper, $option, $value) (#3448, #31422).
      */
     public static function setSingleOption(
         HashTable $dest,
@@ -124,7 +124,20 @@ final class StreamContextJitHelper
         if (!self::hasMarker($dest)) {
             return;
         }
-        $wrapperName = self::coerceOptionKeyString($wrapperKey->resolveIndirect());
+        $wrapperResolved = $wrapperKey->resolveIndirect();
+        // Runtime/NestedJIT null — soft-DEP then coerce (compile-time null handled in JitStreamContextSetOption).
+        if (Variable::TYPE_NULL === $wrapperResolved->type) {
+            VmNullStringParamDeprecation::emit(
+                null,
+                'stream_context_set_option',
+                1,
+                'wrapper_or_options',
+                'array|string'
+            );
+            $wrapperResolved = new Variable();
+            $wrapperResolved->string('');
+        }
+        $wrapperName = self::coerceOptionKeyString($wrapperResolved);
         $optionName = self::coerceOptionKeyString($optionKey->resolveIndirect());
         // exportValue already collapses non-scalars to ''; avoid NestedJIT is_scalar (#27573).
         $exportedValue = self::exportValue($value);
