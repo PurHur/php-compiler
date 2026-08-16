@@ -2209,6 +2209,11 @@ final class BuiltinParamNames
             case 'sodium_pad':
             case 'sodium_unpad':
                 return ['string', 'block_size'];
+            // php-src ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27778)
+            case 'sodium_bin2hex':
+                return ['string'];
+            case 'sodium_hex2bin':
+                return ['string', 'ignore='];
             // php-src ext/sodium/sodium_*.stub.php — Reflection empty without this map (#24490)
             case 'sodium_crypto_generichash':
                 return ['message', 'key=', 'length='];

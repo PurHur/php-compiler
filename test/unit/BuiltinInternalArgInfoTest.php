@@ -596,6 +596,39 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src ext/sodium/libsodium.stub.php — bin2hex/hex2bin Reflection stubs (#27778). */
+    public function testSodiumBin2hexHex2binReflectionStubTypes(): void
+    {
+        $this->assertSame(['string'], BuiltinParamNames::forFunction('sodium_bin2hex'));
+        $this->assertSame(['string', 'ignore='], BuiltinParamNames::forFunction('sodium_hex2bin'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_bin2hex'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_hex2bin'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_bin2hex', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_hex2bin', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_hex2bin', 1));
+
+        $bin = BuiltinInternalArgInfo::paramInfoForFunction('sodium_bin2hex', 0);
+        $this->assertNotNull($bin);
+        $this->assertSame('string', $bin['name']);
+        $this->assertSame('string', $bin['type']);
+        $this->assertFalse($bin['isOptional']);
+
+        $hex0 = BuiltinInternalArgInfo::paramInfoForFunction('sodium_hex2bin', 0);
+        $hex1 = BuiltinInternalArgInfo::paramInfoForFunction('sodium_hex2bin', 1);
+        $this->assertNotNull($hex0);
+        $this->assertNotNull($hex1);
+        $this->assertSame('string', $hex0['name']);
+        $this->assertSame('string', $hex0['type']);
+        $this->assertFalse($hex0['isOptional']);
+        $this->assertSame('ignore', $hex1['name']);
+        $this->assertSame('string', $hex1['type']);
+        $this->assertTrue($hex1['isOptional']);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable('sodium_hex2bin', 1, $hex1, false));
+        $dest = new \PHPCompiler\VM\Variable();
+        $this->assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'sodium_hex2bin', 1, $hex1));
+        $this->assertSame('', $dest->toString());
+    }
+
     /** php-src ext/sodium/libsodium.stub.php — (): bool (#27775). */
     public function testSodiumCryptoAeadAes256gcmIsAvailableReflectionReturnBool(): void
     {
