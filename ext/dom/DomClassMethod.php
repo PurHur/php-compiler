@@ -219,6 +219,8 @@ abstract class DomClassMethod extends VmClassMethod
      * DOMDocument::saveXML/saveHTML — ?DOMNode $node, int $options (php-src ext/dom/document.c).
      *
      * CalledArgs may be sparse when a trailing optional is named and $node is omitted (#25182).
+     * A lone int/float is still argument #1 ($node) — Zend TypeErrors; options require arg #2
+     * (`saveXML(null, LIBXML_…)`), never the mistaken int-as-options path (#31396).
      *
      * @return array{0: ?ObjectEntry, 1: int}
      */
@@ -232,15 +234,9 @@ abstract class DomClassMethod extends VmClassMethod
         $function = rtrim($label, '()');
 
         if ($hasNode) {
-            $first = $frame->calledArgs[1]->resolveIndirect();
-            // Positional saveXML(LIBXML_…) — single int is options, not a node (#6140).
-            if (!$hasOptions && \in_array($first->type, [Variable::TYPE_INTEGER, Variable::TYPE_FLOAT], true)) {
-                $options = $first->toInt();
-            } else {
-                $node = $this->saveSerializationOptionalDomNodeArg($frame->calledArgs[1], $label, 0);
-                if ($hasOptions) {
-                    $options = $this->zParamLongArg($frame, 2, $function, 2, 'options');
-                }
+            $node = $this->saveSerializationOptionalDomNodeArg($frame->calledArgs[1], $function, 1, 'node');
+            if ($hasOptions) {
+                $options = $this->zParamLongArg($frame, 2, $function, 2, 'options');
             }
         } elseif ($hasOptions) {
             $options = $this->zParamLongArg($frame, 2, $function, 2, 'options');
@@ -289,26 +285,37 @@ abstract class DomClassMethod extends VmClassMethod
         );
     }
 
-    protected function saveSerializationOptionalDomNodeArg(Variable $var, string $label, int $index): ?ObjectEntry
-    {
+    /**
+     * Z_PARAM_OBJECT_OF_CLASS_OR_NULL(DOMNode) — Zend TypeError shape (php_dom.stub.php; #31396).
+     *
+     * $function is Class::method without trailing "()".
+     */
+    protected function saveSerializationOptionalDomNodeArg(
+        Variable $var,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ?ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             return null;
         }
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw new \TypeError(\sprintf(
-                '%s expects argument #%d to be of type ?DOMNode, %s given',
-                $label,
-                $index + 1,
+                '%s(): Argument #%d ($%s) must be of type ?DOMNode, %s given',
+                $function,
+                $userArgIndex,
+                $paramName,
                 VmDom::typeLabel($var)
             ));
         }
         $object = $var->toObject();
         if (!VmDom::isDomNode($object)) {
             throw new \TypeError(\sprintf(
-                '%s expects argument #%d to be of type ?DOMNode, %s given',
-                $label,
-                $index + 1,
+                '%s(): Argument #%d ($%s) must be of type ?DOMNode, %s given',
+                $function,
+                $userArgIndex,
+                $paramName,
                 $object->class->name
             ));
         }
