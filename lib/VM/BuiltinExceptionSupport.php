@@ -44,6 +44,8 @@ final class BuiltinExceptionSupport
     public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
     public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
     public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
+    /** Zend OutOfRangeException — LogicException child (#31553, ext/spl/spl_dllist.c). */
+    public const CLASS_OUT_OF_RANGE_EXCEPTION = 'outofrangeexception';
     /** PHP 8.4+ request_parse_body() (#5965, ext/standard/http.c). */
     public const CLASS_REQUEST_PARSE_BODY_EXCEPTION = 'requestparsebodyexception';
     /** php-src ext/uri — Uri\InvalidUriException (#21468). */
@@ -695,6 +697,26 @@ final class BuiltinExceptionSupport
         }
 
         return self::materializeThrowable($ctx, self::CLASS_OUT_OF_BOUNDS_EXCEPTION, $message, $file, $line);
+    }
+
+    /**
+     * Bridge host OutOfRangeException into the VM class (#31553, ext/spl/spl_dllist.c).
+     *
+     * Without a dedicated catch before LogicException, executeInternalHandler collapses
+     * OutOfRangeException (a LogicException subclass) to LogicException — so
+     * `instanceof OutOfRangeException` is false despite the Zend message.
+     */
+    public static function materializeOutOfRangeException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_OUT_OF_RANGE_EXCEPTION])) {
+            return self::materializeLogicException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_OUT_OF_RANGE_EXCEPTION, $message, $file, $line);
     }
 
     public static function materializeRuntimeException(
