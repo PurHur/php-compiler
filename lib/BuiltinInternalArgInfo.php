@@ -271,6 +271,8 @@ final class BuiltinInternalArgInfo
             'sodium_memzero' => 'void',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27734)
             'sodium_pad', 'sodium_unpad' => 'string',
+            // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27778)
+            'sodium_bin2hex', 'sodium_hex2bin' => 'string',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27775)
             'sodium_crypto_aead_aes256gcm_is_available' => 'bool',
             // ext/pgsql/pgsql.stub.php — InternalArgInfo empty return; Zend string|int|false (#27703)
@@ -909,6 +911,12 @@ final class BuiltinInternalArgInfo
             'sodium_pad', 'sodium_unpad' => match ($index) {
                 0 => 'string',
                 1 => 'int',
+                default => null,
+            },
+            // ext/sodium/libsodium.stub.php — string $string / string $ignore = ""; absent from InternalArgInfo (#27778)
+            'sodium_bin2hex' => 0 === $index ? 'string' : null,
+            'sodium_hex2bin' => match ($index) {
+                0, 1 => 'string',
                 default => null,
             },
             // ext/pgsql/pgsql.stub.php — ?PgSql\Result $result; InternalArgInfo untyped (#27703)
