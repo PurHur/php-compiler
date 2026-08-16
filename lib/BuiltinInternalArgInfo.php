@@ -230,6 +230,8 @@ final class BuiltinInternalArgInfo
             'base64_decode', 'hex2bin' => 'string|false',
             // ext/standard/basic_functions.stub.php / md5.c — InternalArgInfo return string (missing |false) (#28347)
             'md5_file', 'sha1_file' => 'string|false',
+            // ext/standard/type.stub.php — aliases absent from InternalArgInfo; Zend : bool (#28312)
+            'is_integer', 'is_long', 'is_double' => 'bool',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471, #28569)
             'finfo_open' => 'finfo|false',
             'finfo_file', 'finfo_buffer' => 'string|false',
@@ -737,6 +739,16 @@ final class BuiltinInternalArgInfo
             'gettype' => 0 === $index ? 'mixed' : null,
             // Zend/zend_builtin_functions.stub.php — mixed $value; InternalArgInfo untyped (#26375)
             'get_debug_type' => 0 === $index ? 'mixed' : null,
+            // ext/standard/type.stub.php — mixed $value; InternalArgInfo empty / aliases absent (#28312)
+            'is_numeric', 'is_string', 'is_int', 'is_integer', 'is_long', 'is_float', 'is_double',
+            'is_bool', 'is_null', 'is_array', 'is_object', 'is_resource', 'is_scalar'
+                => 0 === $index ? 'mixed' : null,
+            // ext/standard/type.stub.php — mixed $value; untyped &$callable_name (InternalArgInfo string) (#28312, #30242)
+            'is_callable' => match ($index) {
+                0 => 'mixed',
+                2 => '',
+                default => null,
+            },
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
             // ext/standard/basic_functions.stub.php — object $object (InternalArgInfo omits) (#26210)
