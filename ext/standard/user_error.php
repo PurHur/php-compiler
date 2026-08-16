@@ -9,12 +9,10 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -22,6 +20,7 @@ use PHPLLVM\Value;
  * user_error() — alias of trigger_error() (Zend/zend_builtin_functions.stub.php, #6183 / #21480).
  *
  * Soft-null DEP+coerce for $message on PHP 8.4 forward profile.
+ * Soft-null DEP then ValueError for $error_level (same as trigger_error) (#31464).
  */
 final class user_error extends Internal
 {
@@ -42,13 +41,10 @@ final class user_error extends Internal
         $message = VmString::trimFamilyStringArgForFrame($frame, 0, 'user_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
-            $levelVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $levelVar->type) {
-                throw new \TypeError('user_error(): Argument #2 ($error_type) must be of type int');
-            }
-            $level = $levelVar->toInt();
+            // Same soft-null int guard as trigger_error — Zend stub name is $error_level (#31464).
+            $level = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'user_error', 2, 'error_level');
             if (!ErrorReporter::isUserErrorLevel($level)) {
-                throw new \ValueError('user_error(): Argument #2 ($error_type) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED');
+                throw new \ValueError('user_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED');
             }
         }
         $file = null;
@@ -125,15 +121,16 @@ final class user_error extends Internal
         if (null !== $compileTime) {
             if (!ErrorReporter::isUserErrorLevel($compileTime)) {
                 throw new \ValueError(
-                    'user_error(): Argument #2 ($error_type) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED'
+                    'user_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED'
                 );
             }
 
             return $context->getTypeFromString('int32')->constInt($compileTime, false);
         }
 
+        // Soft-null DEP+coerce like trigger_error (#31464); JitLongArg skipped DEP.
         $levelI32 = $context->builder->trunc(
-            JitLongArg::lower($context, $arg, 'user_error() error type'),
+            JitIntdiv::lowerIntBuiltinArgForCaller($context, $arg, 'user_error', 2, 'error_level'),
             $context->getTypeFromString('int32')
         );
         self::jitGuardUserErrorLevel($context, $levelI32);
@@ -183,7 +180,7 @@ final class user_error extends Internal
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitValueError(
             $context,
-            'user_error(): Argument #2 ($error_type) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED'
+            'user_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED'
         );
         $context->builder->call($context->lookupFunction('abort'));
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
