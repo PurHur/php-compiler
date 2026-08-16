@@ -282,9 +282,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         foreach (['strpos', 'stripos', 'strrpos', 'strripos'] as $f) {
             $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
         }
-        foreach (['strstr', 'stristr'] as $f) {
+        foreach (['strstr', 'stristr', 'strchr'] as $f) {
             $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
         }
+    }
+
+    /** php-src string.stub.php — strchr before_needle bool optional; InternalArgInfo omits 3rd (#25758). */
+    public function testStrchrBeforeNeedleStubParamAndOptional(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('strchr', 2));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('strchr', 2);
+        $this->assertNotNull($info);
+        $this->assertSame('before_needle', $info['name']);
+        $this->assertSame('bool', $info['type']);
+        $this->assertTrue($info['isOptional']);
+        $this->assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('strchr'));
+        $this->assertSame(
+            ['haystack', 'needle', 'before_needle='],
+            BuiltinParamNames::forFunction('strchr')
+        );
     }
 
     /** php-src calendar.stub.php — InternalArgInfo return int (missing |false) (#28780). */

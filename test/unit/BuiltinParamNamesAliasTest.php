@@ -4739,6 +4739,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['haystack', 'needle', 'before_needle'], $stristr);
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($stristr, 'before_needle', 'stristr'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($stristr, 'part', 'stristr'));
+
+        // strchr: InternalArgInfo omits 3rd — encode optional in name table (#25758)
+        $strchr = BuiltinParamNames::forFunction('strchr');
+        self::assertSame(['haystack', 'needle', 'before_needle='], $strchr);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($strchr, 'before_needle', 'strchr'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('strchr'));
     }
 
     /** @covers issue #23644 */

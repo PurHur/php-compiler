@@ -114,7 +114,8 @@ final class BuiltinInternalArgInfo
             'timezone_open' => 'DateTimeZone|false',
             // ext/standard/string.stub.php — InternalArgInfo omits |false (#25442)
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
-            'strstr', 'stristr' => 'string|false',
+            // strchr alias: InternalArgInfo return string + only 2 params (#25758, re-#25442)
+            'strstr', 'stristr', 'strchr' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472)
             'highlight_string', 'highlight_file', 'show_source' => 'string|bool',
             // ext/standard/basic_functions.stub.php — PHP 8.4; InternalArgInfo bool → true (#25453, #28239)
@@ -1104,6 +1105,8 @@ final class BuiltinInternalArgInfo
             'flock' => 2 === $index ? '' : null,
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)
             'hash' => 3 === $index ? 'array' : null,
+            // ext/standard/string.stub.php — bool $before_needle = false; InternalArgInfo omits 3rd (#25758)
+            'strchr' => 2 === $index ? 'bool' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
             // ext/standard/string.stub.php — &$percent = null (untyped; InternalArgInfo float) (#25361)
