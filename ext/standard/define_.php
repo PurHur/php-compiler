@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
@@ -19,6 +21,7 @@ use PHPLLVM\Value;
  *
  * Excess argc (>3) → Zend ArgumentCountError (#30573; php-src Zend/zend_builtin_functions.c).
  * The 3rd `$case_insensitive` parameter remains arity-legal (deprecated/ignored).
+ * Under strict_types, null for `$case_insensitive` → TypeError (#31406; Z_PARAM_BOOL).
  *
  * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(define)
  * php-src: Zend/zend_builtin_functions.stub.php — define(string, mixed, bool = false): bool
@@ -53,7 +56,18 @@ final class define_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('define() requires VM context');
         }
-        if ($argc >= 3 && $frame->calledArgs[2]->resolveIndirect()->toBool()) {
+        // Z_PARAM_BOOL $case_insensitive — strict TypeError; soft-null DEP+coerce (#31406).
+        $caseInsensitive = false;
+        if ($argc >= 3) {
+            $caseInsensitive = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                2,
+                'define',
+                3,
+                'case_insensitive'
+            );
+        }
+        if ($caseInsensitive) {
             $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
             $frame->vmContext->errors->triggerError(
                 self::MSG_CASE_INSENSITIVE_IGNORED,
@@ -87,9 +101,27 @@ final class define_ extends Internal
         if ($argc < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
-        if ($argc >= 3
-            && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {
-            throw new \LogicException('define() case_insensitive must be a boolean literal in this compiler build');
+        if ($argc >= 3) {
+            // Compile-time null under strict: catchable TypeError then stop (#31406 / peer md5 #31358).
+            if ($context->callerStrictTypes && (
+                JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)
+            )) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'define(): Argument #3 ($case_insensitive) must be of type bool, null given'
+                );
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+            // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31406).
+            JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $args[2],
+                'define',
+                'case_insensitive',
+                3
+            );
         }
 
         return JitDefine::invoke($context, $args[0], $args[1]);
