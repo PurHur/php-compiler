@@ -61,6 +61,8 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'pclose',
             'fileno',
             'getenv',
+            'mkstemp',
+            'memchr',
         ];
     }
 
@@ -71,7 +73,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -87,18 +89,29 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31582', $source);
         $this->assertStringContainsString('#31606', $source);
         $this->assertStringContainsString('#31637', $source);
+        $this->assertStringContainsString('#31655', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
-        foreach (['mkstemp', 'syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
+        foreach (['syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
             $this->assertStringContainsString(
                 "'{$sym}' =>",
                 $source,
                 "LibcExtern must keep live {$sym} (#28850)"
             );
         }
+        $this->assertStringNotContainsString(
+            "'mkstemp' =>",
+            $source,
+            'LibcExtern must not declare libc mkstemp (#31655)'
+        );
+        $this->assertStringNotContainsString(
+            "'memchr' =>",
+            $source,
+            'LibcExtern must not declare libc memchr (#31655)'
+        );
         $this->assertStringNotContainsString(
             "'rename' =>",
             $source,
@@ -221,6 +234,17 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc getenv (#31637)'
         );
+        $this->assertStringContainsString('#31655', $source);
+    }
+
+    public function testJitTempnamKernelDeclaresMkstempMemchrModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitTempnamKernel.php');
+        $this->assertStringContainsString('#31655', $source);
+        $this->assertStringContainsString("['memchr'", $source);
+        $this->assertStringContainsString("['mkstemp'", $source);
+        $this->assertStringContainsString("lookupFunction('mkstemp')", $source);
+        $this->assertStringContainsString("lookupFunction('memchr')", $source);
     }
 
     public function testStreamKernelsDeclareStdioModuleLocallyAfterLibcExternDrop(): void
