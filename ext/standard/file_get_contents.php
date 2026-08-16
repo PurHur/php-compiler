@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -39,8 +40,10 @@ final class file_get_contents extends Internal
 
         $useIncludePath = false;
         if (isset($frame->calledArgs[1])) {
-            $useIncludePath = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[1],
+            // Z_PARAM_BOOL: caller strict_types → TypeError on null; else soft-null DEP+coerce (#31338).
+            $useIncludePath = VmMath::parseBoolBuiltinArgForFrame(
+                $frame,
+                1,
                 'file_get_contents',
                 2,
                 'use_include_path'
@@ -124,6 +127,17 @@ final class file_get_contents extends Internal
         }
 
         $pathStr = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'file_get_contents', 0, 'filename');
+        if ($argc >= 2) {
+            // Z_PARAM_BOOL — match VM parseBoolBuiltinArgForFrame (#31338). Include-path
+            // resolution for true remains on the VM helper path; NestedJIT still type-checks.
+            JitBoolArg::lowerCoerceZParamBool(
+                $context,
+                $args[1],
+                'file_get_contents',
+                'use_include_path',
+                2
+            );
+        }
         if (1 === $argc) {
             return JitFileGetContents::invoke($context, $pathStr);
         }
