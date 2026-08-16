@@ -1,13 +1,13 @@
 {
     "version": 1,
-    "generated_at": "2026-08-16T17:33:32+00:00",
+    "generated_at": "2026-08-16T18:43:20+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "4bcbe70c761d5d51f3ee",
     "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
-    "unit_count": 410,
-    "published_fresh": 381,
-    "kept_live_unpublished": 29,
-    "total_bytes": 868540421,
+    "unit_count": 411,
+    "published_fresh": 391,
+    "kept_live_unpublished": 20,
+    "total_bytes": 870479901,
     "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)"
 }
