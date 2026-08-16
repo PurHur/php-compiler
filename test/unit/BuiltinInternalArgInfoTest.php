@@ -822,6 +822,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('linkinfo'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28174). */
+    public function testGetcwdReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getcwd'));
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28841). */
     public function testGetrusageReflectionReturnUnion(): void
     {
