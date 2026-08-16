@@ -299,18 +299,27 @@ final class SplArrayStorage
      * the ArrayObject store entry would leave them on the stale table (#24243); retarget every
      * store row that still points at the previous HashTable identity. Iterator positions are kept
      * (Zend does not rewind USE_OTHER iterators on exchange).
+     *
+     * $input must already be the storage to install: a duplicated array HT, a shared
+     * ArrayObject/ArrayIterator table, or a materialized object-property HT (#31528). Do not
+     * duplicate here — that would break USE_OTHER share semantics.
+     *
+     * $orFlags mirrors php-src spl_array_set_array just_array path: OR inherited user flags
+     * from another SPL array object without clearing the receiver's existing user flags.
      */
-    public static function exchangeArray(ObjectEntry $object, HashTable $input): HashTable
+    public static function exchangeArray(ObjectEntry $object, HashTable $input, int $orFlags = 0): HashTable
     {
         $oldTable = self::state($object)['table'];
         $old = $oldTable->duplicate();
-        $newTable = $input->duplicate();
         foreach (self::$store as $id => $state) {
             if ($state['table'] === $oldTable) {
-                self::$store[$id]['table'] = $newTable;
+                self::$store[$id]['table'] = $input;
             }
         }
         self::$store[$object->id]['pos'] = 0;
+        if (0 !== $orFlags) {
+            self::$store[$object->id]['flags'] |= $orFlags;
+        }
 
         return $old;
     }

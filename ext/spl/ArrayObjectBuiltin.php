@@ -457,17 +457,21 @@ final class ArrayObjectExchangeArray extends VmClassMethod
         );
         // User arity excludes $this (#30837; zim_ArrayObject_exchangeArray).
         $this->requireExactUserArgCount($frame, 'ArrayObject::exchangeArray', 1);
-        $input = SplIteratorSupport::requireArrayArg(
+        // php-src Z_PARAM_ARRAY_OR_OBJECT ("A") + spl_array_set_array(just_array=true) (#31528).
+        // ArrayObject/ArrayIterator → share live table; plain objects → property HT; arrays → copy.
+        [$table, $flags] = SplIteratorSupport::requireArrayOrObjectConstructArg(
             $frame->calledArgs[1],
             'ArrayObject::exchangeArray',
-            1
+            1,
+            0,
+            true
         );
         if (null === $frame->returnVar) {
-            SplArrayStorage::exchangeArray($object, $input);
+            SplArrayStorage::exchangeArray($object, $table, $flags);
 
             return;
         }
-        $old = SplArrayStorage::exchangeArray($object, $input);
+        $old = SplArrayStorage::exchangeArray($object, $table, $flags);
         $frame->returnVar->array($old);
     }
 }
