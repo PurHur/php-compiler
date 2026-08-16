@@ -1634,10 +1634,12 @@ final class BuiltinParamNames
             case 'strripos':
                 return ['haystack', 'needle', 'offset'];
             case 'strstr':
-            case 'strchr':
             case 'stristr':
-                // InternalArgInfo: strstr/stristr use `part`, strchr omits 3rd; Zend stub is before_needle (#23218)
+                // InternalArgInfo: strstr/stristr use `part=`; Zend stub is before_needle (#23218)
                 return ['haystack', 'needle', 'before_needle'];
+            case 'strchr':
+                // InternalArgInfo omits 3rd; mark optional so Reflection matches Zend (#25758, re-#23218)
+                return ['haystack', 'needle', 'before_needle='];
             case 'strrchr':
                 // php-src stub is haystack/needle only on 8.2; Reflection already correct via ArgInfo (#24038)
                 return ['haystack', 'needle'];
