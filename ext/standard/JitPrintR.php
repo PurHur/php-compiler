@@ -8,6 +8,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringPrintR;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -60,7 +62,24 @@ final class JitPrintR
             return $truePtr;
         }
 
-        $returns = self::boolValForBranch($context, $args[1]);
+        // Compile-time null under strict: catchable TypeError then stop IR (#31337 / peer #31358).
+        if ($context->callerStrictTypes && (
+            JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
+        )) {
+            JitNativeString::ensureInsertBlock($context);
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'print_r(): Argument #2 ($return) must be of type bool, null given'
+            );
+            JitNativeString::ensureInsertBlock($context);
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
+        }
+        // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31337).
+        $returns = JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'print_r', 'return', 2);
         $returnBb = BasicBlockHelper::append($context, 'print_r_return_mode');
         $echoBb = BasicBlockHelper::append($context, 'print_r_echo_mode');
         $doneBb = BasicBlockHelper::append($context, 'print_r_call_done');
@@ -89,20 +108,5 @@ final class JitPrintR
         $result->addIncoming($truePtr, $echoEndBb);
 
         return $result;
-    }
-
-    private static function boolValForBranch(Context $context, JITVariable $arg): Value
-    {
-        $boolVal = JITVariable::TYPE_VALUE === $arg->type
-            ? $context->castToBool(JitValueBox::valuePtrFromVariable($context, $arg))
-            : $context->helper->loadValue($arg);
-        if (JITVariable::KIND_VALUE !== $arg->kind) {
-            return $boolVal;
-        }
-        $i1 = $context->getTypeFromString('int1');
-        $slot = $context->builder->alloca($i1, 1, 'print_r_bool_tmp');
-        $context->builder->store($boolVal, $slot);
-
-        return $context->builder->load($slot);
     }
 }

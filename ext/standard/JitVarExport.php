@@ -8,6 +8,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringVarExport;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -67,7 +69,24 @@ final class JitVarExport
 
             return $nullPtr;
         }
-        $returns = self::boolValForBranch($context, $args[1]);
+        // Compile-time null under strict: catchable TypeError then stop IR (#31337 / peer #31358).
+        if ($context->callerStrictTypes && (
+            JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
+        )) {
+            JitNativeString::ensureInsertBlock($context);
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'var_export(): Argument #2 ($return) must be of type bool, null given'
+            );
+            JitNativeString::ensureInsertBlock($context);
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+            return $nullPtr;
+        }
+        // Z_PARAM_BOOL: strict TypeError on null; else null→false + E_DEPRECATED (#31337).
+        $returns = JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'var_export', 'return', 2);
         $returnBb = BasicBlockHelper::append($context, 'var_export_return_mode');
         $echoBb = BasicBlockHelper::append($context, 'var_export_echo_mode');
         $doneBb = BasicBlockHelper::append($context, 'var_export_call_done');
