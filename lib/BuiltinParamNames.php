@@ -1641,6 +1641,12 @@ final class BuiltinParamNames
             case 'strrchr':
                 // php-src stub is haystack/needle only on 8.2; Reflection already correct via ArgInfo (#24038)
                 return ['haystack', 'needle'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still str/mask/start/len or haystack/char_list (#23400)
+            case 'strcspn':
+            case 'strspn':
+                return ['string', 'characters', 'offset=', 'length='];
+            case 'strpbrk':
+                return ['string', 'characters'];
             case 'preg_match':
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
             case 'preg_match_all':
