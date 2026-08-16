@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\simplexml;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -108,15 +109,20 @@ final class SimpleXmlIteratorConstruct extends VmClassMethod
         if (VmSimpleXmlIterator::CLASS_LC !== strtolower($iterator->class->name)) {
             throw new \LogicException('SimpleXMLIterator::__construct() called on invalid receiver');
         }
-        $dataVar = $frame->calledArgs[1]->resolveIndirect();
-        // php-src: SimpleXMLIterator inherits SimpleXMLElement::__construct(string $data, …) (#22406 / sxe.c).
-        if (Variable::TYPE_STRING !== $dataVar->type) {
-            throw new \TypeError('SimpleXMLIterator::__construct(): Argument #1 ($data) must be of type string');
-        }
+        // php-src: SimpleXMLIterator inherits SimpleXMLElement::__construct(string $data, …)
+        // (#22406 / sxe.c). Soft-null $data matches SimpleXMLElement (#31514).
+        $data = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
+            'SimpleXMLIterator::__construct',
+            0,
+            'data',
+            false
+        );
         VmSimpleXml::constructFromData(
             $frame->vmContext,
             $iterator,
-            $dataVar->toString(),
+            $data,
             $frame
         );
     }

@@ -127,6 +127,19 @@ final class JitSimpleXmlUserScript
         if (\count($args) < 2 || !\extension_loaded('simplexml')) {
             return null;
         }
+        // Soft-null $data — E_DEPRECATED then empty parse → Exception (#31514 / sxe.c).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[1],
+                'SimpleXMLElement::__construct',
+                0,
+                'data'
+            );
+            self::$lastConstructParseFailed = true;
+
+            return null;
+        }
         $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         if (null === $lit) {
             return null;
