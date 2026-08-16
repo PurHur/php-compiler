@@ -1472,7 +1472,10 @@ final class BuiltinParamNames
                 return ['share_handle'];
             case 'curl_share_setopt':
                 return ['share_handle', 'option', 'value'];
+            // php-src ext/curl/curl.stub.php — InternalArgInfo still code / omits share (#27810)
             case 'curl_strerror':
+            case 'curl_multi_strerror':
+            case 'curl_share_strerror':
                 return ['error_code'];
             // php-src ext/hash/hash.stub.php — options missing from InternalArgInfo (#25068)
             case 'hash':

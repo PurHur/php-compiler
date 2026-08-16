@@ -1005,6 +1005,34 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($info['isOptional']);
     }
 
+    /** php-src curl.stub.php — int $error_code → ?string; InternalArgInfo bool/code/absent (#27810). */
+    public function testCurlStrerrorReflectionStubTypes(): void
+    {
+        foreach (['curl_strerror', 'curl_multi_strerror', 'curl_share_strerror'] as $fn) {
+            $this->assertSame('?string', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+            $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($info);
+            $this->assertSame('int', $info['type']);
+            $this->assertFalse($info['isOptional']);
+            $this->assertSame(['error_code'], BuiltinParamNames::forFunction($fn));
+            $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'error_code',
+                $fn
+            ));
+            $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'code',
+                $fn
+            ));
+        }
+        // share is absent from InternalArgInfo — name comes from BuiltinParamNames overlay.
+        $share = BuiltinInternalArgInfo::paramInfoForFunction('curl_share_strerror', 0);
+        $this->assertNotNull($share);
+        $this->assertSame('error_code', $share['name']);
+    }
+
     /** php-src ext/sysvshm/sysvshm.stub.php — SysvSharedMemory stubs; InternalArgInfo int/untyped (#27943). */
     public function testShmAttachReflectionStubTypes(): void
     {

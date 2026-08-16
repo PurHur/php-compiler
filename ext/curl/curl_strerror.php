@@ -11,6 +11,8 @@ use PHPCompiler\ext\standard\VmMath;
  * curl_strerror() — libcurl easy error string (php-src ext/curl/interface.c; #16659, #25813).
  *
  * Delegates to {@see VmCurlNative::easyStrerror()} → curl_easy_strerror(), matching Zend.
+ * Reflection stub: int $error_code → ?string (#27810; curl.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
  */
 final class curl_strerror extends CurlFunction
 {
