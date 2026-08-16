@@ -83,6 +83,7 @@ final class JitTempnamKernel
 
         foreach ([
             ['memchr', $i8p, [$i8p, $i32, $sizeT]],
+            // strrchr(3) module-local after LibcExtern/Module always-on drop (#31458).
             ['strrchr', $i8p, [$i8p, $i32]],
             ['strlen', $i64, [$i8p]],
             ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],

@@ -1011,15 +1011,10 @@ class Module extends ModuleAbstract
         \PHPCompiler\JIT\LibcExtern::register($context);
         StringStrspn::ensureLinked($context);
         StringStrpbrk::ensureLinked($context);
-        try {
-            $context->lookupFunction('strrchr');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i32);
-            $fn = $context->module->addFunction('strrchr', $ft);
-            $context->registerFunction('strrchr', $fn);
-        }
+        // strrchr(3) dropped from always-on Module decls (#31458 / #31403 peer):
+        // StrrchrJitHelper owns user-script strrchr(); NestedJIT JitTempnamKernel +
+        // ReflectionSetup::shortNameFromCstr declare strrchr module-locally
+        // (LibcExtern row also dropped).
         try {
             $context->lookupFunction('strtol');
         } catch (\Throwable $e) {

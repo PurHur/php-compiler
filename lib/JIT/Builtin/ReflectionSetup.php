@@ -259,12 +259,31 @@ final class ReflectionSetup
     }
 
     /**
+     * Module-local strrchr(3) after LibcExtern/Module always-on drop (#31458).
+     */
+    private static function ensureLibcStrrchr(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strrchr');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $fn = $context->module->addFunction(
+                'strrchr',
+                $context->context->functionType($i8p, false, $i8p, $i32)
+            );
+            $context->registerFunction('strrchr', $fn);
+        }
+    }
+
+    /**
      * Unqualified class name from a native cstr (ReflectionClass::getShortName).
      *
      * @return array{cstr: Value, len: Value}
      */
     public static function shortNameFromCstr(Context $context, Value $cstr, Value $len): array
     {
+        self::ensureLibcStrrchr($context);
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $sizeT = $context->getTypeFromString('size_t');

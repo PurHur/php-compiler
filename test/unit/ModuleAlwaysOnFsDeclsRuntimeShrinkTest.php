@@ -30,6 +30,7 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
             'stat', // #31403 — JitStatKernel + NestedJIT module-local
             'access', // #31403
             'lstat', // #31403
+            'strrchr', // #31458 — StrrchrJitHelper + NestedJIT module-local
         ];
     }
 
@@ -48,16 +49,17 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#30530', $source);
         $this->assertStringContainsString('#31374', $source);
         $this->assertStringContainsString('#31403', $source);
+        $this->assertStringContainsString('#31458', $source);
         foreach ($this->deletedDecls() as $sym) {
             $this->assertStringNotContainsString(
                 "lookupFunction('{$sym}')",
                 $source,
-                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403)"
+                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458)"
             );
             $this->assertStringNotContainsString(
                 "addFunction('{$sym}'",
                 $source,
-                "Module.php must not always-add libc {$sym} (#30530/#31374/#31403)"
+                "Module.php must not always-add libc {$sym} (#30530/#31374/#31403/#31458)"
             );
         }
     }
