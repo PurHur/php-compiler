@@ -49,6 +49,8 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'strcoll',
             'strchr',
             'strstr',
+            'realpath',
+            'strdup',
         ];
     }
 
@@ -59,7 +61,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -70,6 +72,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31458', $source);
         $this->assertStringContainsString('#31498', $source);
         $this->assertStringContainsString('#31519', $source);
+        $this->assertStringContainsString('#31534', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -144,6 +147,16 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strstr (#31519)'
         );
+        $this->assertStringNotContainsString(
+            "'realpath' =>",
+            $source,
+            'LibcExtern must not declare libc realpath (#31534)'
+        );
+        $this->assertStringNotContainsString(
+            "'strdup' =>",
+            $source,
+            'LibcExtern must not declare libc strdup (#31534)'
+        );
     }
 
     public function testChownRuntimeDoesNotLookupLibcChown(): void
@@ -171,5 +184,15 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("lookupFunction('strchr')", $source);
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitParseStrUserScriptCstrKernel.php');
         $this->assertStringContainsString("'strchr'", $kernel);
+    }
+
+    public function testSysGetTempDirDeclaresRealpathModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SysGetTempDirRuntime.php');
+        $this->assertStringContainsString('ensureLibc', $source);
+        $this->assertStringContainsString('#31534', $source);
+        $this->assertStringContainsString("['realpath', \$i8p, [\$i8p, \$i8p]]", $source);
+        $this->assertStringContainsString("lookupFunction('realpath')", $source);
+        $this->assertStringNotContainsString('LibcExtern::register', $source);
     }
 }

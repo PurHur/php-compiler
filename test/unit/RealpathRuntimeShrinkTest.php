@@ -49,5 +49,14 @@ final class RealpathRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('realpath')", $source);
         $this->assertStringNotContainsString("addFunction('realpath'", $source);
         $this->assertStringContainsString('#30530', $source);
+        $this->assertStringContainsString('#31534', $source);
+    }
+
+    public function testLibcExternDropsAlwaysOnRealpathAndStrdup(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringNotContainsString("'realpath' =>", $source);
+        $this->assertStringNotContainsString("'strdup' =>", $source);
+        $this->assertStringContainsString('#31534', $source);
     }
 }
