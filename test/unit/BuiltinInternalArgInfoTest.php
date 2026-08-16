@@ -589,6 +589,32 @@ final class BuiltinInternalArgInfoTest extends TestCase
         );
     }
 
+    /** php-src ext/pgsql/pgsql.stub.php — connection_string/flags → PgSql\Connection|false (#27811). */
+    public function testPgConnectReflectionStubTypes(): void
+    {
+        foreach (['pg_connect', 'pg_pconnect'] as $fn) {
+            $this->assertSame(
+                ['connection_string', 'flags='],
+                BuiltinParamNames::forFunction($fn)
+            );
+            $this->assertSame(
+                'PgSql\\Connection|false',
+                BuiltinInternalArgInfo::returnTypeLabelForFunction($fn)
+            );
+            $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+            $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+            $this->assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn));
+            $cs = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($cs);
+            $this->assertSame('string', $cs['type']);
+            $this->assertFalse($cs['isOptional']);
+            $flags = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            $this->assertNotNull($flags);
+            $this->assertSame('int', $flags['type']);
+            $this->assertTrue($flags['isOptional']);
+        }
+    }
+
     /** php-src ext/pgsql/pgsql.stub.php — result/field/oid_only → string|int|false (#27703). */
     public function testPgFieldTableReflectionStubTypes(): void
     {
