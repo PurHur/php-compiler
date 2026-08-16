@@ -13,6 +13,9 @@ use PHPLLVM\Value;
 
 /**
  * curl_share_strerror() — libcurl share error string (php-src ext/curl/share.c; #20531).
+ *
+ * Reflection stub: int $error_code → ?string (#27810; curl.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
  */
 final class curl_share_strerror extends Internal
 {

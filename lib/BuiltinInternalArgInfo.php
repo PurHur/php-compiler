@@ -369,6 +369,8 @@ final class BuiltinInternalArgInfo
             'json_validate' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo return int; Zend bool (#26107)
             'curl_multi_setopt' => 'bool',
+            // ext/curl/curl.stub.php — InternalArgInfo return bool / absent; Zend ?string (#27810)
+            'curl_strerror', 'curl_multi_strerror', 'curl_share_strerror' => '?string',
             // ext/curl/curl.stub.php — InternalArgInfo resource / empty; Zend CurlHandle|false / void (#26186)
             'curl_init' => 'CurlHandle|false',
             'curl_close' => 'void',
@@ -1044,6 +1046,8 @@ final class BuiltinInternalArgInfo
                 default => null,
             },
             'curl_share_close', 'curl_share_errno' => 0 === $index ? 'CurlShareHandle' : null,
+            // ext/curl/curl.stub.php — int $error_code; InternalArgInfo still code / absent (#27810)
+            'curl_strerror', 'curl_multi_strerror', 'curl_share_strerror' => 0 === $index ? 'int' : null,
             // ext/shmop/shmop.stub.php — Shmop $shmop; InternalArgInfo still int (legacy shmid) (#28451)
             'shmop_read', 'shmop_write', 'shmop_size', 'shmop_delete', 'shmop_close' => 0 === $index ? 'Shmop' : null,
             // ext/sysvmsg/sysvmsg.stub.php — SysvMessageQueue + mixed/untyped outs; InternalArgInfo resource/untyped/int (#28452)

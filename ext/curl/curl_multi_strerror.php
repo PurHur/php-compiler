@@ -9,6 +9,9 @@ use PHPCompiler\ext\standard\VmMath;
 
 /**
  * curl_multi_strerror() — libcurl multi error string (php-src ext/curl/interface.c; #16659).
+ *
+ * Reflection stub: int $error_code → ?string (#27810; curl.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
  */
 final class curl_multi_strerror extends CurlFunction
 {
