@@ -38,7 +38,8 @@ final class highlight_file extends Internal
         );
         $return = false;
         if ($argc >= 2) {
-            $return = VmHighlight::resolveReturnFlag($frame->calledArgs[1], $functionName);
+            // Z_PARAM_BOOL: strict TypeError on null; else soft-null DEP+coerce (#31383).
+            $return = VmHighlight::resolveReturnFlag($frame, $functionName);
         }
         $contents = VmFs::readPathContentsViaOpen($path, $frame->vmContext);
         if (false === $contents) {
