@@ -263,6 +263,8 @@ final class BuiltinInternalArgInfo
             'sodium_crypto_sign_detached',
             'sodium_crypto_box_seal' => 'string',
             'sodium_crypto_sign_verify_detached' => 'bool',
+            // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#28856)
+            'sodium_crypto_secretbox_open' => 'string|false',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27630)
             'sodium_memzero' => 'void',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27775)
@@ -859,6 +861,11 @@ final class BuiltinInternalArgInfo
                 default => null,
             },
             'sodium_crypto_secretbox', 'sodium_crypto_box' => match ($index) {
+                0, 1, 2 => 'string',
+                default => null,
+            },
+            // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#28856)
+            'sodium_crypto_secretbox_open' => match ($index) {
                 0, 1, 2 => 'string',
                 default => null,
             },

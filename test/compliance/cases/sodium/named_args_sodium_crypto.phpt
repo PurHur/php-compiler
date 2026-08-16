@@ -1,5 +1,5 @@
 --TEST--
-sodium_crypto_* named arguments + Reflection (VM, issue #24490 / #28753)
+sodium_crypto_* named arguments + Reflection (VM, issue #24490 / #28753 / #28856)
 --SKIPIF--
 <?php
 if (!extension_loaded('sodium') && !function_exists('sodium_crypto_generichash')) {
@@ -11,6 +11,7 @@ if (!extension_loaded('sodium') && !function_exists('sodium_crypto_generichash')
 $funcs = [
     'sodium_crypto_generichash' => 'message,key,length',
     'sodium_crypto_secretbox' => 'message,nonce,key',
+    'sodium_crypto_secretbox_open' => 'ciphertext,nonce,key',
     'sodium_crypto_box' => 'message,nonce,key_pair',
     'sodium_crypto_sign' => 'message,secret_key',
     'sodium_crypto_sign_detached' => 'message,secret_key',
@@ -40,9 +41,15 @@ $kp = sodium_crypto_sign_keypair();
 $sk = sodium_crypto_sign_secretkey($kp);
 $sig = sodium_crypto_sign_detached(message: 'm', secret_key: $sk);
 echo (strlen($sig) === SODIUM_CRYPTO_SIGN_BYTES) ? "sign_detached_named_ok\n" : "sign_detached_named_BAD\n";
+$sbKey = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+$sbNonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+$sbCipher = sodium_crypto_secretbox('hi', $sbNonce, $sbKey);
+$sbPlain = sodium_crypto_secretbox_open(ciphertext: $sbCipher, nonce: $sbNonce, key: $sbKey);
+echo ('hi' === $sbPlain) ? "secretbox_open_named_ok\n" : "secretbox_open_named_BAD\n";
 --EXPECT--
 sodium_crypto_generichash=message,key,length ok
 sodium_crypto_secretbox=message,nonce,key ok
+sodium_crypto_secretbox_open=ciphertext,nonce,key ok
 sodium_crypto_box=message,nonce,key_pair ok
 sodium_crypto_sign=message,secret_key ok
 sodium_crypto_sign_detached=message,secret_key ok
@@ -52,3 +59,4 @@ sodium_crypto_pwhash_str=password,opslimit,memlimit ok
 named_match
 wrong_name_rejected
 sign_detached_named_ok
+secretbox_open_named_ok

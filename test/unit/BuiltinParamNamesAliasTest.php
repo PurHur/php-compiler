@@ -3600,7 +3600,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'user_string', 'hash_equals'));
     }
 
-    /** @covers issue #24490 */
+    /** @covers issue #24490 / #28856 */
     public function testSodiumCryptoZendStubNamedParams(): void
     {
         $generichash = BuiltinParamNames::forFunction('sodium_crypto_generichash');
@@ -3616,6 +3616,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($secretbox, 'message', 'sodium_crypto_secretbox'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($secretbox, 'nonce', 'sodium_crypto_secretbox'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($secretbox, 'key', 'sodium_crypto_secretbox'));
+
+        $open = BuiltinParamNames::forFunction('sodium_crypto_secretbox_open');
+        self::assertSame(['ciphertext', 'nonce', 'key'], $open);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($open, 'ciphertext', 'sodium_crypto_secretbox_open'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($open, 'nonce', 'sodium_crypto_secretbox_open'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($open, 'key', 'sodium_crypto_secretbox_open'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('sodium_crypto_secretbox_open'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('sodium_crypto_secretbox_open'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_crypto_secretbox_open'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_secretbox_open', 0));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_secretbox_open', 1));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_crypto_secretbox_open', 2));
+        self::assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('sodium_crypto_secretbox_open', 0)['type'] ?? null);
 
         $box = BuiltinParamNames::forFunction('sodium_crypto_box');
         self::assertSame(['message', 'nonce', 'key_pair'], $box);
