@@ -55,6 +55,8 @@ final class TempnamRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__phpc_jit_tempnam_leaf', $source);
         $this->assertStringContainsString('ensureNestedLeafBody', $source);
         $this->assertStringContainsString("lookupFunction('mkstemp')", $source);
+        $this->assertStringContainsString("lookupFunction('memchr')", $source);
+        $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('SysGetTempDirRuntime::invokeNestedLeaf', $source);
         $this->assertStringNotContainsString('implementForThinAot', $source);
     }

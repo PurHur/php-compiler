@@ -32,7 +32,9 @@ final class LibcExtern
             'memmove' => [$i8p, false, [$i8p, $i8p, $sizeT]],
             'memset' => [$i8p, false, [$i8p, $i32, $sizeT]],
             'memcmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
-            'memchr' => [$i8p, false, [$i8p, $i32, $sizeT]],
+            // memchr dropped (#31655): JitTempnamKernel::ensureLibc declares memchr(3)
+            // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
+            // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
             'strlen' => [$sizeT, false, [$i8p]],
             'strcmp' => [$i32, false, [$i8p, $i8p]],
             'strncmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
@@ -61,7 +63,9 @@ final class LibcExtern
             'close' => [$i32, false, [$i32]],
             'read' => [$i64, false, [$i32, $i8p, $i64]],
             'write' => [$i64, false, [$i32, $i8p, $i64]],
-            'mkstemp' => [$i32, false, [$i8p]],
+            // mkstemp dropped (#31655): JitTempnamKernel::ensureLibc declares mkstemp(3)
+            // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
+            // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
             // chmod dropped (#31374): ChmodJitHelper / StringChmod own user-script chmod();
             // NestedJIT JitTempnamKernel + M5TrivialEchoNative declare chmod(2) module-locally.
             // mkdir dropped (#31374): MkdirJitHelper / StringMkdir own user-script mkdir();

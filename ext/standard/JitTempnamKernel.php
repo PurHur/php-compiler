@@ -82,6 +82,7 @@ final class JitTempnamKernel
         $strPtr = $context->getTypeFromString('__string__*');
 
         foreach ([
+            // memchr/mkstemp module-local after LibcExtern always-on drop (#31655).
             ['memchr', $i8p, [$i8p, $i32, $sizeT]],
             // strrchr(3) module-local after LibcExtern/Module always-on drop (#31458).
             ['strrchr', $i8p, [$i8p, $i32]],
