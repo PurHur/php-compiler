@@ -36,7 +36,7 @@ final class filter_input extends Internal
                 'filter_input() expects at most 4 arguments, '.$argc.' given'
             );
         }
-        $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input');
+        $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input', $frame);
         // php-src Z_PARAM_STR $var_name — caller strict_types → TypeError on null (#29776).
         $keyStr = VmString::stringBuiltinArgForFrame(
             $frame,
@@ -153,7 +153,7 @@ final class filter_input extends Internal
             return JitFilter::boxedFalse($context);
         }
 
-        $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);
+        $typeVal = JitFilterInputTypeArg::lower($context, $args[0], 'filter_input');
         $i64 = $context->getTypeFromString('int64');
         $isGet = $context->builder->icmp(
             Builder::INT_EQ,

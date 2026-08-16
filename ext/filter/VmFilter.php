@@ -826,9 +826,14 @@ final class VmFilter
         );
     }
 
-    public static function resolveInputType(Variable $var, string $fn): int
+    /**
+     * php-src Z_PARAM_LONG $type / $input_type — soft-null → E_DEPRECATED + coerce 0;
+     * caller strict_types → TypeError (#31486). Param name is input_type for filter_has_var.
+     */
+    public static function resolveInputType(Variable $var, string $fn, ?Frame $frame = null): int
     {
         $var = $var->resolveIndirect();
+        $param = self::inputTypeParamName($fn);
         $fromEnum = self::tryPhpInputFilterInt($var);
         if (null !== $fromEnum) {
             self::assertValidInputType($fromEnum, $fn);
@@ -837,10 +842,25 @@ final class VmFilter
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #1 ($type) must be of type PhpInputFilter|int, %s given',
+                '%s(): Argument #1 ($%s) must be of type PhpInputFilter|int, %s given',
                 $fn,
+                $param,
                 EnumCaseSupport::typeNameForVariable($var)
             ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            // php-src Z_PARAM_LONG — strict TypeError; else E_DEPRECATED then coerce to 0 (#31486).
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #1 ($%s) must be of type PhpInputFilter|int, null given',
+                    $fn,
+                    $param
+                ));
+            }
+            VmNullNumberParamDeprecation::emit($frame, $fn, 1, $param, 'int');
+            self::assertValidInputType(0, $fn);
+
+            return 0;
         }
         if (Variable::TYPE_INTEGER === $var->type) {
             $type = $var->toInt();
@@ -850,10 +870,17 @@ final class VmFilter
         }
 
         throw new \TypeError(sprintf(
-            '%s(): Argument #1 ($type) must be of type PhpInputFilter|int, %s given',
+            '%s(): Argument #1 ($%s) must be of type PhpInputFilter|int, %s given',
             $fn,
+            $param,
             EnumCaseSupport::typeNameForVariable($var)
         ));
+    }
+
+    /** php-src filter.stub.php — filter_has_var uses $input_type; peers use $type (#31486). */
+    public static function inputTypeParamName(string $fn): string
+    {
+        return 'filter_has_var' === $fn ? 'input_type' : 'type';
     }
 
     public static function tryPhpInputFilterInt(Variable $var): ?int
@@ -883,11 +910,10 @@ final class VmFilter
             self::INPUT_SERVER,
         ], true)) {
             // php-src php_filter_get_storage — ValueError when type is not an INPUT_* constant.
-            $arg = 'filter_has_var' === $fn ? 'input_type' : 'type';
             throw new \ValueError(sprintf(
                 '%s(): Argument #1 ($%s) must be an INPUT_* constant',
                 $fn,
-                $arg
+                self::inputTypeParamName($fn)
             ));
         }
     }

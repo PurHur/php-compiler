@@ -36,7 +36,7 @@ final class filter_input_array extends Internal
         if (null === $ctx) {
             throw new \LogicException('filter_input_array() requires VM context in this compiler build');
         }
-        $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input_array');
+        $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input_array', $frame);
         $definition = null;
         if ($argc >= 2) {
             $definition = self::resolveDefinition($frame, $frame->calledArgs[1]);
