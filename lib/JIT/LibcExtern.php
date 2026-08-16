@@ -41,8 +41,10 @@ final class LibcExtern
             // strcoll dropped (#31498): StringStrcoll declares strcoll(3) module-locally
             // for the __compiler_strcoll trampoline (#27059); no other lookupFunction remains.
             // strcspn dropped (#29050): parse_str AOT kernel + StringStrspn use __compiler_strcspn.
-            'strchr' => [$i8p, false, [$i8p, $i32]],
-            'strstr' => [$i8p, false, [$i8p, $i8p]],
+            // strchr dropped (#31519): NestedJIT StringGetenv putenv leaf + JitParseStrUserScriptCstrKernel
+            // declare strchr(3) module-locally; PHP strchr()/strstr() are VmString (not libc).
+            // strstr dropped (#31519): no remaining lookupFunction('strstr') consumers
+            // (user-script strstr/strchr already PHP helpers — peer BootstrapCompileSmokeM3EmitShrinkTest).
             // strrchr dropped (#31458): StrrchrJitHelper owns user-script strrchr();
             // NestedJIT JitTempnamKernel + ReflectionSetup declare strrchr(3) module-locally.
             'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],

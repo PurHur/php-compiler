@@ -1014,6 +1014,10 @@ class Module extends ModuleAbstract
         // StrrchrJitHelper owns user-script strrchr(); NestedJIT JitTempnamKernel +
         // ReflectionSetup::shortNameFromCstr declare strrchr module-locally
         // (LibcExtern row also dropped).
+        // strchr(3)/strstr(3) dropped from LibcExtern always-on (#31519 / #31458 peer):
+        // NestedJIT StringGetenv putenv leaf + JitParseStrUserScriptCstrKernel declare
+        // strchr module-locally; PHP strchr()/strstr() are VmString (not libc). No
+        // remaining lookupFunction('strstr') consumers.
         try {
             $context->lookupFunction('strtol');
         } catch (\Throwable $e) {
