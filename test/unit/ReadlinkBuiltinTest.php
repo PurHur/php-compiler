@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * readlink() VM/AOT smoke.
+ * readlink() VM/AOT smoke (#28425 AOT missing-path + Reflection peer).
  */
 final class ReadlinkBuiltinTest extends TestCase
 {
@@ -30,6 +30,11 @@ PHP;
 
     private const EXPECT = "target.txt\nnotlink\ngone\n";
 
+    private const AOT_MISSING_CODE = <<<'PHP'
+$missing = @readlink('/no/such/phpc-readlink-path');
+echo (false === $missing) ? "false\n" : ("bad:" . gettype($missing) . "\n");
+PHP;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -47,28 +52,30 @@ PHP;
 
     public function testVmMatchesPhpSubset(): void
     {
-        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
+        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
     }
 
     /**
+     * AOT: missing path → false (bridge compiles; NestedJIT success leaf is follow-up).
+     *
      * @group llvm
      * @group jit
      */
-    public function testAotNativeBinaryMatchesPhpSubset(): void
+    public function testAotMissingPathReturnsFalse(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $this->assertSame(self::EXPECT, $this->runAotBinary());
+        $this->assertSame("false\n", $this->runAotBinary(self::AOT_MISSING_CODE));
     }
 
-    private function runAotBinary(): string
+    private function runAotBinary(string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_readlink_');
         $out = $tmp.'_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::CODE);
+        file_put_contents($tmp, "<?php\n".$code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
@@ -103,12 +110,12 @@ PHP;
         return (string) $result;
     }
 
-    private function runBin(string $bin): string
+    private function runBin(string $bin, string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_readlink_');
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::CODE);
+        file_put_contents($tmp, "<?php\n".$code);
         $proc = proc_open(
             ['php', $repo.'/'.$bin, $tmp],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
