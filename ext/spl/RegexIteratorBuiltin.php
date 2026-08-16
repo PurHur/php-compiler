@@ -424,11 +424,17 @@ final class RegexIteratorBuiltin
         }
     }
 
-    public static function validateMode(int $mode): void
-    {
+    /**
+     * php-src zim_RegexIterator_setMode / __construct mode range check.
+     * Callers pass the Zend-shaped method+arg citation (#31573).
+     */
+    public static function validateMode(
+        int $mode,
+        string $where = 'RegexIterator::__construct(): Argument #3 ($mode)'
+    ): void {
         if ($mode < self::MATCH || $mode > self::REPLACE) {
             throw new \ValueError(
-                'RegexIterator::__construct(): Argument #3 ($mode) must be RegexIterator::MATCH, '
+                $where.' must be RegexIterator::MATCH, '
                 .'RegexIterator::GET_MATCH, RegexIterator::ALL_MATCHES, RegexIterator::SPLIT, '
                 .'or RegexIterator::REPLACE'
             );
@@ -437,7 +443,7 @@ final class RegexIteratorBuiltin
 
     public static function setModeValue(ObjectEntry $object, int $mode): void
     {
-        self::validateMode($mode);
+        self::validateMode($mode, 'RegexIterator::setMode(): Argument #1 ($mode)');
         self::$state[$object->id]['mode'] = $mode;
     }
 
