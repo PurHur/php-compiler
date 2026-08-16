@@ -11,7 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * ftp_close() — tear down FTP\Connection (php-src ext/ftp/php_ftp.c; #3353).
+ * ftp_close() — tear down FTP\Connection (php-src ext/ftp/php_ftp.c; #3353, #31377).
+ *
+ * JIT/AOT: {@see JitFtpClose} → NestedJIT {@see FtpCloseJitHelper} (#31377).
  */
 final class ftp_close extends Internal
 {
@@ -39,6 +41,11 @@ final class ftp_close extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ftp_close() is not implemented for JIT in this compiler build (issue #3353)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitFtpClose::emitArgumentCountError($context, 'ftp_close', $argc);
+        }
+
+        return JitFtpClose::invoke($context, 'ftp_close', $args[0]);
     }
 }

@@ -74,6 +74,18 @@ final class VmFtpCore
         return self::$jitOwned[$key]['fd'];
     }
 
+    /**
+     * ftp_close() under JIT/AOT — drop owned-fd map entry (#31377).
+     */
+    public static function releaseJitOwnedForLookupKey(int $key): void
+    {
+        if ($key <= 0 || !isset(self::$jitOwned[$key])) {
+            return;
+        }
+        self::$jitOwned[$key]['closed'] = true;
+        unset(self::$jitOwned[$key]);
+    }
+
     public static function sslConnect(string $hostname, int $port, int $timeout, Context $ctx): Variable|false
     {
         return self::openConnection($hostname, $port, $timeout, $ctx, true);
