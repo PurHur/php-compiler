@@ -100,6 +100,8 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStatKernel.php');
         $this->assertStringContainsString("lookupFunction(\$statFn)", $kernel);
         $this->assertStringContainsString("lookupFunction('access')", $kernel);
+        $this->assertStringContainsString('ensureLibcStat', $kernel);
+        $this->assertStringContainsString('#31403', $kernel);
         $this->assertStringContainsString('STAT_MODE_OFFSET', $kernel);
         $this->assertStringContainsString('LONG_FIELD_LAYOUT', $kernel);
         $this->assertStringContainsString('ensureLongFieldStandalone', $kernel);

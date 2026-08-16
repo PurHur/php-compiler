@@ -42,6 +42,9 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'time',
             'chmod',
             'mkdir',
+            'stat',
+            'access',
+            'lstat',
         ];
     }
 
@@ -52,13 +55,14 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
         $this->assertStringContainsString('#29050', $source);
         $this->assertStringContainsString('#30332', $source);
         $this->assertStringContainsString('#31374', $source);
+        $this->assertStringContainsString('#31403', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -97,6 +101,21 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             "'mkdir' =>",
             $source,
             'LibcExtern must not declare libc mkdir (#31374)'
+        );
+        $this->assertStringNotContainsString(
+            "'stat' =>",
+            $source,
+            'LibcExtern must not declare libc stat (#31403)'
+        );
+        $this->assertStringNotContainsString(
+            "'access' =>",
+            $source,
+            'LibcExtern must not declare libc access (#31403)'
+        );
+        $this->assertStringNotContainsString(
+            "'lstat' =>",
+            $source,
+            'LibcExtern must not declare libc lstat (#31403)'
         );
     }
 
