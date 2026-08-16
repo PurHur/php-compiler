@@ -267,6 +267,8 @@ final class BuiltinInternalArgInfo
             'sodium_crypto_secretbox_open' => 'string|false',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27630)
             'sodium_memzero' => 'void',
+            // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27734)
+            'sodium_pad', 'sodium_unpad' => 'string',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27775)
             'sodium_crypto_aead_aes256gcm_is_available' => 'bool',
             // ext/pgsql/pgsql.stub.php — InternalArgInfo empty return; Zend string|int|false (#27703)
@@ -899,6 +901,12 @@ final class BuiltinInternalArgInfo
             },
             // ext/sodium/libsodium.stub.php — string &$string; absent from InternalArgInfo (#27630)
             'sodium_memzero' => 0 === $index ? 'string' : null,
+            // ext/sodium/libsodium.stub.php — string $string, int $block_size; absent from InternalArgInfo (#27734)
+            'sodium_pad', 'sodium_unpad' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                default => null,
+            },
             // ext/pgsql/pgsql.stub.php — ?PgSql\Result $result; InternalArgInfo untyped (#27703)
             'pg_field_table' => match ($index) {
                 0 => '?PgSql\\Result',
