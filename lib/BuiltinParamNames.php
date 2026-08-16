@@ -115,6 +115,8 @@ final class BuiltinParamNames
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
             'collator::asort' => ['array', 'flags'],
+            // php-src ext/intl/collator/collator.stub.php — OOP getSortKey(string $string); InternalArgInfo still coll/str (#28785)
+            'collator::getsortkey' => ['string'],
             'messageformatter::create' => ['locale', 'pattern'],
             'messageformatter::format' => ['args'],
             'messageformatter::setpattern' => ['pattern'],

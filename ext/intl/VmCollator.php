@@ -14,6 +14,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
@@ -153,6 +154,11 @@ final class VmCollator
             $entry->methods[$lc] = $handler;
             $entry->methodVisibility[$lc] = $vis;
             $entry->methodNames[$lc] = $name;
+        }
+        // php-src collator.stub.php — getSortKey(string $string): string|false (#28785)
+        $sortKeyRet = ReflectionTypeSupport::cfgTypeFromLabel('string|false');
+        if (null !== $sortKeyRet) {
+            $entry->methodReturnDeclaredTypes['getsortkey'] = $sortKeyRet;
         }
         $ctx->classes[self::CLASS_LC] = $entry;
     }
