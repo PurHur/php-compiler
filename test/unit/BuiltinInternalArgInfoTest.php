@@ -197,6 +197,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array', $cufaArgs['type']);
     }
 
+    /** ext/standard/array.stub.php — array_pop/array_shift(): mixed (#26112). */
+    public function testArrayPopShiftReflectionReturnIsMixed(): void
+    {
+        foreach (['array_pop', 'array_shift'] as $fn) {
+            $this->assertSame('mixed', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+    }
+
     /** Zend/zend_builtin_functions.stub.php — gc_disable/enable void; gc_mem_caches int (#28022). */
     public function testGcControlReflectionReturnTypes(): void
     {

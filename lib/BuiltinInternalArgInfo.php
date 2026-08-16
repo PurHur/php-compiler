@@ -435,6 +435,8 @@ final class BuiltinInternalArgInfo
             'array_sum', 'array_product' => 'int|float',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#26111)
             'array_key_first', 'array_key_last' => 'string|int|null',
+            // ext/standard/array.stub.php — InternalArgInfo omits mixed return (#26112)
+            'array_pop', 'array_shift' => 'mixed',
             // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#26172)
             'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
             // ext/imap/php_imap.stub.php — InternalArgInfo return string (missing |false) (#27681, #27764, #27765)
