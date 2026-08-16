@@ -235,6 +235,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/link.stub.php / basic_functions.stub.php — InternalArgInfo omits |false (#28425)
             'readlink' => 'string|false',
             'linkinfo' => 'int|false',
+            // ext/standard/basic_functions.stub.php / dir.c — InternalArgInfo return string (missing |false) (#28174)
+            'getcwd' => 'string|false',
             // ext/standard/type.stub.php — aliases absent from InternalArgInfo; Zend : bool (#28312)
             'is_integer', 'is_long', 'is_double' => 'bool',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471, #28569)
