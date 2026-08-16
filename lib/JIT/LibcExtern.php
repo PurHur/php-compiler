@@ -58,9 +58,6 @@ final class LibcExtern
             'close' => [$i32, false, [$i32]],
             'read' => [$i64, false, [$i32, $i8p, $i64]],
             'write' => [$i64, false, [$i32, $i8p, $i64]],
-            'stat' => [$i32, false, [$i8p, $i8p]],
-            'access' => [$i32, false, [$i8p, $i32]],
-            'lstat' => [$i32, false, [$i8p, $i8p]],
             'mkstemp' => [$i32, false, [$i8p]],
             // chmod dropped (#31374): ChmodJitHelper / StringChmod own user-script chmod();
             // NestedJIT JitTempnamKernel + M5TrivialEchoNative declare chmod(2) module-locally.
@@ -74,6 +71,8 @@ final class LibcExtern
             // module-locally; ChrootJitHelper uses @chroot (chdir #29219 shape).
             // getcwd NestedJIT leaf (#29429): GetcwdJit declares getcwd(2) module-locally;
             // GetcwdJitHelper uses @getcwd (never lived in this table — always-on realpath LLVM removed).
+            // stat/access/lstat dropped (#31403): JitStatKernel / TouchLibcRuntime / FtokRuntime /
+            // JitFsGlobKernel declare module-locally; StatPathJitHelper owns user-script path predicates.
             'getenv' => [$i8p, false, [$i8p]],
             'putenv' => [$i32, false, [$i8p]],
             'setenv' => [$i32, false, [$i8p, $i8p, $i32]],

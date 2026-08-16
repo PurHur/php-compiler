@@ -1065,33 +1065,9 @@ class Module extends ModuleAbstract
         }
         // realpath(3) dropped from always-on Module decls (#30530): SysGetTempDirRuntime
         // NestedJIT leaf declares realpath module-locally (#29433); StringRealpath is PHP helper.
-        try {
-            $context->lookupFunction('stat');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('stat', $ft);
-            $context->registerFunction('stat', $fn);
-        }
-        try {
-            $context->lookupFunction('access');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i32);
-            $fn = $context->module->addFunction('access', $ft);
-            $context->registerFunction('access', $fn);
-        }
-        try {
-            $context->lookupFunction('lstat');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('lstat', $ft);
-            $context->registerFunction('lstat', $fn);
-        }
+        // stat(2)/access(2)/lstat(2) dropped (#31403 / #30530 peer): JitStatKernel /
+        // TouchLibcRuntime / FtokRuntime / JitFsGlobKernel declare module-locally;
+        // StatPathJitHelper owns user-script path predicates (LibcExtern rows also dropped).
         // statvfs(3) dropped (#30530): disk_free_space/disk_total_space use VmFsDiskPure (#8989).
         // readlink(2)/unlink(2)/rmdir(2) dropped (#30530): StringReadlink / StringUnlink /
         // StringRmdir → *JitHelper PHP; no remaining libc lookupFunction consumers.

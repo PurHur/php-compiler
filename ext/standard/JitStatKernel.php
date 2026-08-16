@@ -42,6 +42,7 @@ final class JitStatKernel
     /** @return Value i32 — st_mode, or -1 on failure */
     public static function mode(Context $context, Value $pathStr, bool $useLstat): Value
     {
+        self::ensureLibcStat($context);
         $statFn = $useLstat ? 'lstat' : 'stat';
         $fn = self::ensureModeStandalone($context, $statFn);
 
@@ -56,6 +57,7 @@ final class JitStatKernel
      */
     public static function longField(Context $context, Value $pathStr, Value $useLstat, Value $fieldId): Value
     {
+        self::ensureLibcStat($context);
         $fn = self::ensureLongFieldStandalone($context);
 
         return $context->builder->call($fn, $pathStr, $useLstat, $fieldId);
@@ -64,6 +66,7 @@ final class JitStatKernel
     /** @return Value i1 — access(2) succeeds */
     public static function accessOk(Context $context, Value $pathStr, int $mode): Value
     {
+        self::ensureLibcStat($context);
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($pathStr, $map['value']);
         $i32 = $context->getTypeFromString('int32');
@@ -76,6 +79,32 @@ final class JitStatKernel
         return $context->builder->icmp(Builder::INT_EQ, $ret, $i32->constInt(0, false));
     }
 
+    /**
+     * Module-local stat(2)/lstat(2)/access(2) after always-on LibcExtern/Module drop (#31403).
+     */
+    private static function ensureLibcStat(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        foreach (
+            [
+                ['stat', $i32, [$i8p, $i8p]],
+                ['lstat', $i32, [$i8p, $i8p]],
+                ['access', $i32, [$i8p, $i32]],
+            ] as [$name, $ret, $params]
+        ) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+                $context->registerFunction($name, $fn);
+            }
+        }
+    }
+
     private static function ensureModeStandalone(Context $context, string $statFn): Value
     {
         $name = '__phpc_jit_stat_mode_kernel_'.$statFn;
@@ -85,6 +114,8 @@ final class JitStatKernel
 
             return $existing;
         }
+
+        self::ensureLibcStat($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i32 = $context->getTypeFromString('int32');
@@ -134,6 +165,8 @@ final class JitStatKernel
 
             return $existing;
         }
+
+        self::ensureLibcStat($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');

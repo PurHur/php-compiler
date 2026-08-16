@@ -124,12 +124,14 @@ final class JitFsGlobKernel
         $i8ppp = $i8pp->pointerType(0);
         $voidTy = $context->getTypeFromString('void');
 
-        // glob/scandir only — malloc/free/memset/stat/strcmp come from LibcExtern (i8*).
+        // glob/scandir + module-local stat(2) after LibcExtern/Module always-on drop (#31403).
+        // malloc/free/memset/strcmp still come from LibcExtern (i8*).
         foreach ([
             ['glob', $i32, [$i8p, $i32, $i8p, $i8p]],
             ['globfree', $voidTy, [$i8p]],
             ['scandir', $i32, [$i8p, $i8ppp, $i8p, $i8p]],
             ['alphasort', $i32, [$i8pp, $i8pp]],
+            ['stat', $i32, [$i8p, $i8p]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
