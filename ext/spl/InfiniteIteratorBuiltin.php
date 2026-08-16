@@ -139,7 +139,9 @@ final class InfiniteIteratorConstruct extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'InfiniteIterator::__construct',
+            'Iterator'
         );
         SplDualIteratorStorage::initSimple($object, $inner);
     }
@@ -167,7 +169,9 @@ final class NoRewindIteratorConstruct extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'NoRewindIterator::__construct',
+            'Iterator'
         );
         SplDualIteratorStorage::initNoRewind($object, $inner);
     }

@@ -260,7 +260,9 @@ final class AppendIteratorAppend extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'AppendIterator::append',
+            'Iterator'
         );
         AppendIteratorBuiltin::appendIterator($object, $inner);
     }

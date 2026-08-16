@@ -529,17 +529,56 @@ final class SplDualIteratorStorage
         self::advanceToYield($frame, $object);
     }
 
-    public static function resolveIterator(Context $ctx, Frame $frame, Variable $traversable): ObjectEntry
-    {
+    /**
+     * Resolve an inner iterator for OuterIterator wrappers.
+     *
+     * php-src: typed Iterator params use Z_PARAM_OBJ_OF_CLASS (no IteratorAggregate unwrap);
+     * IteratorIterator uses Traversable and unwraps IteratorAggregate (#31513).
+     *
+     * @param 'Traversable'|'Iterator' $expectedType
+     */
+    public static function resolveIterator(
+        Context $ctx,
+        Frame $frame,
+        Variable $traversable,
+        string $function = 'IteratorIterator::__construct',
+        string $expectedType = 'Traversable'
+    ): ObjectEntry {
         $resolved = $traversable->resolveIndirect();
+        if ('Iterator' === $expectedType) {
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                throw new \TypeError(
+                    $function.'(): Argument #1 ($iterator) must be of type Iterator, '
+                    .self::typeLabel($resolved).' given'
+                );
+            }
+            $object = $resolved->toObject();
+            if (!InterfaceCheck::entryImplements($object->class, 'iterator', $ctx)) {
+                throw new \TypeError(
+                    $function.'(): Argument #1 ($iterator) must be of type Iterator, '
+                    .$object->class->name.' given'
+                );
+            }
+
+            return $object;
+        }
+
         if (Variable::TYPE_OBJECT !== $resolved->type) {
             throw new \TypeError(
-                'IteratorIterator::__construct(): Argument #1 ($iterator) must be of type Traversable, '
+                $function.'(): Argument #1 ($iterator) must be of type Traversable, '
                 .self::typeLabel($resolved).' given'
             );
         }
         $object = $resolved->toObject();
-        if (InterfaceCheck::entryImplements($object->class, 'iteratoraggregate', $ctx)) {
+        $isAggregate = InterfaceCheck::entryImplements($object->class, 'iteratoraggregate', $ctx);
+        $isIterator = InterfaceCheck::entryImplements($object->class, 'iterator', $ctx);
+        if (!$isAggregate && !$isIterator) {
+            throw new \TypeError(
+                $function.'(): Argument #1 ($iterator) must be of type Traversable, '
+                .$object->class->name.' given'
+            );
+        }
+        if ($isAggregate && !$isIterator) {
             $inner = self::vm($frame)->invokeInstanceMethod($object, 'getIterator')->resolveIndirect();
             if (Variable::TYPE_OBJECT !== $inner->type) {
                 throw new \UnexpectedValueException('IteratorAggregate::getIterator() must return an object');
@@ -553,9 +592,29 @@ final class SplDualIteratorStorage
         return $object;
     }
 
+    /**
+     * RecursiveIteratorIterator::__construct — Z_PARAM_OBJECT then RecursiveIterator /
+     * IteratorAggregate-producing-it check (php-src spl_iterators.c; #31513).
+     */
     public static function resolveRecursiveIterator(Context $ctx, Frame $frame, Variable $traversable): ObjectEntry
     {
-        $object = self::resolveIterator($ctx, $frame, $traversable);
+        $resolved = $traversable->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            throw new \TypeError(
+                'RecursiveIteratorIterator::__construct(): Argument #1 ($iterator) must be of type object, '
+                .self::typeLabel($resolved).' given'
+            );
+        }
+        $object = $resolved->toObject();
+        if (InterfaceCheck::entryImplements($object->class, 'iteratoraggregate', $ctx)
+            && !InterfaceCheck::entryImplements($object->class, 'iterator', $ctx)
+        ) {
+            $inner = self::vm($frame)->invokeInstanceMethod($object, 'getIterator')->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $inner->type) {
+                throw new \UnexpectedValueException('IteratorAggregate::getIterator() must return an object');
+            }
+            $object = $inner->toObject();
+        }
         if (!InterfaceCheck::entryImplements($object->class, 'recursiveiterator', $ctx)) {
             throw new \InvalidArgumentException(
                 'An instance of RecursiveIterator or IteratorAggregate creating it is required'

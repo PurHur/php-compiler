@@ -392,7 +392,9 @@ final class MultipleIteratorAttachIterator extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'MultipleIterator::attachIterator',
+            'Iterator'
         );
         $info = null;
         if (isset($frame->calledArgs[2])) {
@@ -447,7 +449,9 @@ final class MultipleIteratorDetachIterator extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'MultipleIterator::detachIterator',
+            'Iterator'
         );
         SplIteratorSupport::setReturnBool(
             $frame,
@@ -478,7 +482,9 @@ final class MultipleIteratorContainsIterator extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[1]
+            $frame->calledArgs[1],
+            'MultipleIterator::containsIterator',
+            'Iterator'
         );
         SplIteratorSupport::setReturnBool(
             $frame,

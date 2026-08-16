@@ -615,7 +615,9 @@ final class CachingIteratorConstruct extends VmClassMethod
         $inner = SplDualIteratorStorage::resolveIterator(
             $frame->vmContext,
             $frame,
-            $iteratorArg
+            $iteratorArg,
+            'CachingIterator::__construct',
+            'Iterator'
         );
         // php-src: int $flags = self::CALL_TOSTRING; explicit null → 0 (Z_PARAM_LONG_OR_NULL).
         $flags = self::resolveConstructFlags($flagsArg, 'CachingIterator::__construct');
