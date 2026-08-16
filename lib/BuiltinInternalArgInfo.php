@@ -1394,6 +1394,15 @@ final class BuiltinInternalArgInfo
             'domdocument::createelementns' => 0 === $index ? '?string' : null,
             // ext/dom/php_dom.stub.php — createAttributeNS(?string $namespace, …)
             'domdocument::createattributens' => 0 === $index ? '?string' : null,
+            // ext/dom/php_dom.stub.php — *AttributeNS / getElementsByTagNameNS(?string $namespace, …)
+            // InternalArgInfo still advertises non-nullable string (#31469).
+            'domelement::getattributens',
+            'domelement::hasattributens',
+            'domelement::setattributens',
+            'domelement::removeattributens',
+            'domelement::getattributenodens',
+            'domelement::getelementsbytagnamens',
+            'domdocument::getelementsbytagnamens' => 0 === $index ? '?string' : null,
             // ext/dom/php_dom.stub.php — loadHTML(string $source, int $options = 0): bool (#28713)
             // InternalArgInfo omits the optional $options param (load/loadXML already have int).
             'domdocument::loadhtml',
