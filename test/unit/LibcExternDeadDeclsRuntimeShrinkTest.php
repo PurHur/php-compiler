@@ -47,6 +47,8 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'lstat',
             'strrchr',
             'strcoll',
+            'strchr',
+            'strstr',
         ];
     }
 
@@ -57,7 +59,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -67,6 +69,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31403', $source);
         $this->assertStringContainsString('#31458', $source);
         $this->assertStringContainsString('#31498', $source);
+        $this->assertStringContainsString('#31519', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -131,6 +134,16 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strcoll (#31498)'
         );
+        $this->assertStringNotContainsString(
+            "'strchr' =>",
+            $source,
+            'LibcExtern must not declare libc strchr (#31519)'
+        );
+        $this->assertStringNotContainsString(
+            "'strstr' =>",
+            $source,
+            'LibcExtern must not declare libc strstr (#31519)'
+        );
     }
 
     public function testChownRuntimeDoesNotLookupLibcChown(): void
@@ -148,5 +161,15 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrspn.php');
         $this->assertStringContainsString('phpc_strspn_extended', $source);
         $this->assertStringNotContainsString("lookupFunction('strspn')", $source);
+    }
+
+    public function testStringGetenvDeclaresStrchrModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenv.php');
+        $this->assertStringContainsString('ensureLibcStrchr', $source);
+        $this->assertStringContainsString('#31519', $source);
+        $this->assertStringContainsString("lookupFunction('strchr')", $source);
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitParseStrUserScriptCstrKernel.php');
+        $this->assertStringContainsString("'strchr'", $kernel);
     }
 }

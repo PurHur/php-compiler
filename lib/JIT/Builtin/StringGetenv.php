@@ -21,7 +21,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * (Rename #20603 shape — no thin libc ABI fork). NestedJIT leaf: libc getenv(3)
  * via {@see invokeNestedLeaf} (chdir #29219 shape — kernel deleted).
  * Putenv overlay helpers remain on {@see GetenvJitHelper} (ensurePutenvLinked).
- * Putenv NestedJIT leaf: libc setenv/unsetenv via {@see invokePutenvNestedLeaf} (#29334).
+ * Putenv NestedJIT leaf: libc setenv/unsetenv via {@see invokePutenvNestedLeaf} (#29334);
+ * strchr(3) is module-local after LibcExtern always-on drop (#31519).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
@@ -187,6 +188,7 @@ final class StringGetenv
     public static function invokePutenvNestedLeaf(Context $context, Value $assignmentStr): void
     {
         LibcExtern::register($context);
+        self::ensureLibcStrchr($context);
         $map = $context->structFieldMap['__string__'];
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
@@ -241,6 +243,24 @@ final class StringGetenv
 
         $context->builder->positionAtEnd($doneBb);
         $context->builder->call($context->lookupFunction('free'), $cStr);
+    }
+
+    /**
+     * Module-local strchr(3) after LibcExtern always-on drop (#31519).
+     */
+    private static function ensureLibcStrchr(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strchr');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $fn = $context->module->addFunction(
+                'strchr',
+                $context->context->functionType($i8p, false, $i8p, $i32)
+            );
+            $context->registerFunction('strchr', $fn);
+        }
     }
 
     /**
