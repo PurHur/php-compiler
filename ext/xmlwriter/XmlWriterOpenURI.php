@@ -20,7 +20,7 @@ final class XmlWriterOpenURI extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::openUri()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::openUri', 1);
-        $uri = $this->stringArg($frame->calledArgs[1], 'XMLWriter::openUri()', 0, 'uri');
+        $uri = $this->stringArg($frame->calledArgs[1], 'XMLWriter::openUri()', 0, $frame, 'uri');
         $ok = VmXmlWriter::openURI($entry, $uri);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

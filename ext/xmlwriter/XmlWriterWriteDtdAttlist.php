@@ -20,8 +20,8 @@ final class XmlWriterWriteDtdAttlist extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeDtdAttlist()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::writeDtdAttlist', 2);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtdAttlist()', 0, 'name');
-        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeDtdAttlist()', 1, 'content');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtdAttlist()', 0, $frame, 'name');
+        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeDtdAttlist()', 1, $frame, 'content');
         $ok = VmXmlWriter::writeDtdAttlist($entry, $name, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

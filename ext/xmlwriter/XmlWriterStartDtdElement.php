@@ -20,7 +20,7 @@ final class XmlWriterStartDtdElement extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::startDtdElement()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::startDtdElement', 1);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startDtdElement()', 0, 'name');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startDtdElement()', 0, $frame, 'name');
         $ok = VmXmlWriter::startDtdElement($entry, $name);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

@@ -20,7 +20,7 @@ final class xmlwriter_write_cdata extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_write_cdata', 2);
         $entry = $this->writerArg($frame, 'xmlwriter_write_cdata');
-        $content = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_write_cdata', 2, 'content');
+        $content = $this->stringArgAt($frame, 1, 'xmlwriter_write_cdata', 2, 'content');
         $ok = VmXmlWriter::writeCData($entry, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

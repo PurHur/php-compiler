@@ -20,13 +20,12 @@ final class xmlwriter_write_element_ns extends XmlWriterProceduralFunction
     {
         $this->requireArgCountRange($frame, 'xmlwriter_write_element_ns', 4, 5);
         $entry = $this->writerArg($frame, 'xmlwriter_write_element_ns');
-        $prefix = $this->nullableStringArgAt($frame->calledArgs[1], 'xmlwriter_write_element_ns', 2, 'prefix');
-        $name = $this->stringArgAt($frame->calledArgs[2], 'xmlwriter_write_element_ns', 3, 'name');
-        $uri = $this->nullableStringArgAt($frame->calledArgs[3], 'xmlwriter_write_element_ns', 4, 'namespace');
+        $prefix = $this->nullableStringArgAt($frame, 1, 'xmlwriter_write_element_ns', 2, 'prefix');
+        $name = $this->stringArgAt($frame, 2, 'xmlwriter_write_element_ns', 3, 'name');
+        $uri = $this->nullableStringArgAt($frame, 3, 'xmlwriter_write_element_ns', 4, 'namespace');
         $content = null;
         if (isset($frame->calledArgs[4])) {
-            $content = $this->nullableStringArgAt(
-                $frame->calledArgs[4],
+            $content = $this->nullableStringArgAt($frame, 4,
                 'xmlwriter_write_element_ns',
                 5,
                 'content'

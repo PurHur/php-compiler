@@ -21,8 +21,8 @@ final class XmlWriterWriteDtdEntity extends XmlWriterClassMethod
         $entry = $this->receiver($frame, 'XMLWriter::writeDtdEntity()');
         $this->requireUserArgCountRange($frame, 'XMLWriter::writeDtdEntity', 2, 6);
         $argc = \count($frame->calledArgs);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtdEntity()', 0, 'name');
-        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeDtdEntity()', 1, 'content');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtdEntity()', 0, $frame, 'name');
+        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeDtdEntity()', 1, $frame, 'content');
         $isParam = false;
         $publicId = null;
         $systemId = null;
@@ -31,13 +31,13 @@ final class XmlWriterWriteDtdEntity extends XmlWriterClassMethod
             $isParam = $frame->calledArgs[3]->resolveIndirect()->toBool();
         }
         if ($argc >= 5) {
-            $publicId = $this->nullableStringArg($frame->calledArgs[4], 'XMLWriter::writeDtdEntity()', 3, 'publicId');
+            $publicId = $this->nullableStringArg($frame->calledArgs[4], 'XMLWriter::writeDtdEntity()', 3, $frame, 'publicId');
         }
         if ($argc >= 6) {
-            $systemId = $this->nullableStringArg($frame->calledArgs[5], 'XMLWriter::writeDtdEntity()', 4, 'systemId');
+            $systemId = $this->nullableStringArg($frame->calledArgs[5], 'XMLWriter::writeDtdEntity()', 4, $frame, 'systemId');
         }
         if ($argc >= 7) {
-            $notationData = $this->nullableStringArg($frame->calledArgs[6], 'XMLWriter::writeDtdEntity()', 5, 'notationData');
+            $notationData = $this->nullableStringArg($frame->calledArgs[6], 'XMLWriter::writeDtdEntity()', 5, $frame, 'notationData');
         }
         $ok = VmXmlWriter::writeDtdEntity($entry, $name, $content, $isParam, $publicId, $systemId, $notationData);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

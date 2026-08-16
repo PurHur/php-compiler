@@ -20,10 +20,10 @@ final class XmlWriterWriteAttributeNS extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeAttributeNs()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::writeAttributeNs', 4);
-        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::writeAttributeNs()', 0, 'prefix');
-        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeAttributeNs()', 1, 'name');
-        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeAttributeNs()', 2, 'uri');
-        $content = $this->stringArg($frame->calledArgs[4], 'XMLWriter::writeAttributeNs()', 3, 'content');
+        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::writeAttributeNs()', 0, $frame, 'prefix');
+        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeAttributeNs()', 1, $frame, 'name');
+        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeAttributeNs()', 2, $frame, 'uri');
+        $content = $this->stringArg($frame->calledArgs[4], 'XMLWriter::writeAttributeNs()', 3, $frame, 'content');
         $ok = VmXmlWriter::writeAttributeNS($entry, $prefix, $name, $uri, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

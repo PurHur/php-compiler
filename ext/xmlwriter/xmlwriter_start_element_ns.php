@@ -20,9 +20,9 @@ final class xmlwriter_start_element_ns extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_start_element_ns', 4);
         $entry = $this->writerArg($frame, 'xmlwriter_start_element_ns');
-        $prefix = $this->nullableStringArgAt($frame->calledArgs[1], 'xmlwriter_start_element_ns', 2, 'prefix');
-        $name = $this->stringArgAt($frame->calledArgs[2], 'xmlwriter_start_element_ns', 3, 'name');
-        $uri = $this->nullableStringArgAt($frame->calledArgs[3], 'xmlwriter_start_element_ns', 4, 'namespace');
+        $prefix = $this->nullableStringArgAt($frame, 1, 'xmlwriter_start_element_ns', 2, 'prefix');
+        $name = $this->stringArgAt($frame, 2, 'xmlwriter_start_element_ns', 3, 'name');
+        $uri = $this->nullableStringArgAt($frame, 3, 'xmlwriter_start_element_ns', 4, 'namespace');
         $ok = VmXmlWriter::startElementNS($entry, $prefix, $name, $uri);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

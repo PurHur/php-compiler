@@ -20,20 +20,18 @@ final class xmlwriter_start_dtd extends XmlWriterProceduralFunction
     {
         $this->requireArgCountRange($frame, 'xmlwriter_start_dtd', 2, 4);
         $entry = $this->writerArg($frame, 'xmlwriter_start_dtd');
-        $qualifiedName = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_start_dtd', 2, 'qualifiedName');
+        $qualifiedName = $this->stringArgAt($frame, 1, 'xmlwriter_start_dtd', 2, 'qualifiedName');
         $publicId = null;
         $systemId = null;
         if (isset($frame->calledArgs[2])) {
-            $publicId = $this->nullableStringArgAt(
-                $frame->calledArgs[2],
+            $publicId = $this->nullableStringArgAt($frame, 2,
                 'xmlwriter_start_dtd',
                 3,
                 'publicId'
             );
         }
         if (isset($frame->calledArgs[3])) {
-            $systemId = $this->nullableStringArgAt(
-                $frame->calledArgs[3],
+            $systemId = $this->nullableStringArgAt($frame, 3,
                 'xmlwriter_start_dtd',
                 4,
                 'systemId'

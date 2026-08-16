@@ -20,7 +20,7 @@ final class XmlWriterStartDtdEntity extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::startDtdEntity()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::startDtdEntity', 2);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startDtdEntity()', 0, 'name');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::startDtdEntity()', 0, $frame, 'name');
         $isParam = $frame->calledArgs[2]->resolveIndirect()->toBool();
         $ok = VmXmlWriter::startDtdEntity($entry, $name, $isParam);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

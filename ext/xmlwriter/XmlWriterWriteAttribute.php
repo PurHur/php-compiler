@@ -20,8 +20,8 @@ final class XmlWriterWriteAttribute extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeAttribute()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::writeAttribute', 2);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeAttribute()', 0, 'name');
-        $value = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeAttribute()', 1, 'value');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeAttribute()', 0, $frame, 'name');
+        $value = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeAttribute()', 1, $frame, 'value');
         $ok = VmXmlWriter::writeAttribute($entry, $name, $value);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

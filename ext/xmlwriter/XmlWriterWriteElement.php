@@ -21,10 +21,10 @@ final class XmlWriterWriteElement extends XmlWriterClassMethod
         $entry = $this->receiver($frame, 'XMLWriter::writeElement()');
         $this->requireUserArgCountRange($frame, 'XMLWriter::writeElement', 1, 2);
         $argc = \count($frame->calledArgs);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeElement()', 0, 'name');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeElement()', 0, $frame, 'name');
         $content = null;
         if ($argc >= 3) {
-            $content = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::writeElement()', 1, 'content');
+            $content = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::writeElement()', 1, $frame, 'content');
         }
         $ok = VmXmlWriter::writeElement($entry, $name, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

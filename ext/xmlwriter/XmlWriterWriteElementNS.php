@@ -21,12 +21,12 @@ final class XmlWriterWriteElementNS extends XmlWriterClassMethod
         $entry = $this->receiver($frame, 'XMLWriter::writeElementNs()');
         $this->requireUserArgCountRange($frame, 'XMLWriter::writeElementNs', 3, 4);
         $argc = \count($frame->calledArgs);
-        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::writeElementNs()', 0, 'prefix');
-        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeElementNs()', 1, 'name');
-        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeElementNs()', 2, 'uri');
+        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::writeElementNs()', 0, $frame, 'prefix');
+        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeElementNs()', 1, $frame, 'name');
+        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeElementNs()', 2, $frame, 'uri');
         $content = null;
         if ($argc >= 5) {
-            $content = $this->nullableStringArg($frame->calledArgs[4], 'XMLWriter::writeElementNs()', 3, 'content');
+            $content = $this->nullableStringArg($frame->calledArgs[4], 'XMLWriter::writeElementNs()', 3, $frame, 'content');
         }
         $ok = VmXmlWriter::writeElementNS($entry, $prefix, $name, $uri, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

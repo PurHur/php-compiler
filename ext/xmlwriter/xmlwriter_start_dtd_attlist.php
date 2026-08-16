@@ -20,7 +20,7 @@ final class xmlwriter_start_dtd_attlist extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_start_dtd_attlist', 2);
         $entry = $this->writerArg($frame, 'xmlwriter_start_dtd_attlist');
-        $name = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_start_dtd_attlist', 2, 'name');
+        $name = $this->stringArgAt($frame, 1, 'xmlwriter_start_dtd_attlist', 2, 'name');
         $ok = VmXmlWriter::startDtdAttlist($entry, $name);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

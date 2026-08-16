@@ -20,7 +20,7 @@ final class xmlwriter_start_pi extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_start_pi', 2);
         $entry = $this->writerArg($frame, 'xmlwriter_start_pi');
-        $target = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_start_pi', 2, 'target');
+        $target = $this->stringArgAt($frame, 1, 'xmlwriter_start_pi', 2, 'target');
         $ok = VmXmlWriter::startPI($entry, $target);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

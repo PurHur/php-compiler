@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlwriter;
 
+use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -53,10 +54,11 @@ abstract class XmlWriterProceduralFunction extends Internal
 
     /**
      * Procedural string arg — 1-based index includes $writer as argument #1.
+     * Z_PARAM_STR soft-null DEP (#31610).
      */
-    protected function stringArgAt(Variable $var, string $function, int $argNum, string $paramName): string
+    protected function stringArgAt(Frame $frame, int $frameArgIndex, string $function, int $argNum, string $paramName): string
     {
-        $var = $var->resolveIndirect();
+        $var = $frame->calledArgs[$frameArgIndex]->resolveIndirect();
         if (Variable::TYPE_OBJECT === $var->type) {
             throw new \TypeError(sprintf(
                 '%s(): Argument #%d ($%s) must be of type string, %s given',
@@ -74,18 +76,23 @@ abstract class XmlWriterProceduralFunction extends Internal
                 $paramName
             ));
         }
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit($frame, $function, $argNum - 1, $paramName);
+
+            return '';
+        }
 
         return $var->toString();
     }
 
-    protected function nullableStringArgAt(Variable $var, string $function, int $argNum, string $paramName): ?string
+    protected function nullableStringArgAt(Frame $frame, int $frameArgIndex, string $function, int $argNum, string $paramName): ?string
     {
-        $var = $var->resolveIndirect();
+        $var = $frame->calledArgs[$frameArgIndex]->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             return null;
         }
 
-        return $this->stringArgAt($var, $function, $argNum, $paramName);
+        return $this->stringArgAt($frame, $frameArgIndex, $function, $argNum, $paramName);
     }
 
     protected function newWriter(Frame $frame): ObjectEntry

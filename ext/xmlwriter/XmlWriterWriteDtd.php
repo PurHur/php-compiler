@@ -21,18 +21,18 @@ final class XmlWriterWriteDtd extends XmlWriterClassMethod
         $entry = $this->receiver($frame, 'XMLWriter::writeDtd()');
         $this->requireUserArgCountRange($frame, 'XMLWriter::writeDtd', 1, 4);
         $argc = \count($frame->calledArgs);
-        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtd()', 0, 'name');
+        $name = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeDtd()', 0, $frame, 'name');
         $publicId = null;
         $systemId = null;
         $content = null;
         if ($argc >= 3) {
-            $publicId = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::writeDtd()', 1, 'publicId');
+            $publicId = $this->nullableStringArg($frame->calledArgs[2], 'XMLWriter::writeDtd()', 1, $frame, 'publicId');
         }
         if ($argc >= 4) {
-            $systemId = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeDtd()', 2, 'systemId');
+            $systemId = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeDtd()', 2, $frame, 'systemId');
         }
         if ($argc >= 5) {
-            $content = $this->nullableStringArg($frame->calledArgs[4], 'XMLWriter::writeDtd()', 3, 'content');
+            $content = $this->nullableStringArg($frame->calledArgs[4], 'XMLWriter::writeDtd()', 3, $frame, 'content');
         }
         $ok = VmXmlWriter::writeDtd($entry, $name, $publicId, $systemId, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {

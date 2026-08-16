@@ -20,7 +20,7 @@ final class xmlwriter_open_uri extends XmlWriterProceduralFunction
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'xmlwriter_open_uri', 1);
-        $uri = $this->stringArgAt($frame->calledArgs[0], 'xmlwriter_open_uri', 1, 'uri');
+        $uri = $this->stringArgAt($frame, 0, 'xmlwriter_open_uri', 1, 'uri');
         $entry = $this->newWriter($frame);
         $ok = VmXmlWriter::openURI($entry, $uri);
         if (!$ok) {

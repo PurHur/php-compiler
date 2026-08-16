@@ -20,7 +20,7 @@ final class xmlwriter_text extends XmlWriterProceduralFunction
     {
         $this->requireExactArgCount($frame, 'xmlwriter_text', 2);
         $entry = $this->writerArg($frame, 'xmlwriter_text');
-        $content = $this->stringArgAt($frame->calledArgs[1], 'xmlwriter_text', 2, 'content');
+        $content = $this->stringArgAt($frame, 1, 'xmlwriter_text', 2, 'content');
         $ok = VmXmlWriter::text($entry, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

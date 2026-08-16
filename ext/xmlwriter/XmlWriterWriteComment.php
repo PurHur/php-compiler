@@ -20,7 +20,7 @@ final class XmlWriterWriteComment extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::writeComment()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::writeComment', 1);
-        $content = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeComment()', 0, 'content');
+        $content = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writeComment()', 0, $frame, 'content');
         $ok = VmXmlWriter::writeComment($entry, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

@@ -20,8 +20,8 @@ final class XmlWriterWritePI extends XmlWriterClassMethod
     {
         $entry = $this->receiver($frame, 'XMLWriter::writePi()');
         $this->requireExactUserArgCount($frame, 'XMLWriter::writePi', 2);
-        $target = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writePi()', 0, 'target');
-        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writePi()', 1, 'content');
+        $target = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writePi()', 0, $frame, 'target');
+        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writePi()', 1, $frame, 'content');
         $ok = VmXmlWriter::writePI($entry, $target, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
