@@ -25,6 +25,29 @@ final class VmPregPatternTest extends TestCase
         $this->assertSame('Empty regular expression', VmPregPattern::patternWarningMessage(''));
     }
 
+    /** Bracket delimiters use matching closer (#31511 / php_pcre.c). */
+    public function testPatternWarningMessageForUnclosedBracketDelimiter(): void
+    {
+        $this->assertSame(
+            "No ending matching delimiter ')' found",
+            VmPregPattern::patternWarningMessage('(')
+        );
+        $this->assertSame(
+            "No ending matching delimiter ']' found",
+            VmPregPattern::patternWarningMessage('[a')
+        );
+    }
+
+    public function testParsePhpPatternAcceptsBracketDelimiters(): void
+    {
+        $parsed = VmPregPattern::parsePhpPattern('(a)');
+        $this->assertIsArray($parsed);
+        $this->assertSame('a', $parsed[0]);
+        $nested = VmPregPattern::parsePhpPattern('(a(b)c)');
+        $this->assertIsArray($nested);
+        $this->assertSame('a(b)c', $nested[0]);
+    }
+
     /** Issue #14880 — PCRE compile failures surface Zend-style warning text. */
     public function testCompileWarningMessageForUnclosedGroup(): void
     {

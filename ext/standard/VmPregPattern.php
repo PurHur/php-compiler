@@ -16,6 +16,9 @@ final class VmPregPattern
 
     /**
      * Zend ext/pcre/php_pcre.c delimiter/compile failure text (issue #12083).
+     *
+     * Bracket-style delimiters (()[]{}<>) use a matching closer and nest
+     * (php_pcre.c); unpaired open → "No ending matching delimiter".
      */
     public static function patternWarningMessage(string $pattern): ?string
     {
@@ -27,30 +30,12 @@ final class VmPregPattern
         if (!self::isValidDelimiter($delimiter)) {
             return 'Delimiter must not be alphanumeric, backslash, or NUL';
         }
-        if ($len < 2) {
-            return \sprintf("No ending delimiter '%s' found", $delimiter);
+        $end = self::findEndingDelimiterIndex($pattern);
+        if (null === $end) {
+            return self::missingEndingDelimiterMessage($delimiter);
         }
 
-        $i = 1;
-        while ($i < $len) {
-            if ('\\' === $pattern[$i]) {
-                if ($i + 1 < $len) {
-                    $i += 2;
-                    continue;
-                }
-
-                return \sprintf("No ending delimiter '%s' found", $delimiter);
-            }
-            if ($pattern[$i] === $delimiter) {
-                break;
-            }
-            $i++;
-        }
-        if ($i >= $len) {
-            return \sprintf("No ending delimiter '%s' found", $delimiter);
-        }
-
-        for ($j = $i + 1; $j < $len; $j++) {
+        for ($j = $end + 1; $j < $len; $j++) {
             $modifier = $pattern[$j];
             if ('e' === $modifier) {
                 return 'The /e modifier is no longer supported, use preg_replace_callback instead';
@@ -61,6 +46,70 @@ final class VmPregPattern
         }
 
         return null;
+    }
+
+    /**
+     * Index of the ending delimiter, or null when missing (escaped bytes skipped).
+     */
+    public static function findEndingDelimiterIndex(string $pattern): ?int
+    {
+        $len = \strlen($pattern);
+        if ($len < 2) {
+            return null;
+        }
+        $open = $pattern[0];
+        $close = self::matchingCloser($open);
+        $nesting = ($close !== $open);
+        $depth = 1;
+        $i = 1;
+        while ($i < $len) {
+            if ('\\' === $pattern[$i]) {
+                if ($i + 1 < $len) {
+                    $i += 2;
+                    continue;
+                }
+
+                return null;
+            }
+            $ch = $pattern[$i];
+            if ($nesting) {
+                if ($ch === $open) {
+                    $depth++;
+                } elseif ($ch === $close) {
+                    $depth--;
+                    if (0 === $depth) {
+                        return $i;
+                    }
+                }
+            } elseif ($ch === $close) {
+                return $i;
+            }
+            $i++;
+        }
+
+        return null;
+    }
+
+    /** php-src: bracket delimiters close with the matching pair char. */
+    public static function matchingCloser(string $open): string
+    {
+        return match ($open) {
+            '(' => ')',
+            '[' => ']',
+            '{' => '}',
+            '<' => '>',
+            default => $open,
+        };
+    }
+
+    private static function missingEndingDelimiterMessage(string $delimiter): string
+    {
+        $close = self::matchingCloser($delimiter);
+        if ($close !== $delimiter) {
+            return \sprintf("No ending matching delimiter '%s' found", $close);
+        }
+
+        return \sprintf("No ending delimiter '%s' found", $delimiter);
     }
 
     /** Nested JIT: match on $pattern[$j] after an e-check mis-lowers (#16075 tier-2). */
@@ -80,24 +129,15 @@ final class VmPregPattern
         if (null !== self::patternWarningMessage($pattern)) {
             return null;
         }
-        $len = \strlen($pattern);
-        $delimiter = $pattern[0];
-
-        $i = 1;
-        while ($i < $len) {
-            if ('\\' === $pattern[$i]) {
-                $i += 2;
-                continue;
-            }
-            if ($pattern[$i] === $delimiter) {
-                break;
-            }
-            $i++;
+        $end = self::findEndingDelimiterIndex($pattern);
+        if (null === $end) {
+            return null;
         }
 
-        $regex = \substr($pattern, 1, $i - 1);
+        $regex = \substr($pattern, 1, $end - 1);
         $opts = 0;
-        for ($j = $i + 1; $j < $len; $j++) {
+        $len = \strlen($pattern);
+        for ($j = $end + 1; $j < $len; $j++) {
             $opts |= self::modifierOptFlag($pattern[$j]);
         }
 

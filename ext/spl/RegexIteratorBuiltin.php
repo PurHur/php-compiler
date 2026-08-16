@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmPreg;
+use PHPCompiler\ext\standard\VmPregCompileWarn;
 use PHPCompiler\ext\standard\VmPregMatches;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
@@ -145,6 +146,21 @@ final class RegexIteratorBuiltin
         }
 
         return false;
+    }
+
+    /**
+     * php-src RegexIterator::__construct — compile pattern before store (#31511).
+     *
+     * @throws \InvalidArgumentException Zend-shaped delimiter/compile failure
+     */
+    public static function assertPatternCompiles(string $pattern, string $methodLabel): void
+    {
+        $message = VmPregCompileWarn::compileWarningMessage($pattern);
+        if (null === $message) {
+            return;
+        }
+
+        throw new \InvalidArgumentException($methodLabel.': '.$message);
     }
 
     public static function initState(
@@ -481,7 +497,7 @@ final class RegexIteratorConstruct extends VmClassMethod
         );
         SplDualIteratorStorage::initSimple($object, $inner);
 
-        $regex = VmReflection::stringArg($frame->calledArgs[2], 'RegexIterator::__construct() regex', 1);
+        $regex = VmReflection::stringArg($frame->calledArgs[2], 'RegexIterator::__construct() pattern', 2);
         $mode = RegexIteratorBuiltin::MATCH;
         $flags = 0;
         $pregFlags = 0;
@@ -509,13 +525,15 @@ final class RegexIteratorConstruct extends VmClassMethod
             $pregVar = $frame->calledArgs[5]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $pregVar->type) {
                 throw new \TypeError(
-                    'RegexIterator::__construct(): Argument #5 ($preg_flags) must be of type int, '
+                    'RegexIterator::__construct(): Argument #5 ($pregFlags) must be of type int, '
                     .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
                 );
             }
             $pregFlags = $pregVar->toInt();
         }
 
+        RegexIteratorBuiltin::validateMode($mode);
+        RegexIteratorBuiltin::assertPatternCompiles($regex, 'RegexIterator::__construct()');
         RegexIteratorBuiltin::initState($object, $regex, $mode, $flags, $pregFlags);
     }
 }
@@ -952,7 +970,7 @@ final class RecursiveRegexIteratorConstruct extends VmClassMethod
         );
         SplDualIteratorStorage::initSimple($object, $inner);
 
-        $regex = VmReflection::stringArg($frame->calledArgs[2], 'RecursiveRegexIterator::__construct() regex', 1);
+        $regex = VmReflection::stringArg($frame->calledArgs[2], 'RecursiveRegexIterator::__construct() pattern', 2);
         $mode = RegexIteratorBuiltin::MATCH;
         $flags = 0;
         $pregFlags = 0;
@@ -980,13 +998,15 @@ final class RecursiveRegexIteratorConstruct extends VmClassMethod
             $pregVar = $frame->calledArgs[5]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $pregVar->type) {
                 throw new \TypeError(
-                    'RecursiveRegexIterator::__construct(): Argument #5 ($preg_flags) must be of type int, '
+                    'RecursiveRegexIterator::__construct(): Argument #5 ($pregFlags) must be of type int, '
                     .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
                 );
             }
             $pregFlags = $pregVar->toInt();
         }
 
+        RegexIteratorBuiltin::validateMode($mode);
+        RegexIteratorBuiltin::assertPatternCompiles($regex, 'RecursiveRegexIterator::__construct()');
         RegexIteratorBuiltin::initState($object, $regex, $mode, $flags, $pregFlags);
     }
 }
