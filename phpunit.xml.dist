@@ -140,6 +140,8 @@
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
             <file>./test/compliance/VarExportPrintRReflection23308VMTest.php</file>
             <file>./test/compliance/VarExportPrintRReflection23308JITTest.php</file>
+            <file>./test/compliance/VsprintfVprintfReflection23333VMTest.php</file>
+            <file>./test/compliance/VsprintfVprintfReflection23333JITTest.php</file>
             <file>./test/compliance/StrcspnStrspnStrpbrkNamed23400VMTest.php</file>
             <file>./test/compliance/StrcspnStrspnStrpbrkNamed23400JITTest.php</file>
             <file>./test/compliance/ErrorLogNamed23341VMTest.php</file>
