@@ -909,9 +909,9 @@ final class BuiltinParamNames
                 return ['arg'];
             case 'escapeshellcmd':
                 return ['command'];
-            // php-src ext/session/session.stub.php — InternalArgInfo still says newname (#23436)
+            // php-src ext/session/session.stub.php — ?string $name = null; InternalArgInfo still says newname (#23436, #31423)
             case 'session_name':
-                return ['name'];
+                return ['name='];
             // php-src ext/session/session.stub.php — ?string $id = null; InternalArgInfo still says newid (#23402, #26460)
             case 'session_id':
                 return ['id='];

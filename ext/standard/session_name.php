@@ -16,6 +16,8 @@ use PHPLLVM\Value;
  * session_name() — get or set the session cookie name (issue #1184).
  *
  * Excess argc → Zend ArgumentCountError (#30684; php-src ext/session/session.c).
+ * Reflection stub: ?string $name = null → string|false (#31423; session.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinInternalDefaultValues}).
  */
 class session_name extends Internal
 {
