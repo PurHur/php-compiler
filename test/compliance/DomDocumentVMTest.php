@@ -274,6 +274,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_xml_reflection_nullable_residual.phpt',
             'dom_xml_reflection_nullable_residual.phpt'
         );
+        yield 'dom_reflection_c14n_ctor_stubs.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_reflection_c14n_ctor_stubs.phpt',
+            'dom_reflection_c14n_ctor_stubs.phpt'
+        );
         yield 'dom_document_schema_validate_arity_message.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_document_schema_validate_arity_message.phpt',
             'dom_document_schema_validate_arity_message.phpt'

@@ -1747,6 +1747,12 @@ final class BuiltinInternalArgInfo
             // ext/xmlwriter/php_xmlwriter.stub.php — startDocument/writeElement ?string (#31501)
             'xmlwriter::startdocument' => ($index === 0 || $index === 1 || $index === 2) ? '?string' : null,
             'xmlwriter::writeelement' => 1 === $index ? '?string' : null,
+            // ext/dom/php_dom.stub.php — C14N ?array xpath/nsPrefixes; lookupNamespaceURI ?string (#31849)
+            'domnode::c14n' => ($index === 2 || $index === 3) ? '?array' : null,
+            'domnode::c14nfile' => ($index === 3 || $index === 4) ? '?array' : null,
+            'domnode::lookupnamespaceuri' => 0 === $index ? '?string' : null,
+            // ext/dom/php_dom.stub.php — DOMElement::__construct(?string $value = null, …) (#31849)
+            'domelement::__construct' => 1 === $index ? '?string' : null,
             // ext/dom/php_dom.stub.php — loadHTML(string $source, int $options = 0): bool (#28713)
             // InternalArgInfo omits the optional $options param (load/loadXML already have int).
             'domdocument::loadhtml',

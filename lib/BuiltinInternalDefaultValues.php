@@ -935,6 +935,27 @@ final class BuiltinInternalDefaultValues
         'domxpath::evaluate' => [
             2 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/dom/php_dom.stub.php — ctor defaults (string does not infer) (#31849)
+        'domdocument::__construct' => [
+            0 => ['kind' => 'string', 'value' => '1.0'],
+            1 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domelement::__construct' => [
+            // $value is ?string → null via infer; $namespace = '' needs explicit
+            2 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domtext::__construct' => [
+            0 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domcomment::__construct' => [
+            0 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domattr::__construct' => [
+            1 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domprocessinginstruction::__construct' => [
+            1 => ['kind' => 'string', 'value' => ''],
+        ],
         // php-src ext/imap/php_imap.stub.php — int $timeout = -1 (int infer → 0) (#27680)
         'imap_timeout' => [
             1 => ['kind' => 'int', 'value' => -1],
