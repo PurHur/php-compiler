@@ -689,12 +689,17 @@ final class VmDomJitDispatch
                 $argc
             ));
         }
-        $qualifiedName = self::stringArg($extra[0], 'DOMImplementation::createDocumentType', 0);
+        $qualifiedName = self::stringArg(
+            $extra[0],
+            'DOMImplementation::createDocumentType',
+            0,
+            'qualifiedName'
+        );
         $publicId = isset($extra[1])
-            ? self::stringArg($extra[1], 'DOMImplementation::createDocumentType', 1)
+            ? self::stringArg($extra[1], 'DOMImplementation::createDocumentType', 1, 'publicId')
             : '';
         $systemId = isset($extra[2])
-            ? self::stringArg($extra[2], 'DOMImplementation::createDocumentType', 2)
+            ? self::stringArg($extra[2], 'DOMImplementation::createDocumentType', 2, 'systemId')
             : '';
 
         return VmDom::createDocumentType($ctx, $qualifiedName, $publicId, $systemId);
@@ -793,7 +798,12 @@ final class VmDomJitDispatch
      */
     public static function getAttributeNode(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
-        $name = self::stringArg($extra[0] ?? self::missingArg('getAttributeNode', 0), 'getAttributeNode', 0);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('getAttributeNode', 0),
+            'DOMElement::getAttributeNode',
+            0,
+            'qualifiedName'
+        );
 
         return VmDom::getAttributeNode($ctx, $element, $name);
     }
@@ -1074,7 +1084,12 @@ final class VmDomJitDispatch
             throw new \Error('Call to undefined method '.$namedNodeMap->class->name.'::getNamedItem()');
         }
         self::requireExactExtraArgCount('DOMNamedNodeMap::getNamedItem', $extra, 1);
-        $name = self::stringArg($extra[0] ?? self::missingArg('getNamedItem', 0), 'DOMNamedNodeMap::getNamedItem', 0);
+        $name = self::stringArg(
+            $extra[0] ?? self::missingArg('getNamedItem', 0),
+            'DOMNamedNodeMap::getNamedItem',
+            0,
+            'qualifiedName'
+        );
         $result = new Variable();
         $node = VmDom::namedNodeMapGetNamedItem($namedNodeMap, $name);
         if (null === $node) {
@@ -1104,7 +1119,8 @@ final class VmDomJitDispatch
         $localName = self::stringArg(
             $extra[1] ?? self::missingArg('getNamedItemNS', 1),
             'DOMNamedNodeMap::getNamedItemNS',
-            1
+            1,
+            'localName'
         );
         $result = new Variable();
         $node = VmDom::namedNodeMapGetNamedItemNS($namedNodeMap, $namespace, $localName);

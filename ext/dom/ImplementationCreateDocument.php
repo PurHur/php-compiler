@@ -30,7 +30,13 @@ final class ImplementationCreateDocument extends DomClassMethod
             ? $this->nullableStringArg($frame->calledArgs[1], 'DOMImplementation::createDocument()', 0)
             : null;
         $qualifiedName = isset($frame->calledArgs[2])
-            ? $this->stringArg($frame->calledArgs[2], 'DOMImplementation::createDocument()', 1)
+            ? $this->stringArg(
+                $frame->calledArgs[2],
+                'DOMImplementation::createDocument()',
+                1,
+                $frame,
+                'qualifiedName'
+            )
             : '';
         $doctype = isset($frame->calledArgs[3])
             ? self::optionalDocumentType($frame->calledArgs[3])

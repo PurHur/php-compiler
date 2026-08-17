@@ -20,7 +20,13 @@ final class FragmentAppendXML extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocumentFragment::appendXML() expects exactly 1 argument');
         }
-        $data = $this->stringArg($frame->calledArgs[1], 'DOMDocumentFragment::appendXML()', 0);
+        $data = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMDocumentFragment::appendXML()',
+            0,
+            $frame,
+            'data'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocumentFragment::appendXML() requires VM context in this compiler build');
         }

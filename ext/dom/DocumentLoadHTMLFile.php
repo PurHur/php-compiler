@@ -22,7 +22,13 @@ final class DocumentLoadHTMLFile extends DomClassMethod
     {
         $this->requireUserArgCountRange($frame, 'DOMDocument::loadHTMLFile', 1, 2);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::loadHTMLFile()');
-        $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::loadHTMLFile()', 0);
+        $filename = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMDocument::loadHTMLFile()',
+            0,
+            $frame,
+            'filename'
+        );
         $options = 0;
         if (isset($frame->calledArgs[2])) {
             // Z_PARAM_LONG $options (#25768).

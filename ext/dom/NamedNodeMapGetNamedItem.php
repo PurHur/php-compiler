@@ -22,7 +22,13 @@ final class NamedNodeMapGetNamedItem extends DomClassMethod
     {
         $this->requireExactUserArgCount($frame, 'DOMNamedNodeMap::getNamedItem', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_NAMED_NODE_MAP, 'DOMNamedNodeMap::getNamedItem()');
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMNamedNodeMap::getNamedItem()', 0);
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMNamedNodeMap::getNamedItem()',
+            0,
+            $frame,
+            'qualifiedName'
+        );
         if (null === $frame->returnVar) {
             return;
         }

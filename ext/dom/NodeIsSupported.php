@@ -22,8 +22,20 @@ final class NodeIsSupported extends DomClassMethod
     {
         $this->requireExactUserArgCount($frame, 'DOMNode::isSupported', 2);
         $node = $this->domRegistryNodeReceiver($frame, 'DOMNode::isSupported()');
-        $feature = $this->stringArg($frame->calledArgs[1], 'DOMNode::isSupported()', 0);
-        $version = $this->stringArg($frame->calledArgs[2], 'DOMNode::isSupported()', 1);
+        $feature = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMNode::isSupported()',
+            0,
+            $frame,
+            'feature'
+        );
+        $version = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMNode::isSupported()',
+            1,
+            $frame,
+            'version'
+        );
         if (null === $frame->returnVar) {
             return;
         }
