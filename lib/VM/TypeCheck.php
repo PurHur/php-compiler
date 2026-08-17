@@ -640,6 +640,8 @@ final class TypeCheck
         string $declaredLabel,
         ?string $callableName = null
     ): void {
+        $classConstraint = self::resolveParentTypeHintConstraint($classConstraint);
+        $declaredLabel = self::resolveParentTypeHintConstraint($declaredLabel);
         if (self::matchesClassTypeHint($value, $classConstraint)) {
             return;
         }
@@ -684,6 +686,7 @@ final class TypeCheck
                 return;
             }
             $expected = $target->declaredTypeLabel ?? self::normalizeClassLabel($target->classConstraint);
+            $expected = self::normalizeClassLabel(self::resolveParentTypeHintConstraint($expected));
             if ($propertyWrite && ('Property' === $kind || 'Static variable' === $kind)) {
                 throw self::propertyTypeError($target, $expected, $value);
             }
@@ -1092,10 +1095,31 @@ final class TypeCheck
         throw new \TypeError("{$kind} must be of type {$expected}, {$given}");
     }
 
+    /**
+     * Trait methods keep lexical `parent` on the shared Block; resolve for checks/TypeErrors (#31747).
+     */
+    private static function resolveParentTypeHintConstraint(string $classConstraint): string
+    {
+        if ('parent' !== strtolower(ltrim($classConstraint, '\\'))) {
+            return $classConstraint;
+        }
+        $vm = \PHPCompiler\VM::running();
+        $resolved = $vm?->resolveParentTypeHintClassName();
+
+        return null !== $resolved && '' !== $resolved ? $resolved : $classConstraint;
+    }
+
     private static function matchesClassTypeHint(Variable $value, string $classConstraint): bool
     {
         $resolved = $value->resolveIndirect();
         $classLc = strtolower(ltrim($classConstraint, '\\'));
+        if ('parent' === $classLc) {
+            $vm = \PHPCompiler\VM::running();
+            $parentLc = $vm?->resolveParentTypeHintClassLc();
+            if (null !== $parentLc && '' !== $parentLc) {
+                $classLc = $parentLc;
+            }
+        }
         // Zend IS_OBJECT return/param check accepts any object incl. anonymous classes (#11173, zend_execute.c).
         if ('object' === $classLc) {
             return Variable::TYPE_OBJECT === $resolved->type
