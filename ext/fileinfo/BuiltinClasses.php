@@ -111,6 +111,7 @@ final class FinfoFileMethod extends VmClassMethod
         }
         $object = $frame->calledArgs[0]->resolveIndirect()->toObject();
         $path = VmString::stringBuiltinArgForFrame($frame, 1, 'finfo::file', 0, 'filename');
+        VmFinfo::rejectEmptyFilename($path, 'finfo::file', 0, 'filename');
         $flags = VmFinfo::coerceFlagsArg($frame, 2, 'finfo::file', 2, 'flags');
         $result = VmFinfo::file($object, $path, $flags, $frame, 'finfo::file');
         if (false === $result) {

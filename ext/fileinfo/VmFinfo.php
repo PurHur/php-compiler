@@ -102,6 +102,34 @@ final class VmFinfo
     }
 
     /**
+     * php-src ext/fileinfo/fileinfo.c — empty path uses "cannot be empty" on all profiles (#30489).
+     */
+    public static function emptyFilenameValueErrorMessage(
+        string $function,
+        int $argIndex,
+        string $paramName = 'filename'
+    ): string {
+        return \sprintf(
+            '%s(): Argument #%d ($%s) cannot be empty',
+            $function,
+            $argIndex + 1,
+            $paramName
+        );
+    }
+
+    /** @throws \ValueError */
+    public static function rejectEmptyFilename(
+        string $path,
+        string $function,
+        int $argIndex,
+        string $paramName = 'filename'
+    ): void {
+        if ('' === $path) {
+            throw new \ValueError(self::emptyFilenameValueErrorMessage($function, $argIndex, $paramName));
+        }
+    }
+
+    /**
      * @return string|false
      */
     public static function file(ObjectEntry $finfo, string $path, int $flags, Frame $frame, string $function)
