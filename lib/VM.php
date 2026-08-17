@@ -9918,6 +9918,8 @@ restart:
                     $parsed = $this->context->runtime->parseAndCompileFile($resolved);
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
+                    // ZEND_INCLUDE_OR_EVAL copies EX(This) into the included op_array (#31903).
+                    $this->inheritIncludeThis($new, $frame);
                     // Resume the caller via the run stack (like a call); keep $frame as a scope donor only.
                     $new->parent = null;
                     if (null !== $op->arg2) {
@@ -10812,8 +10814,82 @@ restart:
         if (null !== $func->class) {
             return !isset($frame->scope[$thisIdx]);
         }
-        // {main} / plain function — $this is never in object context (php-src FETCH_THIS).
+        // {main} / plain function — $this is never in object context (php-src FETCH_THIS)
+        // unless include inherited EX(This) from an instance caller (#31903).
+        if (isset($frame->scope[$thisIdx])) {
+            $var = $frame->scope[$thisIdx]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $var->type) {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    /**
+     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the included {main} frame (#31903).
+     *
+     * php-src: Zend/zend_execute.c ZEND_INCLUDE_OR_EVAL; Zend/zend_vm_def.h inherits EX(This).
+     */
+    private function inheritIncludeThis(Frame $included, Frame $caller): void
+    {
+        $thisIdx = $included->block->slotIndexForVariableName('this');
+        if (null === $thisIdx) {
+            return;
+        }
+        $inherited = self::callerThisIfBound($caller);
+        if (null === $inherited) {
+            return;
+        }
+        if (!isset($included->scope[$thisIdx])) {
+            $included->scope[$thisIdx] = new Variable();
+        }
+        $included->scope[$thisIdx]->copyFrom($inherited);
+    }
+
+    /**
+     * Bound $this of the include/eval caller, or null when not in object context.
+     */
+    private static function callerThisIfBound(Frame $caller): ?Variable
+    {
+        $func = null !== $caller->block ? $caller->block->func : null;
+        if (null !== $func && (($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return null;
+        }
+        if (null !== $caller->pendingClosureInvoke && null !== $caller->pendingClosureInvoke->boundThis) {
+            $bound = $caller->pendingClosureInvoke->boundThis->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $bound->type) {
+                return $bound;
+            }
+        }
+        if (null !== $caller->closureCall && null !== $caller->closureCall->boundThis) {
+            $bound = $caller->closureCall->boundThis->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $bound->type) {
+                return $bound;
+            }
+        }
+        if (null !== $caller->block) {
+            $idx = $caller->block->slotIndexForVariableName('this');
+            if (null !== $idx && isset($caller->scope[$idx])) {
+                $var = $caller->scope[$idx]->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $var->type) {
+                    return $var;
+                }
+            }
+        }
+        // Instance method whose body never mentioned $this — receiver is calledArgs[0].
+        if (
+            null !== $func
+            && null !== $func->class
+            && isset($caller->calledArgs[0])
+        ) {
+            $arg0 = $caller->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $arg0->type) {
+                return $arg0;
+            }
+        }
+
+        return null;
     }
 
     /** True when a closure invoke has a bound object for $this (auto-bind / bindTo). */

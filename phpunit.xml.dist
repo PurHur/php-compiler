@@ -73,6 +73,8 @@
             <file>./test/compliance/VisibilityTest.php</file>
             <file>./test/compliance/VisibilityJitTest.php</file>
             <file>./test/compliance/IncludeScopeVMTest.php</file>
+            <file>./test/compliance/IncludeInheritsThisVMTest.php</file>
+            <file>./test/compliance/IncludeInheritsThisJITTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
             <file>./test/compliance/RoundingModeMissingClassErrorVMTest.php</file>

@@ -1530,6 +1530,13 @@ class Block {
                     $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                     continue;
                 }
+                // Include/eval {main} must not treat caller calledArgs[0] as $this —
+                // that is a function's first user argument. TYPE_INCLUDE copies
+                // EX(This) after getFrame (ZEND_INCLUDE_OR_EVAL, #31903).
+                if ($enteringFromOtherFunc && $this->isMainScript()) {
+                    $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
+                    continue;
+                }
                 if (!empty($frame->callArgs)) {
                     $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                     $scope[$pos]->copyFrom($frame->callArgs[0]);

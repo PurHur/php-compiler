@@ -199,6 +199,7 @@ final class IncludeHelper
         $context->pushScope();
         ++$context->inlineIncludeDepth;
         $context->builder->positionAtEnd($entryBb);
+        self::bindIncludedThis($context, $included, $entryBb);
         foreach ($localBindings as $operand) {
             if (!$context->hasVariableOp($operand)) {
                 $calleeVar = new Variable(
@@ -326,6 +327,63 @@ final class IncludeHelper
             );
         }
         self::compileIncludedFile($jit, $func, $callerBlock, $path, $resultOperand);
+    }
+
+    /**
+     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the inlined {main} (#31903).
+     *
+     * Alias inlined {main} `$this` operands to the caller's LLVM `$this`
+     * (KIND_VALUE `__object__*`). Static / file-scope callers have no bound `$this`.
+     */
+    private static function bindIncludedThis(Context $context, Block $included, BasicBlock $entryBb): void
+    {
+        if (null !== $included->func && (($included->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return;
+        }
+        $callerThis = $context->findThisVariable();
+        if (null === $callerThis || Variable::TYPE_OBJECT !== $callerThis->type || null === $callerThis->value) {
+            return;
+        }
+        $thisOps = [];
+        foreach ($included->scopedOperands() as $operand) {
+            if ('this' === OperandName::resolve($operand)) {
+                $thisOps[spl_object_id($operand)] = $operand;
+            }
+        }
+        foreach ($included->argOperands() as $operand) {
+            if ('this' === OperandName::resolve($operand)) {
+                $thisOps[spl_object_id($operand)] = $operand;
+            }
+        }
+        if (null !== $included->orig) {
+            foreach ($included->orig->hoistedOperands as $operand) {
+                if ('this' === OperandName::resolve($operand)) {
+                    $thisOps[spl_object_id($operand)] = $operand;
+                }
+            }
+        }
+        if ([] === $thisOps) {
+            return;
+        }
+        $objVar = $callerThis;
+        if (Variable::KIND_VALUE !== $callerThis->kind) {
+            $saved = $context->builder->getInsertBlock();
+            $context->builder->positionAtEnd($entryBb);
+            $loaded = $context->builder->load($callerThis->value);
+            $objVar = new Variable(
+                $context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $loaded
+            );
+            if (null !== $saved) {
+                BasicBlockHelper::restoreInsertBlock($context, $saved);
+            }
+        }
+        foreach ($thisOps as $operand) {
+            $context->setVariableOp($operand, $objVar);
+        }
+        $context->bindVariableByName('this', $objVar);
     }
 
     private static function appendIncludeResume(Context $context, Function_ $func): BasicBlock
