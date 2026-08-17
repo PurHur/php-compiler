@@ -5420,6 +5420,9 @@ restart:
                             break;
                         }
                         $arg1->indirect($appendCell);
+                        if (null !== $appendCell) {
+                            $this->markPersistentHashTableBucketIfNeeded($containerSlot, $appendCell);
+                        }
                         $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                         break;
                     }
@@ -5507,13 +5510,17 @@ restart:
                             }
                             // Coalesce left read: isset already emitted float→int DEP (#29664).
                             $emitFloatKeyDep = !$op->arrayDimFetchSkipFloatKeyDeprecation;
-                            $arg1->indirect($table->findVariable(
+                            $dimCell = $table->findVariable(
                                 $arg3,
                                 $forWrite,
                                 $this->context,
                                 $frame,
                                 $emitFloatKeyDep
-                            ));
+                            );
+                            $arg1->indirect($dimCell);
+                            if ($forWrite && null !== $dimCell) {
+                                $this->markPersistentHashTableBucketIfNeeded($containerSlot, $dimCell);
+                            }
                             if ($forWrite) {
                                 $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                             }
@@ -24235,11 +24242,12 @@ restart:
     }
 
     /**
-     * True when a scope cell is (or aliases) context-owned long-lived storage (#28039, #28040).
+     * True when a scope cell is (or aliases) context-owned long-lived storage (#28039, #28040, #31937).
      *
      * DECLARE_FUNCTION_STATIC / global / class-static install an INDIRECT into a persistent cell;
-     * releasing through that alias on frame exit destroys Closures and wipes object properties
-     * the static still holds (destroyForGc while the cell pointer survives).
+     * FETCH_DIM_W into those arrays (and instance-property arrays) aliases a HashTable bucket.
+     * Releasing through that alias on frame exit destroys Closures and wipes object properties
+     * the persistent table still holds (destroyForGc while the cell pointer survives).
      */
     private function variableAliasesFunctionStaticCell(Variable $var): bool
     {
@@ -24249,6 +24257,9 @@ restart:
         }
         foreach ($candidates as $cell) {
             if ($cell->functionStaticStorage) {
+                return true;
+            }
+            if ($cell->persistentHashTableBucket) {
                 return true;
             }
             if (null !== $this->context->functionStaticKeyForStorage($cell)) {
@@ -24263,6 +24274,28 @@ restart:
         }
 
         return false;
+    }
+
+    /**
+     * Mark a HashTable bucket that lives in persistent array storage (#31937).
+     *
+     * Class-static / function-static / global cells are already skipped by
+     * {@see variableAliasesFunctionStaticCell}; the bucket Variable is a different
+     * identity, so FETCH_DIM_W aliases must be tagged separately.
+     */
+    private function markPersistentHashTableBucketIfNeeded(Variable $containerSlot, Variable $bucket): void
+    {
+        if ($this->variableAliasesFunctionStaticCell($containerSlot)
+            || $this->variableAliasesObjectPropertyCell($containerSlot)
+        ) {
+            $bucket->persistentHashTableBucket = true;
+
+            return;
+        }
+        $resolved = $containerSlot->resolveIndirect();
+        if ($resolved->persistentHashTableBucket) {
+            $bucket->persistentHashTableBucket = true;
+        }
     }
 
     /** Generator yield key/value cells must survive fcall temp release (#18184). */
