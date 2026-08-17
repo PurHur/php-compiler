@@ -282,6 +282,19 @@ class Context {
     public array $deferredClassConstants = [];
 
     /**
+     * True while lazily evaluating a class constant initializer (#31837, zend_constants.c).
+     * Nested {@see ClassConstExpr} fetches use visited-mark cycle detection only in this mode.
+     */
+    public bool $classConstLazyEvaluating = false;
+
+    /**
+     * Lazy-evaluate a pending class constant (cycle detection; #31837).
+     *
+     * @var null|callable(ClassEntry $entry, string $constKey, string $fetchClassDisplay, string $fetchConstDisplay, bool $markVisited): void
+     */
+    public $ensureClassConstEvaluated = null;
+
+    /**
      * Parent inheritance deferred until a forward-referenced parent class is declared (#9721).
      *
      * @var list<array{childLc: string, parentName: string}>

@@ -384,6 +384,11 @@ class OpCode {
     public bool $propertyAsymmetricExplicitRead = false;
     /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
     public bool $classConstFetchOnObject = false;
+    /**
+     * TYPE_CLASS_CONST_FETCH: lexical `self`/`parent`/`static` before FQCN rewrite
+     * (MagicStringResolver phpcLexicalScopeKeyword; self-referencing Error messages #31837).
+     */
+    public ?string $classConstFetchLexicalScope = null;
     /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */
     public int $classConstVisibilityFlags = 0;
     /** TYPE_DECLARE_CLASS_CONST: `case` in enum body vs user `const` (#5054, zend_enum.c). */

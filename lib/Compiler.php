@@ -43861,6 +43861,11 @@ class Compiler {
             $this->compileOperand($expr->class, $block, true),
             $this->compileOperand($expr->name, $block, true)
         );
+        // Lexical self/parent/static before FQCN rewrite (zend_constants.c self-referencing Error; #31837).
+        $lexicalScope = $expr->getAttribute('phpcLexicalScopeKeyword');
+        if (\is_string($lexicalScope) && '' !== $lexicalScope) {
+            $op->classConstFetchLexicalScope = $lexicalScope;
+        }
         // Use-site line for #[\Deprecated] class-const / enum-case notices (Zend zend_attributes.c / #29381).
         // Without this, FatalSite walks back to DECLARE_CLASS and cites the declaration line.
         $this->assignSourceMetadata($op, $expr);

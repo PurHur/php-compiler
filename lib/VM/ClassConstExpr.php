@@ -241,7 +241,17 @@ final class ClassConstExpr
         $constIsClass = 'class' === strtolower($constNameRaw);
 
         if ($lcClass === strtolower($entry->name)) {
-            self::fetchFromDeclaringClass($context, $frame, $op, $entry, $constName, $constIsClass);
+            $fetchClassDisplay = $op->classConstFetchLexicalScope ?? $className;
+            self::fetchFromDeclaringClass(
+                $context,
+                $frame,
+                $op,
+                $entry,
+                $constName,
+                $constIsClass,
+                $fetchClassDisplay,
+                $constNameRaw
+            );
 
             return;
         }
@@ -302,7 +312,9 @@ final class ClassConstExpr
         OpCode $op,
         ClassEntry $entry,
         string $constName,
-        bool $constIsClass = false
+        bool $constIsClass = false,
+        string $fetchClassDisplay = '',
+        string $fetchConstDisplay = ''
     ): void {
         if ($constIsClass || 'class' === strtolower($constName)) {
             $frame->scope[$op->arg1]->string($entry->name);
@@ -315,6 +327,33 @@ final class ClassConstExpr
                 $frame->scope[$op->arg1]->copyFrom($inherited);
 
                 return;
+            }
+            // Lazy sibling eval with visited-mark cycle detection (zend_constants.c; #31837).
+            if (
+                $context->classConstLazyEvaluating
+                && null !== $context->ensureClassConstEvaluated
+                && null !== $entry->unevaluatedClassConsts
+                && isset($entry->unevaluatedClassConsts['segments'][$constName])
+            ) {
+                $displayClass = '' !== $fetchClassDisplay ? $fetchClassDisplay : $entry->name;
+                $displayConst = '' !== $fetchConstDisplay
+                    ? $fetchConstDisplay
+                    : ($entry->constNames[$constName] ?? $constName);
+                ($context->ensureClassConstEvaluated)(
+                    $entry,
+                    $constName,
+                    $displayClass,
+                    $displayConst,
+                    true
+                );
+                if (isset($entry->constants[$constName])) {
+                    if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $constName, $frame->scope[$op->arg1])) {
+                        return;
+                    }
+                    $frame->scope[$op->arg1]->copyFrom($entry->constants[$constName]);
+
+                    return;
+                }
             }
             if (
                 null !== $entry->forwardDeclaredConstNames

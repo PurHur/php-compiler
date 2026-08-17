@@ -77,6 +77,7 @@
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
             <file>./test/compliance/RoundingModeMissingClassErrorVMTest.php</file>
             <file>./test/compliance/ClassConstSelfInheritedVMTest.php</file>
+            <file>./test/compliance/ClassConstSelfReferencingCycleVMTest.php</file>
             <file>./test/compliance/ClassConstPrivateSelfChildVMTest.php</file>
             <file>./test/compliance/ConstantDefinedClassConstVisibilityVMTest.php</file>
             <file>./test/compliance/ConstantDefinedClassConstVisibilityJITTest.php</file>

@@ -169,6 +169,23 @@ class ClassEntry {
     public array $constDeclaredTypes = [];
     /** @var array<string, true>|null sibling const names declared but not yet evaluated (#7382). */
     public ?array $forwardDeclaredConstNames = null;
+    /**
+     * Unevaluated class-const segments for lazy eval / cycle detection (#31837, zend_constants.c).
+     *
+     * @var array{
+     *     block: \PHPCompiler\Block,
+     *     frame: \PHPCompiler\Frame,
+     *     classBodyOps: list<\PHPCompiler\OpCode>,
+     *     segments: array<string, array{initIndices: list<int>, declareIndex: int}>
+     * }|null
+     */
+    public ?array $unevaluatedClassConsts = null;
+    /**
+     * Const keys currently being evaluated (IS_CONSTANT_VISITED_MARK; #31837).
+     *
+     * @var array<string, true>
+     */
+    public array $classConstVisiting = [];
     /** Class docblock + declaration site (#7358). */
     public ?\PHPCompiler\Compiler\SourceLocation $sourceLocation = null;
     /** @var array<string, \PHPCompiler\Compiler\SourceLocation> method lc => source metadata (#7358) */

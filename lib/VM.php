@@ -160,6 +160,22 @@ class VM {
 
     public function __construct(Context $context) {
         $this->context = $context;
+        // ClassConstExpr nested fetches need VM segment evaluation for cycle detection (#31837).
+        $context->ensureClassConstEvaluated = function (
+            ClassEntry $entry,
+            string $constKey,
+            string $fetchClassDisplay,
+            string $fetchConstDisplay,
+            bool $markVisited
+        ): void {
+            $this->ensureClassConstEvaluated(
+                $entry,
+                $constKey,
+                $fetchClassDisplay,
+                $fetchConstDisplay,
+                $markVisited
+            );
+        };
     }
 
     public function run(Block $block): int {
@@ -19569,7 +19585,24 @@ restart:
         if ([] === $this->context->deferredClassConstants) {
             return;
         }
-        $first = $this->context->deferredClassConstants[0];
+        // Same-class cycles stay as unevaluated AST until fetch (zend_constants.c; #31837).
+        $remaining = [];
+        foreach ($this->context->deferredClassConstants as $deferred) {
+            /** @var ClassEntry $entry */
+            $entry = $deferred['entry'];
+            if (
+                null !== $entry->unevaluatedClassConsts
+                && [] !== $entry->unevaluatedClassConsts['segments']
+            ) {
+                continue;
+            }
+            $remaining[] = $deferred;
+        }
+        $this->context->deferredClassConstants = $remaining;
+        if ([] === $remaining) {
+            return;
+        }
+        $first = $remaining[0];
         $pendingName = array_key_first($first['segments']);
         if (false === $pendingName) {
             return;
@@ -21675,12 +21708,76 @@ restart:
             foreach ($pending as $lcName) {
                 $stillPending[$lcName] = $segments[$lcName];
             }
+            $entry->unevaluatedClassConsts = [
+                'block' => $block,
+                'frame' => $frame,
+                'classBodyOps' => $classBodyOps,
+                'segments' => $stillPending,
+            ];
 
             return $stillPending;
         }
         $entry->forwardDeclaredConstNames = null;
+        $entry->unevaluatedClassConsts = null;
 
         return [];
+    }
+
+    /**
+     * Lazily evaluate a pending class constant; detect self-referencing cycles (#31837).
+     *
+     * Matches php-src zend_constants.c: the outermost user fetch updates without the visited
+     * mark; nested class-const fetches mark before updating so re-entry throws
+     * {@code Cannot declare self-referencing constant …}.
+     */
+    public function ensureClassConstEvaluated(
+        ClassEntry $entry,
+        string $constKey,
+        string $fetchClassDisplay,
+        string $fetchConstDisplay,
+        bool $markVisited
+    ): void {
+        if (isset($entry->constants[$constKey])) {
+            return;
+        }
+        if (isset($entry->classConstVisiting[$constKey])) {
+            throw new \Error(
+                "Cannot declare self-referencing constant {$fetchClassDisplay}::{$fetchConstDisplay}"
+            );
+        }
+        $bag = $entry->unevaluatedClassConsts;
+        if (null === $bag || !isset($bag['segments'][$constKey])) {
+            return;
+        }
+        if ($markVisited) {
+            $entry->classConstVisiting[$constKey] = true;
+        }
+        $prevLazy = $this->context->classConstLazyEvaluating;
+        $this->context->classConstLazyEvaluating = true;
+        try {
+            $this->evaluateDeferredClassConstSegment(
+                $entry,
+                $bag['block'],
+                $bag['frame'],
+                $bag['classBodyOps'],
+                $bag['segments'][$constKey]
+            );
+            unset($entry->unevaluatedClassConsts['segments'][$constKey]);
+            if ([] === $entry->unevaluatedClassConsts['segments']) {
+                $entry->unevaluatedClassConsts = null;
+                $entry->forwardDeclaredConstNames = null;
+            } else {
+                $entry->forwardDeclaredConstNames = array_fill_keys(
+                    array_keys($entry->unevaluatedClassConsts['segments']),
+                    true
+                );
+            }
+        } finally {
+            $this->context->classConstLazyEvaluating = $prevLazy;
+            if ($markVisited) {
+                unset($entry->classConstVisiting[$constKey]);
+            }
+        }
     }
 
     /**
@@ -23333,6 +23430,21 @@ restart:
         }
         // Case-sensitive constant / enum-case key (#25910, #25929).
         $memberKey = ClassConstName::key($memberNameRaw);
+        if (
+            !isset($classEntry->constants[$memberKey])
+            && null !== $classEntry->unevaluatedClassConsts
+            && isset($classEntry->unevaluatedClassConsts['segments'][$memberKey])
+            && null !== $this->context->ensureClassConstEvaluated
+        ) {
+            // Outermost fetch: update without visited mark (ZEND_FETCH_CLASS_CONSTANT; #31837).
+            ($this->context->ensureClassConstEvaluated)(
+                $classEntry,
+                $memberKey,
+                $classEntry->name,
+                $memberNameRaw,
+                false
+            );
+        }
         if (isset($classEntry->constants[$memberKey])) {
             if (!ClassConstName::matchesDeclared(
                 $memberNameRaw,
