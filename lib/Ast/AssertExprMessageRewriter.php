@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\ext\standard\AssertOptionsJitHelper;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
+use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
@@ -13,12 +15,12 @@ use PhpParser\NodeVisitorAbstract;
 use PhpParser\PrettyPrinter\Standard as PrettyPrinter;
 
 /**
- * Inject Zend-style assert() expression text as the description when omitted (#29630).
+ * Zend {@code assert()} compile-time handling (zend_compile.c {@code zend_compile_assert}).
  *
- * php-src compiles {@code assert($expr)} as {@code assert($expr, 'assert($expr)')} so
- * AssertionError / E_WARNING messages use the normalized expression (zend_compile.c /
- * ext/standard/assert.c). Without a description, this compiler previously always used
- * {@code assert(): assert(false) failed}.
+ * - {@code zend.assertions < 0}: replace the call with constant {@code true} so the
+ *   condition and description are not evaluated (#31857).
+ * - Otherwise inject the pretty-printed expression as the description when omitted
+ *   (#29630), matching php-src {@code assert($expr)} → {@code assert($expr, 'assert($expr)')}.
  */
 final class AssertExprMessageRewriter extends NodeVisitorAbstract
 {
@@ -36,6 +38,12 @@ final class AssertExprMessageRewriter extends NodeVisitorAbstract
         }
         if ('assert' !== strtolower($node->name->toString())) {
             return null;
+        }
+        if ($node->isFirstClassCallable()) {
+            return null;
+        }
+        if (AssertOptionsJitHelper::shouldCompileOutAssert()) {
+            return new ConstFetch(new Name('true'), $node->getAttributes());
         }
         if (1 !== \count($node->args)) {
             return null;
