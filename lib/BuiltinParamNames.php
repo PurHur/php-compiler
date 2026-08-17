@@ -783,6 +783,9 @@ final class BuiltinParamNames
             // php-src file.stub.php / dir.stub.php / basic_functions.stub.php (#23461)
             case 'unlink':
                 return ['filename', 'context'];
+            // php-src ext/standard/file.stub.php — InternalArgInfo still says source_file/destination_file (#23347)
+            case 'copy':
+                return ['from', 'to', 'context'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says path/new_path (#28854)
             case 'move_uploaded_file':
                 return ['from', 'to'];

@@ -2846,6 +2846,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'new_path', 'move_uploaded_file'));
     }
 
+    /** @covers issue #23347 */
+    public function testCopyZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('copy');
+        self::assertSame(['from', 'to', 'context'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'from', 'copy'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'to', 'copy'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'copy'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'source_file', 'copy'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'destination_file', 'copy'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('copy'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('copy'));
+    }
+
     /** @covers issue #23264 */
     public function testCryptQuotemetaStrrevStrRot13ZendStubNamedParams(): void
     {
