@@ -15,6 +15,7 @@ use PHPLLVM\Value;
  *
  * Signature: curl_upkeep(CurlHandle $handle): bool
  * Returns true iff curl_easy_upkeep() returns CURLE_OK (SAVE_CURL_ERROR on handle).
+ * Reflection / named `$handle` via BuiltinInternalArgInfo + BuiltinParamNames (#27702).
  */
 final class curl_upkeep extends Internal
 {

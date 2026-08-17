@@ -1448,6 +1448,8 @@ final class BuiltinParamNames
             case 'curl_error':
             case 'curl_exec':
             case 'curl_reset':
+            // php-src ext/curl/curl.stub.php — InternalArgInfo omits curl_upkeep (#27702)
+            case 'curl_upkeep':
                 return ['handle'];
             case 'curl_setopt':
                 return ['handle', 'option', 'value'];
