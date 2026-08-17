@@ -742,10 +742,9 @@ final class VmSoapServer
             '      <'.$pfx.':Reason><'.$pfx.':Text xml:lang="en">'.
             \htmlspecialchars($string, \ENT_XML1).
             '</'.$pfx.':Text></'.$pfx.':Reason>'."\n";
-        // SOAP 1.2 uses Role instead of faultactor.
-        if ('' !== $actor) {
-            $body .= '      <'.$pfx.':Role>'.\htmlspecialchars($actor, \ENT_XML1).'</'.$pfx.':Role>'."\n";
-        }
+        // php-src serialize_response_call SOAP_1_2: Z_FAULT_ACTOR_P is not
+        // serialized (no env:Node / env:Role). $actor stays on SoapFault only.
+        // Detail element is SOAP_1_2_ENV_NS_PREFIX ":Detail" (#31945).
         if (null !== $details) {
             $detailInner = self::encodeFaultDetail($details, $name);
             $body .= '      <'.$pfx.':Detail>'.$detailInner.'</'.$pfx.':Detail>'."\n";
