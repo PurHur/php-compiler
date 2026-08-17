@@ -34,6 +34,8 @@ final class JitGethostnameKernel
     public static function invoke(Context $context): Value
     {
         LibcExtern::register($context);
+        // Module-local open/close/read after LibcExtern always-on drop (#31817).
+        LibcExtern::ensurePosixFd($context);
 
         $fn = $context->builder->getInsertBlock()->getParent();
         $i8 = $context->getTypeFromString('int8');

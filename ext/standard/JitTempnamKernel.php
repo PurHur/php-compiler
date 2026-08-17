@@ -90,6 +90,7 @@ final class JitTempnamKernel
             ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
             ['snprintf', $i32, [$i8p, $sizeT, $i8p]],
             ['mkstemp', $i32, [$i8p]],
+            // close(2) module-local after LibcExtern always-on drop (#31817).
             ['close', $i32, [$i32]],
             ['chmod', $i32, [$i8p, $i32]],
             ['__string__init', $strPtr, [$i64, $i8p]],

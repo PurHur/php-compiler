@@ -122,6 +122,7 @@ final class TouchLibcRuntime
 
     private static function ensureLibc(Context $context): void
     {
+        // Module-local open/close after LibcExtern always-on drop (#31817); peer #31403 stat.
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');

@@ -48,6 +48,8 @@ final class JitFileGetContentsLibc
         }
 
         LibcExtern::register($context);
+        // Module-local open/close/read after LibcExtern always-on drop (#31817).
+        LibcExtern::ensurePosixFd($context);
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
             ? $probe

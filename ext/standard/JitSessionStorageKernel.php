@@ -262,6 +262,8 @@ final class JitSessionStorageKernel
     private static function emitSessionWireLoadFromPath(Context $context, Value $pathStr, Value $destHt): void
     {
         LibcExtern::register($context);
+        // Module-local open/close/read after LibcExtern always-on drop (#31817).
+        LibcExtern::ensurePosixFd($context);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -572,6 +574,8 @@ final class JitSessionStorageKernel
     private static function emitSessionWireSaveToPath(Context $context, Value $sessionHt, Value $pathStr): void
     {
         LibcExtern::register($context);
+        // Module-local open/close/write after LibcExtern always-on drop (#31817).
+        LibcExtern::ensurePosixFd($context);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');

@@ -68,10 +68,10 @@ final class LibcExtern
             // stays on JitStreamIoKernel / __compiler_fopen / StreamIoJitHelper (#5343 / #26929).
             // fflush/ferror/fgets dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel /
             // ObStorageLlvm declare module-locally; user-script builtins stay on PHP helpers.
-            'open' => [$i32, false, [$i8p, $i32, $i32]],
-            'close' => [$i32, false, [$i32]],
-            'read' => [$i64, false, [$i32, $i8p, $i64]],
-            'write' => [$i64, false, [$i32, $i8p, $i64]],
+            // open/close/read/write dropped (#31817): TouchLibcRuntime / JitStreamIoKernel /
+            // JitTempnamKernel / ObStorageLlvm already declare module-locally; NestedJIT fd
+            // leaves call ensurePosixFd() before lookup. User-script file I/O stays on PHP
+            // helpers (StreamIo / FileGetContents / Readfile / RandomBytes / …).
             // mkstemp dropped (#31655): JitTempnamKernel::ensureLibc declares mkstemp(3)
             // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
             // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
@@ -170,6 +170,42 @@ final class LibcExtern
     }
 
     /**
+     * Module-local open/close/read/write after LibcExtern always-on drop (#31817).
+     *
+     * User-script file I/O stays on PHP helpers (`__compiler_*`); NestedJIT fd leaves
+     * call this before lookupFunction('open') etc. Peer: ensureStdioFile (#31764).
+     */
+    public static function ensurePosixFd(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        // Tuple list (not always-on table rows) so LibcExternDeadDeclsRuntimeShrinkTest can
+        // assert open/close/read/write rows are gone without matching this helper.
+        foreach ([
+            ['open', $i32, [$i8p, $i32, $i32]],
+            ['close', $i32, [$i32]],
+            ['read', $i64, [$i32, $i8p, $i64]],
+            ['write', $i64, [$i32, $i8p, $i64]],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+
+                continue;
+            } catch (\LogicException $e) {
+            }
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
+        }
+    }
+
+    /**
      * Module-local printf(3) after LibcExtern always-on drop (#31706).
      *
      * User-script printf() stays on JitPrintf / __compiler_printf (#3681); NestedJIT
@@ -218,9 +254,11 @@ final class LibcExtern
     /**
      * MCJIT fails to relocate libc `write` (null call) while varargs libc
      * (snprintf/syscall) resolves (#98, #21109). Implement write via SYS_write.
+     * Declares write module-locally after always-on drop (#31817).
      */
     private static function implementWriteViaHostAlias(Context $context): void
     {
+        self::ensurePosixFd($context);
         $fn = $context->module->getNamedFunction('write');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;

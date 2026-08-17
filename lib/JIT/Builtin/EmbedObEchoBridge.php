@@ -285,6 +285,8 @@ final class EmbedObEchoBridge
 
             return;
         }
+        // Module-local write(2) after LibcExtern always-on drop (#31817).
+        \PHPCompiler\JIT\LibcExtern::ensurePosixFd($context);
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');

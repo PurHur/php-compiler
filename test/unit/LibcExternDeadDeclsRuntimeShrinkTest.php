@@ -71,6 +71,10 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'fwrite',
             'fclose',
             'strcasecmp',
+            'open',
+            'close',
+            'read',
+            'write',
         ];
     }
 
@@ -81,7 +85,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -103,8 +107,10 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31743', $source);
         $this->assertStringContainsString('#31764', $source);
         $this->assertStringContainsString('#31787', $source);
+        $this->assertStringContainsString('#31817', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
+        $this->assertStringContainsString('ensurePosixFd', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -289,15 +295,37 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strcasecmp (#31787)'
         );
+        $this->assertStringNotContainsString(
+            "'open' =>",
+            $source,
+            'LibcExtern must not declare libc open (#31817)'
+        );
+        $this->assertStringNotContainsString(
+            "'close' =>",
+            $source,
+            'LibcExtern must not declare libc close (#31817)'
+        );
+        $this->assertStringNotContainsString(
+            "'read' =>",
+            $source,
+            'LibcExtern must not declare libc read (#31817)'
+        );
+        $this->assertStringNotContainsString(
+            "'write' =>",
+            $source,
+            'LibcExtern must not declare libc write (#31817)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
         $this->assertStringContainsString('#31743', $source);
         $this->assertStringContainsString('#31764', $source);
         $this->assertStringContainsString('#31787', $source);
+        $this->assertStringContainsString('#31817', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
+        $this->assertStringContainsString('ensurePosixFd', $source);
     }
 
     public function testNestedJitConsumersEnsurePrintfAfterLibcExternDrop(): void
@@ -339,6 +367,42 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("['fwrite'", $io);
         $this->assertStringContainsString("['fclose'", $io);
         $this->assertStringContainsString('#31764', $io);
+    }
+
+    public function testNestedJitConsumersEnsurePosixFdAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'ext/standard/JitFileGetContentsLibc.php',
+            'ext/standard/JitReadfileLibc.php',
+            'ext/standard/JitRandomBytesKernel.php',
+            'ext/standard/JitGethostnameKernel.php',
+            'ext/standard/JitObWriteStdoutKernel.php',
+            'ext/standard/JitSessionStorageKernel.php',
+            'lib/JIT/Builtin/SocketPairIoRuntime.php',
+            'ext/standard/JitProgressNoteKernel.php',
+            'lib/JIT/Builtin/EmbedObEchoBridge.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensurePosixFd',
+                $source,
+                "{$rel} must call LibcExtern::ensurePosixFd after #31817"
+            );
+            $this->assertStringContainsString('#31817', $source);
+        }
+        $touch = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/TouchLibcRuntime.php');
+        $this->assertStringContainsString("['open'", $touch);
+        $this->assertStringContainsString("['close'", $touch);
+        $this->assertStringContainsString('#31817', $touch);
+        $io = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
+        $this->assertStringContainsString("['close'", $io);
+        $this->assertStringContainsString('#31817', $io);
+        $tempnam = (string) file_get_contents(__DIR__.'/../../ext/standard/JitTempnamKernel.php');
+        $this->assertStringContainsString("['close'", $tempnam);
+        $this->assertStringContainsString('#31817', $tempnam);
+        $ob = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObStorageLlvm.php');
+        $this->assertStringContainsString("'write'", $ob);
+        $this->assertStringContainsString('#31817', $ob);
     }
 
     public function testParseStrKernelDeclaresMemmoveModuleLocallyAfterLibcExternDrop(): void

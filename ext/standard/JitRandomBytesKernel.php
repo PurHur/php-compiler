@@ -30,6 +30,8 @@ final class JitRandomBytesKernel
     public static function invoke(Context $context, Value $len): Value
     {
         LibcExtern::register($context);
+        // Module-local open/close/read after LibcExtern always-on drop (#31817).
+        LibcExtern::ensurePosixFd($context);
 
         $fn = $context->builder->getInsertBlock()->getParent();
         $i64 = $context->getTypeFromString('int64');
