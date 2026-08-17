@@ -239,4 +239,15 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('public static function emitIllegalOffsetType', $read);
         $this->assertStringContainsString('public static function illegalOffsetMessageForJitKey', $read);
     }
+
+    public function testHashTableHelperDelegatesForeachByRefLlvmV10(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString('HashTableWriteLlvm::assignForeachByRefWritable', $helper);
+        $this->assertStringNotContainsString('foreachByRefPackedArm', $helper);
+
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString('public static function assignForeachByRefWritable', $write);
+        $this->assertStringContainsString('self::setAtIndex', $write);
+    }
 }
