@@ -10,6 +10,9 @@ if (!\class_exists('SoapFault', false)) {
     {
         public ?string $faultcode = null;
 
+        /** php-src soap.stub.php — set from array ($ns, $code) ctor (#31956). */
+        public ?string $faultcodens = null;
+
         public string $faultstring = '';
 
         public ?string $faultactor = null;
@@ -32,7 +35,20 @@ if (!\class_exists('SoapFault', false)) {
             string $lang = ''
         ) {
             if (\is_array($code)) {
-                $this->faultcode = isset($code[1]) ? (string) $code[1] : (isset($code[0]) ? (string) $code[0] : '');
+                // php-src zim_SoapFault___construct: exactly two string indexes (#31956).
+                if (
+                    2 !== \count($code)
+                    || !isset($code[0], $code[1])
+                    || !\is_string($code[0])
+                    || !\is_string($code[1])
+                    || '' === $code[1]
+                ) {
+                    throw new \ValueError(
+                        'SoapFault::__construct(): Argument #1 ($code) is not a valid fault code'
+                    );
+                }
+                $this->faultcodens = $code[0];
+                $this->faultcode = $code[1];
             } else {
                 $this->faultcode = null === $code ? null : (string) $code;
             }

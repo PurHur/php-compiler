@@ -669,8 +669,9 @@ final class VmSoapServer
         $details = $e->detail ?? null;
         $name = isset($e->_name) ? (string) $e->_name : '';
         $lang = isset($e->lang) ? (string) $e->lang : '';
+        $faultcodens = isset($e->faultcodens) ? (string) $e->faultcodens : '';
 
-        return self::buildFaultEnvelope($state->soapVersion, $code, $string, $actor, $details, $name, $lang);
+        return self::buildFaultEnvelope($state->soapVersion, $code, $string, $actor, $details, $name, $lang, $faultcodens);
     }
 
     private static function buildFaultFromPending(SoapServerState $state): string
@@ -698,13 +699,17 @@ final class VmSoapServer
         string $actor = '',
         mixed $details = null,
         string $name = '',
-        string $lang = ''
+        string $lang = '',
+        string $faultcodens = ''
     ): string {
         if (SoapConstants::SOAP_1_2 === $soapVersion) {
-            return self::buildSoap12FaultEnvelope($code, $string, $actor, $details, $name, $lang);
+            return self::buildSoap12FaultEnvelope($code, $string, $actor, $details, $name, $lang, $faultcodens);
         }
 
-        $body = '      <faultcode>'.\htmlspecialchars($code, \ENT_XML1).'</faultcode>'."\n".
+        $envNs = SoapConstants::SOAP_1_1_ENV_NAMESPACE;
+        $envPfx = SoapConstants::SOAP_1_1_ENV_NS_PREFIX;
+        [$codeXml, $extraNs] = self::faultCodeXmlQName($code, $faultcodens, $envPfx, $envNs);
+        $body = '      <faultcode>'.$codeXml.'</faultcode>'."\n".
             '      <faultstring>'.\htmlspecialchars($string, \ENT_XML1).'</faultstring>'."\n";
         if ('' !== $actor) {
             $body .= '      <faultactor>'.\htmlspecialchars($actor, \ENT_XML1).'</faultactor>'."\n";
@@ -715,13 +720,13 @@ final class VmSoapServer
         }
 
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
-            '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'."\n".
-            '  <SOAP-ENV:Body>'."\n".
-            '    <SOAP-ENV:Fault>'."\n".
+            '<'.$envPfx.':Envelope xmlns:'.$envPfx.'="'.$envNs.'"'.$extraNs.'>'."\n".
+            '  <'.$envPfx.':Body>'."\n".
+            '    <'.$envPfx.':Fault>'."\n".
             $body.
-            '    </SOAP-ENV:Fault>'."\n".
-            '  </SOAP-ENV:Body>'."\n".
-            '</SOAP-ENV:Envelope>';
+            '    </'.$envPfx.':Fault>'."\n".
+            '  </'.$envPfx.':Body>'."\n".
+            '</'.$envPfx.':Envelope>';
     }
 
     /**
@@ -730,6 +735,7 @@ final class VmSoapServer
      * env:Code/Value is an env QName only when php-src set_soap_fault sets faultcodens
      * (Client→Sender, Server→Receiver, VersionMismatch, MustUnderstand, DataEncodingUnknown).
      * Passing already-mapped "Receiver"/"Sender" is a custom code (unprefixed), matching Zend 8.2.
+     * Array ctor ($ns, $code) sets faultcodens and QNames via encode_add_ns (#31956).
      */
     private static function buildSoap12FaultEnvelope(
         string $code,
@@ -737,11 +743,12 @@ final class VmSoapServer
         string $actor = '',
         mixed $details = null,
         string $name = '',
-        string $lang = ''
+        string $lang = '',
+        string $faultcodens = ''
     ): string {
-        $ns = 'http://www.w3.org/2003/05/soap-envelope';
-        $pfx = 'env';
-        $value = self::soap12FaultCodeValue($code, $pfx);
+        $ns = SoapConstants::SOAP_1_2_ENV_NAMESPACE;
+        $pfx = SoapConstants::SOAP_1_2_ENV_NS_PREFIX;
+        [$value, $extraNs] = self::soap12FaultCodeValue($code, $pfx, $faultcodens);
         // php-src SoapServer::fault default $lang is empty → no xml:lang (Zend 8.2).
         // Non-empty $lang sets xml:lang on env:Text (php-src xmlNodeSetLang).
         $langAttr = '' !== $lang ? ' xml:lang="'.\htmlspecialchars($lang, \ENT_XML1).'"' : '';
@@ -758,7 +765,7 @@ final class VmSoapServer
         }
 
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
-            '<'.$pfx.':Envelope xmlns:'.$pfx.'="'.$ns.'">'."\n".
+            '<'.$pfx.':Envelope xmlns:'.$pfx.'="'.$ns.'"'.$extraNs.'>'."\n".
             '  <'.$pfx.':Body>'."\n".
             '    <'.$pfx.':Fault>'."\n".
             $body.
@@ -768,10 +775,20 @@ final class VmSoapServer
     }
 
     /**
-     * php-src set_soap_fault SOAP_1_2 + serialize_response_call Code/Value (#31944).
+     * php-src set_soap_fault SOAP_1_2 + serialize_response_call Code/Value (#31944 / #31956).
+     *
+     * @return array{0: string, 1: string} [Value text, extra Envelope xmlns attr]
      */
-    private static function soap12FaultCodeValue(string $code, string $pfx): string
+    private static function soap12FaultCodeValue(string $code, string $pfx, string $faultcodens = ''): array
     {
+        if ('' !== $faultcodens) {
+            return self::faultCodeXmlQName(
+                $code,
+                $faultcodens,
+                $pfx,
+                SoapConstants::SOAP_1_2_ENV_NAMESPACE
+            );
+        }
         $qname = false;
         if ('Client' === $code) {
             $code = 'Sender';
@@ -788,7 +805,45 @@ final class VmSoapServer
         }
         $escaped = \htmlspecialchars($code, \ENT_XML1);
 
-        return $qname ? $pfx.':'.$escaped : $escaped;
+        return [$qname ? $pfx.':'.$escaped : $escaped, ''];
+    }
+
+    /**
+     * php-src serialize_response_call: encode_add_ns + xmlBuildQName when Z_FAULT_CODENS_P set (#31956).
+     *
+     * Custom namespaces get ns1 (SOAP_GLOBAL(cur_uniq_ns) first unused prefix). Envelope
+     * env/SOAP-ENV href reuses the envelope prefix — no extra xmlns.
+     *
+     * @return array{0: string, 1: string} [QName or local, extra Envelope xmlns attr]
+     */
+    private static function faultCodeXmlQName(
+        string $code,
+        string $faultcodens,
+        string $envelopePfx,
+        string $envelopeNs
+    ): array {
+        $escaped = \htmlspecialchars($code, \ENT_XML1);
+        if ('' === $faultcodens) {
+            return [$escaped, ''];
+        }
+        if ($faultcodens === $envelopeNs) {
+            return [$envelopePfx.':'.$escaped, ''];
+        }
+        if (SoapConstants::SOAP_1_2_ENV_NAMESPACE === $faultcodens) {
+            return [
+                SoapConstants::SOAP_1_2_ENV_NS_PREFIX.':'.$escaped,
+                ' xmlns:'.SoapConstants::SOAP_1_2_ENV_NS_PREFIX.'="'.SoapConstants::SOAP_1_2_ENV_NAMESPACE.'"',
+            ];
+        }
+        if (SoapConstants::SOAP_1_1_ENV_NAMESPACE === $faultcodens) {
+            return [
+                SoapConstants::SOAP_1_1_ENV_NS_PREFIX.':'.$escaped,
+                ' xmlns:'.SoapConstants::SOAP_1_1_ENV_NS_PREFIX.'="'.SoapConstants::SOAP_1_1_ENV_NAMESPACE.'"',
+            ];
+        }
+        $escapedNs = \htmlspecialchars($faultcodens, \ENT_XML1);
+
+        return ['ns1:'.$escaped, ' xmlns:ns1="'.$escapedNs.'"'];
     }
 
     private static function encodeFaultDetail(mixed $details, string $name): string

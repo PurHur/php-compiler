@@ -264,7 +264,8 @@ final class BuiltinExceptionSupport
         string $faultstring = '',
         string $faultactor = '',
         mixed $detail = null,
-        string $name = ''
+        string $name = '',
+        string $faultcodens = ''
     ): Variable {
         if (!isset($ctx->classes[self::CLASS_SOAP_FAULT])) {
             return self::materializeException($ctx, $message, $file, $line);
@@ -273,6 +274,9 @@ final class BuiltinExceptionSupport
         $obj = $var->toObject();
         if ('' !== $faultcode) {
             $obj->getProperty('faultcode')->string($faultcode);
+        }
+        if ('' !== $faultcodens && $obj->hasProperty('faultcodens')) {
+            $obj->getProperty('faultcodens')->string($faultcodens);
         }
         $fs = '' !== $faultstring ? $faultstring : $message;
         $obj->getProperty('faultstring')->string($fs);

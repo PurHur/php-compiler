@@ -58,6 +58,9 @@ final class BuiltinClasses
         if (!isset($existing['faultcode'])) {
             $entry->properties[] = new ClassProperty('faultcode', null, $nullProto, false, $pub, 'soapfault');
         }
+        if (!isset($existing['faultcodens'])) {
+            $entry->properties[] = new ClassProperty('faultcodens', null, $nullProto, false, $pub, 'soapfault');
+        }
         if (!isset($existing['faultstring'])) {
             $entry->properties[] = new ClassProperty('faultstring', $empty, $strProto, false, $pub, 'soapfault');
         }
