@@ -39,7 +39,10 @@ final class LibcExtern
             // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
             'strlen' => [$sizeT, false, [$i8p]],
             'strcmp' => [$i32, false, [$i8p, $i8p]],
-            'strncmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
+            // strncmp dropped (#31839): M5TrivialEchoNative declares strncmp(3) module-locally
+            // (ensureStrncmp — sole NestedJIT lookupFunction consumer); user-script strncmp()
+            // stays on NCompareJitHelper / VmString (#15225 / MemcmpRuntimeShrinkTest) — not libc.
+            // Peer strncasecmp (#31682) / strcasecmp (#31787) / open-fd (#31817) drops.
             // strcasecmp dropped (#31787): NestedJIT class/name compares look up
             // __compiler_strcasecmp (StringCaseCompare::ensureStrcasecmpLinked);
             // user-script strcasecmp() stays on CaseCompareJitHelper / VmString

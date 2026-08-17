@@ -75,6 +75,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'close',
             'read',
             'write',
+            'strncmp',
         ];
     }
 
@@ -85,7 +86,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -108,6 +109,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31764', $source);
         $this->assertStringContainsString('#31787', $source);
         $this->assertStringContainsString('#31817', $source);
+        $this->assertStringContainsString('#31839', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
@@ -315,6 +317,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc write (#31817)'
         );
+        $this->assertStringNotContainsString(
+            "'strncmp' =>",
+            $source,
+            'LibcExtern must not declare libc strncmp (#31839)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
@@ -322,10 +329,24 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31764', $source);
         $this->assertStringContainsString('#31787', $source);
         $this->assertStringContainsString('#31817', $source);
+        $this->assertStringContainsString('#31839', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
+    }
+
+    public function testM5TrivialEchoNativeDeclaresStrncmpModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/M5TrivialEchoNative.php');
+        $this->assertStringContainsString('ensureStrncmp', $source);
+        $this->assertStringContainsString('#31839', $source);
+        $this->assertStringContainsString("lookupFunction('strncmp')", $source);
+        $this->assertMatchesRegularExpression("/addFunction\\(\\s*'strncmp'/", $source);
+        $this->assertStringNotContainsString(
+            "'strncmp' =>",
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php')
+        );
     }
 
     public function testNestedJitConsumersEnsurePrintfAfterLibcExternDrop(): void
