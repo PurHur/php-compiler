@@ -857,7 +857,66 @@ bootstrap_compile_invoke_zend() {
   fi
 
   echo "bootstrap-compile-invoke: php ${BOOTSTRAP_COMPILE_DRIVER} -o ${out} ${entry} (gen-0 Zend)" >&2
-  "$@" php "${BOOTSTRAP_COMPILE_DRIVER}" -o "${out}" "${entry}"
+
+  # Post-emit hang watchdog (#31726): after runtime_standalone_compiletofile_done the
+  # -o binary is linked and runnable, but php can spin tearing down multi-GiB LLVM
+  # graphs. Prefer Runtime/AotEmitFastExit::_exit; if that misses, stop waiting once
+  # the artifact has been stable past BOOTSTRAP_SELFHOST_POST_EMIT_GRACE_SEC.
+  local progress="${PHP_COMPILER_JIT_PROGRESS_FILE:-${ROOT}/build/.last-jit-func}"
+  local grace="${BOOTSTRAP_SELFHOST_POST_EMIT_GRACE_SEC:-45}"
+  local max_sec="${BOOTSTRAP_SELFHOST_ZEND_COMPILE_MAX_SEC:-7200}"
+  local start_ts
+  start_ts="$(date +%s)"
+  local seen_done=0
+  local done_ts=0
+  local php_pid=""
+  local now=0
+  local elapsed_done=0
+  local elapsed_total=0
+
+  set +e
+  "$@" php "${BOOTSTRAP_COMPILE_DRIVER}" -o "${out}" "${entry}" &
+  php_pid=$!
+  set -e
+
+  while kill -0 "${php_pid}" 2>/dev/null; do
+    now="$(date +%s)"
+    if [[ -x "${out}" && -f "${progress}" ]] \
+      && grep -qx 'runtime_standalone_compiletofile_done' "${progress}" 2>/dev/null; then
+      if [[ "${seen_done}" -eq 0 ]]; then
+        seen_done=1
+        done_ts="${now}"
+        echo "bootstrap-compile-invoke: compiletofile_done + runnable ${out}; grace ${grace}s for clean exit (#31726)" >&2
+      else
+        elapsed_done=$((now - done_ts))
+        if [[ "${elapsed_done}" -ge "${grace}" ]]; then
+          echo "bootstrap-compile-invoke: php still running ${grace}s after compiletofile_done — stopping hung emit (#31726)" >&2
+          kill "${php_pid}" 2>/dev/null || true
+          sleep 2
+          kill -9 "${php_pid}" 2>/dev/null || true
+          wait "${php_pid}" 2>/dev/null || true
+          if [[ -x "${out}" ]]; then
+            return 0
+          fi
+          return 1
+        fi
+      fi
+    fi
+    elapsed_total=$((now - start_ts))
+    if [[ "${elapsed_total}" -ge "${max_sec}" ]]; then
+      echo "bootstrap-compile-invoke: Zend gen-0 exceeded ${max_sec}s (#31726)" >&2
+      kill -9 "${php_pid}" 2>/dev/null || true
+      wait "${php_pid}" 2>/dev/null || true
+      return 1
+    fi
+    sleep 2
+  done
+
+  set +e
+  wait "${php_pid}"
+  local rc=$?
+  set -e
+  return "${rc}"
 }
 
 # Link OUT from ENTRY. Optional prefix: env VAR=val … (same as `env … php bin/compile.php`).

@@ -286,6 +286,10 @@ function run(string $filename, string $code, array $options): void
     // Inventory compile_driver emit-helper links OOM through 6G–10G when
     // PHP_COMPILER_MEMORY_LIMIT is already set by ci_apply_llvm_memory_env (#23970).
     if ('' !== $normalized && str_contains($normalized, 'test/selfhost/')) {
+        // Warm libc `_exit` before LLVM so post-emit fast-exit cannot hang on cdef (#31726).
+        if (\class_exists(\PHPCompiler\AOT\AotEmitFastExit::class, true)) {
+            \PHPCompiler\AOT\AotEmitFastExit::warmup();
+        }
         $bundleLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
         $isCompileDriver = str_contains($normalized, 'compile_driver.php');
         $limitMib = static function ($limit): int {
@@ -560,15 +564,9 @@ function run(string $filename, string $code, array $options): void
         // shutdown then tears down LLVM builders/module in an order that aborts with
         // `free(): invalid pointer` (exit 134) or spins after a successful link
         // (#21925, #31726). Prefer Runtime::standalone() fast-exit (before $context
-        // dtor); this is a belt-and-suspenders path if that return is reached.
-        // Output is already on disk — skip PHP/LLVM destructors via _exit.
+        // dtor); this is belt-and-suspenders if that return is reached.
         if ($aotEmitOk && '' !== $normalized && str_contains($normalized, 'test/selfhost/')) {
-            $noFastExit = getenv('PHP_COMPILER_AOT_NO_FAST_EXIT');
-            $skipFastExit = '1' === $noFastExit || 'true' === strtolower((string) $noFastExit);
-            if (!$skipFastExit && (\class_exists(\FFI::class, false) || \class_exists(\FFI::class))) {
-                $ffi = \FFI::cdef('void _exit(int status);');
-                $ffi->_exit(0);
-            }
+            \PHPCompiler\AOT\AotEmitFastExit::exitAfterSuccessfulSelfhostEmit($filename, (string) $options['-o']);
         }
     }
     if (isset($options['-l']) && null !== $bundleLintCacheFile) {
