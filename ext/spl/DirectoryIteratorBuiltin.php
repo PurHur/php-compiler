@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -510,9 +511,15 @@ final class DirectoryIteratorSeek extends VmClassMethod
             DirectoryIteratorBuiltin::CLASS_LC,
             'DirectoryIterator::seek()'
         );
-        // php-src zim_DirectoryIterator_seek — exactly 1 user arg (#31009).
+        // php-src zim_DirectoryIterator_seek — exactly 1 user arg (#31009); Z_PARAM_LONG soft-null (#31723).
         $this->requireExactUserArgCount($frame, 'DirectoryIterator::seek', 1);
-        $offset = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $offset = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'DirectoryIterator::seek',
+            1,
+            'offset'
+        );
         DirectoryIteratorStorage::seek($object, $offset);
     }
 }
