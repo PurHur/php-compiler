@@ -390,6 +390,10 @@ final class BuiltinInternalDefaultValues
         'grapheme_strripos' => [
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src grapheme.stub.php — int $length = 1 (#24579)
+        'grapheme_str_split' => [
+            1 => ['kind' => 'int', 'value' => 1],
+        ],
         // php-src ext/hash/hash.stub.php — length=0, binary=false, options=[] (#25469)
         'hash_pbkdf2' => [
             4 => ['kind' => 'int', 'value' => 0],

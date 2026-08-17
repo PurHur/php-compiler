@@ -153,6 +153,48 @@ PHP
         $this->assertStringNotContainsString('(empty)', $stdout);
     }
 
+    /** @covers issue #31883 */
+    public function testCaughtUnsetStringOffsetErrorReportsUserSite(): void
+    {
+        $stdout = $this->runVmCliStdout(<<<'PHP'
+<?php
+function show(string $label, Throwable $e): void {
+    $f = $e->getFile();
+    echo $label, '|', ($f === '' ? '(empty)' : basename($f)), ':', $e->getLine(), "\n";
+}
+$s = 'abc';
+try { unset($s[1]); } catch (Throwable $e) { show('unset-str-offset', $e); }
+$x = 1;
+try { unset($x[0]); } catch (Throwable $e) { show('unset-scalar-offset', $e); }
+class T5 {
+    public readonly int $x;
+    public function __construct(int $x) { $this->x = $x; }
+}
+$o5 = new T5(1);
+try { $o5->x = 2; } catch (Throwable $e) { show('readonly-write', $e); }
+PHP
+            , 'unset_string_offset_getfile.php');
+        $this->assertStringContainsString('unset-str-offset|unset_string_offset_getfile.php:7', $stdout);
+        $this->assertStringContainsString('unset-scalar-offset|unset_string_offset_getfile.php:9', $stdout);
+        $this->assertStringContainsString('readonly-write|unset_string_offset_getfile.php:15', $stdout);
+        $this->assertStringNotContainsString('(empty)', $stdout);
+    }
+
+    /** @covers issue #31883 */
+    public function testUncaughtUnsetStringOffsetFatalAtUserSite(): void
+    {
+        $stderr = $this->runVmCliFile(<<<'PHP'
+<?php
+$s = 'abc';
+unset($s[1]);
+PHP
+            , 'unset_string_offset_uncaught.php');
+        $this->assertStringContainsString('Cannot unset string offsets', $stderr);
+        $this->assertStringContainsString('unset_string_offset_uncaught.php', $stderr);
+        $this->assertMatchesRegularExpression('/unset_string_offset_uncaught\.php:3\b/', $stderr);
+        $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
+    }
+
     private function runVmCliStdout(string $code, ?string $basename = null): string
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
