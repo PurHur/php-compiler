@@ -287,7 +287,6 @@ final class PackArgvSerialize
     {
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
         $pos = $context->builder->load($posSlot);
         $mem = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->store($val, $mem);
@@ -304,7 +303,6 @@ final class PackArgvSerialize
     {
         $double = $context->getTypeFromString('double');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
         $pos = $context->builder->load($posSlot);
         $mem = BasicBlockHelper::entryAlloca($context, $double);
         $context->builder->store($val, $mem);
@@ -330,9 +328,8 @@ final class PackArgvSerialize
             );
             $context->registerFunction('malloc', $fn);
         }
-        // memcpy(3) via LibcExtern::ensureMemcpyDecl after always-on drop (#31885);
-        // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
-        LibcExtern::ensureMemcpyDecl($context);
+        // Module-local memcpy(3) body — decl-only SIGSEGVs argv pack (#31963 / #31885).
+        LibcExtern::ensureMemcpyImplemented($context);
     }
 
     private static function ensureValueReaders(Context $context): void

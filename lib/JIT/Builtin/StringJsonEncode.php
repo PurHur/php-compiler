@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -104,17 +109,7 @@ final class StringJsonEncode
         $valuePtr = $context->getTypeFromString('__value__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            '__compiler_json_encode_value',
-            self::VALUE_BRIDGE_ENTRY,
-            [$valuePtr, $i64],
-            $strPtr,
-            self::ENCODE_VALUE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#20816'
-        );
+        self::implementJsonEncodeValueBridge($context);
         JitVmHelperLink::ensureBridge(
             $context,
             '__compiler_json_encode_array',
@@ -127,6 +122,84 @@ final class StringJsonEncode
             '#20816'
         );
         self::registerLinkedRuntime($context);
+    }
+
+    /**
+     * Scalar float fast path via {@see ZendDoubleStringRuntime} — NestedJIT `(string)` on
+     * float SIGSEGVs (#31963). Other types still use {@see JsonEncodeNestedJitHelper}.
+     */
+    private static function implementJsonEncodeValueBridge(Context $context): void
+    {
+        $abiName = '__compiler_json_encode_value';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::VALUE_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        ZendDoubleStringRuntime::ensureLinked($context);
+        self::ensureJitHelperCompiled($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $double = $context->getTypeFromString('double');
+        $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::VALUE_BRIDGE_ENTRY);
+        $floatBb = $fn->appendBasicBlock('json_enc_val_float');
+        $helperBb = $fn->appendBasicBlock('json_enc_val_helper');
+
+        $context->builder->positionAtEnd($entry);
+        $valPtr = $fn->getParam(0);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isVmFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(VmVariable::TYPE_FLOAT, false)
+        );
+        $isJitDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(JitVariable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isFloat = $context->builder->or($isVmFloat, $isJitDouble);
+        $context->builder->branchIf($isFloat, $floatBb, $helperBb);
+
+        $context->builder->positionAtEnd($floatBb);
+        try {
+            $context->lookupFunction('__value__readDouble');
+        } catch (\Throwable) {
+            $readDouble = $context->module->addFunction(
+                '__value__readDouble',
+                $context->context->functionType($double, false, $valuePtr)
+            );
+            $context->registerFunction('__value__readDouble', $readDouble);
+        }
+        $dbl = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
+        $formatted = ZendDoubleStringRuntime::format($context, $dbl);
+        $context->builder->returnValue($formatted);
+
+        $context->builder->positionAtEnd($helperBb);
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::ENCODE_VALUE_HELPER, '#20816');
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper($context, $valPtr, $helperFn->getParam(0)->typeOf()),
+            JitNestedHelperCoerce::coerceArgForHelper($context, $fn->getParam(1), $helperFn->getParam(1)->typeOf()),
+        ];
+        $result = $context->builder->call($helperFn, ...$args);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $result, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     public static function ensureJitHelperCompiled(Context $context): void

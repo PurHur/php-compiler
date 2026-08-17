@@ -25,8 +25,6 @@ final class StringFormat
 
     private const SPRINTF_HELPER = 'PHPCompiler\\ext\\standard\\SprintfJitHelper::sprintfArgv';
 
-    private const NUMBER_FORMAT_HELPER = 'PHPCompiler\\ext\\standard\\SprintfJitHelper::numberFormat';
-
     private const SPRINTF_BRIDGE_ENTRY = 'sprintf_bridge_entry';
 
     private const PRINTF_BRIDGE_ENTRY = 'printf_bridge_entry';
@@ -36,7 +34,6 @@ final class StringFormat
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SPRINTF_HELPER,
-        self::NUMBER_FORMAT_HELPER,
     ];
 
     /** @var list<string> */
@@ -115,7 +112,7 @@ final class StringFormat
 
         self::ensureRuntimeHelpers($context);
         PackArgvSerialize::ensureLinked($context);
-        self::ensureJitHelperCompiled($context);
+        self::ensureSprintfJitHelperCompiled($context);
         self::implementSprintfBridge($context);
         self::implementPrintfBridge($context);
         self::implementNumberFormatBridge($context);
@@ -150,12 +147,28 @@ final class StringFormat
             $context->lookupFunction('__string__separate'),
             $fn->getParam(0)
         );
+        $argc = $fn->getParam(1);
+        $argv = $fn->getParam(2);
+        $one = $i64->constInt(1, false);
+        $fastBb = $fn->appendBasicBlock('sprintf_one_arg_fast');
+        $slowBb = $fn->appendBasicBlock('sprintf_nestedjit_slow');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $argc, $one),
+            $fastBb,
+            $slowBb
+        );
+
+        $context->builder->positionAtEnd($fastBb);
+        $out = SprintfSnprintfRuntime::formatOneArg($context, $fn, $fmtSep, $argv);
+        $context->builder->returnValue($out);
+
+        $context->builder->positionAtEnd($slowBb);
         $blob = $context->builder->call(
             $context->lookupFunction('phpc_pack_argv_serialize'),
-            $fn->getParam(1),
-            $fn->getParam(2)
+            $argc,
+            $argv
         );
-        $helper = self::helperFunction($context, self::SPRINTF_HELPER);
+        $helper = self::sprintfHelperFunction($context, self::SPRINTF_HELPER);
         $out = JitNestedHelperCoerce::callHelper($context, $helper, [$fmtSep, $blob]);
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $out, $strPtr)
@@ -248,23 +261,12 @@ final class StringFormat
 
         $entry = $fn->appendBasicBlock(self::NUMBER_FORMAT_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
-        $decSep = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $fn->getParam(2)
-        );
         $thouSep = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $fn->getParam(3)
         );
-        $helper = self::helperFunction($context, self::NUMBER_FORMAT_HELPER);
-        $out = JitNestedHelperCoerce::callHelper(
-            $context,
-            $helper,
-            [$fn->getParam(0), $fn->getParam(1), $decSep, $thouSep, $fn->getParam(4)]
-        );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $out, $strPtr)
-        );
+        $thouOrd = self::stringFirstByteOrd($context, $fn, $thouSep);
+        NumberFormatRuntime::emitBridgeBody($context, $fn, $thouOrd);
         $context->registerFunction($abiName, $fn);
     }
 
@@ -292,14 +294,14 @@ final class StringFormat
         }
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function sprintfHelperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        self::ensureSprintfJitHelperCompiled($context);
 
         return JitVmHelperLink::lookupCompiled($context, $logical, '#20841');
     }
 
-    public static function ensureJitHelperCompiled(Context $context): void
+    public static function ensureSprintfJitHelperCompiled(Context $context): void
     {
         JitVmHelperLink::ensureCompiled(
             $context,
@@ -307,6 +309,12 @@ final class StringFormat
             self::COMPILED_HELPERS,
             '#20841'
         );
+    }
+
+    /** @deprecated use ensureSprintfJitHelperCompiled */
+    public static function ensureJitHelperCompiled(Context $context): void
+    {
+        self::ensureSprintfJitHelperCompiled($context);
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -318,5 +326,34 @@ final class StringFormat
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** First UTF-8 byte of separated __string__ (0 when empty) for NestedJIT separator ordinals (#31963). */
+    private static function stringFirstByteOrd(Context $context, LlvmFunction $fn, \PHPLLVM\Value $strSep): \PHPLLVM\Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load($context->builder->structGep($strSep, $map['length']));
+        $data = $context->builder->structGep($strSep, $map['value']);
+        $emptyBb = $fn->appendBasicBlock('nf_sep_ord_empty');
+        $workBb = $fn->appendBasicBlock('nf_sep_ord_work');
+        $doneBb = $fn->appendBasicBlock('nf_sep_ord_done');
+        $hasByte = $context->builder->icmp(Builder::INT_UGT, $len, $sizeT->constInt(0, false));
+        $context->builder->branchIf($hasByte, $workBb, $emptyBb);
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($workBb);
+        $byte = $context->builder->load($data);
+        $ord = $context->builder->zExt($byte, $i64);
+        $workEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($i64->constInt(0, false), $emptyBb);
+        $phi->addIncoming($ord, $workEnd);
+
+        return $phi;
     }
 }
