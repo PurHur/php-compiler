@@ -461,14 +461,14 @@ final class RecursiveTreeIteratorSetPrefixPart extends VmClassMethod
                 .(\count($frame->calledArgs) - 1).' given'
             );
         }
-        $part = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $part->type) {
-            throw new \TypeError(
-                'RecursiveTreeIterator::setPrefixPart(): Argument #1 ($part) must be of type int, '
-                .SplTreeIteratorArg::typeLabel($part).' given'
-            );
-        }
-        $partInt = $part->toInt();
+        // php-src zim_RecursiveTreeIterator_setPrefixPart — Z_PARAM_LONG $part (#31677).
+        $partInt = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'RecursiveTreeIterator::setPrefixPart',
+            1,
+            'part'
+        );
         if ($partInt < 0 || $partInt > 5) {
             throw new \ValueError(
                 'RecursiveTreeIterator::setPrefixPart(): Argument #1 ($part) must be a RecursiveTreeIterator::PREFIX_* constant'
