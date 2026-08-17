@@ -13805,12 +13805,14 @@ class Compiler {
                     $rhsSlot = $this->compileOperand($expr->expr, $block, true);
                     $ops = [];
                     if ($emitStaticPropertyFetch) {
-                        $ops[] = new OpCode(
+                        $staticFetchOp = new OpCode(
                             OpCode::TYPE_STATIC_PROPERTY_FETCH,
                             $fetchSlot,
                             $this->compileOperand($staticPropertyFetch->class, $block, true),
                             $this->compileStaticPropertyNameSlot($staticPropertyFetch->name, $staticPropertyFetch->class, $block)
                         );
+                        $this->assignSourceMetadata($staticFetchOp, $staticPropertyFetch);
+                        $ops[] = $staticFetchOp;
                     }
                     // One property write; publish used result without re-writing the slot (#29194).
                     // Stamp ASSIGN (not only the fetch) so JIT private(set) Errors cite the write (#29665).
@@ -14168,6 +14170,8 @@ class Compiler {
                     $this->compileOperand($expr->class, $block, true),
                     $this->compileStaticPropertyNameSlot($expr->name, $expr->class, $block)
                 );
+                // Stamp user line for typed-static uninit Errors (#31859, zend_object_handlers.c).
+                $this->assignSourceMetadata($staticFetchOp, $expr);
                 // isset/empty/?? on dim of Class::$prop — FETCH_STATIC_PROP_IS (#31783).
                 if ($this->isStaticPropertyFetchPreludeForDimIssetEmptyOrCoalesce($expr, $block)) {
                     $staticFetchOp->propertyHookCoalesceRead = true;
@@ -16008,6 +16012,7 @@ class Compiler {
             $this->compileOperand($fetch->class, $block, true),
             $this->compileStaticPropertyNameSlot($fetch->name, $fetch->class, $block)
         );
+        $this->assignSourceMetadata($op, $fetch);
         if ($propertyHookCoalesceRead) {
             $op->propertyHookCoalesceRead = true;
         }
