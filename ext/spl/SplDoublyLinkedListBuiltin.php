@@ -6,11 +6,13 @@ namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -425,7 +427,7 @@ final class SplDoublyLinkedListBuiltin
 
     public static function offsetExists(ObjectEntry $object, Variable $offset): bool
     {
-        $index = self::coerceIndex($offset, 'offsetExists', true);
+        $index = self::coerceIndex($offset, 'offsetExists');
         $count = \count(self::state($object));
 
         return $index >= 0 && $index < $count;
@@ -433,7 +435,7 @@ final class SplDoublyLinkedListBuiltin
 
     public static function offsetGet(ObjectEntry $object, Variable $offset): Variable
     {
-        $index = self::coerceIndex($offset, 'offsetGet', false);
+        $index = self::coerceIndex($offset, 'offsetGet');
         $state = self::state($object);
         if ($index < 0 || $index >= \count($state)) {
             throw new \OutOfRangeException('SplDoublyLinkedList::offsetGet(): Argument #1 ($index) is out of range');
@@ -454,7 +456,7 @@ final class SplDoublyLinkedListBuiltin
 
             return;
         }
-        $index = self::coerceIndex($offset, 'offsetSet', true);
+        $index = self::coerceIndex($offset, 'offsetSet');
         $count = \count(self::state($object));
         if ($index < 0 || $index >= $count) {
             throw new \OutOfRangeException('SplDoublyLinkedList::offsetSet(): Argument #1 ($index) is out of range');
@@ -466,7 +468,7 @@ final class SplDoublyLinkedListBuiltin
 
     public static function offsetUnset(ObjectEntry $object, Variable $offset): void
     {
-        $index = self::coerceIndex($offset, 'offsetUnset', false);
+        $index = self::coerceIndex($offset, 'offsetUnset');
         $count = \count(self::state($object));
         if ($index < 0 || $index >= $count) {
             throw new \OutOfRangeException('SplDoublyLinkedList::offsetUnset(): Argument #1 ($index) is out of range');
@@ -474,15 +476,35 @@ final class SplDoublyLinkedListBuiltin
         \array_splice(self::$store[$object->id], $index, 1);
     }
 
-    private static function coerceIndex(Variable $offset, string $method, bool $nullable): int
+    /**
+     * php-src Z_PARAM_LONG for dllist index — null soft-deprecates to 0 (#31804).
+     * Callers that treat null specially (offsetSet append) must not call this for null.
+     */
+    private static function coerceIndex(Variable $offset, string $method): int
     {
         $resolved = $offset->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
-            if (!$nullable) {
+            $frame = null;
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm) {
+                $frame = $vm->builtinHandlerFrame();
+                if (null === $frame) {
+                    $frames = $vm->context->runStackFrames();
+                    $frame = [] !== $frames ? $frames[0] : null;
+                }
+            }
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(
                     'SplDoublyLinkedList::'.$method.'(): Argument #1 ($index) must be of type int, null given'
                 );
             }
+            VmNullNumberParamDeprecation::emit(
+                $frame,
+                'SplDoublyLinkedList::'.$method,
+                1,
+                'index',
+                'int'
+            );
 
             return 0;
         }
@@ -495,9 +517,8 @@ final class SplDoublyLinkedListBuiltin
                 Variable::TYPE_OBJECT => 'object',
                 default => 'mixed',
             };
-            $expected = $nullable ? '?int' : 'int';
             throw new \TypeError(
-                'SplDoublyLinkedList::'.$method.'(): Argument #1 ($index) must be of type '.$expected.', '.$typeName.' given'
+                'SplDoublyLinkedList::'.$method.'(): Argument #1 ($index) must be of type int, '.$typeName.' given'
             );
         }
 
