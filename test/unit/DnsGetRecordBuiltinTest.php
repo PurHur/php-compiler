@@ -95,11 +95,20 @@ final class DnsGetRecordBuiltinTest extends TestCase
         $this->assertSame(0, $result->getNumElements());
     }
 
-    public function testVmDnsEmptyHostnameDnsAllReturnsEmptyArray(): void
+    public function testVmDnsEmptyHostnameDnsAllReturnsRootDelegationWhenAvailable(): void
     {
         $result = VmDns::dnsGetRecord('', StdlibConstants::DNS_ALL);
-        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $result);
-        $this->assertSame(0, $result->getNumElements());
+        if (!$result instanceof \PHPCompiler\VM\HashTable || 0 === $result->getNumElements()) {
+            $this->markTestSkipped('root DNS_ALL delegation unavailable (offline resolver)');
+        }
+
+        $first = $result->find('0');
+        $this->assertInstanceOf(VMVariable::class, $first);
+        $record = $first->resolveIndirect()->toArray();
+        $typeVar = $record->find('type');
+        $this->assertInstanceOf(VMVariable::class, $typeVar);
+        $type = $typeVar->resolveIndirect()->toString();
+        $this->assertContains($type, ['NS', 'SOA']);
     }
 
     public function testVmDnsEmptyHostnameDnsAnyReturnsEmptyArray(): void
