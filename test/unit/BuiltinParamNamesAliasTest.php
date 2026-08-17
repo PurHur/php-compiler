@@ -2765,7 +2765,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testSubstrReplaceZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('substr_replace');
-        self::assertSame(['string', 'replace', 'offset', 'length'], $names);
+        self::assertSame(['string', 'replace', 'offset', 'length='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'substr_replace'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'replace', 'substr_replace'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'substr_replace'));
@@ -2807,7 +2807,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testStrtrZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('strtr');
-        self::assertSame(['string', 'from', 'to'], $names);
+        self::assertSame(['string', 'from', 'to='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'strtr'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'from', 'strtr'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'to', 'strtr'));

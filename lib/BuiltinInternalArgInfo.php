@@ -246,6 +246,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php — alias/absent from InternalArgInfo; Zend : array (#27785)
             // get_included_files already array via InternalArgInfo; keep alias + mangled in sync.
             'get_required_files', 'get_mangled_object_vars' => 'array',
+            // ext/standard/string.stub.php — InternalArgInfo omits return / empty types (#23588)
+            'str_ireplace', 'substr_replace' => 'array|string',
             // ext/standard/type.stub.php — aliases absent from InternalArgInfo; Zend : bool (#28312)
             'is_integer', 'is_long', 'is_double' => 'bool',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471, #28569)
@@ -706,6 +708,8 @@ final class BuiltinInternalArgInfo
             'crypt' => 1 === $index ? false : null,
             // ext/standard/password.stub.php — $options = [] (InternalArgInfo required) (#28917)
             'password_hash' => 2 === $index ? true : null,
+            // ext/standard/string.stub.php — ?string $to = null (InternalArgInfo required string) (#23588)
+            'strtr' => 2 === $index ? true : null,
             default => null,
         };
     }
@@ -1273,8 +1277,26 @@ final class BuiltinInternalArgInfo
             'hash' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — bool $before_needle = false; InternalArgInfo omits 3rd (#25758)
             'strchr' => 2 === $index ? 'bool' : null,
-            // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
-            'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
+            // ext/standard/string.stub.php — array|string unions; &$count = null untyped (#23588 / #24886)
+            // InternalArgInfo: str_replace has string|array; str_ireplace params empty + count int.
+            'str_replace', 'str_ireplace' => match ($index) {
+                0, 1, 2 => 'array|string',
+                3 => '',
+                default => null,
+            },
+            // ext/standard/string.stub.php — array|string / array|int / array|int|null (#23588)
+            'substr_replace' => match ($index) {
+                0, 1 => 'array|string',
+                2 => 'array|int',
+                3 => 'array|int|null',
+                default => null,
+            },
+            // ext/standard/string.stub.php — string|array $from, ?string $to = null (#23588)
+            'strtr' => match ($index) {
+                1 => 'array|string',
+                2 => '?string',
+                default => null,
+            },
             // ext/standard/string.stub.php — &$percent = null (untyped; InternalArgInfo float) (#25361)
             'similar_text' => 2 === $index ? '' : null,
             // ext/standard/string.stub.php — array|string $separator, ?array $array = null (#24811)
