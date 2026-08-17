@@ -19,10 +19,13 @@ echo (int) $child->contains($root), "\n";
 echo (int) $root->contains($sibling), "\n";
 echo (int) $root->contains($root), "\n";
 echo (int) $root->contains(null), "\n";
+$n = null;
+echo (int) $root->contains($n), "\n";
 --EXPECT--
 1
 1
 0
 1
 1
+0
 0

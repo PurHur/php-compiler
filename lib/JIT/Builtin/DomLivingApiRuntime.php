@@ -48,14 +48,13 @@ final class DomLivingApiRuntime
 
     public static function invokeContains(Context $context, Variable $receiver, Variable $other): Value
     {
-        if (Variable::TYPE_NULL === $other->type) {
-            $receiverLlvm = self::loadObject($context, $receiver);
-            JitDomDocumentMethodKernel::ensureContainsNullBridge($context);
+        // php-src stub ?DOMNode — compile-time null → false (#31791, peer invokeIsEqualNode / #24462).
+        // Literal null often arrives as TYPE_VALUE + isNullConstant; the old TYPE_NULL-only
+        // bridge path never ran, and containsViaParentSlots loadObject(null) segfaulted under AOT.
+        if (Variable::TYPE_NULL === $other->type || $other->isNullConstant) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_contains_null_const');
 
-            return $context->builder->call(
-                $context->lookupFunction(self::ABI_CONTAINS_NULL),
-                $receiverLlvm
-            );
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::containsViaParentSlots($context, $receiver, $other);
@@ -90,6 +89,16 @@ final class DomLivingApiRuntime
         $hit = $fn->appendBasicBlock('dom_contains_hit');
         $miss = $fn->appendBasicBlock('dom_contains_miss');
         $done = $fn->appendBasicBlock('dom_contains_done');
+
+        // Runtime null in a value box → false (php-src ?DOMNode); avoid GEP on null (#31791).
+        $otherIsNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $otherLlvm,
+            $objPtr->constNull()
+        );
+        $afterOtherNull = $fn->appendBasicBlock('dom_contains_after_other_null');
+        $context->builder->branchIf($otherIsNull, $miss, $afterOtherNull);
+        $context->builder->positionAtEnd($afterOtherNull);
 
         $same = $context->builder->icmp(Builder::INT_EQ, $receiverLlvm, $otherLlvm);
         $startWalk = $fn->appendBasicBlock('dom_contains_start');
