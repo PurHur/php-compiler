@@ -109,7 +109,7 @@ final class ObjectStaticPropertyLlvm
         $context->builder->returnVoid();
     }
 
-    public static function fetch(Object_ $object, int $classId, string $name): Variable
+    public static function fetch(Object_ $object, int $classId, string $name, bool $forWrite = false): Variable
     {
         $entry = $object->staticPropertyGlobalEntry($classId, $name);
         if (null === $entry) {
@@ -129,7 +129,12 @@ final class ObjectStaticPropertyLlvm
             );
         }
         $context = $object->jitContext();
-        if (!empty($entry['typedWithoutDefault']) && null !== ($entry['initGlobal'] ?? null)) {
+        // BP_VAR_W assign skips uninitialized typed-static read guard (Zend zend_execute.c; #31965).
+        if (
+            !$forWrite
+            && !empty($entry['typedWithoutDefault'])
+            && null !== ($entry['initGlobal'] ?? null)
+        ) {
             $declName = $object->classNameForId($classId);
             $meta = $object->staticPropertyVisibilityMeta($classId, $name);
             if (null !== $meta) {

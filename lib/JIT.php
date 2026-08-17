@@ -10038,7 +10038,11 @@ class JIT {
                             $classId,
                             $nameOp->value
                         );
-                        $fetched = $this->context->type->object->staticPropertyFetch($classId, $nameOp->value);
+                        $fetched = $this->context->type->object->staticPropertyFetch(
+                            $classId,
+                            $nameOp->value,
+                            $forWrite
+                        );
                         if ($forWrite) {
                             $fetched->staticPropertyHookClassLc = strtolower(ltrim($className, '\\'));
                             $fetched->objectPropertyName = $nameOp->value;
@@ -16903,6 +16907,34 @@ class JIT {
                     Variable::TYPE_NATIVE_DOUBLE,
                 ], true)
             ) {
+                // Class static property lvalues must store via module globals + init flag,
+                // not a promoted stack slot (#20877, #31965).
+                if (null !== $result->staticPropertyGlobal && null !== $result->staticPropertyType) {
+                    if (
+                        !JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
+                            $this->context,
+                            $this,
+                            $result,
+                            $this->context->jitEnclosingBlock
+                        )
+                        && !JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
+                            $this->context,
+                            $result,
+                            $value,
+                            $this->context->jitEnclosingBlock,
+                            $this
+                        )
+                    ) {
+                        $this->context->type->object->staticPropertyStore(
+                            $result->staticPropertyGlobal,
+                            $value,
+                            $result->staticPropertyType,
+                            $result->staticPropertyInitGlobal
+                        );
+                    }
+
+                    return;
+                }
                 $llvmFunc = $this->context->builder->getInsertBlock()->getParent();
                 $slot = JIT\BasicBlockHelper::entryAllocaForFunction(
                     $this->context,
@@ -17012,6 +17044,32 @@ class JIT {
             $value->type === $result->type
             && !($branchMergeTarget && Variable::TYPE_VALUE === $result->type)
         ) {
+            if (null !== $result->staticPropertyGlobal && null !== $result->staticPropertyType) {
+                if (
+                    !JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
+                        $this->context,
+                        $this,
+                        $result,
+                        $this->context->jitEnclosingBlock
+                    )
+                    && !JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
+                        $this->context,
+                        $result,
+                        $value,
+                        $this->context->jitEnclosingBlock,
+                        $this
+                    )
+                ) {
+                    $this->context->type->object->staticPropertyStore(
+                        $result->staticPropertyGlobal,
+                        $value,
+                        $result->staticPropertyType,
+                        $result->staticPropertyInitGlobal
+                    );
+                }
+
+                return;
+            }
             if (!$result->includeBinding) {
                 $result->free();
             }
