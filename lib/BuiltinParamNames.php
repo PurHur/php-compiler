@@ -2120,6 +2120,9 @@ final class BuiltinParamNames
             // php-src ext/intl/grapheme/grapheme.stub.php — InternalArgInfo still str/start/part/extract_type (#27884)
             case 'grapheme_strlen':
                 return ['string'];
+            // php-src ext/intl/grapheme/grapheme.stub.php — PHP 8.4+; absent from InternalArgInfo (#24579)
+            case 'grapheme_str_split':
+                return ['string', 'length='];
             case 'grapheme_substr':
                 return ['string', 'offset', 'length='];
             case 'grapheme_strstr':

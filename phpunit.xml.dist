@@ -895,6 +895,8 @@
             <file>./test/compliance/MbStrPadPhantomCallJITTest.php</file>
             <file>./test/compliance/MbSplitEmptyPatternVMTest.php</file>
             <file>./test/compliance/GraphemePosEmptyNeedleVMTest.php</file>
+            <file>./test/compliance/GraphemeStrSplitNamed24579VMTest.php</file>
+            <file>./test/compliance/GraphemeStrSplitNamed24579JITTest.php</file>
             <file>./test/compliance/MbStrstrFamilyReflectionVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsDoubleEncodeNullJITTest.php</file>
