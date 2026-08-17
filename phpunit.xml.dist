@@ -474,6 +474,8 @@
             <file>./test/compliance/DomGetElementByIdNonIdNullVMTest.php</file>
             <file>./test/compliance/DomPhpcEnginePropsInvisibleVMTest.php</file>
             <file>./test/compliance/DomPhpcEnginePropsInvisibleJITTest.php</file>
+            <file>./test/compliance/DomNodeDeclaredPropsVMTest.php</file>
+            <file>./test/compliance/DomNodeDeclaredPropsJITTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictJITTest.php</file>
             <file>./test/compliance/DomCreateNullStrictVMTest.php</file>
