@@ -5047,7 +5047,12 @@ class Object_ extends Type {
     }
 
     /**
-     * Preserve prop_info->ce and typed-init flags when copying parent slots (#31785).
+     * Preserve prop_info->ce, typed-init flags, and defaults when copying parent slots
+     * (#31785, #31895, zend_inheritance.c / zend_objects.c).
+     *
+     * allocate() applies {@see propertyDefaults}[$classId] only — without copying the
+     * parent's compile-time / `new` defaults onto the child, subclass instances leave
+     * inherited slots UNDEF (typed Error / untyped warning).
      *
      * @param array{0: int, 1: string, 2: int, 3: int} $parentPropset
      */
@@ -5078,6 +5083,14 @@ class Object_ extends Type {
         if (isset($this->propertyDeclaredTypeLabels[$parentId][$parentSlot])) {
             $this->propertyDeclaredTypeLabels[$childId][$childSlot]
                 = $this->propertyDeclaredTypeLabels[$parentId][$parentSlot];
+        }
+        if (isset($this->propertyDefaults[$parentId][$parentSlot])) {
+            $this->propertyDefaults[$childId][$childSlot]
+                = $this->propertyDefaults[$parentId][$parentSlot];
+        }
+        if (isset($this->runtimePropertyNewDefaults[$parentId][$parentSlot])) {
+            $this->runtimePropertyNewDefaults[$childId][$childSlot]
+                = $this->runtimePropertyNewDefaults[$parentId][$parentSlot];
         }
     }
 
