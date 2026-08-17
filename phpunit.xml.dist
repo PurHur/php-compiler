@@ -118,6 +118,8 @@
             <file>./test/compliance/TraitInstanceofStaticJITTest.php</file>
             <file>./test/compliance/TraitSelfTypehintsVMTest.php</file>
             <file>./test/compliance/TraitSelfTypehintsJITTest.php</file>
+            <file>./test/compliance/TraitParentTypehintVMTest.php</file>
+            <file>./test/compliance/TraitParentTypehintJITTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>
