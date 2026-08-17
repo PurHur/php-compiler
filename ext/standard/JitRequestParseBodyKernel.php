@@ -40,6 +40,8 @@ final class JitRequestParseBodyKernel
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         LibcExtern::register($context);
+        // Module-local strncmp after LibcExtern always-on drop (#31839).
+        LibcExtern::ensureStrncmp($context);
         StringGetenv::ensureLibcGetenv($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensurePopulateHelperCompiled($context);

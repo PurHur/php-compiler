@@ -73,6 +73,8 @@ final class JitSessionStorageKernel
         StringFilePutContents::implement($context);
         // Cookie apply + session path I/O use libc getenv (#21900).
         LibcExtern::register($context);
+        // Module-local strncmp after LibcExtern always-on drop (#31839).
+        LibcExtern::ensureStrncmp($context);
         self::implement($context);
     }
 
