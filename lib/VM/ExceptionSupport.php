@@ -352,7 +352,8 @@ final class ExceptionSupport
         }
         $receiver->getProperty(self::PROP_MESSAGE)->string($message);
         $receiver->getProperty(self::PROP_CODE)->int($code);
-        $receiver->getProperty(self::PROP_FILE)->string(self::throwSiteFile($frame));
+        $file = self::throwSiteFile($frame);
+        $receiver->getProperty(self::PROP_FILE)->string($file);
         $lineProp = $receiver->getProperty(self::PROP_LINE);
         $line = 0;
         $lineVar = $lineProp->resolveIndirect();
@@ -362,7 +363,7 @@ final class ExceptionSupport
         if ($line <= 0) {
             $line = self::throwSiteLine($frame);
         }
-        $lineProp->int($line);
+        $lineProp->int(\PHPCompiler\ext\standard\VmEval::unwrapEvalThrowableLine($file, $line));
         if (array_key_exists($messageArgIndex + 2, $frame->calledArgs)) {
             $prevArg = $frame->calledArgs[$messageArgIndex + 2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $prevArg->type) {
@@ -459,7 +460,9 @@ final class ExceptionSupport
         if ($line <= 0) {
             $line = self::throwSiteLine($frame);
         }
-        $receiver->getProperty(self::PROP_LINE)->int($line);
+        $receiver->getProperty(self::PROP_LINE)->int(
+            \PHPCompiler\ext\standard\VmEval::unwrapEvalThrowableLine($file, $line)
+        );
         if (array_key_exists(6, $frame->calledArgs)) {
             $prevArg = $frame->calledArgs[6]->resolveIndirect();
             if (Variable::TYPE_NULL !== $prevArg->type) {
@@ -502,7 +505,10 @@ final class ExceptionSupport
 
     public static function throwSiteLine(Frame $frame): int
     {
-        return FatalSite::lineFromOpcodes($frame);
+        return \PHPCompiler\ext\standard\VmEval::unwrapEvalThrowableLine(
+            self::throwSiteFile($frame),
+            FatalSite::lineFromOpcodes($frame)
+        );
     }
 
     /**
@@ -764,7 +770,10 @@ final class ExceptionSupport
         if ($line < 1) {
             $line = 1;
         }
-        $obj->getProperty(self::PROP_LINE)->int($line);
+        $file = self::readThrowableFile($obj);
+        $obj->getProperty(self::PROP_LINE)->int(
+            \PHPCompiler\ext\standard\VmEval::unwrapEvalThrowableLine($file, $line)
+        );
     }
 
     /**

@@ -33,6 +33,19 @@ final class VmEvalUnclosedNestTest extends TestCase
     }
 
     /**
+     * @covers \PHPCompiler\ext\standard\VmEval::unwrapEvalThrowableLine
+     * @covers issue #31948
+     */
+    public function testUnwrapEvalThrowableLineShiftsWrapEvalCodePrefix(): void
+    {
+        $evalFile = "script.php(3) : eval()'d code";
+        $this->assertSame(1, VmEval::unwrapEvalThrowableLine($evalFile, 2));
+        $this->assertSame(2, VmEval::unwrapEvalThrowableLine($evalFile, 3));
+        $this->assertSame(0, VmEval::unwrapEvalThrowableLine($evalFile, 0));
+        $this->assertSame(2, VmEval::unwrapEvalThrowableLine('script.php', 2));
+    }
+
+    /**
      * @covers \PHPCompiler\ext\standard\VmEval::isZeroLengthEvalSource
      * @covers issue #31914
      */

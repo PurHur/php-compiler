@@ -15,6 +15,7 @@ use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ExceptionSupport;
+use PHPCompiler\ext\standard\VmEval;
 use PHPLLVM\Value;
 
 /**
@@ -94,6 +95,10 @@ final class ExceptionConstruct implements Call
         $fileVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $fileStr);
         $object->storeInstanceProperty($obj, $decl, ExceptionSupport::PROP_FILE, $fileVar);
         $line = max(0, $context->callSiteLine);
+        // wrapEvalCode prepends `<?php\n` — Zend Exception::getLine() is 1-based in the eval string (#31948).
+        if ($context->evalInlineDepth > 0 && $line > 0) {
+            $line = VmEval::unwrapEvalLine($line);
+        }
         $lineVar = new Variable(
             $context,
             Variable::TYPE_NATIVE_LONG,

@@ -87,6 +87,30 @@ try {
         );
     }
 
+    /** wrapEvalCode prepends `<?php\\n` — Zend getLine() is 1-based in the eval string (#31948). */
+    public function testEvalThrowGetLineMatchesEvalString(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+echo eval(\'return __LINE__;\');
+echo "\n";
+try {
+    eval(\'throw new Exception("x");\');
+} catch (Exception $e) {
+    echo $e->getLine();
+    echo "\n";
+}
+try {
+    eval("\nthrow new Exception(\\"x\\");");
+} catch (Exception $e) {
+    echo $e->getLine();
+    echo "\n";
+}
+',
+            "1\n1\n2\n"
+        );
+    }
+
     public function testRethrowPreservesOriginalLine(): void
     {
         $this->assertVmOutput(

@@ -336,6 +336,11 @@ class Context {
     public int $inlineIncludeDepth = 0;
 
     /**
+     * Nested eval() inline lowering depth — Exception/Error getLine() must unwrap wrapEvalCode (#31948).
+     */
+    public int $evalInlineDepth = 0;
+
+    /**
      * Caller blocks for nested literal includes (layout → partial); used to resolve
      * inherited locals from the outer TU (#764, #784).
      *
