@@ -1230,24 +1230,6 @@ final class M5TrivialEchoNative
      */
     private static function ensureStrncmp(Context $context): void
     {
-        if (null !== $context->module->getNamedFunction('strncmp')) {
-            $context->registerFunction('strncmp', $context->module->getNamedFunction('strncmp'));
-
-            return;
-        }
-        try {
-            $context->lookupFunction('strncmp');
-
-            return;
-        } catch (\LogicException $e) {
-        }
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $fn = $context->module->addFunction(
-            'strncmp',
-            $context->context->functionType($i32, false, $i8p, $i8p, $sizeT)
-        );
-        $context->registerFunction('strncmp', $fn);
+        LibcExtern::ensureStrncmp($context);
     }
 }

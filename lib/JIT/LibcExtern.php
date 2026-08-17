@@ -39,8 +39,8 @@ final class LibcExtern
             // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
             'strlen' => [$sizeT, false, [$i8p]],
             'strcmp' => [$i32, false, [$i8p, $i8p]],
-            // strncmp dropped (#31839): M5TrivialEchoNative declares strncmp(3) module-locally
-            // (ensureStrncmp — sole NestedJIT lookupFunction consumer); user-script strncmp()
+            // strncmp dropped (#31839): NestedJIT leaves call ensureStrncmp() before lookup
+            // (M5TrivialEchoNative + multipart/CGI/stream kernels); user-script strncmp()
             // stays on NCompareJitHelper / VmString (#15225 / MemcmpRuntimeShrinkTest) — not libc.
             // Peer strncasecmp (#31682) / strcasecmp (#31787) / open-fd (#31817) drops.
             // strcasecmp dropped (#31787): NestedJIT class/name compares look up
@@ -134,6 +134,34 @@ final class LibcExtern
         foreach ($specs as $name => [$ret, $vararg, $params]) {
             self::ensure($context, $name, $ctx->functionType($ret, $vararg, ...$params));
         }
+    }
+
+    /**
+     * Module-local strncmp(3) after LibcExtern always-on drop (#31839).
+     *
+     * User-script strncmp() stays on NCompareJitHelper / VmString; NestedJIT prefix
+     * walks (multipart/CGI/stream/M5) call this before lookupFunction('strncmp').
+     * Peer: ensureStdioFile (#31764) / ensurePosixFd (#31817).
+     */
+    public static function ensureStrncmp(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strncmp');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->getNamedFunction('strncmp');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'strncmp',
+                $context->context->functionType($i32, false, $i8p, $i8p, $sizeT)
+            );
+        }
+        $context->registerFunction('strncmp', $fn);
     }
 
     /**

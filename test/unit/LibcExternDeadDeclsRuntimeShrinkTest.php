@@ -334,6 +334,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
+        $this->assertStringContainsString('ensureStrncmp', $source);
     }
 
     public function testM5TrivialEchoNativeDeclaresStrncmpModuleLocallyAfterLibcExternDrop(): void
@@ -342,11 +343,30 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStrncmp', $source);
         $this->assertStringContainsString('#31839', $source);
         $this->assertStringContainsString("lookupFunction('strncmp')", $source);
-        $this->assertMatchesRegularExpression("/addFunction\\(\\s*'strncmp'/", $source);
+        $this->assertStringContainsString('LibcExtern::ensureStrncmp', $source);
         $this->assertStringNotContainsString(
             "'strncmp' =>",
             (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php')
         );
+    }
+
+    public function testNestedJitConsumersEnsureStrncmpAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'ext/standard/JitMultipartKernel.php',
+            'ext/standard/JitSuperglobalRefreshKernel.php',
+            'ext/standard/JitRequestParseBodyKernel.php',
+            'ext/standard/JitSessionStorageKernel.php',
+            'lib/JIT/M5TrivialEchoNative.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensureStrncmp',
+                $source,
+                "{$rel} must call LibcExtern::ensureStrncmp after #31839"
+            );
+            $this->assertStringContainsString('#31839', $source);
+        }
     }
 
     public function testNestedJitConsumersEnsurePrintfAfterLibcExternDrop(): void

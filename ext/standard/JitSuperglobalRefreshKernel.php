@@ -44,6 +44,9 @@ final class JitSuperglobalRefreshKernel
     public static function ensurePrerequisites(Context $context): void
     {
         LibcExtern::register($context);
+        // Module-local strncmp after LibcExtern always-on drop (#31839) — PATH_INFO /
+        // multipart Content-Type prefix walks look up strncmp before Multipart ensure.
+        LibcExtern::ensureStrncmp($context);
         StringGetenv::ensureLibcGetenv($context);
         self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);

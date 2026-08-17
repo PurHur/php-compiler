@@ -457,6 +457,8 @@ final class BuiltinInternalArgInfo
             'flush' => 'void',
             // InternalArgInfo false|array; Zend stubs are array only (#25780)
             'ob_get_status', 'ob_list_handlers' => 'array',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return bool; Zend string|false (#25593)
+            'ob_get_clean' => 'string|false',
             // ext/libxml/libxml.stub.php — InternalArgInfo return object (#25844)
             'libxml_get_errors' => 'array',
             // ext/libxml/libxml.stub.php — InternalArgInfo return object/empty; Zend unions + voids (#28021)
