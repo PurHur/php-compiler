@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * curl_escape() — URL-encode a string (php-src ext/curl/interface.c; #6351, #20493).
  *
  * Signature: curl_escape(CurlHandle $handle, string $string): string|false
+ * Reflection / named `$handle`/`$string` via BuiltinInternalArgInfo + BuiltinParamNames (#27798).
  */
 final class curl_escape extends Internal
 {

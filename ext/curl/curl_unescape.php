@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * curl_unescape() — URL-decode a string (php-src ext/curl/interface.c; #6351, #20493).
  *
  * Signature: curl_unescape(CurlHandle $handle, string $string): string|false
+ * Reflection / named `$handle`/`$string` via BuiltinInternalArgInfo + BuiltinParamNames (#27798).
  */
 final class curl_unescape extends Internal
 {
