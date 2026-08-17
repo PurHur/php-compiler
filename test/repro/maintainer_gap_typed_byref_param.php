@@ -1,7 +1,21 @@
 <?php
 // Typed by-ref parameters must TypeError / in-place-coerce like Zend ZEND_RECV (not skip checks).
 error_reporting(E_ALL);
-function t(int &$x) { $x++; echo 'in=', var_export($x, true), "\n"; }
+set_error_handler(static function (int $no, string $str): bool {
+    if (E_DEPRECATED === $no) {
+        echo 'DEP:', $str, "\n";
+
+        return true;
+    }
+
+    return false;
+});
+
+function t(int &$x)
+{
+    $x++;
+    echo 'in=', var_export($x, true), "\n";
+}
 
 echo "== int ==\n";
 $a = 1;

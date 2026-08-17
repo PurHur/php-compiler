@@ -143,13 +143,14 @@ final class TypeCheck
     public static function coerceParameter(Variable $dest, bool $strict, ?GenericArrayTypeSpec $arraySpec = null): void
     {
         $target = $dest->resolveIndirect();
-        if (null !== $target->unionTypeConstraints) {
+        $meta = self::declaredTypeCarrier($dest);
+        if (null !== $meta->unionTypeConstraints) {
             self::coerceUnionValue(
                 $target,
-                $target->unionTypeConstraints,
+                $meta->unionTypeConstraints,
                 $strict,
                 'Argument',
-                $target->declaredTypeLabel
+                $meta->declaredTypeLabel
             );
             if (null !== $arraySpec) {
                 self::assertGenericArrayShape($dest, $arraySpec, 'Argument');
@@ -655,6 +656,32 @@ final class TypeCheck
         throw new \TypeError($message);
     }
 
+    /**
+     * Declared-type metadata for a typed slot.
+     *
+     * By-ref ARG_RECV aliases the caller's zval (`Variable::indirect`); the param
+     * wrapper keeps `typeConstraint` while `resolveIndirect()` does not
+     * (#31882, zend_verify_arg_type). Prefer the wrapper when it carries the type.
+     */
+    private static function declaredTypeCarrier(Variable $dest): Variable
+    {
+        if (
+            $dest->isIndirect()
+            && (
+                null !== $dest->typeConstraint
+                || null !== $dest->unionTypeConstraints
+                || null !== $dest->classConstraint
+                || null !== $dest->literalBoolType
+                || null !== $dest->declaredTypeLabel
+                || null !== $dest->dnfArms
+            )
+        ) {
+            return $dest;
+        }
+
+        return $dest->resolveIndirect();
+    }
+
     private static function coerceTypedSlot(
         Variable $dest,
         bool $strict,
@@ -664,14 +691,15 @@ final class TypeCheck
         ?string $returnCallableName = null
     ): void {
         $target = $dest->resolveIndirect();
-        $constraint ??= $target->typeConstraint;
+        $meta = self::declaredTypeCarrier($dest);
+        $constraint ??= $meta->typeConstraint;
         if (null === $constraint) {
             return;
         }
-        if (null !== $target->literalBoolType) {
+        if (null !== $meta->literalBoolType) {
             self::assertLiteralBool(
                 $dest,
-                $target->literalBoolType,
+                $meta->literalBoolType,
                 $kind,
                 $propertyWrite,
                 $constraint,
@@ -681,11 +709,11 @@ final class TypeCheck
             return;
         }
         $value = $target;
-        if (Variable::TYPE_OBJECT === $constraint && null !== $target->classConstraint) {
-            if (self::matchesClassTypeHint($value, $target->classConstraint)) {
+        if (Variable::TYPE_OBJECT === $constraint && null !== $meta->classConstraint) {
+            if (self::matchesClassTypeHint($value, $meta->classConstraint)) {
                 return;
             }
-            $expected = $target->declaredTypeLabel ?? self::normalizeClassLabel($target->classConstraint);
+            $expected = $meta->declaredTypeLabel ?? self::normalizeClassLabel($meta->classConstraint);
             $expected = self::normalizeClassLabel(self::resolveParentTypeHintConstraint($expected));
             if ($propertyWrite && ('Property' === $kind || 'Static variable' === $kind)) {
                 throw self::propertyTypeError($target, $expected, $value);
