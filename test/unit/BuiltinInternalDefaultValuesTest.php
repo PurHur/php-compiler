@@ -630,4 +630,31 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         ));
         self::assertSame(0, $dest->toInt());
     }
+
+    /** @covers issue #25067 */
+    public function testNumberFormatSeparatorDefaults(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'number_format',
+            1,
+            ['name' => 'decimals', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(0, $dest->toInt());
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'number_format',
+            2,
+            ['name' => 'decimal_separator', 'type' => '?string', 'isOptional' => true]
+        ));
+        self::assertSame('.', $dest->toString());
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'number_format',
+            3,
+            ['name' => 'thousands_separator', 'type' => '?string', 'isOptional' => true]
+        ));
+        self::assertSame(',', $dest->toString());
+    }
 }

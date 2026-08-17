@@ -761,6 +761,13 @@ final class BuiltinInternalArgInfo
             'round' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
                 ? 'RoundingMode|int'
                 : null,
+            // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)
+            'number_format' => match ($index) {
+                0 => 'float',
+                1 => 'int',
+                2, 3 => '?string',
+                default => null,
+            },
             // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096, #28566)
             'bcceil', 'bcfloor' => 0 === $index ? 'string' : null,
             'bcround' => match ($index) {

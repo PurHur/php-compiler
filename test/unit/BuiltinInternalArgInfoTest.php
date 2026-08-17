@@ -864,6 +864,58 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('substr_count', 3));
     }
 
+    /** php-src basic_functions.stub.php — number_format optional ?string separators (#25067). */
+    public function testNumberFormatReflectionStubTypesAndDefaults(): void
+    {
+        $this->assertSame(
+            ['num', 'decimals=', 'decimal_separator=', 'thousands_separator='],
+            BuiltinParamNames::forFunction('number_format')
+        );
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('number_format'));
+        $this->assertSame(4, BuiltinParamNames::paramCountForInternalFunction('number_format'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('number_format'));
+        $this->assertSame('float', BuiltinInternalArgInfo::stubParamTypeOverride('number_format', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('number_format', 1));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('number_format', 2));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('number_format', 3));
+        $num = BuiltinInternalArgInfo::paramInfoForFunction('number_format', 0);
+        $this->assertNotNull($num);
+        $this->assertSame('float', $num['type']);
+        $this->assertFalse($num['isOptional']);
+        $decimals = BuiltinInternalArgInfo::paramInfoForFunction('number_format', 1);
+        $this->assertNotNull($decimals);
+        $this->assertSame('int', $decimals['type']);
+        $this->assertTrue($decimals['isOptional']);
+        $decSep = BuiltinInternalArgInfo::paramInfoForFunction('number_format', 2);
+        $this->assertNotNull($decSep);
+        $this->assertSame('decimal_separator', $decSep['name']);
+        $this->assertSame('?string', $decSep['type']);
+        $this->assertTrue($decSep['isOptional']);
+        $thouSep = BuiltinInternalArgInfo::paramInfoForFunction('number_format', 3);
+        $this->assertNotNull($thouSep);
+        $this->assertSame('thousands_separator', $thouSep['name']);
+        $this->assertSame('?string', $thouSep['type']);
+        $this->assertTrue($thouSep['isOptional']);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'number_format',
+            1,
+            ['name' => 'decimals', 'type' => 'int', 'isOptional' => true],
+            false
+        ));
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'number_format',
+            2,
+            ['name' => 'decimal_separator', 'type' => '?string', 'isOptional' => true],
+            false
+        ));
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'number_format',
+            3,
+            ['name' => 'thousands_separator', 'type' => '?string', 'isOptional' => true],
+            false
+        ));
+    }
+
     /** php-src basic_functions.stub.php — crypt $salt required; InternalArgInfo still salt= (#28920). */
     public function testCryptSaltRequiredReflectionStub(): void
     {

@@ -79,6 +79,13 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'enum_case', 'class' => 'RoundingMode', 'case' => 'HalfAwayFromZero'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — decimals=0, separators="." / "," (#25067)
+        // ?string would infer null; string does not infer "." / ",".
+        'number_format' => [
+            1 => ['kind' => 'int', 'value' => 0],
+            2 => ['kind' => 'string', 'value' => '.'],
+            3 => ['kind' => 'string', 'value' => ','],
+        ],
         // php-src ext/bcmath/bcmath.stub.php — RoundingMode::HalfAwayFromZero (#28566)
         'bcround' => [
             1 => ['kind' => 'int', 'value' => 0],
