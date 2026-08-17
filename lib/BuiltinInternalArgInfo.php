@@ -384,6 +384,8 @@ final class BuiltinInternalArgInfo
             'normalizer_normalize' => 'string|false',
             // ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
             'normalizer_get_raw_decomposition' => '?string',
+            // ext/intl/php_intl.stub.php — InternalArgInfo return int / options idna_info array (#25199)
+            'idn_to_ascii', 'idn_to_utf8' => 'string|false',
             // ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
             'datefmt_format_object' => 'string|false',
             // ext/intl/calendar/calendar.stub.php — @alias intlcal_create_instance; absent from InternalArgInfo (#27944)
@@ -973,6 +975,13 @@ final class BuiltinInternalArgInfo
             'grapheme_str_split' => match ($index) {
                 0 => 'string',
                 1 => 'int',
+                default => null,
+            },
+            // ext/intl/php_intl.stub.php — flags/variant/?array idna_info; InternalArgInfo options/array (#25199)
+            'idn_to_ascii', 'idn_to_utf8' => match ($index) {
+                0 => 'string',
+                1, 2 => 'int',
+                3 => '?array',
                 default => null,
             },
             // ext/intl/normalizer/normalizer.stub.php — string $string, int $form = FORM_C (#25586)

@@ -1,0 +1,13 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -2771,8 +2771,8 @@
+         'id3_remove_tag' => ['bool', 'filename' => 'string', 'version=' => 'int'],
+         'id3_set_tag' => ['bool', 'filename' => 'string', 'tag' => 'array', 'version=' => 'int'],
+         'idate' => ['int', 'format' => 'string', 'timestamp=' => 'int'],
+-        'idn_to_ascii' => ['int', 'domain' => 'string', 'options=' => 'int', 'variant=' => 'int', '&idna_info=' => 'array'],
+-        'idn_to_utf8' => ['int', 'domain' => 'string', 'options=' => 'int', 'variant=' => 'int', '&idna_info=' => 'array'],
++        'idn_to_ascii' => ['string|false', 'domain' => 'string', 'flags=' => 'int', 'variant=' => 'int', '&idna_info=' => '?array'],
++        'idn_to_utf8' => ['string|false', 'domain' => 'string', 'flags=' => 'int', 'variant=' => 'int', '&idna_info=' => '?array'],
+         'ifx_affected_rows' => ['int', 'result_id' => ''],
+         'ifx_blobinfile_mode' => ['bool', 'mode' => 'int'],
+         'ifx_byteasvarchar' => ['bool', 'mode' => 'int'],

@@ -771,6 +771,7 @@
             <file>./test/compliance/CurlEscapeUnescapeReflectionVMTest.php</file>
             <file>./test/compliance/NormalizerGetRawDecompositionReflectionVMTest.php</file>
             <file>./test/compliance/NormalizerNormalizeReflectionVMTest.php</file>
+            <file>./test/compliance/IdnToAsciiReflectionVMTest.php</file>
             <file>./test/compliance/DatefmtFormatObjectReflectionVMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681VMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681JITTest.php</file>
