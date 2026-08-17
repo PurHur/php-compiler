@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -526,14 +527,16 @@ final class RecursiveTreeIteratorSetPostfix extends VmClassMethod
                 .(\count($frame->calledArgs) - 1).' given'
             );
         }
-        $postfixArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $postfixArg->type) {
-            throw new \TypeError(
-                'RecursiveTreeIterator::setPostfix(): Argument #1 ($postfix) must be of type string, '
-                .SplTreeIteratorArg::typeLabel($postfixArg).' given'
-            );
-        }
-        SplTreeIteratorStorage::setPostfix($object, $postfixArg->toString());
+        // php-src zim_RecursiveTreeIterator_setPostfix — Z_PARAM_STR soft-null (#31805).
+        $postfix = VmString::stringBuiltinArgForFrame(
+            $frame,
+            1,
+            'RecursiveTreeIterator::setPostfix',
+            0,
+            'postfix',
+            false
+        );
+        SplTreeIteratorStorage::setPostfix($object, $postfix);
     }
 }
 
