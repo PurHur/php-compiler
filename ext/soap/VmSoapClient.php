@@ -16,6 +16,7 @@ use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\BuiltinExceptionSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmHttpBuildQuery;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmStreamContext;
@@ -33,7 +34,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * Document/literal operation→output message parts + complexType fields scope nested SDL types (#21091).
  * Document/literal operation→input sequence names positional __soapCall args (#21131).
  * WSDL soap:binding style / soap:body use applied when ctor omits style/use (#21132).
- * options['typemap'] from_xml/to_xml string callbacks (#21046).
+ * options['typemap'] from_xml/to_xml string or Closure/callable callbacks (#21046 / #31845).
  */
 final class VmSoapClient
 {
@@ -324,8 +325,12 @@ final class VmSoapClient
         if (isset($options['classmap']) && \is_array($options['classmap'])) {
             $state->classmap = self::normalizeClassmap($options['classmap']);
         }
-        // php-src SoapClient ctor: typemap [{type_ns,type_name,from_xml,to_xml}] (#21046).
-        if (isset($options['typemap']) && \is_array($options['typemap'])) {
+        // php-src SoapClient ctor: typemap [{type_ns,type_name,from_xml,to_xml}] (#21046 / #31845).
+        if (isset($options['__phpc_typemap']) && \is_array($options['__phpc_typemap'])) {
+            $state->typemap = $options['__phpc_typemap'];
+            unset($options['__phpc_typemap']);
+            $state->options = $options;
+        } elseif (isset($options['typemap']) && \is_array($options['typemap'])) {
             $state->typemap = self::normalizeTypemap($options['typemap']);
         }
         // php-src SoapClient ctor: cache_wsdl / soap.wsdl_cache_* (#26511 / php_sdl.c get_sdl).
@@ -1001,7 +1006,7 @@ final class VmSoapClient
     /**
      * php-src soap.c SoapClient ctor — Z_CLIENT_TYPEMAP is array (was resource pre-8.4) (#23903).
      *
-     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     * @param list<array{type_ns: string, type_name: string, from_xml: string|Variable|null, to_xml: string|Variable|null}> $typemap
      */
     private static function attachTypemap(ObjectEntry $object, Context $ctx, array $typemap): void
     {
@@ -1014,7 +1019,36 @@ final class VmSoapClient
         if ([] === $typemap) {
             return;
         }
-        $object->getProperty('typemap')->copyFrom(self::importDecodedTree($typemap, $ctx));
+        // Preserve Closure/callable Variables — cannot round-trip via JSON (#31845).
+        $outer = new HashTable();
+        $i = 0;
+        foreach ($typemap as $entry) {
+            $row = new HashTable();
+            $ns = new Variable();
+            $ns->string($entry['type_ns']);
+            $row->add('type_ns', $ns);
+            $tn = new Variable();
+            $tn->string($entry['type_name']);
+            $row->add('type_name', $tn);
+            foreach (['from_xml', 'to_xml'] as $cbKey) {
+                $cb = $entry[$cbKey];
+                if (null === $cb) {
+                    continue;
+                }
+                $slot = new Variable();
+                if (\is_string($cb)) {
+                    $slot->string($cb);
+                } else {
+                    $slot->copyFrom($cb);
+                }
+                $row->add($cbKey, $slot);
+            }
+            $rowVar = new Variable();
+            $rowVar->array($row);
+            $outer->addIndex($i, $rowVar);
+            ++$i;
+        }
+        $object->getProperty('typemap')->array($outer);
     }
 
     /**
@@ -2471,21 +2505,31 @@ final class VmSoapClient
         return null;
     }
 
-    private static function invokeTypemapToXml(Context $ctx, string $callback, mixed $value): ?string
+    private static function invokeTypemapToXml(Context $ctx, string|Variable $callback, mixed $value): ?string
     {
         try {
-            $fn = VmUserCall::resolveStringCallback($ctx, $callback);
+            $arg = self::importJsonLike($value, $ctx);
+            $result = self::invokeTypemapCallback($ctx, $callback, $arg);
         } catch (\Throwable) {
             return null;
         }
-        $arg = self::importJsonLike($value, $ctx);
-        $result = VmUserCall::invokeOne($ctx, $fn, $arg);
         $result = $result->resolveIndirect();
         if (Variable::TYPE_STRING === $result->type) {
             return $result->toString();
         }
 
         return null;
+    }
+
+    private static function invokeTypemapCallback(Context $ctx, string|Variable $callback, Variable $arg): Variable
+    {
+        if (\is_string($callback)) {
+            $fn = VmUserCall::resolveStringCallback($ctx, $callback);
+
+            return VmUserCall::invokeOne($ctx, $fn, $arg);
+        }
+
+        return VmCallable::invoke($ctx, $callback, $arg);
     }
 
     /**
@@ -2511,7 +2555,7 @@ final class VmSoapClient
     /**
      * @param array<mixed> $raw
      *
-     * @return list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}>
+     * @return list<array{type_ns: string, type_name: string, from_xml: string|Variable|null, to_xml: string|Variable|null}>
      */
     private static function normalizeTypemap(array $raw): array
     {
@@ -2550,6 +2594,77 @@ final class VmSoapClient
         }
 
         return $out;
+    }
+
+    /**
+     * Peel typemap before JSON export so Closures survive (#31845 / php-src ZVAL_COPY).
+     *
+     * @return list<array{type_ns: string, type_name: string, from_xml: string|Variable|null, to_xml: string|Variable|null}>
+     */
+    public static function normalizeTypemapFromVariable(Variable $typemapVar, Context $ctx): array
+    {
+        $typemapVar = $typemapVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $typemapVar->type) {
+            return [];
+        }
+        $out = [];
+        foreach ($typemapVar->toArray()->iterateKeyed(false) as [$_key, $entryVar]) {
+            $entryVar = $entryVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $entryVar->type) {
+                continue;
+            }
+            $ht = $entryVar->toArray();
+            $typeNameSlot = $ht->find('type_name');
+            if (null === $typeNameSlot) {
+                continue;
+            }
+            $typeNameVar = $typeNameSlot->resolveIndirect();
+            if (Variable::TYPE_STRING !== $typeNameVar->type || '' === $typeNameVar->toString()) {
+                continue;
+            }
+            $typeNs = '';
+            $typeNsSlot = $ht->find('type_ns');
+            if (null !== $typeNsSlot) {
+                $typeNsVar = $typeNsSlot->resolveIndirect();
+                if (Variable::TYPE_STRING === $typeNsVar->type) {
+                    $typeNs = $typeNsVar->toString();
+                }
+            }
+            $fromXml = self::typemapCallbackFromSlot($ht->find('from_xml'), $ctx);
+            $toXml = self::typemapCallbackFromSlot($ht->find('to_xml'), $ctx);
+            if (null === $fromXml && null === $toXml) {
+                continue;
+            }
+            $out[] = [
+                'type_ns' => $typeNs,
+                'type_name' => $typeNameVar->toString(),
+                'from_xml' => $fromXml,
+                'to_xml' => $toXml,
+            ];
+        }
+
+        return $out;
+    }
+
+    private static function typemapCallbackFromSlot(?Variable $slot, Context $ctx): string|Variable|null
+    {
+        if (null === $slot) {
+            return null;
+        }
+        $cb = $slot->resolveIndirect();
+        if (Variable::TYPE_STRING === $cb->type) {
+            $name = $cb->toString();
+
+            return '' !== $name ? $name : null;
+        }
+        if (VmCallable::isCallable($ctx, $cb)) {
+            $copy = new Variable();
+            $copy->copyFrom($cb);
+
+            return $copy;
+        }
+
+        return null;
     }
 
     /**
@@ -2875,11 +2990,10 @@ final class VmSoapClient
 
     private static function importTypemapFromXml(SoapTypemapFromXml $mapped, Context $ctx): Variable
     {
-        $fn = VmUserCall::resolveStringCallback($ctx, $mapped->callback);
         $arg = new Variable();
         $arg->string($mapped->xml);
 
-        return VmUserCall::invokeOne($ctx, $fn, $arg);
+        return self::invokeTypemapCallback($ctx, $mapped->callback, $arg);
     }
 
     /**
@@ -3178,9 +3292,9 @@ final class SoapClientState
     public array $classmap = [];
 
     /**
-     * php-src typemap entries (#21046).
+     * php-src typemap entries (#21046 / #31845).
      *
-     * @var list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}>
+     * @var list<array{type_ns: string, type_name: string, from_xml: string|Variable|null, to_xml: string|Variable|null}>
      */
     public array $typemap = [];
 
@@ -3273,7 +3387,7 @@ final class SoapMappedObject
 final class SoapTypemapFromXml
 {
     public function __construct(
-        public readonly string $callback,
+        public readonly string|Variable $callback,
         public readonly string $xml,
     ) {
     }
@@ -3309,8 +3423,9 @@ final class SoapClientConstruct extends SoapClassMethod
                     'SoapClient::__construct(): Argument #2 ($options) must be of type array'
                 );
             }
-            // Peel stream_context before JSON export — resource-like arrays are not JSON-safe (#20365).
+            // Peel stream_context / typemap before JSON export — resources/Closures are not JSON-safe (#20365 / #31845).
             $streamContextOptions = null;
+            $typemapEntries = null;
             $sourceHt = $optVar->toArray();
             $scSlot = $sourceHt->find('stream_context');
             if (null !== $scSlot) {
@@ -3325,10 +3440,19 @@ final class SoapClientConstruct extends SoapClassMethod
                     }
                 }
             }
+            $tmSlot = $sourceHt->find('typemap');
+            if (null !== $tmSlot) {
+                $typemapEntries = VmSoapClient::normalizeTypemapFromVariable(
+                    $tmSlot->resolveIndirect(),
+                    $frame->vmContext
+                );
+            }
             $filtered = new HashTable();
             foreach ($sourceHt->iterateKeyed(true) as [$key, $value]) {
                 $k = $key->resolveIndirect();
-                if (Variable::TYPE_STRING === $k->type && 'stream_context' === $k->toString()) {
+                if (Variable::TYPE_STRING === $k->type
+                    && ('stream_context' === $k->toString() || 'typemap' === $k->toString())
+                ) {
                     continue;
                 }
                 $copy = new Variable();
@@ -3347,6 +3471,9 @@ final class SoapClientConstruct extends SoapClassMethod
             }
             if (null !== $streamContextOptions) {
                 $options['__phpc_stream_context_options'] = $streamContextOptions;
+            }
+            if (null !== $typemapEntries) {
+                $options['__phpc_typemap'] = $typemapEntries;
             }
             // php-src soap.c: ssl_method option is deprecated (#20366).
             if (isset($options['ssl_method']) && (\is_int($options['ssl_method']) || \is_float($options['ssl_method']))) {
