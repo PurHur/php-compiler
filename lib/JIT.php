@@ -10235,6 +10235,10 @@ class JIT {
                         : (int) ($op->arg3 ?? 0);
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
                     $echoOp = $block->getOperand($argOffset);
+                    // echo/print $this in FLAG_STATIC / {main} / plain function (#31901).
+                    if (JIT\UnboundThisGuard::emitIfProven($this->context, $this, $block, $echoOp)) {
+                        break;
+                    }
                     $scriptGlobalEchoName = (
                         OpCode::TYPE_ECHO === $op->type
                         && null !== $op->echoScriptGlobalName
