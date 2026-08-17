@@ -74,10 +74,12 @@ final class SplTempFileObjectConstruct extends VmClassMethod
         );
         $maxMemory = SplTempFileObjectBuiltin::DEFAULT_MAX_MEMORY;
         if (isset($frame->calledArgs[1])) {
-            $maxMemory = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
+            // php-src Z_PARAM_LONG — soft-null cites parameter #1 ($maxMemory) (#31807).
+            $maxMemory = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
                 'SplTempFileObject::__construct',
-                0,
+                1,
                 'maxMemory'
             );
             if ($maxMemory < 0) {

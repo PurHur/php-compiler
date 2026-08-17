@@ -687,12 +687,13 @@ final class SplFixedArraySetSize extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::setSize()'
         );
-        // User arity excludes $this (#30836; zim_SplFixedArray_setSize).
+        // User arity excludes $this (#30836; zim_SplFixedArray_setSize); Z_PARAM_LONG soft-null cite #1 (#31807).
         $this->requireExactUserArgCount($frame, 'SplFixedArray::setSize', 1);
-        $size = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1],
+        $size = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
             'SplFixedArray::setSize',
-            0,
+            1,
             'size'
         );
         SplFixedArrayBuiltin::setSize($object, $size);
