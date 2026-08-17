@@ -23,6 +23,20 @@ final class SelfhostAotFastExitTest extends TestCase
         $this->assertStringContainsString('#21925', $compile);
     }
 
+    /** Issue #31726: fast-exit must run before Runtime::standalone() returns (context dtor hang). */
+    public function testRuntimeStandaloneFastExitsBeforeContextDestructor(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $runtime = (string) file_get_contents($root.'/lib/Runtime.php');
+        $this->assertStringContainsString('runtime_standalone_fast_exit', $runtime);
+        $this->assertStringContainsString('#31726', $runtime);
+        $this->assertStringContainsString('PHP_COMPILER_AOT_NO_FAST_EXIT', $runtime);
+        $this->assertMatchesRegularExpression(
+            '/compiletofile_done.*runtime_standalone_fast_exit|_exit\(0\)/s',
+            $runtime
+        );
+    }
+
     public function testBuilderDisposeIsIdempotent(): void
     {
         $root = dirname(__DIR__, 2);
