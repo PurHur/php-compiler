@@ -3562,7 +3562,8 @@ class VM {
     }
 
     /**
-     * True when zend_std_read_property must invoke __get (undeclared, inaccessible, or post-unset).
+     * True when zend_std_read_property must invoke __get (missing, inaccessible, or post-unset).
+     * Existing dynamic slots are read from storage, not __get (#31949).
      * Scope-aware meta: in-frame private beats child shadow so __get does not recurse (#25795).
      * Post-unset declared slots use __get like Zend (#25810, zend_object_handlers.c).
      */
@@ -3576,7 +3577,8 @@ class VM {
         }
         $meta = $this->classPropertyMeta($object, $name, $frame);
         if (null === $meta) {
-            return true;
+            // Live dynamic slots are read from storage (zend_std_read_property, #31949).
+            return !$object->hasProperty($name);
         }
         if ($this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, $meta->getVisibility)) {
             return true;
@@ -3795,8 +3797,9 @@ class VM {
     /**
      * Resolve an instance property write lvalue, including __set / dynamic properties (#146).
      * Inaccessible declared props with __set use the magic proxy (zend_std_write_property; #25686/#25687).
+     * $op distinguishes zend_std_write_property (plain assign) from get_property_ptr_ptr (#31949).
      */
-    protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame): Variable
+    protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame, ?OpCode $op = null): Variable
     {
         if ($this->propertyWriteUsesMagicSet($object, $name, $frame)) {
             $proxy = new Variable();
@@ -3855,7 +3858,12 @@ class VM {
 
             return $proxy;
         }
-        if ($this->instanceMethodReturnsByRef($object, '__get')) {
+        // get_property_ptr_ptr (+=, ++, &$obj->p) may bind a by-ref __get (#5309).
+        // zend_std_write_property does not: no __set → deprecated dynamic property (#31949).
+        if (
+            $this->instanceMethodReturnsByRef($object, '__get')
+            && (null === $op || !$this->propertyFetchDestUsedAsPlainAssign($frame, $op))
+        ) {
             return $this->invokeMagicGet($object, $name);
         }
         // Defense in depth — primary gate is enforceInternalDynamicPropertyCreate (#26055, #26371).
@@ -9123,7 +9131,7 @@ restart:
                             // Declared-but-UNDEF (e.g. after unset): BP_VAR_RW ++/-- warns like a read (#29241).
                             $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op)
                                 && $this->objectPropertySlotIsUndefinedForRwWarn($propertyObject, $name, $frame);
-                            $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame);
+                            $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame, $op);
                             if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                                 VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
                             }
@@ -9335,7 +9343,7 @@ restart:
                         }
                         // Missing dynamic prop: create then Undefined property for ++/-- (BP_VAR_RW, #29241).
                         $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op);
-                        $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame);
+                        $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame, $op);
                         if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                             VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
                         }
@@ -11820,6 +11828,22 @@ restart:
             $frame,
             $scriptFile
         );
+    }
+
+    /**
+     * True when fetch dest is the LHS of a following TYPE_ASSIGN (zend_std_write_property).
+     * Excludes ASSIGN_REF / ++/-- / compound — those use get_property_ptr_ptr (#31949).
+     */
+    private function propertyFetchDestUsedAsPlainAssign(Frame $frame, OpCode $op): bool
+    {
+        $next = $frame->block->opCodes[$frame->pos] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return OpCode::TYPE_ASSIGN === $next->type
+            && $next->arg2 === (int) $op->arg1
+            && $next->arg3 !== (int) $op->arg1;
     }
 
     /** True when a following opcode assigns through this PROPERTY_FETCH destination slot (#5370). */
