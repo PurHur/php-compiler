@@ -122,6 +122,108 @@ final class TypedPropertyUninitGuard
     }
 
     /**
+     * Uninitialized typed property by-ref fetch (#31771, zend_object_handlers.c get_property_ptr_ptr).
+     *
+     * Non-nullable: Error. Nullable: ZVAL_NULL then alias.
+     */
+    public static function emitBeforeByRef(Context $context, Variable $var): void
+    {
+        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
+            return;
+        }
+        if (Variable::TYPE_VALUE !== $var->type) {
+            return;
+        }
+        if (null === $var->objectPropertyClassName || null === $var->objectPropertyName) {
+            return;
+        }
+        $object = $context->type->object;
+        assert($object instanceof Object_);
+        $resolved = $object->resolvePropertySlot($var->objectPropertyClassName, $var->objectPropertyName);
+        if (null === $resolved) {
+            return;
+        }
+        [$classId, $slotIndex] = $resolved;
+        if (!$object->propertySlotRequiresTypedInitGuard($classId, $slotIndex)) {
+            return;
+        }
+        $valuePtr = self::valuePtrFromVariable($context, $var);
+        if (null === $valuePtr) {
+            return;
+        }
+        $declaringClass = $object->classNameForId($classId);
+        $allowsNull = $object->propertySlotAllowsNull($classId, $slotIndex);
+
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $entry = $context->builder->getInsertBlock();
+        if (null === $entry || null !== $entry->getTerminator()) {
+            return;
+        }
+
+        $checkBlock = $fn->appendBasicBlock('typed_prop_byref_check');
+        $okBlock = $fn->appendBasicBlock('typed_prop_byref_ok');
+        $exitBlock = $fn->appendBasicBlock('typed_prop_byref_exit');
+        $raiseBlock = $allowsNull ? null : $fn->appendBasicBlock('typed_prop_byref_raise');
+        $initNullBlock = $allowsNull ? $fn->appendBasicBlock('typed_prop_byref_init_null') : null;
+
+        $context->builder->positionAtEnd($entry);
+        $context->builder->branch($checkBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_UNDEFINED, false)
+        );
+        if ($allowsNull) {
+            assert(null !== $initNullBlock);
+            $context->builder->branchIf($isUndef, $initNullBlock, $okBlock);
+
+            $context->builder->positionAtEnd($initNullBlock);
+            $context->builder->store(
+                $i8->constInt(VmVariable::TYPE_NULL, false),
+                $context->builder->structGep($valuePtr, $map['type'])
+            );
+            $context->builder->branch($okBlock);
+        } else {
+            assert(null !== $raiseBlock);
+            $context->builder->branchIf($isUndef, $raiseBlock, $okBlock);
+
+            $context->builder->positionAtEnd($raiseBlock);
+            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+            ErrorRaise::registerDeclarations($context);
+            ErrorRaise::ensureLinked($context);
+            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                ErrorRaise::ensureStandaloneBodies($context);
+            }
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            ErrorRaise::emitRaise(
+                $context,
+                sprintf(
+                    'Cannot access uninitialized non-nullable property %s::$%s by reference',
+                    MethodVisibility::formatAnonymousScopeForMessage((string) $declaringClass),
+                    $var->objectPropertyName
+                )
+            );
+            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+            }
+            self::emitRaiseAndTerminate($context);
+        }
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->branch($exitBlock);
+        $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /**
      * Uninitialized static typed property read guard (#4908, #5047, zend_object_handlers.c).
      */
     public static function emitBeforeStaticRead(

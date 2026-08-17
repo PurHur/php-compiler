@@ -4831,6 +4831,8 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    // `$r = &$obj->uninitTyped` — get_property_ptr_ptr Error / nullable ZVAL_NULL (#31771).
+                    VM\TypedPropertyCheck::prepareWritableByReference($rhsSlot);
                     // Reference acquisition via `$r = &$obj->prop` follows set visibility (#7070).
                     // Already-acquired by-ref call returns (`$r = &$obj->getPriv()`) must not
                     // re-check — Zend aliases the returned reference (#29456).
@@ -6836,6 +6838,9 @@ restart:
                             break;
                         }
                         $dest = $frame->scope[$op->arg1];
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                            VM\TypedPropertyCheck::prepareWritableByReference($storage);
+                        }
                         $dest->indirect($storage);
                         if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                             $dest->propertyRefAcquisition = true;
@@ -6876,6 +6881,9 @@ restart:
                     }
                     if (!$mutates) {
                         VM\TypedPropertyCheck::assertReadable($storage);
+                    }
+                    if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                        VM\TypedPropertyCheck::prepareWritableByReference($storage);
                     }
                     $dest->indirect($storage);
                     if ($forWrite) {
@@ -9060,7 +9068,11 @@ restart:
                             // Declared-but-UNDEF (e.g. after unset): BP_VAR_RW ++/-- warns like a read (#29241).
                             $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op)
                                 && $this->objectPropertySlotIsUndefinedForRwWarn($propertyObject, $name, $frame);
-                            $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                            $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame);
+                            if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                                VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
+                            }
+                            $result->indirect($writeLvalue);
                             if ($warnUndefAfterRw) {
                                 $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
                             }
@@ -9256,7 +9268,11 @@ restart:
                         }
                         // Missing dynamic prop: create then Undefined property for ++/-- (BP_VAR_RW, #29241).
                         $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op);
-                        $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                        $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame);
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                            VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
+                        }
+                        $result->indirect($writeLvalue);
                         if ($warnUndefAfterRw) {
                             $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
                         }
