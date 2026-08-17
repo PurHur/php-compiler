@@ -59,10 +59,10 @@ final class LibcExtern
             // strdup dropped from always-on (#31534): JitFsGlobKernel / JitStreamIoKernel declare
             // strdup(3) module-locally (#31721 GlobIterator/FilesystemIterator AOT).
             // strtok_r dropped (#29091): parse_str AOT kernel uses __compiler_strtok_r.
-            'fopen' => [$i8p, false, [$i8p, $i8p]],
-            'fread' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
-            'fwrite' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
-            'fclose' => [$i32, false, [$i8p]],
+            // fopen/fread/fwrite/fclose dropped (#31764): JitStreamIoKernel::ensureLibc already
+            // declares FILE* ops module-locally; JitFilePutContentsLibc / JitMultipartKernel /
+            // M5TrivialEchoNative call ensureStdioFile() before lookup. User-script fopen()
+            // stays on JitStreamIoKernel / __compiler_fopen / StreamIoJitHelper (#5343 / #26929).
             // fflush/ferror/fgets dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel /
             // ObStorageLlvm declare module-locally; user-script builtins stay on PHP helpers.
             'open' => [$i32, false, [$i8p, $i32, $i32]],
@@ -127,6 +127,42 @@ final class LibcExtern
 
         foreach ($specs as $name => [$ret, $vararg, $params]) {
             self::ensure($context, $name, $ctx->functionType($ret, $vararg, ...$params));
+        }
+    }
+
+    /**
+     * Module-local fopen/fread/fwrite/fclose after LibcExtern always-on drop (#31764).
+     *
+     * User-script fopen() stays on JitStreamIoKernel / __compiler_fopen (#5343);
+     * NestedJIT FILE* leaves call this before lookupFunction('fopen') etc.
+     */
+    public static function ensureStdioFile(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        // Tuple list (not always-on table rows) so LibcExternDeadDeclsRuntimeShrinkTest can
+        // assert fopen/fread/fwrite/fclose rows are gone without matching this helper.
+        foreach ([
+            ['fopen', $i8p, [$i8p, $i8p]],
+            ['fread', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
+            ['fwrite', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
+            ['fclose', $i32, [$i8p]],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+
+                continue;
+            } catch (\LogicException $e) {
+            }
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
         }
     }
 
