@@ -5876,25 +5876,72 @@ class Compiler {
         int $i,
         Block $block
     ): bool {
+        return $this->isArrayDimFetchSkippedForIssetOrEmpty($fetch, $ops, $i, $block)
+            || $this->isArrayDimFetchSkippedForUnset($fetch, $ops, $i, $block);
+    }
+
+    /**
+     * isset()/empty() consumers only — not unset (#31818).
+     *
+     * @param Op[] $ops
+     */
+    private function isArrayDimFetchSkippedForIssetOrEmpty(
+        Op\Expr\ArrayDimFetch $fetch,
+        array $ops,
+        int $i,
+        Block $block
+    ): bool {
         $opCount = count($ops);
         for ($j = $i + 1; $j < $opCount; ++$j) {
             $next = $ops[$j];
             if (
                 $this->isArrayDimFetchOnlyIssetVar($fetch, $next)
                 || $this->isArrayDimFetchOnlyEmptyVar($fetch, $next, $block)
-                || $this->isArrayDimFetchOnlyUnsetVar($fetch, $next)
             ) {
                 return true;
             }
             if ($next instanceof Op\Expr\ArrayDimFetch) {
                 if ($this->arrayDimFetchConsumesPriorResult($next, $fetch)) {
-                    return $this->isArrayDimFetchSkippedForIssetEmptyOrUnset($next, $ops, $j, $block);
+                    return $this->isArrayDimFetchSkippedForIssetOrEmpty($next, $ops, $j, $block);
                 }
-                // Sibling dim fetch before multi-target unset/isset/empty (#24250).
+                // Sibling dim fetch before multi-target isset/empty (#24250).
                 continue;
             }
             if ($next instanceof Op\Expr\PropertyFetch) {
-                // Property prelude for a later sibling dim (`$this->a[$k], $this->b[$k]`) (#24250).
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * unset($container[$dim]) consumers — PropertyFetch must stay R-mode for live alias (#31818).
+     *
+     * @param Op[] $ops
+     */
+    private function isArrayDimFetchSkippedForUnset(
+        Op\Expr\ArrayDimFetch $fetch,
+        array $ops,
+        int $i,
+        Block $block
+    ): bool {
+        $opCount = count($ops);
+        for ($j = $i + 1; $j < $opCount; ++$j) {
+            $next = $ops[$j];
+            if ($this->isArrayDimFetchOnlyUnsetVar($fetch, $next)) {
+                return true;
+            }
+            if ($next instanceof Op\Expr\ArrayDimFetch) {
+                if ($this->arrayDimFetchConsumesPriorResult($next, $fetch)) {
+                    return $this->isArrayDimFetchSkippedForUnset($next, $ops, $j, $block);
+                }
+                // Sibling dim before multi-target unset (#24250).
+                continue;
+            }
+            if ($next instanceof Op\Expr\PropertyFetch) {
                 continue;
             }
 
@@ -6148,7 +6195,9 @@ class Compiler {
                     // Sibling dim before a later consumer — keep scanning (#24250).
                     continue;
                 }
-                if ($this->isArrayDimFetchSkippedForIssetEmptyOrUnset($next, $ops, $j, $block)) {
+                // isset/empty/?? → FETCH_OBJ_IS (#31783). unset($obj->arr[$k]) must NOT —
+                // that needs a live property alias (re-#24250 / #31818).
+                if ($this->isArrayDimFetchSkippedForIssetOrEmpty($next, $ops, $j, $block)) {
                     return true;
                 }
                 if ($this->isArrayDimFetchSkippedForCoalesce($next, $ops, $j, $block)) {
