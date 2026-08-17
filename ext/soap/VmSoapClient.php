@@ -39,6 +39,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * __soapCall $options location/soapaction/uri apply per-call without mutating ctor state (#31873).
  * SOAP 1.2 HTTP uses application/soap+xml; action= (no SOAPAction header) (#31918 / php_http.c).
  * SOAP 1.2 encoded requests use env:encodingStyle + SOAP_1_2_ENC_NAMESPACE (#31919).
+ * SOAP 1.2 SoapHeader uses role + mustUnderstand=true (#31920 / soap.c).
  */
 final class VmSoapClient
 {
@@ -2488,7 +2489,7 @@ final class VmSoapClient
         if ($headers !== []) {
             $headerXml = '  <'.$prefix.':Header>'."\n";
             foreach ($headers as $hdr) {
-                $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix);
+                $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix, $state->soapVersion);
             }
             $headerXml .= '  </'.$prefix.':Header>'."\n";
         }
@@ -2515,7 +2516,7 @@ final class VmSoapClient
             '</'.$prefix.':Envelope>';
     }
 
-    private static function encodeSoapHeaderElement(ObjectEntry $header, string $prefix): string
+    private static function encodeSoapHeaderElement(ObjectEntry $header, string $prefix, int $soapVersion): string
     {
         $ns = $header->hasProperty('namespace')
             ? $header->getProperty('namespace')->resolveIndirect()->toString()
@@ -2524,32 +2525,11 @@ final class VmSoapClient
             ? $header->getProperty('name')->resolveIndirect()->toString()
             : 'Header';
         $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'Header';
-        $must = false;
-        if ($header->hasProperty('mustUnderstand')) {
-            $mu = $header->getProperty('mustUnderstand')->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN === $mu->type) {
-                $must = $mu->toBool();
-            } elseif (Variable::TYPE_INTEGER === $mu->type) {
-                $must = 0 !== $mu->toInt();
-            }
-        }
         $attrs = '';
         if ('' !== $ns) {
             $attrs .= ' xmlns="'.\htmlspecialchars($ns, \ENT_XML1).'"';
         }
-        if ($must) {
-            $attrs .= ' '.$prefix.':mustUnderstand="1"';
-        }
-        if ($header->hasProperty('actor')) {
-            $actorVar = $header->getProperty('actor')->resolveIndirect();
-            if (Variable::TYPE_NULL !== $actorVar->type) {
-                if (Variable::TYPE_INTEGER === $actorVar->type) {
-                    $attrs .= ' '.$prefix.':actor="'.$actorVar->toInt().'"';
-                } else {
-                    $attrs .= ' '.$prefix.':actor="'.\htmlspecialchars($actorVar->toString(), \ENT_XML1).'"';
-                }
-            }
-        }
+        $attrs .= SoapHeaderXml::envelopeAttributeString($soapVersion, $prefix, $header);
         $inner = '';
         if ($header->hasProperty('data')) {
             $dataVar = $header->getProperty('data')->resolveIndirect();

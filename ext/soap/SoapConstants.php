@@ -100,6 +100,11 @@ final class SoapConstants
     /** php-src php_soap.h SOAP_1_1_ENC_NAMESPACE / SOAP_1_2_ENC_NAMESPACE (#31919). */
     public const SOAP_1_1_ENC_NAMESPACE = 'http://schemas.xmlsoap.org/soap/encoding/';
     public const SOAP_1_2_ENC_NAMESPACE = 'http://www.w3.org/2003/05/soap-encoding';
+    /** php-src php_soap.h SOAP_*_ACTOR_* (#31920). */
+    public const SOAP_1_1_ACTOR_NEXT = 'http://schemas.xmlsoap.org/soap/actor/next';
+    public const SOAP_1_2_ACTOR_NEXT = 'http://www.w3.org/2003/05/soap-envelope/role/next';
+    public const SOAP_1_2_ACTOR_NONE = 'http://www.w3.org/2003/05/soap-envelope/role/none';
+    public const SOAP_1_2_ACTOR_UNLIMATERECEIVER = 'http://www.w3.org/2003/05/soap-envelope/role/ultimateReceiver';
 
     /** @return array<string, int|string> */
     public static function registeredConstants(): array
