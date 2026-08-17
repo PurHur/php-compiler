@@ -2928,8 +2928,8 @@ class Context {
                     return;
                 }
             }
-            // Inlined include {main}: additional $this operands (hoisted vs scoped)
-            // must alias the include-entry bind / LLVM param 0 (#31903).
+            // Inlined eval/include {main}: additional $this operands (hoisted vs scoped)
+            // must alias the include-entry bind / LLVM param 0 (#31902 / #31903).
             if ($this->inlineIncludeDepth > 0) {
                 $inheritedThis = $this->findThisVariable();
                 if (null !== $inheritedThis && Variable::TYPE_OBJECT === $inheritedThis->type) {

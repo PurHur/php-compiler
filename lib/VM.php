@@ -3983,6 +3983,8 @@ class VM {
         $out = new Variable();
         $child = $block->getFrame($this->context, $caller);
         $child->ephemeral = true;
+        // ZEND_INCLUDE_OR_EVAL copies EX(This) into the eval unit (#31902).
+        $this->inheritIncludeThis($child, $caller);
         // Scope comes from getFrame($caller); parent must stay null so nested runFrames exits.
         $child->parent = null;
         $child->returnVar = $out;
@@ -3992,6 +3994,9 @@ class VM {
         $this->context->scriptStack->push($child->scriptPath);
         $prevDeferDepth = $this->context->deferCatchBelowTryHandlerDepth;
         $this->context->deferCatchBelowTryHandlerDepth = \count($this->context->activeTryHandlerFrames);
+        // Isolated stack — nested eval return must not pop the outer method/script
+        // frame that is executing TYPE_EVAL (#31902; same shape as coercion invoke).
+        $savedStack = $this->context->swapRunStack(null);
         try {
             $this->context->push($child);
             $result = $this->runFrames();
@@ -4001,6 +4006,7 @@ class VM {
         } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
             throw $redirect;
         } finally {
+            $this->context->swapRunStack($savedStack);
             $this->context->deferCatchBelowTryHandlerDepth = $prevDeferDepth;
             $this->context->scriptStack->pop();
         }
@@ -10795,8 +10801,15 @@ restart:
             return false;
         }
         $func = $frame->block->func;
-        // No frame function (or missing) — treat as unbound (zend_execute.c FETCH_THIS).
+        // No frame function (eval/include {main}) — bound only when EX(This) was inherited (#31902).
         if (null === $func) {
+            if (isset($frame->scope[$thisIdx])) {
+                $var = $frame->scope[$thisIdx]->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $var->type) {
+                    return false;
+                }
+            }
+
             return true;
         }
         // Static methods and static closures never have $this (zend_closures.c / #23704).
@@ -10815,7 +10828,7 @@ restart:
             return !isset($frame->scope[$thisIdx]);
         }
         // {main} / plain function — $this is never in object context (php-src FETCH_THIS)
-        // unless include inherited EX(This) from an instance caller (#31903).
+        // unless eval/include inherited EX(This) from an instance caller (#31902, #31903).
         if (isset($frame->scope[$thisIdx])) {
             $var = $frame->scope[$thisIdx]->resolveIndirect();
             if (Variable::TYPE_OBJECT === $var->type) {
@@ -10827,7 +10840,7 @@ restart:
     }
 
     /**
-     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the included {main} frame (#31903).
+     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the included/eval {main} frame (#31902, #31903).
      *
      * php-src: Zend/zend_execute.c ZEND_INCLUDE_OR_EVAL; Zend/zend_vm_def.h inherits EX(This).
      */
