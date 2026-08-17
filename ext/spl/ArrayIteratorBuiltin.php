@@ -437,9 +437,15 @@ final class ArrayIteratorSetFlags extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::setFlags()'
         );
-        // php-src zim_ArrayIterator_setFlags — exactly 1 user arg (#30963)
+        // php-src zim_ArrayIterator_setFlags — exactly 1 user arg (#30963); Z_PARAM_LONG soft-null (#31696).
         $this->requireExactUserArgCount($frame, 'ArrayIterator::setFlags', 1);
-        $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'ArrayIterator::setFlags',
+            1,
+            'flags'
+        );
         SplArrayStorage::setFlags($object, $flags);
     }
 }
