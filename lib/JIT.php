@@ -13107,7 +13107,12 @@ class JIT {
                             $name->value
                         );
                         if ($forDimWrite) {
-                            JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
+                            // BP_VAR_W auto-init (#31770); BP_VAR_RW ++/+= must Error (#31784).
+                            if ($this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)) {
+                                JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $fetched);
+                            } else {
+                                JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
+                            }
                         }
                         if ($forceBranchMerge) {
                             $this->assignOperand($result, $fetched, true);
@@ -23540,6 +23545,71 @@ class JIT {
             $next = $ops[$i];
             if (OpCode::destSlotUsedAsDimWriteContainer($next, $destSlot)) {
                 return true;
+            }
+            if (
+                OpCode::TYPE_PROPERTY_FETCH === $next->type
+                || OpCode::TYPE_PROPERTY_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg1 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH === $next->type
+                || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+            ) {
+                continue;
+            }
+            if (OpCode::TYPE_UNSET === $next->type) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * True when property fetch feeds dim RW (++/--/+=) — Zend BP_VAR_RW (#31784).
+     */
+    private function varFetchDestUsedAsDimRwContainer(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $ops = $block->opCodes;
+        $n = \count($ops);
+        for ($i = $opIndex + 1; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+                && (int) $next->arg2 === $destSlot
+            ) {
+                $dimSlot = (int) $next->arg1;
+                for ($j = $i + 1; $j < $n; ++$j) {
+                    $consumer = $ops[$j];
+                    if (OpCode::dimSlotUsedAsRwOp($consumer, $dimSlot)) {
+                        return true;
+                    }
+                    if (
+                        OpCode::TYPE_ASSIGN === $consumer->type
+                        && (int) $consumer->arg2 === $dimSlot
+                        && (int) $consumer->arg3 !== $dimSlot
+                    ) {
+                        return false;
+                    }
+                    if ((int) $consumer->arg1 === $dimSlot) {
+                        if (
+                            OpCode::TYPE_PROPERTY_FETCH === $consumer->type
+                            || OpCode::TYPE_PROPERTY_FETCH_WRITE === $consumer->type
+                            || OpCode::TYPE_ARRAY_DIM_FETCH === $consumer->type
+                            || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $consumer->type
+                        ) {
+                            return false;
+                        }
+                    }
+                }
+
+                return false;
             }
             if (
                 OpCode::TYPE_PROPERTY_FETCH === $next->type

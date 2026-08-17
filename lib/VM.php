@@ -6880,7 +6880,8 @@ restart:
                         }
                     }
                     if (!$mutates) {
-                        if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                        // BP_VAR_W dim-assign/append auto-inits (#31770); BP_VAR_RW ++/+= Errors (#31784).
+                        if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
                             if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($storage)) {
                                 VM\TypedPropertyCheck::assertReadable($storage);
                             }
@@ -9215,7 +9216,8 @@ restart:
                             }
                             // Dim-write (`$o->a[0]=` / `$o->a[]=`) is BP_VAR_W: uninitialized typed
                             // array slots auto-init to [] (zend_std_get_property_ptr_ptr + zend_try_array_init, #31770).
-                            if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                            // Dim RW (`$o->a[0]++` / `+=`) is BP_VAR_RW and must Error (#31784).
+                            if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
                                 if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($propSlot)) {
                                     VM\TypedPropertyCheck::assertReadable($propSlot);
                                 }
@@ -11793,6 +11795,83 @@ restart:
             }
             if (OpCode::TYPE_UNSET === $next->type) {
                 // unset of a different container; keep scanning for ours.
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * BP_VAR_W dim-assign/append may auto-init typed array props (#31770); BP_VAR_RW may not (#31784).
+     */
+    private function propertyFetchAllowsTypedArrayDimAutoInit(Frame $frame, OpCode $op): bool
+    {
+        return $this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)
+            && !$this->propertyFetchDestUsedAsDimRwContainer($frame, $op);
+    }
+
+    /**
+     * True when property fetch feeds ARRAY_DIM_FETCH_WRITE whose element is then
+     * ++/--/compound-assigned — Zend BP_VAR_RW (zend_std_get_property_ptr_ptr, #31784).
+     */
+    private function propertyFetchDestUsedAsDimRwContainer(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        $ops = $frame->block->opCodes;
+        $n = \count($ops);
+        for ($i = $frame->pos; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+                && (int) $next->arg2 === $destSlot
+            ) {
+                $dimSlot = (int) $next->arg1;
+                for ($j = $i + 1; $j < $n; ++$j) {
+                    $consumer = $ops[$j];
+                    if (OpCode::dimSlotUsedAsRwOp($consumer, $dimSlot)) {
+                        return true;
+                    }
+                    // Pure `$dim = expr` (RHS ≠ dim) is BP_VAR_W — stop.
+                    if (
+                        OpCode::TYPE_ASSIGN === $consumer->type
+                        && (int) $consumer->arg2 === $dimSlot
+                        && (int) $consumer->arg3 !== $dimSlot
+                    ) {
+                        return false;
+                    }
+                    if ((int) $consumer->arg1 === $dimSlot) {
+                        if (
+                            OpCode::TYPE_PROPERTY_FETCH === $consumer->type
+                            || OpCode::TYPE_PROPERTY_FETCH_WRITE === $consumer->type
+                            || OpCode::TYPE_ARRAY_DIM_FETCH === $consumer->type
+                            || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $consumer->type
+                        ) {
+                            return false;
+                        }
+                    }
+                }
+
+                return false;
+            }
+            if (
+                OpCode::TYPE_PROPERTY_FETCH === $next->type
+                || OpCode::TYPE_PROPERTY_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg1 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH === $next->type
+                || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+            ) {
+                continue;
+            }
+            if (OpCode::TYPE_UNSET === $next->type) {
                 continue;
             }
 

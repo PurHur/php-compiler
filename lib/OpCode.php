@@ -487,6 +487,30 @@ class OpCode {
     }
 
     /**
+     * True when {@see $dimSlot} (ARRAY_DIM_FETCH_WRITE result) is read-modified
+     * (++/--/compound assign) — Zend BP_VAR_RW on the property, not BP_VAR_W (#31784).
+     */
+    public static function dimSlotUsedAsRwOp(self $op, int $dimSlot): bool
+    {
+        if (
+            \in_array($op->type, [
+                self::TYPE_PRE_INC,
+                self::TYPE_POST_INC,
+                self::TYPE_PRE_DEC,
+                self::TYPE_POST_DEC,
+            ], true)
+            && $op->arg3 === $dimSlot
+        ) {
+            return true;
+        }
+        if (self::destSlotUsedAsCompoundAssignRead($op, $dimSlot)) {
+            return true;
+        }
+
+        return self::destSlotUsedAsInPlaceCompoundAssign($op, $dimSlot);
+    }
+
+    /**
      * True when {@see $destSlot} is the foreach container for a by-ref value fetch
      * (`foreach ($obj->prop as &$v)` — FE_RESET_RW / #29215).
      */
