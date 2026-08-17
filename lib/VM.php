@@ -12744,6 +12744,7 @@ restart:
         $faultactor = isset($error->faultactor) ? (string) $error->faultactor : '';
         $detail = $error->detail ?? null;
         $name = isset($error->_name) ? (string) $error->_name : '';
+        $faultcodens = isset($error->faultcodens) ? (string) $error->faultcodens : '';
         $thrown = VM\BuiltinExceptionSupport::materializeSoapFault(
             $this->context,
             $error->getMessage(),
@@ -12753,7 +12754,8 @@ restart:
             $faultstring,
             $faultactor,
             $detail,
-            $name
+            $name,
+            $faultcodens
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);

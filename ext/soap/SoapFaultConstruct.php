@@ -35,21 +35,14 @@ final class SoapFaultConstruct extends VmClassMethod
         $receiver = $receiverVar->toObject();
 
         $faultcode = '';
+        $faultcodens = null;
         if (\array_key_exists(1, $frame->calledArgs)) {
             $codeVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $codeVar->type) {
                 if (Variable::TYPE_ARRAY === $codeVar->type) {
-                    // Zend: array($ns, $code) — use second element / first string as code.
-                    $ht = $codeVar->toArray();
-                    $vals = [];
-                    foreach ($ht as $entry) {
-                        $vals[] = $entry->value->resolveIndirect();
-                    }
-                    if (isset($vals[1]) && Variable::TYPE_STRING === $vals[1]->type) {
-                        $faultcode = $vals[1]->toString();
-                    } elseif (isset($vals[0]) && Variable::TYPE_STRING === $vals[0]->type) {
-                        $faultcode = $vals[0]->toString();
-                    }
+                    // php-src zim_SoapFault___construct: HashTable of 2 string indexes
+                    // (ns, code) → fault_code_ns + fault_code (#31956).
+                    [$faultcodens, $faultcode] = self::parseArrayFaultCode($codeVar);
                 } else {
                     $faultcode = VmString::coerceStringBuiltinArg(
                         $frame->calledArgs[1],
@@ -92,7 +85,41 @@ final class SoapFaultConstruct extends VmClassMethod
             $detail = $frame->calledArgs[4]->resolveIndirect();
         }
 
-        self::apply($receiver, $faultcode, $faultstring, $actor, $detail, $frame);
+        self::apply($receiver, $faultcode, $faultstring, $actor, $detail, $frame, $faultcodens);
+    }
+
+    /**
+     * php-src zim_SoapFault___construct array branch (ext/soap/soap.c; #31956).
+     *
+     * @return array{0: string, 1: string} [faultcodens, faultcode]
+     */
+    private static function parseArrayFaultCode(Variable $codeVar): array
+    {
+        $ht = $codeVar->toArray();
+        $nsVar = $ht->find('0');
+        $codeElem = $ht->find('1');
+        if (
+            2 !== $ht->getNumElements()
+            || null === $nsVar
+            || null === $codeElem
+        ) {
+            throw new \ValueError(
+                'SoapFault::__construct(): Argument #1 ($code) is not a valid fault code'
+            );
+        }
+        $nsVar = $nsVar->resolveIndirect();
+        $codeElem = $codeElem->resolveIndirect();
+        if (
+            Variable::TYPE_STRING !== $nsVar->type
+            || Variable::TYPE_STRING !== $codeElem->type
+            || '' === $codeElem->toString()
+        ) {
+            throw new \ValueError(
+                'SoapFault::__construct(): Argument #1 ($code) is not a valid fault code'
+            );
+        }
+
+        return [$nsVar->toString(), $codeElem->toString()];
     }
 
     public static function apply(
@@ -101,7 +128,8 @@ final class SoapFaultConstruct extends VmClassMethod
         string $faultstring,
         ?string $actor,
         ?Variable $detail,
-        Frame $frame
+        Frame $frame,
+        ?string $faultcodens = null
     ): void {
         $message = '' !== $faultstring ? $faultstring : $faultcode;
         $receiver->getProperty(ExceptionSupport::PROP_MESSAGE)->string($message);
@@ -111,6 +139,13 @@ final class SoapFaultConstruct extends VmClassMethod
 
         $codeProp = $receiver->getProperty('faultcode');
         $codeProp->string($faultcode);
+        if ($receiver->hasProperty('faultcodens')) {
+            if (null === $faultcodens) {
+                $receiver->getProperty('faultcodens')->null();
+            } else {
+                $receiver->getProperty('faultcodens')->string($faultcodens);
+            }
+        }
         $stringProp = $receiver->getProperty('faultstring');
         $stringProp->string($faultstring);
         if (null === $actor) {

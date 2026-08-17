@@ -871,8 +871,12 @@ final class ExceptionSupport
                     }
                 }
                 $name = self::readOptionalStringProperty($entry, '_name');
+                $codens = self::readOptionalStringProperty($entry, 'faultcodens');
+                $ctorCode = (null !== $codens && '' !== $codens)
+                    ? [$codens, $code]
+                    : ('' !== $code ? $code : null);
                 $native = new \SoapFault(
-                    '' !== $code ? $code : null,
+                    $ctorCode,
                     $string,
                     $actor,
                     $detail,
