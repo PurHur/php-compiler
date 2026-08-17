@@ -139,6 +139,7 @@
             <file>./test/compliance/RegexIteratorEmptyPattern31511VMTest.php</file>
             <file>./test/compliance/RegexIteratorSetModeValueError31573VMTest.php</file>
             <file>./test/compliance/RegexIteratorGettersExcessArgc31594VMTest.php</file>
+            <file>./test/compliance/RegexIteratorSettersNullSoft31748VMTest.php</file>
             <file>./test/compliance/ArrayFillReverseNamed23305VMTest.php</file>
             <file>./test/compliance/ArrayFillReverseNamed23305JITTest.php</file>
             <file>./test/compliance/PowSqrtFmodNamed23306VMTest.php</file>

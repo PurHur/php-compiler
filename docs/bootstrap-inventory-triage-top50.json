@@ -1,7 +1,36 @@
 {
-    "scanned": 5682,
+    "scanned": 7553,
     "top": 50,
     "rows": [
+        {
+            "message": "Cannot redeclare class::$immutable",
+            "file_count": 2,
+            "examples": [
+                "lib/JIT/Call/DateTimeModify.php",
+                "lib/JIT/Call/DateTimeSetTimezone.php"
+            ],
+            "issue": null,
+            "rank": 1
+        },
+        {
+            "message": "Cannot redeclare class::$ownerLc",
+            "file_count": 2,
+            "examples": [
+                "ext/spl/SplArraySerializeSupport.php",
+                "ext/spl/SplLegacySerializableMethods.php"
+            ],
+            "issue": null,
+            "rank": 2
+        },
+        {
+            "message": "Cannot redeclare class::$classKey",
+            "file_count": 1,
+            "examples": [
+                "lib/VM/Builtin/DateSerializeMethods.php"
+            ],
+            "issue": null,
+            "rank": 3
+        },
         {
             "message": "Cannot redeclare class::$func",
             "file_count": 1,
@@ -9,7 +38,7 @@
                 "ext/standard/VmSplAutoload.php"
             ],
             "issue": null,
-            "rank": 1
+            "rank": 4
         },
         {
             "message": "Cannot redeclare class::$multiline",
@@ -18,16 +47,34 @@
                 "ext/standard/VmPregEngine.php"
             ],
             "issue": null,
-            "rank": 2
+            "rank": 5
         },
         {
-            "message": "Cannot redeclare class::$ownerLc",
+            "message": "Cannot redeclare class::$payload",
             "file_count": 1,
             "examples": [
-                "ext/spl/SplLegacySerializableMethods.php"
+                "ext/standard/VmUnserializeFormat.php"
             ],
             "issue": null,
-            "rank": 3
+            "rank": 6
+        },
+        {
+            "message": "Cannot redeclare class::$wrapper",
+            "file_count": 1,
+            "examples": [
+                "ext/standard/VmUserStream.php"
+            ],
+            "issue": null,
+            "rank": 7
+        },
+        {
+            "message": "Cannot use \"self\" when no class scope is active",
+            "file_count": 1,
+            "examples": [
+                "ext/simplexml/SimpleXmlNodeState.php"
+            ],
+            "issue": null,
+            "rank": 8
         },
         {
             "message": "Stmt_TraitUse",
@@ -36,25 +83,34 @@
                 "lib/JIT/ClassConstFetchHelper.php"
             ],
             "issue": null,
-            "rank": 4
+            "rank": 9
         },
         {
-            "message": "Trait \"ClassConstFetchHelperTrait\" not found",
+            "message": "Syntax error, unexpected ';', expecting T_STRING or T_VARIABLE or '{' or '$' on line 1028",
             "file_count": 1,
             "examples": [
-                "lib/JIT/ClassConstFetchHelper.php"
+                "ext/tidy/VmTidy.php"
             ],
             "issue": null,
-            "rank": 5
+            "rank": 10
         },
         {
-            "message": "Unknown type declaration found: ''",
+            "message": "Syntax error, unexpected ';', expecting T_STRING or T_VARIABLE or '{' or '$' on line 242",
             "file_count": 1,
             "examples": [
-                "ext/dom/VmDom.php"
+                "lib/Compiler/ThrowInClassConstCompileCheck.php"
             ],
             "issue": null,
-            "rank": 6
+            "rank": 11
+        },
+        {
+            "message": "Unknown type declaration found: PHPCompiler\\OpCode[]",
+            "file_count": 1,
+            "examples": [
+                "lib/Compiler.php"
+            ],
+            "issue": null,
+            "rank": 12
         }
     ],
     "source": "live"

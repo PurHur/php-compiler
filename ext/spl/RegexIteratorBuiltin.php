@@ -739,20 +739,16 @@ final class RegexIteratorSetMode extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::setMode()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'RegexIterator::setMode() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
-        $modeVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $modeVar->type) {
-            throw new \TypeError(
-                'RegexIterator::setMode(): Argument #1 ($mode) must be of type int, '
-                .RegexIteratorBuiltin::typeLabelFor($modeVar).' given'
-            );
-        }
-        RegexIteratorBuiltin::setModeValue($object, $modeVar->toInt());
+        // php-src zim_RegexIterator_setMode — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG (#31748).
+        $this->requireExactUserArgCount($frame, 'RegexIterator::setMode', 1);
+        $mode = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'RegexIterator::setMode',
+            1,
+            'mode'
+        );
+        RegexIteratorBuiltin::setModeValue($object, $mode);
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
         }
@@ -796,20 +792,16 @@ final class RegexIteratorSetFlags extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'RegexIterator::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
-        $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-            throw new \TypeError(
-                'RegexIterator::setFlags(): Argument #1 ($flags) must be of type int, '
-                .RegexIteratorBuiltin::typeLabelFor($flagsVar).' given'
-            );
-        }
-        RegexIteratorBuiltin::setFlagsValue($object, $flagsVar->toInt());
+        // php-src zim_RegexIterator_setFlags — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG (#31748).
+        $this->requireExactUserArgCount($frame, 'RegexIterator::setFlags', 1);
+        $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'RegexIterator::setFlags',
+            1,
+            'flags'
+        );
+        RegexIteratorBuiltin::setFlagsValue($object, $flags);
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
         }
@@ -853,20 +845,16 @@ final class RegexIteratorSetPregFlags extends VmClassMethod
             RegexIteratorBuiltin::CLASS_LC,
             'RegexIterator::setPregFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'RegexIterator::setPregFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
-        $pregVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $pregVar->type) {
-            throw new \TypeError(
-                'RegexIterator::setPregFlags(): Argument #1 ($preg_flags) must be of type int, '
-                .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
-            );
-        }
-        RegexIteratorBuiltin::setPregFlagsValue($object, $pregVar->toInt());
+        // php-src zim_RegexIterator_setPregFlags — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG (#31748).
+        $this->requireExactUserArgCount($frame, 'RegexIterator::setPregFlags', 1);
+        $pregFlags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'RegexIterator::setPregFlags',
+            1,
+            'pregFlags'
+        );
+        RegexIteratorBuiltin::setPregFlagsValue($object, $pregFlags);
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
         }
