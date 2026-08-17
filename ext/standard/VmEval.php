@@ -48,6 +48,47 @@ final class VmEval
     }
 
     /**
+     * Declaring class (self) of an eval/include caller frame (#31912).
+     *
+     * php-src: execute_data->func->common.scope — not called_scope (that is {@see Frame::$calledClass}).
+     */
+    public static function declaringClassFromFrame(Frame $frame): ?string
+    {
+        $func = null !== $frame->block ? $frame->block->func : null;
+        $fromFunc = self::declaringClassFromCfgFunc($func);
+        if (null !== $fromFunc) {
+            return $fromFunc;
+        }
+        if (null !== $frame->scopeClass && '' !== $frame->scopeClass) {
+            return $frame->scopeClass;
+        }
+
+        return null;
+    }
+
+    /**
+     * Declaring class of a CFG func / method block (JIT TYPE_EVAL caller) (#31912).
+     */
+    public static function declaringClassFromCfgFunc(?\PHPCfg\Func $func): ?string
+    {
+        if (null === $func || null === $func->class) {
+            return null;
+        }
+        $value = $func->class->value ?? null;
+
+        return is_string($value) && '' !== $value ? $value : null;
+    }
+
+    public static function declaringClassFromBlock(?Block $block): ?string
+    {
+        if (null === $block) {
+            return null;
+        }
+
+        return self::declaringClassFromCfgFunc($block->func);
+    }
+
+    /**
      * Call-site line for nesting into zendEvalFilename (#25809).
      *
      * Inside an outer eval unit, CFG lines are still wrapEvalCode-shifted; unwrap so nested
@@ -107,10 +148,14 @@ final class VmEval
      * Swallows {@see CompileFatal} — use {@see tryCompileBlockOrThrowCompileFatal()} when AOT/JIT
      * must surface reference-profile rejects instead of silently emitting false (#26169).
      */
-    public static function tryCompileBlock(Runtime $runtime, string $code, ?string $filename = null): ?Block
-    {
+    public static function tryCompileBlock(
+        Runtime $runtime,
+        string $code,
+        ?string $filename = null,
+        ?string $evalClassScope = null
+    ): ?Block {
         try {
-            return self::tryCompileBlockOrThrowCompileFatal($runtime, $code, $filename);
+            return self::tryCompileBlockOrThrowCompileFatal($runtime, $code, $filename, $evalClassScope);
         } catch (CompileFatal) {
             return null;
         }
@@ -125,13 +170,15 @@ final class VmEval
     public static function tryCompileBlockOrThrowCompileFatal(
         Runtime $runtime,
         string $code,
-        ?string $filename = null
+        ?string $filename = null,
+        ?string $evalClassScope = null
     ): ?Block {
         Runtime::clearLastParseFailure();
         $runtime->compiler->resetCompileAbortDetail();
         $wrapped = self::wrapEvalCode($code);
         $filename ??= self::EVAL_FILENAME;
-
+        $compiler = $runtime->compiler;
+        $compiler->pushEvalClassScope($evalClassScope);
         try {
             return $runtime->parseAndCompile($wrapped, $filename);
         } catch (CompileFatal $e) {
@@ -147,6 +194,8 @@ final class VmEval
             return null;
         } catch (\Throwable) {
             return null;
+        } finally {
+            $compiler->popEvalClassScope();
         }
     }
 
@@ -167,6 +216,8 @@ final class VmEval
         // Stamp Zend reflection/__FILE__ shape onto the compile unit (#26032, #25809).
         [$evalFile] = ExceptionSupport::evalFatalSite($scopeFrame, 1);
 
+        $compiler = $runtime->compiler;
+        $compiler->pushEvalClassScope(self::declaringClassFromFrame($scopeFrame));
         try {
             $block = $runtime->parseAndCompile($wrapped, $evalFile);
         } catch (\CompileError $e) {
@@ -192,6 +243,8 @@ final class VmEval
                 throw new \CompileError($message);
             }
             self::failEvalParse($ctx, $e->getMessage(), self::lineFromThrowable($e), $code);
+        } finally {
+            $compiler->popEvalClassScope();
         }
 
         if (null === $block) {

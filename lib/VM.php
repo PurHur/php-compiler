@@ -3989,9 +3989,16 @@ class VM {
         // Zend __FILE__/__DIR__: enclosing script path + call site (#25809, zend_eval_string).
         [$evalFile] = VM\ExceptionSupport::evalFatalSite($caller, 1);
         $child->scriptPath = $evalFile;
+        // zend_eval_string copies called_scope AND func->scope (self ≠ static on subclass) (#31912).
+        $this->inheritEvalClassScope($child, $caller);
+        // ZEND_INCLUDE_OR_EVAL also copies EX(This); isolation must not drop object context (#4410).
+        $this->inheritIncludeThis($child, $caller);
         $this->context->scriptStack->push($child->scriptPath);
         $prevDeferDepth = $this->context->deferCatchBelowTryHandlerDepth;
         $this->context->deferCatchBelowTryHandlerDepth = \count($this->context->activeTryHandlerFrames);
+        // Isolate nested runFrames so eval completion does not continue the caller (#31912).
+        // Without this, ephemeral parent=null falls through to nextframe and resumes f()/main.
+        $savedStack = $this->context->swapRunStack(null);
         try {
             $this->context->push($child);
             $result = $this->runFrames();
@@ -3999,10 +4006,20 @@ class VM {
                 throw new \LogicException('eval() execution failed in this compiler build');
             }
         } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+            $this->context->swapRunStack($savedStack);
+            $savedStack = null;
             throw $redirect;
         } finally {
+            if (null !== $savedStack) {
+                $this->context->swapRunStack($savedStack);
+            }
             $this->context->deferCatchBelowTryHandlerDepth = $prevDeferDepth;
-            $this->context->scriptStack->pop();
+            // Ephemeral eval finish already pops this path; pop only if still on top.
+            if ($this->context->scriptStack->current() === $evalFile
+                || $this->context->scriptStack->current() === VM\ScriptStack::normalize($evalFile)
+            ) {
+                $this->context->scriptStack->pop();
+            }
         }
 
         return $out->resolveIndirect();
@@ -10845,6 +10862,26 @@ restart:
             $included->scope[$thisIdx] = new Variable();
         }
         $included->scope[$thisIdx]->copyFrom($inherited);
+    }
+
+    /**
+     * zend_eval_string copies func->common.scope (self) and called_scope (static) (#31912).
+     *
+     * php-src: Zend/zend_execute_API.c zend_eval_string; Zend/zend_execute.c ZEND_INCLUDE_OR_EVAL.
+     */
+    private function inheritEvalClassScope(Frame $eval, Frame $caller): void
+    {
+        $declaring = VmEval::declaringClassFromFrame($caller);
+        if (null !== $declaring && '' !== $declaring) {
+            $eval->scopeClass = $declaring;
+        }
+        if (null === $eval->calledClass || '' === $eval->calledClass) {
+            if (null !== $caller->calledClass && '' !== $caller->calledClass) {
+                $eval->calledClass = $caller->calledClass;
+            } elseif (null !== $declaring && '' !== $declaring) {
+                $eval->calledClass = $declaring;
+            }
+        }
     }
 
     /**
@@ -18961,6 +18998,10 @@ restart:
             }
 
             return $funcClassLc;
+        }
+        // eval/include {main}: declaring class copied from the caller (#31912).
+        if (null !== $frame->scopeClass && '' !== $frame->scopeClass) {
+            return strtolower($frame->scopeClass);
         }
         // Bound closure scope (Closure::bind/bindTo $newScope) — #3673.
         if (null !== $frame->calledClass && '' !== $frame->calledClass) {
