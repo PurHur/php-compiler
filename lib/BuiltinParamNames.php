@@ -763,8 +763,9 @@ final class BuiltinParamNames
                 return ['callback'];
             case 'headers_sent':
                 return ['filename', 'line'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg + required 4-arg (#25067)
             case 'number_format':
-                return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
+                return ['num', 'decimals=', 'decimal_separator=', 'thousands_separator='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says number (#23259, #27795)
             case 'abs':
             case 'floor':
