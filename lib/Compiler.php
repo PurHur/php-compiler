@@ -43869,6 +43869,10 @@ class Compiler {
             && ($expr->class instanceof Operand\Variable || $expr->class instanceof Operand\Temporary)) {
             $op->classConstFetchOnObject = true;
         }
+        $scopeKeyword = $expr->getAttribute('phpcLexicalScopeKeyword');
+        if (is_string($scopeKeyword) && '' !== $scopeKeyword) {
+            $op->classConstFetchScopeKeyword = $scopeKeyword;
+        }
 
         return [$op];
     }

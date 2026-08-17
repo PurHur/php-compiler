@@ -169,6 +169,27 @@ class ClassEntry {
     public array $constDeclaredTypes = [];
     /** @var array<string, true>|null sibling const names declared but not yet evaluated (#7382). */
     public ?array $forwardDeclaredConstNames = null;
+    /**
+     * Pending class-const init segments for lazy materialization / cycle detection (#31837).
+     *
+     * @var null|array{
+     *     block: \PHPCompiler\Block,
+     *     frame: \PHPCompiler\Frame,
+     *     classBodyOps: list<\PHPCompiler\OpCode>,
+     *     segments: array<string, array{initIndices: list<int>, declareIndex: int}>
+     * }
+     */
+    public ?array $pendingConstMaterialization = null;
+    /**
+     * Constants currently marked visited during AST-style evaluation (zend_constants.c IS_CONSTANT_VISITED).
+     *
+     * @var array<string, true>
+     */
+    public array $visitedConstNames = [];
+    /**
+     * When true, sibling forward refs materialize eagerly (runtime fetch path, not declare multipass).
+     */
+    public bool $lazyConstMaterialize = false;
     /** Class docblock + declaration site (#7358). */
     public ?\PHPCompiler\Compiler\SourceLocation $sourceLocation = null;
     /** @var array<string, \PHPCompiler\Compiler\SourceLocation> method lc => source metadata (#7358) */

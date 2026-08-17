@@ -239,9 +239,18 @@ final class ClassConstExpr
         // Case-sensitive class constant / enum case key (#25910, #25929).
         $constName = \PHPCompiler\ClassConstName::key($constNameRaw);
         $constIsClass = 'class' === strtolower($constNameRaw);
+        $fetchClassDisplay = $op->classConstFetchScopeKeyword ?? $className;
 
         if ($lcClass === strtolower($entry->name)) {
-            self::fetchFromDeclaringClass($context, $frame, $op, $entry, $constName, $constIsClass);
+            self::fetchFromDeclaringClass(
+                $context,
+                $frame,
+                $op,
+                $entry,
+                $constName,
+                $constIsClass,
+                $fetchClassDisplay
+            );
 
             return;
         }
@@ -302,7 +311,8 @@ final class ClassConstExpr
         OpCode $op,
         ClassEntry $entry,
         string $constName,
-        bool $constIsClass = false
+        bool $constIsClass = false,
+        string $fetchClassName = 'self'
     ): void {
         if ($constIsClass || 'class' === strtolower($constName)) {
             $frame->scope[$op->arg1]->string($entry->name);
@@ -316,10 +326,33 @@ final class ClassConstExpr
 
                 return;
             }
+            if (isset($entry->visitedConstNames[$constName])) {
+                throw new \Error(self::selfReferencingConstantMessage($entry, $constName, $fetchClassName));
+            }
             if (
                 null !== $entry->forwardDeclaredConstNames
                 && isset($entry->forwardDeclaredConstNames[$constName])
             ) {
+                // Nested fetch during lazy materialization — evaluate now with visited mark
+                // (zend_get_class_constant_ex / IS_CONSTANT_VISITED; #31837).
+                if ($entry->lazyConstMaterialize || [] !== $entry->visitedConstNames) {
+                    $vm = $context->runtime->vm;
+                    if (null !== $vm) {
+                        $vm->materializePendingClassConstant($entry, $constName, true, $fetchClassName);
+                        if (isset($entry->constants[$constName])) {
+                            if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch(
+                                $entry,
+                                $constName,
+                                $frame->scope[$op->arg1]
+                            )) {
+                                return;
+                            }
+                            $frame->scope[$op->arg1]->copyFrom($entry->constants[$constName]);
+
+                            return;
+                        }
+                    }
+                }
                 throw new ClassConstForwardReferenceException($entry->name, $constName);
             }
             $display = $entry->constNames[$constName] ?? $constName;
@@ -331,6 +364,35 @@ final class ClassConstExpr
             return;
         }
         $frame->scope[$op->arg1]->copyFrom($entry->constants[$constName]);
+    }
+
+    /**
+     * Zend/zend_constants.c — "Cannot declare self-referencing constant %s::%s".
+     */
+    public static function selfReferencingConstantMessage(
+        ClassEntry $entry,
+        string $constName,
+        string $fetchClassName = 'self'
+    ): string {
+        $display = $entry->constNames[$constName]
+            ?? self::pendingConstCanonicalName($entry, $constName)
+            ?? $constName;
+
+        return "Cannot declare self-referencing constant {$fetchClassName}::{$display}";
+    }
+
+    private static function pendingConstCanonicalName(ClassEntry $entry, string $constName): ?string
+    {
+        $pending = $entry->pendingConstMaterialization;
+        if (null === $pending || !isset($pending['segments'][$constName])) {
+            return null;
+        }
+        $declareOp = $pending['classBodyOps'][$pending['segments'][$constName]['declareIndex']];
+        if (!isset($pending['frame']->scope[$declareOp->arg1])) {
+            return null;
+        }
+
+        return $pending['frame']->scope[$declareOp->arg1]->toString();
     }
 
     /**
