@@ -783,6 +783,9 @@ final class BuiltinParamNames
             // php-src file.stub.php / dir.stub.php / basic_functions.stub.php (#23461)
             case 'unlink':
                 return ['filename', 'context'];
+            // php-src ext/standard/file.stub.php — InternalArgInfo still says source_file/destination_file (#23347)
+            case 'copy':
+                return ['from', 'to', 'context'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says path/new_path (#28854)
             case 'move_uploaded_file':
                 return ['from', 'to'];
@@ -2122,6 +2125,9 @@ final class BuiltinParamNames
             // php-src ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
             case 'datefmt_format_object':
                 return ['datetime', 'format=', 'locale='];
+            // php-src ext/intl/calendar/calendar.stub.php — both optional; $timezone untyped (#27944)
+            case 'intlcal_create_instance':
+                return ['timezone=', 'locale='];
             // php-src ext/intl/resourcebundle/resourcebundle.stub.php — bundlename + fallback infer false (#25587)
             case 'resourcebundle_create':
                 return ['locale', 'bundle', 'fallback='];

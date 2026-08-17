@@ -239,7 +239,7 @@ final class JitStreamIoKernel
 
     private static function ensureLibc(Context $context): void
     {
-        // Module-local stdio after LibcExtern always-on drop (#31606).
+        // Module-local stdio after LibcExtern always-on drop (#31606 / fopen family #31764).
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
