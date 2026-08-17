@@ -555,7 +555,7 @@ final class VmSoapServer
         if ($state->responseHeaders !== []) {
             $headerXml = '  <'.$prefix.':Header>'."\n";
             foreach ($state->responseHeaders as $hdr) {
-                $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix);
+                $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix, $state->soapVersion);
             }
             $headerXml .= '  </'.$prefix.':Header>'."\n";
         }
@@ -574,7 +574,7 @@ final class VmSoapServer
             '</'.$prefix.':Envelope>';
     }
 
-    private static function encodeSoapHeaderElement(ObjectEntry $header, string $prefix): string
+    private static function encodeSoapHeaderElement(ObjectEntry $header, string $prefix, int $soapVersion): string
     {
         $ns = $header->hasProperty('namespace')
             ? $header->getProperty('namespace')->resolveIndirect()->toString()
@@ -583,22 +583,11 @@ final class VmSoapServer
             ? $header->getProperty('name')->resolveIndirect()->toString()
             : 'Header';
         $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'Header';
-        $must = false;
-        if ($header->hasProperty('mustUnderstand')) {
-            $mu = $header->getProperty('mustUnderstand')->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN === $mu->type) {
-                $must = $mu->toBool();
-            } elseif (Variable::TYPE_INTEGER === $mu->type) {
-                $must = 0 !== $mu->toInt();
-            }
-        }
         $attrs = '';
         if ('' !== $ns) {
             $attrs .= ' xmlns="'.\htmlspecialchars($ns, \ENT_XML1).'"';
         }
-        if ($must) {
-            $attrs .= ' '.$prefix.':mustUnderstand="1"';
-        }
+        $attrs .= SoapHeaderXml::envelopeAttributeString($soapVersion, $prefix, $header);
         $inner = '';
         if ($header->hasProperty('data')) {
             $dataVar = $header->getProperty('data')->resolveIndirect();
