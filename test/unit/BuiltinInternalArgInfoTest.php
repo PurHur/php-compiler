@@ -1646,6 +1646,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('value', $alterValue['name']);
     }
 
+    /** php-src basic_functions.stub.php — absent from InternalArgInfo (#23405). */
+    public function testIniParseQuantityReflectionStubTypes(): void
+    {
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('ini_parse_quantity'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('ini_parse_quantity', 0));
+        $shorthand = BuiltinInternalArgInfo::paramInfoForFunction('ini_parse_quantity', 0);
+        $this->assertNotNull($shorthand);
+        $this->assertSame('shorthand', $shorthand['name']);
+        $this->assertSame('string', $shorthand['type']);
+        $this->assertFalse($shorthand['isOptional']);
+    }
+
     /** php-src password.stub.php — absent from InternalArgInfo (#23292). */
     public function testPasswordGetInfoNeedsRehashReflectionStubTypes(): void
     {

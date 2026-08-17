@@ -1399,6 +1399,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23405 — ini_parse_quantity Zend stub name (absent from InternalArgInfo) */
+    public function testIniParseQuantityZendStubNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('ini_parse_quantity');
+        self::assertSame(['shorthand'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'shorthand', 'ini_parse_quantity'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'value', 'ini_parse_quantity'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('ini_parse_quantity'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('ini_parse_quantity'));
+    }
+
     /** @covers issue #23341 — error_log Zend stub names (InternalArgInfo still extra_headers) */
     public function testErrorLogZendStubNamedParameters(): void
     {
