@@ -546,8 +546,17 @@ final class VmSoapServer
     private static function buildResponse(SoapServerState $state, string $opName, Variable $result): string
     {
         $ns = $state->uri !== '' ? $state->uri : 'http://example.com/';
-        $envelopeNs = 'http://schemas.xmlsoap.org/soap/envelope/';
-        $prefix = 'SOAP-ENV';
+        if (SoapConstants::SOAP_1_2 === $state->soapVersion) {
+            $envelopeNs = 'http://www.w3.org/2003/05/soap-envelope';
+            $prefix = 'env';
+            $encNs = SoapConstants::SOAP_1_2_ENC_NAMESPACE;
+            $encPrefix = 'enc';
+        } else {
+            $envelopeNs = 'http://schemas.xmlsoap.org/soap/envelope/';
+            $prefix = 'SOAP-ENV';
+            $encNs = SoapConstants::SOAP_1_1_ENC_NAMESPACE;
+            $encPrefix = 'SOAP-ENC';
+        }
         $respName = $opName.'Response';
         $inner = self::encodeReturn($result);
 
@@ -565,8 +574,8 @@ final class VmSoapServer
             ' xmlns:ns1="'.\htmlspecialchars($ns, \ENT_XML1).'"'.
             ' xmlns:xsd="http://www.w3.org/2001/XMLSchema"'.
             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'.
-            ' xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"'.
-            ' SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'."\n".
+            ' xmlns:'.$encPrefix.'="'.$encNs.'"'.
+            ' '.$prefix.':encodingStyle="'.$encNs.'">'."\n".
             $headerXml.
             '  <'.$prefix.':Body>'."\n".
             '    <ns1:'.$respName.'>'.$inner.'</ns1:'.$respName.'>'."\n".
