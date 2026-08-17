@@ -95,7 +95,7 @@ final class IncludeHelper
 
         $context->recordJitIncludedFile($path);
 
-        $included = $context->runtime->parseAndCompileFile($path);
+        $included = $context->runtime->parseAndCompileFile($path, true);
         if (null === $included) {
             $diag = $context->runtime->compiler->getCompileAbortDetail();
             $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : ' — (no compiler abort detail; parser/CFG returned null)';

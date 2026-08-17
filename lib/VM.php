@@ -9921,11 +9921,13 @@ restart:
                     }
                     $this->context->recordIncludedFile($resolved);
                     $this->context->scriptStack->push($resolved);
-                    $parsed = $this->context->runtime->parseAndCompileFile($resolved);
+                    $parsed = $this->context->runtime->parseAndCompileFile($resolved, true);
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
                     // ZEND_INCLUDE_OR_EVAL copies EX(This) into the included op_array (#31903).
                     $this->inheritIncludeThis($new, $frame);
+                    // …and called_scope for self/static/parent in the included unit (#31913).
+                    $this->inheritIncludeClassScope($new, $frame);
                     // Resume the caller via the run stack (like a call); keep $frame as a scope donor only.
                     $new->parent = null;
                     if (null !== $op->arg2) {
@@ -10858,6 +10860,42 @@ restart:
             $included->scope[$thisIdx] = new Variable();
         }
         $included->scope[$thisIdx]->copyFrom($inherited);
+    }
+
+    /**
+     * ZEND_INCLUDE_OR_EVAL copies caller called_scope into the included {main} frame (#31913).
+     *
+     * php-src: Zend/zend_execute.c / zend_vm_def.h — self/static/parent in an included file
+     * bind to the runtime caller class, not a compile-time global-scope reject.
+     */
+    private function inheritIncludeClassScope(Frame $included, Frame $caller): void
+    {
+        if (null !== $included->calledClass && '' !== $included->calledClass) {
+            return;
+        }
+        $scope = self::includeCallerClassScopeLc($caller);
+        if (null !== $scope) {
+            $included->calledClass = $scope;
+        }
+    }
+
+    /**
+     * Late-static / self scope class (lowercase) of an include/require caller frame.
+     */
+    private static function includeCallerClassScopeLc(Frame $caller): ?string
+    {
+        if (null !== $caller->calledClass && '' !== $caller->calledClass) {
+            return $caller->calledClass;
+        }
+        if (null !== $caller->block && null !== $caller->block->func && null !== $caller->block->func->class) {
+            return strtolower(ltrim($caller->block->func->class->value, '\\'));
+        }
+        $boundThis = self::callerThisIfBound($caller);
+        if (null !== $boundThis && Variable::TYPE_OBJECT === $boundThis->type) {
+            return strtolower($boundThis->toObject()->class->name);
+        }
+
+        return null;
     }
 
     /**

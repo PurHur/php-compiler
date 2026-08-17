@@ -976,12 +976,15 @@ class Runtime {
         }
     }
 
-    public function parseAndCompileFile(string $filename): ?Block {
+    public function parseAndCompileFile(string $filename, bool $forIncludeTarget = false): ?Block {
         if (ServeCompileCache::isEnabled() && !ServeCompileCache::isLoading()) {
             return ServeCompileCache::getFile($this, $filename);
         }
         self::clearLastParseFailure();
         $this->compiler->resetCompileAbortDetail();
+        if ($forIncludeTarget) {
+            $this->compiler->pushIncludeTargetCompile();
+        }
         try {
             $normalized = VM\ScriptStack::normalize($filename);
             if ('' !== $normalized) {
@@ -1008,6 +1011,10 @@ class Runtime {
         } catch (\Throwable $e) {
             $this->emitParseCompileFailureStderr($filename, $e, isset($code) ? $code : null);
             throw $e;
+        } finally {
+            if ($forIncludeTarget) {
+                $this->compiler->popIncludeTargetCompile();
+            }
         }
     }
 
