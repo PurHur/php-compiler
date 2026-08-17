@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\ext\standard\ob_end_flush;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -1130,7 +1131,7 @@ final class ObStorageLlvm
         self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
         self::ensureExternal($context, 'write', $context->context->functionType($i64, false, $i32, $i8p, $i64));
         self::ensureExternal($context, 'fflush', $context->context->functionType($i32, false, $i8p));
-        self::ensureExternal($context, 'memcpy', $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT));
+        LibcExtern::ensureMemcpyDecl($context);
         self::ensureExternal($context, 'malloc', $context->context->functionType($i8p, false, $sizeT));
         self::ensureExternal(
             $context,
@@ -1185,12 +1186,7 @@ final class ObStorageLlvm
 
     private static function ensureExternal(Context $context, string $name, $ft): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
+        LibcExtern::ensureExternalDecl($context, $name, $ft);
     }
 
     private static function registerLinkedRuntime(Context $context, bool $requireAll = true): void

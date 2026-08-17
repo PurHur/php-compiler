@@ -654,18 +654,30 @@ final class LibcExtern
         $context->registerFunction('strcmp', $fn);
     }
 
-    private static function ensure(Context $context, string $name, $fnType): void
+    /**
+     * Declare an external libc/helper symbol without versioning duplicates (#31894).
+     *
+     * lookupFunction() may throw while the symbol already exists in the MODULE (LibcExtern
+     * implement*Body adds bodies without always registering). addFunction() on an existing name
+     * silently versions to name.N with no body → link failure for every AOT binary.
+     */
+    public static function ensureExternalDecl(Context $context, string $name, $fnType): void
     {
-        if (null !== $context->module->getNamedFunction($name)) {
-            return;
-        }
         try {
             $context->lookupFunction($name);
 
             return;
         } catch (\Throwable) {
         }
-        $fn = $context->module->addFunction($name, $fnType);
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn) {
+            $fn = $context->module->addFunction($name, $fnType);
+        }
         $context->registerFunction($name, $fn);
+    }
+
+    private static function ensure(Context $context, string $name, $fnType): void
+    {
+        self::ensureExternalDecl($context, $name, $fnType);
     }
 }
