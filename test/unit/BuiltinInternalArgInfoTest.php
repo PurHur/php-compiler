@@ -1032,6 +1032,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($info['isOptional']);
     }
 
+    /** php-src curl.stub.php — CurlMultiHandle; InternalArgInfo still resource (#28591). */
+    public function testCurlMultiInitReflectionReturnType(): void
+    {
+        $this->assertSame('CurlMultiHandle', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_multi_init'));
+    }
+
     /** php-src curl.stub.php — int $error_code → ?string; InternalArgInfo bool/code/absent (#27810). */
     public function testCurlStrerrorReflectionStubTypes(): void
     {
