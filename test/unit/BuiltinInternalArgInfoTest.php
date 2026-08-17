@@ -1126,6 +1126,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('CurlMultiHandle', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_multi_init'));
     }
 
+    /** php-src curl.stub.php — CurlShareHandle; InternalArgInfo empty return (#27628). */
+    public function testCurlShareInitReflectionReturnType(): void
+    {
+        $this->assertSame('CurlShareHandle', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_share_init'));
+    }
+
+    /** php-src curl.stub.php — array $share_options → CurlSharePersistentHandle; absent from InternalArgInfo (#27711). */
+    public function testCurlShareInitPersistentReflectionStubTypes(): void
+    {
+        $this->assertSame('CurlSharePersistentHandle', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_share_init_persistent'));
+        $this->assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('curl_share_init_persistent', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('curl_share_init_persistent', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('share_options', $info['name']);
+        $this->assertSame('array', $info['type']);
+        $this->assertFalse($info['isOptional']);
+        $this->assertSame(['share_options'], BuiltinParamNames::forFunction('curl_share_init_persistent'));
+    }
+
     /** php-src curl.stub.php — int $error_code → ?string; InternalArgInfo bool/code/absent (#27810). */
     public function testCurlStrerrorReflectionStubTypes(): void
     {
