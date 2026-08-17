@@ -19558,6 +19558,14 @@ restart:
             if ([] !== $stillPending) {
                 $deferred['segments'] = $stillPending;
                 $remaining[] = $deferred;
+                $deferred['entry']->pendingConstMaterialization = [
+                    'block' => $deferred['block'],
+                    'frame' => $deferred['frame'],
+                    'classBodyOps' => $deferred['classBodyOps'],
+                    'segments' => $stillPending,
+                ];
+            } else {
+                $deferred['entry']->pendingConstMaterialization = null;
             }
         }
         $this->context->deferredClassConstants = $remaining;
@@ -21403,6 +21411,12 @@ restart:
                     'classBodyOps' => $classBodyOps,
                     'segments' => $stillPending,
                 ];
+                $entry->pendingConstMaterialization = [
+                    'block' => $block,
+                    'frame' => $frame,
+                    'classBodyOps' => $classBodyOps,
+                    'segments' => $stillPending,
+                ];
             }
         }
         foreach ($entry->properties as $prop) {
@@ -21679,8 +21693,103 @@ restart:
             return $stillPending;
         }
         $entry->forwardDeclaredConstNames = null;
+        $entry->pendingConstMaterialization = null;
 
         return [];
+    }
+
+    /**
+     * Lazy-evaluate a forward-declared class constant (zend_get_class_constant_ex / #31837).
+     *
+     * {@code $markVisited} mirrors IS_CONSTANT_VISITED: nested fetches mark; the outer
+     * FETCH_CLASS_CONSTANT path does not (so mutual cycles report the peer name).
+     */
+    public function materializePendingClassConstant(
+        ClassEntry $entry,
+        string $constName,
+        bool $markVisited = true,
+        string $fetchClassName = 'self'
+    ): void {
+        if (isset($entry->constants[$constName])) {
+            return;
+        }
+        if ($markVisited && isset($entry->visitedConstNames[$constName])) {
+            throw new \Error(
+                VM\ClassConstExpr::selfReferencingConstantMessage($entry, $constName, $fetchClassName)
+            );
+        }
+        $pending = $entry->pendingConstMaterialization;
+        if (null === $pending || !isset($pending['segments'][$constName])) {
+            $this->hydratePendingConstMaterializationFromDeferred($entry);
+            $pending = $entry->pendingConstMaterialization;
+        }
+        if (null === $pending || !isset($pending['segments'][$constName])) {
+            return;
+        }
+        if ($markVisited) {
+            $entry->visitedConstNames[$constName] = true;
+        }
+        $prevLazy = $entry->lazyConstMaterialize;
+        $entry->lazyConstMaterialize = true;
+        try {
+            $this->evaluateDeferredClassConstSegment(
+                $entry,
+                $pending['block'],
+                $pending['frame'],
+                $pending['classBodyOps'],
+                $pending['segments'][$constName]
+            );
+            unset($entry->forwardDeclaredConstNames[$constName]);
+            if (null !== $entry->forwardDeclaredConstNames && [] === $entry->forwardDeclaredConstNames) {
+                $entry->forwardDeclaredConstNames = null;
+            }
+            unset($entry->pendingConstMaterialization['segments'][$constName]);
+            if (
+                null !== $entry->pendingConstMaterialization
+                && [] === $entry->pendingConstMaterialization['segments']
+            ) {
+                $entry->pendingConstMaterialization = null;
+            }
+            $this->removeDeferredClassConstSegment($entry, $constName);
+        } finally {
+            $entry->lazyConstMaterialize = $prevLazy;
+            if ($markVisited) {
+                unset($entry->visitedConstNames[$constName]);
+            }
+        }
+    }
+
+    private function hydratePendingConstMaterializationFromDeferred(ClassEntry $entry): void
+    {
+        foreach ($this->context->deferredClassConstants as $deferred) {
+            if ($deferred['entry'] !== $entry) {
+                continue;
+            }
+            $entry->pendingConstMaterialization = [
+                'block' => $deferred['block'],
+                'frame' => $deferred['frame'],
+                'classBodyOps' => $deferred['classBodyOps'],
+                'segments' => $deferred['segments'],
+            ];
+
+            return;
+        }
+    }
+
+    private function removeDeferredClassConstSegment(ClassEntry $entry, string $constName): void
+    {
+        $remaining = [];
+        foreach ($this->context->deferredClassConstants as $deferred) {
+            if ($deferred['entry'] !== $entry) {
+                $remaining[] = $deferred;
+                continue;
+            }
+            unset($deferred['segments'][$constName]);
+            if ([] !== $deferred['segments']) {
+                $remaining[] = $deferred;
+            }
+        }
+        $this->context->deferredClassConstants = $remaining;
     }
 
     /**
@@ -23333,6 +23442,15 @@ restart:
         }
         // Case-sensitive constant / enum-case key (#25910, #25929).
         $memberKey = ClassConstName::key($memberNameRaw);
+        if (
+            !isset($classEntry->constants[$memberKey])
+            && null !== $classEntry->forwardDeclaredConstNames
+            && isset($classEntry->forwardDeclaredConstNames[$memberKey])
+        ) {
+            // Outer FETCH_CLASS_CONSTANT does not mark visited (zend_vm_def.h); nested
+            // sibling fetches do via materializePendingClassConstant(mark=true) (#31837).
+            $this->materializePendingClassConstant($classEntry, $memberKey, false, $classEntry->name);
+        }
         if (isset($classEntry->constants[$memberKey])) {
             if (!ClassConstName::matchesDeclared(
                 $memberNameRaw,

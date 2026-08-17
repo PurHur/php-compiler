@@ -233,6 +233,7 @@
             <file>./test/compliance/TypedPropNullDefaultFatal31820JITTest.php</file>
             <file>./test/compliance/TypedPropSelfParent31835VMTest.php</file>
             <file>./test/compliance/TypedPropSelfParent31835JITTest.php</file>
+            <file>./test/compliance/ClassConstSelfReferencingCycle31837VMTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147JITTest.php</file>
             <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
