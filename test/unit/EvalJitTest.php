@@ -27,6 +27,7 @@ final class EvalJitTest extends BaseTest
             'eval_magic_consts.phpt',
             'eval_parse_error.phpt',
             'eval_return_value.phpt',
+            'eval_empty_returns_false.phpt',
             'eval_dynamic_fn.phpt',
             'eval_inherits_class_scope.phpt',
         ] as $file) {

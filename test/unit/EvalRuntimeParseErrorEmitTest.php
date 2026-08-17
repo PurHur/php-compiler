@@ -28,5 +28,7 @@ final class EvalRuntimeParseErrorEmitTest extends TestCase
         // Cross-eval final property override vs outer Object_ tables (#28437).
         $this->assertStringContainsString('rejectOuterUnitFinalPropertyOverride', $src);
         $this->assertStringContainsString('Cannot override final property', $src);
+        // Empty eval source is FAILURE → emitFalse, not inlined NULL (#31914).
+        $this->assertStringContainsString('isZeroLengthEvalSource', $src);
     }
 }

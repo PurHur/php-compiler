@@ -79,6 +79,8 @@
             <file>./test/compliance/IncludeInheritsClassScopeJITTest.php</file>
             <file>./test/compliance/EvalInheritsThisVMTest.php</file>
             <file>./test/compliance/EvalInheritsThisJITTest.php</file>
+            <file>./test/compliance/EvalEmptyReturnsFalse31914VMTest.php</file>
+            <file>./test/compliance/EvalEmptyReturnsFalse31914JITTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
             <file>./test/compliance/RoundingModeMissingClassErrorVMTest.php</file>

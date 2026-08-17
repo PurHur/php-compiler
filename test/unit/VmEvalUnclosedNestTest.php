@@ -32,6 +32,21 @@ final class VmEvalUnclosedNestTest extends TestCase
         $this->assertSame("<?php\nreturn \$x + 1;", VmEval::wrapEvalCode('$x + 1'));
     }
 
+    /**
+     * @covers \PHPCompiler\ext\standard\VmEval::isZeroLengthEvalSource
+     * @covers issue #31914
+     */
+    public function testZeroLengthEvalSourceIsFailureNotWhitespace(): void
+    {
+        $this->assertTrue(VmEval::isZeroLengthEvalSource(''));
+        $this->assertFalse(VmEval::isZeroLengthEvalSource('   '));
+        $this->assertFalse(VmEval::isZeroLengthEvalSource(';'));
+        $this->assertFalse(VmEval::isZeroLengthEvalSource("\n"));
+        $false = VmEval::falseEvalFailureResult();
+        $this->assertSame(VM\Variable::TYPE_BOOLEAN, $false->type);
+        $this->assertFalse($false->toBool());
+    }
+
     /** @covers \PHPCompiler\ext\standard\VmEval::normalizeParseMessage */
     public function testNormalizeParseMessageUsesZendUnclosedBrace(): void
     {
