@@ -136,7 +136,14 @@ final class VmEval
             return $runtime->parseAndCompile($wrapped, $filename);
         } catch (CompileFatal $e) {
             throw $e;
-        } catch (\CompileError) {
+        } catch (\CompileError $e) {
+            // Typed class const (and similar) 8.2 rejects throw CompileError with a
+            // parser-shaped message — surface as CompileFatal so JIT/AOT emit ParseError
+            // with the Zend text instead of a generic "Parse error" (#31860).
+            if (CompileFatal::isSyntaxParseErrorMessage($e->getMessage())) {
+                throw new CompileFatal($filename, 1, $e->getMessage());
+            }
+
             return null;
         } catch (\Throwable) {
             return null;
@@ -162,14 +169,20 @@ final class VmEval
 
         try {
             $block = $runtime->parseAndCompile($wrapped, $evalFile);
-        } catch (CompileFatal $e) {
-            // Reference-profile syntax rejectors throw CompileFatal; Zend eval surfaces ParseError (#22796).
+        } catch (\CompileError $e) {
+            // Zend eval() turns parser syntax failures into catchable ParseError (zif_eval).
+            // Reference-profile rejectors throw CompileFatal; typed class/trait/interface const
+            // rejects on 8.2 throw CompileError via throwCompileError() with the same
+            // "syntax error, …" text — both must be ParseError, not process Fatal (#22796, #31860).
             if (CompileFatal::isSyntaxParseErrorMessage($e->getMessage())) {
-                $line = $e->sourceLine > 1 ? $e->sourceLine - 1 : max(1, $e->sourceLine);
+                $line = 1;
+                if ($e instanceof CompileFatal && $e->sourceLine > 0) {
+                    $line = $e->sourceLine > 1 ? $e->sourceLine - 1 : max(1, $e->sourceLine);
+                } elseif ($e->getCode() > 0) {
+                    $line = $e->getCode();
+                }
                 self::failEvalParse($ctx, $e->getMessage(), $line, $code);
             }
-            throw $e;
-        } catch (\CompileError $e) {
             throw $e;
         } catch (\Throwable $e) {
             // php-parser Error for modifier lists uses the same text as zend_throw_exception
