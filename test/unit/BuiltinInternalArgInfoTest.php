@@ -1267,6 +1267,47 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(\PHPCompiler\VM\Variable::TYPE_NULL, $dest->type);
     }
 
+    /** php-src normalizer.stub.php — $string/$form int NFC → string|false; InternalArgInfo still $input/string (#25586). */
+    public function testNormalizerNormalizeReflectionStubTypes(): void
+    {
+        $fn = 'normalizer_normalize';
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+        $string = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+        $this->assertNotNull($string);
+        $this->assertSame('string', $string['type']);
+        $this->assertFalse($string['isOptional']);
+        $form = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+        $this->assertNotNull($form);
+        $this->assertSame('int', $form['type']);
+        $this->assertSame('form', $form['name']);
+        $this->assertTrue($form['isOptional']);
+        $this->assertSame(['string', 'form='], BuiltinParamNames::forFunction($fn));
+        $this->assertSame(['string', 'form='], BuiltinParamNames::paramNamesForInternalFunction($fn));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'string',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'form',
+            $fn
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'input',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $form, false));
+        $dest = new \PHPCompiler\VM\Variable();
+        $this->assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, 1, $form));
+        $this->assertSame(\PHPCompiler\VM\Variable::TYPE_INTEGER, $dest->type);
+        $this->assertSame(16, $dest->toInt());
+    }
+
     /** php-src normalizer.stub.php — string/form → ?string; absent from InternalArgInfo (#27705). */
     public function testNormalizerGetRawDecompositionReflectionStubTypes(): void
     {

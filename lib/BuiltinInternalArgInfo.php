@@ -380,6 +380,8 @@ final class BuiltinInternalArgInfo
             'grapheme_str_split' => 'array|false',
             // ext/intl/php_intl.stub.php — PHP 8.5+ (#27591)
             'grapheme_levenshtein' => 'int|false',
+            // ext/intl/normalizer/normalizer.stub.php — InternalArgInfo still string (missing |false) (#25586)
+            'normalizer_normalize' => 'string|false',
             // ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
             'normalizer_get_raw_decomposition' => '?string',
             // ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
@@ -969,6 +971,12 @@ final class BuiltinInternalArgInfo
             },
             // ext/intl/grapheme/grapheme.stub.php — PHP 8.4+ string $string, int $length = 1 (#24579)
             'grapheme_str_split' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                default => null,
+            },
+            // ext/intl/normalizer/normalizer.stub.php — string $string, int $form = FORM_C (#25586)
+            'normalizer_normalize' => match ($index) {
                 0 => 'string',
                 1 => 'int',
                 default => null,

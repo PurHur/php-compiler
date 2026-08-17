@@ -1040,6 +1040,10 @@ final class BuiltinInternalDefaultValues
         'intlcal_create_instance' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/intl/normalizer/normalizer.stub.php — int $form = Normalizer::FORM_C (16); int infer → 0 (#25586)
+        'normalizer_normalize' => [
+            1 => ['kind' => 'int', 'value' => 16],
+        ],
         // php-src ext/intl/normalizer/normalizer.stub.php — int $form = Normalizer::FORM_C (16); int infer → 0 (#27705)
         'normalizer_get_raw_decomposition' => [
             1 => ['kind' => 'int', 'value' => 16],
