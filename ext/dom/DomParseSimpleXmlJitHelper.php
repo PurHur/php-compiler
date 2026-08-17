@@ -569,6 +569,42 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Move direct child {@code $index} to the end of root-inner XML (#31684).
+     *
+     * Peer {@see rootInnerXmlReplaceChildAt}: thin-AOT appendChild same-parent move
+     * must reorder PROP_USER_SCRIPT_INNER_XML (not concat a fresh {@code <tag/>}).
+     *
+     * @return string|null New root-inner XML, or null when index is out of range
+     */
+    public static function rootInnerXmlMoveChildToEnd(string $xml, int $index): ?string
+    {
+        $inner = self::rootInnerXmlArgv($xml);
+        if ('' === $inner) {
+            return null;
+        }
+
+        return self::moveChildMarkupToEnd($inner, $index);
+    }
+
+    /**
+     * Rotate one direct-child markup chunk to the end of {@code $inner} (#31684).
+     *
+     * @return string|null
+     */
+    public static function moveChildMarkupToEnd(string $inner, int $index): ?string
+    {
+        $chunks = self::directChildMarkupChunks($inner);
+        if ($index < 0 || $index >= \count($chunks)) {
+            return null;
+        }
+        $moved = $chunks[$index];
+        array_splice($chunks, $index, 1);
+        $chunks[] = $moved;
+
+        return implode('', $chunks);
+    }
+
+    /**
      * Outer-markup slices of each direct child under {@code $inner} (#28671).
      *
      * @return list<string>
