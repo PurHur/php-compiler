@@ -257,9 +257,15 @@ final class ArrayIteratorSeek extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::seek()'
         );
-        // php-src zim_ArrayIterator_seek — exactly 1 user arg (#30963)
+        // php-src zim_ArrayIterator_seek — exactly 1 user arg (#30963); Z_PARAM_LONG soft-null (#31730).
         $this->requireExactUserArgCount($frame, 'ArrayIterator::seek', 1);
-        $offset = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $offset = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'ArrayIterator::seek',
+            1,
+            'offset'
+        );
         ArrayIteratorBuiltin::seek($object, $offset);
     }
 }
