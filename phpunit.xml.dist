@@ -246,6 +246,8 @@
             <file>./test/compliance/ReadlinkLinkinfoReflectionReturnVMTest.php</file>
             <file>./test/compliance/GetcwdReflectionReturnVMTest.php</file>
             <file>./test/compliance/CryptSaltRequiredReflectionVMTest.php</file>
+            <file>./test/compliance/PasswordHashVerifyAlgosReflectionVMTest.php</file>
+            <file>./test/compliance/PasswordHashVerifyAlgosReflectionJITTest.php</file>
             <file>./test/compliance/GetrusageReflectionReturnVMTest.php</file>
             <file>./test/compliance/IsStarReflectionMixedVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictVMTest.php</file>
@@ -958,6 +960,7 @@
             <file>./test/aot/GzwriteBytesAotTest.php</file>
             <file>./test/aot/MbChrOrdAotTest.php</file>
             <file>./test/aot/DomXpathTreeAxesAotTest.php</file>
+            <file>./test/aot/PasswordHashVerifyAlgosReflectionAotTest.php</file>
             <file>./test/aot/MbEncodingRegistryAotTest.php</file>
             <file>./test/aot/DateIsodateSetAotTest.php</file>
             <file>./test/aot/DateTimeGetOffsetAotTest.php</file>

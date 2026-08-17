@@ -2054,10 +2054,13 @@ final class BuiltinParamNames
             case 'strtok':
                 return ['string', 'token='];
             // php-src ext/standard/password.stub.php — calleeParamMetadata uses forFunction; verify missing from InternalArgInfo (#23207)
+            // $options = [] optional (InternalArgInfo still required) (#28917)
             case 'password_hash':
-                return ['password', 'algo', 'options'];
+                return ['password', 'algo', 'options='];
             case 'password_verify':
                 return ['password', 'hash'];
+            case 'password_algos':
+                return [];
             // php-src ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
             case 'password_get_info':
                 return ['hash'];
