@@ -54,7 +54,8 @@ final class LibcExtern
             // NestedJIT JitTempnamKernel + ReflectionSetup declare strrchr(3) module-locally.
             'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],
             'strtod' => [$dbl, false, [$i8p, $i8pp]],
-            // strdup dropped (#31534): no remaining lookupFunction('strdup') consumers.
+            // strdup dropped from always-on (#31534): JitFsGlobKernel / JitStreamIoKernel declare
+            // strdup(3) module-locally (#31721 GlobIterator/FilesystemIterator AOT).
             // strtok_r dropped (#29091): parse_str AOT kernel uses __compiler_strtok_r.
             'fopen' => [$i8p, false, [$i8p, $i8p]],
             'fread' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],

@@ -125,6 +125,8 @@ final class JitFsGlobKernel
         $voidTy = $context->getTypeFromString('void');
 
         // glob/scandir + module-local stat(2) after LibcExtern/Module always-on drop (#31403).
+        // strdup(3) after always-on LibcExtern drop (#31534) — still required by emitGlobVec /
+        // emitScandirVec (#31721 AOT FilesystemIterator/GlobIterator).
         // malloc/free/memset/strcmp still come from LibcExtern (i8*).
         foreach ([
             ['glob', $i32, [$i8p, $i32, $i8p, $i8p]],
@@ -132,6 +134,7 @@ final class JitFsGlobKernel
             ['scandir', $i32, [$i8p, $i8ppp, $i8p, $i8p]],
             ['alphasort', $i32, [$i8pp, $i8pp]],
             ['stat', $i32, [$i8p, $i8p]],
+            ['strdup', $i8p, [$i8p]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }

@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\StringPath;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -54,8 +55,9 @@ final class GlobIteratorJitHelper
         $objectType = $context->type->object;
         $pathStr = self::loadString($context, $pathArg);
         $i64 = $context->getTypeFromString('int64');
+        // php-src Z_PARAM_LONG $flags — soft-null DEP+0 outside strict_types (#31721).
         $flags = null !== $flagsArg
-            ? self::toI64($context, $flagsArg)
+            ? JitStrictIntArg::lower($context, $flagsArg, 'GlobIterator::__construct', 2, 'flags')
             : $i64->constInt(0, false);
 
         $ht = $context->builder->call(

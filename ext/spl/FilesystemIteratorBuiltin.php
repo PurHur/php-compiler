@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -246,10 +247,13 @@ final class FilesystemIteratorConstruct extends VmClassMethod
             'directory',
             VmString::emptyStringArgValueErrorMessageCannot('FilesystemIterator::__construct', 0, 'directory')
         );
+        // php-src zim_FilesystemIterator___construct — Z_PARAM_LONG $flags; omitted → SKIP_DOTS;
+        // explicit null → E_DEPRECATED then 0 outside strict_types (#31721).
         $flags = FilesystemIteratorBuiltin::SKIP_DOTS;
         if ($argCount >= 3) {
-            $flags = SplFilesystemArg::requireIntArg(
-                $frame->calledArgs[2],
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
                 'FilesystemIterator::__construct',
                 2,
                 'flags'
@@ -285,11 +289,12 @@ final class RecursiveDirectoryIteratorConstruct extends VmClassMethod
         );
         // php-src RecursiveDirectoryIterator defaults to flags=0 (include dots;
         // CURRENT_AS_FILEINFO / KEY_AS_PATHNAME). Do NOT inherit FilesystemIterator's
-        // SKIP_DOTS default (#20145).
+        // SKIP_DOTS default (#20145). Z_PARAM_LONG soft-null DEP+0 (#31721).
         $flags = 0;
         if ($argCount >= 3) {
-            $flags = SplFilesystemArg::requireIntArg(
-                $frame->calledArgs[2],
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
                 'RecursiveDirectoryIterator::__construct',
                 2,
                 'flags'
