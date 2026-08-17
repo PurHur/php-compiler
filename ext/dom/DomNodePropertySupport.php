@@ -18,6 +18,7 @@ final class DomNodePropertySupport
     /**
      * php-src ext/dom/php_dom.c — DOMAttr::$specified is read-only (#20605).
      * Dom\* ParentNode::$children is private(set) when advertised (PHP 8.5+; #21559).
+     * NodeList / NamedNodeMap / CharacterData / TokenList::$length (#31707).
      */
     public static function rejectReadOnlyPropertyWrite(ObjectEntry $owner, string $name): void
     {
@@ -45,6 +46,14 @@ final class DomNodePropertySupport
                 'Cannot modify readonly property '.$owner->class->name.'::$nodeValue'
             );
         }
+        // php-src nodelist.c / nodemap.c / characterdata.c / token_list.c — @$length (#31707).
+        if (strtolower(VmDom::PROP_LENGTH) === strtolower($name)
+            && self::hasReadOnlyLengthProperty($owner)
+        ) {
+            throw new \Error(
+                'Cannot write read-only property '.$owner->class->name.'::$length'
+            );
+        }
         if (!VmDom::isAttr($owner)) {
             return;
         }
@@ -53,6 +62,39 @@ final class DomNodePropertySupport
                 'Cannot write read-only property DOMAttr::$specified'
             );
         }
+    }
+
+    /**
+     * Classes whose `$length` property is engine-managed read-only (php-src stubs; #31707).
+     */
+    private static function hasReadOnlyLengthProperty(ObjectEntry $owner): bool
+    {
+        if (VmDom::isNodeList($owner)
+            || VmDom::isHtmlCollection($owner)
+            || VmDom::isNamedNodeMap($owner)
+            || VmDom::isTokenList($owner)
+            || VmDom::isCharacterData($owner)
+        ) {
+            return true;
+        }
+        $lc = strtolower($owner->class->name);
+
+        return VmDom::CLASS_NODE_LIST === $lc
+            || VmDom::CLASS_NAMED_NODE_MAP === $lc
+            || VmDom::CLASS_TOKEN_LIST === $lc
+            || VmDomLiving::CLASS_NODE_LIST === $lc
+            || VmDomLiving::CLASS_NAMED_NODE_MAP === $lc
+            || VmDomLiving::CLASS_DTD_NAMED_NODE_MAP === $lc
+            || VmDomLiving::CLASS_HTML_COLLECTION === $lc
+            || VmDomLiving::CLASS_TOKEN_LIST === $lc
+            || VmDom::CLASS_CHARACTER_DATA === $lc
+            || VmDom::CLASS_TEXT === $lc
+            || VmDom::CLASS_COMMENT === $lc
+            || VmDom::CLASS_CDATA === $lc
+            || VmDomLiving::CLASS_CHARACTER_DATA === $lc
+            || VmDomLiving::CLASS_TEXT === $lc
+            || VmDomLiving::CLASS_COMMENT === $lc
+            || VmDomLiving::CLASS_CDATA === $lc;
     }
 
     public static function isManagedProperty(ObjectEntry $object, string $name): bool
@@ -95,6 +137,7 @@ final class DomNodePropertySupport
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
             || (VmDom::isTextOrCdataNode($object) && strtolower(VmDom::PROP_WHOLE_TEXT) === $lc)
             || (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
+            || (VmDom::isNamedNodeMap($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
             || (\PHPCompiler\CompilerVersion::supportsDomNodeIsConnected()
                 && strtolower(VmDom::PROP_IS_CONNECTED) === $lc);
     }
@@ -327,6 +370,11 @@ final class DomNodePropertySupport
         }
         if (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc) {
             VmDom::refreshNodeListIfLive($object);
+            $var->int(\count(DomRegistry::state($object)->listNodeIds));
+
+            return $var;
+        }
+        if (VmDom::isNamedNodeMap($object) && strtolower(VmDom::PROP_LENGTH) === $lc) {
             $var->int(\count(DomRegistry::state($object)->listNodeIds));
 
             return $var;
