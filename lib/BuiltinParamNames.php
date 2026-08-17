@@ -919,6 +919,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says varname (#23568)
             case 'ini_restore':
                 return ['option'];
+            // php-src ext/standard/basic_functions.stub.php — absent from InternalArgInfo (#23405)
+            case 'ini_parse_quantity':
+                return ['shorthand'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says value (#23568)
             case 'ignore_user_abort':
                 return ['enable='];
