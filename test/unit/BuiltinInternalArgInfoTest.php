@@ -828,6 +828,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getcwd'));
     }
 
+    /** php-src basic_functions.stub.php — crypt $salt required; InternalArgInfo still salt= (#28920). */
+    public function testCryptSaltRequiredReflectionStub(): void
+    {
+        $this->assertSame(2, BuiltinInternalArgInfo::stubRequiredParamCountOverride('crypt'));
+        $this->assertSame(2, BuiltinInternalArgInfo::requiredParamCountForFunction('crypt'));
+        $this->assertFalse(BuiltinInternalArgInfo::stubParamIsOptionalOverride('crypt', 1));
+        $salt = BuiltinInternalArgInfo::paramInfoForFunction('crypt', 1);
+        $this->assertNotNull($salt);
+        $this->assertSame('salt', $salt['name']);
+        $this->assertSame('string', $salt['type']);
+        $this->assertFalse($salt['isOptional']);
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('crypt'));
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28841). */
     public function testGetrusageReflectionReturnUnion(): void
     {

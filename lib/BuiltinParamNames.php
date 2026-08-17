@@ -384,7 +384,8 @@ final class BuiltinParamNames
             case 'strrev':
             case 'str_rot13':
                 return ['string'];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/salt (#23264)
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/salt=
+            // ($salt required; optionality override in BuiltinInternalArgInfo, #23264 / #28920)
             case 'crypt':
                 return ['string', 'salt'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/crc (#23491)

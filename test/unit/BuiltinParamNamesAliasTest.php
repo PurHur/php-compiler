@@ -2850,6 +2850,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($crypt, 'string', 'crypt'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($crypt, 'salt', 'crypt'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($crypt, 'str', 'crypt'));
+        // InternalArgInfo still has salt=; Zend requires both args (#28920)
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('crypt'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('crypt'));
+        $salt = BuiltinInternalArgInfo::paramInfoForFunction('crypt', 1);
+        self::assertNotNull($salt);
+        self::assertSame('salt', $salt['name']);
+        self::assertSame('string', $salt['type']);
+        self::assertFalse($salt['isOptional']);
     }
 
     /** @covers issue #23217 / #25594 */

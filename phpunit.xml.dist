@@ -226,6 +226,7 @@
             <file>./test/compliance/Md5Sha1FileReflectionReturnVMTest.php</file>
             <file>./test/compliance/ReadlinkLinkinfoReflectionReturnVMTest.php</file>
             <file>./test/compliance/GetcwdReflectionReturnVMTest.php</file>
+            <file>./test/compliance/CryptSaltRequiredReflectionVMTest.php</file>
             <file>./test/compliance/GetrusageReflectionReturnVMTest.php</file>
             <file>./test/compliance/IsStarReflectionMixedVMTest.php</file>
             <file>./test/compliance/HashHmacFileNullAlgoStrictVMTest.php</file>
