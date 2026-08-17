@@ -159,10 +159,11 @@ final class RecursiveCachingIteratorConstruct extends VmClassMethod
             1,
             $frame->vmContext
         );
-        // Same default/null semantics as CachingIterator (#22336; php-src spl.stub.php).
+        // Same default/null semantics as CachingIterator (#22336 / #31679; php-src spl.stub.php).
         $flags = CachingIteratorConstruct::resolveConstructFlags(
             $frame->calledArgs[2] ?? null,
-            'RecursiveCachingIterator::__construct'
+            'RecursiveCachingIterator::__construct',
+            $frame
         );
         // php-src spl_cit_check_flags — method name is RecursiveCachingIterator (#31551).
         CachingIteratorBuiltin::assertExclusiveToStringFlags(

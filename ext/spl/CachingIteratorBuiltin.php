@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -664,8 +667,8 @@ final class CachingIteratorConstruct extends VmClassMethod
             'CachingIterator::__construct',
             'Iterator'
         );
-        // php-src: int $flags = self::CALL_TOSTRING; explicit null → 0 (Z_PARAM_LONG_OR_NULL).
-        $flags = self::resolveConstructFlags($flagsArg, 'CachingIterator::__construct');
+        // php-src: int $flags = self::CALL_TOSTRING; explicit null → soft DEP + 0 (Z_PARAM_LONG; #31679).
+        $flags = self::resolveConstructFlags($flagsArg, 'CachingIterator::__construct', $frame);
         // php-src spl_cit_check_flags — exclusive TOSTRING bits (#31551).
         CachingIteratorBuiltin::assertExclusiveToStringFlags($flags, 'CachingIterator::__construct', 2);
         // php-src zim_cachingiterator_construct — store iterator only; first rewind is on
@@ -693,41 +696,37 @@ final class CachingIteratorConstruct extends VmClassMethod
     }
 
     /**
-     * Resolve construct $flags (php-src spl_iterators.c / Z_PARAM_LONG_OR_NULL; #22336).
+     * Resolve construct $flags (php-src spl_iterators.c / Z_PARAM_LONG; #22336, #31679).
      *
-     * Omitted arg → CALL_TOSTRING; explicit null → 0; int → value.
+     * Omitted arg → CALL_TOSTRING; explicit null → E_DEPRECATED then 0 outside strict_types;
+     * strict_types → TypeError; int → value.
+     *
+     * Uses the resolved Variable (not a fixed calledArgs index) because php-cfg may hoist
+     * ClassConstFetch so flags precede the iterator arg (#17400).
      */
-    public static function resolveConstructFlags(?Variable $flagsArg, string $function = 'CachingIterator::__construct'): int
-    {
+    public static function resolveConstructFlags(
+        ?Variable $flagsArg,
+        string $function = 'CachingIterator::__construct',
+        ?Frame $frame = null
+    ): int {
         if (null === $flagsArg) {
             return CachingIteratorBuiltin::CALL_TOSTRING;
         }
-        $flagsArg = $flagsArg->resolveIndirect();
-        if (Variable::TYPE_NULL === $flagsArg->type) {
-            return 0;
-        }
-        if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-            throw new \TypeError(
-                $function.'(): Argument #2 ($flags) must be of type int, '
-                .self::typeLabel($flagsArg).' given'
-            );
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+            // Mirror parseZParamLongBuiltinArgForFrame strict branch — parseIntBuiltinArg soft-coerces null.
+            $arg = $flagsArg->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $arg->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #2 ($flags) must be of type int, %s given',
+                    $function,
+                    EnumCaseSupport::typeNameForTypeErrorActual($arg)
+                ));
+            }
+
+            return $arg->toInt();
         }
 
-        return $flagsArg->toInt();
-    }
-
-    private static function typeLabel(Variable $var): string
-    {
-        return match ($var->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        return VmMath::parseZParamLongBuiltinArg($flagsArg, $function, 2, 'flags', $frame);
     }
 }
 
