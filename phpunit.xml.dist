@@ -213,6 +213,8 @@
             <file>./test/compliance/TryCatchElsePhpSrcStrict31159JITTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146VMTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146JITTest.php</file>
+            <file>./test/compliance/TypedPropNestedCoalesce31769VMTest.php</file>
+            <file>./test/compliance/TypedPropNestedCoalesce31769JITTest.php</file>
             <file>./test/compliance/UninitTypedPropertyByref31771VMTest.php</file>
             <file>./test/compliance/UninitTypedPropertyByref31771JITTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
