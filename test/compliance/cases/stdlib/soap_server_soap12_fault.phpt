@@ -24,8 +24,8 @@ $out = (string) ob_get_clean();
 echo 'threw=', $threw, "\n";
 echo 'env12=', str_contains($out, '2003/05/soap-envelope') ? 1 : 0, "\n";
 echo 'env11=', str_contains($out, 'schemas.xmlsoap.org/soap/envelope') ? 1 : 0, "\n";
-echo 'code=', (str_contains($out, 'Code') && str_contains($out, 'Receiver')) ? 1 : 0, "\n";
-echo 'reason=', (str_contains($out, 'Reason') && str_contains($out, 'nope12')) ? 1 : 0, "\n";
+echo 'code=', (str_contains($out, '<env:Code>') && str_contains($out, '<env:Value>env:Receiver</env:Value>')) ? 1 : 0, "\n";
+echo 'reason=', (str_contains($out, '<env:Reason>') && str_contains($out, 'nope12')) ? 1 : 0, "\n";
 
 // SOAP 1.1 path unchanged
 function boom11($x)
