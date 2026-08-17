@@ -5694,6 +5694,13 @@ restart:
                     if (null !== $op->arg3 && $op->arg3 > 0) {
                         $frame->callSiteLine = $op->arg3;
                     }
+                    // Encapsed "$this" / "{$this}" lowers to CAST_STRING on the this CV (#31728).
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
+                    if (null !== $catchFrame) {
+                        $frame->callSiteLine = $savedCallSiteLine;
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $castStringSrc = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
                     try {
                         $frame->scope[$op->arg1]->castFrom(
@@ -6027,6 +6034,17 @@ restart:
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
                     $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    // "$this" / concat with this CV — Error outside object context (#31728).
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg3);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
@@ -10704,6 +10722,7 @@ restart:
 
     /**
      * isset($this) / empty($this) in static or non-object scope — false / true without Error (#5411).
+     * File scope ({main}), plain functions, and static methods: $this is never bound (#31728).
      */
     private function isUnboundThisSlot(Frame $frame, int $slot): bool
     {
@@ -10712,8 +10731,9 @@ restart:
             return false;
         }
         $func = $frame->block->func;
+        // No frame function (or missing) — treat as unbound (zend_execute.c FETCH_THIS).
         if (null === $func) {
-            return false;
+            return true;
         }
         // Static methods and static closures never have $this (zend_closures.c / #23704).
         if ((($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
@@ -10726,11 +10746,12 @@ restart:
         if (((int) ($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0) {
             return !$this->closureFrameHasBoundThis($frame, $thisIdx);
         }
-        if (null === $func->class) {
-            return false;
+        // Instance method: unbound when $this was never installed in scope.
+        if (null !== $func->class) {
+            return !isset($frame->scope[$thisIdx]);
         }
-
-        return !isset($frame->scope[$thisIdx]);
+        // {main} / plain function — $this is never in object context (php-src FETCH_THIS).
+        return true;
     }
 
     /** True when a closure invoke has a bound object for $this (auto-bind / bindTo). */

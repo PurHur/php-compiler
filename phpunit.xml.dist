@@ -111,6 +111,7 @@
             <file>./test/compliance/ClosureDynpropErrorThrowSiteVMTest.php</file>
             <file>./test/compliance/AnonymousClassImplementsNameVMTest.php</file>
             <file>./test/compliance/AnonymousClassImplementsNameJITTest.php</file>
+            <file>./test/compliance/ThisInterpOutsideObjectContextVMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>
