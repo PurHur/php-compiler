@@ -230,6 +230,9 @@ final class TypedPropertyCheck
      * FETCH_DIM_W / []= on an uninitialized typed array property (zend_std_get_property_ptr_ptr
      * BP_VAR_W + zend_try_array_init, #31770). Scalars stay uninitialized so assertReadable Errors.
      *
+     * Callers must not invoke this for dim RW ops (++/--/+=): those are BP_VAR_RW and must Error
+     * like a bare read (#31784).
+     *
      * @return bool true when the slot is writable as an array (already initialized, or just inited)
      */
     public static function tryInitEmptyArrayForDimWrite(Variable $var): bool

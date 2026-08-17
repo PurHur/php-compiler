@@ -122,6 +122,8 @@
             <file>./test/compliance/TraitParentTypehintJITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignJITTest.php</file>
+            <file>./test/compliance/UninitTypedArrayDimRwVMTest.php</file>
+            <file>./test/compliance/UninitTypedArrayDimRwJITTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>

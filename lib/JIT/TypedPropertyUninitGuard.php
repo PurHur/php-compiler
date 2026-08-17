@@ -226,6 +226,8 @@ final class TypedPropertyUninitGuard
     /**
      * FETCH_DIM_W on a typed property: array-containing types auto-init [] (zend_try_array_init, #31770).
      * Other typed slots still Error on uninitialized access.
+     *
+     * Callers must use {@see emitBeforeRead} for dim RW (++/--/+=) — BP_VAR_RW (#31784).
      */
     public static function emitBeforeDimWrite(Context $context, Variable $var): void
     {
