@@ -207,6 +207,10 @@ final class BuiltinInternalArgInfo
             // ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
             'password_get_info' => 'array',
             'password_needs_rehash' => 'bool',
+            // ext/standard/password.stub.php — verify/algos omitted; hash already string (#28917)
+            'password_verify' => 'bool',
+            'password_algos' => 'array',
+            'password_hash' => 'string',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#26185)
             'filesize', 'filemtime' => 'int|false',
             'glob', 'scandir' => 'array|false',
@@ -679,6 +683,8 @@ final class BuiltinInternalArgInfo
         return match ($callableLc) {
             // ext/standard/basic_functions.stub.php — crypt(string, string): string (#28920)
             'crypt' => 2,
+            // ext/standard/password.stub.php — $options = [] (InternalArgInfo required) (#28917)
+            'password_hash' => 2,
             default => null,
         };
     }
@@ -691,6 +697,8 @@ final class BuiltinInternalArgInfo
         return match ($callableLc) {
             // ext/standard/basic_functions.stub.php — $salt required (#28920)
             'crypt' => 1 === $index ? false : null,
+            // ext/standard/password.stub.php — $options = [] (InternalArgInfo required) (#28917)
+            'password_hash' => 2 === $index ? true : null,
             default => null,
         };
     }
@@ -782,6 +790,14 @@ final class BuiltinInternalArgInfo
                 2 => 'array',
                 default => null,
             },
+            // ext/standard/password.stub.php — algo string|int|null; options array (#28917)
+            'password_hash' => match ($index) {
+                0 => 'string',
+                1 => 'string|int|null',
+                2 => 'array',
+                default => null,
+            },
+            'password_verify' => ($index === 0 || $index === 1) ? 'string' : null,
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
             // ext/calendar/calendar.stub.php — ?int $year = null, int $mode = 0 (#28781, re-#24509)

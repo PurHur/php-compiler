@@ -3506,15 +3506,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testPasswordHashVerifyZendStubNamedParams(): void
     {
         $hash = BuiltinParamNames::forFunction('password_hash');
-        self::assertSame(['password', 'algo', 'options'], $hash);
+        self::assertSame(['password', 'algo', 'options='], $hash);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hash, 'password', 'password_hash'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($hash, 'algo', 'password_hash'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($hash, 'options', 'password_hash'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('password_hash'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('password_hash'));
 
         $verify = BuiltinParamNames::forFunction('password_verify');
         self::assertSame(['password', 'hash'], $verify);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($verify, 'password', 'password_verify'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($verify, 'hash', 'password_verify'));
+
+        $algos = BuiltinParamNames::forFunction('password_algos');
+        self::assertSame([], $algos);
+        self::assertSame(0, BuiltinParamNames::paramCountForInternalFunction('password_algos'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('password_algos'));
     }
 
     /** @covers issue #23292 */
