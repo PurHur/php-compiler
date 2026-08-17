@@ -26,6 +26,10 @@ final class ErrorControlOperatorTest extends BaseTest
             __DIR__.'/../compliance/cases/language/at_silence_assign_undef_rhs.phpt',
             'at_silence_assign_undef_rhs.phpt'
         );
+        yield 'at_silence_value_undef.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/language/at_silence_value_undef.phpt',
+            'at_silence_value_undef.phpt'
+        );
     }
 
     /** Issue #29132 — `$a = @$undef` must not print Undefined variable on stderr. */
@@ -51,5 +55,32 @@ final class ErrorControlOperatorTest extends BaseTest
         $this->assertSame(0, $exitCode, $stderr);
         $this->assertSame("ok\n", $stdout);
         $this->assertStringNotContainsString('Undefined variable', $stderr);
+    }
+
+    /** Issue #31881 — echo / arithmetic / call-arg `@$undef` must not print Undefined variable. */
+    public function testValueConsumingUndefSilenceLeavesStderrEmpty(): void
+    {
+        $code = <<<'PHP'
+        <?php
+        error_reporting(E_ALL);
+        echo @$undef_echo_31881;
+        echo @$undef_plus_31881 + 1;
+        strlen(@$undef_call_31881);
+        echo "ok\n";
+        PHP;
+        $repoRoot = dirname(__DIR__, 2);
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        self::applyLlvmToolchainEnv($env);
+        unset($env['PHP_COMPILER_SKIP_LLVM_PRELOAD']);
+        $cmd = array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN]);
+        [$stdout, $exitCode, $stderr] = self::runVmSubprocess($cmd, $repoRoot, $env, $code, __FUNCTION__);
+        $this->assertSame(0, $exitCode, $stderr);
+        $this->assertStringNotContainsString('Undefined variable', $stderr);
+        $this->assertStringContainsString('ok', $stdout);
     }
 }
