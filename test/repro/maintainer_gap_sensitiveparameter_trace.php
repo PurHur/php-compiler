@@ -1,5 +1,5 @@
 <?php
-/** Maintainer gap: SensitiveParameter stack frames show SensitiveParameterValue — Zend redacts args (Zend/zend_exceptions.c). */
+/** Maintainer gap: SensitiveParameter stack frames show SensitiveParameterValue — Zend redacts args (re-#31693, Zend/zend_exceptions.c). */
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
@@ -9,5 +9,6 @@ function f(#[\SensitiveParameter] string $password) {
 try {
     f('secret');
 } catch (Throwable $e) {
-    echo $e, "\n";
+    echo $e->getTraceAsString(), "\n";
+    echo (string)$e, "\n";
 }
