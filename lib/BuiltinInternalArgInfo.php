@@ -541,6 +541,12 @@ final class BuiltinInternalArgInfo
     public static function requiredParamCountForFunction(string $name): ?int
     {
         $lc = strtolower($name);
+        // php-src basic_functions.stub.php — crypt(string $string, string $salt): string
+        // InternalArgInfo still marks salt optional (`salt=`) (#28920).
+        $requiredOverride = self::stubRequiredParamCountOverride($lc);
+        if (null !== $requiredOverride) {
+            return $requiredOverride;
+        }
         $info = self::instance()->functions[$lc] ?? null;
         if (null === $info) {
             return null;
@@ -629,6 +635,10 @@ final class BuiltinInternalArgInfo
             if (null !== $typeOverride) {
                 $normalized['type'] = $typeOverride;
             }
+            $optionalOverride = self::stubParamIsOptionalOverride($lc, $index);
+            if (null !== $optionalOverride) {
+                $normalized['isOptional'] = $optionalOverride;
+            }
 
             return $normalized;
         }
@@ -651,6 +661,30 @@ final class BuiltinInternalArgInfo
             'type' => $typeOverride,
             'isOptional' => $isOptional,
         ];
+    }
+
+    /**
+     * php-src required arity when InternalArgInfo still marks params optional (#28920).
+     */
+    public static function stubRequiredParamCountOverride(string $callableLc): ?int
+    {
+        return match ($callableLc) {
+            // ext/standard/basic_functions.stub.php — crypt(string, string): string (#28920)
+            'crypt' => 2,
+            default => null,
+        };
+    }
+
+    /**
+     * php-src optionality when InternalArgInfo still has trailing `=` (#28920).
+     */
+    public static function stubParamIsOptionalOverride(string $callableLc, int $index): ?bool
+    {
+        return match ($callableLc) {
+            // ext/standard/basic_functions.stub.php — $salt required (#28920)
+            'crypt' => 1 === $index ? false : null,
+            default => null,
+        };
     }
 
     /**
