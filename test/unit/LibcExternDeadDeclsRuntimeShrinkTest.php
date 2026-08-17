@@ -65,6 +65,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'memchr',
             'strncasecmp',
             'printf',
+            'memmove',
         ];
     }
 
@@ -75,7 +76,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -94,6 +95,8 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
+        $this->assertStringContainsString('#31743', $source);
+        $this->assertStringContainsString('ensureMemmoveDecl', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -248,10 +251,17 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc printf (#31706)'
         );
+        $this->assertStringNotContainsString(
+            "'memmove' =>",
+            $source,
+            'LibcExtern must not declare libc memmove (#31743)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
+        $this->assertStringContainsString('#31743', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
+        $this->assertStringContainsString('ensureMemmoveDecl', $source);
     }
 
     public function testNestedJitConsumersEnsurePrintfAfterLibcExternDrop(): void
@@ -270,6 +280,15 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             );
             $this->assertStringContainsString('#31706', $source);
         }
+    }
+
+    public function testParseStrKernelDeclaresMemmoveModuleLocallyAfterLibcExternDrop(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitParseStrUserScriptCstrKernel.php');
+        $this->assertStringContainsString('#31743', $source);
+        $this->assertStringContainsString('LibcExtern::ensureMemmoveDecl', $source);
+        $this->assertStringContainsString("lookupFunction('memmove')", $source);
+        $this->assertStringNotContainsString("'memmove' =>", (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php'));
     }
 
     public function testObjectTypeRoutesStrncasecmpThroughCompilerAbiAfterLibcExternDrop(): void
