@@ -1831,6 +1831,18 @@ final class BuiltinInternalArgInfo
             'domxpath::__construct' => 1 === $index ? 'bool' : null,
             'domxpath::query',
             'domxpath::evaluate' => 1 === $index ? '?DOMNode' : null,
+            // ext/dom/php_dom.stub.php — schemaValidate flags/xinclude options int; registerPhpFunctions union (#31887)
+            'domdocument::schemavalidate',
+            'domdocument::schemavalidatesource' => 1 === $index ? 'int' : null,
+            'domdocument::xinclude' => 0 === $index ? 'int' : null,
+            'domxpath::registerphpfunctions' => 0 === $index ? 'array|string|null' : null,
+            // ext/simplexml/simplexml.stub.php — children/asXML/addChild nullability (#31887)
+            'simplexmlelement::asxml',
+            'simplexmlelement::savexml' => 0 === $index ? '?string' : null,
+            'simplexmlelement::addchild' => ($index === 1 || $index === 2) ? '?string' : null,
+            'simplexmlelement::addattribute' => 2 === $index ? '?string' : null,
+            'simplexmlelement::children',
+            'simplexmlelement::attributes' => 0 === $index ? '?string' : null,
             // ext/intl/spoofchecker/spoofchecker.stub.php — string $string / $string1/$string2 (#25055)
             'spoofchecker::issuspicious' => 0 === $index ? 'string' : null,
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,

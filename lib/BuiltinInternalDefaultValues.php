@@ -960,6 +960,23 @@ final class BuiltinInternalDefaultValues
         'domprocessinginstruction::__construct' => [
             1 => ['kind' => 'string', 'value' => ''],
         ],
+        // php-src ext/dom/php_dom.stub.php — create* empty-string defaults; getDocNamespaces fromRoot=true (#31887)
+        'domdocument::createelement' => [
+            1 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domdocument::createelementns' => [
+            2 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domimplementation::createdocument' => [
+            1 => ['kind' => 'string', 'value' => ''],
+        ],
+        'domimplementation::createdocumenttype' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            2 => ['kind' => 'string', 'value' => ''],
+        ],
+        'simplexmlelement::getdocnamespaces' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/xmlwriter/php_xmlwriter.stub.php — version='1.0'; flush/outputMemory true (#31867)
         'xmlwriter::startdocument' => [
             0 => ['kind' => 'string', 'value' => '1.0'],

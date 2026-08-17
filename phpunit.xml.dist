@@ -240,6 +240,8 @@
             <file>./test/compliance/ClassConstSelfReferencingCycle31837VMTest.php</file>
             <file>./test/compliance/ZendAssertionsCompileOut31857VMTest.php</file>
             <file>./test/compliance/ZendAssertionsCompileOut31857JITTest.php</file>
+            <file>./test/compliance/TypedByrefParamRecv31882VMTest.php</file>
+            <file>./test/compliance/TypedByrefParamRecv31882JITTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147JITTest.php</file>
             <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
@@ -531,6 +533,8 @@
             <file>./test/compliance/DomReflectionC14nCtorStubsJITTest.php</file>
             <file>./test/compliance/XmlWriterXmlReaderReflectionStubsVMTest.php</file>
             <file>./test/compliance/XmlWriterXmlReaderReflectionStubsJITTest.php</file>
+            <file>./test/compliance/DomSimplexmlReflectionStubsVMTest.php</file>
+            <file>./test/compliance/DomSimplexmlReflectionStubsJITTest.php</file>
             <file>./test/compliance/PdoConstructPrepareQueryReflectionVMTest.php</file>
             <file>./test/compliance/PhpversionVMTest.php</file>
             <file>./test/compliance/PhpSbindirConstant84VMTest.php</file>
