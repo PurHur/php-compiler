@@ -812,6 +812,36 @@ bootstrap_resolve_compile_driver() {
   return 1
 }
 
+# Zend AOT of compiler_minimal peaks well above the default 10g docker cap and is
+# SIGKILL'd (137) with almost no progress. Mirror helloworld (#23970): require 16g
+# cgroup headroom unless the caller opts in (#31714).
+bootstrap_require_zend_docker_mem() {
+  local floor=$((16 * 1024 * 1024 * 1024))
+  local max=""
+  if [[ "${BOOTSTRAP_ALLOW_LOW_DOCKER_MEM:-0}" == "1" ]]; then
+    echo "bootstrap-compile-invoke: BOOTSTRAP_ALLOW_LOW_DOCKER_MEM=1 — skipping 16GiB cgroup check for Zend gen-0 (#31714)" >&2
+    return 0
+  fi
+  if [[ -r /sys/fs/cgroup/memory.max ]]; then
+    max="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || true)"
+  elif [[ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]]; then
+    max="$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || true)"
+  else
+    return 0
+  fi
+  # Unlimited cgroup ("max") — host PHP / unconstrained container.
+  if [[ -z "${max}" || "${max}" == "max" ]]; then
+    return 0
+  fi
+  if [[ "${max}" =~ ^[0-9]+$ ]] && [[ "${max}" -lt "${floor}" ]]; then
+    echo "bootstrap-compile-invoke: cgroup memory=${max} < 16GiB — Zend gen-0 of compiler_minimal OOMs under default PHP_COMPILER_DOCKER_MEM=10g (#31714)" >&2
+    echo "bootstrap-compile-invoke: NEXT_LOWER_CMD: PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'" >&2
+    echo "bootstrap-compile-invoke: (refresh prelinked/bootstrap-gen0 to avoid Zend fallback; or BOOTSTRAP_ALLOW_LOW_DOCKER_MEM=1 to attempt anyway)" >&2
+    return 1
+  fi
+  return 0
+}
+
 bootstrap_compile_invoke_zend() {
   local out=$1
   local entry=$2
@@ -819,6 +849,10 @@ bootstrap_compile_invoke_zend() {
 
   if ! command -v php >/dev/null 2>&1; then
     echo "bootstrap-compile-invoke: Zend gen-0 requires php on PATH (#2842)" >&2
+    return 1
+  fi
+
+  if ! bootstrap_require_zend_docker_mem; then
     return 1
   fi
 

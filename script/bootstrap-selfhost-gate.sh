@@ -25,6 +25,11 @@ When host make/php are missing but Docker works:
   docker info >/dev/null
   ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'
 
+When gen-0 is lowering-stale, link falls back to Zend AOT of compiler_minimal and needs
+16g Docker memory (default 10g SIGKILLs — #31714 / helloworld sibling #23970):
+  PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g \\
+    ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'
+
 Do not nest 'docker info' or 'docker run' inside docker-exec — the container has PHP/LLVM only.
 Missing Docker CLI: see issue #2674.
 EOF
