@@ -670,8 +670,19 @@ final class VmSoapServer
         $name = isset($e->_name) ? (string) $e->_name : '';
         $lang = isset($e->lang) ? (string) $e->lang : '';
         $faultcodens = isset($e->faultcodens) ? (string) $e->faultcodens : '';
+        $headerFault = self::headerFaultFromException($e);
 
-        return self::buildFaultEnvelope($state->soapVersion, $code, $string, $actor, $details, $name, $lang, $faultcodens);
+        return self::buildFaultEnvelope(
+            $state->soapVersion,
+            $code,
+            $string,
+            $actor,
+            $details,
+            $name,
+            $lang,
+            $faultcodens,
+            $headerFault
+        );
     }
 
     private static function buildFaultFromPending(SoapServerState $state): string
@@ -700,10 +711,20 @@ final class VmSoapServer
         mixed $details = null,
         string $name = '',
         string $lang = '',
-        string $faultcodens = ''
+        string $faultcodens = '',
+        mixed $headerFault = null
     ): string {
         if (SoapConstants::SOAP_1_2 === $soapVersion) {
-            return self::buildSoap12FaultEnvelope($code, $string, $actor, $details, $name, $lang, $faultcodens);
+            return self::buildSoap12FaultEnvelope(
+                $code,
+                $string,
+                $actor,
+                $details,
+                $name,
+                $lang,
+                $faultcodens,
+                $headerFault
+            );
         }
 
         $envNs = SoapConstants::SOAP_1_1_ENV_NAMESPACE;
@@ -719,8 +740,11 @@ final class VmSoapServer
             $body .= '      <detail>'.$detailInner.'</detail>'."\n";
         }
 
+        $headerXml = self::encodeFaultHeaderXml($headerFault, $envPfx, $soapVersion);
+
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<'.$envPfx.':Envelope xmlns:'.$envPfx.'="'.$envNs.'"'.$extraNs.'>'."\n".
+            $headerXml.
             '  <'.$envPfx.':Body>'."\n".
             '    <'.$envPfx.':Fault>'."\n".
             $body.
@@ -744,7 +768,8 @@ final class VmSoapServer
         mixed $details = null,
         string $name = '',
         string $lang = '',
-        string $faultcodens = ''
+        string $faultcodens = '',
+        mixed $headerFault = null
     ): string {
         $ns = SoapConstants::SOAP_1_2_ENV_NAMESPACE;
         $pfx = SoapConstants::SOAP_1_2_ENV_NS_PREFIX;
@@ -764,14 +789,84 @@ final class VmSoapServer
             $body .= '      <'.$pfx.':Detail>'.$detailInner.'</'.$pfx.':Detail>'."\n";
         }
 
+        $headerXml = self::encodeFaultHeaderXml($headerFault, $pfx, SoapConstants::SOAP_1_2);
+
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<'.$pfx.':Envelope xmlns:'.$pfx.'="'.$ns.'"'.$extraNs.'>'."\n".
+            $headerXml.
             '  <'.$pfx.':Body>'."\n".
             '    <'.$pfx.':Fault>'."\n".
             $body.
             '    </'.$pfx.':Fault>'."\n".
             '  </'.$pfx.':Body>'."\n".
             '</'.$pfx.':Envelope>';
+    }
+
+    /**
+     * php-src serialize_response_call: Z_FAULT_HEADERFAULT_P → env:Header before Body (#31958).
+     */
+    private static function encodeFaultHeaderXml(mixed $headerFault, string $prefix, int $soapVersion): string
+    {
+        if (null === $headerFault) {
+            return '';
+        }
+        if ($headerFault instanceof ObjectEntry) {
+            return '  <'.$prefix.':Header>'."\n".
+                self::encodeSoapHeaderElement($headerFault, $prefix, $soapVersion).
+                '  </'.$prefix.':Header>'."\n";
+        }
+        if ($headerFault instanceof \SoapHeader) {
+            return '  <'.$prefix.':Header>'."\n".
+                self::encodeNativeSoapHeaderElement($headerFault, $prefix, $soapVersion).
+                '  </'.$prefix.':Header>'."\n";
+        }
+
+        return '';
+    }
+
+    private static function encodeNativeSoapHeaderElement(\SoapHeader $header, string $prefix, int $soapVersion): string
+    {
+        $ns = isset($header->namespace) ? (string) $header->namespace : '';
+        $name = isset($header->name) ? (string) $header->name : 'Header';
+        $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'Header';
+        $attrs = '';
+        if ('' !== $ns) {
+            $attrs .= ' xmlns="'.\htmlspecialchars($ns, \ENT_XML1).'"';
+        }
+        $inner = '';
+        if (isset($header->data) && null !== $header->data) {
+            $data = $header->data;
+            if (\is_string($data)) {
+                $inner = \htmlspecialchars($data, \ENT_XML1);
+            } elseif (\is_int($data) || \is_float($data)) {
+                $inner = (string) $data;
+            } elseif (\is_bool($data)) {
+                $inner = $data ? 'true' : 'false';
+            } else {
+                $inner = \htmlspecialchars((string) $data, \ENT_XML1);
+            }
+        }
+
+        return '    <'.$tag.$attrs.'>'.$inner.'</'.$tag.'>'."\n";
+    }
+
+    /**
+     * Read SoapFault::$headerfault (VM ObjectEntry or native SoapHeader after rematerialize).
+     */
+    private static function headerFaultFromException(\SoapFault $e): mixed
+    {
+        if (!isset($e->headerfault)) {
+            return null;
+        }
+        $hf = $e->headerfault;
+        if (null === $hf) {
+            return null;
+        }
+        if ($hf instanceof ObjectEntry || $hf instanceof \SoapHeader) {
+            return $hf;
+        }
+
+        return null;
     }
 
     /**

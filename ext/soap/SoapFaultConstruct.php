@@ -85,7 +85,49 @@ final class SoapFaultConstruct extends VmClassMethod
             $detail = $frame->calledArgs[4]->resolveIndirect();
         }
 
-        self::apply($receiver, $faultcode, $faultstring, $actor, $detail, $frame, $faultcodens);
+        $name = null;
+        if (\array_key_exists(5, $frame->calledArgs)) {
+            $nameVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $nameVar->type) {
+                $name = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[5],
+                    'SoapFault::__construct',
+                    5,
+                    'name'
+                );
+            }
+        }
+
+        $headerFault = null;
+        if (\array_key_exists(6, $frame->calledArgs)) {
+            $headerFault = $frame->calledArgs[6]->resolveIndirect();
+        }
+
+        $lang = '';
+        if (\array_key_exists(7, $frame->calledArgs)) {
+            $langVar = $frame->calledArgs[7]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $langVar->type) {
+                $lang = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[7],
+                    'SoapFault::__construct',
+                    7,
+                    'lang'
+                );
+            }
+        }
+
+        self::apply(
+            $receiver,
+            $faultcode,
+            $faultstring,
+            $actor,
+            $detail,
+            $frame,
+            $faultcodens,
+            $name,
+            $headerFault,
+            $lang
+        );
     }
 
     /**
@@ -129,7 +171,10 @@ final class SoapFaultConstruct extends VmClassMethod
         ?string $actor,
         ?Variable $detail,
         Frame $frame,
-        ?string $faultcodens = null
+        ?string $faultcodens = null,
+        ?string $name = null,
+        ?Variable $headerFault = null,
+        string $lang = ''
     ): void {
         $message = '' !== $faultstring ? $faultstring : $faultcode;
         $receiver->getProperty(ExceptionSupport::PROP_MESSAGE)->string($message);
@@ -157,6 +202,23 @@ final class SoapFaultConstruct extends VmClassMethod
             $receiver->getProperty('detail')->null();
         } else {
             $receiver->getProperty('detail')->copyFrom($detail);
+        }
+        if ($receiver->hasProperty('_name')) {
+            if (null === $name) {
+                $receiver->getProperty('_name')->null();
+            } else {
+                $receiver->getProperty('_name')->string($name);
+            }
+        }
+        if ($receiver->hasProperty('headerfault')) {
+            if (null === $headerFault || Variable::TYPE_NULL === $headerFault->type) {
+                $receiver->getProperty('headerfault')->null();
+            } else {
+                $receiver->getProperty('headerfault')->copyFrom($headerFault);
+            }
+        }
+        if ($receiver->hasProperty('lang')) {
+            $receiver->getProperty('lang')->string($lang);
         }
         $receiver->constructed = true;
     }

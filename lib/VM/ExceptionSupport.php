@@ -881,6 +881,7 @@ final class ExceptionSupport
                 }
                 $name = self::readOptionalStringProperty($entry, '_name');
                 $codens = self::readOptionalStringProperty($entry, 'faultcodens');
+                $headerFault = self::nativeSoapHeaderFromVmProperty($entry, 'headerfault');
                 $ctorCode = (null !== $codens && '' !== $codens)
                     ? [$codens, $code]
                     : ('' !== $code ? $code : null);
@@ -889,7 +890,8 @@ final class ExceptionSupport
                     $string,
                     $actor,
                     $detail,
-                    $name
+                    $name,
+                    $headerFault
                 );
             } else {
                 $native = new $nativeClass($message);
@@ -946,5 +948,44 @@ final class ExceptionSupport
         }
 
         return $native;
+    }
+
+    /**
+     * Preserve SoapFault::$headerfault across isolated-invoke VM→native rematerialize (#31958).
+     */
+    private static function nativeSoapHeaderFromVmProperty(ObjectEntry $entry, string $prop): ?\SoapHeader
+    {
+        if (!\class_exists('SoapHeader', false) || !$entry->hasProperty($prop)) {
+            return null;
+        }
+        $hfVar = $entry->getProperty($prop)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $hfVar->type) {
+            return null;
+        }
+        $hfObj = $hfVar->toObject();
+        if ('soapheader' !== \strtolower($hfObj->class->name)) {
+            return null;
+        }
+        $ns = self::readOptionalStringProperty($hfObj, 'namespace') ?? '';
+        $name = self::readOptionalStringProperty($hfObj, 'name') ?? 'Header';
+        $data = null;
+        if ($hfObj->hasProperty('data')) {
+            $dataVar = $hfObj->getProperty('data')->resolveIndirect();
+            if (Variable::TYPE_NULL !== $dataVar->type) {
+                if (Variable::TYPE_STRING === $dataVar->type) {
+                    $data = $dataVar->toString();
+                } elseif (Variable::TYPE_INTEGER === $dataVar->type) {
+                    $data = $dataVar->toInt();
+                } elseif (Variable::TYPE_BOOLEAN === $dataVar->type) {
+                    $data = $dataVar->toBool();
+                } elseif (Variable::TYPE_FLOAT === $dataVar->type) {
+                    $data = $dataVar->toFloat();
+                } else {
+                    $data = $dataVar->toString();
+                }
+            }
+        }
+
+        return new \SoapHeader($ns, $name, $data);
     }
 }
