@@ -1217,12 +1217,20 @@ final class VmDomXPath
         if ([] === $segments) {
             throw new \DOMException('Invalid expression');
         }
+        $firstSplit = self::splitAxisAndTest($segments[0]);
         // `//following-sibling::*` ≡ descendant-or-self::node()/following-sibling::* (#31773).
-        if ('child' !== self::splitAxisAndTest($segments[0])['axis']) {
-            return self::walkAxisSegments(
-                self::descendantOrSelfNodeIds($context),
-                $segments,
-                $namespaces
+        // `//*[last()]` / `//a[position()=N]` ≡ descendant-or-self::node()/child::…[pred]
+        // with proximity position **per parent**, not the flattened descendant set (#31923).
+        $useDescendantOrSelfThenStep = 'child' !== $firstSplit['axis']
+            || null !== self::parsePathSegment($firstSplit['testSegment'])['positionPred'];
+        if ($useDescendantOrSelfThenStep) {
+            return self::sortNodeIdsByDocumentOrder(
+                $context,
+                self::walkAxisSegments(
+                    self::descendantOrSelfNodeIds($context),
+                    $segments,
+                    $namespaces
+                )
             );
         }
         $currentIds = self::collectMatchingDescendants($context, $segments[0], $namespaces);
@@ -1248,6 +1256,33 @@ final class VmDomXPath
         }
 
         return self::walkAxisSegments([$start->id], $segments, $namespaces);
+    }
+
+    /**
+     * Reorder a node-set into XPath document order (libxml xmlXPathNodeSet; #31923).
+     *
+     * @param list<int> $ids
+     *
+     * @return list<int>
+     */
+    private static function sortNodeIdsByDocumentOrder(ObjectEntry $context, array $ids): array
+    {
+        if (\count($ids) <= 1) {
+            return $ids;
+        }
+        $document = self::ownerDocumentOrSelf($context);
+        if (null === $document) {
+            return $ids;
+        }
+        $rank = array_flip(self::documentOrderIds($document));
+        usort(
+            $ids,
+            static function (int $a, int $b) use ($rank): int {
+                return ($rank[$a] ?? PHP_INT_MAX) <=> ($rank[$b] ?? PHP_INT_MAX);
+            }
+        );
+
+        return $ids;
     }
 
     /**
