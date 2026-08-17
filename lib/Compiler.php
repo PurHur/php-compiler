@@ -27011,6 +27011,10 @@ class Compiler {
         if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
             return false;
         }
+        // Named CVs / arrow Phi captures are not enum/ConstFetch prelude slots (#31720).
+        if (null !== Block::resolveVariableName($callArg)) {
+            return false;
+        }
         // extract([...], flags: EXTR_SKIP) — array arg must not steal hoisted ConstFetch (#16539).
         if ($this->callArgOperandExpectsArrayProducer($callArg)) {
             return false;
@@ -27022,6 +27026,33 @@ class Compiler {
 
         // php-cfg dead call-arg Variable temps (e.g. var_dump(E::A::class); #9426).
         return $root instanceof Operand\Variable && !$this->isNamedVariableOperand($callArg);
+    }
+
+    /**
+     * True when a true/false/null ConstFetch sits immediately before the call (hoisted prelude).
+     * Used to keep named CV args on compileOperand beside sibling null literals (#31720).
+     */
+    private function callHasTrailingHoistedBoolNullConstFetch(Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $block->orig->children[$i] ?? null;
+            if ($prev instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($prev->name);
+
+                return null !== $name
+                    && \in_array(strtolower($name), ['true', 'false', 'null'], true);
+            }
+            break;
+        }
+
+        return false;
     }
 
     /**
@@ -46935,7 +46966,12 @@ class Compiler {
         }
         $nonEmbeddedArgIndices = [];
         foreach ($callArgs as $i => $candidate) {
-            if (!$this->isEmbeddedCallLiteralArg($candidate)) {
+            // Named CVs / Phi auto-captures must not consume trailing ConstFetch null/true/false
+            // slots — `fn() => new C($x, null)` was binding ConstFetch onto `$x` (#31720).
+            if (
+                !$this->isEmbeddedCallLiteralArg($candidate)
+                && $this->callArgIsDeadInlineTemporary($candidate)
+            ) {
                 $nonEmbeddedArgIndices[] = (int) $i;
             }
         }
@@ -48058,6 +48094,28 @@ class Compiler {
             }
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            // #31720: `fn() => new C($x, null)` — named CV / Phi auto-captures must not be
+            // consumed by trailing ConstFetch null/true/false folding (tryFold / prelude matchers).
+            if (
+                null === $unpackFlag
+                && null !== $cfgCallOp
+                && \is_array($cfgCallOp->args ?? null)
+                && $this->callHasTrailingHoistedBoolNullConstFetch($cfgCallOp, $block)
+            ) {
+                $namedProbe = $cfgArg instanceof Operand ? $cfgArg : $arg;
+                if ($namedProbe instanceof Operand && null !== Block::resolveVariableName($namedProbe)) {
+                    $namedSlot = $this->compileOperand($namedProbe, $block, true);
+                    if (null !== $namedSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $namedSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
             // new C(..., Class::CONST) — fold ClassConstFetch onto a fresh constant slot before
             // dead-temp / echo-?: matchers steal a merge phi ("0"/"1") (#22576, #5506).
             if (
