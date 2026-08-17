@@ -932,6 +932,24 @@ class Runtime {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
         $context->compileToFile($outfile);
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+        // Self-host AOT: returning from standalone() destroys $context and runs LLVM
+        // ExecutionEngine teardown — that can spin at 100% CPU for many minutes (or
+        // abort with free(): invalid pointer) even though -o is already linked (#31726,
+        // #21925). Exit before PHP request shutdown tears the module down.
+        $src = (string) ($sourceFilename ?? '');
+        $selfhostSrc = '' !== $src && str_contains(str_replace('\\', '/', $src), 'test/selfhost/');
+        $selfhostEnv = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $selfhostAot = '1' === $selfhostEnv || 'true' === strtolower((string) $selfhostEnv);
+        if ($selfhostSrc || $selfhostAot) {
+            $noFastExit = getenv('PHP_COMPILER_AOT_NO_FAST_EXIT');
+            $skipFastExit = '1' === $noFastExit || 'true' === strtolower((string) $noFastExit);
+            if (!$skipFastExit && (\class_exists(\FFI::class, false) || \class_exists(\FFI::class))) {
+                \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput($outfile);
+                \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_fast_exit');
+                $ffi = \FFI::cdef('void _exit(int status);');
+                $ffi->_exit(0);
+            }
+        }
     }
 
     public function parseAndCompile(string $code, string $filename): ?Block {

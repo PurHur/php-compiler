@@ -558,7 +558,9 @@ function run(string $filename, string $code, array $options): void
         }
         // Self-host bundle AOT: ExecutionEngine takes module ownership; PHP request
         // shutdown then tears down LLVM builders/module in an order that aborts with
-        // `free(): invalid pointer` (exit 134) even after a successful link (#21925).
+        // `free(): invalid pointer` (exit 134) or spins after a successful link
+        // (#21925, #31726). Prefer Runtime::standalone() fast-exit (before $context
+        // dtor); this is a belt-and-suspenders path if that return is reached.
         // Output is already on disk — skip PHP/LLVM destructors via _exit.
         if ($aotEmitOk && '' !== $normalized && str_contains($normalized, 'test/selfhost/')) {
             $noFastExit = getenv('PHP_COMPILER_AOT_NO_FAST_EXIT');
