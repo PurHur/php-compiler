@@ -242,6 +242,8 @@
             <file>./test/compliance/ZendAssertionsCompileOut31857JITTest.php</file>
             <file>./test/compliance/TypedByrefParamRecv31882VMTest.php</file>
             <file>./test/compliance/TypedByrefParamRecv31882JITTest.php</file>
+            <file>./test/compliance/OptionalBeforeRequiredDeprecated31904VMTest.php</file>
+            <file>./test/compliance/OptionalBeforeRequiredDeprecated31904JITTest.php</file>
             <file>./test/compliance/InheritedPropertyDefaults31895VMTest.php</file>
             <file>./test/compliance/InheritedPropertyDefaults31895JITTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>

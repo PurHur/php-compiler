@@ -833,6 +833,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ prefixes optional-before-required E_DEPRECATED with the callable label
+     * ({@code f(): Optional parameter $a ...}). PHP 8.0–8.3 omit the prefix.
+     *
+     * php-src: Zend/zend_compile.c {@code zend_compile_params} (#31904).
+     * Same ≥8.4.0 gate as {@see supportsImplicitNullableParameterDeprecation()}.
+     */
+    public static function supportsOptionalBeforeRequiredCallablePrefix(): bool
+    {
+        return self::supportsImplicitNullableParameterDeprecation();
+    }
+
+    /**
      * PHP 8.4+ E_DEPRECATED when reading the {@code E_STRICT} constant.
      *
      * php-src: Zend/zend_constants.stub.php (`@deprecated` on {@code E_STRICT}) /
