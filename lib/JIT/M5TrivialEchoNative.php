@@ -202,6 +202,8 @@ final class M5TrivialEchoNative
             return;
         }
 
+        self::ensureStrncmp($context);
+
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
@@ -540,6 +542,7 @@ final class M5TrivialEchoNative
         }
 
         LibcExtern::register($context);
+        self::ensureStrncmp($context);
 
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
@@ -681,6 +684,7 @@ final class M5TrivialEchoNative
         }
 
         LibcExtern::register($context);
+        self::ensureStrncmp($context);
 
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
@@ -1216,5 +1220,34 @@ final class M5TrivialEchoNative
             $context->context->functionType($i32, false, $i8p, $i32)
         );
         $context->registerFunction('chmod', $fn);
+    }
+
+    /**
+     * Module-local strncmp(3) after LibcExtern always-on drop (#31839).
+     *
+     * User-script strncmp() stays on NCompareJitHelper / VmString; M5 echo/`<?php`
+     * tag scans call this before lookupFunction('strncmp'). Peer: ensureChmod (#31374).
+     */
+    private static function ensureStrncmp(Context $context): void
+    {
+        if (null !== $context->module->getNamedFunction('strncmp')) {
+            $context->registerFunction('strncmp', $context->module->getNamedFunction('strncmp'));
+
+            return;
+        }
+        try {
+            $context->lookupFunction('strncmp');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->addFunction(
+            'strncmp',
+            $context->context->functionType($i32, false, $i8p, $i8p, $sizeT)
+        );
+        $context->registerFunction('strncmp', $fn);
     }
 }
