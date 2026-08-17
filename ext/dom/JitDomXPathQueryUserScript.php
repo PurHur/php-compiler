@@ -57,6 +57,13 @@ final class JitDomXPathQueryUserScript
             return $invalid;
         }
 
+        // Named XPath axes / `..` — host Zend node-set at compile time (#31773).
+        // User-script AOT ABI for these paths aborts; VM/JIT use VmDomXPath.
+        $treeAxis = self::tryHostTreeAxisCompileTime($context, $xml, $exprLit);
+        if (null !== $treeAxis) {
+            return $treeAxis;
+        }
+
         // Namespace axis lengths at compile time (#20206) — avoid ABI fallback segfault.
         $nsCount = DomParseSimpleXmlJitHelper::countNamespaceAxisArgv($xml, $exprLit);
         if (null !== $nsCount) {
@@ -239,6 +246,71 @@ final class JitDomXPathQueryUserScript
         self::$lastCacheKey = null;
         self::$lastQueryTag = false === strpos($tag, ':') ? strtolower($tag) : null;
         DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count, true);
+
+        return self::boxNodeList($context, $count);
+    }
+
+    /**
+     * Compile-time host Zend query for `axis::` / `..` location paths (#31773).
+     *
+     * User-script AOT ABI aborts on these expressions; VM/JIT use {@see VmDomXPath}.
+     */
+    private static function tryHostTreeAxisCompileTime(Context $context, string $xml, string $exprLit): ?Value
+    {
+        $trimmed = trim($exprLit);
+        if (!str_contains($trimmed, '::') && !str_contains($trimmed, '..')) {
+            return null;
+        }
+        if (!\extension_loaded('dom') || !\class_exists(\DOMDocument::class, false)) {
+            return null;
+        }
+        set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $doc = new \DOMDocument();
+            if (!@$doc->loadXML($xml)) {
+                restore_error_handler();
+
+                return null;
+            }
+            $xpath = new \DOMXPath($doc);
+            foreach (JitDomXPathRegisterUserScript::namespaces() as $prefix => $uri) {
+                if ('' === $prefix) {
+                    continue;
+                }
+                @$xpath->registerNamespace($prefix, $uri);
+            }
+            $list = $xpath->query($trimmed);
+        } catch (\Throwable) {
+            restore_error_handler();
+
+            return null;
+        }
+        restore_error_handler();
+        if (false === $list) {
+            return null;
+        }
+        $count = $list->length;
+        self::$lastCacheKey = null;
+        self::$lastQueryTag = null;
+        if ($count > 0) {
+            $first = $list->item(0);
+            if ($first instanceof \DOMNode) {
+                $tag = $first->nodeName;
+                if ('#document' !== $tag && '' !== $tag) {
+                    $text = $first instanceof \DOMElement ? (string) $first->textContent : '';
+                    self::$lastCacheKey = 'xpath-axis-'.md5($trimmed);
+                    $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+                    $cacheKey = $context->builder->load(
+                        $context->constantStringFromString(self::$lastCacheKey)
+                    );
+                    $nullDoc = $context->getTypeFromString('__object__*')->constNull();
+                    DomUserScriptElementCacheLlvm::store($context, $nullDoc, $cacheKey, $element);
+                }
+            }
+        }
+        DomUserScriptLiveTagListLlvm::initCount($context, 'xpath-axis', $count, true);
 
         return self::boxNodeList($context, $count);
     }

@@ -482,6 +482,8 @@
             <file>./test/compliance/DomPhpcEnginePropsInvisibleJITTest.php</file>
             <file>./test/compliance/DomNodeDeclaredPropsVMTest.php</file>
             <file>./test/compliance/DomNodeDeclaredPropsJITTest.php</file>
+            <file>./test/compliance/DomXpathTreeAxesVMTest.php</file>
+            <file>./test/compliance/DomXpathTreeAxesJITTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictJITTest.php</file>
             <file>./test/compliance/DomCreateNullStrictVMTest.php</file>
@@ -951,6 +953,7 @@
             <file>./test/aot/DirFactoryAotTest.php</file>
             <file>./test/aot/GzwriteBytesAotTest.php</file>
             <file>./test/aot/MbChrOrdAotTest.php</file>
+            <file>./test/aot/DomXpathTreeAxesAotTest.php</file>
             <file>./test/aot/MbEncodingRegistryAotTest.php</file>
             <file>./test/aot/DateIsodateSetAotTest.php</file>
             <file>./test/aot/DateTimeGetOffsetAotTest.php</file>
