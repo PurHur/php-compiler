@@ -384,6 +384,8 @@ final class BuiltinInternalArgInfo
             'curl_multi_setopt' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo return bool / absent; Zend ?string (#27810)
             'curl_strerror', 'curl_multi_strerror', 'curl_share_strerror' => '?string',
+            // ext/curl/curl.stub.php — InternalArgInfo omits the function; Zend bool (#27702)
+            'curl_upkeep' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo resource / empty; Zend CurlHandle|false / void (#26186)
             'curl_init' => 'CurlHandle|false',
             'curl_close' => 'void',
@@ -1098,7 +1100,7 @@ final class BuiltinInternalArgInfo
                 2 => 'mixed',
                 default => null,
             },
-            'curl_exec', 'curl_close' => 0 === $index ? 'CurlHandle' : null,
+            'curl_exec', 'curl_close', 'curl_upkeep' => 0 === $index ? 'CurlHandle' : null,
             'curl_setopt_array' => 0 === $index ? 'CurlHandle' : null,
             'curl_multi_setopt' => match ($index) {
                 0 => 'CurlMultiHandle',

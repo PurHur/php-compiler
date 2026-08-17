@@ -1060,6 +1060,32 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('error_code', $share['name']);
     }
 
+    /** php-src curl.stub.php — CurlHandle $handle → bool; InternalArgInfo omits the function (#27702). */
+    public function testCurlUpkeepReflectionStubTypes(): void
+    {
+        $fn = 'curl_upkeep';
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('CurlHandle', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+        $this->assertNotNull($info);
+        $this->assertSame('handle', $info['name']);
+        $this->assertSame('CurlHandle', $info['type']);
+        $this->assertFalse($info['isOptional']);
+        $this->assertSame(['handle'], BuiltinParamNames::forFunction($fn));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'handle',
+            $fn
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'ch',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        $this->assertSame(['handle'], BuiltinParamNames::paramNamesForInternalFunction($fn));
+    }
+
     /** php-src normalizer.stub.php — string/form → ?string; absent from InternalArgInfo (#27705). */
     public function testNormalizerGetRawDecompositionReflectionStubTypes(): void
     {
