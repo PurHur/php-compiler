@@ -116,6 +116,8 @@ final class BuiltinInternalArgInfo
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             // strchr alias: InternalArgInfo return string + only 2 params (#25758, re-#25442)
             'strstr', 'stristr', 'strchr' => 'string|false',
+            // ext/standard/string.stub.php — chop rtrim alias absent from InternalArgInfo (#28255, re-#24039)
+            'chop' => 'string',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472)
             'highlight_string', 'highlight_file', 'show_source' => 'string|bool',
             // ext/standard/basic_functions.stub.php — PHP 8.4; InternalArgInfo bool → true (#25453, #28239)
@@ -883,6 +885,11 @@ final class BuiltinInternalArgInfo
             'user_error' => match ($index) {
                 0 => 'string',
                 1 => 'int',
+                default => null,
+            },
+            // ext/standard/string.stub.php — chop rtrim alias absent from InternalArgInfo (#28255, re-#24039)
+            'chop' => match ($index) {
+                0, 1 => 'string',
                 default => null,
             },
             // Zend/zend_builtin_functions.stub.php — count/sizeof Countable|array; sizeof absent (#25966)
