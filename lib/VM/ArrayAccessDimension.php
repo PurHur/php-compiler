@@ -24,6 +24,12 @@ final class ArrayAccessDimension
         $this->callerFrame = $callerFrame;
     }
 
+    /**
+     * Live offsetGet payload (Zend read_dimension BP_VAR_RW).
+     *
+     * Assign-op ($obj[$k] += n) must use this value's runtime type, not the declared mixed
+     * return / TYPE_ARRAYACCESS_OFFSET view (#31947, zend_vm_def.h ZEND_ASSIGN_DIM_OP).
+     */
     public function read(): Variable
     {
         $out = new Variable();
@@ -37,7 +43,7 @@ final class ArrayAccessDimension
             throw new ArrayAccessOffsetSignal($catchFrame);
         }
 
-        return $out;
+        return $out->resolveIndirect();
     }
 
     public function write(Variable $value): void
