@@ -10144,7 +10144,22 @@ class Compiler {
             return $return;
         }
         if ($mappedType === Variable::TYPE_OBJECT) {
-            $var->classConstraint = $type->userType;
+            $classConstraint = $type->userType;
+            // Bare `self`/`parent` property (and promoted) types stay LITERAL/Reference
+            // keywords in php-cfg; DNF (?self / self|…) already early-binds via
+            // resolvedDnfReferenceNameFromCfgType. Resolve the check class here so
+            // instanceof matches Zend while TypeErrors keep the keyword label
+            // (zend_object_handlers.c / #31835).
+            if (null !== $classConstraint && '' !== $classConstraint) {
+                $lc = strtolower(ltrim($classConstraint, '\\'));
+                if ('self' === $lc || 'parent' === $lc) {
+                    $resolved = $this->resolveTypeHintClassName($classConstraint, $block);
+                    if (null !== $resolved && '' !== $resolved) {
+                        $classConstraint = $resolved;
+                    }
+                }
+            }
+            $var->classConstraint = $classConstraint;
         }
         $var->typeConstraint = $mappedType;
         $var->declaredTypeLabel = $type->toString();
