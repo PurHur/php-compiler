@@ -38,11 +38,8 @@ final class ReflectionMethodInvoke implements Call
 
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
-        \PHPCompiler\JIT\Builtin\TypeErrorRaise::ensureDeclInScope(
-            $context,
-            'strcmp',
-            $context->context->functionType($i32, false, $i8p, $i8p)
-        );
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        \PHPCompiler\JIT\LibcExtern::ensureStrcmpDecl($context);
         \PHPCompiler\JIT\Builtin\StringCaseCompare::ensureStrcasecmpLinked($context);
         $strcmp = $context->lookupFunction('strcmp');
         // __compiler_strcasecmp after LibcExtern always-on drop (#31787).

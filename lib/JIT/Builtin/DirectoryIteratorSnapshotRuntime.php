@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -136,6 +137,8 @@ final class DirectoryIteratorSnapshotRuntime
         $setString = $context->lookupFunction('__hashtable__setStringAt');
         $stringInit = $context->lookupFunction('__string__init');
         $strlenFn = $context->lookupFunction('strlen');
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $strcmpFn = $context->lookupFunction('strcmp');
         $loopHead = $fn->appendBasicBlock('di_snap_head');
         $loopBody = $fn->appendBasicBlock('di_snap_body');

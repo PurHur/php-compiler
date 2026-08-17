@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -378,6 +379,8 @@ final class JitGetObjectVarsNative
             $context->getTypeFromString('__value__*')
         );
         $backedType = $object->enumBackedTypeFor($classId);
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         foreach ($object->enumCaseOrderForClass($classId) as $caseKey) {
             $expected = $object->enumCaseBackingScalarForCase($classId, $caseKey);
             if ('int' === $backedType && \is_int($expected)) {

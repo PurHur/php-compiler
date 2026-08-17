@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 
 /** JIT/AOT link for __compiler_refl_func_is_variadic (#22045). */
@@ -33,6 +34,9 @@ final class ReflectionFunctionVariadicLookupRuntime
         $funcCstr = $fn->getParam(0);
         $falseVal = $i1->constInt(0, false);
         $trueVal = $i1->constInt(1, false);
+
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
 
         if ([] === $names) {
             $context->builder->returnValue($falseVal);

@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -163,6 +164,8 @@ final class JitPasswordAlgo
             $context->lookupFunction('__value__readString'),
             $valuePtr
         );
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $is2y = $context->builder->call(
             $context->lookupFunction('strcmp'),
             self::stringData($context, $strPtr),

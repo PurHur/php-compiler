@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\StreamFilter;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -241,6 +242,8 @@ final class JitStreamIoKernel
     {
         // Module-local stdio after LibcExtern always-on drop (#31606 / fopen family #31764).
         // Module-local close(2) after open/close/read/write always-on drop (#31817).
+        // strcmp(3) after always-on LibcExtern drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');

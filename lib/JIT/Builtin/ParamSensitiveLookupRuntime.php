@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -14,6 +15,8 @@ final class ParamSensitiveLookupRuntime
 {
     public static function implement(Context $context, string $functionParamsJson, string $methodParamsJson): void
     {
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         self::implementFunctionBridge($context, self::decodeFunctionParams($functionParamsJson));
         self::implementMethodBridge($context, self::decodeMethodParams($methodParamsJson));
     }

@@ -49,7 +49,12 @@ final class LibcExtern
             // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
             // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
             'strlen' => [$sizeT, false, [$i8p]],
-            'strcmp' => [$i32, false, [$i8p, $i8p]],
+            // strcmp dropped (#31971): NestedJIT leaves call ensureStrcmpDecl before lookup
+            // (enum/CLI/stream/minmax/hash + Reflection); kernels that already declare i8*
+            // strcmp module-locally stay as-is. EMBED MCJIT still gets implementStrcmpBody
+            // after ensureStrcmpDecl (#98 / #21109). Peer memcmp drop (#31954) / strncmp
+            // (#31839). User-script strcmp() stays on VmString / JitStringCompare (#30702)
+            // — not libc.
             // strncmp dropped (#31839): NestedJIT leaves call ensureStrncmp() before lookup
             // (M5TrivialEchoNative + multipart/CGI/stream kernels); user-script strncmp()
             // stays on NCompareJitHelper / VmString (#15225 / MemcmpRuntimeShrinkTest) — not libc.
@@ -617,6 +622,33 @@ final class LibcExtern
         unset($i8);
     }
 
+    /**
+     * Module-local strcmp(3) after LibcExtern always-on drop (#31971).
+     *
+     * EMBED MCJIT still needs a declared symbol before {@see implementStrcmpBody};
+     * NestedJIT enum/CLI/stream/minmax/hash/Reflection leaves call this before
+     * lookupFunction('strcmp'). Peer: ensureMemcmpDecl (#31954) / ensureStrncmp (#31839).
+     */
+    public static function ensureStrcmpDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strcmp');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $fn = $context->module->getNamedFunction('strcmp');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'strcmp',
+                $context->context->functionType($i32, false, $i8p, $i8p)
+            );
+        }
+        $context->registerFunction('strcmp', $fn);
+    }
+
     private static function implementStrlenBody(Context $context): void
     {
         $fn = $context->module->getNamedFunction('strlen');
@@ -650,6 +682,7 @@ final class LibcExtern
 
     private static function implementStrcmpBody(Context $context): void
     {
+        self::ensureStrcmpDecl($context);
         $fn = $context->module->getNamedFunction('strcmp');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;

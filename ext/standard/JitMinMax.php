@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -260,6 +261,9 @@ final class JitMinMax
         $strMap = $context->structFieldMap['__string__'];
         $leftData = $context->builder->structGep($leftStr, $strMap['value']);
         $rightData = $context->builder->structGep($rightStr, $strMap['value']);
+
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
 
         return $context->builder->call(
             $context->lookupFunction('strcmp'),
