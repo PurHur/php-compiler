@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -901,35 +902,16 @@ final class CachingIteratorSetFlags extends VmClassMethod
             CachingIteratorBuiltin::CLASS_LC,
             'CachingIterator::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'CachingIterator::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
-        $flagsArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-            throw new \TypeError(
-                'CachingIterator::setFlags(): Argument #1 ($flags) must be of type int, '
-                .self::typeLabel($flagsArg).' given'
-            );
-        }
-        SplCachingIteratorStorage::setFlags($object, $flagsArg->toInt());
-    }
-
-    /** @param Variable $var */
-    private static function typeLabel(Variable $var): string
-    {
-        return match ($var->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        // php-src zim_CachingIterator_setFlags — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG (#31694).
+        $this->requireExactUserArgCount($frame, 'CachingIterator::setFlags', 1);
+        $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'CachingIterator::setFlags',
+            1,
+            'flags'
+        );
+        SplCachingIteratorStorage::setFlags($object, $flags);
     }
 }
 
