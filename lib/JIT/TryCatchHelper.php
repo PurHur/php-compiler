@@ -19,6 +19,7 @@ use PHPCompiler\JIT\Builtin\UncaughtThrowPrinter;
 use PHPCompiler\JIT\Builtin\GetClassRuntime;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ExceptionSupport;
+use PHPCompiler\ext\standard\VmEval;
 use PHPTypes\Type;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -612,6 +613,9 @@ final class TryCatchHelper
         }
         if ($line <= 0) {
             $line = max(0, $context->callSiteLine);
+        }
+        if ($context->evalInlineDepth > 0 && $line > 0) {
+            $line = VmEval::unwrapEvalLine($line);
         }
         $fileStr = $context->builder->load($context->constantStringFromString($file));
         $fileVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $fileStr);

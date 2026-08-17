@@ -198,6 +198,9 @@ final class IncludeHelper
 
         $context->pushScope();
         ++$context->inlineIncludeDepth;
+        if ($captureEvalReturn) {
+            ++$context->evalInlineDepth;
+        }
         $context->builder->positionAtEnd($entryBb);
         self::bindIncludedThis($context, $included, $entryBb);
         foreach ($localBindings as $operand) {
@@ -269,6 +272,9 @@ final class IncludeHelper
             $exitBb = $jit->compileIncludedAtEntry($func, $included, $bodyBb);
         } finally {
             --$context->inlineIncludeDepth;
+            if ($captureEvalReturn) {
+                --$context->evalInlineDepth;
+            }
             $context->popScope();
             array_pop($context->inlineIncludeCallerBlocks);
             array_pop($context->inlineIncludeBindingRefreshStack);

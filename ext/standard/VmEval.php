@@ -117,6 +117,21 @@ final class VmEval
     }
 
     /**
+     * Exception / Error getLine() inside eval() — same wrapEvalCode shift as CompileError (#31948).
+     *
+     * Leave non-eval paths and unset (≤0) lines unchanged so construct can still fall through
+     * to the throw opcode when the builtin frame has no opline.
+     */
+    public static function unwrapEvalThrowableLine(string $file, int $line): int
+    {
+        if ($line <= 0 || !self::isEvalScriptPath($file)) {
+            return $line;
+        }
+
+        return self::unwrapEvalLine($line);
+    }
+
+    /**
      * eval() Internal builtin — caller scope is the parent frame of the handler.
      *
      */
