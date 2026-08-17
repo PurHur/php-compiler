@@ -46,6 +46,8 @@ final class JitMultipartKernel
 
         $saved = BasicBlockHelper::tryGetInsertBlock($context);
         LibcExtern::register($context);
+        // Module-local fopen/fwrite/fclose after LibcExtern always-on drop (#31764).
+        LibcExtern::ensureStdioFile($context);
         $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         $context->registerFunction('strlen', $libcStrlen);

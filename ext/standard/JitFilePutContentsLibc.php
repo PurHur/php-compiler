@@ -46,6 +46,8 @@ final class JitFilePutContentsLibc
         }
 
         LibcExtern::register($context);
+        // Module-local fopen/fwrite/fclose after LibcExtern always-on drop (#31764).
+        LibcExtern::ensureStdioFile($context);
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
