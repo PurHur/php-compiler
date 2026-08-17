@@ -5569,6 +5569,7 @@ class Compiler {
 
     /**
      * echo var_export($arr['k'] ?? $d, true) . "\n" — defer call until ?? merge + concat echo (#18315).
+     * Also `"prefix" . var_export($o->x ?? $d, true)` where the call is Concat.right (#31769).
      *
      * @param Op[] $ops
      */
@@ -5587,6 +5588,8 @@ class Compiler {
             || !(
                 $this->operandsChainEqual($concat->left, $call->result)
                 || $this->operandsReferToSameVariable($concat->left, $call->result)
+                || $this->operandsChainEqual($concat->right, $call->result)
+                || $this->operandsReferToSameVariable($concat->right, $call->result)
             )
         ) {
             return false;
