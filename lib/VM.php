@@ -6880,11 +6880,10 @@ restart:
                         }
                     }
                     if (!$mutates) {
-                        // BP_VAR_W dim-assign/append auto-inits (#31770); BP_VAR_RW ++/+= Errors (#31784).
+                        // BP_VAR_W dim-assign/append auto-inits or TypeError (#31770/#31819);
+                        // BP_VAR_RW ++/+= Errors (#31784).
                         if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
-                            if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($storage)) {
-                                VM\TypedPropertyCheck::assertReadable($storage);
-                            }
+                            VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($storage);
                         } else {
                             VM\TypedPropertyCheck::assertReadable($storage);
                         }
@@ -9215,12 +9214,10 @@ restart:
                                 break;
                             }
                             // Dim-write (`$o->a[0]=` / `$o->a[]=`) is BP_VAR_W: uninitialized typed
-                            // array slots auto-init to [] (zend_std_get_property_ptr_ptr + zend_try_array_init, #31770).
-                            // Dim RW (`$o->a[0]++` / `+=`) is BP_VAR_RW and must Error (#31784).
+                            // array slots auto-init to []; other types TypeError (zend_try_array_init,
+                            // #31770 / #31819). Dim RW (`$o->a[0]++` / `+=`) is BP_VAR_RW Error (#31784).
                             if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
-                                if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($propSlot)) {
-                                    VM\TypedPropertyCheck::assertReadable($propSlot);
-                                }
+                                VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($propSlot);
                             } else {
                                 VM\TypedPropertyCheck::assertReadable($propSlot);
                             }

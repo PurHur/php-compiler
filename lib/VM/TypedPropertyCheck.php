@@ -262,8 +262,11 @@ final class TypedPropertyCheck
     }
 
     /**
-     * FETCH_DIM_W / []= on an uninitialized typed array property (zend_std_get_property_ptr_ptr
-     * BP_VAR_W + zend_try_array_init, #31770). Scalars stay uninitialized so assertReadable Errors.
+     * FETCH_DIM_W / []= on an uninitialized typed property (zend_std_get_property_ptr_ptr
+     * BP_VAR_W + zend_try_array_init, #31770 / #31819).
+     *
+     * Array-containing types auto-init to []. Other typed slots throw TypeError
+     * ("Cannot auto-initialize an array inside property … of type T") — not the bare-read Error.
      *
      * Callers must not invoke this for dim RW ops (++/--/+=): those are BP_VAR_RW and must Error
      * like a bare read (#31784).
@@ -277,11 +280,37 @@ final class TypedPropertyCheck
             return true;
         }
         if (!self::propertyAllowsArray($target)) {
-            return false;
+            self::throwCannotAutoInitializeArray($target);
         }
         $target->array(new HashTable());
 
         return true;
+    }
+
+    /**
+     * php-src zend_try_array_init failure — TypeError, not uninitialized-property Error (#31819).
+     */
+    public static function cannotAutoInitializeArrayMessage(Variable $var): string
+    {
+        $target = $var->resolveIndirect();
+        $name = $target->objectPropertyName ?? 'property';
+
+        return sprintf(
+            'Cannot auto-initialize an array inside property %s::$%s of type %s',
+            self::declaringClassDisplayName($target),
+            $name,
+            self::uninitializedTypeString($target)
+        );
+    }
+
+    private static function throwCannotAutoInitializeArray(Variable $var): void
+    {
+        $message = self::cannotAutoInitializeArrayMessage($var);
+        $vm = \PHPCompiler\VM::running();
+        if (null === $vm) {
+            throw new \TypeError($message);
+        }
+        throw new TypedPropertyReadSignal($vm->makeEngineError($message, 'TypeError'));
     }
 
     /**
