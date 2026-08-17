@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmFsGlob;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -247,10 +248,13 @@ final class GlobIteratorConstruct extends VmClassMethod
             'pattern',
             VmString::emptyStringArgValueErrorMessageCannot('GlobIterator::__construct', 0, 'pattern')
         );
+        // php-src zim_GlobIterator___construct — Z_PARAM_LONG $flags; omitted → KEY_AS_PATHNAME;
+        // explicit null → E_DEPRECATED then 0 outside strict_types (#31721).
         $flags = FilesystemIteratorBuiltin::KEY_AS_PATHNAME;
         if ($argCount >= 3) {
-            $flags = SplFilesystemArg::requireIntArg(
-                $frame->calledArgs[2],
+            $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                2,
                 'GlobIterator::__construct',
                 2,
                 'flags'
