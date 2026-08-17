@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -404,6 +405,8 @@ final class JitZendScalarCast
         $endPtr = $context->getTypeFromString('int8**')->constNull();
         $i64 = $context->getTypeFromString('int64');
         $base = $context->builder->trunc($i64->constInt(10, false), $context->getTypeFromString('int32'));
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
 
         return $context->builder->trunc($raw, $i64);

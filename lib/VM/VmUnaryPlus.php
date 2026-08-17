@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -153,7 +154,9 @@ final class VmUnaryPlus
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'unary_plus_strtol_end');
         $context->builder->store($i8p->constNull(), $endPtrSlot);
-        $parsed = $context->builder->call(
+        $parsed = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
+        $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,

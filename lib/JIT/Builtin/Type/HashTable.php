@@ -208,17 +208,8 @@ class HashTable extends Type
 
     private function ensureLibcStrtol(): void
     {
-        try {
-            $this->context->lookupFunction('strtol');
-        } catch (\Throwable $e) {
-            $i8p = $this->context->getTypeFromString('int8*');
-            $i8pp = $this->context->getTypeFromString('int8**');
-            $i32 = $this->context->getTypeFromString('int32');
-            $i64 = $this->context->getTypeFromString('int64');
-            $ft = $this->context->context->functionType($i64, false, $i8p, $i8pp, $i32);
-            $fn = $this->context->module->addFunction('strtol', $ft);
-            $this->context->registerFunction('strtol', $fn);
-        }
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($this->context);
     }
 
     /**

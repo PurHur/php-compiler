@@ -158,6 +158,8 @@ final class SscanfStrtolApply
 
         $context->builder->positionAtEnd($doScan);
         $cur2 = $context->builder->load($cursorSlot);
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $val = $context->builder->call(
             $context->lookupFunction('strtol'),
             $cur2,

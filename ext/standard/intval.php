@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -556,6 +557,8 @@ final class intval extends Internal
         $context->builder->positionAtEnd($validBb);
         $ptr = $this->stringDataPtr($context, $strPtr);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
         $parsed = $context->builder->trunc($raw, $i64);
         $validEnd = $context->builder->getInsertBlock();

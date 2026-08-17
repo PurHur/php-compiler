@@ -76,7 +76,8 @@ final class LibcExtern
             // (user-script strstr/strchr already PHP helpers — peer BootstrapCompileSmokeM3EmitShrinkTest).
             // strrchr dropped (#31458): StrrchrJitHelper owns user-script strrchr();
             // NestedJIT JitTempnamKernel + ReflectionSetup declare strrchr(3) module-locally.
-            'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],
+            // strtol dropped (#31988): NestedJIT leaves call ensureStrtolDecl before lookup;
+            // user-script strtol()/intval() stay on ext/standard PHP (not libc on char*).
             'strtod' => [$dbl, false, [$i8p, $i8pp]],
             // strdup dropped from always-on (#31534): JitFsGlobKernel / JitStreamIoKernel declare
             // strdup(3) module-locally (#31721 GlobIterator/FilesystemIterator AOT).
@@ -647,6 +648,34 @@ final class LibcExtern
             );
         }
         $context->registerFunction('strcmp', $fn);
+    }
+
+    /**
+     * Module-local strtol(3) after LibcExtern always-on drop (#31988).
+     *
+     * User-script strtol()/intval() stay on ext/standard PHP; NestedJIT numeric-parse
+     * leaves call this before lookupFunction('strtol'). Peer: ensureStrcmpDecl (#31971).
+     */
+    public static function ensureStrtolDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strtol');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $context->getTypeFromString('int8**');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->module->getNamedFunction('strtol');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'strtol',
+                $context->context->functionType($i64, false, $i8p, $i8pp, $i32)
+            );
+        }
+        $context->registerFunction('strtol', $fn);
     }
 
     private static function implementStrlenBody(Context $context): void
