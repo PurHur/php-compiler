@@ -331,9 +331,15 @@ final class ArrayObjectSetFlags extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::setFlags()'
         );
-        // php-src zim_ArrayObject_setFlags — exactly 1 user arg (#30965).
+        // php-src zim_ArrayObject_setFlags — exactly 1 user arg (#30965); Z_PARAM_LONG soft-null (#31696).
         $this->requireExactUserArgCount($frame, 'ArrayObject::setFlags', 1);
-        $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'ArrayObject::setFlags',
+            1,
+            'flags'
+        );
         SplArrayStorage::setFlags($object, $flags);
     }
 }
