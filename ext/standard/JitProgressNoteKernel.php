@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -397,18 +398,15 @@ final class JitProgressNoteKernel
     {
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
 
         self::ensureExternal(
             $context,
             'strlen',
             $context->context->functionType($sizeT, false, $i8p)
         );
-        self::ensureExternal(
-            $context,
-            'memcpy',
-            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
-        );
+        // memcpy(3) via LibcExtern::ensureMemcpyDecl after always-on drop (#31885);
+        // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
+        LibcExtern::ensureMemcpyDecl($context);
     }
 
     /**

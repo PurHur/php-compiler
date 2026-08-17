@@ -148,11 +148,9 @@ final class JitParseStrUserScriptCstrKernel
 
         self::ensureExternal($context, 'malloc', $context->context->functionType($voidPtr, false, $sizeT));
         self::ensureExternal($context, 'free', $context->context->functionType($voidTy, false, $i8p));
-        self::ensureExternal(
-            $context,
-            'memcpy',
-            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
-        );
+        // memcpy(3) via LibcExtern::ensureMemcpyDecl after always-on drop (#31885);
+        // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
+        LibcExtern::ensureMemcpyDecl($context);
         // memmove module-local after LibcExtern always-on drop (#31743); int8* matches
         // LibcExtern::ensureMemmoveDecl / EMBED implementMemmoveBody ABI.
         LibcExtern::ensureMemmoveDecl($context);

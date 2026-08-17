@@ -50,6 +50,8 @@ final class JitMultipartKernel
         LibcExtern::ensureStdioFile($context);
         // Module-local strncmp after LibcExtern always-on drop (#31839).
         LibcExtern::ensureStrncmp($context);
+        // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
+        LibcExtern::ensureMemcpyDecl($context);
         $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         $context->registerFunction('strlen', $libcStrlen);

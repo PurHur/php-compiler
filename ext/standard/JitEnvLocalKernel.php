@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -302,12 +303,14 @@ final class JitEnvLocalKernel
         foreach ([
             ['strlen', $i64, [$i8p]],
             ['malloc', $voidPtr, [$sizeT]],
-            ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
             ['__string__init', $context->getTypeFromString('__string__*'), [$i64, $i8p]],
             ['__value__readString', $context->getTypeFromString('__string__*'), [$context->getTypeFromString('__value__*')]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
+        // memcpy(3) via LibcExtern::ensureMemcpyDecl after always-on drop (#31885);
+        // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
+        LibcExtern::ensureMemcpyDecl($context);
     }
 
     private static function ensureExternal(Context $context, string $name, $ft): void

@@ -60,6 +60,8 @@ final class MsgRuntime
 
         self::ensureLibcMsg($context);
         LibcExtern::register($context);
+        // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
+        LibcExtern::ensureMemcpyDecl($context);
         self::ensureMapGlobal($context);
         self::implementGetRegisterBridge($context);
         self::implementSendBridge($context);

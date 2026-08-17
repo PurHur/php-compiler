@@ -77,6 +77,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'write',
             'strncmp',
             'memset',
+            'memcpy',
         ];
     }
 
@@ -87,7 +88,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -112,8 +113,10 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31817', $source);
         $this->assertStringContainsString('#31839', $source);
         $this->assertStringContainsString('#31863', $source);
+        $this->assertStringContainsString('#31885', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
+        $this->assertStringContainsString('ensureMemcpyDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
     }
@@ -330,6 +333,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc memset (#31863)'
         );
+        $this->assertStringNotContainsString(
+            "'memcpy' =>",
+            $source,
+            'LibcExtern must not declare libc memcpy (#31885)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
@@ -339,9 +347,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31817', $source);
         $this->assertStringContainsString('#31839', $source);
         $this->assertStringContainsString('#31863', $source);
+        $this->assertStringContainsString('#31885', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
+        $this->assertStringContainsString('ensureMemcpyDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
         $this->assertStringContainsString('ensureStrncmp', $source);
@@ -485,6 +495,36 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureMemsetDecl', $libc);
         $this->assertStringContainsString('#31863', $libc);
         $this->assertStringNotContainsString("'memset' =>", $libc);
+    }
+
+    public function testNestedJitConsumersEnsureMemcpyDeclAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'ext/standard/JitMultipartKernel.php',
+            'ext/standard/JitSessionStorageKernel.php',
+            'lib/JIT/Builtin/SocketPairIoRuntime.php',
+            'lib/JIT/Builtin/MsgRuntime.php',
+            'lib/JIT/Builtin/ShmopRuntime.php',
+            'lib/JIT/Builtin/StringStrtokJit.php',
+            'lib/JIT/Builtin/UndefinedVariableRuntime.php',
+            'lib/JIT/Builtin/UndefinedGlobalVariableRuntime.php',
+            'ext/standard/JitParseStrUserScriptCstrKernel.php',
+            'ext/standard/JitProgressNoteKernel.php',
+            'ext/standard/JitEnvLocalKernel.php',
+            'lib/JIT/Builtin/PackArgvSerialize.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensureMemcpyDecl',
+                $source,
+                "{$rel} must call LibcExtern::ensureMemcpyDecl after #31885"
+            );
+            $this->assertStringContainsString('#31885', $source);
+        }
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringContainsString('ensureMemcpyDecl', $libc);
+        $this->assertStringContainsString('#31885', $libc);
+        $this->assertStringNotContainsString("'memcpy' =>", $libc);
     }
 
     public function testNestedJitConsumersLookupCompilerStrcasecmpAfterLibcExternDrop(): void
