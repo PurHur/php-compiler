@@ -228,6 +228,10 @@ final class BuiltinInternalDefaultValues
         'curl_init' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/curl/curl.stub.php — ?int $option = null (InternalArgInfo int → 0) (#28369)
+        'curl_getinfo' => [
+            1 => ['kind' => 'null'],
+        ],
         // php-src ext/sysvshm/sysvshm.stub.php — ?int $size = null, int $permissions = 0666 (#27943)
         // InternalArgInfo int OPT infers 0/0; Zend reflects NULL and 438.
         'shm_attach' => [

@@ -1076,7 +1076,7 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('error_code', $share['name']);
     }
 
-    /** php-src curl.stub.php — CurlHandle $handle → bool; InternalArgInfo omits the function (#27702). */
+        /** php-src curl.stub.php — CurlHandle $handle → bool; InternalArgInfo omits the function (#27702). */
     public function testCurlUpkeepReflectionStubTypes(): void
     {
         $fn = 'curl_upkeep';
@@ -1100,6 +1100,48 @@ final class BuiltinInternalArgInfoTest extends TestCase
         ));
         $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
         $this->assertSame(['handle'], BuiltinParamNames::paramNamesForInternalFunction($fn));
+    }
+
+    /** php-src curl.stub.php — CurlHandle $handle, ?int $option = null → mixed (#28369). */
+    public function testCurlGetinfoReflectionStubTypes(): void
+    {
+        $fn = 'curl_getinfo';
+        $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('CurlHandle', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+        $handle = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+        $this->assertNotNull($handle);
+        // InternalArgInfo still names the first param `ch`; Reflection uses BuiltinParamNames.
+        $this->assertSame('ch', $handle['name']);
+        $this->assertSame('CurlHandle', $handle['type']);
+        $this->assertFalse($handle['isOptional']);
+        $option = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+        $this->assertNotNull($option);
+        $this->assertSame('option', $option['name']);
+        $this->assertSame('?int', $option['type']);
+        $this->assertTrue($option['isOptional']);
+        $this->assertSame(['handle', 'option'], BuiltinParamNames::forFunction($fn));
+        $this->assertSame(['handle', 'option'], BuiltinParamNames::paramNamesForInternalFunction($fn));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'handle',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'option',
+            $fn
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'ch',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $option, false));
+        $dest = new \PHPCompiler\VM\Variable();
+        $this->assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, 1, $option));
+        $this->assertSame(\PHPCompiler\VM\Variable::TYPE_NULL, $dest->type);
     }
 
     /** php-src normalizer.stub.php — string/form → ?string; absent from InternalArgInfo (#27705). */
