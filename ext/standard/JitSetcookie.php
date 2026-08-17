@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Value;
 
 /**
@@ -44,6 +45,8 @@ final class JitSetcookie
         Value $valuePtr,
         ?Value $pathPtr = null
     ): void {
+        // Module-local printf(3) after LibcExtern always-on drop (#31706).
+        LibcExtern::ensurePrintf($context);
         $map = $context->structFieldMap['__string__'];
         $nameLen = $context->builder->load(
             $context->builder->structGep($namePtr, $map['length'])

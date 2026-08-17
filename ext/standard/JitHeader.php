@@ -9,12 +9,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Value;
 
 final class JitHeader
 {
     public static function emit(Context $context, Value $strPtr): void
     {
+        // Module-local printf(3) after LibcExtern always-on drop (#31706).
+        LibcExtern::ensurePrintf($context);
         $map = $context->structFieldMap['__string__'];
         $length = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])

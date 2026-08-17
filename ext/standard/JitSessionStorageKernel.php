@@ -1166,6 +1166,8 @@ final class JitSessionStorageKernel
     /** Direct printf from session name/id byte buffers (#21900). */
     private static function emitSetcookiePrintfFromGlobals(Context $context, Value $idLen): void
     {
+        // Module-local printf(3) after LibcExtern always-on drop (#31706).
+        LibcExtern::ensurePrintf($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');

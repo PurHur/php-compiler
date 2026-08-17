@@ -99,7 +99,9 @@ final class LibcExtern
             // dropped realpath (#30530).
             // time dropped (#30332): StringTime + TimeJitHelper; TouchLibcRuntime routes via
             // StringTime::invoke (#30472) — no module-local time(2) decl.
-            'printf' => [$i32, true, [$i8p]],
+            // printf dropped (#31706): NestedJIT JitHeader / JitSetcookie / JitSessionStorageKernel /
+            // ScriptExit declare printf(3) module-locally via ensurePrintf(); user-script printf()
+            // stays on JitPrintf / __compiler_printf / printf_ (#3681) — not libc.
             'snprintf' => [$i32, true, [$i8p, $sizeT, $i8p]],
             // popen/pclose/fileno dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel
             // declare module-locally (peer fflush/ferror/fgets above); user-script popen/pclose
@@ -123,6 +125,32 @@ final class LibcExtern
         foreach ($specs as $name => [$ret, $vararg, $params]) {
             self::ensure($context, $name, $ctx->functionType($ret, $vararg, ...$params));
         }
+    }
+
+    /**
+     * Module-local printf(3) after LibcExtern always-on drop (#31706).
+     *
+     * User-script printf() stays on JitPrintf / __compiler_printf (#3681); NestedJIT
+     * header/cookie/echo emitters call this before lookupFunction('printf').
+     */
+    public static function ensurePrintf(Context $context): void
+    {
+        try {
+            $context->lookupFunction('printf');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $fn = $context->module->getNamedFunction('printf');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'printf',
+                $context->context->functionType($i32, true, $i8p)
+            );
+        }
+        $context->registerFunction('printf', $fn);
     }
 
     /**

@@ -64,6 +64,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'mkstemp',
             'memchr',
             'strncasecmp',
+            'printf',
         ];
     }
 
@@ -74,7 +75,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -92,6 +93,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31637', $source);
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
+        $this->assertStringContainsString('#31706', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -241,8 +243,33 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strncasecmp (#31682)'
         );
+        $this->assertStringNotContainsString(
+            "'printf' =>",
+            $source,
+            'LibcExtern must not declare libc printf (#31706)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
+        $this->assertStringContainsString('#31706', $source);
+        $this->assertStringContainsString('ensurePrintf', $source);
+    }
+
+    public function testNestedJitConsumersEnsurePrintfAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'ext/standard/JitHeader.php',
+            'ext/standard/JitSetcookie.php',
+            'ext/standard/JitSessionStorageKernel.php',
+            'lib/JIT/Builtin/ScriptExit.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensurePrintf',
+                $source,
+                "{$rel} must call LibcExtern::ensurePrintf after #31706"
+            );
+            $this->assertStringContainsString('#31706', $source);
+        }
     }
 
     public function testObjectTypeRoutesStrncasecmpThroughCompilerAbiAfterLibcExternDrop(): void
