@@ -22,6 +22,8 @@ final class JitObWriteStdoutKernel
     public static function invoke(Context $context, Value $chunk): void
     {
         LibcExtern::register($context);
+        // Module-local write(2) after LibcExtern always-on drop (#31817).
+        LibcExtern::ensurePosixFd($context);
 
         $map = $context->structFieldMap['__string__'];
         $i32 = $context->getTypeFromString('int32');

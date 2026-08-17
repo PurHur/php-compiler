@@ -50,6 +50,8 @@ final class JitReadfileLibc
         }
 
         LibcExtern::register($context);
+        // Module-local open/close/read/write after LibcExtern always-on drop (#31817).
+        LibcExtern::ensurePosixFd($context);
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe

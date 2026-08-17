@@ -533,6 +533,8 @@ final class JitProgressNoteKernel
 
     private static function emitWrite(Context $context, Value $fd, Value $buf, Value $len): void
     {
+        // Module-local write(2) after LibcExtern always-on drop (#31817).
+        \PHPCompiler\JIT\LibcExtern::ensurePosixFd($context);
         $context->builder->call(
             $context->lookupFunction('write'),
             $fd,

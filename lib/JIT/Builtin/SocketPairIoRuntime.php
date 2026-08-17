@@ -160,6 +160,8 @@ final class SocketPairIoRuntime
         }
 
         \PHPCompiler\JIT\LibcExtern::register($context);
+        // Module-local write(2) after LibcExtern always-on drop (#31817).
+        \PHPCompiler\JIT\LibcExtern::ensurePosixFd($context);
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -228,6 +230,8 @@ final class SocketPairIoRuntime
         }
 
         \PHPCompiler\JIT\LibcExtern::register($context);
+        // Module-local read(2) after LibcExtern always-on drop (#31817).
+        \PHPCompiler\JIT\LibcExtern::ensurePosixFd($context);
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
