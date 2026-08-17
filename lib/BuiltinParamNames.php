@@ -1459,6 +1459,7 @@ final class BuiltinParamNames
                 return ['handle', 'options'];
             case 'curl_escape':
             case 'curl_unescape':
+                // php-src ext/curl/curl.stub.php — handle typed CurlHandle; return string|false (#27798)
                 return ['handle', 'string'];
             case 'curl_getinfo':
                 return ['handle', 'option'];

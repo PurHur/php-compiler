@@ -745,6 +745,7 @@
             <file>./test/compliance/SessionNameReflectionVMTest.php</file>
             <file>./test/compliance/CurlStrerrorReflectionVMTest.php</file>
             <file>./test/compliance/CurlUpkeepReflectionVMTest.php</file>
+            <file>./test/compliance/CurlEscapeUnescapeReflectionVMTest.php</file>
             <file>./test/compliance/NormalizerGetRawDecompositionReflectionVMTest.php</file>
             <file>./test/compliance/DatefmtFormatObjectReflectionVMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681VMTest.php</file>

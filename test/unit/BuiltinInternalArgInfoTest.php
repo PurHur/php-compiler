@@ -1128,6 +1128,51 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['handle'], BuiltinParamNames::paramNamesForInternalFunction($fn));
     }
 
+    /** php-src curl.stub.php — CurlHandle $handle, string $string → string|false (#27798). */
+    public function testCurlEscapeUnescapeReflectionStubTypes(): void
+    {
+        foreach (['curl_escape', 'curl_unescape'] as $fn) {
+            $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+            $this->assertSame('CurlHandle', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+            $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+            $handle = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($handle);
+            // InternalArgInfo still names the first param `ch`; Reflection uses BuiltinParamNames.
+            $this->assertSame('ch', $handle['name']);
+            $this->assertSame('CurlHandle', $handle['type']);
+            $this->assertFalse($handle['isOptional']);
+            $string = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            $this->assertNotNull($string);
+            // InternalArgInfo still names the second param `str`; Reflection uses BuiltinParamNames.
+            $this->assertSame('str', $string['name']);
+            $this->assertSame('string', $string['type']);
+            $this->assertFalse($string['isOptional']);
+            $this->assertSame(['handle', 'string'], BuiltinParamNames::forFunction($fn));
+            $this->assertSame(['handle', 'string'], BuiltinParamNames::paramNamesForInternalFunction($fn));
+            $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'handle',
+                $fn
+            ));
+            $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'string',
+                $fn
+            ));
+            $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'ch',
+                $fn
+            ));
+            $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'str',
+                $fn
+            ));
+            $this->assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        }
+    }
+
     /** php-src curl.stub.php — CurlHandle $handle, ?int $option = null → mixed (#28369). */
     public function testCurlGetinfoReflectionStubTypes(): void
     {
