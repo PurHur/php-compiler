@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPLLVM\Builder;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Value;
 
 /**
@@ -1004,6 +1005,8 @@ final class M5TrivialEchoNative
         $b->positionAtEnd($ok0);
         $ptr = $b->gep($chars, $i);
         $end = $b->alloca($i8p);
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $val = $b->call(
             $context->lookupFunction('strtol'),
             $ptr,

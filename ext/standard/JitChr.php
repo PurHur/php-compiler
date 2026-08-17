@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -230,6 +231,8 @@ final class JitChr
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'chr_str_end');
         $context->builder->store($i8p->constNull(), $endPtrSlot);
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
@@ -255,7 +258,9 @@ final class JitChr
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca($context->getTypeFromString('int8*'), 1, 'chr_strtol_end');
         $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endPtrSlot);
-        $raw = $context->builder->call(
+        $raw = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
+        $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,

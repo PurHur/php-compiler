@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Context;
@@ -284,6 +285,8 @@ final class JitScalarEnumCoerce
         $ptr = self::stringDataPtr($context, $stringVal);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
         $base = $context->builder->trunc($i64->constInt(10, false), $context->getTypeFromString('int32'));
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
         $stringInt = $context->builder->trunc($raw, $i64);
         $stringEnd = $context->builder->getInsertBlock();

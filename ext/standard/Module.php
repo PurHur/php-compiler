@@ -1005,17 +1005,9 @@ class Module extends ModuleAbstract
         // NestedJIT StringGetenv putenv leaf + JitParseStrUserScriptCstrKernel declare
         // strchr module-locally; PHP strchr()/strstr() are VmString (not libc). No
         // remaining lookupFunction('strstr') consumers.
-        try {
-            $context->lookupFunction('strtol');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i8pp = $context->getTypeFromString('int8**');
-            $i32 = $context->getTypeFromString('int32');
-            $i64 = $context->getTypeFromString('int64');
-            $ft = $context->context->functionType($i64, false, $i8p, $i8pp, $i32);
-            $fn = $context->module->addFunction('strtol', $ft);
-            $context->registerFunction('strtol', $fn);
-        }
+        // strtol(3) dropped from always-on Module decls (#31988 / #31971 peer):
+        // NestedJIT leaves call LibcExtern::ensureStrtolDecl before lookup;
+        // user-script strtol()/intval() stay on ext/standard PHP.
         try {
             $context->lookupFunction('strtod');
         } catch (\Throwable $e) {

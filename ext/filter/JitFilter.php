@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\ext\standard\JitBuiltinWarning;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringCaseCompare;
@@ -1193,6 +1194,8 @@ final class JitFilter
         $nullEnd = $context->getTypeFromString('int8*')->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
         $i32 = $context->getTypeFromString('int32');
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
@@ -1256,7 +1259,9 @@ final class JitFilter
         $nullEnd = $context->getTypeFromString('int8*')->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
         $i32 = $context->getTypeFromString('int32');
-        $parsed = $context->builder->call(
+        $parsed = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
+        $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,
