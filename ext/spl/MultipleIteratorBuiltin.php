@@ -545,12 +545,13 @@ final class MultipleIteratorSetFlags extends VmClassMethod
             MultipleIteratorBuiltin::CLASS_LC,
             'MultipleIterator::setFlags()'
         );
-        // php-src zim_MultipleIterator_setFlags — ZEND_PARSE_PARAMETERS_ARGS(1, 1)
+        // php-src zim_MultipleIterator_setFlags — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG (#31795).
         $this->requireExactUserArgCount($frame, 'MultipleIterator::setFlags', 1);
-        $flags = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1],
+        $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
             'MultipleIterator::setFlags',
-            0,
+            1,
             'flags'
         );
         MultipleIteratorBuiltin::setFlags($object, $flags);
