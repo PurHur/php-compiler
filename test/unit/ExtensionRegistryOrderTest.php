@@ -48,7 +48,7 @@ final class ExtensionRegistryOrderTest extends TestCase
     /** The order Runtime::loadCoreModules() used before it delegated to the registry. */
     private const EXPECTED_ORDER = [
         'types', 'spl', 'ds', 'intl', 'zip', 'libxml', 'dom', 'xsl', 'simplexml', 'xml',
-        'xmlrpc', 'wddx', 'xmlreader', 'xmlwriter', 'gd', 'exif', 'fileinfo', 'iconv', 'gettext',
+        'xmlrpc', 'wddx', 'xmlreader', 'xmlwriter', 'gd', 'imagick', 'exif', 'fileinfo', 'iconv', 'gettext',
         'mbstring', 'filter', 'calendar', 'ldap', 'session', 'bcmath',
     ];
 
