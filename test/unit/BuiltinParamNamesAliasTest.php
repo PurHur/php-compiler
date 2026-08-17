@@ -1481,6 +1481,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #27795 — deg2rad/rad2deg/expm1/log1p/asinh/acosh/atanh Zend $num (InternalArgInfo still number) */
+    public function testDeg2radFamilyZendStubNamedParams(): void
+    {
+        foreach (['deg2rad', 'rad2deg', 'expm1', 'log1p', 'asinh', 'acosh', 'atanh'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['num'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'number', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+        }
+    }
+
     /** @covers issue #11785 / #25166 */
     public function testDateTimeClassMethodNamedParameters(): void
     {

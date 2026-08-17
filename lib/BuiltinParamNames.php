@@ -760,10 +760,17 @@ final class BuiltinParamNames
                 return ['filename', 'line'];
             case 'number_format':
                 return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says number (#23259)
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says number (#23259, #27795)
             case 'abs':
             case 'floor':
             case 'ceil':
+            case 'deg2rad':
+            case 'rad2deg':
+            case 'expm1':
+            case 'log1p':
+            case 'asinh':
+            case 'acosh':
+            case 'atanh':
                 return ['num'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still base/number/x (#23306)
             case 'pow':
