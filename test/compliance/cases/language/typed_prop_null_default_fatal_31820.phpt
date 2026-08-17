@@ -8,4 +8,4 @@ class T {
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Default value for property of type int may not be null. Use the nullable type ?int to allow null default value
+PHP Fatal error:  Default value for property of type int may not be null. Use the nullable type ?int to allow null default value in %s on line %d

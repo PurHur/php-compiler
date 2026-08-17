@@ -9023,11 +9023,20 @@ class Compiler {
                             }
                             $classPrefix = $this->compilingClassDisplayName ?? 'class';
                             $targetName = ($child->static ? $classPrefix.'::' : '').'$'.$propName;
+                            $propSourceFile = $child->getFile();
+                            if ('' === $propSourceFile) {
+                                $propSourceFile = 'unknown';
+                            }
                             $this->assertCompileTimeDefaultMatchesDeclaredType(
                                 $defaultVm,
                                 $child->declaredType,
                                 'property',
-                                $targetName
+                                $targetName,
+                                null,
+                                null,
+                                null,
+                                $propSourceFile,
+                                max(1, $child->getLine())
                             );
                         }
                     }
@@ -9853,11 +9862,20 @@ class Compiler {
                 if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
                     $propName = '$'.$param->name->value;
                 }
+                $propSourceFile = $param->getFile();
+                if ('' === $propSourceFile) {
+                    $propSourceFile = 'unknown';
+                }
                 $this->assertCompileTimeDefaultMatchesDeclaredType(
                     $defaultVm,
                     $param->declaredType,
                     'property',
-                    $propName
+                    $propName,
+                    null,
+                    null,
+                    null,
+                    $propSourceFile,
+                    max(1, $param->getLine())
                 );
             }
         }
@@ -12231,7 +12249,9 @@ class Compiler {
         string $targetName,
         ?Block $block = null,
         ?int $defaultSlot = null,
-        ?Op\Expr\Param $param = null
+        ?Op\Expr\Param $param = null,
+        ?string $sourceFile = null,
+        ?int $sourceLine = null
     ): void {
         if (null === $declaredType) {
             return;
@@ -12281,7 +12301,7 @@ class Compiler {
                     return;
                 }
                 $given = TypeCheck::typeNameForConstraint($value->type);
-                $this->throwTypedDefaultMismatch($given, $kind, $targetName, $nameLc);
+                $this->throwTypedDefaultMismatch($given, $kind, $targetName, $nameLc, $sourceFile, $sourceLine);
 
                 return;
             }
@@ -12297,7 +12317,7 @@ class Compiler {
             if (null !== $this->genericArraySpecFromCfgType($checkType)) {
                 return;
             }
-            $this->throwTypedDefaultMismatch('array', $kind, $targetName, $typeLabel);
+            $this->throwTypedDefaultMismatch('array', $kind, $targetName, $typeLabel, $sourceFile, $sourceLine);
 
             return;
         }
@@ -12321,20 +12341,33 @@ class Compiler {
         }
 
         $given = TypeCheck::typeNameForConstraint($value->type);
-        $this->throwTypedDefaultMismatch($given, $kind, $targetName, $typeLabel);
+        $this->throwTypedDefaultMismatch($given, $kind, $targetName, $typeLabel, $sourceFile, $sourceLine);
     }
 
-    protected function throwTypedDefaultMismatch(string $given, string $kind, string $targetName, string $typeLabel): void
-    {
-        // Zend zend_compile.c — null default on non-nullable typed property (#31820)
+    /**
+     * Zend zend_compile.c — property null defaults use a dedicated fatal (#31820);
+     * with file/line → CompileFatal / "PHP Fatal error:" CLI shape (follow-up to #31827).
+     */
+    protected function throwTypedDefaultMismatch(
+        string $given,
+        string $kind,
+        string $targetName,
+        string $typeLabel,
+        ?string $sourceFile = null,
+        ?int $sourceLine = null
+    ): void {
         if ('property' === $kind && 'null' === $given) {
             $this->throwCompileError(
-                "Default value for property of type {$typeLabel} may not be null. Use the nullable type ?{$typeLabel} to allow null default value"
+                "Default value for property of type {$typeLabel} may not be null. Use the nullable type ?{$typeLabel} to allow null default value",
+                $sourceFile,
+                $sourceLine
             );
         }
 
         $this->throwCompileError(
-            "Cannot use {$given} as default value for {$kind} {$targetName} of type {$typeLabel}"
+            "Cannot use {$given} as default value for {$kind} {$targetName} of type {$typeLabel}",
+            $sourceFile,
+            $sourceLine
         );
     }
 
