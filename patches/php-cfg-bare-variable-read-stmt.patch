@@ -27,6 +27,7 @@
 +        // Bare variable reads need a real fetch op for ZEND_CHECK_UNDEFINED_VAR (#13587).
 +        // Materialize into a temp under silence so `$a = @$undef` does not re-fetch the CV
 +        // after END_SILENCE (#29132). UnaryPlus would coerce null→int(0); Assign preserves null.
++        // Value-consuming `@$cv` (echo / arithmetic / call arg) must use that temp (#31881).
 +        if ($expr->expr instanceof Node\Expr\Variable) {
 +            $tmp = new Temporary();
 +            $assign = new Op\Expr\Assign(
