@@ -9216,8 +9216,12 @@ restart:
                             // Dim-write (`$o->a[0]=` / `$o->a[]=`) is BP_VAR_W: uninitialized typed
                             // array slots auto-init to []; other types TypeError (zend_try_array_init,
                             // #31770 / #31819). Dim RW (`$o->a[0]++` / `+=`) is BP_VAR_RW Error (#31784).
+                            // foreach ($o->a as &$v) is FE_RESET_RW / get_property_ptr_ptr — same by-ref
+                            // uninitialized Error as `$r = &$o->a` (#31836), not the bare-read wording.
                             if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
                                 VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($propSlot);
+                            } elseif ($this->propertyFetchDestUsedAsByRefForeachIterable($frame, $op)) {
+                                VM\TypedPropertyCheck::prepareWritableByReference($propSlot);
                             } else {
                                 VM\TypedPropertyCheck::assertReadable($propSlot);
                             }
@@ -9250,7 +9254,8 @@ restart:
                                     $frame = $catchFrame;
                                     goto restart;
                                 }
-                                $result->copyFrom($propSlot);
+                                // Live HT for FE_RESET_RW (nullable uninit was null-inited above).
+                                $result->indirect($propSlot);
                             } else {
                                 $result->copyFrom($propSlot);
                             }
