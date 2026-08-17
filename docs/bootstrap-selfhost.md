@@ -104,6 +104,13 @@ Inside the dev image (same gates):
 ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'
 ```
 
+**Zend gen-0 fallback memory floor** ([#31714](https://github.com/PurHur/php-compiler/issues/31714)): when committed gen-0 is lowering-stale and the link gate falls back to `php bin/compile.php`, default Docker `PHP_COMPILER_DOCKER_MEM=10g` SIGKILLs (~137) mid-compile. The link/invoke path **fails fast** under cgroup `< 16GiB` with a `NEXT_LOWER_CMD`; remount:
+
+```bash
+PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g \
+  ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'
+```
+
 Do **not** nest `docker info` or `docker run` inside the `docker-exec` inner command — the container has PHP/LLVM only ([#2674](https://github.com/PurHur/php-compiler/issues/2674), [#2757](https://github.com/PurHur/php-compiler/issues/2757)). Missing Docker CLI on the host: `script/selfhost-preflight.sh` / issue [#2674](https://github.com/PurHur/php-compiler/issues/2674).
 
 ### When to regenerate `docs/bootstrap-inventory.md` ([#830](https://github.com/PurHur/php-compiler/issues/830))

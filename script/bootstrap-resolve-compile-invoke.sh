@@ -24,6 +24,7 @@
 #   BOOTSTRAP_NO_ZEND_FALLBACK=1 — refuse Zend on spine/M5 compile paths (#8716)
 #   BOOTSTRAP_USE_INVENTORY_DRIVER=1 — inventory argv driver only (#2894)
 #   BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK=1 — opt-in when native driver SIGSEGV (exit 139) and only sidecar copy succeeds
+#   BOOTSTRAP_ZEND_GEN0_ALLOW_LOW_MEM=1 — skip 16GiB cgroup floor for Zend gen-0 (bisect only; #31714)
 set -euo pipefail
 
 # shellcheck source=bootstrap-lowering-freshness.sh
@@ -31,6 +32,44 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-lowering-freshne
 
 BOOTSTRAP_COMPILE_DRIVER_MODE=""
 BOOTSTRAP_COMPILE_DRIVER=""
+
+# Numeric cgroup memory limit in bytes, or fail when unlimited / unavailable.
+# Zend gen-0 AOT of compiler_minimal needs ≥16GiB or Docker SIGKILLs (~137) under default 10g (#31714).
+bootstrap_cgroup_memory_bytes() {
+  local bytes=""
+  if [[ -r /sys/fs/cgroup/memory.max ]]; then
+    bytes="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || true)"
+  elif [[ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]]; then
+    bytes="$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || true)"
+  else
+    return 1
+  fi
+  if [[ "${bytes}" =~ ^[0-9]+$ ]]; then
+    printf '%s' "${bytes}"
+    return 0
+  fi
+  return 1
+}
+
+# Fail fast before a multi-minute Zend gen-0 that dies with 137 under <16GiB (#31714 / helloworld #23970).
+bootstrap_require_zend_gen0_cgroup_mem() {
+  local label="${1:-bootstrap-compile-invoke}"
+  if [[ "${BOOTSTRAP_ZEND_GEN0_ALLOW_LOW_MEM:-0}" == "1" ]]; then
+    return 0
+  fi
+  local bytes=""
+  if ! bytes="$(bootstrap_cgroup_memory_bytes)"; then
+    return 0
+  fi
+  local floor=$((16 * 1024 * 1024 * 1024))
+  if [[ "${bytes}" -lt "${floor}" ]]; then
+    echo "${label}: refusing Zend gen-0 under cgroup memory=${bytes} (< 16GiB) — would SIGKILL (#31714)" >&2
+    echo "${label}: NEXT_LOWER: remount docker-exec with PHP_COMPILER_DOCKER_MEM=16g, or refresh a fresh native gen-0 driver (#21855)" >&2
+    echo "${label}: NEXT_LOWER_CMD: PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g PHP_COMPILER_CI_RAM_GB=0 ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'" >&2
+    return 1
+  fi
+  return 0
+}
 
 # True when DRIVER is the inventory bin/compile.php argv driver (not emit-helper gen-2).
 # helloworld-compile-bin copies the same bytes to OUT and build/.m3_bin_compile_aot_blob (#2880).
@@ -819,6 +858,10 @@ bootstrap_compile_invoke_zend() {
 
   if ! command -v php >/dev/null 2>&1; then
     echo "bootstrap-compile-invoke: Zend gen-0 requires php on PATH (#2842)" >&2
+    return 1
+  fi
+
+  if ! bootstrap_require_zend_gen0_cgroup_mem bootstrap-compile-invoke; then
     return 1
   fi
 

@@ -36,6 +36,10 @@ if bootstrap_resolve_compile_driver; then
       echo "bootstrap-selfhost-link: BOOTSTRAP_M5_NO_ZEND=1 forbids Zend gen-0 (#3053)" >&2
       exit 1
     fi
+    # Fail before apply-patches / driver-smoke / long Zend AOT under default 10g (#31714).
+    if ! bootstrap_require_zend_gen0_cgroup_mem bootstrap-selfhost-link; then
+      exit 1
+    fi
     selfhost_preflight bootstrap-selfhost-link php-only
   fi
 else

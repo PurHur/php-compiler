@@ -25,6 +25,10 @@ When host make/php are missing but Docker works:
   docker info >/dev/null
   ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'
 
+Zend gen-0 fallback (stale/missing native driver) needs ≥16GiB cgroup (#31714):
+  PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g \\
+    ./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'
+
 Do not nest 'docker info' or 'docker run' inside docker-exec — the container has PHP/LLVM only.
 Missing Docker CLI: see issue #2674.
 EOF

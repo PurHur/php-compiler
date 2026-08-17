@@ -158,6 +158,36 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('build/bin-compile-aot-inventory', $dockerExec);
     }
 
+    /** Issue #31714: Zend gen-0 fails fast under <16GiB cgroup (no silent 137). */
+    public function testLinkScriptFailsFastOnLowCgroupForZendGen0(): void
+    {
+        $link = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
+        $this->assertStringContainsString('bootstrap_require_zend_gen0_cgroup_mem', $link);
+        $this->assertStringContainsString('#31714', $link);
+
+        $resolver = (string) file_get_contents(self::$root.'/script/bootstrap-resolve-compile-invoke.sh');
+        $this->assertStringContainsString('bootstrap_cgroup_memory_bytes', $resolver);
+        $this->assertStringContainsString('bootstrap_require_zend_gen0_cgroup_mem', $resolver);
+        $this->assertStringContainsString('BOOTSTRAP_ZEND_GEN0_ALLOW_LOW_MEM', $resolver);
+        $this->assertStringContainsString('refusing Zend gen-0 under cgroup memory=', $resolver);
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=16g', $resolver);
+        $this->assertStringContainsString('NEXT_LOWER_CMD:', $resolver);
+        $this->assertStringContainsString('#31714', $resolver);
+        $this->assertMatchesRegularExpression(
+            '/bootstrap_compile_invoke_zend\(\)[\s\S]*bootstrap_require_zend_gen0_cgroup_mem/s',
+            $resolver,
+            'Zend invoke must check cgroup before starting long gen-0 AOT (#31714)'
+        );
+
+        $gate = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-gate.sh');
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=16g', $gate);
+        $this->assertStringContainsString('#31714', $gate);
+
+        $docs = (string) file_get_contents(self::$root.'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('Zend gen-0 fallback memory floor', $docs);
+        $this->assertStringContainsString('#31714', $docs);
+    }
+
     public function testNativeLinkScriptPrintsBundleOkWhenLlvmPresent(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {
