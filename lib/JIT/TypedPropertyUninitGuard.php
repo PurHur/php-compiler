@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -225,7 +226,7 @@ final class TypedPropertyUninitGuard
 
     /**
      * FETCH_DIM_W on a typed property: array-containing types auto-init [] (zend_try_array_init, #31770).
-     * Other typed slots still Error on uninitialized access.
+     * Other typed slots TypeError ("Cannot auto-initialize an array…", #31819).
      *
      * Callers must use {@see emitBeforeRead} for dim RW (++/--/+=) — BP_VAR_RW (#31784).
      */
@@ -252,7 +253,7 @@ final class TypedPropertyUninitGuard
             return;
         }
         if (!$object->propertySlotAllowsArray($classId, $slotIndex)) {
-            self::emitBeforeRead($context, $var);
+            self::emitCannotAutoInitializeArray($context, $var, $classId, $slotIndex);
 
             return;
         }
@@ -287,6 +288,73 @@ final class TypedPropertyUninitGuard
         $context->builder->positionAtEnd($initBlock);
         HashTableHelper::initArray($context, $var);
         $context->builder->branch($okBlock);
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->branch($exitBlock);
+        $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /**
+     * Uninitialized non-array typed property dim-write → TypeError (zend_try_array_init, #31819).
+     */
+    private static function emitCannotAutoInitializeArray(
+        Context $context,
+        Variable $var,
+        int $classId,
+        int $slotIndex
+    ): void {
+        $object = $context->type->object;
+        assert($object instanceof Object_);
+        $valuePtr = self::valuePtrFromVariable($context, $var);
+        if (null === $valuePtr) {
+            return;
+        }
+        $declaringClass = $object->instancePropertyDeclaringClassName($classId, (string) $var->objectPropertyName);
+        $typeLabel = $object->propertySlotDeclaredTypeLabel($classId, $slotIndex);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $entry = $context->builder->getInsertBlock();
+        if (null === $entry || null !== $entry->getTerminator()) {
+            return;
+        }
+        $checkBlock = $fn->appendBasicBlock('typed_prop_dimw_noarr_check');
+        $okBlock = $fn->appendBasicBlock('typed_prop_dimw_noarr_ok');
+        $exitBlock = $fn->appendBasicBlock('typed_prop_dimw_noarr_exit');
+        $raiseBlock = $fn->appendBasicBlock('typed_prop_dimw_noarr_raise');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->branch($checkBlock);
+        $context->builder->positionAtEnd($checkBlock);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_UNDEFINED, false)
+        );
+        $context->builder->branchIf($isUndef, $raiseBlock, $okBlock);
+        $context->builder->positionAtEnd($raiseBlock);
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            TypeErrorRaise::ensureStandaloneBodies($context);
+        }
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        TypeErrorRaise::emitRaise(
+            $context,
+            sprintf(
+                'Cannot auto-initialize an array inside property %s::$%s of type %s',
+                MethodVisibility::formatAnonymousScopeForMessage((string) $declaringClass),
+                $var->objectPropertyName,
+                $typeLabel
+            )
+        );
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+        }
+        self::emitRaiseAndTerminate($context);
         $context->builder->positionAtEnd($okBlock);
         $context->builder->branch($exitBlock);
         $context->builder->positionAtEnd($exitBlock);

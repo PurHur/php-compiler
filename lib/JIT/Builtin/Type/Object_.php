@@ -115,6 +115,9 @@ class Object_ extends Type {
 
     /** @var array<int, array<int, true>> class id => property slot => type contains array (#31770) */
     private array $propertyAllowsArraySlots = [];
+
+    /** @var array<int, array<int, string>> class id => property slot => declared type label (#31819) */
+    private array $propertyDeclaredTypeLabels = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
     /** @var array<int, Block> class id => __destruct CFG block (#4013) */
@@ -3267,6 +3270,24 @@ class Object_ extends Type {
         return isset($this->propertyAllowsArraySlots[$classId][$slotIndex]);
     }
 
+    /** Declared type text for zend_try_array_init TypeError (#31819). */
+    public function definePropertyDeclaredTypeLabel(int $classId, string $name, string $label): void
+    {
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[1] !== $name) {
+                continue;
+            }
+            $this->propertyDeclaredTypeLabels[$classId][$propset[3]] = $label;
+
+            return;
+        }
+    }
+
+    public function propertySlotDeclaredTypeLabel(int $classId, int $slotIndex): string
+    {
+        return $this->propertyDeclaredTypeLabels[$classId][$slotIndex] ?? 'mixed';
+    }
+
     /** True when the slot stores a typed __value__ property (#4912). */
     public function propertySlotIsTypedValue(int $classId, int $slotIndex): bool
     {
@@ -5053,6 +5074,10 @@ class Object_ extends Type {
         }
         if (isset($this->propertyAllowsArraySlots[$parentId][$parentSlot])) {
             $this->propertyAllowsArraySlots[$childId][$childSlot] = true;
+        }
+        if (isset($this->propertyDeclaredTypeLabels[$parentId][$parentSlot])) {
+            $this->propertyDeclaredTypeLabels[$childId][$childSlot]
+                = $this->propertyDeclaredTypeLabels[$parentId][$parentSlot];
         }
     }
 

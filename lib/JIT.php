@@ -15000,6 +15000,14 @@ class JIT {
                         if (\PHPCompiler\VM\TypedPropertyCheck::propertyAllowsArray($proto)) {
                             $this->context->type->object->markPropertyAllowsArray($classId, $name->value);
                         }
+                        $typeLabel = \PHPCompiler\VM\TypedPropertyCheck::uninitializedTypeString($proto);
+                        if ('' !== $typeLabel) {
+                            $this->context->type->object->definePropertyDeclaredTypeLabel(
+                                $classId,
+                                $name->value,
+                                $typeLabel
+                            );
+                        }
                         // Typed / explicit mixed prototypes stay UNDEFINED; untyped are TYPE_NULL (#22021).
                         if ($proto->isUndefined() || $proto->hasDeclaredTypeConstraint()) {
                             $this->context->type->object->markPropertyTypedInitGuard($classId, $name->value);

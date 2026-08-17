@@ -124,6 +124,8 @@
             <file>./test/compliance/UninitTypedArrayDimAssignJITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimRwVMTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimRwJITTest.php</file>
+            <file>./test/compliance/AssignDimNonarrayTypedUninitVMTest.php</file>
+            <file>./test/compliance/AssignDimNonarrayTypedUninitJITTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>
