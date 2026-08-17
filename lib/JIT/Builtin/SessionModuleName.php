@@ -289,7 +289,7 @@ final class SessionModuleName
         $bytes = $context->builder->structGep($str, $strMap['value']);
         $dataPtr = $context->builder->pointerCast($bytes, $i8p);
         $litPtr = $context->builder->pointerCast($context->constantFromString($literal), $i8p);
-        $cmp = $context->builder->call($context->lookupFunction('strcasecmp'), $dataPtr, $litPtr);
+        $cmp = $context->builder->call($context->lookupFunction(StringCaseCompare::ABI_STRCASECMP), $dataPtr, $litPtr);
 
         return $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
     }

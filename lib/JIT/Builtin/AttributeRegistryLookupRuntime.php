@@ -12,7 +12,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for __compiler_attr_* lookup (#10086, #20901).
  *
- * Embed + thin standalone AOT: host-decoded compile-time tables → libc `strcasecmp`
+ * Embed + thin standalone AOT: host-decoded compile-time tables → `__compiler_strcasecmp`
  * select chains (no dishonest thin stubs; no NestedJIT of AttributeRegistryJitHelper —
  * NestedJIT of the JSON scanner is not thin-AOT-safe: zext/__value__ verify failures).
  * Lookup semantics SSOT for tests: {@see \PHPCompiler\ext\standard\AttributeRegistryJitHelper}.
@@ -67,7 +67,7 @@ final class AttributeRegistryLookupRuntime
         $context->builder->positionAtEnd($entry);
 
         $classCstr = $fn->getParam(0);
-        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $strcasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $result = $sizeT->constInt(0, false);
         foreach (self::decodeClassNames($classNamesJson) as $key => $names) {
             if (!\is_string($key) || !\is_array($names)) {
@@ -104,7 +104,7 @@ final class AttributeRegistryLookupRuntime
 
         $classCstr = $fn->getParam(0);
         $idx = $fn->getParam(1);
-        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $strcasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $result = $context->bytePtr($context->constantFromString(''));
         foreach (self::decodeClassNames($classNamesJson) as $key => $names) {
             if (!\is_string($key) || !\is_array($names)) {
@@ -152,7 +152,7 @@ final class AttributeRegistryLookupRuntime
 
         $classCstr = $fn->getParam(0);
         $methodCstr = $fn->getParam(1);
-        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $strcasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $result = $sizeT->constInt(0, false);
         foreach (self::decodeMethodNames($methodNamesJson) as $classKey => $methods) {
             if (!\is_string($classKey) || !\is_array($methods)) {
@@ -199,7 +199,7 @@ final class AttributeRegistryLookupRuntime
         $classCstr = $fn->getParam(0);
         $methodCstr = $fn->getParam(1);
         $idx = $fn->getParam(2);
-        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $strcasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $result = $context->bytePtr($context->constantFromString(''));
         foreach (self::decodeMethodNames($methodNamesJson) as $classKey => $methods) {
             if (!\is_string($classKey) || !\is_array($methods)) {

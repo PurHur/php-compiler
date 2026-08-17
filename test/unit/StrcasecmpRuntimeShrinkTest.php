@@ -67,36 +67,42 @@ final class StrcasecmpRuntimeShrinkTest extends TestCase
     }
 
     /** @return list<string> */
-    private function introspectionJitEmitters(): array
+    private function nestedJitStrcasecmpConsumers(): array
     {
         return [
-            'ext/standard/JitClassExists.php',
-            'ext/standard/JitInterfaceExists.php',
-            'ext/standard/JitTraitExists.php',
-            'ext/standard/JitGetClassMethods.php',
-            'ext/standard/JitIniGetAll.php',
-            'ext/filter/JitFilterId.php',
             'lib/JIT/InstanceOfHelper.php',
-            'lib/JIT/ClassConstFetchHelper.php',
+            'lib/JIT/ClassConstFetchHelperTrait.php',
             'lib/JIT/Builtin/ClassConstFetchRuntime.php',
             'lib/JIT/Builtin/ReflectionEnumJitHelper.php',
             'lib/JIT/Builtin/SessionModuleName.php',
+            'ext/standard/JitIniGetAll.php',
+            'ext/filter/JitFilterId.php',
         ];
     }
 
     public function testIntrospectionJitEmittersLinkCaseCompareBeforeStrcasecmp(): void
     {
-        foreach ($this->introspectionJitEmitters() as $relativePath) {
+        foreach ($this->nestedJitStrcasecmpConsumers() as $relativePath) {
             $source = (string) file_get_contents(__DIR__.'/../../'.$relativePath);
             $this->assertStringContainsString(
                 'ensureStrcasecmpLinked',
                 $source,
-                "{$relativePath} must link CaseCompareJitHelper before strcasecmp lookup (#15256)"
+                "{$relativePath} must link CaseCompareJitHelper before strcasecmp lookup (#15256/#31787)"
+            );
+            $this->assertStringContainsString(
+                'StringCaseCompare::ABI_STRCASECMP',
+                $source,
+                "{$relativePath} must look up __compiler_strcasecmp after #31787"
             );
             $this->assertStringNotContainsString(
                 "addFunction('strcasecmp'",
                 $source,
                 "{$relativePath} must not declare empty strcasecmp LLVM stub (#15256)"
+            );
+            $this->assertStringNotContainsString(
+                "lookupFunction('strcasecmp')",
+                $source,
+                "{$relativePath} must not look up libc strcasecmp after #31787"
             );
         }
     }

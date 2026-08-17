@@ -238,12 +238,12 @@ final class ReflectionPropertyRawValueRuntime
             $i8p
         );
         $classCmp = $context->builder->call(
-            $context->lookupFunction('strcasecmp'),
+            $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
             $classCstr,
             $wantClass
         );
         $propCmp = $context->builder->call(
-            $context->lookupFunction('strcasecmp'),
+            $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
             $propCstr,
             $wantProp
         );

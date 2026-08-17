@@ -507,7 +507,7 @@ final class ReflectionEnumJitHelper
 
         StringCaseCompare::ensureStrcasecmpLinked($context);
         $nameData = self::stringDataPtr($context, $enumNameStr);
-        $strcasecmpFn = $context->lookupFunction('strcasecmp');
+        $strcasecmpFn = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $i32 = $context->getTypeFromString('int32');
         $miss = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_miss');
 

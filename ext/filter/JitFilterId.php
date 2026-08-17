@@ -55,7 +55,8 @@ final class JitFilterId
         StringCaseCompare::ensureStrcasecmpLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $strcasecmpFn = $context->lookupFunction('strcasecmp');
+        // __compiler_strcasecmp after LibcExtern always-on drop (#31787).
+        $strcasecmpFn = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $id = (string) (++self::$blockSerial);
         $doneBlock = BasicBlockHelper::append($context, 'filter_id_done_'.$id);
         $failBlock = BasicBlockHelper::append($context, 'filter_id_fail_'.$id);

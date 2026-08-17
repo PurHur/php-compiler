@@ -40,7 +40,10 @@ final class LibcExtern
             'strlen' => [$sizeT, false, [$i8p]],
             'strcmp' => [$i32, false, [$i8p, $i8p]],
             'strncmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
-            'strcasecmp' => [$i32, false, [$i8p, $i8p]],
+            // strcasecmp dropped (#31787): NestedJIT class/name compares look up
+            // __compiler_strcasecmp (StringCaseCompare::ensureStrcasecmpLinked);
+            // user-script strcasecmp() stays on CaseCompareJitHelper / VmString
+            // (#15225 / #26861) — not libc. Peer strncasecmp drop (#31682).
             // strncasecmp dropped (#31682): Type/Object_::classIdFromRuntimeName +
             // JitFilter::parseBooleanStringToken look up __compiler_strncasecmp
             // (StringCaseCompare::ensureStrncasecmpLinked); user-script strncasecmp()

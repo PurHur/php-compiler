@@ -43,13 +43,10 @@ final class ReflectionMethodInvoke implements Call
             'strcmp',
             $context->context->functionType($i32, false, $i8p, $i8p)
         );
-        \PHPCompiler\JIT\Builtin\TypeErrorRaise::ensureDeclInScope(
-            $context,
-            'strcasecmp',
-            $context->context->functionType($i32, false, $i8p, $i8p)
-        );
+        \PHPCompiler\JIT\Builtin\StringCaseCompare::ensureStrcasecmpLinked($context);
         $strcmp = $context->lookupFunction('strcmp');
-        $strcasecmp = $context->lookupFunction('strcasecmp');
+        // __compiler_strcasecmp after LibcExtern always-on drop (#31787).
+        $strcasecmp = $context->lookupFunction(\PHPCompiler\JIT\Builtin\StringCaseCompare::ABI_STRCASECMP);
 
         $tag = 'rmi'.(string) (++self::$seq);
         $merge = BasicBlockHelper::append($context, 'refl_method_invoke_merge_'.$tag);
