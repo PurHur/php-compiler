@@ -242,6 +242,10 @@ final class BuiltinByRefParams
             case 'pdostatement::bindcolumn':
                 // $this + $column + &$var (+ optional $type/…) — php-src pdo.stub.php (#22274)
                 return [2];
+            case 'soapclient::__soapcall':
+                // $this + $name + $args + $options + $inputHeaders + &$outputHeaders
+                // php-src soap.stub.php / soap_client_call_impl zend_try_array_init (#31875)
+                return [5];
             case 'msg_send':
                 // php-src ext/sysvmsg/sysvmsg.stub.php — &$error_code (#3666)
                 return [5];

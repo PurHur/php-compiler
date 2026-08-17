@@ -54,7 +54,7 @@ final class BuiltinParamNames
             // php-src ext/soap/soap.stub.php — InternalArgInfo omits location; one_way→oneWay (#31568)
             'soapclient::__dorequest' => ['request', 'location', 'action', 'version', 'oneWay='],
             // php-src ext/soap/soap.stub.php — InternalArgInfo still function_name/arguments (#31873)
-            'soapclient::__soapcall' => ['name', 'args', 'options=', 'inputHeaders=', 'outputHeaders='],
+            'soapclient::__soapcall' => ['name', 'args', 'options=', 'inputHeaders=', '&outputHeaders='],
             // php-src ext/mysqli/mysqli.stub.php — absent from InternalArgInfo (#27712)
             'mysqli::execute_query' => ['query', 'params='],
             'datetimezone::__construct' => ['timezone'],
