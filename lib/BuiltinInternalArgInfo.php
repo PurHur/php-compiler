@@ -367,6 +367,8 @@ final class BuiltinInternalArgInfo
             'normalizer_get_raw_decomposition' => '?string',
             // ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
             'datefmt_format_object' => 'string|false',
+            // ext/intl/calendar/calendar.stub.php — @alias intlcal_create_instance; absent from InternalArgInfo (#27944)
+            'intlcal_create_instance' => '?IntlCalendar',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
             'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
@@ -918,6 +920,12 @@ final class BuiltinInternalArgInfo
             'datefmt_format_object' => match ($index) {
                 0, 1 => '',
                 2 => '?string',
+                default => null,
+            },
+            // ext/intl/calendar/calendar.stub.php — $timezone untyped; ?string $locale = null (#27944)
+            'intlcal_create_instance' => match ($index) {
+                0 => '',
+                1 => '?string',
                 default => null,
             },
             // ext/intl/php_intl.stub.php — PHP 8.5+ costs + locale (#27591)

@@ -15,7 +15,10 @@ use PHPLLVM\Value;
 
 /**
  * intlcal_create_instance() — procedural IntlCalendar::createInstance
- * (php-src calendar_methods.c / calendar.stub.php; #20836).
+ * (php-src calendar_methods.c / calendar.stub.php; #20836, named/Reflection #27944).
+ *
+ * Arginfo: {@see \PHPCompiler\BuiltinParamNames} + {@see \PHPCompiler\BuiltinInternalArgInfo}
+ * (`$timezone = null`, `?string $locale = null`): `?IntlCalendar`.
  */
 final class intlcal_create_instance extends Internal
 {
