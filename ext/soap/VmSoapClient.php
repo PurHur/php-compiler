@@ -864,7 +864,16 @@ final class VmSoapClient
             $request = self::buildRequest($state, $name, $arguments, $ctx, $callUri, $inputHeaders);
             $state->lastRequest = $request;
 
-            $response = self::doRequest($object, $request, $location, $action, $state->soapVersion, $frame);
+            // php-src soap.c do_request — always call_user_function("__doRequest") (#31876).
+            $response = self::dispatchDoRequest(
+                $object,
+                $request,
+                $location,
+                $action,
+                $state->soapVersion,
+                $frame,
+                false
+            );
             $state->lastResponse = $response;
 
             // php-src php_packet_soap.c Header walk → &$outputHeaders (even if Body later faults).
@@ -910,6 +919,71 @@ final class VmSoapClient
 
             return $faultVar;
         }
+    }
+
+    /**
+     * php-src soap.c do_request — invoke instance __doRequest so subclass overrides run (#31876).
+     */
+    public static function dispatchDoRequest(
+        ObjectEntry $object,
+        string $request,
+        string $location,
+        string $action,
+        int $version,
+        Frame $frame,
+        bool $oneWay = false
+    ): string {
+        $vm = $frame->vmContext->runtime->vm ?? null;
+        if (null === $vm) {
+            return self::transportDoRequestWithOneWay(
+                $object,
+                $request,
+                $location,
+                $action,
+                $version,
+                $frame,
+                $oneWay
+            );
+        }
+        $req = new Variable();
+        $req->string($request);
+        $loc = new Variable();
+        $loc->string($location);
+        $act = new Variable();
+        $act->string($action);
+        $ver = new Variable();
+        $ver->int($version);
+        $ow = new Variable();
+        $ow->bool($oneWay);
+        $ret = $vm->invokeInstanceMethod($object, '__doRequest', $req, $loc, $act, $ver, $ow)->resolveIndirect();
+        if (Variable::TYPE_NULL === $ret->type) {
+            return '';
+        }
+
+        return $ret->toString();
+    }
+
+    /**
+     * php-src PHP_METHOD(SoapClient, __doRequest) — oneWay skips the body unless WAIT (#31876).
+     */
+    public static function transportDoRequestWithOneWay(
+        ObjectEntry $object,
+        string $request,
+        string $location,
+        string $action,
+        int $version,
+        ?Frame $frame,
+        bool $oneWay
+    ): string {
+        $body = self::doRequest($object, $request, $location, $action, $version, $frame);
+        if (
+            $oneWay
+            && 0 === (self::state($object)->features & SoapConstants::SOAP_WAIT_ONE_WAY_CALLS)
+        ) {
+            return '';
+        }
+
+        return $body;
     }
 
     public static function doRequest(
@@ -3754,7 +3828,19 @@ final class SoapClientDoRequest extends SoapClassMethod
         $location = $this->stringArg($frame->calledArgs[2], 'SoapClient::__doRequest', 1, 'location');
         $action = $this->stringArg($frame->calledArgs[3], 'SoapClient::__doRequest', 2, 'action');
         $version = (int) $frame->calledArgs[4]->resolveIndirect()->toInt();
-        $response = VmSoapClient::doRequest($receiver, $request, $location, $action, $version, $frame);
+        $oneWay = false;
+        if (isset($frame->calledArgs[5])) {
+            $oneWay = $frame->calledArgs[5]->resolveIndirect()->toBool();
+        }
+        $response = VmSoapClient::transportDoRequestWithOneWay(
+            $receiver,
+            $request,
+            $location,
+            $action,
+            $version,
+            $frame,
+            $oneWay
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->string($response);
         }
