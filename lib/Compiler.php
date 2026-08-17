@@ -58674,8 +58674,17 @@ class Compiler {
                         }
                         break;
                     }
-                    $castPrelude = $block->orig->children[$probeIndex] ?? null;
-                    if ($castPrelude instanceof Op\Expr\Cast) {
+                    $argPrelude = $block->orig->children[$probeIndex] ?? null;
+                    if ($argPrelude instanceof Op\Expr\Cast) {
+                        return;
+                    }
+                    // var_export($arr['o']->name, true) — PropertyFetch feeds arg #0;
+                    // ArrayDimFetch is the object receiver (#31938, zend_execute.c FETCH_OBJ_R).
+                    if (
+                        $argPrelude instanceof Op\Expr\PropertyFetch
+                        || $argPrelude instanceof Op\Expr\NullsafePropertyFetch
+                        || $argPrelude instanceof Op\Expr\StaticPropertyFetch
+                    ) {
                         return;
                     }
                 }
