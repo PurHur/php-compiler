@@ -38,6 +38,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * options['typemap'] from_xml/to_xml string or Closure/callable callbacks (#21046 / #31845).
  * __soapCall $options location/soapaction/uri apply per-call without mutating ctor state (#31873).
  * SOAP 1.2 HTTP uses application/soap+xml; action= (no SOAPAction header) (#31918 / php_http.c).
+ * SOAP 1.2 encoded requests use env:encodingStyle + SOAP_1_2_ENC_NAMESPACE (#31919).
  */
 final class VmSoapClient
 {
@@ -2413,6 +2414,14 @@ final class VmSoapClient
         return false !== $pos ? \substr($qname, $pos + 1) : $qname;
     }
 
+    /** php-src php_soap.h SOAP_1_1_ENC_NAMESPACE / SOAP_1_2_ENC_NAMESPACE (#31919). */
+    private static function encodingNamespace(int $soapVersion): string
+    {
+        return SoapConstants::SOAP_1_2 === $soapVersion
+            ? SoapConstants::SOAP_1_2_ENC_NAMESPACE
+            : SoapConstants::SOAP_1_1_ENC_NAMESPACE;
+    }
+
     /**
      * @param list<mixed> $arguments
      * @param list<ObjectEntry> $inputHeaders
@@ -2484,9 +2493,12 @@ final class VmSoapClient
             $headerXml .= '  </'.$prefix.':Header>'."\n";
         }
 
+        $encNs = self::encodingNamespace($state->soapVersion);
+        $encXmlnsPrefix = SoapConstants::SOAP_1_2 === $state->soapVersion ? 'enc' : 'SOAP-ENC';
         $encodingStyleAttr = '';
         if (SoapConstants::SOAP_ENCODED === $state->use) {
-            $encodingStyleAttr = ' SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"';
+            // php-src soap.c serialize_function_call — env:encodingStyle + SOAP_1_2_ENC_NAMESPACE (#31919).
+            $encodingStyleAttr = ' '.$prefix.':encodingStyle="'.$encNs.'"';
         }
 
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
@@ -2494,7 +2506,7 @@ final class VmSoapClient
             ' xmlns:ns1="'.\htmlspecialchars($ns, \ENT_XML1).'"'.
             ' xmlns:xsd="http://www.w3.org/2001/XMLSchema"'.
             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'.
-            ' xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"'.
+            ' xmlns:'.$encXmlnsPrefix.'="'.$encNs.'"'.
             $encodingStyleAttr.'>'."\n".
             $headerXml.
             '  <'.$prefix.':Body>'."\n".
