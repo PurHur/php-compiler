@@ -20,7 +20,13 @@ final class ElementGetAttributeNode extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMElement::getAttributeNode() expects at least 1 argument');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMElement::getAttributeNode()', 0);
+        $name = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMElement::getAttributeNode()',
+            0,
+            $frame,
+            'qualifiedName'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMElement::getAttributeNode() requires VM context in this compiler build');
         }

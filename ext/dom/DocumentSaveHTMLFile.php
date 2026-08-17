@@ -22,7 +22,13 @@ final class DocumentSaveHTMLFile extends DomClassMethod
     {
         $this->requireExactUserArgCount($frame, 'DOMDocument::saveHTMLFile', 1);
         $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::saveHTMLFile()');
-        $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::saveHTMLFile()', 0);
+        $filename = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMDocument::saveHTMLFile()',
+            0,
+            $frame,
+            'filename'
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(VmDom::saveHTMLFile($receiver, $filename));
         }

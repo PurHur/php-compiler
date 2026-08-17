@@ -21,7 +21,13 @@ final class NamedNodeMapGetNamedItemNS extends DomClassMethod
             throw new \LogicException('DOMNamedNodeMap::getNamedItemNS() expects at least 2 arguments');
         }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMNamedNodeMap::getNamedItemNS()', 0);
-        $localName = $this->stringArg($frame->calledArgs[2], 'DOMNamedNodeMap::getNamedItemNS()', 1);
+        $localName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMNamedNodeMap::getNamedItemNS()',
+            1,
+            $frame,
+            'localName'
+        );
         if (null === $frame->returnVar) {
             return;
         }

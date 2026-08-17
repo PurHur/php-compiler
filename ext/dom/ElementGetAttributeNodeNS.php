@@ -23,7 +23,13 @@ final class ElementGetAttributeNodeNS extends DomClassMethod
         $this->requireExactUserArgCount($frame, 'DOMElement::getAttributeNodeNS', 2);
         $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::getAttributeNodeNS()');
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::getAttributeNodeNS()', 0);
-        $localName = $this->stringArg($frame->calledArgs[2], 'DOMElement::getAttributeNodeNS()', 1);
+        $localName = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMElement::getAttributeNodeNS()',
+            1,
+            $frame,
+            'localName'
+        );
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMElement::getAttributeNodeNS() requires VM context in this compiler build');
         }

@@ -22,8 +22,20 @@ final class ImplementationHasFeature extends DomClassMethod
     {
         $this->requireExactUserArgCount($frame, 'DOMImplementation::hasFeature', 2);
         self::receiver($frame, VmDom::CLASS_IMPLEMENTATION, 'DOMImplementation::hasFeature()');
-        $feature = $this->stringArg($frame->calledArgs[1], 'DOMImplementation::hasFeature()', 0);
-        $version = $this->stringArg($frame->calledArgs[2], 'DOMImplementation::hasFeature()', 1);
+        $feature = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMImplementation::hasFeature()',
+            0,
+            $frame,
+            'feature'
+        );
+        $version = $this->stringArg(
+            $frame->calledArgs[2],
+            'DOMImplementation::hasFeature()',
+            1,
+            $frame,
+            'version'
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmDom::hasFeature($feature, $version));
         }
