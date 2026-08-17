@@ -215,6 +215,8 @@
             <file>./test/compliance/ArrayPadOversizeValueError29342VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153VMTest.php</file>
             <file>./test/compliance/FinalPromotedCtorParamParse31153JITTest.php</file>
+            <file>./test/compliance/EvalTypedClassConstParse31860VMTest.php</file>
+            <file>./test/compliance/EvalTypedClassConstParse31860JITTest.php</file>
             <file>./test/compliance/TryCatchElsePhpSrcStrict31159VMTest.php</file>
             <file>./test/compliance/TryCatchElsePhpSrcStrict31159JITTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146VMTest.php</file>
