@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -153,10 +154,11 @@ final class StringZlibJit
             ['inflateEnd', $i32, [$i8p]],
             ['malloc', $i8p, [$i64]],
             ['free', $voidTy, [$i8p]],
-            ['memset', $i8p, [$i8p, $i32, $i64]],
+            // memset(3) via LibcExtern::ensureMemsetDecl after always-on drop (#31863).
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
+        LibcExtern::ensureMemsetDecl($context);
     }
 
     private static function ensureRuntimeHelpers(Context $context): void
