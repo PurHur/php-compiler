@@ -1259,6 +1259,21 @@ final class Variable {
         return $this->arrayAccessDimension->read()->resolveIndirect();
     }
 
+    /**
+     * ZEND_ASSIGN_DIM_OP reads the live offsetGet payload, not the ArrayAccess view type (#31947).
+     *
+     * TYPE_ARRAYACCESS_OFFSET is named "mixed" in TypeErrors; assign-op must use the stored int/float.
+     */
+    private static function unwrapArrayAccessOperand(self $var): self
+    {
+        $var = $var->resolveIndirect();
+        if ($var->isArrayAccessOffset()) {
+            return $var->readArrayAccessOffsetValue();
+        }
+
+        return $var;
+    }
+
     public function arrayAccessOffsetClassName(): string
     {
         if (self::TYPE_ARRAYACCESS_OFFSET !== $this->type) {
@@ -2724,6 +2739,21 @@ restart:
 
             return;
         }
+        if ($this->type === self::TYPE_ARRAYACCESS_OFFSET) {
+            $result = new self();
+            $result->bitwiseOp(
+                $opCode,
+                self::unwrapArrayAccessOperand($left),
+                self::unwrapArrayAccessOperand($right),
+                $vm,
+                $frame
+            );
+            $this->copyFrom($result);
+
+            return;
+        }
+        $left = self::unwrapArrayAccessOperand($left);
+        $right = self::unwrapArrayAccessOperand($right);
         $this->reset();
 restart:
         if ($left->type === self::TYPE_INDIRECT) {
@@ -2873,8 +2903,21 @@ restart:
 
             return;
         }
-        $left = $left->resolveIndirect();
-        $right = $right->resolveIndirect();
+        if ($this->type === self::TYPE_ARRAYACCESS_OFFSET) {
+            $result = new self();
+            $result->numericOp(
+                $opCode,
+                self::unwrapArrayAccessOperand($left),
+                self::unwrapArrayAccessOperand($right),
+                $vm,
+                $frame
+            );
+            $this->copyFrom($result);
+
+            return;
+        }
+        $left = self::unwrapArrayAccessOperand($left);
+        $right = self::unwrapArrayAccessOperand($right);
         TypedPropertyCheck::assertReadable($left);
         TypedPropertyCheck::assertReadable($right);
         if (OpCode::TYPE_PLUS === $opCode
@@ -2978,6 +3021,19 @@ restart:
             $result = new self();
             $result->incDecOp($opCode, $left, $right, $vm, $frame);
             $this->indirect->copyFrom($result);
+
+            return;
+        }
+        if ($this->type === self::TYPE_ARRAYACCESS_OFFSET) {
+            $result = new self();
+            $result->incDecOp(
+                $opCode,
+                self::unwrapArrayAccessOperand($left),
+                self::unwrapArrayAccessOperand($right),
+                $vm,
+                $frame
+            );
+            $this->copyFrom($result);
 
             return;
         }
