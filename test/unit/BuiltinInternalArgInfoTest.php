@@ -1096,6 +1096,54 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
     }
 
+    /** php-src php_intl.stub.php — datetime/format untyped + ?string locale → string|false (#25200). */
+    public function testDatefmtFormatObjectReflectionStubTypes(): void
+    {
+        $fn = 'datefmt_format_object';
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 2));
+        $datetime = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+        $this->assertNotNull($datetime);
+        $this->assertSame('datetime', $datetime['name']);
+        $this->assertSame('', $datetime['type']);
+        $this->assertFalse($datetime['isOptional']);
+        $format = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+        $this->assertNotNull($format);
+        $this->assertSame('format', $format['name']);
+        $this->assertSame('', $format['type']);
+        $this->assertTrue($format['isOptional']);
+        $locale = BuiltinInternalArgInfo::paramInfoForFunction($fn, 2);
+        $this->assertNotNull($locale);
+        $this->assertSame('locale', $locale['name']);
+        $this->assertSame('?string', $locale['type']);
+        $this->assertTrue($locale['isOptional']);
+        $this->assertSame(['datetime', 'format=', 'locale='], BuiltinParamNames::forFunction($fn));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'datetime',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'format',
+            $fn
+        ));
+        $this->assertSame(2, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'locale',
+            $fn
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'object',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        $this->assertSame(3, BuiltinParamNames::paramCountForInternalFunction($fn));
+    }
+
     /** php-src ext/sysvshm/sysvshm.stub.php — SysvSharedMemory stubs; InternalArgInfo int/untyped (#27943). */
     public function testShmAttachReflectionStubTypes(): void
     {

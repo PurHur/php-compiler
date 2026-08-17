@@ -964,6 +964,11 @@ final class BuiltinInternalDefaultValues
         'normalizer_get_raw_decomposition' => [
             1 => ['kind' => 'int', 'value' => 16],
         ],
+        // php-src ext/intl/php_intl.stub.php — $format = null (untyped; infer would miss) (#25200)
+        'datefmt_format_object' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

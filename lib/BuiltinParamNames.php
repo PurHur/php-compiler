@@ -2119,6 +2119,9 @@ final class BuiltinParamNames
             // php-src ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
             case 'normalizer_get_raw_decomposition':
                 return ['string', 'form='];
+            // php-src ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
+            case 'datefmt_format_object':
+                return ['datetime', 'format=', 'locale='];
             // php-src ext/intl/resourcebundle/resourcebundle.stub.php — bundlename + fallback infer false (#25587)
             case 'resourcebundle_create':
                 return ['locale', 'bundle', 'fallback='];
