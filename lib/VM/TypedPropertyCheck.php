@@ -185,6 +185,21 @@ final class TypedPropertyCheck
         throw new TypedPropertyReadSignal($vm->makeEngineError($message));
     }
 
+    /**
+     * Zend zend_std_get_property_ptr_ptr before creating an INDIRECT (#31771).
+     *
+     * Uninitialized non-nullable typed properties Error; nullable typed slots become null
+     * (ZVAL_NULL) so `$r = &$o->y` aliases an initialized null rather than UNDEF.
+     */
+    public static function prepareWritableByReference(Variable $var): void
+    {
+        self::assertWritableByReference($var);
+        if (!self::isUninitialized($var)) {
+            return;
+        }
+        $var->resolveIndirect()->null();
+    }
+
     public static function writableByReferenceErrorMessage(Variable $var): string
     {
         $target = $var->resolveIndirect();
@@ -209,6 +224,107 @@ final class TypedPropertyCheck
             \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($owner->class->name),
             $name
         );
+    }
+
+    /**
+     * FETCH_DIM_W / []= on an uninitialized typed array property (zend_std_get_property_ptr_ptr
+     * BP_VAR_W + zend_try_array_init, #31770). Scalars stay uninitialized so assertReadable Errors.
+     *
+     * @return bool true when the slot is writable as an array (already initialized, or just inited)
+     */
+    public static function tryInitEmptyArrayForDimWrite(Variable $var): bool
+    {
+        $target = $var->resolveIndirect();
+        if (!self::isUninitialized($target)) {
+            return true;
+        }
+        if (!self::propertyAllowsArray($target)) {
+            return false;
+        }
+        $target->array(new HashTable());
+
+        return true;
+    }
+
+    /**
+     * True when the declared type contains `array` (or `mixed`) — ZEND_TYPE_CONTAINS_CODE(IS_ARRAY).
+     */
+    public static function propertyAllowsArray(Variable $var): bool
+    {
+        $target = $var->resolveIndirect();
+        if (self::slotTypeAllowsArray($target)) {
+            return true;
+        }
+        if (null !== $target->objectPropertyOwner && null !== $target->objectPropertyName) {
+            foreach ($target->objectPropertyOwner->class->properties as $property) {
+                if ($property->name !== $target->objectPropertyName) {
+                    continue;
+                }
+                if ($property->prototype === $target) {
+                    return false;
+                }
+
+                return self::propertyAllowsArray($property->prototype);
+            }
+        }
+        if (null !== $target->staticPropertyClassLc && null !== $target->objectPropertyName) {
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
+                $entry = $vm->context->classes[$target->staticPropertyClassLc];
+                $lc = strtolower($target->objectPropertyName);
+                if (isset($entry->staticProperties[$lc])) {
+                    $proto = $entry->staticProperties[$lc];
+                    if ($proto !== $target) {
+                        return self::propertyAllowsArray($proto);
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function slotTypeAllowsArray(Variable $target): bool
+    {
+        if (Variable::TYPE_ARRAY === $target->typeConstraint) {
+            return true;
+        }
+        if (null !== $target->genericArrayTypeSpec) {
+            return true;
+        }
+        if (null !== $target->unionTypeConstraints) {
+            foreach ($target->unionTypeConstraints as $member) {
+                if (Variable::TYPE_ARRAY === $member) {
+                    return true;
+                }
+            }
+        }
+        $label = strtolower((string) ($target->declaredTypeLabel ?? ''));
+        if ('' !== $label) {
+            if ('mixed' === $label || 'array' === $label || '?array' === $label) {
+                return true;
+            }
+            $normalized = str_replace(['(', ')'], '', $label);
+            foreach (explode('|', $normalized) as $arm) {
+                $arm = trim($arm);
+                if (str_starts_with($arm, '?')) {
+                    $arm = substr($arm, 1);
+                }
+                if ('array' === $arm || 'mixed' === $arm) {
+                    return true;
+                }
+            }
+        }
+        if (null !== $target->dnfArms) {
+            foreach ($target->dnfArms as $arm) {
+                $name = strtolower((string) ($arm['name'] ?? ''));
+                if ('array' === $name || 'mixed' === $name) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -245,8 +361,10 @@ final class TypedPropertyCheck
             $vm = \PHPCompiler\VM::running();
             if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
                 $entry = $vm->context->classes[$target->staticPropertyClassLc];
-                if (isset($entry->staticProperties[strtolower($target->objectPropertyName)])) {
-                    return self::propertyAllowsNull($entry->staticProperties[strtolower($target->objectPropertyName)]);
+                $slot = $entry->staticProperties[strtolower($target->objectPropertyName)] ?? null;
+                // The live static cell already carries type metadata; do not recurse into self (#31771).
+                if (null !== $slot && $slot !== $target) {
+                    return self::propertyAllowsNull($slot);
                 }
             }
         }

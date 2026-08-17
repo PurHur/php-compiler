@@ -8511,6 +8511,7 @@ class JIT {
                     if (null !== $srcName) {
                         if ($this->context->hasVariableOp($srcOp)) {
                             $srcVar = $this->context->getVariableFromOp($srcOp);
+                            JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
                             if (
                                 Variable::TYPE_VALUE === $srcVar->type
                                 && null === $srcVar->valueBoxAliasPtr
@@ -8532,6 +8533,7 @@ class JIT {
                         throw new \LogicException('Reference assignment requires a bound source variable');
                     }
                     $srcVar = $this->context->getVariableFromOp($srcOp);
+                    JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
                     if (
                         Variable::TYPE_VALUE === $srcVar->type
                         && null === $srcVar->valueBoxAliasPtr
@@ -13104,6 +13106,9 @@ class JIT {
                             $declaringClass,
                             $name->value
                         );
+                        if ($forDimWrite) {
+                            JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
+                        }
                         if ($forceBranchMerge) {
                             $this->assignOperand($result, $fetched, true);
                         } else {
@@ -14986,6 +14991,9 @@ class JIT {
                         }
                         if (\PHPCompiler\VM\TypedPropertyCheck::propertyAllowsNull($proto)) {
                             $this->context->type->object->markPropertyAllowsNull($classId, $name->value);
+                        }
+                        if (\PHPCompiler\VM\TypedPropertyCheck::propertyAllowsArray($proto)) {
+                            $this->context->type->object->markPropertyAllowsArray($classId, $name->value);
                         }
                         // Typed / explicit mixed prototypes stay UNDEFINED; untyped are TYPE_NULL (#22021).
                         if ($proto->isUndefined() || $proto->hasDeclaredTypeConstraint()) {
