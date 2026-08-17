@@ -447,37 +447,19 @@ final class LimitIteratorSeek extends VmClassMethod
             LimitIteratorBuiltin::CLASS_LC,
             'LimitIterator::seek()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'LimitIterator::seek() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
-        $offsetArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $offsetArg->type) {
-            throw new \TypeError(
-                'LimitIterator::seek(): Argument #1 ($offset) must be of type int, '
-                .self::typeLabel($offsetArg).' given'
-            );
-        }
-        SplLimitIteratorStorage::seek($frame, $object, $offsetArg->toInt());
+        // php-src zim_LimitIterator_seek — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG (#31676).
+        $this->requireExactUserArgCount($frame, 'LimitIterator::seek', 1);
+        $offset = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'LimitIterator::seek',
+            1,
+            'offset'
+        );
+        SplLimitIteratorStorage::seek($frame, $object, $offset);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(SplLimitIteratorStorage::position($object));
         }
-    }
-
-    private static function typeLabel(Variable $var): string
-    {
-        return match ($var->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
     }
 }
 
