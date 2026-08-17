@@ -2928,6 +2928,16 @@ class Context {
                     return;
                 }
             }
+            // Inlined include {main}: additional $this operands (hoisted vs scoped)
+            // must alias the include-entry bind / LLVM param 0 (#31903).
+            if ($this->inlineIncludeDepth > 0) {
+                $inheritedThis = $this->findThisVariable();
+                if (null !== $inheritedThis && Variable::TYPE_OBJECT === $inheritedThis->type) {
+                    $this->scope->variables[$op] = $inheritedThis;
+
+                    return;
+                }
+            }
         }
         if (null !== $name && Superglobals::isSuperglobalName($name)) {
             $this->scope->variables[$op] = SuperglobalInit::load($this, $name);
