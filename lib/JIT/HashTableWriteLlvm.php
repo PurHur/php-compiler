@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\VM\ArraySpread;
 use PHPCompiler\VM\HashTable as VmHashTable;
 use PHPCompiler\VM\HashTableJitHelper;
+use PHPCompiler\JIT\Builtin\CallUnpackRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPLLVM\Builder;
@@ -799,7 +801,7 @@ final class HashTableWriteLlvm
         );
         $context->builder->branchIf($isArray, $illegalBlock, $done);
         $context->builder->positionAtEnd($illegalBlock);
-        HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in unset');
+        HashTableReadLlvm::emitIllegalOffsetType($context, 'Illegal offset type in unset');
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
     }
@@ -967,7 +969,7 @@ final class HashTableWriteLlvm
         self::trackCompileTimeAssoc($array, $key, $element);
         if (Variable::TYPE_HASHTABLE === $key->type) {
             // Array-literal array keys: typed TypeError under PROFILE≥8.3 (#28628).
-            HashTableHelper::emitIllegalOffsetTypeForKey($context, $key);
+            HashTableReadLlvm::emitIllegalOffsetTypeForKey($context, $key);
 
             return;
         }
@@ -1212,7 +1214,7 @@ final class HashTableWriteLlvm
         );
         $context->builder->branchIf($isArray, $illegalBlock, $done);
         $context->builder->positionAtEnd($illegalBlock);
-        HashTableHelper::emitIllegalOffsetType($context);
+        HashTableReadLlvm::emitIllegalOffsetType($context);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
     }
@@ -1468,7 +1470,7 @@ final class HashTableWriteLlvm
         $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
         if (Variable::TYPE_STRING !== $key->type) {
             if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
-                HashTableHelper::emitIllegalOffsetTypeForKey($context, $key);
+                HashTableReadLlvm::emitIllegalOffsetTypeForKey($context, $key);
 
                 return;
             }
@@ -1679,7 +1681,7 @@ final class HashTableWriteLlvm
 
             return;
         }
-        $srcHt = HashTableHelper::coerceToPackedHashtable($context, $source);
+        $srcHt = self::coerceToPackedHashtable($context, $source);
         $srcPtr = $context->helper->loadValue($srcHt);
         self::spreadPackedInto($context, $dest, $srcPtr);
         self::spreadStringKeysInto($context, $dest, $srcPtr);
@@ -2087,7 +2089,7 @@ final class HashTableWriteLlvm
         if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
             throw new \LogicException('materializeNativeArrayForCall requires a native array');
         }
-        $dest = HashTableHelper::alloc($context);
+        $dest = self::alloc($context);
         $map = $context->structFieldMap['__hashtable__'];
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
         $sizeT = $context->getTypeFromString('size_t');
@@ -2171,7 +2173,7 @@ final class HashTableWriteLlvm
             $result->initialize();
         }
         self::ensureHashtableInitLvalueSlot($context, $result);
-        $ht = HashTableHelper::alloc($context);
+        $ht = self::alloc($context);
         if (Variable::TYPE_VALUE === $result->type) {
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
@@ -2249,7 +2251,7 @@ final class HashTableWriteLlvm
      */
     public static function packVariables(Context $context, array $vars): Variable
     {
-        $ht = HashTableHelper::alloc($context);
+        $ht = self::alloc($context);
         $i64 = $context->getTypeFromString('int64');
         foreach ($vars as $index => $var) {
             if (!$var instanceof Variable) {
@@ -2268,7 +2270,7 @@ final class HashTableWriteLlvm
 
     public static function variableFromVmHashTable(Context $context, \PHPCompiler\VM\HashTable $table): Variable
     {
-        $ht = HashTableHelper::alloc($context);
+        $ht = self::alloc($context);
         $setLong = $context->lookupFunction('__hashtable__setLongAt');
         $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
         $setStringKey = $context->lookupFunction('__hashtable__setStringKeyString');
@@ -2404,5 +2406,197 @@ final class HashTableWriteLlvm
             $ht,
             $keyStr
         );
+    }
+
+    public static function alloc(Context $context): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_alloc_cont');
+
+        return $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+    }
+
+    /** Empty packed list for variadic recv with zero trailing args (issue #197). */
+    public static function emptyVariable(Context $context): Variable
+    {
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            self::alloc($context)
+        );
+    }
+
+    /**
+     * Normalize a call/unpack operand to a packed __hashtable__* (issue #1361).
+     */
+    public static function coerceToPackedHashtable(Context $context, Variable $source): Variable
+    {
+        if ($source->type & Variable::IS_NATIVE_ARRAY) {
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                self::materializeNativeArrayForCall($context, $source)
+            );
+        }
+        if (Variable::TYPE_HASHTABLE === $source->type) {
+            return $source;
+        }
+        if (Variable::TYPE_VALUE === $source->type || $source->valueBoxHashtable) {
+            $ht = HashTableReadLlvm::ensureHashtablePointer($context, $source);
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $ht
+            );
+        }
+        if (Variable::TYPE_OBJECT === $source->type) {
+            $ptr = $context->helper->loadValue($source);
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $context->builder->pointerCast(
+                    $ptr,
+                    $context->getTypeFromString('__hashtable__*')
+                )
+            );
+        }
+
+        throw new \LogicException(
+            'Array spread/unpack requires an array, got '.Variable::getStringType($source->type)
+        );
+    }
+
+    /**
+     * Like {@see coerceToPackedHashtable} but always returns an owned hashtable copy so
+     * call-time unpack does not alias script-global / value-box storage
+     * (`s(...$p)` then use `$v` — #23971 e08_spread).
+     */
+    public static function coerceToPackedHashtableCopy(Context $context, Variable $source): Variable
+    {
+        $packed = self::coerceToPackedHashtable($context, $source);
+        $ptr = $context->helper->loadValue($packed);
+        $copy = HashTableDuplicateRuntime::duplicate($context, $ptr);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $copy
+        );
+    }
+
+    /**
+     * Box a native {@see __hashtable__*} into a value-boxed array local (#24167 k09).
+     */
+    public static function boxedArrayFromHashtable(Context $context, Variable $ht): Variable
+    {
+        if (Variable::TYPE_HASHTABLE !== $ht->type) {
+            throw new \LogicException(
+                'boxedArrayFromHashtable requires TYPE_HASHTABLE, got '.Variable::getStringType($ht->type)
+            );
+        }
+        $slot = JitValueBox::alloc($context);
+        $ptr = $context->helper->loadValue($ht);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $ptr
+        );
+        $context->refcount->addref($ptr);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->valueBoxHashtable = true;
+
+        return $var;
+    }
+
+    /**
+     * Merge ARG_SEND entries that may include unpack markers (issue #1361).
+     *
+     * @param list<Variable|array{unpack: Variable}> $entries
+     */
+    public static function mergeCallArgEntries(Context $context, array $entries): Variable
+    {
+        if (1 === \count($entries)) {
+            $only = $entries[0];
+            if (\is_array($only) && isset($only['unpack'])) {
+                $src = $only['unpack'];
+                if (
+                    !ListUnpackHelper::isDefinitelyArrayAtCompileTime($src)
+                    && Variable::TYPE_VALUE !== $src->type
+                    && Variable::TYPE_OBJECT !== $src->type
+                ) {
+                    CallUnpackRuntime::ensureLinked($context);
+                    ListUnpackHelper::emitCallUnpackOperandCheck($context, $src);
+                }
+
+                return self::coerceToPackedHashtableCopy($context, $src);
+            }
+        }
+
+        $needsNonArrayGuard = false;
+        foreach ($entries as $entry) {
+            if (!\is_array($entry) || !isset($entry['unpack'])) {
+                continue;
+            }
+            $u = $entry['unpack'];
+            if (
+                !ListUnpackHelper::isDefinitelyArrayAtCompileTime($u)
+                && Variable::TYPE_VALUE !== $u->type
+                && Variable::TYPE_OBJECT !== $u->type
+            ) {
+                $needsNonArrayGuard = true;
+                break;
+            }
+        }
+        if ($needsNonArrayGuard) {
+            CallUnpackRuntime::ensureLinked($context);
+        }
+
+        $dest = self::emptyVariable($context);
+        $destVar = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $dest->value
+        );
+        foreach ($entries as $entry) {
+            if (\is_array($entry) && isset($entry['unpack'])) {
+                $u = $entry['unpack'];
+                if (
+                    $needsNonArrayGuard
+                    && !ListUnpackHelper::isDefinitelyArrayAtCompileTime($u)
+                    && Variable::TYPE_VALUE !== $u->type
+                    && Variable::TYPE_OBJECT !== $u->type
+                ) {
+                    ListUnpackHelper::emitCallUnpackOperandCheck($context, $u);
+                }
+                self::spreadInto($context, $destVar, $u);
+                continue;
+            }
+            if (\is_array($entry) && isset($entry['named'])) {
+                $nameVar = new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->constantFromString((string) $entry['named'])
+                );
+                self::addElement($context, $destVar, $entry['value'], $nameVar);
+                continue;
+            }
+            $value = \is_array($entry) ? ($entry['v'] ?? $entry['value'] ?? null) : $entry;
+            self::addElement($context, $destVar, $value, null);
+        }
+
+        return $destVar;
     }
 }

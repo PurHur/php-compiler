@@ -218,4 +218,25 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('public static function forEachStringKeyNode', $read);
         $this->assertStringContainsString('public static function forEachIndexedStringAt', $read);
     }
+
+    public function testHashTableHelperDelegatesCallArgAndCoerceLlvmV9(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString('HashTableWriteLlvm::mergeCallArgEntries', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::coerceToPackedHashtable', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::boxedArrayFromHashtable', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::alloc', $helper);
+        $this->assertStringContainsString('HashTableReadLlvm::emitIllegalOffsetType', $helper);
+        $this->assertStringNotContainsString('CallUnpackRuntime::ensureLinked', $helper);
+        $this->assertStringNotContainsString('TypeErrorRaise::emitRaise', $helper);
+
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString('public static function mergeCallArgEntries', $write);
+        $this->assertStringContainsString('public static function coerceToPackedHashtable', $write);
+        $this->assertStringContainsString('public static function boxedArrayFromHashtable', $write);
+
+        $read = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReadLlvm.php');
+        $this->assertStringContainsString('public static function emitIllegalOffsetType', $read);
+        $this->assertStringContainsString('public static function illegalOffsetMessageForJitKey', $read);
+    }
 }
