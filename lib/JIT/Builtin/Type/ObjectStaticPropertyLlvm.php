@@ -109,7 +109,7 @@ final class ObjectStaticPropertyLlvm
         $context->builder->returnVoid();
     }
 
-    public static function fetch(Object_ $object, int $classId, string $name): Variable
+    public static function fetch(Object_ $object, int $classId, string $name, bool $isMode = false): Variable
     {
         $entry = $object->staticPropertyGlobalEntry($classId, $name);
         if (null === $entry) {
@@ -129,7 +129,12 @@ final class ObjectStaticPropertyLlvm
             );
         }
         $context = $object->jitContext();
-        if (!empty($entry['typedWithoutDefault']) && null !== ($entry['initGlobal'] ?? null)) {
+        // Dim isset/empty/?? is BP_VAR_IS — do not Error on uninitialized typed slots (#31783).
+        if (
+            !$isMode
+            && !empty($entry['typedWithoutDefault'])
+            && null !== ($entry['initGlobal'] ?? null)
+        ) {
             TypedPropertyUninitGuard::emitBeforeStaticRead(
                 $context,
                 $entry['initGlobal'],

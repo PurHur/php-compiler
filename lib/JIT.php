@@ -10038,7 +10038,12 @@ class JIT {
                             $classId,
                             $nameOp->value
                         );
-                        $fetched = $this->context->type->object->staticPropertyFetch($classId, $nameOp->value);
+                        $isDimIs = $this->varFetchDestUsedAsIsDimContainer($block, $i, (int) $op->arg1);
+                        $fetched = $this->context->type->object->staticPropertyFetch(
+                            $classId,
+                            $nameOp->value,
+                            $isDimIs
+                        );
                         if ($forWrite) {
                             $fetched->staticPropertyHookClassLc = strtolower(ltrim($className, '\\'));
                             $fetched->objectPropertyName = $nameOp->value;
@@ -23532,6 +23537,47 @@ class JIT {
         }
 
         return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot);
+    }
+
+    /**
+     * True when fetch dest is the container for dim isset/empty/FETCH_DIM_IS (#31783).
+     */
+    private function varFetchDestUsedAsIsDimContainer(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $ops = $block->opCodes;
+        $n = \count($ops);
+        for ($i = $opIndex + 1; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (OpCode::destSlotUsedAsIsDimContainer($next, $destSlot)) {
+                return true;
+            }
+            if (
+                OpCode::TYPE_PROPERTY_FETCH === $next->type
+                || OpCode::TYPE_PROPERTY_FETCH_WRITE === $next->type
+                || OpCode::TYPE_STATIC_PROPERTY_FETCH === $next->type
+            ) {
+                if ((int) $next->arg1 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH === $next->type
+                || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg2 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (OpCode::TYPE_UNSET === $next->type) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     /**

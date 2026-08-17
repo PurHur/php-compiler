@@ -58,11 +58,11 @@ final class EmptyDimensionLlvm
             return self::compileNativeArrayOffsetIsEmpty($context, $container, $dim);
         }
         if ($container->type === Variable::TYPE_HASHTABLE || Variable::TYPE_VALUE === $container->type) {
-            $htVar = Variable::TYPE_VALUE === $container->type
-                ? self::hashtableFromValueBox($context, $container)
-                : $container;
+            if (Variable::TYPE_VALUE === $container->type) {
+                return self::compileValueBoxOffsetIsEmpty($context, $container, $dim, $containerOp);
+            }
 
-            return self::compileHashTableOffsetIsEmpty($context, $htVar, $dim, $containerOp);
+            return self::compileHashTableOffsetIsEmpty($context, $container, $dim, $containerOp);
         }
 
         $isset = IssetHelper::compile($context, $container, $dim, $dimOp, $containerOp, false);
@@ -269,6 +269,47 @@ final class EmptyDimensionLlvm
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * empty($box[$dim]) — UNDEF/NULL are empty without array-init (#31783).
+     */
+    private static function compileValueBoxOffsetIsEmpty(
+        Context $context,
+        Variable $container,
+        Variable $dim,
+        ?Operand $containerOp
+    ): Value {
+        $missing = IssetHelperLlvm::valueBoxIsNullOrUndefined($context, $container);
+        if (null === $missing) {
+            $htVar = self::hashtableFromValueBox($context, $container);
+
+            return self::compileHashTableOffsetIsEmpty($context, $htVar, $dim, $containerOp);
+        }
+        $i1 = $context->getTypeFromString('int1');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $missingBB = $fn->appendBasicBlock('empty_dim_box_missing');
+        $htBB = $fn->appendBasicBlock('empty_dim_box_ht');
+        $doneBB = $fn->appendBasicBlock('empty_dim_box_done');
+        $context->builder->branchIf($missing, $missingBB, $htBB);
+
+        $context->builder->positionAtEnd($missingBB);
+        $true = $i1->constInt(1, false);
+        $context->builder->branch($doneBB);
+
+        $context->builder->positionAtEnd($htBB);
+        $htVar = self::hashtableFromValueBox($context, $container);
+        $htResult = self::compileHashTableOffsetIsEmpty($context, $htVar, $dim, $containerOp);
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBB);
+
+        $context->builder->positionAtEnd($doneBB);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($true, $missingBB);
+        $phi->addIncoming($htResult, $htEnd);
+
+        return $phi;
     }
 
     private static function hashtableFromValueBox(Context $context, Variable $container): Variable

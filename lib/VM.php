@@ -6880,6 +6880,11 @@ restart:
                         }
                     }
                     if (!$mutates) {
+                        // Dim isset/empty/?? is BP_VAR_IS — uninitialized typed slots are missing (#31783).
+                        if ($this->propertyFetchDestUsedAsIsDimContainer($frame, $op)) {
+                            $this->copyPropertyValueForIsMode($dest, $storage);
+                            break;
+                        }
                         // BP_VAR_W dim-assign/append auto-inits (#31770); BP_VAR_RW ++/+= Errors (#31784).
                         if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
                             if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($storage)) {
@@ -9195,6 +9200,12 @@ restart:
                                 && VM\TypedPropertyCheck::propertyAllowsNull($propSlot)
                             ) {
                                 $result->null();
+                                break;
+                            }
+                            // Dim isset/empty/?? is FETCH_OBJ_IS / BP_VAR_IS: uninitialized typed
+                            // array/string slots are missing dims, not Error (#31783).
+                            if ($this->propertyFetchDestUsedAsIsDimContainer($frame, $op)) {
+                                $this->copyPropertyValueForIsMode($result, $propSlot);
                                 break;
                             }
                             // Untyped declared property after unset: E_WARNING + NULL (#22021, zend_object_handlers.c).
@@ -11795,6 +11806,47 @@ restart:
             }
             if (OpCode::TYPE_UNSET === $next->type) {
                 // unset of a different container; keep scanning for ours.
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * True when property fetch feeds dim isset/empty/?? — Zend FETCH_OBJ_IS / BP_VAR_IS (#31783).
+     */
+    private function propertyFetchDestUsedAsIsDimContainer(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        $ops = $frame->block->opCodes;
+        $n = \count($ops);
+        for ($i = $frame->pos; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (OpCode::destSlotUsedAsIsDimContainer($next, $destSlot)) {
+                return true;
+            }
+            if (
+                OpCode::TYPE_PROPERTY_FETCH === $next->type
+                || OpCode::TYPE_PROPERTY_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg1 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH === $next->type
+                || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg2 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (OpCode::TYPE_UNSET === $next->type) {
                 continue;
             }
 

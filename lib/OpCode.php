@@ -487,6 +487,31 @@ class OpCode {
     }
 
     /**
+     * True when {@see $destSlot} is the container for dim isset/empty/FETCH_DIM_IS
+     * (Zend BP_VAR_IS / FETCH_OBJ_IS, #31783).
+     *
+     * Property-level isset uses {@see $issetOnProperty} and must not match.
+     */
+    public static function destSlotUsedAsIsDimContainer(self $op, int $destSlot): bool
+    {
+        if (
+            self::TYPE_ISSET === $op->type
+            && $op->arg2 === $destSlot
+            && null !== $op->arg3
+            && !$op->issetOnProperty
+        ) {
+            return true;
+        }
+        if (self::TYPE_EMPTY_DIMENSION === $op->type && $op->arg2 === $destSlot) {
+            return true;
+        }
+
+        return self::TYPE_ARRAY_DIM_FETCH === $op->type
+            && $op->arg2 === $destSlot
+            && $op->arrayDimFetchIs;
+    }
+
+    /**
      * True when {@see $dimSlot} (ARRAY_DIM_FETCH_WRITE result) is read-modified
      * (++/--/compound assign) — Zend BP_VAR_RW on the property, not BP_VAR_W (#31784).
      */

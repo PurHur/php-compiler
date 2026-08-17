@@ -194,9 +194,14 @@ final class IssetHelperLlvm
                     $containerOp
                 );
             }
-            $htVar = self::hashtableFromValueBox($context, $container);
 
-            return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+            return self::compileValueBoxOffsetIsSet(
+                $context,
+                $container,
+                $dim,
+                $dimOp,
+                $containerOp
+            );
         }
         if (Variable::TYPE_OBJECT === $container->type && null === $container->objectPropertySlot) {
             $propName = VmIsset::literalStringKey($dimOp);
@@ -251,6 +256,82 @@ final class IssetHelperLlvm
         }
 
         return $context->getTypeFromString('int1')->constInt(0, false);
+    }
+
+    /**
+     * Dim isset on a boxed value: UNDEF/NULL are missing (FETCH_DIM_IS), not array-init (#31783).
+     *
+     * hashtableFromValueBox → ensureHashtablePointer would write [] into uninitialized typed
+     * property slots; Zend FETCH_OBJ_IS + ZEND_ISSET_ISEMPTY_DIM_OBJ must not.
+     */
+    private static function compileValueBoxOffsetIsSet(
+        Context $context,
+        Variable $container,
+        Variable $dim,
+        ?Operand $dimOp,
+        ?Operand $containerOp
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $missing = self::valueBoxIsNullOrUndefined($context, $container);
+        if (null === $missing) {
+            $htVar = self::hashtableFromValueBox($context, $container);
+
+            return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+        }
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $missingBB = $fn->appendBasicBlock('isset_dim_box_missing');
+        $htBB = $fn->appendBasicBlock('isset_dim_box_ht');
+        $doneBB = $fn->appendBasicBlock('isset_dim_box_done');
+        $context->builder->branchIf($missing, $missingBB, $htBB);
+
+        $context->builder->positionAtEnd($missingBB);
+        $false = $i1->constInt(0, false);
+        $context->builder->branch($doneBB);
+
+        $context->builder->positionAtEnd($htBB);
+        $htVar = self::hashtableFromValueBox($context, $container);
+        $htResult = self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBB);
+
+        $context->builder->positionAtEnd($doneBB);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($false, $missingBB);
+        $phi->addIncoming($htResult, $htEnd);
+
+        return $phi;
+    }
+
+    /**
+     * i1: boxed slot is IS_NULL or IS_UNDEF (FETCH_DIM_IS missing, #31783).
+     */
+    public static function valueBoxIsNullOrUndefined(Context $context, Variable $container): ?Value
+    {
+        if (Variable::TYPE_VALUE !== $container->type) {
+            return null;
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+        if (null === $valuePtr) {
+            return null;
+        }
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false)
+        );
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false)
+        );
+
+        return $context->builder->or($isNull, $isUndef);
     }
 
     /**

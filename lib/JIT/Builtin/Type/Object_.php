@@ -6759,9 +6759,9 @@ class Object_ extends Type {
         return null;
     }
 
-    public function staticPropertyFetch(int $classId, string $name): Variable
+    public function staticPropertyFetch(int $classId, string $name, bool $isMode = false): Variable
     {
-        return ObjectStaticPropertyLlvm::fetch($this, $classId, $name);
+        return ObjectStaticPropertyLlvm::fetch($this, $classId, $name, $isMode);
     }
 
     /**
