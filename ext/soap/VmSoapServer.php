@@ -293,7 +293,8 @@ final class VmSoapServer
         string $string,
         string $actor = '',
         mixed $details = null,
-        string $name = ''
+        string $name = '',
+        string $lang = ''
     ): void {
         $state = self::state($object);
         // Zend soap_server_fault_ex: in-handler fault is serialized into the response
@@ -305,6 +306,7 @@ final class VmSoapServer
                 'actor' => $actor,
                 'details' => $details,
                 'name' => $name,
+                'lang' => $lang,
             ];
         }
         throw new \SoapFault($code, $string, '' !== $actor ? $actor : null, $details, '' !== $name ? $name : null);
@@ -666,8 +668,9 @@ final class VmSoapServer
         $actor = isset($e->faultactor) ? (string) $e->faultactor : '';
         $details = $e->detail ?? null;
         $name = isset($e->_name) ? (string) $e->_name : '';
+        $lang = isset($e->lang) ? (string) $e->lang : '';
 
-        return self::buildFaultEnvelope($state->soapVersion, $code, $string, $actor, $details, $name);
+        return self::buildFaultEnvelope($state->soapVersion, $code, $string, $actor, $details, $name, $lang);
     }
 
     private static function buildFaultFromPending(SoapServerState $state): string
@@ -683,7 +686,8 @@ final class VmSoapServer
             $pending['string'],
             $pending['actor'] ?? '',
             $pending['details'] ?? null,
-            $pending['name'] ?? ''
+            $pending['name'] ?? '',
+            $pending['lang'] ?? ''
         );
     }
 
@@ -693,10 +697,11 @@ final class VmSoapServer
         string $string,
         string $actor = '',
         mixed $details = null,
-        string $name = ''
+        string $name = '',
+        string $lang = ''
     ): string {
         if (SoapConstants::SOAP_1_2 === $soapVersion) {
-            return self::buildSoap12FaultEnvelope($code, $string, $actor, $details, $name);
+            return self::buildSoap12FaultEnvelope($code, $string, $actor, $details, $name, $lang);
         }
 
         $body = '      <faultcode>'.\htmlspecialchars($code, \ENT_XML1).'</faultcode>'."\n".
@@ -720,26 +725,28 @@ final class VmSoapServer
     }
 
     /**
-     * SOAP 1.2 Fault envelope (php-src serialize_response_call SOAP_1_2 branch; #20221).
+     * SOAP 1.2 Fault envelope (php-src serialize_response_call SOAP_1_2 branch; #20221 / #31944).
+     *
+     * env:Code/Value is an env QName only when php-src set_soap_fault sets faultcodens
+     * (Client→Sender, Server→Receiver, VersionMismatch, MustUnderstand, DataEncodingUnknown).
+     * Passing already-mapped "Receiver"/"Sender" is a custom code (unprefixed), matching Zend 8.2.
      */
     private static function buildSoap12FaultEnvelope(
         string $code,
         string $string,
         string $actor = '',
         mixed $details = null,
-        string $name = ''
+        string $name = '',
+        string $lang = ''
     ): string {
-        // php-src soap_error: Client→Sender, Server→Receiver under SOAP_1_2.
-        if ('Client' === $code) {
-            $code = 'Sender';
-        } elseif ('Server' === $code) {
-            $code = 'Receiver';
-        }
         $ns = 'http://www.w3.org/2003/05/soap-envelope';
         $pfx = 'env';
-        $value = $pfx.':'.\htmlspecialchars($code, \ENT_XML1);
+        $value = self::soap12FaultCodeValue($code, $pfx);
+        // php-src SoapServer::fault default $lang is empty → no xml:lang (Zend 8.2).
+        // Non-empty $lang sets xml:lang on env:Text (php-src xmlNodeSetLang).
+        $langAttr = '' !== $lang ? ' xml:lang="'.\htmlspecialchars($lang, \ENT_XML1).'"' : '';
         $body = '      <'.$pfx.':Code><'.$pfx.':Value>'.$value.'</'.$pfx.':Value></'.$pfx.':Code>'."\n".
-            '      <'.$pfx.':Reason><'.$pfx.':Text xml:lang="en">'.
+            '      <'.$pfx.':Reason><'.$pfx.':Text'.$langAttr.'>'.
             \htmlspecialchars($string, \ENT_XML1).
             '</'.$pfx.':Text></'.$pfx.':Reason>'."\n";
         // php-src serialize_response_call SOAP_1_2: Z_FAULT_ACTOR_P is not
@@ -758,6 +765,30 @@ final class VmSoapServer
             '    </'.$pfx.':Fault>'."\n".
             '  </'.$pfx.':Body>'."\n".
             '</'.$pfx.':Envelope>';
+    }
+
+    /**
+     * php-src set_soap_fault SOAP_1_2 + serialize_response_call Code/Value (#31944).
+     */
+    private static function soap12FaultCodeValue(string $code, string $pfx): string
+    {
+        $qname = false;
+        if ('Client' === $code) {
+            $code = 'Sender';
+            $qname = true;
+        } elseif ('Server' === $code) {
+            $code = 'Receiver';
+            $qname = true;
+        } elseif (
+            'VersionMismatch' === $code
+            || 'MustUnderstand' === $code
+            || 'DataEncodingUnknown' === $code
+        ) {
+            $qname = true;
+        }
+        $escaped = \htmlspecialchars($code, \ENT_XML1);
+
+        return $qname ? $pfx.':'.$escaped : $escaped;
     }
 
     private static function encodeFaultDetail(mixed $details, string $name): string
@@ -864,7 +895,7 @@ final class SoapServerState
     /**
      * In-handler SoapServer::fault() payload (php-src soap_server_fault_ex; #20194, #20219).
      *
-     * @var array{code: string, string: string, actor?: string, details?: mixed, name?: string}|null
+     * @var array{code: string, string: string, actor?: string, details?: mixed, name?: string, lang?: string}|null
      */
     public ?array $pendingFault = null;
 }
@@ -1087,7 +1118,14 @@ final class SoapServerFault extends SoapClassMethod
                 $name = VmString::coerceStringBuiltinArg($frame->calledArgs[5], 'SoapServer::fault', 5, 'name');
             }
         }
-        VmSoapServer::fault($receiver, $code, $string, $actor, $details, $name);
+        $lang = '';
+        if (\array_key_exists(6, $frame->calledArgs)) {
+            $l = $frame->calledArgs[6]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $l->type) {
+                $lang = VmString::coerceStringBuiltinArg($frame->calledArgs[6], 'SoapServer::fault', 6, 'lang');
+            }
+        }
+        VmSoapServer::fault($receiver, $code, $string, $actor, $details, $name, $lang);
     }
 }
 
