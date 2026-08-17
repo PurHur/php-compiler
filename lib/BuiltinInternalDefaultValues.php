@@ -956,6 +956,25 @@ final class BuiltinInternalDefaultValues
         'domprocessinginstruction::__construct' => [
             1 => ['kind' => 'string', 'value' => ''],
         ],
+        // php-src ext/xmlwriter/php_xmlwriter.stub.php — version='1.0'; flush/outputMemory true (#31867)
+        'xmlwriter::startdocument' => [
+            0 => ['kind' => 'string', 'value' => '1.0'],
+        ],
+        'xmlwriter::flush' => [
+            0 => ['kind' => 'bool', 'value' => true],
+        ],
+        'xmlwriter::outputmemory' => [
+            0 => ['kind' => 'bool', 'value' => true],
+        ],
+        'xmlwriter_start_document' => [
+            1 => ['kind' => 'string', 'value' => '1.0'],
+        ],
+        'xmlwriter_flush' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
+        'xmlwriter_output_memory' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/imap/php_imap.stub.php — int $timeout = -1 (int infer → 0) (#27680)
         'imap_timeout' => [
             1 => ['kind' => 'int', 'value' => -1],
