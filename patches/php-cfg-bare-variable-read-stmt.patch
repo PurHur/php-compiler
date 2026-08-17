@@ -18,7 +18,7 @@
      }
  
      protected function parseStmt_Class(Stmt\Class_ $node)
-@@ -1417,8 +1426,24 @@
+@@ -1417,8 +1426,23 @@
          $block->addParent($this->block);
          $this->block = $block;
          $result = $this->parseExprNode($expr->expr);

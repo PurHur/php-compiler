@@ -196,6 +196,12 @@ class Compiler {
     /** Lowercase class name while compiling a class body (#3803). */
     private ?string $compilingClassLc = null;
 
+    /**
+     * Include/require target units may use self/parent/static at file scope — Zend resolves at
+     * runtime from the caller's called_scope (#31913, zend_execute.c ZEND_INCLUDE_OR_EVAL).
+     */
+    private int $includeTargetCompileDepth = 0;
+
     /** Parent lc while compiling a class body — registerClass() runs after body (#13533). */
     private ?string $compilingClassParentLc = null;
 
@@ -11813,6 +11819,18 @@ class Compiler {
         return $meta->emitsRuntimeNotice();
     }
 
+    public function pushIncludeTargetCompile(): void
+    {
+        ++$this->includeTargetCompileDepth;
+    }
+
+    public function popIncludeTargetCompile(): void
+    {
+        if ($this->includeTargetCompileDepth > 0) {
+            --$this->includeTargetCompileDepth;
+        }
+    }
+
     protected function pseudoClassInCompileScope(string $className, Block $block): bool
     {
         $lc = strtolower($className);
@@ -11823,6 +11841,9 @@ class Compiler {
             return true;
         }
         if (null !== $this->evalClassScopeLc) {
+            return true;
+        }
+        if ($this->includeTargetCompileDepth > 0 && $block->isMainScript()) {
             return true;
         }
 

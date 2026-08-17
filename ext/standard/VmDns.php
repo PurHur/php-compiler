@@ -348,8 +348,8 @@ final class VmDns
             return false;
         }
 
-        // php-src ext/standard/dns.c — empty hostname short-circuit (re-#19078, #30322)
-        if ('' === $hostname) {
+        // php-src ext/standard/dns.c — empty hostname + DNS_ANY (default) → []; explicit DNS_ALL/NS/SOA still query root (#30322, re-#31935).
+        if ('' === $hostname && StdlibConstants::DNS_ANY === $type) {
             return new HashTable();
         }
 

@@ -1,5 +1,12 @@
 --TEST--
-stdlib dns_get_record() empty hostname DNS_ALL/DNS_ANY — empty array (#30322, ext/standard/dns.c)
+stdlib dns_get_record() empty hostname DNS_ALL/DNS_ANY — DNS_ANY empty, DNS_ALL root delegation (#31940, ext/standard/dns.c)
+--SKIPIF--
+<?php
+$r = @dns_get_record('', DNS_ALL);
+if (!is_array($r) || [] === $r) {
+    die('skip root DNS_ALL delegation unavailable');
+}
+?>
 --FILE--
 <?php
 error_reporting(E_ALL);
@@ -14,7 +21,7 @@ $aOnly = dns_get_record('', DNS_A);
 echo ($aOnly === []) ? "a-empty\n" : "a-nonempty\n";
 ?>
 --EXPECT--
-all-empty
-null-empty
+all-nonempty
+null-nonempty
 any-empty
 a-empty

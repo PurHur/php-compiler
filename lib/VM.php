@@ -3983,6 +3983,8 @@ class VM {
         $out = new Variable();
         $child = $block->getFrame($this->context, $caller);
         $child->ephemeral = true;
+        // ZEND_INCLUDE_OR_EVAL copies EX(This) into the eval unit (#31902).
+        $this->inheritIncludeThis($child, $caller);
         // Scope comes from getFrame($caller); parent must stay null so nested runFrames exits.
         $child->parent = null;
         $child->returnVar = $out;
@@ -3997,7 +3999,8 @@ class VM {
         $prevDeferDepth = $this->context->deferCatchBelowTryHandlerDepth;
         $this->context->deferCatchBelowTryHandlerDepth = \count($this->context->activeTryHandlerFrames);
         // Isolate nested runFrames so eval completion does not continue the caller (#31912).
-        // Without this, ephemeral parent=null falls through to nextframe and resumes f()/main.
+        // Isolated stack — nested eval return must not pop the outer method/script
+        // frame that is executing TYPE_EVAL (#31902; same shape as coercion invoke).
         $savedStack = $this->context->swapRunStack(null);
         try {
             $this->context->push($child);
@@ -7526,7 +7529,7 @@ restart:
                         try {
                             // Dynamic "$c()" / array callables do not resolve parent/self/static
                             // as scope keywords — Zend Errors with Class "parent" not found (#25625).
-                            $this->initStaticCallable($frame, $name, false, false, false);
+                            $this->initStaticCallable($frame, $name, false, false, false, true);
                         } catch (\Error $e) {
                             $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                             if (null !== $catchFrame) {
@@ -9932,11 +9935,13 @@ restart:
                     }
                     $this->context->recordIncludedFile($resolved);
                     $this->context->scriptStack->push($resolved);
-                    $parsed = $this->context->runtime->parseAndCompileFile($resolved);
+                    $parsed = $this->context->runtime->parseAndCompileFile($resolved, true);
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
                     // ZEND_INCLUDE_OR_EVAL copies EX(This) into the included op_array (#31903).
                     $this->inheritIncludeThis($new, $frame);
+                    // …and called_scope for self/static/parent in the included unit (#31913).
+                    $this->inheritIncludeClassScope($new, $frame);
                     // Resume the caller via the run stack (like a call); keep $frame as a scope donor only.
                     $new->parent = null;
                     if (null !== $op->arg2) {
@@ -10812,8 +10817,15 @@ restart:
             return false;
         }
         $func = $frame->block->func;
-        // No frame function (or missing) — treat as unbound (zend_execute.c FETCH_THIS).
+        // No frame function (eval/include {main}) — bound only when EX(This) was inherited (#31902).
         if (null === $func) {
+            if (isset($frame->scope[$thisIdx])) {
+                $var = $frame->scope[$thisIdx]->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $var->type) {
+                    return false;
+                }
+            }
+
             return true;
         }
         // Static methods and static closures never have $this (zend_closures.c / #23704).
@@ -10832,7 +10844,7 @@ restart:
             return !isset($frame->scope[$thisIdx]);
         }
         // {main} / plain function — $this is never in object context (php-src FETCH_THIS)
-        // unless include inherited EX(This) from an instance caller (#31903).
+        // unless eval/include inherited EX(This) from an instance caller (#31902, #31903).
         if (isset($frame->scope[$thisIdx])) {
             $var = $frame->scope[$thisIdx]->resolveIndirect();
             if (Variable::TYPE_OBJECT === $var->type) {
@@ -10844,7 +10856,7 @@ restart:
     }
 
     /**
-     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the included {main} frame (#31903).
+     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the included/eval {main} frame (#31902, #31903).
      *
      * php-src: Zend/zend_execute.c ZEND_INCLUDE_OR_EVAL; Zend/zend_vm_def.h inherits EX(This).
      */
@@ -10885,8 +10897,40 @@ restart:
     }
 
     /**
-     * Bound $this of the include/eval caller, or null when not in object context.
+     * ZEND_INCLUDE_OR_EVAL copies caller called_scope into the included {main} frame (#31913).
+     *
+     * php-src: Zend/zend_execute.c / zend_vm_def.h — self/static/parent in an included file
+     * bind to the runtime caller class, not a compile-time global-scope reject.
      */
+    private function inheritIncludeClassScope(Frame $included, Frame $caller): void
+    {
+        if (null !== $included->calledClass && '' !== $included->calledClass) {
+            return;
+        }
+        $scope = self::includeCallerClassScopeLc($caller);
+        if (null !== $scope) {
+            $included->calledClass = $scope;
+        }
+    }
+
+    /**
+     * Late-static / self scope class (lowercase) of an include/require caller frame.
+     */
+    private static function includeCallerClassScopeLc(Frame $caller): ?string
+    {
+        if (null !== $caller->calledClass && '' !== $caller->calledClass) {
+            return $caller->calledClass;
+        }
+        if (null !== $caller->block && null !== $caller->block->func && null !== $caller->block->func->class) {
+            return strtolower(ltrim($caller->block->func->class->value, '\\'));
+        }
+        $boundThis = self::callerThisIfBound($caller);
+        if (null !== $boundThis && Variable::TYPE_OBJECT === $boundThis->type) {
+            return strtolower($boundThis->toObject()->class->name);
+        }
+
+        return null;
+    }
     private static function callerThisIfBound(Frame $caller): ?Variable
     {
         $func = null !== $caller->block ? $caller->block->func : null;
@@ -19218,7 +19262,8 @@ restart:
         string $callableName,
         bool $parentKeywordScope = false,
         bool $selfKeywordScope = false,
-        bool $resolveScopeKeywords = true
+        bool $resolveScopeKeywords = true,
+        bool $isDynamicCallable = false
     ): void {
         [$className, $methodName] = explode('::', $callableName, 2);
         $lcClass = $resolveScopeKeywords
@@ -19265,7 +19310,7 @@ restart:
             // Zend INIT_STATIC_METHOD_CALL: non-static Class::method() is allowed when
             // EX(This) is an object instanceof the called class (self::/static::/parent::
             // and compatible named Class:: from instance methods) (#28050, #1858).
-            if (!$this->instanceThisAllowsNonStaticCall($frame, $lcClass)) {
+            if ($isDynamicCallable || !$this->instanceThisAllowsNonStaticCall($frame, $lcClass)) {
                 $this->assertMethodCallableStatically($class, $methodLc);
             }
         } catch (\LogicException $e) {
@@ -21094,7 +21139,7 @@ restart:
             }
             try {
                 // Dynamic array callables do not resolve parent/self/static (#25625).
-                $this->initStaticCallable($frame, $class.'::'.$methodName, false, false, false);
+                $this->initStaticCallable($frame, $class.'::'.$methodName, false, false, false, true);
             } catch (\Error $e) {
                 return $this->dispatchVmError($e->getMessage(), $frame);
             } catch (\LogicException $e) {
