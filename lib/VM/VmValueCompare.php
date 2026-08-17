@@ -20,6 +20,7 @@ use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
@@ -579,6 +580,8 @@ final class VmValueCompare
             $rightPtr
         );
         $stringMap = $context->structFieldMap['__string__'];
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $cmp = $context->builder->call(
             $context->lookupFunction('strcmp'),
             $context->builder->structGep($leftStr, $stringMap['value']),

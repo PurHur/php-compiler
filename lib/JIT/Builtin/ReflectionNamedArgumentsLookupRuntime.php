@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 
 /** JIT/AOT link for __compiler_refl_*_named_* embedded tables (#17658). */
@@ -13,6 +14,8 @@ final class ReflectionNamedArgumentsLookupRuntime
 {
     public static function implement(Context $context, string $functionParamsJson, string $methodParamsJson): void
     {
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         self::implementFunctionCountBridge($context, self::decodeFunctionParams($functionParamsJson));
         self::implementFunctionNameAtBridge($context, self::decodeFunctionParams($functionParamsJson));
         self::implementMethodCountBridge($context, self::decodeMethodParams($methodParamsJson));

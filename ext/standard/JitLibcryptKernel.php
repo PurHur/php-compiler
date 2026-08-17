@@ -109,6 +109,8 @@ final class JitLibcryptKernel
     public static function verifyMatch(Context $context, Value $passwordStr, Value $hashStr): Value
     {
         LibcExtern::register($context);
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');

@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -57,6 +58,8 @@ final class ReflectionEnumJitHelper
                 $object = $context->type->object;
                 $i32 = $context->getTypeFromString('int32');
                 // Case-sensitive match (Zend/zend_enum.c, #25929 / #25945) — not strcasecmp.
+                // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+                LibcExtern::ensureStrcmpDecl($context);
                 $strcmpFn = $context->lookupFunction('strcmp');
                 $exists = $i1->constInt(0, false);
                 foreach ($object->enumCaseOrderForClass($enumId) as $caseKey) {
@@ -189,6 +192,8 @@ final class ReflectionEnumJitHelper
                 $object = $context->type->object;
                 $i32 = $context->getTypeFromString('int32');
                 // Case-sensitive match (Zend/zend_enum.c, #25929 / #25945) — not strcasecmp.
+                // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+                LibcExtern::ensureStrcmpDecl($context);
                 $strcmpFn = $context->lookupFunction('strcmp');
                 $caseKeys = $object->enumCaseOrderForClass($enumId);
                 $lastCaseIdx = \count($caseKeys) - 1;
@@ -390,6 +395,8 @@ final class ReflectionEnumJitHelper
             ): void {
                 $object = $context->type->object;
                 $i32 = $context->getTypeFromString('int32');
+                // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+                LibcExtern::ensureStrcmpDecl($context);
                 $strcmpFn = $context->lookupFunction('strcmp');
                 $caseKeys = $object->enumCaseOrderForClass($enumId);
                 $lastCaseIdx = \count($caseKeys) - 1;

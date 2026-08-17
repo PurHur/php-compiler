@@ -708,6 +708,8 @@ final class JitHashCryptoKernel
         $md5 = $context->pointerFromStringConstant('md5');
         $done = $fn->appendBasicBlock('hc_pbkdf2_keylen_pick_done');
 
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $isSha256 = $context->builder->icmp(
             Builder::INT_EQ,
             $context->builder->call($context->lookupFunction('strcmp'), $algoCstr, $sha256),

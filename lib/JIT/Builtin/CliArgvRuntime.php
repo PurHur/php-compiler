@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Progress;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -249,6 +250,8 @@ final class CliArgvRuntime
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($cmpBb);
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $cmp = $context->builder->call($context->lookupFunction('strcmp'), $a, $b);
         $isEq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
         $eqVal = $context->builder->select(
@@ -359,6 +362,8 @@ final class CliArgvRuntime
         $valuePtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
 
+        // strcmp(3) after always-on LibcExtern drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         foreach (
             [
                 'strcmp' => [$i32, false, [$i8p, $i8p]],

@@ -128,9 +128,10 @@ final class JitFsGlobKernel
         // glob/scandir + module-local stat(2) after LibcExtern/Module always-on drop (#31403).
         // strdup(3) after always-on LibcExtern drop (#31534) — still required by emitGlobVec /
         // emitScandirVec (#31721 AOT FilesystemIterator/GlobIterator).
-        // memset(3) after always-on LibcExtern drop (#31863); malloc/free/strcmp still come
-        // from LibcExtern (i8*).
+        // memset(3) after always-on LibcExtern drop (#31863); malloc/free still come
+        // from LibcExtern (i8*). strcmp(3) after always-on drop (#31971).
         LibcExtern::ensureMemsetDecl($context);
+        LibcExtern::ensureStrcmpDecl($context);
         foreach ([
             ['glob', $i32, [$i8p, $i32, $i8p, $i8p]],
             ['globfree', $voidTy, [$i8p]],
@@ -172,6 +173,8 @@ final class JitFsGlobKernel
             $context->builder->pointerCast($b, $i8p),
             $context->getTypeFromString('int8')->constInt(self::DIRENT_D_NAME_OFFSET, false)
         );
+        // strcmp(3) via LibcExtern::ensureStrcmpDecl after always-on drop (#31971).
+        LibcExtern::ensureStrcmpDecl($context);
         $cmpB = $context->builder->call($context->lookupFunction('strcmp'), $nameB, $nameA);
         $context->builder->returnValue($cmpB);
         $context->builder->clearInsertionPosition();

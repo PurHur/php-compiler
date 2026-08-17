@@ -960,15 +960,9 @@ class Module extends ModuleAbstract
 
     public function jitInit(JIT\Context $context): void
     {
-        try {
-            $context->lookupFunction('strcmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcmp', $ft);
-            $context->registerFunction('strcmp', $fn);
-        }
+        // strcmp(3) dropped from always-on Module decls (#31971 / #31954 peer):
+        // NestedJIT leaves call LibcExtern::ensureStrcmpDecl before lookup;
+        // user-script strcmp() stays on VmString / JitStringCompare (#30702).
         // nl_langinfo(3): NestedJIT leaf declares module-locally (#30404 / fnmatch #30383).
         // strxfrm(3): NestedJIT leaf declares module-locally (#30420 / nl_langinfo #30404).
         // memcmp(3) dropped from always-on Module decls (#31954 / #31885 peer):
