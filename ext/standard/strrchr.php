@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -37,37 +36,16 @@ final class strrchr extends Internal
     {
         // Catchable ArgumentCountError (AOT/JIT) — #30703.
         if (!$this->requireExactJitArgCount($context, $args, 'strrchr', 2)) {
-            $slot = JitValueBox::alloc($context);
-
-            return JitValueBox::pointer($context, $slot);
+            return $context->getTypeFromString('__string__*')->constNull();
         }
 
-        // Null → TypeError under strict without helper IR after abort (peer utf8_encode #29889 / #29783).
-        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strrchr', 0, 'haystack');
-
-                return $context->getTypeFromString('__string__*')->constNull();
-            }
-            $hay = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strrchr', 0, 'haystack');
-        } else {
-            $hay = $context->callerStrictTypes
-                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strrchr', 0, 'haystack')
-                : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strrchr', 0, 'haystack');
-        }
-
-        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'strrchr', 1, 'needle');
-
-                return $context->getTypeFromString('__string__*')->constNull();
-            }
-            $needle = JitStringBuiltinArg::lower($context, $args[1], 'strrchr', 1, 'needle');
-        } else {
-            $needle = $context->callerStrictTypes
-                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'strrchr', 1, 'needle')
-                : JitStringBuiltinArg::lower($context, $args[1], 'strrchr', 1, 'needle');
-        }
+        // Soft-null outside strict_types — Zend 8.4 deprecate+coerce (#21444); strict → TypeError (#29783).
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strrchr', 0, 'haystack')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strrchr', 0, 'haystack');
+        $needle = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'strrchr', 1, 'needle')
+            : JitStringBuiltinArg::lower($context, $args[1], 'strrchr', 1, 'needle');
 
         return JitStrrchr::find($context, $hay, $needle);
     }
