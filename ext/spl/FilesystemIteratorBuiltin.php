@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -507,10 +508,11 @@ final class FilesystemIteratorSetFlags extends VmClassMethod
             FilesystemIteratorBuiltin::CLASS_LC,
             'FilesystemIterator::setFlags()'
         );
-        // php-src zim_FilesystemIterator_setFlags — exactly 1 user arg (#31009).
+        // php-src zim_FilesystemIterator_setFlags — exactly 1 user arg (#31009); Z_PARAM_LONG soft-null (#31722).
         $this->requireExactUserArgCount($frame, 'FilesystemIterator::setFlags', 1);
-        $flags = SplFilesystemArg::requireIntArg(
-            $frame->calledArgs[1],
+        $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
             'FilesystemIterator::setFlags',
             1,
             'flags'
