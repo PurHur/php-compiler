@@ -1,10 +1,5 @@
 --TEST--
-Language: uninitialized inherited typed property — JIT/AOT (#4614)
---SKIPIF--
-<?php
-if (!getenv('PHP_COMPILER_JIT_EXECUTE')) {
-    die('skip JIT execute not enabled');
-}
+Language: uninitialized inherited typed property — declaring class (#31785 / #4614)
 --FILE--
 <?php
 class Base { public int $x; }
@@ -20,4 +15,4 @@ try {
 }
 --EXPECT--
 false
-Typed property Child::$x must not be accessed before initialization
+Typed property Base::$x must not be accessed before initialization

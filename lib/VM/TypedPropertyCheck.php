@@ -133,23 +133,16 @@ final class TypedPropertyCheck
         $target = $var->resolveIndirect();
         $name = $target->objectPropertyName ?? 'property';
         if (null !== $target->staticPropertyClassLc) {
-            $classLabel = $target->staticPropertyClassLc;
-            $vm = \PHPCompiler\VM::running();
-            if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
-                $classLabel = $vm->context->classes[$target->staticPropertyClassLc]->name;
-            }
-
             return sprintf(
                 'Typed static property %s::$%s must not be accessed before initialization',
-                \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($classLabel),
+                self::declaringClassDisplayName($target),
                 $name
             );
         }
-        $owner = $target->objectPropertyOwner;
 
         return sprintf(
             'Typed property %s::$%s must not be accessed before initialization',
-            \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($owner->class->name),
+            self::declaringClassDisplayName($target),
             $name
         );
     }
@@ -204,26 +197,68 @@ final class TypedPropertyCheck
     {
         $target = $var->resolveIndirect();
         $name = $target->objectPropertyName ?? 'property';
-        if (null !== $target->staticPropertyClassLc) {
-            $classLabel = $target->staticPropertyClassLc;
-            $vm = \PHPCompiler\VM::running();
-            if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
-                $classLabel = $vm->context->classes[$target->staticPropertyClassLc]->name;
-            }
-
-            return sprintf(
-                'Cannot access uninitialized non-nullable property %s::$%s by reference',
-                \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($classLabel),
-                $name
-            );
-        }
-        $owner = $target->objectPropertyOwner;
 
         return sprintf(
             'Cannot access uninitialized non-nullable property %s::$%s by reference',
-            \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($owner->class->name),
+            self::declaringClassDisplayName($target),
             $name
         );
+    }
+
+    /**
+     * php-src zend_uninitialized_property_error / prop_info->ce — declaring class, not the
+     * instance class (#31785, Zend/zend_object_handlers.c).
+     */
+    private static function declaringClassDisplayName(Variable $target): string
+    {
+        $vm = \PHPCompiler\VM::running();
+        $name = $target->objectPropertyName;
+        if (null !== $target->staticPropertyClassLc) {
+            $accessedLc = $target->staticPropertyClassLc;
+            $display = $accessedLc;
+            if (null !== $vm && isset($vm->context->classes[$accessedLc])) {
+                $entry = $vm->context->classes[$accessedLc];
+                $propLc = strtolower((string) $name);
+                $declLc = $entry->staticPropertyDeclaringClassLc[$propLc] ?? $accessedLc;
+                if (!isset($entry->staticPropertyDeclaringClassLc[$propLc])) {
+                    $currentLc = $entry->parentLc;
+                    while (null !== $currentLc && isset($vm->context->classes[$currentLc])) {
+                        $current = $vm->context->classes[$currentLc];
+                        if (isset($current->staticPropertyDeclaringClassLc[$propLc])) {
+                            $declLc = $current->staticPropertyDeclaringClassLc[$propLc];
+                            break;
+                        }
+                        if (isset($current->staticProperties[$propLc])) {
+                            $declLc = strtolower($current->name);
+                            break;
+                        }
+                        $currentLc = $current->parentLc;
+                    }
+                }
+                $display = ($vm->context->classes[$declLc] ?? $entry)->name;
+            }
+
+            return \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($display);
+        }
+        $owner = $target->objectPropertyOwner;
+        $display = $owner->class->name;
+        if (null !== $name) {
+            foreach ($owner->class->properties as $property) {
+                if ($property->name !== $name) {
+                    continue;
+                }
+                $declLc = $property->declaringClassLc;
+                if ('' !== $declLc && null !== $vm && isset($vm->context->classes[$declLc])) {
+                    $display = $vm->context->classes[$declLc]->name;
+                } elseif ('' !== $declLc) {
+                    $display = $declLc;
+                }
+                // Child properties are listed before inherited parent slots (#22521).
+                break;
+            }
+        }
+
+        return \PHPCompiler\MethodVisibility::formatAnonymousScopeForMessage($display);
     }
 
     /**

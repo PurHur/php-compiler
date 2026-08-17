@@ -217,6 +217,8 @@
             <file>./test/compliance/TypedPropNestedCoalesce31769JITTest.php</file>
             <file>./test/compliance/UninitTypedPropertyByref31771VMTest.php</file>
             <file>./test/compliance/UninitTypedPropertyByref31771JITTest.php</file>
+            <file>./test/compliance/InheritedTypedPropertyErrorClass31785VMTest.php</file>
+            <file>./test/compliance/InheritedTypedPropertyErrorClass31785JITTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147JITTest.php</file>
             <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>

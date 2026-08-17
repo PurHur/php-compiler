@@ -42,7 +42,7 @@ final class TypedPropertyUninitGuard
         if (null === $valuePtr) {
             return;
         }
-        $declaringClass = $object->classNameForId($classId);
+        $declaringClass = $object->instancePropertyDeclaringClassName($classId, (string) $var->objectPropertyName);
 
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof \PHPLLVM\Value\Function_);
@@ -152,7 +152,7 @@ final class TypedPropertyUninitGuard
         if (null === $valuePtr) {
             return;
         }
-        $declaringClass = $object->classNameForId($classId);
+        $declaringClass = $object->instancePropertyDeclaringClassName($classId, (string) $var->objectPropertyName);
         $allowsNull = $object->propertySlotAllowsNull($classId, $slotIndex);
 
         $fn = $context->builder->getInsertBlock()->getParent();
