@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\VmValueCompare;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\OpCode;
@@ -118,6 +119,7 @@ final class VmStringCompare
     /** True when $haystack starts with the same bytes as $prefix (#24161). */
     public static function prefixIdentical(Context $context, Value $haystack, Value $prefix): Value
     {
+        self::ensureMemcmp($context);
         $map = $context->structFieldMap['__string__'];
         $i1 = $context->getTypeFromString('int1');
         $falseVal = $i1->constInt(0, false);
@@ -159,6 +161,7 @@ final class VmStringCompare
     /** True when $haystack ends with the same bytes as $suffix (inventory argv absolute paths — #3046). */
     public static function suffixIdentical(Context $context, Value $haystack, Value $suffix): Value
     {
+        self::ensureMemcmp($context);
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
@@ -211,6 +214,7 @@ final class VmStringCompare
      */
     public static function strcmp(Context $context, Value $leftStr, Value $rightStr): Value
     {
+        self::ensureMemcmp($context);
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
@@ -247,6 +251,7 @@ final class VmStringCompare
 
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
+        self::ensureMemcmp($context);
         // NestedJIT / entryAlloca can leave insert cleared mid-Runtime::parse; without an
         // open BB, branchIf to jit_strcmp_* is parentless and sealFunction writes unreachable
         // onto the prior block (#26756).
@@ -304,6 +309,7 @@ final class VmStringCompare
      */
     public static function containsIdentical(Context $context, Value $haystack, Value $needle): Value
     {
+        self::ensureMemcmp($context);
         $map = $context->structFieldMap['__string__'];
         $i1 = $context->getTypeFromString('int1');
         $i64 = $context->getTypeFromString('int64');
@@ -392,6 +398,7 @@ final class VmStringCompare
         Value $offset,
         bool $caseInsensitive = false
     ): Value {
+        self::ensureMemcmp($context);
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
@@ -498,6 +505,7 @@ final class VmStringCompare
         Value $offset,
         bool $caseInsensitive = false
     ): Value {
+        self::ensureMemcmp($context);
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
@@ -741,5 +749,11 @@ final class VmStringCompare
         JitVariable $boxed
     ): Value {
         return self::identicalValueToString($context, $boxed, $nativeStr);
+    }
+
+    /** Module-local memcmp(3) after LibcExtern always-on drop (#31954). */
+    private static function ensureMemcmp(Context $context): void
+    {
+        LibcExtern::ensureMemcmpDecl($context);
     }
 }

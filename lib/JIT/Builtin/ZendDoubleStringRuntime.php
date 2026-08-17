@@ -241,7 +241,7 @@ final class ZendDoubleStringRuntime
                 '__mm__malloc' => [$i8p, false, [$sizeT]],
                 '__mm__free' => [$voidTy, false, [$i8p]],
                 '__string__init' => [$strPtr, false, [$i64, $charPtr]],
-                'memcmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
+                // Unused memcmp decl dropped with LibcExtern always-on (#31954).
             ] as $name => [$ret, $vararg, $params]
         ) {
             try {

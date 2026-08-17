@@ -49,5 +49,7 @@ final class MemcmpRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/VM/VmStringCompare.php');
         $this->assertStringContainsString("lookupFunction('memcmp')", $source);
+        $this->assertStringContainsString('LibcExtern::ensureMemcmpDecl', $source);
+        $this->assertStringContainsString('#31954', $source);
     }
 }

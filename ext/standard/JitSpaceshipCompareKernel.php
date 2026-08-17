@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -136,6 +137,9 @@ final class JitSpaceshipCompareKernel
         self::declareExternal($context, 'strncasecmp', $i32, [$i8p, $i8p, $sizeT]);
         self::declareExternal($context, 'strtod', $dbl, [$i8p, $i8p->pointerType(0)]);
         self::declareExternal($context, '__object__prop_count', $i32, [$objPtr]);
+        // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954);
+        // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
+        LibcExtern::ensureMemcmpDecl($context);
     }
 
     /**
@@ -756,7 +760,8 @@ final class JitSpaceshipCompareKernel
         $context->builder->positionAtEnd($caseCmp);
         $ldata = self::stringData($context, $lname);
         $rdata = self::stringData($context, $rname);
-        // memcmp is module-local under EMBED MCJIT; strncasecmp often relocates to null (#21124).
+        // memcmp is module-local after LibcExtern always-on drop (#31954);
+        // strncasecmp often relocates to null under EMBED MCJIT (#21124).
         $cmp = $context->builder->call(
             $context->lookupFunction('memcmp'),
             $ldata,

@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -307,11 +308,12 @@ final class JitStreamResourceKernel
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
 
+        // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954);
+        // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
+        LibcExtern::ensureMemcmpDecl($context);
         foreach (
             [
-                ['memcmp', $i32, [$voidPtr, $voidPtr, $sizeT]],
                 ['__string__init', $strPtr, [$i64, $i8p]],
                 ['__hashtable__alloc', $htPtr, []],
                 ['__hashtable__setLongAt', $context->getTypeFromString('void'), [$htPtr, $sizeT, $i64]],
