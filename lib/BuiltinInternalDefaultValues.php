@@ -1040,6 +1040,15 @@ final class BuiltinInternalDefaultValues
         'intlcal_create_instance' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/intl/php_intl.stub.php — int $variant = INTL_IDNA_VARIANT_UTS46 (1); int infer → 0 (#25199)
+        'idn_to_ascii' => [
+            2 => ['kind' => 'int', 'value' => 1],
+            3 => ['kind' => 'null'],
+        ],
+        'idn_to_utf8' => [
+            2 => ['kind' => 'int', 'value' => 1],
+            3 => ['kind' => 'null'],
+        ],
         // php-src ext/intl/normalizer/normalizer.stub.php — int $form = Normalizer::FORM_C (16); int infer → 0 (#25586)
         'normalizer_normalize' => [
             1 => ['kind' => 'int', 'value' => 16],
