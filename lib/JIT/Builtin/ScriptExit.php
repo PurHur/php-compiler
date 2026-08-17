@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -463,6 +464,8 @@ final class ScriptExit
 
     private static function echoString(Context $context, Value $strPtr): void
     {
+        // Module-local printf(3) after LibcExtern always-on drop (#31706).
+        LibcExtern::ensurePrintf($context);
         $offset = $context->structFieldIndex($strPtr, 'length');
         $length = $context->builder->load($context->builder->structGep($strPtr, $offset));
         $offset = $context->structFieldIndex($strPtr, 'value');
