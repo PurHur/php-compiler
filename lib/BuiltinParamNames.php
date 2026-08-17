@@ -2151,6 +2151,9 @@ final class BuiltinParamNames
             // php-src ext/intl/php_intl.stub.php — PHP 8.5+ (#27591)
             case 'grapheme_levenshtein':
                 return ['string1', 'string2', 'insertion_cost=', 'replacement_cost=', 'deletion_cost=', 'locale='];
+            // php-src ext/intl/normalizer/normalizer.stub.php — InternalArgInfo still input/form string (#25586)
+            case 'normalizer_normalize':
+                return ['string', 'form='];
             // php-src ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
             case 'normalizer_get_raw_decomposition':
                 return ['string', 'form='];
