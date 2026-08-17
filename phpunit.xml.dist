@@ -700,6 +700,7 @@
             <file>./test/compliance/SessionNameReflectionVMTest.php</file>
             <file>./test/compliance/CurlStrerrorReflectionVMTest.php</file>
             <file>./test/compliance/NormalizerGetRawDecompositionReflectionVMTest.php</file>
+            <file>./test/compliance/DatefmtFormatObjectReflectionVMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681VMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681JITTest.php</file>
             <file>./test/compliance/GetdateStrtotimeArgc30714VMTest.php</file>

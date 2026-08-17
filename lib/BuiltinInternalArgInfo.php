@@ -365,6 +365,8 @@ final class BuiltinInternalArgInfo
             'grapheme_levenshtein' => 'int|false',
             // ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
             'normalizer_get_raw_decomposition' => '?string',
+            // ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
+            'datefmt_format_object' => 'string|false',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
             'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
@@ -910,6 +912,12 @@ final class BuiltinInternalArgInfo
             'normalizer_get_raw_decomposition' => match ($index) {
                 0 => 'string',
                 1 => 'int',
+                default => null,
+            },
+            // ext/intl/php_intl.stub.php — $datetime/$format untyped; ?string $locale = null (#25200)
+            'datefmt_format_object' => match ($index) {
+                0, 1 => '',
+                2 => '?string',
                 default => null,
             },
             // ext/intl/php_intl.stub.php — PHP 8.5+ costs + locale (#27591)
