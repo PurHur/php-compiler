@@ -395,6 +395,8 @@ final class BuiltinInternalArgInfo
             'curl_close' => 'void',
             // InternalArgInfo bool|string; Zend Reflection string|bool (#26186)
             'curl_exec' => 'string|bool',
+            // ext/curl/curl.stub.php — InternalArgInfo return resource; Zend CurlMultiHandle (#28591)
+            'curl_multi_init' => 'CurlMultiHandle',
             // ext/filter/filter.stub.php — InternalArgInfo return empty (#25046, #26184)
             'filter_var' => 'mixed',
             'filter_input' => 'mixed',
