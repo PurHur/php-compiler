@@ -155,6 +155,8 @@
             <file>./test/compliance/StrcspnStrspnStrpbrkNamed23400JITTest.php</file>
             <file>./test/compliance/ErrorLogNamed23341VMTest.php</file>
             <file>./test/compliance/ErrorLogNamed23341JITTest.php</file>
+            <file>./test/compliance/IniParseQuantityNamed23405VMTest.php</file>
+            <file>./test/compliance/IniParseQuantityNamed23405JITTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508VMTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508JITTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorStringCallbackMsg31574VMTest.php</file>
