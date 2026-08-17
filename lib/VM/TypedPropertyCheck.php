@@ -185,6 +185,21 @@ final class TypedPropertyCheck
         throw new TypedPropertyReadSignal($vm->makeEngineError($message));
     }
 
+    /**
+     * Zend zend_std_get_property_ptr_ptr before creating an INDIRECT (#31771).
+     *
+     * Uninitialized non-nullable typed properties Error; nullable typed slots become null
+     * (ZVAL_NULL) so `$r = &$o->y` aliases an initialized null rather than UNDEF.
+     */
+    public static function prepareWritableByReference(Variable $var): void
+    {
+        self::assertWritableByReference($var);
+        if (!self::isUninitialized($var)) {
+            return;
+        }
+        $var->resolveIndirect()->null();
+    }
+
     public static function writableByReferenceErrorMessage(Variable $var): string
     {
         $target = $var->resolveIndirect();
@@ -346,8 +361,10 @@ final class TypedPropertyCheck
             $vm = \PHPCompiler\VM::running();
             if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
                 $entry = $vm->context->classes[$target->staticPropertyClassLc];
-                if (isset($entry->staticProperties[strtolower($target->objectPropertyName)])) {
-                    return self::propertyAllowsNull($entry->staticProperties[strtolower($target->objectPropertyName)]);
+                $slot = $entry->staticProperties[strtolower($target->objectPropertyName)] ?? null;
+                // The live static cell already carries type metadata; do not recurse into self (#31771).
+                if (null !== $slot && $slot !== $target) {
+                    return self::propertyAllowsNull($slot);
                 }
             }
         }

@@ -8511,6 +8511,7 @@ class JIT {
                     if (null !== $srcName) {
                         if ($this->context->hasVariableOp($srcOp)) {
                             $srcVar = $this->context->getVariableFromOp($srcOp);
+                            JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
                             if (
                                 Variable::TYPE_VALUE === $srcVar->type
                                 && null === $srcVar->valueBoxAliasPtr
@@ -8532,6 +8533,7 @@ class JIT {
                         throw new \LogicException('Reference assignment requires a bound source variable');
                     }
                     $srcVar = $this->context->getVariableFromOp($srcOp);
+                    JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
                     if (
                         Variable::TYPE_VALUE === $srcVar->type
                         && null === $srcVar->valueBoxAliasPtr
