@@ -8,8 +8,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\CallUnpackRuntime;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Value;
 
 final class HashTableHelper
@@ -78,20 +76,13 @@ final class HashTableHelper
 
     public static function alloc(Context $context): Value
     {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_alloc_cont');
-
-        return $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        return HashTableWriteLlvm::alloc($context);
     }
 
     /** Empty packed list for variadic recv with zero trailing args (issue #197). */
     public static function emptyVariable(Context $context): Variable
     {
-        return new Variable(
-            $context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            self::alloc($context)
-        );
+        return HashTableWriteLlvm::emptyVariable($context);
     }
 
     public static function variableFromVmHashTable(Context $context, \PHPCompiler\VM\HashTable $table): Variable
@@ -337,44 +328,7 @@ final class HashTableHelper
      */
     public static function coerceToPackedHashtable(Context $context, Variable $source): Variable
     {
-        if ($source->type & Variable::IS_NATIVE_ARRAY) {
-            return new Variable(
-                $context,
-                Variable::TYPE_HASHTABLE,
-                Variable::KIND_VALUE,
-                self::materializeNativeArrayForCall($context, $source)
-            );
-        }
-        if (Variable::TYPE_HASHTABLE === $source->type) {
-            return $source;
-        }
-        if (Variable::TYPE_VALUE === $source->type || $source->valueBoxHashtable) {
-            $ht = self::ensureHashtablePointer($context, $source);
-
-            return new Variable(
-                $context,
-                Variable::TYPE_HASHTABLE,
-                Variable::KIND_VALUE,
-                $ht
-            );
-        }
-        if (Variable::TYPE_OBJECT === $source->type) {
-            $ptr = $context->helper->loadValue($source);
-
-            return new Variable(
-                $context,
-                Variable::TYPE_HASHTABLE,
-                Variable::KIND_VALUE,
-                $context->builder->pointerCast(
-                    $ptr,
-                    $context->getTypeFromString('__hashtable__*')
-                )
-            );
-        }
-
-        throw new \LogicException(
-            'Array spread/unpack requires an array, got '.Variable::getStringType($source->type)
-        );
+        return HashTableWriteLlvm::coerceToPackedHashtable($context, $source);
     }
 
     public static function spreadInto(Context $context, Variable $dest, Variable $source): void
@@ -385,117 +339,19 @@ final class HashTableHelper
     /**
      * Merge ARG_SEND entries that may include unpack markers (issue #1361).
      *
-     * Call-time `...$arr` allows string keys (named args). Do not use list-unpack's
-     * array_is_list guard — that is for `list()` / `[...$arr]` only (#23971).
-     *
      * @param list<Variable|array{unpack: Variable}> $entries
      */
     public static function mergeCallArgEntries(Context $context, array $entries): Variable
     {
-        if (1 === \count($entries)) {
-            $only = $entries[0];
-            if (\is_array($only) && isset($only['unpack'])) {
-                $src = $only['unpack'];
-                if (
-                    !ListUnpackHelper::isDefinitelyArrayAtCompileTime($src)
-                    && Variable::TYPE_VALUE !== $src->type
-                    && Variable::TYPE_OBJECT !== $src->type
-                ) {
-                    CallUnpackRuntime::ensureLinked($context);
-                    ListUnpackHelper::emitCallUnpackOperandCheck($context, $src);
-                }
-
-                return self::coerceToPackedHashtableCopy($context, $src);
-            }
-        }
-
-        $needsNonArrayGuard = false;
-        foreach ($entries as $entry) {
-            if (!\is_array($entry) || !isset($entry['unpack'])) {
-                continue;
-            }
-            $u = $entry['unpack'];
-            if (
-                !ListUnpackHelper::isDefinitelyArrayAtCompileTime($u)
-                && Variable::TYPE_VALUE !== $u->type
-                && Variable::TYPE_OBJECT !== $u->type
-            ) {
-                $needsNonArrayGuard = true;
-                break;
-            }
-        }
-        if ($needsNonArrayGuard) {
-            CallUnpackRuntime::ensureLinked($context);
-        }
-
-        $dest = self::emptyVariable($context);
-        $destVar = new Variable(
-            $context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            $dest->value
-        );
-        foreach ($entries as $entry) {
-            if (\is_array($entry) && isset($entry['unpack'])) {
-                $u = $entry['unpack'];
-                if (
-                    $needsNonArrayGuard
-                    && !ListUnpackHelper::isDefinitelyArrayAtCompileTime($u)
-                    && Variable::TYPE_VALUE !== $u->type
-                    && Variable::TYPE_OBJECT !== $u->type
-                ) {
-                    ListUnpackHelper::emitCallUnpackOperandCheck($context, $u);
-                }
-                self::spreadInto($context, $destVar, $u);
-                continue;
-            }
-            if (\is_array($entry) && isset($entry['named'])) {
-                $nameVar = new Variable(
-                    $context,
-                    Variable::TYPE_STRING,
-                    Variable::KIND_VALUE,
-                    $context->constantFromString((string) $entry['named'])
-                );
-                self::addElement($context, $destVar, $entry['value'], $nameVar);
-                continue;
-            }
-            $value = \is_array($entry) ? ($entry['v'] ?? $entry['value'] ?? null) : $entry;
-            self::addElement($context, $destVar, $value, null);
-        }
-
-        return $destVar;
+        return HashTableWriteLlvm::mergeCallArgEntries($context, $entries);
     }
 
     /**
      * Box a native {@see __hashtable__*} into a value-boxed array local (#24167 k09).
-     *
-     * Variadic recv passes a packed HT; builtins like array_sum() need TYPE_VALUE with an
-     * array tag (implode tolerates raw HT via {@see ArrayBuiltinHelper::loadHashTable}).
      */
     public static function boxedArrayFromHashtable(Context $context, Variable $ht): Variable
     {
-        if (Variable::TYPE_HASHTABLE !== $ht->type) {
-            throw new \LogicException(
-                'boxedArrayFromHashtable requires TYPE_HASHTABLE, got '.Variable::getStringType($ht->type)
-            );
-        }
-        $slot = JitValueBox::alloc($context);
-        $ptr = $context->helper->loadValue($ht);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $slot),
-            $ptr
-        );
-        $context->refcount->addref($ptr);
-        $var = new Variable(
-            $context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
-            $slot
-        );
-        $var->valueBoxHashtable = true;
-
-        return $var;
+        return HashTableWriteLlvm::boxedArrayFromHashtable($context, $ht);
     }
 
     /**
@@ -505,24 +361,12 @@ final class HashTableHelper
      */
     public static function coerceToPackedHashtableCopy(Context $context, Variable $source): Variable
     {
-        $packed = self::coerceToPackedHashtable($context, $source);
-        $ptr = $context->helper->loadValue($packed);
-        $copy = \PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime::duplicate($context, $ptr);
-
-        return new Variable(
-            $context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            $copy
-        );
+        return HashTableWriteLlvm::coerceToPackedHashtableCopy($context, $source);
     }
 
     public static function emitIllegalOffsetType(Context $context, string $message = 'Illegal offset type'): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        HashTableReadLlvm::emitIllegalOffsetType($context, $message);
     }
 
     /**
@@ -533,10 +377,7 @@ final class HashTableHelper
         Variable $key,
         string $legacyMessage = 'Illegal offset type'
     ): void {
-        self::emitIllegalOffsetType(
-            $context,
-            self::illegalOffsetMessageForJitKey($context, $key, $legacyMessage)
-        );
+        HashTableReadLlvm::emitIllegalOffsetTypeForKey($context, $key, $legacyMessage);
     }
 
     /**
@@ -547,28 +388,6 @@ final class HashTableHelper
         Variable $key,
         string $legacyMessage = 'Illegal offset type'
     ): string {
-        if (Variable::TYPE_HASHTABLE === $key->type) {
-            return \PHPCompiler\VM\EnumCaseSupport::formatIllegalContainerOffsetMessage(
-                'array',
-                $legacyMessage
-            );
-        }
-
-        $typeName = 'object';
-        if (null !== $key->compileTimeEnumCase && isset($key->compileTimeEnumCase['classId'])) {
-            $name = $context->type->object->classNameForId((int) $key->compileTimeEnumCase['classId']);
-            if (\is_string($name) && '' !== $name) {
-                $typeName = $name;
-            }
-        } elseif (null !== $key->objectPropertyClassName && '' !== $key->objectPropertyClassName) {
-            $typeName = $key->objectPropertyClassName;
-        } elseif (null !== $key->magicGetOverloadedClass && '' !== $key->magicGetOverloadedClass) {
-            $typeName = $key->magicGetOverloadedClass;
-        }
-
-        return \PHPCompiler\VM\EnumCaseSupport::formatIllegalContainerOffsetMessage(
-            $typeName,
-            $legacyMessage
-        );
+        return HashTableReadLlvm::illegalOffsetMessageForJitKey($context, $key, $legacyMessage);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -305,7 +306,7 @@ final class HashTableReadLlvm
         $objResPred = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($objIllegal);
-        HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
+        HashTableReadLlvm::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
         $objIllegalResult = $i1->constInt(0, false);
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($falseBlock);
@@ -605,7 +606,7 @@ final class HashTableReadLlvm
         }
         if (Variable::TYPE_HASHTABLE === $dim->type) {
             // Array used as offset — Zend TypeError with isset/empty wording (#29567).
-            HashTableHelper::emitIllegalOffsetTypeForKey(
+            HashTableReadLlvm::emitIllegalOffsetTypeForKey(
                 $context,
                 $dim,
                 'Illegal offset type in isset or empty'
@@ -837,7 +838,7 @@ final class HashTableReadLlvm
             $context->builder->branchIf($slotEmpty, $initSlot, $useSlot);
 
             $context->builder->positionAtEnd($initSlot);
-            $newHt = HashTableHelper::alloc($context);
+            $newHt = HashTableWriteLlvm::alloc($context);
             $emptyHt = new Variable(
                 $context,
                 Variable::TYPE_HASHTABLE,
@@ -866,7 +867,7 @@ final class HashTableReadLlvm
             $context->builder->branchIf($needsInit, $initBox, $ready);
 
             $context->builder->positionAtEnd($initBox);
-            $boxHt = HashTableHelper::alloc($context);
+            $boxHt = HashTableWriteLlvm::alloc($context);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
                 $valPtr,
@@ -902,7 +903,7 @@ final class HashTableReadLlvm
         $context->builder->branchIf($isNull, $init, $ready);
 
         $context->builder->positionAtEnd($init);
-        $newHt = HashTableHelper::alloc($context);
+        $newHt = HashTableWriteLlvm::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $valPtr,
@@ -1081,6 +1082,61 @@ final class HashTableReadLlvm
         $context->builder->branch($headBb);
 
         $context->builder->positionAtEnd($doneBb);
+    }
+
+    public static function emitIllegalOffsetType(Context $context, string $message = 'Illegal offset type'): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+    }
+
+    /**
+     * Array-literal / dim-write illegal key — PROFILE≥8.3 typed TypeError (#28628, zend_illegal_container_offset).
+     */
+    public static function emitIllegalOffsetTypeForKey(
+        Context $context,
+        Variable $key,
+        string $legacyMessage = 'Illegal offset type'
+    ): void {
+        self::emitIllegalOffsetType(
+            $context,
+            self::illegalOffsetMessageForJitKey($context, $key, $legacyMessage)
+        );
+    }
+
+    /**
+     * Resolve zend_zval_type_name()-shaped label for a compile-time JIT array key (#28628).
+     */
+    public static function illegalOffsetMessageForJitKey(
+        Context $context,
+        Variable $key,
+        string $legacyMessage = 'Illegal offset type'
+    ): string {
+        if (Variable::TYPE_HASHTABLE === $key->type) {
+            return \PHPCompiler\VM\EnumCaseSupport::formatIllegalContainerOffsetMessage(
+                'array',
+                $legacyMessage
+            );
+        }
+
+        $typeName = 'object';
+        if (null !== $key->compileTimeEnumCase && isset($key->compileTimeEnumCase['classId'])) {
+            $name = $context->type->object->classNameForId((int) $key->compileTimeEnumCase['classId']);
+            if (\is_string($name) && '' !== $name) {
+                $typeName = $name;
+            }
+        } elseif (null !== $key->objectPropertyClassName && '' !== $key->objectPropertyClassName) {
+            $typeName = $key->objectPropertyClassName;
+        } elseif (null !== $key->magicGetOverloadedClass && '' !== $key->magicGetOverloadedClass) {
+            $typeName = $key->magicGetOverloadedClass;
+        }
+
+        return \PHPCompiler\VM\EnumCaseSupport::formatIllegalContainerOffsetMessage(
+            $typeName,
+            $legacyMessage
+        );
     }
 
 }
