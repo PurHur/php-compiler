@@ -21,6 +21,7 @@ final class Soap12FaultEnvelopeVMTest extends BaseTest
         foreach ([
             'soap_server_soap12_fault.phpt',
             'soap_server_soap12_fault_envelope.phpt',
+            'soap_server_fault_headerfault.phpt',
         ] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,

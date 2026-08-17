@@ -70,6 +70,15 @@ final class BuiltinClasses
         if (!isset($existing['detail'])) {
             $entry->properties[] = new ClassProperty('detail', null, $nullProto, false, $pub, 'soapfault');
         }
+        if (!isset($existing['_name'])) {
+            $entry->properties[] = new ClassProperty('_name', null, $nullProto, false, $pub, 'soapfault');
+        }
+        if (!isset($existing['headerfault'])) {
+            $entry->properties[] = new ClassProperty('headerfault', null, $nullProto, false, $pub, 'soapfault');
+        }
+        if (!isset($existing['lang'])) {
+            $entry->properties[] = new ClassProperty('lang', $empty, $strProto, false, $pub, 'soapfault');
+        }
 
         $ctor = new SoapFaultConstruct();
         $entry->constructor = $ctor;
