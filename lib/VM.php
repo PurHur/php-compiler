@@ -7509,7 +7509,7 @@ restart:
                         try {
                             // Dynamic "$c()" / array callables do not resolve parent/self/static
                             // as scope keywords — Zend Errors with Class "parent" not found (#25625).
-                            $this->initStaticCallable($frame, $name, false, false, false);
+                            $this->initStaticCallable($frame, $name, false, false, false, true);
                         } catch (\Error $e) {
                             $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                             if (null !== $catchFrame) {
@@ -19177,7 +19177,8 @@ restart:
         string $callableName,
         bool $parentKeywordScope = false,
         bool $selfKeywordScope = false,
-        bool $resolveScopeKeywords = true
+        bool $resolveScopeKeywords = true,
+        bool $isDynamicCallable = false
     ): void {
         [$className, $methodName] = explode('::', $callableName, 2);
         $lcClass = $resolveScopeKeywords
@@ -19224,7 +19225,7 @@ restart:
             // Zend INIT_STATIC_METHOD_CALL: non-static Class::method() is allowed when
             // EX(This) is an object instanceof the called class (self::/static::/parent::
             // and compatible named Class:: from instance methods) (#28050, #1858).
-            if (!$this->instanceThisAllowsNonStaticCall($frame, $lcClass)) {
+            if ($isDynamicCallable || !$this->instanceThisAllowsNonStaticCall($frame, $lcClass)) {
                 $this->assertMethodCallableStatically($class, $methodLc);
             }
         } catch (\LogicException $e) {
@@ -21053,7 +21054,7 @@ restart:
             }
             try {
                 // Dynamic array callables do not resolve parent/self/static (#25625).
-                $this->initStaticCallable($frame, $class.'::'.$methodName, false, false, false);
+                $this->initStaticCallable($frame, $class.'::'.$methodName, false, false, false, true);
             } catch (\Error $e) {
                 return $this->dispatchVmError($e->getMessage(), $frame);
             } catch (\LogicException $e) {
