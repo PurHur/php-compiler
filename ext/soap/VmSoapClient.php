@@ -778,7 +778,7 @@ final class VmSoapClient
 
         [$bodyOut, $contentEncoding, $acceptEncoding] = self::applyRequestCompression($state, $request);
 
-        $cookieHeader = self::formatCookieHeader($state->cookies);
+        $cookieHeader = self::formatCookieHeader($state->cookies, $location);
         $authHeader = self::formatAuthorizationHeader($state, $location);
         $proxyAuthHeader = self::formatProxyAuthorizationHeader($state);
         $useProxy = self::usesHttpProxy($state, $location);
@@ -921,6 +921,10 @@ final class VmSoapClient
             if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
                 $responseHeaders = \implode("\r\n", $http_response_header)."\r\n";
             }
+        }
+        // php-src php_http.c — merge Set-Cookie into Z_CLIENT_COOKIES (#31843).
+        if ('' !== $responseHeaders) {
+            self::ingestSetCookiesFromResponseHeaders($object, $state, $responseHeaders, $location);
         }
         // php-src: HTTP 401 + WWW-Authenticate Digest → store challenge and retry (#20340).
         if (
@@ -1077,23 +1081,46 @@ final class VmSoapClient
     }
 
     /**
-     * Cookie header from jar — php-src php_http.c (#31569).
+     * Cookie header from jar — php-src php_http.c (#31569 / #31844).
      *
      * Each cookie is an array; index 0 is the value. Optional path (1), domain (2),
-     * and secure (3) are ignored for path/domain matching in this subset (fixture/HTTP
-     * transport still needs name=value pairs).
+     * and secure (3) gate emission (path prefix, in_domain, SSL-or-not-secure).
      *
      * @param array<string, array<int, mixed>|string> $cookies
      */
-    private static function formatCookieHeader(array $cookies): string
+    private static function formatCookieHeader(array $cookies, string $location = ''): string
     {
         if ($cookies === []) {
             return '';
         }
+        $payload = '' !== $location ? SoapUrlPayload::fromLocation($location) : null;
+        $uriPath = null !== $payload && null !== $payload->path && '' !== $payload->path
+            ? $payload->path
+            : '/';
+        $uriHost = null !== $payload && null !== $payload->host ? $payload->host : '';
+        $useSsl = (bool) \preg_match('#^https://#i', $location);
+
         $parts = [];
         foreach ($cookies as $name => $value) {
             if (\is_array($value)) {
                 if (!isset($value[0]) || !\is_string($value[0])) {
+                    continue;
+                }
+                // php-src: path prefix match (strncmp) when index 1 is a string (#31844).
+                if (isset($value[1]) && \is_string($value[1])) {
+                    $cookiePath = $value[1];
+                    if (0 !== \strncmp($uriPath, $cookiePath, \strlen($cookiePath))) {
+                        continue;
+                    }
+                }
+                // php-src: in_domain(uri->host, domain) when index 2 is a string (#31844).
+                if (isset($value[2]) && \is_string($value[2])) {
+                    if (!self::cookieInDomain($uriHost, $value[2])) {
+                        continue;
+                    }
+                }
+                // php-src: skip secure cookies on non-SSL (#31844).
+                if (!$useSsl && \array_key_exists(3, $value) && $value[3]) {
                     continue;
                 }
                 $parts[] = $name.'='.$value[0];
@@ -1107,6 +1134,102 @@ final class VmSoapClient
         }
 
         return \implode('; ', $parts);
+    }
+
+    /**
+     * php-src php_http.c in_domain — leading '.' ⇒ suffix match, else exact (#31844).
+     */
+    private static function cookieInDomain(string $host, string $domain): bool
+    {
+        if ('' === $domain) {
+            return true;
+        }
+        if (isset($domain[0]) && '.' === $domain[0]) {
+            return \str_ends_with($host, $domain);
+        }
+
+        return $host === $domain;
+    }
+
+    /**
+     * php-src php_http.c Set-Cookie: loop — merge into Z_CLIENT_COOKIES (#31843).
+     *
+     * Index 0 = value; 1 = path; 2 = domain; 3 = secure bool. Missing path/domain
+     * default from request URI (dirname of path; host).
+     */
+    private static function ingestSetCookiesFromResponseHeaders(
+        ObjectEntry $object,
+        SoapClientState $state,
+        string $responseHeaders,
+        string $location
+    ): void {
+        if ('' === $responseHeaders || !\preg_match_all('/^Set-Cookie:\s*(.+)$/im', $responseHeaders, $matches)) {
+            return;
+        }
+        $payload = SoapUrlPayload::fromLocation($location);
+        $uriPath = null !== $payload && null !== $payload->path && '' !== $payload->path
+            ? $payload->path
+            : '/';
+        $uriHost = null !== $payload && null !== $payload->host ? $payload->host : '';
+        // php-src default path: URI path up to (not including) last '/'.
+        $pos = \strrpos($uriPath, '/');
+        $defaultPath = false === $pos ? '' : \substr($uriPath, 0, $pos);
+
+        $changed = false;
+        foreach ($matches[1] as $cookieLine) {
+            $cookieLine = \trim((string) $cookieLine);
+            if ('' === $cookieLine) {
+                continue;
+            }
+            $eqpos = \strpos($cookieLine, '=');
+            $sempos = \strpos($cookieLine, ';');
+            if (false === $eqpos || (false !== $sempos && $sempos < $eqpos)) {
+                continue;
+            }
+            $name = \substr($cookieLine, 0, $eqpos);
+            if ('' === $name) {
+                continue;
+            }
+            if (false !== $sempos) {
+                $cookieValue = \substr($cookieLine, $eqpos + 1, $sempos - ($eqpos + 1));
+            } else {
+                $cookieValue = \substr($cookieLine, $eqpos + 1);
+            }
+            $zcookie = [0 => $cookieValue];
+            if (false !== $sempos) {
+                $options = \substr($cookieLine, $sempos + 1);
+                while ('' !== $options) {
+                    $options = \ltrim($options);
+                    if ('' === $options) {
+                        break;
+                    }
+                    $nextSem = \strpos($options, ';');
+                    $token = false === $nextSem ? $options : \substr($options, 0, $nextSem);
+                    if (0 === \strncasecmp($token, 'path=', 5)) {
+                        $zcookie[1] = \substr($token, 5);
+                    } elseif (0 === \strncasecmp($token, 'domain=', 7)) {
+                        $zcookie[2] = \substr($token, 7);
+                    } elseif (0 === \strncasecmp($token, 'secure', 6)) {
+                        $zcookie[3] = true;
+                    }
+                    if (false === $nextSem) {
+                        break;
+                    }
+                    $options = \substr($options, $nextSem + 1);
+                }
+            }
+            if (!\array_key_exists(1, $zcookie)) {
+                $zcookie[1] = $defaultPath;
+            }
+            if (!\array_key_exists(2, $zcookie) && '' !== $uriHost) {
+                $zcookie[2] = $uriHost;
+            }
+            $state->cookies[$name] = $zcookie;
+            $changed = true;
+        }
+        if ($changed && null !== $state->vmContext) {
+            self::syncCookiesProperty($object, $state, $state->vmContext);
+        }
     }
 
     /**
