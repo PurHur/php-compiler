@@ -40,6 +40,14 @@ final class InstanceOfHelper
         return self::emitDynamic($context, $expr, $context->getVariableFromOp($classOp));
     }
 
+    /**
+     * instanceof against a runtime class id — late `static` LSB (#31746, zend_execute.c ZEND_INSTANCEOF).
+     */
+    public static function emitWithRuntimeClassId(Context $context, Variable $expr, Value $rhsClassId): Variable
+    {
+        return self::emitWithRhsClassId($context, $expr, $rhsClassId);
+    }
+
     private static function emitDynamic(Context $context, Variable $expr, Variable $classVar): Variable
     {
         if (InstanceOfJitHelper::jitRhsTypeIsInvalidClass($classVar->type)) {

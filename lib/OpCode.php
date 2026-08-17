@@ -296,7 +296,8 @@ class OpCode {
     public ?string $instanceofUnionTypes = null;
     /**
      * TYPE_INSTANCEOF: lexical `self`/`parent`/`static` (not `$name = 'self'`).
-     * Trait methods keep these keywords; VM/JIT bind `self` to the using class (#31729).
+     * Trait methods keep these keywords; VM/JIT bind `self` to the using class (#31729)
+     * and `static` to the late-bound called class (#31746).
      *
      * @var null|'parent'|'self'|'static'
      */

@@ -9969,6 +9969,25 @@ class JIT {
                     }
                     $keyword = $op->instanceofScopeKeyword;
                     if (null !== $keyword && '' !== $keyword) {
+                        // `static` late-binds to $this / called class (Zend ZEND_INSTANCEOF).
+                        // AOT must not bake the trait/declaring name — that makes trait
+                        // `instanceof static` always false (#31746).
+                        if (
+                            'static' === $keyword
+                            && JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)
+                        ) {
+                            $classIdVal = JIT\ClassConstFetchHelper::emitStaticKeywordClassIdForPseudoConst(
+                                $this->context->type->object,
+                                $block
+                            );
+                            $result = JIT\InstanceOfHelper::emitWithRuntimeClassId(
+                                $this->context,
+                                $expr,
+                                $classIdVal
+                            );
+                            $this->assignOperand($block->getOperand($op->arg1), $result);
+                            break;
+                        }
                         // Trait flatten compiles this block with traitComposingClassName set (#31729).
                         $resolved = $this->resolveJitStaticScopeClass(
                             $block,
