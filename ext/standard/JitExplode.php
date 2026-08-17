@@ -17,6 +17,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\VmStringCompare;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -567,16 +568,8 @@ final class JitExplode
             : $context->module->addFunction($name, $ft);
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
-        // Ensure memcmp for VmStringCompare::findOffset
-        try {
-            $context->lookupFunction('memcmp');
-        } catch (\Throwable) {
-            $i32 = $context->getTypeFromString('int32');
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $mft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-            $context->registerFunction('memcmp', $context->module->addFunction('memcmp', $mft));
-        }
+        // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954).
+        LibcExtern::ensureMemcmpDecl($context);
         $found = VmStringCompare::findOffset(
             $context,
             $fn->getParam(0),

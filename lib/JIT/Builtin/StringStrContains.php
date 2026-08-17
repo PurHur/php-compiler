@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\VmStringCompare;
 use PHPLLVM\Value;
 
@@ -53,15 +54,7 @@ final class StringStrContains
 
     private static function ensureMemcmp(Context $context): void
     {
-        try {
-            $context->lookupFunction('memcmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('memcmp', $ft);
-            $context->registerFunction('memcmp', $fn);
-        }
+        // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954).
+        LibcExtern::ensureMemcmpDecl($context);
     }
 }

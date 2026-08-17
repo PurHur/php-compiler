@@ -39,7 +39,12 @@ final class LibcExtern
             // JitGcCollectCyclesStandaloneKernel / StringZlibJit) call ensureMemsetDecl before
             // lookup; EMBED MCJIT still gets implementMemsetBody after ensureMemsetDecl
             // (#98 / #21109). Peer memmove drop (#31743).
-            'memcmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
+            // memcmp dropped (#31954): NestedJIT string/spaceship/stream leaves call
+            // ensureMemcmpDecl before lookup; kernels that already declare i8* memcmp
+            // module-locally stay as-is. EMBED MCJIT still gets implementMemcmpBody after
+            // ensureMemcmpDecl (#98 / #21109). Peer memcpy drop (#31885). User-script
+            // memcmp() is not a php-src builtin (#25359); internal PHP is VmString /
+            // NCompareJitHelper.
             // memchr dropped (#31655): JitTempnamKernel::ensureLibc declares memchr(3)
             // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
             // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
@@ -538,8 +543,37 @@ final class LibcExtern
         unset($i8, $i8p);
     }
 
+    /**
+     * Module-local memcmp(3) after LibcExtern always-on drop (#31954).
+     *
+     * EMBED MCJIT still needs a declared symbol before {@see implementMemcmpBody};
+     * NestedJIT string/spaceship/stream leaves call this before lookupFunction('memcmp').
+     * Peer: ensureMemcpyDecl (#31885).
+     */
+    public static function ensureMemcmpDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('memcmp');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->getNamedFunction('memcmp');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'memcmp',
+                $context->context->functionType($i32, false, $i8p, $i8p, $sizeT)
+            );
+        }
+        $context->registerFunction('memcmp', $fn);
+    }
+
     private static function implementMemcmpBody(Context $context): void
     {
+        self::ensureMemcmpDecl($context);
         $fn = $context->module->getNamedFunction('memcmp');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;

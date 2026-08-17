@@ -971,16 +971,9 @@ class Module extends ModuleAbstract
         }
         // nl_langinfo(3): NestedJIT leaf declares module-locally (#30404 / fnmatch #30383).
         // strxfrm(3): NestedJIT leaf declares module-locally (#30420 / nl_langinfo #30404).
-        try {
-            $context->lookupFunction('memcmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('memcmp', $ft);
-            $context->registerFunction('memcmp', $fn);
-        }
+        // memcmp(3) dropped from always-on Module decls (#31954 / #31885 peer):
+        // NestedJIT leaves call LibcExtern::ensureMemcmpDecl before lookup;
+        // user-script memcmp() is not a php-src builtin (#25359).
         try {
             $context->lookupFunction('strncmp');
         } catch (\Throwable $e) {
