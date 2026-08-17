@@ -40,6 +40,13 @@ final class EvalRuntime
         $literal = JitStringArg::compileTimeLiteral($codeVar);
 
         if (null !== $literal) {
+            // zend_eval_stringl length 0 is FAILURE → zif_eval false, not inlined NULL (#31914).
+            if (VmEval::isZeroLengthEvalSource($literal)) {
+                self::emitFalse($jit, $resultOp);
+
+                return;
+            }
+
             $callerPath = $callerBlock->scriptPath();
             $callLine = null !== $op->sourceLocation
                 ? (int) $op->sourceLocation->startLine

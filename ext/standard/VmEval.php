@@ -200,6 +200,27 @@ final class VmEval
     }
 
     /**
+     * php-src zend_compile_string / zend_eval_stringl: length 0 is FAILURE, not a null result (#31914).
+     *
+     * zif_eval maps FAILURE to boolean false. Whitespace-only and ';' still compile and return null.
+     */
+    public static function isZeroLengthEvalSource(string $code): bool
+    {
+        return '' === $code;
+    }
+
+    /**
+     * Zend zif_eval RETVAL_FALSE when zend_eval_stringl returns FAILURE (#31914).
+     */
+    public static function falseEvalFailureResult(): Variable
+    {
+        $false = new Variable();
+        $false->bool(false);
+
+        return $false;
+    }
+
+    /**
      * Shared compile+execute path for TYPE_EVAL and the eval() builtin.
      */
     public static function evalCodeInFrame(
@@ -207,6 +228,11 @@ final class VmEval
         Frame $scopeFrame,
         string $code
     ): Variable {
+        // Empty source never compiles (zend_compile_string length 0 → NULL → FAILURE).
+        if (self::isZeroLengthEvalSource($code)) {
+            return self::falseEvalFailureResult();
+        }
+
         $ctx = $vm->context;
         $runtime = $ctx->runtime;
 
@@ -435,6 +461,8 @@ final class VmEval
     public static function wrapEvalCode(string $code): string
     {
         $trimmed = rtrim($code);
+        // Whitespace-only (not length 0) compiles as an empty statement list → NULL.
+        // Zero-length is FAILURE at evalCodeInFrame / EvalRuntime, not this wrap (#31914).
         if ('' === $trimmed) {
             return "<?php\n";
         }
