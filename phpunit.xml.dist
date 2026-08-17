@@ -245,6 +245,8 @@
             <file>./test/compliance/ForeachByrefUnsetRefcount31936VMTest.php</file>
             <file>./test/compliance/ForeachByrefUnsetRefcount31936JITTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
+            <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
+            <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>
             <file>./test/compliance/InheritedTypedPropertyErrorClass31785VMTest.php</file>
             <file>./test/compliance/InheritedTypedPropertyErrorClass31785JITTest.php</file>
             <file>./test/compliance/TypedPropNullDefaultFatal31820VMTest.php</file>
