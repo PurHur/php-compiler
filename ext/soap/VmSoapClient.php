@@ -239,7 +239,7 @@ final class VmSoapClient
             new ParameterMetadata('args', [], false, false, false, false, 'array', null),
             new ParameterMetadata('options', [], false, true, false, false, '?array', 'null'),
             new ParameterMetadata('inputHeaders', [], false, true, false, false, null, 'null'),
-            new ParameterMetadata('outputHeaders', [], false, true, false, false, null, 'null'),
+            new ParameterMetadata('outputHeaders', [], false, true, false, true, null, 'null'),
         ];
         $doRequestReturn = ReflectionTypeSupport::cfgTypeFromLabel('?string');
         if (null !== $doRequestReturn) {
@@ -446,6 +446,45 @@ final class VmSoapClient
         }
 
         return $headers;
+    }
+
+    /**
+     * php-src php_packet_soap.c — Header children → &$outputHeaders keyed by local name (#31875).
+     *
+     * @return array<string, mixed>
+     */
+    private static function extractSoapOutputHeaders(string $response): array
+    {
+        $dom = new \DOMDocument();
+        if (!@$dom->loadXML($response)) {
+            return [];
+        }
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('SOAP-ENV', 'http://schemas.xmlsoap.org/soap/envelope/');
+        $xpath->registerNamespace('env', 'http://www.w3.org/2003/05/soap-envelope');
+        $nodes = $xpath->query('//SOAP-ENV:Header/*|//env:Header/*');
+        if (!$nodes || 0 === $nodes->length) {
+            return [];
+        }
+        $out = [];
+        foreach ($nodes as $node) {
+            if (!$node instanceof \DOMElement) {
+                continue;
+            }
+            $name = $node->localName ?? $node->nodeName;
+            $out[$name] = self::domElementToValue($node);
+        }
+
+        return $out;
+    }
+
+    private static function writeOutputHeaders(Variable $outputHeadersVar, string $response, Context $ctx): void
+    {
+        $ht = new HashTable();
+        foreach (self::extractSoapOutputHeaders($response) as $name => $value) {
+            $ht->add((string) $name, self::importValue($value, $ctx));
+        }
+        $outputHeadersVar->byRefTarget()->array($ht);
     }
 
     /**
@@ -803,6 +842,7 @@ final class VmSoapClient
     /**
      * @param array<string, mixed>|null $callOptions php-src __soapCall $options (location/soapaction/uri) (#31873)
      * @param list<ObjectEntry>         $inputHeaders per-call SoapHeaders merged ahead of defaults (#31874)
+     * @param ?Variable                 $outputHeadersVar by-ref 5th arg; Header children keyed by local name (#31875)
      */
     public static function soapCall(
         ObjectEntry $object,
@@ -811,9 +851,14 @@ final class VmSoapClient
         Context $ctx,
         Frame $frame,
         ?array $callOptions = null,
-        array $inputHeaders = []
+        array $inputHeaders = [],
+        ?Variable $outputHeadersVar = null
     ): Variable {
         $state = self::state($object);
+        // php-src soap.c soap_client_call_impl — zend_try_array_init before parse (#31875).
+        if (null !== $outputHeadersVar) {
+            $outputHeadersVar->byRefTarget()->array(new HashTable());
+        }
         try {
             [$location, $action, $callUri] = self::resolveCallOptions($state, $name, $callOptions);
             $request = self::buildRequest($state, $name, $arguments, $ctx, $callUri, $inputHeaders);
@@ -821,6 +866,11 @@ final class VmSoapClient
 
             $response = self::doRequest($object, $request, $location, $action, $state->soapVersion, $frame);
             $state->lastResponse = $response;
+
+            // php-src php_packet_soap.c Header walk → &$outputHeaders (even if Body later faults).
+            if (null !== $outputHeadersVar) {
+                self::writeOutputHeaders($outputHeadersVar, $response, $ctx);
+            }
 
             $decoded = self::decodeResponse(
                 $response,
@@ -3619,7 +3669,8 @@ final class SoapClientSoapCall extends SoapClassMethod
             $arguments = [];
         }
         $callOptions = null;
-        if ($argc >= 4) {
+        // Sparse named args skip optionals (outputHeaders: $out without $options) (#31875).
+        if (isset($frame->calledArgs[3])) {
             $optVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_NULL !== $optVar->type) {
                 if (Variable::TYPE_ARRAY !== $optVar->type) {
@@ -3633,7 +3684,7 @@ final class SoapClientSoapCall extends SoapClassMethod
             }
         }
         $inputHeaders = [];
-        if ($argc >= 5) {
+        if (isset($frame->calledArgs[4])) {
             $inputHeaders = VmSoapClient::parseInputHeadersArg(
                 $frame->calledArgs[4],
                 'SoapClient::__soapCall'
@@ -3646,7 +3697,8 @@ final class SoapClientSoapCall extends SoapClassMethod
             $frame->vmContext,
             $frame,
             $callOptions,
-            $inputHeaders
+            $inputHeaders,
+            $frame->calledArgs[5] ?? null
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);
