@@ -67,6 +67,8 @@ final class ShmopRuntime
 
         self::ensureLibcShm($context);
         LibcExtern::register($context);
+        // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
+        LibcExtern::ensureMemcpyDecl($context);
         self::ensureMapGlobal($context);
         self::implementOpenRegisterBridge($context);
         self::implementSizeBridge($context);

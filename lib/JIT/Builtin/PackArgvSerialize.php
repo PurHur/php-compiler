@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -320,24 +321,18 @@ final class PackArgvSerialize
     {
         $voidPtr = $context->getTypeFromString('void*');
         $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
-
-        foreach (
-            [
-                ['malloc', $voidPtr, [$sizeT]],
-                ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
-            ] as [$name, $ret, $params]
-        ) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $fn = $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($ret, false, ...$params)
-                );
-                $context->registerFunction($name, $fn);
-            }
+        try {
+            $context->lookupFunction('malloc');
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction(
+                'malloc',
+                $context->context->functionType($voidPtr, false, $sizeT)
+            );
+            $context->registerFunction('malloc', $fn);
         }
+        // memcpy(3) via LibcExtern::ensureMemcpyDecl after always-on drop (#31885);
+        // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
+        LibcExtern::ensureMemcpyDecl($context);
     }
 
     private static function ensureValueReaders(Context $context): void

@@ -77,6 +77,8 @@ final class UndefinedGlobalVariableRuntime
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $voidTy = $context->getTypeFromString('void');
+        // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
+        \PHPCompiler\JIT\LibcExtern::ensureMemcpyDecl($context);
         $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT);
         $fn = null !== $probe
             ? $probe

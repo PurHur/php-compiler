@@ -42,6 +42,8 @@ final class StringStrtokJit
     public static function implement(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
+        // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
+        \PHPCompiler\JIT\LibcExtern::ensureMemcpyDecl($context);
         self::ensureGlobals($context);
         self::implementIfMissing($context, '__phpc_strtok_reset', self::emitReset(...));
         self::implementIfMissing($context, '__phpc_strtok_init', self::emitInit(...));

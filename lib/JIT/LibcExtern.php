@@ -28,7 +28,10 @@ final class LibcExtern
             'malloc' => [$i8p, false, [$sizeT]],
             'realloc' => [$i8p, false, [$i8p, $sizeT]],
             'free' => [$void, false, [$i8p]],
-            'memcpy' => [$i8p, false, [$i8p, $i8p, $sizeT]],
+            // memcpy dropped (#31885): NestedJIT leaves that lookup without a local decl
+            // call ensureMemcpyDecl before lookup; kernels that already declare i8* memcpy
+            // module-locally stay as-is. EMBED MCJIT still gets implementMemcpyBody after
+            // ensureMemcpyDecl (#98 / #21109). Peer memset drop (#31863) / memmove (#31743).
             // memmove dropped (#31743): JitParseStrUserScriptCstrKernel::ensureLibc declares
             // memmove(3) module-locally (sole NestedJIT lookupFunction consumer); EMBED MCJIT
             // still gets implementMemmoveBody after ensureMemmoveDecl (#98 / #21109).
@@ -383,8 +386,36 @@ final class LibcExtern
         $context->registerFunction('memset', $fn);
     }
 
+    /**
+     * Module-local memcpy(3) after LibcExtern always-on drop (#31885).
+     *
+     * EMBED MCJIT still needs a declared symbol before {@see implementMemcpyBody};
+     * NestedJIT session/socket/strtok/undefined-var leaves call this before lookup.
+     * Peer: ensureMemsetDecl (#31863) / ensureMemmoveDecl (#31743).
+     */
+    public static function ensureMemcpyDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('memcpy');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->getNamedFunction('memcpy');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'memcpy',
+                $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)
+            );
+        }
+        $context->registerFunction('memcpy', $fn);
+    }
+
     private static function implementMemcpyBody(Context $context): void
     {
+        self::ensureMemcpyDecl($context);
         $fn = $context->module->getNamedFunction('memcpy');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;
