@@ -282,7 +282,7 @@ final class BuiltinInternalArgInfoTest extends TestCase
         foreach (['strpos', 'stripos', 'strrpos', 'strripos'] as $f) {
             $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
         }
-        foreach (['strstr', 'stristr', 'strchr'] as $f) {
+        foreach (['strstr', 'stristr', 'strchr', 'strrchr'] as $f) {
             $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
         }
     }

@@ -19,11 +19,12 @@ final class StrrchrRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('string_trim::jitCopySlice', $source);
     }
 
-    public function testStringStrrchrBridgeUsesStrrchrJitHelper(): void
+    public function testStringStrrchrBridgeUsesInlineScanAbi(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrrchr.php');
-        $this->assertStringContainsString('StrrchrJitHelper', $bridge);
+        $this->assertStringContainsString('phpc_strrchr_scan', $bridge);
         $this->assertStringNotContainsString("lookupFunction('strrchr')", $bridge);
+        $this->assertStringNotContainsString('JitNestedHelperCoerce::callHelper', $bridge);
     }
 
     public function testAlwaysOnLibcStrrchrDroppedAfterModuleLocalEnsure(): void
