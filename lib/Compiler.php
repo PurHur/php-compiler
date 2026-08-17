@@ -12326,6 +12326,13 @@ class Compiler {
 
     protected function throwTypedDefaultMismatch(string $given, string $kind, string $targetName, string $typeLabel): void
     {
+        // Zend zend_compile.c — null default on non-nullable typed property (#31820)
+        if ('property' === $kind && 'null' === $given) {
+            $this->throwCompileError(
+                "Default value for property of type {$typeLabel} may not be null. Use the nullable type ?{$typeLabel} to allow null default value"
+            );
+        }
+
         $this->throwCompileError(
             "Cannot use {$given} as default value for {$kind} {$targetName} of type {$typeLabel}"
         );

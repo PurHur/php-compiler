@@ -227,6 +227,8 @@
             <file>./test/compliance/UninitTypedPropertyByref31771JITTest.php</file>
             <file>./test/compliance/InheritedTypedPropertyErrorClass31785VMTest.php</file>
             <file>./test/compliance/InheritedTypedPropertyErrorClass31785JITTest.php</file>
+            <file>./test/compliance/TypedPropNullDefaultFatal31820VMTest.php</file>
+            <file>./test/compliance/TypedPropNullDefaultFatal31820JITTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147JITTest.php</file>
             <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
