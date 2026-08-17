@@ -828,6 +828,16 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getcwd'));
     }
 
+    /** php-src basic_functions.stub.php — alias/absent return array (#27785). */
+    public function testRequiredFilesMangledObjectVarsReflectionReturnArray(): void
+    {
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_included_files'));
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_required_files'));
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_mangled_object_vars'));
+        $this->assertSame('array', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('get_required_files'));
+        $this->assertSame('array', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('get_mangled_object_vars'));
+    }
+
     /** php-src basic_functions.stub.php — crypt $salt required; InternalArgInfo still salt= (#28920). */
     public function testCryptSaltRequiredReflectionStub(): void
     {
