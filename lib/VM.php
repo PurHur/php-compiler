@@ -6875,7 +6875,13 @@ restart:
                         }
                     }
                     if (!$mutates) {
-                        VM\TypedPropertyCheck::assertReadable($storage);
+                        if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                            if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($storage)) {
+                                VM\TypedPropertyCheck::assertReadable($storage);
+                            }
+                        } else {
+                            VM\TypedPropertyCheck::assertReadable($storage);
+                        }
                     }
                     $dest->indirect($storage);
                     if ($forWrite) {
@@ -9195,7 +9201,15 @@ restart:
                                 $result->null();
                                 break;
                             }
-                            VM\TypedPropertyCheck::assertReadable($propSlot);
+                            // Dim-write (`$o->a[0]=` / `$o->a[]=`) is BP_VAR_W: uninitialized typed
+                            // array slots auto-init to [] (zend_std_get_property_ptr_ptr + zend_try_array_init, #31770).
+                            if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                                if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($propSlot)) {
+                                    VM\TypedPropertyCheck::assertReadable($propSlot);
+                                }
+                            } else {
+                                VM\TypedPropertyCheck::assertReadable($propSlot);
+                            }
                             // `$obj->arr[]=` / unset($obj->arr[$k]) need a live alias into property storage.
                             // Plain R-mode fetches must copy: an indirect alias makes ternary/`&&` phi self-ASSIGN
                             // look like a property write (readonly / DOM read-only / skipped `__get`) (#23986, #24250).

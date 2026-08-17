@@ -112,6 +112,9 @@ class Object_ extends Type {
 
     /** @var array<int, array<int, true>> class id => property slot => true when declared type allows null (#5220) */
     private array $propertyAllowsNullSlots = [];
+
+    /** @var array<int, array<int, true>> class id => property slot => type contains array (#31770) */
+    private array $propertyAllowsArraySlots = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
     /** @var array<int, Block> class id => __destruct CFG block (#4013) */
@@ -3234,6 +3237,23 @@ class Object_ extends Type {
     public function propertySlotAllowsNull(int $classId, int $slotIndex): bool
     {
         return isset($this->propertyAllowsNullSlots[$classId][$slotIndex]);
+    }
+
+    public function markPropertyAllowsArray(int $classId, string $name): void
+    {
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[1] !== $name) {
+                continue;
+            }
+            $this->propertyAllowsArraySlots[$classId][$propset[3]] = true;
+
+            return;
+        }
+    }
+
+    public function propertySlotAllowsArray(int $classId, int $slotIndex): bool
+    {
+        return isset($this->propertyAllowsArraySlots[$classId][$slotIndex]);
     }
 
     /** True when the slot stores a typed __value__ property (#4912). */
