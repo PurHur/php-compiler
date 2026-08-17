@@ -149,15 +149,28 @@ final class JitValueNumeric
         $context->builder->positionAtEnd($longBlock);
         $boxedLong = JitLongArg::lower($context, $boxed, 'binary op boxed operand');
         if ('left' === $nativeSide) {
-            $longResult = self::emitLongOp($context, $opType, $nativeLong, $boxedLong);
+            if (JitLongArithOverflow::supportsOpcode($opType)) {
+                JitLongArithOverflow::writeBoxedBinary($context, $opType, $nativeLong, $boxedLong, $slotPtr);
+            } else {
+                $longResult = self::emitLongOp($context, $opType, $nativeLong, $boxedLong);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $slotPtr,
+                    $longResult
+                );
+            }
         } else {
-            $longResult = self::emitLongOp($context, $opType, $boxedLong, $nativeLong);
+            if (JitLongArithOverflow::supportsOpcode($opType)) {
+                JitLongArithOverflow::writeBoxedBinary($context, $opType, $boxedLong, $nativeLong, $slotPtr);
+            } else {
+                $longResult = self::emitLongOp($context, $opType, $boxedLong, $nativeLong);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $slotPtr,
+                    $longResult
+                );
+            }
         }
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $slotPtr,
-            $longResult
-        );
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
@@ -240,12 +253,16 @@ final class JitValueNumeric
         $context->builder->positionAtEnd($longBlock);
         $ll = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
         $rl = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
-        $lres = self::emitLongOp($context, $opType, $ll, $rl);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $slotPtr,
-            $lres
-        );
+        if (JitLongArithOverflow::supportsOpcode($opType)) {
+            JitLongArithOverflow::writeBoxedBinary($context, $opType, $ll, $rl, $slotPtr);
+        } else {
+            $lres = self::emitLongOp($context, $opType, $ll, $rl);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $slotPtr,
+                $lres
+            );
+        }
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
