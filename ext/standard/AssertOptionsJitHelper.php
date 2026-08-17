@@ -32,6 +32,15 @@ final class AssertOptionsJitHelper
         return self::$zendAssertions > 0 && self::$active;
     }
 
+    /**
+     * php-src {@code zend_compile_assert}: {@code EG(assertions) < 0} compiles {@code assert()}
+     * to constant {@code true} and does not evaluate arguments (#31857, Zend/zend_compile.c).
+     */
+    public static function shouldCompileOutAssert(): bool
+    {
+        return self::$zendAssertions < 0;
+    }
+
     public static function shouldThrowOnFailure(): bool
     {
         return self::$exception;
