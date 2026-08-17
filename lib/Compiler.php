@@ -43400,12 +43400,47 @@ class Compiler {
             return [$op];
         }
 
-        return [new OpCode(
+        $op = new OpCode(
             OpCode::TYPE_INSTANCEOF,
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->expr, $block, true),
             $this->compileOperand($expr->class, $block, true)
-        )];
+        );
+        $keyword = $this->instanceofLexicalScopeKeyword($expr->class);
+        if (null !== $keyword) {
+            $op->instanceofScopeKeyword = $keyword;
+        }
+
+        return [$op];
+    }
+
+    /**
+     * Lexical instanceof RHS `self`/`parent`/`static` after php-cfg rewrite (#31729).
+     *
+     * Class methods already lower `self`/`parent` to the FQCN; trait bodies keep the
+     * keyword. Do not walk {@see Operand::$original} — a rewritten Literal('CI') may
+     * still carry a Name('self') from the parser.
+     *
+     * @return null|'parent'|'self'|'static'
+     */
+    private function instanceofLexicalScopeKeyword(?Operand $class): ?string
+    {
+        if (null === $class) {
+            return null;
+        }
+        if ($class instanceof Operand\Literal && is_string($class->value)) {
+            $lc = strtolower($class->value);
+            if ('self' === $lc || 'parent' === $lc || 'static' === $lc) {
+                return $lc;
+            }
+
+            return null;
+        }
+        if ($class instanceof Operand\Variable && $class->name instanceof Operand\Literal) {
+            return $this->instanceofLexicalScopeKeyword($class->name);
+        }
+
+        return null;
     }
 
     /**

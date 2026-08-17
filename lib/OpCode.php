@@ -294,6 +294,13 @@ class OpCode {
     public ?string $catchTypes = null;
     /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
     public ?string $instanceofUnionTypes = null;
+    /**
+     * TYPE_INSTANCEOF: lexical `self`/`parent`/`static` (not `$name = 'self'`).
+     * Trait methods keep these keywords; VM/JIT bind `self` to the using class (#31729).
+     *
+     * @var null|'parent'|'self'|'static'
+     */
+    public ?string $instanceofScopeKeyword = null;
 
     /** TYPE_DECLARE_PROPERTY: property is readonly (#3149, #3432). */
     public bool $propertyReadonly = false;
