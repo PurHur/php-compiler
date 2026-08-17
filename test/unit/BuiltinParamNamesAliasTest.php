@@ -1399,6 +1399,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23405 — ini_parse_quantity Zend stub name (absent from InternalArgInfo) */
+    public function testIniParseQuantityZendStubNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('ini_parse_quantity');
+        self::assertSame(['shorthand'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'shorthand', 'ini_parse_quantity'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'value', 'ini_parse_quantity'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('ini_parse_quantity'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('ini_parse_quantity'));
+    }
+
     /** @covers issue #23341 — error_log Zend stub names (InternalArgInfo still extra_headers) */
     public function testErrorLogZendStubNamedParameters(): void
     {
@@ -2835,6 +2846,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'new_path', 'move_uploaded_file'));
     }
 
+    /** @covers issue #23347 */
+    public function testCopyZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('copy');
+        self::assertSame(['from', 'to', 'context'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'from', 'copy'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'to', 'copy'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'copy'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'source_file', 'copy'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'destination_file', 'copy'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('copy'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('copy'));
+    }
+
     /** @covers issue #23264 */
     public function testCryptQuotemetaStrrevStrRot13ZendStubNamedParams(): void
     {
@@ -3481,15 +3506,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testPasswordHashVerifyZendStubNamedParams(): void
     {
         $hash = BuiltinParamNames::forFunction('password_hash');
-        self::assertSame(['password', 'algo', 'options'], $hash);
+        self::assertSame(['password', 'algo', 'options='], $hash);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hash, 'password', 'password_hash'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($hash, 'algo', 'password_hash'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($hash, 'options', 'password_hash'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('password_hash'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('password_hash'));
 
         $verify = BuiltinParamNames::forFunction('password_verify');
         self::assertSame(['password', 'hash'], $verify);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($verify, 'password', 'password_verify'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($verify, 'hash', 'password_verify'));
+
+        $algos = BuiltinParamNames::forFunction('password_algos');
+        self::assertSame([], $algos);
+        self::assertSame(0, BuiltinParamNames::paramCountForInternalFunction('password_algos'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('password_algos'));
     }
 
     /** @covers issue #23292 */

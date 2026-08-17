@@ -332,6 +332,10 @@ final class BuiltinInternalDefaultValues
         'password_needs_rehash' => [
             2 => ['kind' => 'array'],
         ],
+        // php-src ext/standard/password.stub.php — array $options = [] (#28917)
+        'password_hash' => [
+            2 => ['kind' => 'array'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — array $options = [] (#23260)
         'unserialize' => [
             1 => ['kind' => 'array'],
@@ -960,9 +964,18 @@ final class BuiltinInternalDefaultValues
         'intlcalendar::createinstance' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/intl/calendar/calendar.stub.php — same untyped $timezone = null (#27944)
+        'intlcal_create_instance' => [
+            0 => ['kind' => 'null'],
+        ],
         // php-src ext/intl/normalizer/normalizer.stub.php — int $form = Normalizer::FORM_C (16); int infer → 0 (#27705)
         'normalizer_get_raw_decomposition' => [
             1 => ['kind' => 'int', 'value' => 16],
+        ],
+        // php-src ext/intl/php_intl.stub.php — $format = null (untyped; infer would miss) (#25200)
+        'datefmt_format_object' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
         ],
     ];
 

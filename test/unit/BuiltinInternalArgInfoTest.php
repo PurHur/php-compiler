@@ -1060,6 +1060,32 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('error_code', $share['name']);
     }
 
+    /** php-src curl.stub.php — CurlHandle $handle → bool; InternalArgInfo omits the function (#27702). */
+    public function testCurlUpkeepReflectionStubTypes(): void
+    {
+        $fn = 'curl_upkeep';
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('CurlHandle', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+        $this->assertNotNull($info);
+        $this->assertSame('handle', $info['name']);
+        $this->assertSame('CurlHandle', $info['type']);
+        $this->assertFalse($info['isOptional']);
+        $this->assertSame(['handle'], BuiltinParamNames::forFunction($fn));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'handle',
+            $fn
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'ch',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        $this->assertSame(['handle'], BuiltinParamNames::paramNamesForInternalFunction($fn));
+    }
+
     /** php-src normalizer.stub.php — string/form → ?string; absent from InternalArgInfo (#27705). */
     public function testNormalizerGetRawDecompositionReflectionStubTypes(): void
     {
@@ -1094,6 +1120,54 @@ final class BuiltinInternalArgInfoTest extends TestCase
             $fn
         ));
         $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+    }
+
+    /** php-src php_intl.stub.php — datetime/format untyped + ?string locale → string|false (#25200). */
+    public function testDatefmtFormatObjectReflectionStubTypes(): void
+    {
+        $fn = 'datefmt_format_object';
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 2));
+        $datetime = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+        $this->assertNotNull($datetime);
+        $this->assertSame('datetime', $datetime['name']);
+        $this->assertSame('', $datetime['type']);
+        $this->assertFalse($datetime['isOptional']);
+        $format = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+        $this->assertNotNull($format);
+        $this->assertSame('format', $format['name']);
+        $this->assertSame('', $format['type']);
+        $this->assertTrue($format['isOptional']);
+        $locale = BuiltinInternalArgInfo::paramInfoForFunction($fn, 2);
+        $this->assertNotNull($locale);
+        $this->assertSame('locale', $locale['name']);
+        $this->assertSame('?string', $locale['type']);
+        $this->assertTrue($locale['isOptional']);
+        $this->assertSame(['datetime', 'format=', 'locale='], BuiltinParamNames::forFunction($fn));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'datetime',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'format',
+            $fn
+        ));
+        $this->assertSame(2, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'locale',
+            $fn
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'object',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        $this->assertSame(3, BuiltinParamNames::paramCountForInternalFunction($fn));
     }
 
     /** php-src ext/sysvshm/sysvshm.stub.php — SysvSharedMemory stubs; InternalArgInfo int/untyped (#27943). */
@@ -1646,6 +1720,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('value', $alterValue['name']);
     }
 
+    /** php-src basic_functions.stub.php — absent from InternalArgInfo (#23405). */
+    public function testIniParseQuantityReflectionStubTypes(): void
+    {
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('ini_parse_quantity'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('ini_parse_quantity', 0));
+        $shorthand = BuiltinInternalArgInfo::paramInfoForFunction('ini_parse_quantity', 0);
+        $this->assertNotNull($shorthand);
+        $this->assertSame('shorthand', $shorthand['name']);
+        $this->assertSame('string', $shorthand['type']);
+        $this->assertFalse($shorthand['isOptional']);
+    }
+
     /** php-src password.stub.php — absent from InternalArgInfo (#23292). */
     public function testPasswordGetInfoNeedsRehashReflectionStubTypes(): void
     {
@@ -1668,6 +1754,51 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($options['isOptional']);
         $this->assertTrue(BuiltinInternalDefaultValues::isAvailable(
             'password_needs_rehash',
+            2,
+            ['name' => 'options', 'type' => 'array', 'isOptional' => true],
+            false
+        ));
+    }
+
+    /** php-src password.stub.php — verify/algos types; hash algo union + optional options (#28917). */
+    public function testPasswordHashVerifyAlgosReflectionStubTypes(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('password_verify'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('password_verify', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('password_verify', 1));
+        $password = BuiltinInternalArgInfo::paramInfoForFunction('password_verify', 0);
+        $this->assertNotNull($password);
+        $this->assertSame('password', $password['name']);
+        $this->assertSame('string', $password['type']);
+        $this->assertFalse($password['isOptional']);
+        $hash = BuiltinInternalArgInfo::paramInfoForFunction('password_verify', 1);
+        $this->assertNotNull($hash);
+        $this->assertSame('hash', $hash['name']);
+        $this->assertSame('string', $hash['type']);
+        $this->assertFalse($hash['isOptional']);
+
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('password_algos'));
+        $this->assertNull(BuiltinInternalArgInfo::paramInfoForFunction('password_algos', 0));
+
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('password_hash'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('password_hash', 0));
+        $this->assertSame('string|int|null', BuiltinInternalArgInfo::stubParamTypeOverride('password_hash', 1));
+        $this->assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('password_hash', 2));
+        $this->assertTrue(BuiltinInternalArgInfo::stubParamIsOptionalOverride('password_hash', 2));
+        $this->assertSame(2, BuiltinInternalArgInfo::stubRequiredParamCountOverride('password_hash'));
+        $this->assertSame(2, BuiltinInternalArgInfo::requiredParamCountForFunction('password_hash'));
+        $algo = BuiltinInternalArgInfo::paramInfoForFunction('password_hash', 1);
+        $this->assertNotNull($algo);
+        $this->assertSame('algo', $algo['name']);
+        $this->assertSame('string|int|null', $algo['type']);
+        $this->assertFalse($algo['isOptional']);
+        $options = BuiltinInternalArgInfo::paramInfoForFunction('password_hash', 2);
+        $this->assertNotNull($options);
+        $this->assertSame('options', $options['name']);
+        $this->assertSame('array', $options['type']);
+        $this->assertTrue($options['isOptional']);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'password_hash',
             2,
             ['name' => 'options', 'type' => 'array', 'isOptional' => true],
             false

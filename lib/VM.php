@@ -4831,6 +4831,8 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    // `$r = &$obj->uninitTyped` — get_property_ptr_ptr Error / nullable ZVAL_NULL (#31771).
+                    VM\TypedPropertyCheck::prepareWritableByReference($rhsSlot);
                     // Reference acquisition via `$r = &$obj->prop` follows set visibility (#7070).
                     // Already-acquired by-ref call returns (`$r = &$obj->getPriv()`) must not
                     // re-check — Zend aliases the returned reference (#29456).
@@ -6836,6 +6838,9 @@ restart:
                             break;
                         }
                         $dest = $frame->scope[$op->arg1];
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                            VM\TypedPropertyCheck::prepareWritableByReference($storage);
+                        }
                         $dest->indirect($storage);
                         if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                             $dest->propertyRefAcquisition = true;
@@ -6875,7 +6880,17 @@ restart:
                         }
                     }
                     if (!$mutates) {
-                        VM\TypedPropertyCheck::assertReadable($storage);
+                        // BP_VAR_W dim-assign/append auto-inits (#31770); BP_VAR_RW ++/+= Errors (#31784).
+                        if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
+                            if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($storage)) {
+                                VM\TypedPropertyCheck::assertReadable($storage);
+                            }
+                        } else {
+                            VM\TypedPropertyCheck::assertReadable($storage);
+                        }
+                    }
+                    if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                        VM\TypedPropertyCheck::prepareWritableByReference($storage);
                     }
                     $dest->indirect($storage);
                     if ($forWrite) {
@@ -9060,7 +9075,11 @@ restart:
                             // Declared-but-UNDEF (e.g. after unset): BP_VAR_RW ++/-- warns like a read (#29241).
                             $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op)
                                 && $this->objectPropertySlotIsUndefinedForRwWarn($propertyObject, $name, $frame);
-                            $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                            $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame);
+                            if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                                VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
+                            }
+                            $result->indirect($writeLvalue);
                             if ($warnUndefAfterRw) {
                                 $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
                             }
@@ -9195,7 +9214,16 @@ restart:
                                 $result->null();
                                 break;
                             }
-                            VM\TypedPropertyCheck::assertReadable($propSlot);
+                            // Dim-write (`$o->a[0]=` / `$o->a[]=`) is BP_VAR_W: uninitialized typed
+                            // array slots auto-init to [] (zend_std_get_property_ptr_ptr + zend_try_array_init, #31770).
+                            // Dim RW (`$o->a[0]++` / `+=`) is BP_VAR_RW and must Error (#31784).
+                            if ($this->propertyFetchAllowsTypedArrayDimAutoInit($frame, $op)) {
+                                if (!VM\TypedPropertyCheck::tryInitEmptyArrayForDimWrite($propSlot)) {
+                                    VM\TypedPropertyCheck::assertReadable($propSlot);
+                                }
+                            } else {
+                                VM\TypedPropertyCheck::assertReadable($propSlot);
+                            }
                             // `$obj->arr[]=` / unset($obj->arr[$k]) need a live alias into property storage.
                             // Plain R-mode fetches must copy: an indirect alias makes ternary/`&&` phi self-ASSIGN
                             // look like a property write (readonly / DOM read-only / skipped `__get`) (#23986, #24250).
@@ -9256,7 +9284,11 @@ restart:
                         }
                         // Missing dynamic prop: create then Undefined property for ++/-- (BP_VAR_RW, #29241).
                         $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op);
-                        $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                        $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame);
+                        if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
+                            VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
+                        }
+                        $result->indirect($writeLvalue);
                         if ($warnUndefAfterRw) {
                             $this->warnUndefinedPropertyAfterIncDecRwFetch($propertyObject, $name, $frame);
                         }
@@ -11763,6 +11795,83 @@ restart:
             }
             if (OpCode::TYPE_UNSET === $next->type) {
                 // unset of a different container; keep scanning for ours.
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * BP_VAR_W dim-assign/append may auto-init typed array props (#31770); BP_VAR_RW may not (#31784).
+     */
+    private function propertyFetchAllowsTypedArrayDimAutoInit(Frame $frame, OpCode $op): bool
+    {
+        return $this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)
+            && !$this->propertyFetchDestUsedAsDimRwContainer($frame, $op);
+    }
+
+    /**
+     * True when property fetch feeds ARRAY_DIM_FETCH_WRITE whose element is then
+     * ++/--/compound-assigned — Zend BP_VAR_RW (zend_std_get_property_ptr_ptr, #31784).
+     */
+    private function propertyFetchDestUsedAsDimRwContainer(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        $ops = $frame->block->opCodes;
+        $n = \count($ops);
+        for ($i = $frame->pos; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+                && (int) $next->arg2 === $destSlot
+            ) {
+                $dimSlot = (int) $next->arg1;
+                for ($j = $i + 1; $j < $n; ++$j) {
+                    $consumer = $ops[$j];
+                    if (OpCode::dimSlotUsedAsRwOp($consumer, $dimSlot)) {
+                        return true;
+                    }
+                    // Pure `$dim = expr` (RHS ≠ dim) is BP_VAR_W — stop.
+                    if (
+                        OpCode::TYPE_ASSIGN === $consumer->type
+                        && (int) $consumer->arg2 === $dimSlot
+                        && (int) $consumer->arg3 !== $dimSlot
+                    ) {
+                        return false;
+                    }
+                    if ((int) $consumer->arg1 === $dimSlot) {
+                        if (
+                            OpCode::TYPE_PROPERTY_FETCH === $consumer->type
+                            || OpCode::TYPE_PROPERTY_FETCH_WRITE === $consumer->type
+                            || OpCode::TYPE_ARRAY_DIM_FETCH === $consumer->type
+                            || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $consumer->type
+                        ) {
+                            return false;
+                        }
+                    }
+                }
+
+                return false;
+            }
+            if (
+                OpCode::TYPE_PROPERTY_FETCH === $next->type
+                || OpCode::TYPE_PROPERTY_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg1 === $destSlot) {
+                    return false;
+                }
+                continue;
+            }
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH === $next->type
+                || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+            ) {
+                continue;
+            }
+            if (OpCode::TYPE_UNSET === $next->type) {
                 continue;
             }
 
@@ -18675,6 +18784,37 @@ restart:
         }
 
         return false;
+    }
+
+    /**
+     * Late-bind trait `parent` param/return typehints to the composing class parent (#31747).
+     *
+     * Trait methods keep the lexical keyword on the shared Block (Reflection); type checks
+     * resolve against the using class like zend_inheritance.c trait method copy.
+     */
+    public function resolveParentTypeHintClassLc(): ?string
+    {
+        $frame = $this->executingFrame;
+        if (null === $frame) {
+            return null;
+        }
+        try {
+            return $this->resolveClassScopeName('parent', $frame);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** Display name for TypeError expected type when resolving trait `parent` (#31747). */
+    public function resolveParentTypeHintClassName(): ?string
+    {
+        $parentLc = $this->resolveParentTypeHintClassLc();
+        if (null === $parentLc || '' === $parentLc) {
+            return null;
+        }
+        $entry = $this->context->classes[$parentLc] ?? null;
+
+        return null !== $entry && '' !== $entry->name ? $entry->name : $parentLc;
     }
 
     protected function resolveClassScopeName(string $className, Frame $frame): string

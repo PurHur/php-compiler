@@ -1076,6 +1076,8 @@ final class M5TrivialEchoNative
         self::ensureFputs($context);
         self::ensureFputc($context);
         self::ensureChmod($context);
+        // Module-local fopen/fclose after LibcExtern always-on drop (#31764).
+        LibcExtern::ensureStdioFile($context);
         $i32 = $context->getTypeFromString('int32');
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');

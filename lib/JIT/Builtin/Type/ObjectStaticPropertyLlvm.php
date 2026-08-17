@@ -130,10 +130,15 @@ final class ObjectStaticPropertyLlvm
         }
         $context = $object->jitContext();
         if (!empty($entry['typedWithoutDefault']) && null !== ($entry['initGlobal'] ?? null)) {
+            $declName = $object->classNameForId($classId);
+            $meta = $object->staticPropertyVisibilityMeta($classId, $name);
+            if (null !== $meta) {
+                $declName = $meta['declaringClassName'];
+            }
             TypedPropertyUninitGuard::emitBeforeStaticRead(
                 $context,
                 $entry['initGlobal'],
-                $object->classNameForId($classId),
+                $declName,
                 $name
             );
         }

@@ -625,6 +625,7 @@ trait ClassConstFetchHelperTrait
             return $nameStr;
         }
         StringCaseCompare::ensureStrcasecmpLinked($context);
+        // __compiler_strcasecmp after LibcExtern always-on drop (#31787).
         $i32 = $context->getTypeFromString('int32');
         $result = $nameStr;
 
@@ -639,7 +640,7 @@ trait ClassConstFetchHelperTrait
         ) {
             $keyGlobal = $context->builder->load($context->constantStringFromString($keyword));
             $cmp = $context->builder->call(
-                $context->lookupFunction('strcasecmp'),
+                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
                 self::stringDataPtr($context, $nameStr),
                 self::stringDataPtr($context, $keyGlobal)
             );
@@ -654,7 +655,7 @@ trait ClassConstFetchHelperTrait
         if (null !== $parentName) {
             $parentKey = $context->builder->load($context->constantStringFromString('parent'));
             $cmp = $context->builder->call(
-                $context->lookupFunction('strcasecmp'),
+                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
                 self::stringDataPtr($context, $nameStr),
                 self::stringDataPtr($context, $parentKey)
             );
@@ -689,7 +690,7 @@ trait ClassConstFetchHelperTrait
                 $context->constantStringFromString($declLc)
             );
             $cmp = $context->builder->call(
-                $context->lookupFunction('strcasecmp'),
+                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
                 self::stringDataPtr($context, $resolvedNameStr),
                 self::stringDataPtr($context, $lcGlobal)
             );
@@ -742,7 +743,7 @@ trait ClassConstFetchHelperTrait
                 $context->constantStringFromString($declLc)
             );
             $cmp = $context->builder->call(
-                $context->lookupFunction('strcasecmp'),
+                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
                 self::stringDataPtr($context, $resolvedNameStr),
                 self::stringDataPtr($context, $lcGlobal)
             );

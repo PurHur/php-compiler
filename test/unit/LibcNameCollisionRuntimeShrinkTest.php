@@ -51,5 +51,8 @@ final class LibcNameCollisionRuntimeShrinkTest extends TestCase
         // strncasecmp dropped (#31682) — Object_ / JitFilter use __compiler_strncasecmp
         $this->assertStringNotContainsString("'strncasecmp' =>", $source);
         $this->assertStringContainsString('#31682', $source);
+        // strcasecmp dropped (#31787) — NestedJIT class/name compares use __compiler_strcasecmp
+        $this->assertStringNotContainsString("'strcasecmp' =>", $source);
+        $this->assertStringContainsString('#31787', $source);
     }
 }

@@ -202,9 +202,15 @@ final class BuiltinInternalArgInfo
             'fscanf' => 'array|int|false|null',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false; ini_alter absent (#26465, #26187)
             'ini_set', 'ini_alter' => 'string|false',
+            // ext/standard/basic_functions.stub.php — absent from InternalArgInfo (#23405)
+            'ini_parse_quantity' => 'int',
             // ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
             'password_get_info' => 'array',
             'password_needs_rehash' => 'bool',
+            // ext/standard/password.stub.php — verify/algos omitted; hash already string (#28917)
+            'password_verify' => 'bool',
+            'password_algos' => 'array',
+            'password_hash' => 'string',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#26185)
             'filesize', 'filemtime' => 'int|false',
             'glob', 'scandir' => 'array|false',
@@ -363,6 +369,10 @@ final class BuiltinInternalArgInfo
             'grapheme_levenshtein' => 'int|false',
             // ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
             'normalizer_get_raw_decomposition' => '?string',
+            // ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
+            'datefmt_format_object' => 'string|false',
+            // ext/intl/calendar/calendar.stub.php — @alias intlcal_create_instance; absent from InternalArgInfo (#27944)
+            'intlcal_create_instance' => '?IntlCalendar',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
             'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
@@ -378,6 +388,8 @@ final class BuiltinInternalArgInfo
             'curl_multi_setopt' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo return bool / absent; Zend ?string (#27810)
             'curl_strerror', 'curl_multi_strerror', 'curl_share_strerror' => '?string',
+            // ext/curl/curl.stub.php — InternalArgInfo omits the function; Zend bool (#27702)
+            'curl_upkeep' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo resource / empty; Zend CurlHandle|false / void (#26186)
             'curl_init' => 'CurlHandle|false',
             'curl_close' => 'void',
@@ -671,6 +683,8 @@ final class BuiltinInternalArgInfo
         return match ($callableLc) {
             // ext/standard/basic_functions.stub.php — crypt(string, string): string (#28920)
             'crypt' => 2,
+            // ext/standard/password.stub.php — $options = [] (InternalArgInfo required) (#28917)
+            'password_hash' => 2,
             default => null,
         };
     }
@@ -683,6 +697,8 @@ final class BuiltinInternalArgInfo
         return match ($callableLc) {
             // ext/standard/basic_functions.stub.php — $salt required (#28920)
             'crypt' => 1 === $index ? false : null,
+            // ext/standard/password.stub.php — $options = [] (InternalArgInfo required) (#28917)
+            'password_hash' => 2 === $index ? true : null,
             default => null,
         };
     }
@@ -760,6 +776,8 @@ final class BuiltinInternalArgInfo
                 1 => 'string|int|float|bool|null',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — string $shorthand; absent from InternalArgInfo (#23405)
+            'ini_parse_quantity' => 0 === $index ? 'string' : null,
             // ext/date/php_date.stub.php — hour required; ?int minute…year = null (#25147)
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
             // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
@@ -772,6 +790,14 @@ final class BuiltinInternalArgInfo
                 2 => 'array',
                 default => null,
             },
+            // ext/standard/password.stub.php — algo string|int|null; options array (#28917)
+            'password_hash' => match ($index) {
+                0 => 'string',
+                1 => 'string|int|null',
+                2 => 'array',
+                default => null,
+            },
+            'password_verify' => ($index === 0 || $index === 1) ? 'string' : null,
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
             // ext/calendar/calendar.stub.php — ?int $year = null, int $mode = 0 (#28781, re-#24509)
@@ -906,6 +932,18 @@ final class BuiltinInternalArgInfo
             'normalizer_get_raw_decomposition' => match ($index) {
                 0 => 'string',
                 1 => 'int',
+                default => null,
+            },
+            // ext/intl/php_intl.stub.php — $datetime/$format untyped; ?string $locale = null (#25200)
+            'datefmt_format_object' => match ($index) {
+                0, 1 => '',
+                2 => '?string',
+                default => null,
+            },
+            // ext/intl/calendar/calendar.stub.php — $timezone untyped; ?string $locale = null (#27944)
+            'intlcal_create_instance' => match ($index) {
+                0 => '',
+                1 => '?string',
                 default => null,
             },
             // ext/intl/php_intl.stub.php — PHP 8.5+ costs + locale (#27591)
@@ -1078,7 +1116,7 @@ final class BuiltinInternalArgInfo
                 2 => 'mixed',
                 default => null,
             },
-            'curl_exec', 'curl_close' => 0 === $index ? 'CurlHandle' : null,
+            'curl_exec', 'curl_close', 'curl_upkeep' => 0 === $index ? 'CurlHandle' : null,
             'curl_setopt_array' => 0 === $index ? 'CurlHandle' : null,
             'curl_multi_setopt' => match ($index) {
                 0 => 'CurlMultiHandle',

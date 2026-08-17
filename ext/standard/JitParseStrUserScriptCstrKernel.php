@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringStrspn;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -152,11 +153,9 @@ final class JitParseStrUserScriptCstrKernel
             'memcpy',
             $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
         );
-        self::ensureExternal(
-            $context,
-            'memmove',
-            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
-        );
+        // memmove module-local after LibcExtern always-on drop (#31743); int8* matches
+        // LibcExtern::ensureMemmoveDecl / EMBED implementMemmoveBody ABI.
+        LibcExtern::ensureMemmoveDecl($context);
         self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
         self::ensureExternal($context, 'strchr', $context->context->functionType($i8p, false, $i8p, $i32));
         StringStrspn::ensureLinked($context);

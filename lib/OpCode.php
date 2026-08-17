@@ -296,7 +296,8 @@ class OpCode {
     public ?string $instanceofUnionTypes = null;
     /**
      * TYPE_INSTANCEOF: lexical `self`/`parent`/`static` (not `$name = 'self'`).
-     * Trait methods keep these keywords; VM/JIT bind `self` to the using class (#31729).
+     * Trait methods keep these keywords; VM/JIT bind `self` to the using class (#31729)
+     * and `static` to the late-bound called class (#31746).
      *
      * @var null|'parent'|'self'|'static'
      */
@@ -483,6 +484,30 @@ class OpCode {
             && $op->arg2 === $destSlot
             && null !== $op->arg3
             && !$op->unsetOnProperty;
+    }
+
+    /**
+     * True when {@see $dimSlot} (ARRAY_DIM_FETCH_WRITE result) is read-modified
+     * (++/--/compound assign) — Zend BP_VAR_RW on the property, not BP_VAR_W (#31784).
+     */
+    public static function dimSlotUsedAsRwOp(self $op, int $dimSlot): bool
+    {
+        if (
+            \in_array($op->type, [
+                self::TYPE_PRE_INC,
+                self::TYPE_POST_INC,
+                self::TYPE_PRE_DEC,
+                self::TYPE_POST_DEC,
+            ], true)
+            && $op->arg3 === $dimSlot
+        ) {
+            return true;
+        }
+        if (self::destSlotUsedAsCompoundAssignRead($op, $dimSlot)) {
+            return true;
+        }
+
+        return self::destSlotUsedAsInPlaceCompoundAssign($op, $dimSlot);
     }
 
     /**

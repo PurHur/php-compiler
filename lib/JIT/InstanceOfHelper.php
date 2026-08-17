@@ -40,6 +40,14 @@ final class InstanceOfHelper
         return self::emitDynamic($context, $expr, $context->getVariableFromOp($classOp));
     }
 
+    /**
+     * instanceof against a runtime class id — late `static` LSB (#31746, zend_execute.c ZEND_INSTANCEOF).
+     */
+    public static function emitWithRuntimeClassId(Context $context, Variable $expr, Value $rhsClassId): Variable
+    {
+        return self::emitWithRhsClassId($context, $expr, $rhsClassId);
+    }
+
     private static function emitDynamic(Context $context, Variable $expr, Variable $classVar): Variable
     {
         if (InstanceOfJitHelper::jitRhsTypeIsInvalidClass($classVar->type)) {
@@ -159,12 +167,13 @@ final class InstanceOfHelper
     private static function emitWithClassNameString(Context $context, Variable $expr, Value $classNameStr): Variable
     {
         StringCaseCompare::ensureStrcasecmpLinked($context);
+        // __compiler_strcasecmp after LibcExtern always-on drop (#31787).
         $objectType = $context->type->object;
         $i1 = $context->getTypeFromString('int1');
         $acc = $i1->constInt(0, false);
         foreach ($objectType->allClassNamesById() as $name) {
             $lit = $context->builder->load($context->constantStringFromString($name));
-            $cmp = $context->builder->call($context->lookupFunction('strcasecmp'), $classNameStr, $lit);
+            $cmp = $context->builder->call($context->lookupFunction(StringCaseCompare::ABI_STRCASECMP), $classNameStr, $lit);
             $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $context->constantFromInteger(0, 'int32'));
             $check = $objectType->emitInstanceOf($expr, $name);
             $bool = self::nativeBoolValue($context, $check);

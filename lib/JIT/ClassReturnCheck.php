@@ -39,6 +39,21 @@ final class ClassReturnCheck
             return true;
         }
         $expected = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
+        $classLc = strtolower(ltrim($block->returnClassConstraint, '\\'));
+        // Trait `parent` return type — resolve via composing class (#31747, zend_inheritance.c).
+        if ('parent' === $classLc) {
+            $resolvedParent = self::resolveParentReturnClassLc($context, $block);
+            if (null !== $resolvedParent && '' !== $resolvedParent) {
+                $classLc = $resolvedParent;
+                $objectTypeEarly = $context->type->object;
+                assert($objectTypeEarly instanceof ObjectType);
+                try {
+                    $expected = ltrim($objectTypeEarly->classNameForId($objectTypeEarly->lookup($resolvedParent)), '\\');
+                } catch (\Throwable) {
+                    $expected = $resolvedParent;
+                }
+            }
+        }
         $callableName = self::callableName($block);
         if (self::isVmHashTableClass($expected)
             || self::isVmHashTableClass($block->returnClassConstraint)
@@ -63,10 +78,42 @@ final class ClassReturnCheck
         if (Variable::TYPE_VALUE === $return->type) {
             return self::enforceValueBox($context, $objectType, $return, $callableName, $expected);
         }
-        $classLc = strtolower(ltrim($block->returnClassConstraint, '\\'));
         $ok = $objectType->emitInstanceOf($return, $classLc);
 
         return self::branchOnBoolOrRaise($context, $ok, $callableName, $expected, $return, $objectType);
+    }
+
+    /**
+     * Bind lexical `parent` return types in trait methods to the composing class parent (#31747).
+     */
+    private static function resolveParentReturnClassLc(Context $context, Block $block): ?string
+    {
+        $declaringClass = null;
+        if (null !== $block->func && null !== $block->func->class) {
+            $declaringClass = $block->func->class->value;
+            $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+            if ($context->type->object->isTraitClass($declaringLc)) {
+                $composing = $context->scope->traitComposingClassName;
+                if ('' !== $composing
+                    && !$context->type->object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                    $declaringClass = $composing;
+                } elseif ($context->scope->classId > 0) {
+                    $fromId = $context->type->object->classNameForId($context->scope->classId);
+                    if ('' !== $fromId
+                        && !$context->type->object->isTraitClass(strtolower(ltrim($fromId, '\\')))) {
+                        $declaringClass = $fromId;
+                    }
+                } elseif ('' !== $context->scope->className
+                    && !$context->type->object->isTraitClass(strtolower(ltrim($context->scope->className, '\\')))) {
+                    $declaringClass = $context->scope->className;
+                }
+            }
+        }
+        if (null === $declaringClass || '' === $declaringClass) {
+            return null;
+        }
+
+        return $context->type->object->parentClassLc($declaringClass);
     }
 
     /** NestedJIT / param ABI name for {@see \PHPCompiler\VM\HashTable} (#21109). */

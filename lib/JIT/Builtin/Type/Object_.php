@@ -112,6 +112,9 @@ class Object_ extends Type {
 
     /** @var array<int, array<int, true>> class id => property slot => true when declared type allows null (#5220) */
     private array $propertyAllowsNullSlots = [];
+
+    /** @var array<int, array<int, true>> class id => property slot => type contains array (#31770) */
+    private array $propertyAllowsArraySlots = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
     /** @var array<int, Block> class id => __destruct CFG block (#4013) */
@@ -2803,6 +2806,17 @@ class Object_ extends Type {
         return $this->classIdToName[$id];
     }
 
+    /**
+     * Declaring class display name for an instance property (prop_info->ce, #31785).
+     */
+    public function instancePropertyDeclaringClassName(int $classId, string $propName): string
+    {
+        $lc = strtolower($propName);
+        $declId = $this->instancePropertyDeclaringClassId[$classId][$lc] ?? $classId;
+
+        return $this->classNameForId($declId);
+    }
+
     /** @return array<int, string> */
     public function registeredClassNamesById(): array
     {
@@ -3234,6 +3248,23 @@ class Object_ extends Type {
     public function propertySlotAllowsNull(int $classId, int $slotIndex): bool
     {
         return isset($this->propertyAllowsNullSlots[$classId][$slotIndex]);
+    }
+
+    public function markPropertyAllowsArray(int $classId, string $name): void
+    {
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[1] !== $name) {
+                continue;
+            }
+            $this->propertyAllowsArraySlots[$classId][$propset[3]] = true;
+
+            return;
+        }
+    }
+
+    public function propertySlotAllowsArray(int $classId, int $slotIndex): bool
+    {
+        return isset($this->propertyAllowsArraySlots[$classId][$slotIndex]);
     }
 
     /** True when the slot stores a typed __value__ property (#4912). */
@@ -4988,9 +5019,41 @@ class Object_ extends Type {
                 continue;
             }
             $this->defineProperty($childId, $name, $propset[2]);
+            $this->copyInheritedInstancePropertySlotMeta($childId, $parentId, $name, $propset);
         }
         // Do not markHasConstructor on the child — that makes `new Child` look for
         // child::__construct (missing) and skip inheritedConstructorProxyLc (#27565).
+    }
+
+    /**
+     * Preserve prop_info->ce and typed-init flags when copying parent slots (#31785).
+     *
+     * @param array{0: int, 1: string, 2: int, 3: int} $parentPropset
+     */
+    private function copyInheritedInstancePropertySlotMeta(
+        int $childId,
+        int $parentId,
+        string $name,
+        array $parentPropset
+    ): void {
+        $nameLc = strtolower($name);
+        $this->instancePropertyDeclaringClassId[$childId][$nameLc]
+            = $this->instancePropertyDeclaringClassId[$parentId][$nameLc] ?? $parentId;
+        $childSet = $this->findInstancePropertySet($childId, $name);
+        if (null === $childSet) {
+            return;
+        }
+        $parentSlot = $parentPropset[3];
+        $childSlot = $childSet[3];
+        if (isset($this->typedPropertyInitGuardSlots[$parentId][$parentSlot])) {
+            $this->typedPropertyInitGuardSlots[$childId][$childSlot] = true;
+        }
+        if (isset($this->propertyAllowsNullSlots[$parentId][$parentSlot])) {
+            $this->propertyAllowsNullSlots[$childId][$childSlot] = true;
+        }
+        if (isset($this->propertyAllowsArraySlots[$parentId][$parentSlot])) {
+            $this->propertyAllowsArraySlots[$childId][$childSlot] = true;
+        }
     }
 
     public function markHasConstructor(int $classId): void

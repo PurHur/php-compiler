@@ -783,6 +783,9 @@ final class BuiltinParamNames
             // php-src file.stub.php / dir.stub.php / basic_functions.stub.php (#23461)
             case 'unlink':
                 return ['filename', 'context'];
+            // php-src ext/standard/file.stub.php — InternalArgInfo still says source_file/destination_file (#23347)
+            case 'copy':
+                return ['from', 'to', 'context'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says path/new_path (#28854)
             case 'move_uploaded_file':
                 return ['from', 'to'];
@@ -919,6 +922,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says varname (#23568)
             case 'ini_restore':
                 return ['option'];
+            // php-src ext/standard/basic_functions.stub.php — absent from InternalArgInfo (#23405)
+            case 'ini_parse_quantity':
+                return ['shorthand'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says value (#23568)
             case 'ignore_user_abort':
                 return ['enable='];
@@ -1442,6 +1448,8 @@ final class BuiltinParamNames
             case 'curl_error':
             case 'curl_exec':
             case 'curl_reset':
+            // php-src ext/curl/curl.stub.php — InternalArgInfo omits curl_upkeep (#27702)
+            case 'curl_upkeep':
                 return ['handle'];
             case 'curl_setopt':
                 return ['handle', 'option', 'value'];
@@ -2048,10 +2056,13 @@ final class BuiltinParamNames
             case 'strtok':
                 return ['string', 'token='];
             // php-src ext/standard/password.stub.php — calleeParamMetadata uses forFunction; verify missing from InternalArgInfo (#23207)
+            // $options = [] optional (InternalArgInfo still required) (#28917)
             case 'password_hash':
-                return ['password', 'algo', 'options'];
+                return ['password', 'algo', 'options='];
             case 'password_verify':
                 return ['password', 'hash'];
+            case 'password_algos':
+                return [];
             // php-src ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
             case 'password_get_info':
                 return ['hash'];
@@ -2116,6 +2127,12 @@ final class BuiltinParamNames
             // php-src ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
             case 'normalizer_get_raw_decomposition':
                 return ['string', 'form='];
+            // php-src ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
+            case 'datefmt_format_object':
+                return ['datetime', 'format=', 'locale='];
+            // php-src ext/intl/calendar/calendar.stub.php — both optional; $timezone untyped (#27944)
+            case 'intlcal_create_instance':
+                return ['timezone=', 'locale='];
             // php-src ext/intl/resourcebundle/resourcebundle.stub.php — bundlename + fallback infer false (#25587)
             case 'resourcebundle_create':
                 return ['locale', 'bundle', 'fallback='];
