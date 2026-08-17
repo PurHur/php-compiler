@@ -6119,6 +6119,12 @@ restart:
                         $frame->suppressNextEcho = false;
                         break;
                     }
+                    // echo $this outside object context — Error (zend_execute.c ZEND_ECHO / FETCH_THIS, #31901).
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     try {
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
@@ -6153,6 +6159,12 @@ restart:
                     VM\OutputBuffer::append($printed, $echoFile, (int) ($op->arg2 ?? 0));
                     break;
                 case OpCode::TYPE_PRINT:
+                    // print $this outside object context — Error (zend_execute.c ZEND_PRINT / FETCH_THIS, #31901).
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     try {
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
