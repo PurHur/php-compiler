@@ -1073,6 +1073,7 @@ class Compiler {
             foreach ($params as $param) {
                 $new->addOpCode($this->compileParam($param, $new, $paramIdx++));
             }
+            $this->maybeEmitOptionalBeforeRequiredParamDeprecations($params, $new);
             if (null !== $func && '__construct' === $func->name && null !== $func->class) {
                 $this->compileCtorPromotionAssignments($new, $params);
             }
@@ -7193,6 +7194,12 @@ class Compiler {
             DeprecatedMetadata::applyToBlock($methodBlock, $child);
             $this->markGeneratorIfNeeded($child, $methodBlock);
             $declare->block1 = $methodBlock;
+        } else {
+            // Abstract/interface methods skip compileCfgBlock — still emit optional-before-required
+            // E_DEPRECATED (zend_compile_params, #31904).
+            $diag = new Block(null);
+            $diag->func = $child->func;
+            $this->maybeEmitOptionalBeforeRequiredParamDeprecations($child->func->params, $diag);
         }
         // null cfg: abstract / interface methods — NonAbstractMethodBodyCheck rejects
         // non-abstract class/trait/enum `function f();` (#24906). Empty `{}` has cfg.
@@ -12013,33 +12020,96 @@ class Compiler {
     }
 
     /**
-     * Zend 8.4 compile-time deprecation for implicit nullable typed parameters (#21390, #22987, #29274).
+     * Zend compile-time E_DEPRECATED for optional-before-required params (#31904).
      *
-     * Emits during CFG compile for both eval (VM running) and file-level parseAndCompile
-     * (VM not running yet — use {@see $vmContext} from Runtime). Message is prefixed with the
-     * Zend zend_error callable label ({@see displayCallableNameForCompileDeprecation()}).
+     * php-src: Zend/zend_compile.c {@code zend_compile_params} — last required (non-default,
+     * non-variadic) parameter names the message; PHP 5-style {@code Type $p = null} is skipped
+     * ({@code forced_allow_nullable} / implicit nullable). PHP 8.4+ prefixes the callable label.
+     *
+     * @param list<Op\Expr\Param> $params
      */
-    protected function maybeEmitImplicitNullableParamDeprecation(
-        Op\Expr\Param $param,
-        ?int $defaultSlot,
-        Block $block
-    ): void {
-        if (!CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
+    protected function maybeEmitOptionalBeforeRequiredParamDeprecations(array $params, Block $block): void
+    {
+        $lastRequired = -1;
+        foreach ($params as $i => $param) {
+            if ($param->variadic) {
+                continue;
+            }
+            if (null === $param->defaultVar && null === $param->defaultBlock) {
+                $lastRequired = $i;
+            }
+        }
+        if ($lastRequired < 0) {
             return;
         }
-        if (!$this->paramIsImplicitNullable($param, $defaultSlot, $block)) {
+        $requiredParam = $params[$lastRequired] ?? null;
+        if (!$requiredParam instanceof Op\Expr\Param) {
             return;
+        }
+        $requiredName = $this->displayParamName($requiredParam);
+        $callablePrefix = '';
+        if (CompilerVersion::supportsOptionalBeforeRequiredCallablePrefix()) {
+            $callablePrefix = $this->displayCallableNameForCompileDeprecation($block).'(): ';
+        }
+        foreach ($params as $i => $param) {
+            if ($i >= $lastRequired || $param->variadic) {
+                continue;
+            }
+            if (null === $param->defaultVar && null === $param->defaultBlock) {
+                continue;
+            }
+            if ($this->paramSkipsOptionalBeforeRequiredDeprecation($param, $block, (int) $i)) {
+                continue;
+            }
+            $this->emitCompileTimeInternalDeprecated(
+                sprintf(
+                    '%sOptional parameter %s declared before required parameter %s is implicitly treated as a required parameter',
+                    $callablePrefix,
+                    $this->displayParamName($param),
+                    $requiredName
+                ),
+                $block,
+                max(0, $param->getLine())
+            );
+        }
+    }
+
+    /**
+     * PHP 5-style {@code Type $param = null} is not a true optional (zend_compile.c, #31904).
+     */
+    protected function paramSkipsOptionalBeforeRequiredDeprecation(Op\Expr\Param $param, Block $block, int $paramIdx): bool
+    {
+        $defaultSlot = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg2 === $paramIdx) {
+                $defaultSlot = $op->arg3;
+                break;
+            }
+        }
+        if (null !== $defaultSlot) {
+            return $this->paramIsImplicitNullable($param, $defaultSlot, $block);
+        }
+        if (null === $param->declaredType || $param->declaredType instanceof Op\Type\Nullable) {
+            return false;
+        }
+        if ($this->cfgTypeUsesDnfShape($param->declaredType)) {
+            return false;
         }
 
+        return $this->paramAstDefaultIsNull($param);
+    }
+
+    /**
+     * Zend E_DEPRECATED during CFG compile (eval: VM running; file-level: {@see $vmContext}).
+     */
+    protected function emitCompileTimeInternalDeprecated(string $message, Block $block, int $line): void
+    {
         $vm = VM::running();
         $context = $vm instanceof VM ? $vm->context : $this->vmContext;
         if (!$context instanceof VMContext) {
             return;
         }
 
-        $paramName = $this->displayParamName($param);
-        $callableName = $this->displayCallableNameForCompileDeprecation($block);
-        $line = max(0, $param->getLine());
         $file = $block->scriptPath();
         if ('' === $file) {
             $file = $this->debugLastPhaseInputFile;
@@ -12063,17 +12133,42 @@ class Compiler {
             }
         }
 
-        // Zend zend_compile.c / zend_error: "{func}(): Implicitly marking parameter $x …" (#29274).
         $context->errors->internalDeprecated(
-            sprintf(
-                '%s(): Implicitly marking parameter %s as nullable is deprecated, the explicit nullable type must be used instead',
-                $callableName,
-                $paramName
-            ),
+            $message,
             $context,
             $frame,
             $file,
             $line
+        );
+    }
+
+    /**
+     * Zend 8.4 compile-time deprecation for implicit nullable typed parameters (#21390, #22987, #29274).
+     *
+     * Emits during CFG compile for both eval (VM running) and file-level parseAndCompile
+     * (VM not running yet — use {@see $vmContext} from Runtime). Message is prefixed with the
+     * Zend zend_error callable label ({@see displayCallableNameForCompileDeprecation()}).
+     */
+    protected function maybeEmitImplicitNullableParamDeprecation(
+        Op\Expr\Param $param,
+        ?int $defaultSlot,
+        Block $block
+    ): void {
+        if (!CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
+            return;
+        }
+        if (!$this->paramIsImplicitNullable($param, $defaultSlot, $block)) {
+            return;
+        }
+
+        $this->emitCompileTimeInternalDeprecated(
+            sprintf(
+                '%s(): Implicitly marking parameter %s as nullable is deprecated, the explicit nullable type must be used instead',
+                $this->displayCallableNameForCompileDeprecation($block),
+                $this->displayParamName($param)
+            ),
+            $block,
+            max(0, $param->getLine())
         );
     }
 
