@@ -18677,6 +18677,37 @@ restart:
         return false;
     }
 
+    /**
+     * Late-bind trait `parent` param/return typehints to the composing class parent (#31747).
+     *
+     * Trait methods keep the lexical keyword on the shared Block (Reflection); type checks
+     * resolve against the using class like zend_inheritance.c trait method copy.
+     */
+    public function resolveParentTypeHintClassLc(): ?string
+    {
+        $frame = $this->executingFrame;
+        if (null === $frame) {
+            return null;
+        }
+        try {
+            return $this->resolveClassScopeName('parent', $frame);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** Display name for TypeError expected type when resolving trait `parent` (#31747). */
+    public function resolveParentTypeHintClassName(): ?string
+    {
+        $parentLc = $this->resolveParentTypeHintClassLc();
+        if (null === $parentLc || '' === $parentLc) {
+            return null;
+        }
+        $entry = $this->context->classes[$parentLc] ?? null;
+
+        return null !== $entry && '' !== $entry->name ? $entry->name : $parentLc;
+    }
+
     protected function resolveClassScopeName(string $className, Frame $frame): string
     {
         $lcClass = strtolower($className);

@@ -114,6 +114,8 @@
             <file>./test/compliance/ThisInterpOutsideObjectContextVMTest.php</file>
             <file>./test/compliance/TraitInstanceofSelfVMTest.php</file>
             <file>./test/compliance/TraitInstanceofSelfJITTest.php</file>
+            <file>./test/compliance/TraitParentTypehintVMTest.php</file>
+            <file>./test/compliance/TraitParentTypehintJITTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117JITTest.php</file>
             <file>./test/compliance/FilterVarNullOptions31209VMTest.php</file>

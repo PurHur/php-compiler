@@ -22336,7 +22336,19 @@ class JIT {
             if (!isset($block->paramClassConstraints[$slot])) {
                 continue;
             }
-            $constraints[$paramIdx + $offset] = $block->paramClassConstraints[$slot];
+            $constraint = $block->paramClassConstraints[$slot];
+            // Trait flatten sets traitComposingClassName — bind `parent` like VM (#31747).
+            if ('parent' === strtolower(ltrim($constraint, '\\'))) {
+                try {
+                    $constraint = $this->resolveJitStaticScopeClass(
+                        $block,
+                        new Operand\Literal('parent')
+                    );
+                } catch (\Throwable) {
+                    // Keep lexical keyword when composing parent is unavailable.
+                }
+            }
+            $constraints[$paramIdx + $offset] = $constraint;
         }
 
         return $constraints;
