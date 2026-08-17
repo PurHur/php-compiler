@@ -7197,8 +7197,8 @@ restart:
                         break;
                     }
                     $unsetDimMsg = Variable::TYPE_STRING === $container->type
-                        ? 'Cannot unset string offsets'
-                        : 'Cannot unset offset in a non-array variable';
+                        ? VM\VmUnset::ERROR_STRING_OFFSET
+                        : VM\VmUnset::ERROR_NON_ARRAY;
                     $catchFrame = $this->dispatchUnsetDimNonContainerError($frame, $unsetDimMsg);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -15698,11 +15698,6 @@ restart:
     }
 
     /**
-     * Reject unset($scalar[$key]) — Zend ZEND_UNSET_DIM on non-array/string (#4880, zend_execute.c).
-     *
-     * @return Frame|null catch frame when try/catch (Error) handles the throw
-     */
-    /**
      * unset($GLOBALS['name']) on the script $GLOBALS operand (#5868).
      */
     private function isGlobalsSuperglobalUnset(Frame $frame, int $containerSlot, string $name): bool
@@ -15715,16 +15710,17 @@ restart:
         return null !== $globalsSlot && $globalsSlot === $containerSlot;
     }
 
+    /**
+     * Reject unset($scalar[$key]) — Zend ZEND_UNSET_DIM on non-array/string (#4880, zend_execute.c).
+     *
+     * Route through {@see dispatchVmError} so getFile()/getLine() stamp the user unset site
+     * (#31883, re-#31859).
+     *
+     * @return Frame|null catch frame when try/catch (Error) handles the throw
+     */
     private function dispatchUnsetDimNonContainerError(Frame $frame, string $message): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
-
-        return null;
+        return $this->dispatchVmError($message, $frame);
     }
 
     /**
