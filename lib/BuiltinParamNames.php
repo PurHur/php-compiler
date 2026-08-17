@@ -1860,9 +1860,11 @@ final class BuiltinParamNames
             case 'trim':
             case 'ltrim':
             case 'rtrim':
-            case 'chop':
-                // php-src basic_functions.stub.php — chop is rtrim alias; no $mode (#23224, #24039)
+                // php-src string.stub.php — $characters optional via InternalArgInfo (#23224)
                 return ['string', 'characters'];
+            case 'chop':
+                // rtrim alias absent from InternalArgInfo — encode optional $characters (#28255, re-#24039)
+                return ['string', 'characters='];
             case 'mb_strlen':
                 return ['string', 'encoding'];
             // php-src ext/mbstring/mbstring.stub.php — ?int $length = null, ?string $encoding = null (#25362)

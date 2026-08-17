@@ -323,16 +323,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #10027 #23224 #24039 */
+    /** @covers issue #10027 #23224 #24039 #28255 */
     public function testTrimCharactersNamedParamResolves(): void
     {
-        foreach (['trim', 'ltrim', 'rtrim', 'chop'] as $fn) {
+        foreach (['trim', 'ltrim', 'rtrim'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
             self::assertSame(['string', 'characters'], $names);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'characters', $fn));
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mode', $fn));
         }
+        $chop = BuiltinParamNames::forFunction('chop');
+        self::assertSame(['string', 'characters='], $chop);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($chop, 'string', 'chop'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($chop, 'characters', 'chop'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($chop, 'mode', 'chop'));
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('chop'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('chop', 0));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('chop', 1));
     }
 
     /** @covers issue #10637 / #24449 — stub shape callback + ...args (basic_functions.stub.php) */
