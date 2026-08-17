@@ -1966,6 +1966,13 @@ final class BuiltinInternalArgInfo
                 4 => 'bool',
                 default => null,
             },
+            // ext/soap/soap.stub.php — __soapCall name/args/?array options (#31873)
+            'soapclient::__soapcall' => match ($index) {
+                0 => 'string',
+                1 => 'array',
+                2 => '?array',
+                default => null,
+            },
             // ext/xmlwriter/php_xmlwriter.stub.php — PHP 8.4+ factories (#27922)
             'xmlwriter::touri' => 0 === $index ? 'string' : null,
             // toStream($stream) is untyped (@param resource) — no type override
