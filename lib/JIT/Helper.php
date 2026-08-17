@@ -1619,35 +1619,19 @@ restart:
                 goto return_long;
             }
             if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_NATIVE_DOUBLE === $rightType) {
-                Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
-                $tmp = JitValueBox::alloc($this->context);
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeDouble'),
-                    JitValueBox::pointer($this->context, $tmp),
-                    $rightValue
+                $leftDouble = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readDouble'),
+                    JitValueBox::valuePtrFromVariable($this->context, $left)
                 );
-                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
-                    $this->context,
-                    $boxedPtr,
-                    JitValueBox::pointer($this->context, $tmp)
-                );
+                $result = JitFloatCompare::spaceship($this->context, $leftDouble, $rightValue);
                 goto return_long;
             }
             if (Variable::TYPE_NATIVE_DOUBLE === $leftType && Variable::TYPE_VALUE === $rightType) {
-                Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $right);
-                $tmp = JitValueBox::alloc($this->context);
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeDouble'),
-                    JitValueBox::pointer($this->context, $tmp),
-                    $leftValue
+                $rightDouble = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readDouble'),
+                    JitValueBox::valuePtrFromVariable($this->context, $right)
                 );
-                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
-                    $this->context,
-                    JitValueBox::pointer($this->context, $tmp),
-                    $boxedPtr
-                );
+                $result = JitFloatCompare::spaceship($this->context, $leftValue, $rightDouble);
                 goto return_long;
             }
         }
