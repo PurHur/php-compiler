@@ -420,6 +420,10 @@ final class BuiltinInternalArgInfo
             'curl_exec' => 'string|bool',
             // ext/curl/curl.stub.php — InternalArgInfo return resource; Zend CurlMultiHandle (#28591)
             'curl_multi_init' => 'CurlMultiHandle',
+            // ext/curl/curl.stub.php — InternalArgInfo empty return; Zend CurlShareHandle (#27628)
+            'curl_share_init' => 'CurlShareHandle',
+            // ext/curl/curl.stub.php — absent from InternalArgInfo; Zend CurlSharePersistentHandle (#27711)
+            'curl_share_init_persistent' => 'CurlSharePersistentHandle',
             // ext/filter/filter.stub.php — InternalArgInfo return empty (#25046, #26184)
             'filter_var' => 'mixed',
             'filter_input' => 'mixed',
@@ -1213,6 +1217,8 @@ final class BuiltinInternalArgInfo
                 default => null,
             },
             'curl_share_close', 'curl_share_errno' => 0 === $index ? 'CurlShareHandle' : null,
+            // ext/curl/curl.stub.php — array $share_options; absent from InternalArgInfo (#27711)
+            'curl_share_init_persistent' => 0 === $index ? 'array' : null,
             // ext/curl/curl.stub.php — int $error_code; InternalArgInfo still code / absent (#27810)
             'curl_strerror', 'curl_multi_strerror', 'curl_share_strerror' => 0 === $index ? 'int' : null,
             // ext/shmop/shmop.stub.php — Shmop $shmop; InternalArgInfo still int (legacy shmid) (#28451)
