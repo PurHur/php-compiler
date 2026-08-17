@@ -450,6 +450,9 @@ final class HashTable {
      * By-ref (ZEND_FE_FETCH_RW): promote the bucket to a shared IS_REFERENCE cell so the
      * residual loop variable keeps write-through across HashTable COW (append / separate)
      * — same shape as ASSIGN_REF into a dim (#22027, #26738).
+     *
+     * The shared cell records {@see Variable::$sharedRefBucket} so releasing the last named
+     * alias (rebind / unset($v)) unwraps the bucket — Zend zval_ptr_dtor (#31936).
      */
     private function valueAtBucketIndex(int $index, bool $byRef): Variable
     {
@@ -459,7 +462,13 @@ final class HashTable {
             if (Variable::TYPE_INDIRECT !== $cell->type) {
                 $ref = new Variable();
                 $ref->copyFrom($cell);
+                $ref->sharedRefBucket = $cell;
                 $cell->indirect($ref);
+            } else {
+                $payload = $cell->resolveIndirect();
+                if (null === $payload->sharedRefBucket) {
+                    $payload->sharedRefBucket = $cell;
+                }
             }
 
             return $cell->resolveIndirect();

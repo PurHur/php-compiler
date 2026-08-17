@@ -248,6 +248,30 @@ class HashTableTest extends TestCase
     }
 
     /**
+     * Releasing the last named foreach-by-ref alias unwraps buckets (Zend unset($v), #31936).
+     */
+    public function testForeachByRefUnsetUnwrapsSoleReference(): void
+    {
+        $ht = new HashTable();
+        foreach ([1, 2, 3] as $i => $n) {
+            $v = new Variable();
+            $v->int($n);
+            $ht->addIndex($i, $v);
+        }
+        $ht->iterReset();
+        $loop = new Variable();
+        while ($ht->iterValid()) {
+            $loop->indirect($ht->iterCurrentValue(true));
+        }
+        $this->assertFalse($ht->findIndex(0)->isIndirect(), 'prior elements unwrap when $v rebinds');
+        $this->assertFalse($ht->findIndex(1)->isIndirect());
+        $this->assertTrue($ht->findIndex(2)->isIndirect(), 'last element stays a ref while $v is live');
+        $loop->reset();
+        $this->assertFalse($ht->findIndex(2)->isIndirect(), 'unset($v) unwraps the last element');
+        $this->assertSame(3, $ht->findIndex(2)->toInt());
+    }
+
+    /**
      * Foreach cursor (Z_FE_POS) must not skip the next element when unset deletes the
      * current bucket — nInternalPointer update must not feed ITER_VALID's ++ (#21985).
      */

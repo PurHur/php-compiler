@@ -195,6 +195,18 @@ final class Variable {
      */
     public bool $hashTableBucketCell = false;
 
+    /**
+     * Number of TYPE_INDIRECT wrappers pointing at this shared IS_REFERENCE cell
+     * (Zend zend_reference.gc.refcount). Foreach-by-ref / ASSIGN_REF payloads only (#31936).
+     */
+    public int $sharedRefAliasCount = 0;
+
+    /**
+     * HashTable bucket whose TYPE_INDIRECT stores this cell. When the last named alias
+     * is released and only the bucket remains, unwrap in place (zend_variables.c #31936).
+     */
+    public ?Variable $sharedRefBucket = null;
+
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
     }
@@ -1074,6 +1086,9 @@ final class Variable {
     }
 
     public function indirect(Variable $value): void {
+        if (self::TYPE_INDIRECT === $this->type && isset($this->indirect) && $this->indirect === $value) {
+            return;
+        }
         $this->reset();
         $this->typedPropertyByRef = false;
         $this->propertyAssignLvalue = false;
@@ -1081,6 +1096,7 @@ final class Variable {
         $this->skipPropertySetHook = false;
         $this->type = self::TYPE_INDIRECT;
         $this->indirect = $value;
+        $value->sharedRefAliasCount++;
     }
 
     public function directIndirectTarget(): ?self
@@ -1092,7 +1108,63 @@ final class Variable {
         return $this->indirect;
     }
 
+    /**
+     * Drop this INDIRECT alias and unwrap a HashTable bucket that would otherwise remain
+     * a sole zend_reference (var_dump `&` marker) — php-src zval_ptr_dtor / #31936.
+     */
+    private function releaseIndirectAlias(): void
+    {
+        if (self::TYPE_INDIRECT !== $this->type || !isset($this->indirect)) {
+            return;
+        }
+        $cell = $this->indirect;
+        if ($cell->sharedRefAliasCount > 0) {
+            --$cell->sharedRefAliasCount;
+        }
+        if ($this->hashTableBucketCell) {
+            return;
+        }
+        $this->tryCollapseSoleSharedRef($cell);
+    }
+
+    /**
+     * When only the array bucket still holds the IS_REFERENCE cell, copy the payload
+     * back onto the bucket so var_dump matches Zend (no `&` after unset($v)).
+     */
+    private function tryCollapseSoleSharedRef(self $cell): void
+    {
+        if (1 !== $cell->sharedRefAliasCount) {
+            return;
+        }
+        $bucket = $cell->sharedRefBucket;
+        if (null === $bucket || $bucket === $this) {
+            return;
+        }
+        if (!$bucket->isIndirect() || $bucket->directIndirectTarget() !== $cell) {
+            return;
+        }
+        $bucket->unwrapIndirectInPlace();
+        $cell->sharedRefAliasCount = 0;
+        $cell->sharedRefBucket = null;
+        $cell->reset();
+    }
+
+    /**
+     * Replace TYPE_INDIRECT with a value copy of the shared cell (no write-through).
+     */
+    private function unwrapIndirectInPlace(): void
+    {
+        if (self::TYPE_INDIRECT !== $this->type || !isset($this->indirect)) {
+            return;
+        }
+        $cell = $this->indirect;
+        $this->type = self::TYPE_NULL;
+        unset($this->indirect);
+        $this->copyFrom($cell);
+    }
+
     public function reset(): void {
+        $this->releaseIndirectAlias();
         $this->releaseTrackedMemory();
         if (self::TYPE_OBJECT === $this->type && isset($this->object)) {
             if ($this->object->refCount <= 1) {
