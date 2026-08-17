@@ -525,6 +525,8 @@
             <file>./test/compliance/DomSoftNullParamNamesDeprecatedJITTest.php</file>
             <file>./test/compliance/DomReflectionC14nCtorStubsVMTest.php</file>
             <file>./test/compliance/DomReflectionC14nCtorStubsJITTest.php</file>
+            <file>./test/compliance/XmlWriterXmlReaderReflectionStubsVMTest.php</file>
+            <file>./test/compliance/XmlWriterXmlReaderReflectionStubsJITTest.php</file>
             <file>./test/compliance/PdoConstructPrepareQueryReflectionVMTest.php</file>
             <file>./test/compliance/PhpversionVMTest.php</file>
             <file>./test/compliance/PhpSbindirConstant84VMTest.php</file>

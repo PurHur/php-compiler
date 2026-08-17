@@ -262,6 +262,12 @@ final class BuiltinInternalArgInfo
             'simplexml_import_dom' => '?SimpleXMLElement',
             // ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo return resource; Zend XMLWriter|false (#28786)
             'xmlwriter_open_memory', 'xmlwriter_open_uri' => 'XMLWriter|false',
+            // ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo omits union (#31867)
+            'xmlwriter_flush' => 'string|int',
+            // ext/xml/xml.stub.php — InternalArgInfo return string; Zend ?string (#31867)
+            'xml_error_string' => '?string',
+            // ext/xml/xml.stub.php — InternalArgInfo return int; Zend bool (#31867)
+            'xml_parser_set_option' => 'bool',
             // pecl-networking-uuid uuid.stub.php — absent from InternalArgInfo (#27836)
             'uuid_generate_md5', 'uuid_generate_sha1' => 'string',
             // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096)
@@ -729,6 +735,15 @@ final class BuiltinInternalArgInfo
             && 1 === $index
         ) {
             return 'StreamBucket';
+        }
+
+        // ext/xmlwriter/php_xmlwriter.stub.php — XMLWriter $writer; InternalArgInfo untyped (#31867)
+        if (0 === $index
+            && str_starts_with($callableLc, 'xmlwriter_')
+            && 'xmlwriter_open_uri' !== $callableLc
+            && 'xmlwriter_open_memory' !== $callableLc
+        ) {
+            return 'XMLWriter';
         }
 
         return match ($callableLc) {
@@ -1539,7 +1554,9 @@ final class BuiltinInternalArgInfo
             // ext/xml/xml.stub.php — XMLParser $parser; InternalArgInfo untyped (#27738)
             'xml_get_current_byte_index',
             'xml_get_current_column_number',
-            'xml_get_current_line_number' => 0 === $index ? 'XMLParser' : null,
+            'xml_get_current_line_number',
+            'xml_get_error_code',
+            'xml_parser_set_option' => 0 === $index ? 'XMLParser' : null,
             // ext/xml/xml.stub.php — XMLParser $parser; InternalArgInfo untyped (#27743)
             'xml_parser_get_option' => 0 === $index ? 'XMLParser' : null,
             // ext/xml/xml.stub.php — XMLParser $parser; InternalArgInfo untyped (#27793)
@@ -1568,6 +1585,23 @@ final class BuiltinInternalArgInfo
             'xml_set_element_handler' => match ($index) {
                 0 => 'XMLParser',
                 1, 2 => '',
+                default => null,
+            },
+            // ext/xmlwriter/php_xmlwriter.stub.php — *ns prefix/namespace ?string; DTD tails (#31867)
+            'xmlwriter_start_attribute_ns',
+            'xmlwriter_start_element_ns' => ($index === 1 || $index === 3) ? '?string' : null,
+            'xmlwriter_write_attribute_ns' => ($index === 1 || $index === 3) ? '?string' : null,
+            'xmlwriter_write_element_ns' => match ($index) {
+                1, 3, 4 => '?string',
+                default => null,
+            },
+            'xmlwriter_write_element' => 2 === $index ? '?string' : null,
+            'xmlwriter_start_document' => ($index === 1 || $index === 2 || $index === 3) ? '?string' : null,
+            'xmlwriter_start_dtd' => ($index === 2 || $index === 3) ? '?string' : null,
+            'xmlwriter_write_dtd' => ($index === 2 || $index === 3 || $index === 4) ? '?string' : null,
+            'xmlwriter_write_dtd_entity' => match ($index) {
+                3 => 'bool',
+                4, 5, 6 => '?string',
                 default => null,
             },
             // ext/imap/php_imap.stub.php — PHP 8.3+; absent from InternalArgInfo (#27674)
@@ -1754,9 +1788,26 @@ final class BuiltinInternalArgInfo
             },
             // ext/xmlreader/php_xmlreader.stub.php — expand(?DOMNode $baseNode = null) (#31501)
             'xmlreader::expand' => 0 === $index ? '?DOMNode' : null,
+            // ext/xmlreader/php_xmlreader.stub.php — next(?string $name = null); setSchema* ?string (#31867)
+            'xmlreader::next' => 0 === $index ? '?string' : null,
+            'xmlreader::setschema',
+            'xmlreader::setrelaxngschema',
+            'xmlreader::setrelaxngschemasource' => 0 === $index ? '?string' : null,
             // ext/xmlwriter/php_xmlwriter.stub.php — startDocument/writeElement ?string (#31501)
             'xmlwriter::startdocument' => ($index === 0 || $index === 1 || $index === 2) ? '?string' : null,
             'xmlwriter::writeelement' => 1 === $index ? '?string' : null,
+            // ext/xmlwriter/php_xmlwriter.stub.php — *Ns prefix/namespace ?string; DTD tails (#31867)
+            'xmlwriter::startattributens',
+            'xmlwriter::startelementns' => ($index === 0 || $index === 2) ? '?string' : null,
+            'xmlwriter::writeattributens' => ($index === 0 || $index === 2) ? '?string' : null,
+            'xmlwriter::writeelementns' => ($index === 0 || $index === 2 || $index === 3) ? '?string' : null,
+            'xmlwriter::startdtd' => ($index === 1 || $index === 2) ? '?string' : null,
+            'xmlwriter::writedtd' => ($index === 1 || $index === 2 || $index === 3) ? '?string' : null,
+            'xmlwriter::writedtdentity' => match ($index) {
+                2 => 'bool',
+                3, 4, 5 => '?string',
+                default => null,
+            },
             // ext/dom/php_dom.stub.php — C14N ?array xpath/nsPrefixes; lookupNamespaceURI ?string (#31849)
             'domnode::c14n' => ($index === 2 || $index === 3) ? '?array' : null,
             'domnode::c14nfile' => ($index === 3 || $index === 4) ? '?array' : null,
