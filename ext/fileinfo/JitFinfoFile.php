@@ -83,7 +83,7 @@ final class JitFinfoFile
             $context,
             $pathArg,
             $pathStr,
-            VmString::emptyStringArgValueErrorMessageCannot($function, $argIndex, $paramName)
+            VmFinfo::emptyFilenameValueErrorMessage($function, $argIndex, $paramName)
         );
         $raw = FinfoFileRuntime::invoke($context, $pathStr);
         $null = $context->getTypeFromString('__string__*')->constNull();
