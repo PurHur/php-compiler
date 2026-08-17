@@ -46,6 +46,7 @@ final class EvalRuntime
                 : 0;
             $callLine = VmEval::evalCallSiteLine($callerPath, $callLine);
             $evalFile = VmEval::zendEvalFilename($callerPath, $callLine);
+            $evalClassScope = VmEval::declaringClassFromBlock($callerBlock);
 
             // Type/function decls: bin/jit.php VM-lowers via Block::literalEvalSourceNeedsVm
             // (#25535). AOT still lowers TYPE_EVAL here — must not emitFalse without first
@@ -58,7 +59,7 @@ final class EvalRuntime
             }
 
             // Expression-only literal: inline when compile succeeds (#26032 filename shape).
-            $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal, $evalFile);
+            $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal, $evalFile, $evalClassScope);
             if ($evalBlock instanceof Block) {
                 $evalBlock->setScriptPath($evalFile);
                 \PHPCompiler\JIT\IncludeHelper::compileInlinedBlock(

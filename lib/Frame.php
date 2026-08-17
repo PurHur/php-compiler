@@ -47,6 +47,13 @@ class Frame {
     /** Late-static-bind class for the active call (runtime class name, issue #1231). */
     public ?string $calledClass = null;
 
+    /**
+     * Declaring class (self/parent) for eval/include {main} — distinct from {@see $calledClass} LSB (#31912).
+     *
+     * php-src: execute_data->func->common.scope vs called_scope.
+     */
+    public ?string $scopeClass = null;
+
     /** Class used for the pending static call (set by STATICCALL_INIT / initStaticCallable). */
     public ?string $staticCallClass = null;
 

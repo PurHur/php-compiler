@@ -212,6 +212,24 @@ class Compiler {
     private ?string $compilingClassDisplayName = null;
 
     /**
+     * Declaring class (self) while compiling eval()'d code from a method (#31912).
+     *
+     * Distinct from {@see $compilingClassLc} (class *body* being lowered). Zend
+     * `zend_eval_string` compiles with the caller's `func->common.scope`.
+     */
+    private ?string $evalClassScopeLc = null;
+
+    /** Display FQCN for {@see $evalClassScopeLc} (#31912). */
+    private ?string $evalClassScopeDisplay = null;
+
+    /**
+     * Saved eval class-scope pairs for reentrant parseAndCompile (#31912).
+     *
+     * @var list<array{0:?string,1:?string}>
+     */
+    private array $evalClassScopeStack = [];
+
+    /**
      * PHP 8.4+ rich closure names keyed by CFG Func — set before body compile so nested
      * closures can nest parent names (zend_compile.c, #30076).
      *
@@ -305,6 +323,38 @@ class Compiler {
     public function setBareRethrowLines(array $lines): void
     {
         $this->bareRethrowLines = $lines;
+    }
+
+    /**
+     * Bind eval() compile to the caller's declaring class (self/parent) (#31912).
+     *
+     * php-src: Zend/zend_execute_API.c zend_eval_string — CG(active_class_entry) /
+     * execute_data->func->common.scope so `self::class` is not a global-scope fatal.
+     */
+    public function pushEvalClassScope(?string $className): void
+    {
+        $this->evalClassScopeStack[] = [$this->evalClassScopeLc, $this->evalClassScopeDisplay];
+        if (null === $className || '' === $className) {
+            $this->evalClassScopeLc = null;
+            $this->evalClassScopeDisplay = null;
+
+            return;
+        }
+        $display = ltrim($className, '\\');
+        $this->evalClassScopeDisplay = $display;
+        $this->evalClassScopeLc = strtolower($display);
+    }
+
+    public function popEvalClassScope(): void
+    {
+        $prev = array_pop($this->evalClassScopeStack);
+        if (null === $prev) {
+            $this->evalClassScopeLc = null;
+            $this->evalClassScopeDisplay = null;
+
+            return;
+        }
+        [$this->evalClassScopeLc, $this->evalClassScopeDisplay] = $prev;
     }
 
     public function setDebugLastPhaseInputFile(?string $filename): void
@@ -8754,6 +8804,9 @@ class Compiler {
 
             return null !== $name ? ltrim($name, '\\') : null;
         }
+        if (null !== $this->evalClassScopeDisplay && '' !== $this->evalClassScopeDisplay) {
+            return $this->evalClassScopeDisplay;
+        }
 
         return null;
     }
@@ -8767,6 +8820,9 @@ class Compiler {
             $name = $this->staticNameFromOperand($block->func->class);
 
             return null !== $name ? strtolower(ltrim($name, '\\')) : null;
+        }
+        if (null !== $this->evalClassScopeLc && '' !== $this->evalClassScopeLc) {
+            return $this->evalClassScopeLc;
         }
 
         return null;
@@ -11784,6 +11840,9 @@ class Compiler {
         if (null !== $this->compilingClassLc) {
             return true;
         }
+        if (null !== $this->evalClassScopeLc) {
+            return true;
+        }
         if ($this->includeTargetCompileDepth > 0 && $block->isMainScript()) {
             return true;
         }
@@ -11824,6 +11883,10 @@ class Compiler {
                 $name = $this->staticNameFromOperand($block->func->class);
 
                 return null !== $name ? strtolower(ltrim($name, '\\')) : null;
+            }
+            // eval() donor is declaring class — `static::` must not fold here (#31912, #19614).
+            if ('self' === $lc && null !== $this->evalClassScopeLc) {
+                return $this->evalClassScopeLc;
             }
 
             return null;
@@ -13927,7 +13990,7 @@ class Compiler {
                         $staticFetchOp = new OpCode(
                             OpCode::TYPE_STATIC_PROPERTY_FETCH,
                             $fetchSlot,
-                            $this->compileOperand($staticPropertyFetch->class, $block, true),
+                            $this->compileClassNameOperand($staticPropertyFetch->class, $block),
                             $this->compileStaticPropertyNameSlot($staticPropertyFetch->name, $staticPropertyFetch->class, $block)
                         );
                         $this->assignSourceMetadata($staticFetchOp, $staticPropertyFetch);
@@ -14286,7 +14349,7 @@ class Compiler {
                 $staticFetchOp = new OpCode(
                     OpCode::TYPE_STATIC_PROPERTY_FETCH,
                     $this->compileOperand($expr->result, $block, false),
-                    $this->compileOperand($expr->class, $block, true),
+                    $this->compileClassNameOperand($expr->class, $block),
                     $this->compileStaticPropertyNameSlot($expr->name, $expr->class, $block)
                 );
                 // Stamp user line for typed-static uninit Errors (#31859, zend_object_handlers.c).
@@ -16128,7 +16191,7 @@ class Compiler {
         $op = new OpCode(
             OpCode::TYPE_STATIC_PROPERTY_FETCH,
             $this->compileOperand($fetch->result, $block, false),
-            $this->compileOperand($fetch->class, $block, true),
+            $this->compileClassNameOperand($fetch->class, $block),
             $this->compileStaticPropertyNameSlot($fetch->name, $fetch->class, $block)
         );
         $this->assignSourceMetadata($op, $fetch);
@@ -16157,7 +16220,7 @@ class Compiler {
         $block->addOpCode(new OpCode(
             OpCode::TYPE_STATIC_PROPERTY_FETCH,
             $this->compileOperand($fetch->result, $block, false),
-            $this->compileOperand($fetch->class, $block, true),
+            $this->compileClassNameOperand($fetch->class, $block),
             $this->compileStaticPropertyNameSlot($fetch->name, $fetch->class, $block)
         ));
     }
@@ -18105,7 +18168,7 @@ class Compiler {
         Block $block
     ): array {
         return [
-            $this->compileOperand($fetch->class, $block, true),
+            $this->compileClassNameOperand($fetch->class, $block),
             $this->compileStaticPropertyNameSlot($fetch->name, $fetch->class, $block),
         ];
     }
@@ -42307,6 +42370,33 @@ class Compiler {
     }
 
     /**
+     * Compile a class-name operand, rewriting eval-donor `self` to the enclosing FQCN (#31912).
+     *
+     * php-src zend_eval_string compiles with the caller's scope so php-cfg MagicStringResolver
+     * would have rewritten `self` during a method compile. Eval is a separate translation unit.
+     */
+    protected function compileClassNameOperand(Operand $class, Block $block): int
+    {
+        return $this->compileOperand($this->rewriteEvalDonorClassOperand($class), $block, true);
+    }
+
+    private function rewriteEvalDonorClassOperand(Operand $class): Operand
+    {
+        if (null === $this->evalClassScopeDisplay || '' === $this->evalClassScopeDisplay) {
+            return $class;
+        }
+        $name = $this->staticNameFromOperand($class);
+        if (null === $name) {
+            return $class;
+        }
+        if ('self' === strtolower($name)) {
+            return new Literal($this->evalClassScopeDisplay);
+        }
+
+        return $class;
+    }
+
+    /**
      * Static property name operand (#23606, zend_compile.c / zend_object_handlers.c).
      *
      * php-cfg already distinguishes forms:
@@ -43578,7 +43668,7 @@ class Compiler {
                         $staticUnsetOp = new OpCode(
                             OpCode::TYPE_STATIC_PROPERTY_UNSET,
                             null,
-                            $this->compileOperand($staticPropertyFetch->class, $block, true),
+                            $this->compileClassNameOperand($staticPropertyFetch->class, $block),
                             $this->compileStaticPropertyNameSlot(
                                 $staticPropertyFetch->name,
                                 $staticPropertyFetch->class,
@@ -43982,7 +44072,7 @@ class Compiler {
         $op = new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $this->compileOperand($destOperand, $block, false),
-            $this->compileOperand($expr->class, $block, true),
+            $this->compileClassNameOperand($expr->class, $block),
             $this->compileOperand($expr->name, $block, true)
         );
         // Use-site line for #[\Deprecated] class-const / enum-case notices (Zend zend_attributes.c / #29381).
@@ -56237,7 +56327,7 @@ class Compiler {
         $op = new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $valueSlot,
-            $this->compileOperand($fetch->class, $block, true),
+            $this->compileClassNameOperand($fetch->class, $block),
             $this->compileOperand($fetch->name, $block, true)
         );
         $this->assignSourceMetadata($op, $fetch);

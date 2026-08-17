@@ -1693,6 +1693,9 @@ class Block {
             if (null !== $frame->calledClass && '' !== $frame->calledClass) {
                 $return->calledClass = $frame->calledClass;
             }
+            if (null !== $frame->scopeClass && '' !== $frame->scopeClass) {
+                $return->scopeClass = $frame->scopeClass;
+            }
             if (null !== $frame->generatorState) {
                 $return->generatorState = $frame->generatorState;
             }

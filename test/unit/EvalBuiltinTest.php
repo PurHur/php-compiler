@@ -27,6 +27,7 @@ final class EvalBuiltinTest extends BaseTest
             'eval_typed_class_const_reject_catchable.phpt',
             'eval_return_value.phpt',
             'eval_this_scope.phpt',
+            'eval_inherits_class_scope.phpt',
         ] as $file) {
             $path = __DIR__.'/../compliance/cases/language/'.$file;
             yield $file => self::parsePHPT($path, $file);
