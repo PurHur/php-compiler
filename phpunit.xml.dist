@@ -258,6 +258,7 @@
             <file>./test/compliance/ReadlinkLinkinfoReflectionReturnVMTest.php</file>
             <file>./test/compliance/GetcwdReflectionReturnVMTest.php</file>
             <file>./test/compliance/RequiredMangledReflectionReturnVMTest.php</file>
+            <file>./test/compliance/StrReplaceFamilyReflectionVMTest.php</file>
             <file>./test/compliance/CryptSaltRequiredReflectionVMTest.php</file>
             <file>./test/compliance/PasswordHashVerifyAlgosReflectionVMTest.php</file>
             <file>./test/compliance/PasswordHashVerifyAlgosReflectionJITTest.php</file>

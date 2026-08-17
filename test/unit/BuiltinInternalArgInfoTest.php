@@ -838,6 +838,32 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('get_mangled_object_vars'));
     }
 
+    /** php-src ext/standard/string.stub.php — str_ireplace/substr_replace/strtr Reflection (#23588). */
+    public function testStrReplaceFamilyReflectionStubTypes(): void
+    {
+        $this->assertSame('array|string', BuiltinInternalArgInfo::returnTypeLabelForFunction('str_ireplace'));
+        $this->assertSame('array|string', BuiltinInternalArgInfo::returnTypeLabelForFunction('substr_replace'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('strtr'));
+        $this->assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('str_ireplace', 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('str_ireplace', 3));
+        $this->assertSame('array|int', BuiltinInternalArgInfo::stubParamTypeOverride('substr_replace', 2));
+        $this->assertSame('array|int|null', BuiltinInternalArgInfo::stubParamTypeOverride('substr_replace', 3));
+        $this->assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('strtr', 1));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('strtr', 2));
+        $this->assertTrue(BuiltinInternalArgInfo::stubParamIsOptionalOverride('strtr', 2));
+        $to = BuiltinInternalArgInfo::paramInfoForFunction('strtr', 2);
+        $this->assertNotNull($to);
+        $this->assertSame('to', $to['name']);
+        $this->assertSame('?string', $to['type']);
+        $this->assertTrue($to['isOptional']);
+        $length = BuiltinInternalArgInfo::paramInfoForFunction('substr_replace', 3);
+        $this->assertNotNull($length);
+        $this->assertSame('length', $length['name']);
+        $this->assertSame('array|int|null', $length['type']);
+        $this->assertTrue($length['isOptional']);
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('substr_count', 3));
+    }
+
     /** php-src basic_functions.stub.php — crypt $salt required; InternalArgInfo still salt= (#28920). */
     public function testCryptSaltRequiredReflectionStub(): void
     {

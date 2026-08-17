@@ -2029,14 +2029,16 @@ final class BuiltinParamNames
             case 'substr_compare':
                 return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/repl/start (#23183)
+            // length = null optional (#23588)
             case 'substr_replace':
-                return ['string', 'replace', 'offset', 'length'];
+                return ['string', 'replace', 'offset', 'length='];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says input/mult (#23204)
             case 'str_repeat':
                 return ['string', 'times'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/from/to (#23215)
+            // ?string $to = null (#23588)
             case 'strtr':
-                return ['string', 'from', 'to'];
+                return ['string', 'from', 'to='];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/allowable_tags (#23217)
             case 'strip_tags':
                 return ['string', 'allowed_tags'];
