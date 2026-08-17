@@ -929,24 +929,7 @@ final class GcCollectCyclesRuntime
 
     private static function ensureExternal(Context $context, string $name, $ft): void
     {
-        try {
-            $context->lookupFunction($name);
-
-            return;
-        } catch (\Throwable $e) {
-        }
-        // The symbol may already exist in the MODULE while being absent from the context registry —
-        // LibcExtern adds `memset` and gives it a body via implementMemsetBody() without every
-        // caller having registered it. addFunction() on an existing name does not fail; LLVM
-        // silently renames the second one to `memset.1`, which carries no body, so the link ends
-        // with `undefined reference to memset.1` from phpc_gc_collect_cycles_impl and EVERY AOT
-        // binary fails to link (aot-smoke 0/8). Reuse the existing declaration instead, matching
-        // the getNamedFunction()-first pattern LibcExtern already uses.
-        $fn = $context->module->getNamedFunction($name);
-        if (null === $fn) {
-            $fn = $context->module->addFunction($name, $ft);
-        }
-        $context->registerFunction($name, $fn);
+        \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, $name, $ft);
     }
 
     private static function registerLinkedRuntime(Context $context): void

@@ -73,8 +73,8 @@ final class OutputRewriteVarsStorage
     {
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        self::ensureExternal($context, 'memcpy', $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT));
-        self::ensureExternal($context, 'malloc', $context->context->functionType($i8p, false, $sizeT));
+        \PHPCompiler\JIT\LibcExtern::ensureMemcpyDecl($context);
+        \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, 'malloc', $context->context->functionType($i8p, false, $sizeT));
     }
 
     /** Append name\\x1Evalue (with \\x1D separator when blob non-empty). */
@@ -391,11 +391,6 @@ final class OutputRewriteVarsStorage
 
     private static function ensureExternal(Context $context, string $name, $ft): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
+        \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, $name, $ft);
     }
 }

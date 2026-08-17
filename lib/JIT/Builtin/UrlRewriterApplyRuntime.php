@@ -237,14 +237,9 @@ final class UrlRewriterApplyRuntime
         foreach ([
             '__string__init' => $context->context->functionType($strPtr, false, $i64, $i8p),
             'malloc' => $context->context->functionType($i8p, false, $sizeT),
-            'memcpy' => $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT),
         ] as $name => $ft) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $fn = $context->module->addFunction($name, $ft);
-                $context->registerFunction($name, $fn);
-            }
+            \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, $name, $ft);
         }
+        \PHPCompiler\JIT\LibcExtern::ensureMemcpyDecl($context);
     }
 }
