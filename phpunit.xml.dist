@@ -798,6 +798,7 @@
             <file>./test/compliance/SplFileObjectExcessArgc30937JITTest.php</file>
             <file>./test/compliance/SplFileObjectExcessArgc31008VMTest.php</file>
             <file>./test/compliance/SplFileObjectExcessArgc31008JITTest.php</file>
+            <file>./test/compliance/SplFileObjectSetFlagsNullSoft31796VMTest.php</file>
             <file>./test/compliance/DirItExcessArgc31009VMTest.php</file>
             <file>./test/compliance/DirItExcessArgc31009JITTest.php</file>
             <file>./test/compliance/RiiGlobExcessArgc31010VMTest.php</file>

@@ -1202,9 +1202,15 @@ final class SplFileObjectSetFlags extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::setFlags()'
         );
-        // php-src zim_SplFileObject_setFlags — exactly 1 user arg (#31008).
+        // php-src zim_SplFileObject_setFlags — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG (#31796).
         $this->requireExactUserArgCount($frame, 'SplFileObject::setFlags', 1);
-        $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $flags = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'SplFileObject::setFlags',
+            1,
+            'flags'
+        );
         SplFileObjectStorage::setFlags($object, $flags);
     }
 }
