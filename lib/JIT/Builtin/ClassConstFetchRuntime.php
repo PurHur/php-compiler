@@ -57,7 +57,7 @@ final class ClassConstFetchRuntime
         $classPseudo = $context->builder->load($context->constantStringFromString('class'));
         $context->builder->positionAtEnd($entry);
         $isClass = $context->builder->call(
-            $context->lookupFunction('strcasecmp'),
+            $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
             self::stringDataPtr($context, $nativeName),
             self::stringDataPtr($context, $classPseudo)
         );

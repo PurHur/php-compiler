@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableReadLlvm;
@@ -349,7 +350,9 @@ final class JitIsCallable
         $i32 = $context->getTypeFromString('int32');
         $object = $context->type->object;
         $methodData = self::stringDataPtr($context, $methodStr);
-        $strcasecmp = $context->lookupFunction('strcasecmp');
+        // __compiler_strcasecmp after LibcExtern always-on drop (#31787).
+        StringCaseCompare::ensureStrcasecmpLinked($context);
+        $strcasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $exists = $i1->constInt(0, false);
         foreach ($object->allClassNamesById() as $id => $className) {
             $isClass = $context->builder->icmp(
@@ -387,7 +390,8 @@ final class JitIsCallable
         $i1 = $context->getTypeFromString('int1');
         $i32 = $context->getTypeFromString('int32');
         $object = $context->type->object;
-        $strcasecmp = $context->lookupFunction('strcasecmp');
+        StringCaseCompare::ensureStrcasecmpLinked($context);
+        $strcasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP);
         $classData = self::stringDataPtr($context, $classStr);
         $methodData = self::stringDataPtr($context, $methodStr);
         $exists = $i1->constInt(0, false);

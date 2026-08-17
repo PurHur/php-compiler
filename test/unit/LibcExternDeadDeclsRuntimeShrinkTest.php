@@ -70,6 +70,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'fread',
             'fwrite',
             'fclose',
+            'strcasecmp',
         ];
     }
 
@@ -80,7 +81,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -101,6 +102,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31706', $source);
         $this->assertStringContainsString('#31743', $source);
         $this->assertStringContainsString('#31764', $source);
+        $this->assertStringContainsString('#31787', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
     }
@@ -282,11 +284,17 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc fclose (#31764)'
         );
+        $this->assertStringNotContainsString(
+            "'strcasecmp' =>",
+            $source,
+            'LibcExtern must not declare libc strcasecmp (#31787)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
         $this->assertStringContainsString('#31743', $source);
         $this->assertStringContainsString('#31764', $source);
+        $this->assertStringContainsString('#31787', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
@@ -340,6 +348,45 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LibcExtern::ensureMemmoveDecl', $source);
         $this->assertStringContainsString("lookupFunction('memmove')", $source);
         $this->assertStringNotContainsString("'memmove' =>", (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php'));
+    }
+
+    public function testNestedJitConsumersLookupCompilerStrcasecmpAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'lib/JIT/InstanceOfHelper.php',
+            'lib/JIT/Call/ReflectionMethodInvoke.php',
+            'lib/JIT/ClassConstFetchHelperTrait.php',
+            'lib/JIT/Builtin/ClassConstFetchRuntime.php',
+            'lib/JIT/Builtin/ReflectionEnumJitHelper.php',
+            'lib/JIT/Builtin/SessionModuleName.php',
+            'lib/JIT/Builtin/AttributeRegistryLookupRuntime.php',
+            'lib/JIT/Builtin/ReflectionPropertyGetMangledNameRuntime.php',
+            'lib/JIT/Builtin/ReflectionPropertyRawValueRuntime.php',
+            'lib/JIT/Builtin/ReflectionPropertyIsVirtualRuntime.php',
+            'lib/JIT/Builtin/ReflectionPropertyIsFinalRuntime.php',
+            'ext/standard/JitIniGetAll.php',
+            'ext/standard/JitIsCallable.php',
+            'ext/filter/JitFilterId.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'StringCaseCompare::ABI_STRCASECMP',
+                $source,
+                "{$rel} must look up __compiler_strcasecmp after #31787"
+            );
+            $this->assertStringContainsString(
+                'ensureStrcasecmpLinked',
+                $source,
+                "{$rel} must link CaseCompareJitHelper before strcasecmp lookup (#31787)"
+            );
+            $this->assertStringNotContainsString(
+                "lookupFunction('strcasecmp')",
+                $source,
+                "{$rel} must not look up libc strcasecmp after #31787"
+            );
+        }
+        $this->assertStringContainsString('#31787', (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php'));
+        $this->assertStringContainsString('#31787', (string) file_get_contents(__DIR__.'/../../lib/JIT/InstanceOfHelper.php'));
     }
 
     public function testObjectTypeRoutesStrncasecmpThroughCompilerAbiAfterLibcExternDrop(): void
