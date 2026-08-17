@@ -37,6 +37,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * WSDL soap:binding style / soap:body use applied when ctor omits style/use (#21132).
  * options['typemap'] from_xml/to_xml string or Closure/callable callbacks (#21046 / #31845).
  * __soapCall $options location/soapaction/uri apply per-call without mutating ctor state (#31873).
+ * SOAP 1.2 HTTP uses application/soap+xml; action= (no SOAPAction header) (#31918 / php_http.c).
  */
 final class VmSoapClient
 {
@@ -1016,7 +1017,8 @@ final class VmSoapClient
             $useProxy,
             $state->userAgent,
             $state->keepAlive,
-            $state->streamContextOptions
+            $state->streamContextOptions,
+            $version
         );
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
@@ -1076,8 +1078,7 @@ final class VmSoapClient
             // Legacy host HTTP wrapper (missing stream_socket_client).
             $useSsl = (bool) \preg_match('#^https://#i', $location);
             $headers = ($state->keepAlive ? "Connection: Keep-Alive\r\n" : "Connection: close\r\n").
-                "Content-Type: text/xml; charset=utf-8\r\n".
-                'SOAPAction: "'.$action."\"\r\n";
+                self::contentTypeAndActionHeaders($version, $action);
             if ('' !== $acceptEncoding) {
                 $headers .= 'Accept-Encoding: '.$acceptEncoding."\r\n";
             }
@@ -1702,7 +1703,8 @@ final class VmSoapClient
         bool $useProxy = false,
         ?string $userAgent = null,
         bool $keepAlive = true,
-        ?array $streamContextOptions = null
+        ?array $streamContextOptions = null,
+        int $soapVersion = SoapConstants::SOAP_1_1
     ): string {
         $path = '/';
         $host = 'localhost';
@@ -1737,8 +1739,7 @@ final class VmSoapClient
         if ('' !== $contentEncoding) {
             $hdr .= 'Content-Encoding: '.$contentEncoding."\r\n";
         }
-        $hdr .= "Content-Type: text/xml; charset=utf-8\r\n".
-            'SOAPAction: "'.$action."\"\r\n".
+        $hdr .= self::contentTypeAndActionHeaders($soapVersion, $action).
             'Content-Length: '.$contentLength."\r\n";
         if ('' !== $cookieHeader) {
             $hdr .= 'Cookie: '.$cookieHeader."\r\n";
@@ -1759,6 +1760,24 @@ final class VmSoapClient
         );
 
         return $hdr;
+    }
+
+    /**
+     * php-src php_http.c Content-Type / SOAPAction vs SOAP 1.2 action param (#31918).
+     */
+    private static function contentTypeAndActionHeaders(int $soapVersion, string $action): string
+    {
+        if (SoapConstants::SOAP_1_2 === $soapVersion) {
+            $hdr = 'Content-Type: application/soap+xml; charset=utf-8';
+            if ('' !== $action) {
+                $hdr .= '; action="'.$action.'"';
+            }
+
+            return $hdr."\r\n";
+        }
+
+        return "Content-Type: text/xml; charset=utf-8\r\n".
+            'SOAPAction: "'.$action."\"\r\n";
     }
 
     /**
