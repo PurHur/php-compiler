@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmJson;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -246,10 +247,10 @@ final class SplDoublyLinkedListBuiltin
 
     /**
      * php-src SplDoublyLinkedList::add — insert at $index (0..count inclusive).
+     * Index soft-null is handled by the method handler (Z_PARAM_LONG; #31803).
      */
-    public static function add(ObjectEntry $object, Variable $index, Variable $value): void
+    public static function add(ObjectEntry $object, int $pos, Variable $value): void
     {
-        $pos = self::coerceIndex($index, 'add', false);
         $count = self::count($object);
         if ($pos < 0 || $pos > $count) {
             throw new \OutOfRangeException(
@@ -924,9 +925,16 @@ final class SplDoublyLinkedListAdd extends VmClassMethod
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::add()'
         );
-        // php-src: ZEND_PARSE_PARAMETERS_ARGS(2, 2) (#30964)
+        // php-src: ZEND_PARSE_PARAMETERS_ARGS(2, 2) (#30964); Z_PARAM_LONG soft-null (#31803).
         $this->requireExactUserArgCount($frame, 'SplDoublyLinkedList::add', 2);
-        SplDoublyLinkedListBuiltin::add($object, $frame->calledArgs[1], $frame->calledArgs[2]);
+        $index = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'SplDoublyLinkedList::add',
+            1,
+            'index'
+        );
+        SplDoublyLinkedListBuiltin::add($object, $index, $frame->calledArgs[2]);
     }
 }
 
