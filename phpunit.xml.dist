@@ -114,6 +114,10 @@
             <file>./test/compliance/ThisInterpOutsideObjectContextVMTest.php</file>
             <file>./test/compliance/TraitInstanceofSelfVMTest.php</file>
             <file>./test/compliance/TraitInstanceofSelfJITTest.php</file>
+            <file>./test/compliance/TraitInstanceofStaticVMTest.php</file>
+            <file>./test/compliance/TraitInstanceofStaticJITTest.php</file>
+            <file>./test/compliance/TraitSelfTypehintsVMTest.php</file>
+            <file>./test/compliance/TraitSelfTypehintsJITTest.php</file>
             <file>./test/compliance/TraitParentTypehintVMTest.php</file>
             <file>./test/compliance/TraitParentTypehintJITTest.php</file>
             <file>./test/compliance/AnonUninitTypedPropertyErrorMessage31117VMTest.php</file>
@@ -472,6 +476,8 @@
             <file>./test/compliance/DomGetElementByIdNonIdNullVMTest.php</file>
             <file>./test/compliance/DomPhpcEnginePropsInvisibleVMTest.php</file>
             <file>./test/compliance/DomPhpcEnginePropsInvisibleJITTest.php</file>
+            <file>./test/compliance/DomNodeDeclaredPropsVMTest.php</file>
+            <file>./test/compliance/DomNodeDeclaredPropsJITTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictJITTest.php</file>
             <file>./test/compliance/DomCreateNullStrictVMTest.php</file>

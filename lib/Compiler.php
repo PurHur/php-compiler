@@ -8540,6 +8540,16 @@ class Compiler {
         $lexical = ltrim($className, '\\');
         $lc = strtolower($lexical);
         if ('self' === $lc || 'static' === $lc) {
+            // Trait `self` stays the keyword; trait import rebinds to the using class
+            // (zend_inheritance.c / zend_traits.c, #31744). Baking the trait name here
+            // makes TypeError demand T instead of the composing class.
+            if ('self' === $lc) {
+                $declaringLc = $this->declaringClassLcForTypeHint($block);
+                if (null !== $declaringLc && $this->classCompileRegistry->isTrait($declaringLc)) {
+                    return $lexical;
+                }
+            }
+
             return $this->declaringClassDisplayNameForTypeHint($block);
         }
         if ('parent' === $lc) {
@@ -43418,7 +43428,8 @@ class Compiler {
      * Lexical instanceof RHS `self`/`parent`/`static` after php-cfg rewrite (#31729).
      *
      * Class methods already lower `self`/`parent` to the FQCN; trait bodies keep the
-     * keyword. Do not walk {@see Operand::$original} — a rewritten Literal('CI') may
+     * keyword. `static` stays the keyword in class and trait methods (late bind).
+     * Do not walk {@see Operand::$original} — a rewritten Literal('CI') may
      * still carry a Name('self') from the parser.
      *
      * @return null|'parent'|'self'|'static'

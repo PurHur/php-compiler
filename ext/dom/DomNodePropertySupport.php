@@ -27,6 +27,24 @@ final class DomNodePropertySupport
                 'Cannot write read-only property '.$owner->class->name.'::$document'
             );
         }
+        if (strtolower(VmDom::PROP_SCHEMA_TYPE_INFO) === strtolower($name)
+            && (VmDom::isElement($owner) || VmDom::isAttr($owner))
+        ) {
+            throw new \Error(
+                'Cannot write read-only property '.$owner->class->name.'::$schemaTypeInfo'
+            );
+        }
+        if (VmDom::isEntity($owner)) {
+            $lc = strtolower($name);
+            if (strtolower(VmDom::PROP_ACTUAL_ENCODING) === $lc
+                || strtolower(VmDom::PROP_ENCODING) === $lc
+                || strtolower(VmDom::PROP_VERSION) === $lc
+            ) {
+                throw new \Error(
+                    'Cannot write read-only property '.$owner->class->name.'::$'.$name
+                );
+            }
+        }
         if (VmDom::isLivingParentNodeForChildren($owner)
             && strtolower(VmDom::PROP_CHILDREN) === strtolower($name)
         ) {
@@ -110,6 +128,20 @@ final class DomNodePropertySupport
                 || strtolower(VmDom::PROP_XPATH_DOCUMENT) === $lc;
         }
 
+        // php-src php_dom.stub.php — schemaTypeInfo / Entity encoding always null (#31753).
+        if (strtolower(VmDom::PROP_SCHEMA_TYPE_INFO) === $lc
+            && (VmDom::isElement($object) || VmDom::isAttr($object))
+        ) {
+            return true;
+        }
+        if (VmDom::isEntity($object)
+            && (strtolower(VmDom::PROP_ACTUAL_ENCODING) === $lc
+                || strtolower(VmDom::PROP_ENCODING) === $lc
+                || strtolower(VmDom::PROP_VERSION) === $lc)
+        ) {
+            return true;
+        }
+
         // Dom\* ParentNode::$children (PHP 8.5+; #21559, re-#21033).
         if (VmDom::isLivingParentNodeForChildren($object)
             && strtolower(VmDom::PROP_CHILDREN) === $lc
@@ -121,7 +153,7 @@ final class DomNodePropertySupport
             || strtolower(VmDom::PROP_NODE_NAME) === $lc
             || (VmDom::isElement($object) && strtolower(VmDom::PROP_TAG_NAME) === $lc)
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
-            || (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc)
+            || strtolower(VmDom::PROP_ATTRIBUTES) === $lc
             || (VmDom::exposesChildNodes($object) && strtolower(VmDom::PROP_CHILD_NODES) === $lc)
             || strtolower(VmDom::PROP_NODE_VALUE) === $lc
             || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc
@@ -230,6 +262,20 @@ final class DomNodePropertySupport
 
             return $var;
         }
+        if (strtolower(VmDom::PROP_SCHEMA_TYPE_INFO) === $lc) {
+            $var->null();
+
+            return $var;
+        }
+        if (VmDom::isEntity($object)
+            && (strtolower(VmDom::PROP_ACTUAL_ENCODING) === $lc
+                || strtolower(VmDom::PROP_ENCODING) === $lc
+                || strtolower(VmDom::PROP_VERSION) === $lc)
+        ) {
+            $var->null();
+
+            return $var;
+        }
         if (strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc) {
             $owner = VmDom::ownerDocumentEntry($object);
             if (null === $owner) {
@@ -240,7 +286,12 @@ final class DomNodePropertySupport
 
             return $var;
         }
-        if (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc) {
+        if (strtolower(VmDom::PROP_ATTRIBUTES) === $lc) {
+            if (!VmDom::isElement($object)) {
+                $var->null();
+
+                return $var;
+            }
             if (null === $ctx) {
                 $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
             }

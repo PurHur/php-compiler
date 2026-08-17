@@ -157,6 +157,9 @@ final class VmDom
 
     public const PROP_ATTRIBUTES = 'attributes';
 
+    /** php-src php_dom.stub.php — DOMElement/DOMAttr::$schemaTypeInfo always null (#31753). */
+    public const PROP_SCHEMA_TYPE_INFO = 'schemaTypeInfo';
+
     public const PROP_CLASS_LIST = 'classList';
 
     public const PROP_NEXT_SIBLING = 'nextSibling';
@@ -236,6 +239,25 @@ final class VmDom
      */
     public const PROP_CHILD_NODES_OWNER = '__phpcChildNodesOwner';
 
+    /**
+     * php-src stub property for Reflection (XMLReader #31639 pattern; #31753).
+     *
+     * Runtime reads for computed node props stay virtual via {@see DomNodePropertySupport}.
+     */
+    private static function stubDeclaredProperty(
+        string $name,
+        string $typeLabel,
+        string $declaringClassLc,
+        int $visibility,
+        bool $readonly = true,
+        ?Variable $default = null
+    ): ClassProperty {
+        $proto = new Variable(Variable::TYPE_UNDEFINED);
+        $proto->declaredTypeLabel = $typeLabel;
+
+        return new ClassProperty($name, $default, $proto, $readonly, $visibility, $declaringClassLc);
+    }
+
     public static function registerClasses(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_IMPLEMENTATION])) {
@@ -269,6 +291,45 @@ final class VmDom
         if (CompilerVersion::supportsDomParentElement()) {
             $node->properties[] = new ClassProperty(self::PROP_PARENT_ELEMENT, $nullProto, $objProto);
         }
+        // php-src php_dom.stub.php — declared on DOMNode, inherited by all node classes (#31753).
+        $node->properties[] = self::stubDeclaredProperty(
+            self::PROP_ATTRIBUTES,
+            '?DOMNamedNodeMap',
+            self::CLASS_NODE,
+            $pub,
+            true,
+            $nullProto
+        );
+        $node->properties[] = self::stubDeclaredProperty(
+            self::PROP_NAMESPACE_URI,
+            '?string',
+            self::CLASS_NODE,
+            $pub,
+            true,
+            $nullProto
+        );
+        $node->properties[] = self::stubDeclaredProperty(
+            self::PROP_PREFIX,
+            'string',
+            self::CLASS_NODE,
+            $pub,
+            false
+        );
+        $node->properties[] = self::stubDeclaredProperty(
+            self::PROP_LOCAL_NAME,
+            '?string',
+            self::CLASS_NODE,
+            $pub,
+            true
+        );
+        $node->properties[] = self::stubDeclaredProperty(
+            self::PROP_BASE_URI,
+            '?string',
+            self::CLASS_NODE,
+            $pub,
+            true,
+            $nullProto
+        );
         // Engine DomRegistry id — C-only storage; not in Zend PHP property table (#31439, #22513).
         $registryIdProp = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
         $registryIdProp->phpInvisible = true;
@@ -431,6 +492,31 @@ final class VmDom
         $entity->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, $nullProto, $strProto);
         $entity->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, $nullProto, $strProto);
         $entity->properties[] = new ClassProperty(self::PROP_NOTATION_NAME, $nullProto, $strProto);
+        // php-src php_dom.stub.php — deprecated always-null (#31753).
+        $entity->properties[] = self::stubDeclaredProperty(
+            self::PROP_ACTUAL_ENCODING,
+            '?string',
+            self::CLASS_ENTITY,
+            $pub,
+            true,
+            $nullProto
+        );
+        $entity->properties[] = self::stubDeclaredProperty(
+            self::PROP_ENCODING,
+            '?string',
+            self::CLASS_ENTITY,
+            $pub,
+            true,
+            $nullProto
+        );
+        $entity->properties[] = self::stubDeclaredProperty(
+            self::PROP_VERSION,
+            '?string',
+            self::CLASS_ENTITY,
+            $pub,
+            true,
+            $nullProto
+        );
         $ctx->classes[self::CLASS_ENTITY] = $entity;
 
         $notation = new ClassEntry('DOMNotation');
@@ -452,6 +538,15 @@ final class VmDom
         $specifiedDefault = new Variable(Variable::TYPE_BOOLEAN);
         $specifiedDefault->bool(true);
         $attr->properties[] = new ClassProperty(self::PROP_SPECIFIED, $specifiedDefault, $boolProto);
+        // php-src php_dom.stub.php — mixed schemaTypeInfo always null (#31753).
+        $attr->properties[] = self::stubDeclaredProperty(
+            self::PROP_SCHEMA_TYPE_INFO,
+            'mixed',
+            self::CLASS_ATTR,
+            $pub,
+            true,
+            $nullProto
+        );
         // php-src ext/dom/attr.c — DOMAttr::__construct orphaned attribute (#24631).
         $attrConstruct = new AttrConstruct();
         $attr->constructor = $attrConstruct;
@@ -554,6 +649,21 @@ final class VmDom
             $xpath->methods['quote'] = new XPathQuote();
             $xpath->methodVisibility['quote'] = $pubStatic;
         }
+        // php-src php_dom.stub.php — DOMXPath::$document / $registerNodeNamespaces (#20842, #31753).
+        $xpath->properties[] = self::stubDeclaredProperty(
+            self::PROP_XPATH_DOCUMENT,
+            'DOMDocument',
+            self::CLASS_XPATH,
+            $pub,
+            true
+        );
+        $xpath->properties[] = self::stubDeclaredProperty(
+            self::PROP_REGISTER_NODE_NAMESPACES,
+            'bool',
+            self::CLASS_XPATH,
+            $pub,
+            false
+        );
         $ctx->classes[self::CLASS_XPATH] = $xpath;
 
         $impl = new ClassEntry('DOMImplementation');
@@ -632,6 +742,30 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
         $document->properties[] = new ClassProperty(self::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
         $document->properties[] = new ClassProperty(self::PROP_CHILD_ELEMENT_COUNT, null, $intProto);
+        // php-src php_dom.stub.php — document-only declared props (#31753).
+        $document->properties[] = self::stubDeclaredProperty(
+            self::PROP_DOCTYPE,
+            '?DOMDocumentType',
+            self::CLASS_DOCUMENT,
+            $pub,
+            true,
+            $nullProto
+        );
+        $document->properties[] = self::stubDeclaredProperty(
+            self::PROP_IMPLEMENTATION,
+            'DOMImplementation',
+            self::CLASS_DOCUMENT,
+            $pub,
+            true
+        );
+        $document->properties[] = self::stubDeclaredProperty(
+            self::PROP_DOCUMENT_URI,
+            '?string',
+            self::CLASS_DOCUMENT,
+            $pub,
+            false,
+            $nullProto
+        );
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['load'] = new DocumentLoad();
@@ -741,6 +875,15 @@ final class VmDom
             $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_CLASS_NAME, $nullProto, $strProto);
         }
         $element->properties[] = new ClassProperty(self::PROP_ATTRIBUTES, $nullProto, $objProto);
+        // php-src php_dom.stub.php — mixed schemaTypeInfo always null (#31753).
+        $element->properties[] = self::stubDeclaredProperty(
+            self::PROP_SCHEMA_TYPE_INFO,
+            'mixed',
+            self::CLASS_ELEMENT,
+            $pub,
+            true,
+            $nullProto
+        );
         // ParentNode + NonDocumentTypeChildNode on Element (#19431).
         $element->properties[] = new ClassProperty(self::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
         $element->properties[] = new ClassProperty(self::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
