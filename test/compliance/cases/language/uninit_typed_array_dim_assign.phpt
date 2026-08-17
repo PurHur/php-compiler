@@ -1,3 +1,6 @@
+--TEST--
+Language: dim-assign/append on uninitialized typed array property auto-inits [] (#31770)
+--FILE--
 <?php
 class C {
     public array $a;
@@ -41,3 +44,17 @@ try {
 } catch (Error $e) {
     echo 'bare=', $e->getMessage(), "\n";
 }
+?>
+--EXPECT--
+idx=array (
+  0 => 1,
+)
+append=array (
+  0 => 3,
+)
+npush=array (
+  0 => 2,
+)
+string_concat=Typed property C::$s must not be accessed before initialization
+int_add=Typed property C::$i must not be accessed before initialization
+bare=Typed property C::$a must not be accessed before initialization

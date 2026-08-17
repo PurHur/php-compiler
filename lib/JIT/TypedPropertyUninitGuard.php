@@ -224,6 +224,73 @@ final class TypedPropertyUninitGuard
     }
 
     /**
+     * FETCH_DIM_W on a typed property: array-containing types auto-init [] (zend_try_array_init, #31770).
+     * Other typed slots still Error on uninitialized access.
+     */
+    public static function emitBeforeDimWrite(Context $context, Variable $var): void
+    {
+        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
+            return;
+        }
+        if (Variable::TYPE_VALUE !== $var->type) {
+            return;
+        }
+        if (null === $var->objectPropertyClassName || null === $var->objectPropertyName) {
+            return;
+        }
+        $object = $context->type->object;
+        assert($object instanceof Object_);
+        $resolved = $object->resolvePropertySlot($var->objectPropertyClassName, $var->objectPropertyName);
+        if (null === $resolved) {
+            return;
+        }
+        [$classId, $slotIndex] = $resolved;
+        if (!$object->propertySlotRequiresTypedInitGuard($classId, $slotIndex)) {
+            return;
+        }
+        if (!$object->propertySlotAllowsArray($classId, $slotIndex)) {
+            self::emitBeforeRead($context, $var);
+
+            return;
+        }
+        $valuePtr = self::valuePtrFromVariable($context, $var);
+        if (null === $valuePtr) {
+            return;
+        }
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $entry = $context->builder->getInsertBlock();
+        if (null === $entry || null !== $entry->getTerminator()) {
+            return;
+        }
+        $checkBlock = $fn->appendBasicBlock('typed_prop_dimw_check');
+        $initBlock = $fn->appendBasicBlock('typed_prop_dimw_init');
+        $okBlock = $fn->appendBasicBlock('typed_prop_dimw_ok');
+        $exitBlock = $fn->appendBasicBlock('typed_prop_dimw_exit');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->branch($checkBlock);
+        $context->builder->positionAtEnd($checkBlock);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_UNDEFINED, false)
+        );
+        $context->builder->branchIf($isUndef, $initBlock, $okBlock);
+        $context->builder->positionAtEnd($initBlock);
+        HashTableHelper::initArray($context, $var);
+        $context->builder->branch($okBlock);
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->branch($exitBlock);
+        $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /**
      * Uninitialized static typed property read guard (#4908, #5047, zend_object_handlers.c).
      */
     public static function emitBeforeStaticRead(
