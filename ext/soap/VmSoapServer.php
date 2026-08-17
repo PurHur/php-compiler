@@ -24,6 +24,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\VmUserCall;
 use PHPCompiler\VM\MagicMethodInvocationAborted;
 use PHPCompiler\VM\ScriptExit;
+use PHPCompiler\Web\ResponseContext;
 
 /**
  * SoapServer VM class — v1 string handle + addFunction/setObject (php-src ext/soap/soap.c; #20126, #20292).
@@ -241,17 +242,20 @@ final class VmSoapServer
         $state->pendingFault = null;
         ++self::$handleDepth;
         try {
+            $isFault = false;
             try {
                 [$opName, $args] = self::parseRequest($request);
                 $result = self::dispatch($object, $opName, $args, $ctx, $frame);
                 if (null !== $state->pendingFault) {
                     $response = self::buildFaultFromPending($state);
+                    $isFault = true;
                 } else {
                     $response = self::buildResponse($state, $opName, $result);
                 }
             } catch (\SoapFault $e) {
                 // Prefer pendingFault: isolated dispatch rematerializes SoapFault as
                 // new SoapFault($message) and drops faultcode (#20194).
+                $isFault = true;
                 $response = null !== $state->pendingFault
                     ? self::buildFaultFromPending($state)
                     : self::buildFaultResponse($state, $e);
@@ -259,10 +263,12 @@ final class VmSoapServer
                 if (null === $state->pendingFault) {
                     throw $e;
                 }
+                $isFault = true;
                 $response = self::buildFaultFromPending($state);
             } catch (ScriptExit $e) {
                 throw $e;
             } catch (\Throwable $e) {
+                $isFault = true;
                 if (null !== $state->pendingFault) {
                     $response = self::buildFaultFromPending($state);
                 } else {
@@ -272,6 +278,8 @@ final class VmSoapServer
             }
 
             $state->lastResponse = $response;
+            // php-src soap_server_fault_ex / serialize_response_call sapi_add_header (#31957).
+            self::emitHandleTransportHeaders($state, $ctx, $isFault);
             OutputBuffer::append($response);
         } finally {
             // php-src: SESSION persistence object must remain in $_SESSION for
@@ -285,6 +293,58 @@ final class VmSoapServer
             --self::$handleDepth;
             $state->pendingFault = null;
         }
+    }
+
+    /**
+     * php-src soap.c soap_server_fault_ex / success serialize_response_call sapi_add_header (#31957).
+     *
+     * SOAP 1.2: Content-Type application/soap+xml; charset=utf-8
+     * SOAP 1.1: Content-Type text/xml; charset=utf-8
+     * Faults: HTTP/1.1 500 unless $_SERVER['HTTP_USER_AGENT'] === "Shockwave Flash".
+     */
+    private static function emitHandleTransportHeaders(
+        SoapServerState $state,
+        Context $ctx,
+        bool $isFault
+    ): void {
+        if ($isFault && self::shouldUseHttpErrorStatus($ctx)) {
+            ResponseContext::addHeader('HTTP/1.1 500 Internal Server Error');
+        }
+        ResponseContext::addHeader(self::responseContentTypeHeader($state->soapVersion));
+    }
+
+    /** php-src soap.c Content-Type for SOAP 1.1 vs 1.2 server responses. */
+    public static function responseContentTypeHeader(int $soapVersion): string
+    {
+        if (SoapConstants::SOAP_1_2 === $soapVersion) {
+            return 'Content-Type: application/soap+xml; charset=utf-8';
+        }
+
+        return 'Content-Type: text/xml; charset=utf-8';
+    }
+
+    /**
+     * php-src soap_server_fault_ex: skip HTTP 500 when User-Agent is exactly "Shockwave Flash".
+     */
+    private static function shouldUseHttpErrorStatus(Context $ctx): bool
+    {
+        return 'Shockwave Flash' !== self::httpUserAgent($ctx);
+    }
+
+    private static function httpUserAgent(Context $ctx): string
+    {
+        $server = $ctx->getSuperglobal('_SERVER');
+        if (null !== $server && Variable::TYPE_ARRAY === $server->type) {
+            $uaVar = $server->toArray()->find('HTTP_USER_AGENT');
+            if (null !== $uaVar && Variable::TYPE_STRING === $uaVar->type) {
+                return $uaVar->toString();
+            }
+        }
+        if (isset($_SERVER['HTTP_USER_AGENT']) && \is_string($_SERVER['HTTP_USER_AGENT'])) {
+            return $_SERVER['HTTP_USER_AGENT'];
+        }
+
+        return '';
     }
 
     public static function fault(
