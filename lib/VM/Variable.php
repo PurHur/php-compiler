@@ -109,6 +109,14 @@ final class Variable {
     public bool $functionStaticStorage = false;
 
     /**
+     * True for HashTable buckets inside class-static / function-static / global / instance-property
+     * arrays (#31937). FETCH_DIM_W leaves an INDIRECT into the bucket; releasing that alias on
+     * frame exit drops the object's refcount while the persistent table still holds the pointer,
+     * so destroyForGc wipes properties (singleton / registry pattern).
+     */
+    public bool $persistentHashTableBucket = false;
+
+    /**
      * True when this INDIRECT alias was created by ASSIGN_REF to a typed property
      * (`$r = &$obj->prop` / `&Class::$prop`). TypeError messages then use Zend's
      * "reference held by property" wording (#25622, zend_execute.c).
