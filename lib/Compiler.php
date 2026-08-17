@@ -43418,7 +43418,8 @@ class Compiler {
      * Lexical instanceof RHS `self`/`parent`/`static` after php-cfg rewrite (#31729).
      *
      * Class methods already lower `self`/`parent` to the FQCN; trait bodies keep the
-     * keyword. Do not walk {@see Operand::$original} — a rewritten Literal('CI') may
+     * keyword. `static` stays the keyword in class and trait methods (late bind).
+     * Do not walk {@see Operand::$original} — a rewritten Literal('CI') may
      * still carry a Name('self') from the parser.
      *
      * @return null|'parent'|'self'|'static'
