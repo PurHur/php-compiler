@@ -66,6 +66,12 @@ final class JitDomXPathQueryUserScript
             return self::boxNodeList($context, $nsCount);
         }
 
+        // Relative `.` / `.//tag` with context node (#20257 / #31738) — avoid AOT context ABI.
+        $relative = self::tryRelativeCompileTime($context, $xml, $exprLit);
+        if (null !== $relative) {
+            return $relative;
+        }
+
         // //tag[@attr='v'|N]/@name — predicate then attribute axis (#21148, #24333).
         if (preg_match(
             '~^//([*\w][\w:-]*)\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\]/@([\w.-]+)$~',
@@ -191,6 +197,50 @@ final class JitDomXPathQueryUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /**
+     * Compile-time relative location paths from documentElement context (#20257 / #31738).
+     */
+    private static function tryRelativeCompileTime(Context $context, string $xml, string $exprLit): ?Value
+    {
+        $trimmed = trim($exprLit);
+        if ('.' === $trimmed) {
+            // Self axis from documentElement — cache root so item(0) is not firstChild (#31738).
+            if (!preg_match('~<[?]xml[^>]*>\s*<([A-Za-z_][\w:.-]*)~', $xml, $rootMatch)
+                && !preg_match('~^\s*<([A-Za-z_][\w:.-]*)~', $xml, $rootMatch)
+            ) {
+                return null;
+            }
+            $rootName = $rootMatch[1];
+            self::$lastCacheKey = 'xpath-self-dot';
+            self::$lastQueryTag = null;
+            $element = JitDomCreateElement::materializeElementWithTextContent($context, $rootName, '');
+            $cacheKey = $context->builder->load(
+                $context->constantStringFromString(self::$lastCacheKey)
+            );
+            $nullDoc = $context->getTypeFromString('__object__*')->constNull();
+            DomUserScriptElementCacheLlvm::store($context, $nullDoc, $cacheKey, $element);
+
+            return self::boxNodeList($context, 1);
+        }
+        if (!preg_match('~^\.//([*\w][\w:-]*)$~', $trimmed, $matches)) {
+            return null;
+        }
+        $tag = $matches[1];
+        $registeredNs = self::registeredNamespaces();
+        $count = DomParseSimpleXmlJitHelper::countXPathNameTestArgv($xml, $tag, $registeredNs);
+        if (null === $count) {
+            $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+        }
+        if (null === $count) {
+            return null;
+        }
+        self::$lastCacheKey = null;
+        self::$lastQueryTag = false === strpos($tag, ':') ? strtolower($tag) : null;
+        DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count, true);
+
+        return self::boxNodeList($context, $count);
     }
 
     /**
