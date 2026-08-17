@@ -1330,13 +1330,17 @@ final class RecursiveIteratorIteratorSetMaxDepth extends VmClassMethod
             'RecursiveIteratorIterator::setMaxDepth()'
         );
         // php-src zim_RecursiveIteratorIterator_setMaxDepth — optional max_depth; at most 1 (#30956).
+        // Z_PARAM_LONG when present — null soft-deprecates to 0 (#31695).
         $this->requireUserArgCountRange($frame, 'RecursiveIteratorIterator::setMaxDepth', 0, 1);
         $maxDepth = -1;
         if (isset($frame->calledArgs[1])) {
-            $arg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER === $arg->type) {
-                $maxDepth = $arg->toInt();
-            }
+            $maxDepth = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
+                'RecursiveIteratorIterator::setMaxDepth',
+                1,
+                'maxDepth'
+            );
         }
         SplDualIteratorStorage::setMaxDepth($object, $maxDepth);
     }
