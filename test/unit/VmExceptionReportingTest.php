@@ -126,6 +126,68 @@ PHP
         $this->assertStringNotContainsString('ExceptionSupport.php', $stdout);
     }
 
+    /** @covers issue #31859 */
+    public function testCaughtTypedPropertyErrorsReportUserSite(): void
+    {
+        $stdout = $this->runVmCliStdout(<<<'PHP'
+<?php
+function show(string $label, Throwable $e): void {
+    $f = $e->getFile();
+    echo $label, '|', ($f === '' ? '(empty)' : basename($f)), ':', $e->getLine(), "\n";
+}
+class T1 { public int $x; }
+try { echo (new T1)->x; } catch (Throwable $e) { show('typed-read', $e); }
+class T2 { public static int $x; }
+try { echo T2::$x; } catch (Throwable $e) { show('typed-static-read', $e); }
+class T3 { public static $x = 1; }
+try { unset(T3::$x); } catch (Throwable $e) { show('unset-static', $e); }
+class T8 { public int $x; }
+$o8 = new T8;
+try { $r = &$o8->x; } catch (Throwable $e) { show('byref-typed', $e); }
+PHP
+            , 'typed_prop_error_getfile.php');
+        $this->assertStringContainsString('typed-read|typed_prop_error_getfile.php:7', $stdout);
+        $this->assertStringContainsString('typed-static-read|typed_prop_error_getfile.php:9', $stdout);
+        $this->assertStringContainsString('unset-static|typed_prop_error_getfile.php:11', $stdout);
+        $this->assertStringContainsString('byref-typed|typed_prop_error_getfile.php:14', $stdout);
+        $this->assertStringNotContainsString('(empty)', $stdout);
+    }
+
+    private function runVmCliStdout(string $code, ?string $basename = null): string
+    {
+        $bin = realpath(__DIR__ . '/../../bin/vm.php');
+        $this->assertNotFalse($bin);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_vm_exc_');
+        $this->assertNotFalse($tmp);
+        $script = $tmp . '.php';
+        rename($tmp, $script);
+        if (null !== $basename) {
+            $named = dirname($script) . '/' . $basename;
+            rename($script, $named);
+            $script = $named;
+        }
+        file_put_contents($script, $code);
+        $php = getenv('PHP_COMPILER_PHP') ?: PHP_BINARY;
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open([$php, $bin, $script], $descriptor, $pipes, dirname(__DIR__, 2));
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($script);
+        $this->assertSame(0, $exit);
+        $this->assertIsString($stdout);
+
+        return $stdout;
+    }
+
     private function runVmCliFile(string $code, ?string $basename = null): string
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');

@@ -4471,6 +4471,10 @@ class VM {
 
     /**
      * Build a catchable VM Error object for engine-thrown failures (#3429).
+     *
+     * When an opcode is executing, stamp user file/line like zend_throw_exception
+     * so caught Errors (typed-property reads, by-ref fetch, …) match Zend getFile()/getLine()
+     * (#31859, zend_exceptions.c / zend_object_handlers.c).
      */
     public function makeEngineError(string $message, string $className = 'Error'): Variable
     {
@@ -4481,6 +4485,12 @@ class VM {
         $obj = new ObjectEntry($this->context->classes[$lc]);
         $obj->constructed = true;
         $obj->getProperty('message')->string($message);
+        // php-src zend_throw_exception / zend_exception_get_props: default code is 0.
+        $obj->getProperty(VM\ExceptionSupport::PROP_CODE)->int(0);
+        if (null !== $this->executingFrame) {
+            [$file, $line] = VM\ExceptionSupport::userFatalSite($this->executingFrame);
+            VM\ExceptionSupport::stampThrowableSite($obj, $file, $line);
+        }
         $thrown = new Variable();
         $thrown->object($obj);
 
@@ -15855,6 +15865,9 @@ restart:
     /**
      * Reject unset() on static properties (Zend zend_std_unset_static_property).
      * Typed (#6648) and untyped (#23691) both Error; hook raw-writes may clear backing.
+     *
+     * Route through {@see dispatchVmError} so getFile()/getLine() stamp the user unset site
+     * (#31859, zend_object_handlers.c).
      */
     private function enforceStaticPropertyUnset(
         string $classLc,
@@ -15865,17 +15878,11 @@ restart:
             return null;
         }
         $className = $this->context->classes[$classLc]->name ?? $classLc;
-        $thrown = VM\BuiltinExceptionSupport::materializeError(
-            $this->context,
-            sprintf('Attempt to unset static property %s::$%s', $className, $propNameRaw)
-        );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchVmError(
+            sprintf('Attempt to unset static property %s::$%s', $className, $propNameRaw),
+            $frame
+        );
     }
 
     /** Reject unset() on virtual hooked static properties without an unset hook (#6425, #6491, #26373). */
