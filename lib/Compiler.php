@@ -6081,6 +6081,103 @@ class Compiler {
     }
 
     /**
+     * PropertyFetch → ArrayDimFetch → isset/empty/?? — quiet FETCH_OBJ_IS (#31783).
+     */
+    private function isPropertyFetchPreludeForDimIssetEmptyOrCoalesce(
+        Op\Expr\PropertyFetch $fetch,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $ops = $block->orig->children;
+        $index = array_search($fetch, $ops, true);
+        if (!is_int($index)) {
+            return false;
+        }
+
+        return $this->propertyOrStaticFetchResultFeedsDimIssetEmptyOrCoalesce(
+            $fetch->result,
+            $ops,
+            $index,
+            $block
+        );
+    }
+
+    /**
+     * StaticPropertyFetch → ArrayDimFetch → isset/empty/?? — FETCH_STATIC_PROP_IS (#31783).
+     */
+    private function isStaticPropertyFetchPreludeForDimIssetEmptyOrCoalesce(
+        Op\Expr\StaticPropertyFetch $fetch,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $ops = $block->orig->children;
+        $index = array_search($fetch, $ops, true);
+        if (!is_int($index)) {
+            return false;
+        }
+
+        return $this->propertyOrStaticFetchResultFeedsDimIssetEmptyOrCoalesce(
+            $fetch->result,
+            $ops,
+            $index,
+            $block
+        );
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function propertyOrStaticFetchResultFeedsDimIssetEmptyOrCoalesce(
+        ?Operand $fetchResult,
+        array $ops,
+        int $index,
+        Block $block
+    ): bool {
+        if (null === $fetchResult) {
+            return false;
+        }
+        $opCount = count($ops);
+        for ($j = $index + 1; $j < $opCount; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\ArrayDimFetch) {
+                if (!$this->operandsChainEqual($next->var, $fetchResult)) {
+                    // Sibling dim before a later consumer — keep scanning (#24250).
+                    continue;
+                }
+                if ($this->isArrayDimFetchSkippedForIssetEmptyOrUnset($next, $ops, $j, $block)) {
+                    return true;
+                }
+                if ($this->isArrayDimFetchSkippedForCoalesce($next, $ops, $j, $block)) {
+                    return true;
+                }
+                if (null !== $this->findCoalesceUsingArrayDimFetchLeft($next, $ops, $j)) {
+                    return true;
+                }
+
+                return false;
+            }
+            if (
+                $next instanceof Op\Expr\PropertyFetch
+                || $next instanceof Op\Expr\StaticPropertyFetch
+                || $next instanceof Op\Expr\ArrayDimFetch
+            ) {
+                continue;
+            }
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg emits StaticPropertyFetch as its own stmt before Isset_; skip duplicate lowering (#15112).
      */
     private function isStaticPropertyFetchOnlyIssetVar(
@@ -13961,12 +14058,18 @@ class Compiler {
             case Op\Expr\ClassConstFetch::class:
                 return $this->compileClassConstFetch($expr, $block);
             case Op\Expr\StaticPropertyFetch::class:
-                return [new OpCode(
+                $staticFetchOp = new OpCode(
                     OpCode::TYPE_STATIC_PROPERTY_FETCH,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->class, $block, true),
                     $this->compileStaticPropertyNameSlot($expr->name, $expr->class, $block)
-                )];
+                );
+                // isset/empty/?? on dim of Class::$prop — FETCH_STATIC_PROP_IS (#31783).
+                if ($this->isStaticPropertyFetchPreludeForDimIssetEmptyOrCoalesce($expr, $block)) {
+                    $staticFetchOp->propertyHookCoalesceRead = true;
+                }
+
+                return [$staticFetchOp];
             case Op\Expr\FirstClassCallable::class:
                 return $this->compileFirstClassCallable($expr, $block);
             case Op\Expr\FuncCall::class:
@@ -14140,6 +14243,13 @@ class Compiler {
                 );
                 // Zend attributes dynamic-property E_DEPRECATED to the fetch/write site (#21953).
                 $this->assignSourceMetadata($fetchOp, $expr);
+                // isset/empty/?? on dim of $obj->prop — FETCH_OBJ_IS (#31783, zend_object_handlers.c).
+                if (
+                    !$propForWrite
+                    && $this->isPropertyFetchPreludeForDimIssetEmptyOrCoalesce($expr, $block)
+                ) {
+                    $fetchOp->propertyHookCoalesceRead = true;
+                }
 
                 return [$fetchOp];
             case Op\Expr\Array_::class:
