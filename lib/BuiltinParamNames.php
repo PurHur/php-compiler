@@ -53,6 +53,8 @@ final class BuiltinParamNames
             'pdo::connect' => ['dsn', 'username=', 'password=', 'options='],
             // php-src ext/soap/soap.stub.php — InternalArgInfo omits location; one_way→oneWay (#31568)
             'soapclient::__dorequest' => ['request', 'location', 'action', 'version', 'oneWay='],
+            // php-src ext/soap/soap.stub.php — InternalArgInfo still function_name/arguments (#31873)
+            'soapclient::__soapcall' => ['name', 'args', 'options=', 'inputHeaders=', 'outputHeaders='],
             // php-src ext/mysqli/mysqli.stub.php — absent from InternalArgInfo (#27712)
             'mysqli::execute_query' => ['query', 'params='],
             'datetimezone::__construct' => ['timezone'],
@@ -760,10 +762,17 @@ final class BuiltinParamNames
                 return ['filename', 'line'];
             case 'number_format':
                 return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says number (#23259)
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says number (#23259, #27795)
             case 'abs':
             case 'floor':
             case 'ceil':
+            case 'deg2rad':
+            case 'rad2deg':
+            case 'expm1':
+            case 'log1p':
+            case 'asinh':
+            case 'acosh':
+            case 'atanh':
                 return ['num'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still base/number/x (#23306)
             case 'pow':
@@ -2120,6 +2129,9 @@ final class BuiltinParamNames
             // php-src ext/intl/grapheme/grapheme.stub.php — InternalArgInfo still str/start/part/extract_type (#27884)
             case 'grapheme_strlen':
                 return ['string'];
+            // php-src ext/intl/grapheme/grapheme.stub.php — PHP 8.4+; absent from InternalArgInfo (#24579)
+            case 'grapheme_str_split':
+                return ['string', 'length='];
             case 'grapheme_substr':
                 return ['string', 'offset', 'length='];
             case 'grapheme_strstr':

@@ -20,6 +20,9 @@ use PHPLLVM\Value;
 /**
  * grapheme_str_split() — split string into grapheme clusters (php-src ext/intl/grapheme; #5958).
  *
+ * Signature: grapheme_str_split(string $string, int $length = 1): array|false
+ * Reflection / named `$string`/`$length` via BuiltinInternalArgInfo + BuiltinParamNames (#24579).
+ *
  * VM: {@see VmGrapheme}; JIT: fold via {@see JitGrapheme::tryStrSplitFold}, runtime via {@see JitGraphemeStrSplit} (#5958, #6246, #19964).
  */
 final class grapheme_str_split extends Internal

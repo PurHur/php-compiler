@@ -376,6 +376,8 @@ final class BuiltinInternalArgInfo
             'grapheme_stripos',
             'grapheme_strrpos',
             'grapheme_strripos' => 'int|false',
+            // ext/intl/grapheme/grapheme.stub.php — PHP 8.4+; absent from InternalArgInfo (#24579)
+            'grapheme_str_split' => 'array|false',
             // ext/intl/php_intl.stub.php — PHP 8.5+ (#27591)
             'grapheme_levenshtein' => 'int|false',
             // ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
@@ -956,6 +958,12 @@ final class BuiltinInternalArgInfo
             'grapheme_strpos', 'grapheme_stripos', 'grapheme_strrpos', 'grapheme_strripos' => match ($index) {
                 0, 1 => 'string',
                 2 => 'int',
+                default => null,
+            },
+            // ext/intl/grapheme/grapheme.stub.php — PHP 8.4+ string $string, int $length = 1 (#24579)
+            'grapheme_str_split' => match ($index) {
+                0 => 'string',
+                1 => 'int',
                 default => null,
             },
             // ext/intl/normalizer/normalizer.stub.php — string $string, int $form = FORM_C; absent (#27705)
@@ -1964,6 +1972,13 @@ final class BuiltinInternalArgInfo
                 0, 1, 2 => 'string',
                 3 => 'int',
                 4 => 'bool',
+                default => null,
+            },
+            // ext/soap/soap.stub.php — __soapCall name/args/?array options (#31873)
+            'soapclient::__soapcall' => match ($index) {
+                0 => 'string',
+                1 => 'array',
+                2 => '?array',
                 default => null,
             },
             // ext/xmlwriter/php_xmlwriter.stub.php — PHP 8.4+ factories (#27922)

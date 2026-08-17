@@ -1481,6 +1481,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #27795 — deg2rad/rad2deg/expm1/log1p/asinh/acosh/atanh Zend $num (InternalArgInfo still number) */
+    public function testDeg2radFamilyZendStubNamedParams(): void
+    {
+        foreach (['deg2rad', 'rad2deg', 'expm1', 'log1p', 'asinh', 'acosh', 'atanh'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['num'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'number', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+        }
+    }
+
     /** @covers issue #11785 / #25166 */
     public function testDateTimeClassMethodNamedParameters(): void
     {
@@ -5067,6 +5079,31 @@ final class BuiltinParamNamesAliasTest extends TestCase
             BuiltinParamNames::forFunction('grapheme_stristr')
         );
         self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('grapheme_strpos'));
+    }
+
+    /** @covers issue #24579 — php-src ext/intl/grapheme/grapheme.stub.php PHP 8.4+ */
+    public function testGraphemeStrSplitNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('grapheme_str_split');
+        self::assertSame(['string', 'length='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'grapheme_str_split'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'grapheme_str_split'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'grapheme_str_split'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('grapheme_str_split'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('grapheme_str_split'));
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('grapheme_str_split'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('grapheme_str_split', 0));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('grapheme_str_split', 1));
+        $length = BuiltinInternalArgInfo::paramInfoForFunction('grapheme_str_split', 1);
+        self::assertNotNull($length);
+        self::assertSame('length', $length['name']);
+        self::assertSame('int', $length['type']);
+        self::assertTrue($length['isOptional']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('grapheme_str_split', 1, $length, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'grapheme_str_split', 1, $length));
+        self::assertSame(Variable::TYPE_INTEGER, $dest->type);
+        self::assertSame(1, $dest->toInt());
     }
 
     /** @covers issue #24551 */
