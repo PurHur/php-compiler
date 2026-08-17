@@ -233,7 +233,7 @@ final class VmSoapClient
             new ParameterMetadata('oneWay', [], false, true, false, false, 'bool', 'false'),
         ];
         // php-src soap.stub.php — __soapCall name/args/options/?array (#31873).
-        // inputHeaders / outputHeaders names only; by-ref + emit/parse are #31874 / #31875.
+        // inputHeaders emit #31874; outputHeaders by-ref + parse #31875.
         $entry->methodParameterMetadata['__soapcall'] = [
             new ParameterMetadata('name', [], false, false, false, false, 'string', null),
             new ParameterMetadata('args', [], false, false, false, false, 'array', null),
@@ -405,6 +405,47 @@ final class VmSoapClient
         }
 
         return [$location, $action, $callUri];
+    }
+
+    /**
+     * php-src soap_client_call_impl $inputHeaders — SoapHeader|array|null (#31874).
+     *
+     * @return list<ObjectEntry>
+     */
+    public static function parseInputHeadersArg(Variable $arg, string $label): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            return [];
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $obj = $arg->toObject();
+            if ('soapheader' !== \strtolower($obj->class->name)) {
+                throw new \TypeError(
+                    $label.': Argument #4 ($inputHeaders) must be of type SoapHeader|array|null, '
+                    .ReflectionSupport::valueTypeLabelPublic($arg).' given'
+                );
+            }
+
+            return [$obj];
+        }
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                $label.': Argument #4 ($inputHeaders) must be of type SoapHeader|array|null, '
+                .ReflectionSupport::valueTypeLabelPublic($arg).' given'
+            );
+        }
+        $headers = [];
+        foreach ($arg->toArray()->iterateKeyed(false) as $pair) {
+            $v = $pair[1]->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $v->type || 'soapheader' !== \strtolower($v->toObject()->class->name)) {
+                // php-src verify_soap_headers_array — E_ERROR "Invalid SOAP header"
+                throw new \Error('Invalid SOAP header');
+            }
+            $headers[] = $v->toObject();
+        }
+
+        return $headers;
     }
 
     /**
@@ -761,6 +802,7 @@ final class VmSoapClient
 
     /**
      * @param array<string, mixed>|null $callOptions php-src __soapCall $options (location/soapaction/uri) (#31873)
+     * @param list<ObjectEntry>         $inputHeaders per-call SoapHeaders merged ahead of defaults (#31874)
      */
     public static function soapCall(
         ObjectEntry $object,
@@ -768,12 +810,13 @@ final class VmSoapClient
         array $arguments,
         Context $ctx,
         Frame $frame,
-        ?array $callOptions = null
+        ?array $callOptions = null,
+        array $inputHeaders = []
     ): Variable {
         $state = self::state($object);
         try {
             [$location, $action, $callUri] = self::resolveCallOptions($state, $name, $callOptions);
-            $request = self::buildRequest($state, $name, $arguments, $ctx, $callUri);
+            $request = self::buildRequest($state, $name, $arguments, $ctx, $callUri, $inputHeaders);
             $state->lastRequest = $request;
 
             $response = self::doRequest($object, $request, $location, $action, $state->soapVersion, $frame);
@@ -2229,13 +2272,15 @@ final class VmSoapClient
 
     /**
      * @param list<mixed> $arguments
+     * @param list<ObjectEntry> $inputHeaders
      */
     private static function buildRequest(
         SoapClientState $state,
         string $name,
         array $arguments,
         ?Context $ctx = null,
-        ?string $callUri = null
+        ?string $callUri = null,
+        array $inputHeaders = []
     ): string {
         $ns = (null !== $callUri && '' !== $callUri)
             ? $callUri
@@ -2284,9 +2329,13 @@ final class VmSoapClient
         }
 
         $headerXml = '';
-        if ($state->soapHeaders !== []) {
+        $headers = $inputHeaders;
+        foreach ($state->soapHeaders as $hdr) {
+            $headers[] = $hdr;
+        }
+        if ($headers !== []) {
             $headerXml = '  <'.$prefix.':Header>'."\n";
-            foreach ($state->soapHeaders as $hdr) {
+            foreach ($headers as $hdr) {
                 $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix);
             }
             $headerXml .= '  </'.$prefix.':Header>'."\n";
@@ -3583,7 +3632,22 @@ final class SoapClientSoapCall extends SoapClassMethod
                 $callOptions = \is_array($exported) ? $exported : [];
             }
         }
-        $result = VmSoapClient::soapCall($receiver, $name, $arguments, $frame->vmContext, $frame, $callOptions);
+        $inputHeaders = [];
+        if ($argc >= 5) {
+            $inputHeaders = VmSoapClient::parseInputHeadersArg(
+                $frame->calledArgs[4],
+                'SoapClient::__soapCall'
+            );
+        }
+        $result = VmSoapClient::soapCall(
+            $receiver,
+            $name,
+            $arguments,
+            $frame->vmContext,
+            $frame,
+            $callOptions,
+            $inputHeaders
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);
         }
