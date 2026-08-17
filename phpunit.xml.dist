@@ -529,6 +529,8 @@
             <file>./test/compliance/CollatorGetSortKeyNamed28785JITTest.php</file>
             <file>./test/compliance/IntlCalendarCreateInstanceNamed28482VMTest.php</file>
             <file>./test/compliance/IntlCalendarCreateInstanceNamed28482JITTest.php</file>
+            <file>./test/compliance/IntlcalCreateInstanceNamed27944VMTest.php</file>
+            <file>./test/compliance/IntlcalCreateInstanceNamed27944JITTest.php</file>
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorVMTest.php</file>
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorJITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
