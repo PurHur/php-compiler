@@ -361,6 +361,8 @@ final class BuiltinInternalArgInfo
             'grapheme_strripos' => 'int|false',
             // ext/intl/php_intl.stub.php — PHP 8.5+ (#27591)
             'grapheme_levenshtein' => 'int|false',
+            // ext/intl/normalizer/normalizer.stub.php — absent from InternalArgInfo (#27705)
+            'normalizer_get_raw_decomposition' => '?string',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
             'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
@@ -864,6 +866,12 @@ final class BuiltinInternalArgInfo
             'grapheme_strpos', 'grapheme_stripos', 'grapheme_strrpos', 'grapheme_strripos' => match ($index) {
                 0, 1 => 'string',
                 2 => 'int',
+                default => null,
+            },
+            // ext/intl/normalizer/normalizer.stub.php — string $string, int $form = FORM_C; absent (#27705)
+            'normalizer_get_raw_decomposition' => match ($index) {
+                0 => 'string',
+                1 => 'int',
                 default => null,
             },
             // ext/intl/php_intl.stub.php — PHP 8.5+ costs + locale (#27591)

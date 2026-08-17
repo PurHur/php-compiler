@@ -15,6 +15,8 @@ use PHPLLVM\Value;
  * normalizer_get_raw_decomposition() — UCD Decomposition_Mapping (#19535).
  *
  * php-src: ext/intl/normalizer — alias of Normalizer::getRawDecomposition().
+ * Reflection stub: string $string, int $form = FORM_C → ?string (#27705; normalizer.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
  */
 final class normalizer_get_raw_decomposition extends Internal
 {

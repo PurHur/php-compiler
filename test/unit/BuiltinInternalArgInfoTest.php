@@ -1046,6 +1046,42 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('error_code', $share['name']);
     }
 
+    /** php-src normalizer.stub.php — string/form → ?string; absent from InternalArgInfo (#27705). */
+    public function testNormalizerGetRawDecompositionReflectionStubTypes(): void
+    {
+        $fn = 'normalizer_get_raw_decomposition';
+        $this->assertSame('?string', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+        $string = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+        $this->assertNotNull($string);
+        $this->assertSame('string', $string['type']);
+        $this->assertSame('string', $string['name']);
+        $this->assertFalse($string['isOptional']);
+        $form = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+        $this->assertNotNull($form);
+        $this->assertSame('int', $form['type']);
+        $this->assertSame('form', $form['name']);
+        $this->assertTrue($form['isOptional']);
+        $this->assertSame(['string', 'form='], BuiltinParamNames::forFunction($fn));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'string',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'form',
+            $fn
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction($fn),
+            'input',
+            $fn
+        ));
+        $this->assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+    }
+
     /** php-src ext/sysvshm/sysvshm.stub.php — SysvSharedMemory stubs; InternalArgInfo int/untyped (#27943). */
     public function testShmAttachReflectionStubTypes(): void
     {
