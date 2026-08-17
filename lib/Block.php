@@ -1531,8 +1531,8 @@ class Block {
                     continue;
                 }
                 // Include/eval {main} must not treat caller calledArgs[0] as $this —
-                // that is a function's first user argument. TYPE_INCLUDE copies
-                // EX(This) after getFrame (ZEND_INCLUDE_OR_EVAL, #31903).
+                // that is a function's first user argument. TYPE_EVAL / TYPE_INCLUDE copy
+                // EX(This) after getFrame (ZEND_INCLUDE_OR_EVAL, #31902 / #31903).
                 if ($enteringFromOtherFunc && $this->isMainScript()) {
                     $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                     continue;

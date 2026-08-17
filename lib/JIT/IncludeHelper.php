@@ -330,7 +330,7 @@ final class IncludeHelper
     }
 
     /**
-     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the inlined {main} (#31903).
+     * ZEND_INCLUDE_OR_EVAL copies EX(This) into the inlined {main} (#31902 / #31903).
      *
      * Alias inlined {main} `$this` operands to the caller's LLVM `$this`
      * (KIND_VALUE `__object__*`). Static / file-scope callers have no bound `$this`.
