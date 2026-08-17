@@ -445,6 +445,14 @@ final class SplDoublyLinkedListBuiltin
 
     public static function offsetSet(ObjectEntry $object, Variable $offset, Variable $value): void
     {
+        // php-src spl_dllist_object_write_dimension / zim_SplDoublyLinkedList_offsetSet —
+        // null index (incl. $list[]=) appends via push; no E_DEPRECATED (#31731).
+        $resolved = $offset->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            self::push($object, $value);
+
+            return;
+        }
         $index = self::coerceIndex($offset, 'offsetSet', true);
         $count = \count(self::state($object));
         if ($index < 0 || $index >= $count) {
