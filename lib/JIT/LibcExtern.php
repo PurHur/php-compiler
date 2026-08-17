@@ -29,7 +29,9 @@ final class LibcExtern
             'realloc' => [$i8p, false, [$i8p, $sizeT]],
             'free' => [$void, false, [$i8p]],
             'memcpy' => [$i8p, false, [$i8p, $i8p, $sizeT]],
-            'memmove' => [$i8p, false, [$i8p, $i8p, $sizeT]],
+            // memmove dropped (#31743): JitParseStrUserScriptCstrKernel::ensureLibc declares
+            // memmove(3) module-locally (sole NestedJIT lookupFunction consumer); EMBED MCJIT
+            // still gets implementMemmoveBody after ensureMemmoveDecl (#98 / #21109).
             'memset' => [$i8p, false, [$i8p, $i32, $sizeT]],
             'memcmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
             // memchr dropped (#31655): JitTempnamKernel::ensureLibc declares memchr(3)
@@ -276,8 +278,35 @@ final class LibcExtern
         $context->registerFunction('memcpy', $fn);
     }
 
+    /**
+     * Module-local memmove(3) after LibcExtern always-on drop (#31743).
+     *
+     * EMBED MCJIT still needs a declared symbol before {@see implementMemmoveBody};
+     * NestedJIT parse_str also calls this via ensureLibc before lookup.
+     */
+    public static function ensureMemmoveDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('memmove');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->getNamedFunction('memmove');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'memmove',
+                $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)
+            );
+        }
+        $context->registerFunction('memmove', $fn);
+    }
+
     private static function implementMemmoveBody(Context $context): void
     {
+        self::ensureMemmoveDecl($context);
         $fn = $context->module->getNamedFunction('memmove');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;
