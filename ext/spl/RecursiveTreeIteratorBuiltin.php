@@ -475,14 +475,16 @@ final class RecursiveTreeIteratorSetPrefixPart extends VmClassMethod
                 'RecursiveTreeIterator::setPrefixPart(): Argument #1 ($part) must be a RecursiveTreeIterator::PREFIX_* constant'
             );
         }
-        $prefixArg = $frame->calledArgs[2]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $prefixArg->type) {
-            throw new \TypeError(
-                'RecursiveTreeIterator::setPrefixPart(): Argument #2 ($prefix) must be of type string, '
-                .SplTreeIteratorArg::typeLabel($prefixArg).' given'
-            );
-        }
-        SplTreeIteratorStorage::setPrefixPart($object, $partInt, $prefixArg->toString());
+        // php-src Z_PARAM_STR $value — soft-null DEP (#31806); Zend names the param $value.
+        $prefix = VmString::stringBuiltinArgForFrame(
+            $frame,
+            2,
+            'RecursiveTreeIterator::setPrefixPart',
+            1,
+            'value',
+            false
+        );
+        SplTreeIteratorStorage::setPrefixPart($object, $partInt, $prefix);
     }
 }
 
