@@ -36,6 +36,8 @@ final class JitGethostnameKernel
         LibcExtern::register($context);
         // Module-local open/close/read after LibcExtern always-on drop (#31817).
         LibcExtern::ensurePosixFd($context);
+        // Module-local memset(3) after LibcExtern always-on drop (#31863).
+        LibcExtern::ensureMemsetDecl($context);
 
         $fn = $context->builder->getInsertBlock()->getParent();
         $i8 = $context->getTypeFromString('int8');

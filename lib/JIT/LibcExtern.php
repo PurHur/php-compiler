@@ -32,7 +32,10 @@ final class LibcExtern
             // memmove dropped (#31743): JitParseStrUserScriptCstrKernel::ensureLibc declares
             // memmove(3) module-locally (sole NestedJIT lookupFunction consumer); EMBED MCJIT
             // still gets implementMemmoveBody after ensureMemmoveDecl (#98 / #21109).
-            'memset' => [$i8p, false, [$i8p, $i32, $sizeT]],
+            // memset dropped (#31863): NestedJIT leaves (JitFsGlobKernel / JitGethostnameKernel /
+            // JitGcCollectCyclesStandaloneKernel / StringZlibJit) call ensureMemsetDecl before
+            // lookup; EMBED MCJIT still gets implementMemsetBody after ensureMemsetDecl
+            // (#98 / #21109). Peer memmove drop (#31743).
             'memcmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
             // memchr dropped (#31655): JitTempnamKernel::ensureLibc declares memchr(3)
             // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
@@ -289,8 +292,37 @@ final class LibcExtern
         unset($i32);
     }
 
+    /**
+     * Module-local memset(3) after LibcExtern always-on drop (#31863).
+     *
+     * EMBED MCJIT still needs a declared symbol before {@see implementMemsetBody};
+     * NestedJIT FS/zlib/GC leaves call this before lookupFunction('memset').
+     * Peer: ensureMemmoveDecl (#31743).
+     */
+    public static function ensureMemsetDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('memset');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->getNamedFunction('memset');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'memset',
+                $context->context->functionType($i8p, false, $i8p, $i32, $sizeT)
+            );
+        }
+        $context->registerFunction('memset', $fn);
+    }
+
     private static function implementMemsetBody(Context $context): void
     {
+        self::ensureMemsetDecl($context);
         $fn = $context->module->getNamedFunction('memset');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;

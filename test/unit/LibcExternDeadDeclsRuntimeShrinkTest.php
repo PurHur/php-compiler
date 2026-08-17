@@ -76,6 +76,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'read',
             'write',
             'strncmp',
+            'memset',
         ];
     }
 
@@ -86,7 +87,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -110,7 +111,9 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31787', $source);
         $this->assertStringContainsString('#31817', $source);
         $this->assertStringContainsString('#31839', $source);
+        $this->assertStringContainsString('#31863', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
+        $this->assertStringContainsString('ensureMemsetDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
     }
@@ -322,6 +325,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strncmp (#31839)'
         );
+        $this->assertStringNotContainsString(
+            "'memset' =>",
+            $source,
+            'LibcExtern must not declare libc memset (#31863)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
@@ -330,8 +338,10 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31787', $source);
         $this->assertStringContainsString('#31817', $source);
         $this->assertStringContainsString('#31839', $source);
+        $this->assertStringContainsString('#31863', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
+        $this->assertStringContainsString('ensureMemsetDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
     }
@@ -433,6 +443,28 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LibcExtern::ensureMemmoveDecl', $source);
         $this->assertStringContainsString("lookupFunction('memmove')", $source);
         $this->assertStringNotContainsString("'memmove' =>", (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php'));
+    }
+
+    public function testNestedJitConsumersEnsureMemsetDeclAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'ext/standard/JitFsGlobKernel.php',
+            'ext/standard/JitGethostnameKernel.php',
+            'ext/standard/JitGcCollectCyclesStandaloneKernel.php',
+            'lib/JIT/Builtin/StringZlibJit.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensureMemsetDecl',
+                $source,
+                "{$rel} must call LibcExtern::ensureMemsetDecl after #31863"
+            );
+            $this->assertStringContainsString('#31863', $source);
+        }
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringContainsString('ensureMemsetDecl', $libc);
+        $this->assertStringContainsString('#31863', $libc);
+        $this->assertStringNotContainsString("'memset' =>", $libc);
     }
 
     public function testNestedJitConsumersLookupCompilerStrcasecmpAfterLibcExternDrop(): void

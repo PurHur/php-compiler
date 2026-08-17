@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -127,7 +128,9 @@ final class JitFsGlobKernel
         // glob/scandir + module-local stat(2) after LibcExtern/Module always-on drop (#31403).
         // strdup(3) after always-on LibcExtern drop (#31534) — still required by emitGlobVec /
         // emitScandirVec (#31721 AOT FilesystemIterator/GlobIterator).
-        // malloc/free/memset/strcmp still come from LibcExtern (i8*).
+        // memset(3) after always-on LibcExtern drop (#31863); malloc/free/strcmp still come
+        // from LibcExtern (i8*).
+        LibcExtern::ensureMemsetDecl($context);
         foreach ([
             ['glob', $i32, [$i8p, $i32, $i8p, $i8p]],
             ['globfree', $voidTy, [$i8p]],

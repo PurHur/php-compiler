@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -333,6 +334,8 @@ final class JitGcCollectCyclesStandaloneKernel
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($init);
+        // Module-local memset(3) after LibcExtern always-on drop (#31863).
+        LibcExtern::ensureMemsetDecl($context);
         $countExt = $context->builder->zext($count, $sizeT);
         $markedBase = GcCollectCyclesRuntime::standaloneGlobalPtr($context, GcCollectCyclesRuntime::G_MARKED, $i8);
         $inboundBase = GcCollectCyclesRuntime::standaloneGlobalPtr($context, GcCollectCyclesRuntime::G_INBOUND, $i32);
