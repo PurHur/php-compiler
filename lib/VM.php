@@ -6677,11 +6677,17 @@ restart:
                                 }
                             }
                         } else {
-                            $className = VM\InstanceOfClassName::resolveClassName($frame->scope[$op->arg3]);
+                            $keyword = $op->instanceofScopeKeyword;
+                            if (null !== $keyword && '' !== $keyword) {
+                                // Trait `instanceof self` → composing class (#31729, zend_inheritance.c).
+                                $className = $this->resolveClassScopeName($keyword, $frame);
+                            } else {
+                                $className = VM\InstanceOfClassName::resolveClassName($frame->scope[$op->arg3]);
+                            }
                             $matches = $this->valueInstanceOfClassName($value, $className);
                         }
                         $frame->scope[$op->arg1]->bool($matches);
-                    } catch (\Error $e) {
+                    } catch (\Error|\LogicException $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;

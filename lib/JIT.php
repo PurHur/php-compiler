@@ -9967,6 +9967,17 @@ class JIT {
                         $this->assignOperand($block->getOperand($op->arg1), $result);
                         break;
                     }
+                    $keyword = $op->instanceofScopeKeyword;
+                    if (null !== $keyword && '' !== $keyword) {
+                        // Trait flatten compiles this block with traitComposingClassName set (#31729).
+                        $resolved = $this->resolveJitStaticScopeClass(
+                            $block,
+                            new Operand\Literal($keyword)
+                        );
+                        $result = $this->context->type->object->emitInstanceOf($expr, $resolved);
+                        $this->assignOperand($block->getOperand($op->arg1), $result);
+                        break;
+                    }
                     $result = JIT\InstanceOfHelper::emit(
                         $this->context,
                         $expr,
