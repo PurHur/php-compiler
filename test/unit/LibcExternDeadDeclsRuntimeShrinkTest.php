@@ -534,11 +534,19 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'lib/JIT/Builtin/PackArgvSerialize.php',
         ] as $rel) {
             $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
-            $this->assertStringContainsString(
-                'LibcExtern::ensureMemcpyDecl',
-                $source,
-                "{$rel} must call LibcExtern::ensureMemcpyDecl after #31885"
-            );
+            if ('lib/JIT/Builtin/PackArgvSerialize.php' === $rel) {
+                $this->assertTrue(
+                    str_contains($source, 'LibcExtern::ensureMemcpyDecl')
+                    || str_contains($source, 'LibcExtern::ensureMemcpyImplemented'),
+                    "{$rel} must call LibcExtern memcpy helper after #31885"
+                );
+            } else {
+                $this->assertStringContainsString(
+                    'LibcExtern::ensureMemcpyDecl',
+                    $source,
+                    "{$rel} must call LibcExtern::ensureMemcpyDecl after #31885"
+                );
+            }
             $this->assertStringContainsString('#31885', $source);
         }
         $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');

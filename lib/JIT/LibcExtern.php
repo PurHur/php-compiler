@@ -423,6 +423,19 @@ final class LibcExtern
         $context->registerFunction('memcpy', $fn);
     }
 
+    /**
+     * Decl + module-local body for thin AOT (#31963).
+     *
+     * {@see ensureMemcpyDecl} alone leaves a body-less symbol that wins at link time;
+     * {@see PackArgvSerialize} then SIGSEGVs packing argv for sprintf/printf/number_format.
+     * EMBED MCJIT already gets this via {@see implementMcjitMemBodies}; standalone AOT must
+     * opt in at call sites that emit memcpy IR (peer memset {@see ensureMemsetDecl} + body).
+     */
+    public static function ensureMemcpyImplemented(Context $context): void
+    {
+        self::implementMemcpyBody($context);
+    }
+
     private static function implementMemcpyBody(Context $context): void
     {
         self::ensureMemcpyDecl($context);

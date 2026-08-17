@@ -50,6 +50,56 @@ final class ZendDoubleStringRuntime
         );
     }
 
+    /** serialize() wire `d:…;` without NestedJIT float cast (#31963). */
+    public static function formatSerializeWire(Context $context, Value $doubleVal): Value
+    {
+        self::ensureSerializeWireLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_zend_serialize_double'),
+            $doubleVal
+        );
+    }
+
+    public static function ensureSerializeWireLinked(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_zend_serialize_double');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__compiler_zend_serialize_double', $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureDecls($context);
+
+        $double = $context->getTypeFromString('double');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                '__compiler_zend_serialize_double',
+                $context->context->functionType($strPtr, false, $double)
+            );
+        $entry = $fn->appendBasicBlock('zend_ser_double_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            self::snprintfCall($context, $fn->getParam(0), 'd:%.16g;', null)
+        );
+        $context->registerFunction('__compiler_zend_serialize_double', $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
     private static function implement(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {

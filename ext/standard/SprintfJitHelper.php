@@ -484,8 +484,18 @@ final class SprintfJitHelper
                     ++$pos;
                 }
             }
+            $precision = null;
             if ($pos < $fmtLen && '.' === $format[$pos]) {
-                return null;
+                ++$pos;
+                if ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    $precision = 0;
+                    while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                        $precision = ($precision * 10) + self::digitValue($format[$pos]);
+                        ++$pos;
+                    }
+                } else {
+                    $precision = 0;
+                }
             }
             if ($pos >= $fmtLen) {
                 self::throwIncompletePercent($packedArgs, $packLen, $argIdx + 1);
@@ -548,6 +558,30 @@ final class SprintfJitHelper
                 }
                 continue;
             }
+            if ('f' === $spec || 'F' === $spec) {
+                $dbl = self::readPackedDoubleAtOffset($packedArgs, $packLen, $cursor);
+                if (null === $dbl) {
+                    return null;
+                }
+                $size = self::packedArgByteSizeAtOffset($packedArgs, $packLen, $cursor);
+                if (null === $size) {
+                    return null;
+                }
+                $k = 0;
+                while ($k < $size) {
+                    ++$cursor;
+                    ++$k;
+                }
+                ++$argIdx;
+                $prec = null !== $precision ? $precision : 6;
+                $formatted = self::formatSprintfFWire($dbl, $prec);
+                if (null !== $width) {
+                    $out .= self::padLeftSpaces($formatted, $width);
+                } else {
+                    $out .= $formatted;
+                }
+                continue;
+            }
 
             return null;
         }
@@ -588,6 +622,36 @@ final class SprintfJitHelper
         }
 
         return $n;
+    }
+
+    /** NestedJIT-safe packed IEEE754 double read (TAG_DOUBLE=2 + 8 LE bytes, #31963). */
+    private static function readPackedDoubleAtOffset(string $packed, int $packLen, int $offset): ?float
+    {
+        if ($offset >= $packLen) {
+            return null;
+        }
+        $p = 0;
+        while ($p < $offset) {
+            ++$p;
+        }
+        if (!self::isByte($packed[$p], 2)) {
+            return null;
+        }
+        if ($offset + 9 > $packLen) {
+            return null;
+        }
+        ++$p;
+        $bytes = '';
+        $i = 0;
+        while ($i < 8) {
+            $bytes .= $packed[$p];
+            ++$p;
+            ++$i;
+        }
+
+        $decoded = unpack('d', $bytes);
+
+        return false === $decoded ? null : (float) $decoded[1];
     }
 
     private static function packedArgByteSizeAtOffset(string $packed, int $packLen, int $offset): ?int
@@ -1378,5 +1442,79 @@ final class SprintfJitHelper
             248 => "\xf8", 249 => "\xf9", 250 => "\xfa", 251 => "\xfb", 252 => "\xfc", 253 => "\xfd",
             254 => "\xfe", 255 => "\xff", default => "\0",
         };
+    }
+
+    /** NestedJIT same-TU %f wire — no cross-class float cast (#31963). */
+    private static function formatSprintfFWire(float $value, int $precision): string
+    {
+        if (\is_nan($value)) {
+            return 'NaN';
+        }
+        if (\is_infinite($value)) {
+            return $value > 0.0 ? 'INF' : '-INF';
+        }
+        $precision = \max(0, $precision);
+        $negative = $value < 0.0;
+        $abs = $negative ? -$value : $value;
+        if (0.0 === $abs) {
+            if ($precision > 0) {
+                return ($negative ? '-' : '').'0.'.self::repeatCharWire('0', $precision);
+            }
+
+            return $negative ? '-0' : '0';
+        }
+        $scale = 1.0;
+        $i = 0;
+        while ($i < $precision) {
+            $scale *= 10.0;
+            ++$i;
+        }
+        $scaledInt = (int) ($abs * $scale + 0.5);
+        $scaleInt = (int) $scale;
+        if ($scaleInt <= 0) {
+            $scaleInt = 1;
+        }
+        $intPart = intdiv($scaledInt, $scaleInt);
+        $fracPart = $scaledInt % $scaleInt;
+        if ($fracPart < 0) {
+            $fracPart = -$fracPart;
+        }
+        $fracDigits = self::repeatCharWire('0', $precision);
+        if ($precision > 0) {
+            $fracStr = (string) $fracPart;
+            $pad = $precision;
+            $flen = 0;
+            while (isset($fracStr[$flen])) {
+                ++$flen;
+            }
+            $pad -= $flen;
+            if ($pad > 0) {
+                $fracDigits = self::repeatCharWire('0', $pad).$fracStr;
+            } else {
+                $fracDigits = $fracStr;
+            }
+        }
+        $formatted = (string) $intPart;
+        if ($precision > 0) {
+            $formatted .= '.';
+            $formatted .= $fracDigits;
+        }
+
+        return $negative ? '-'.$formatted : $formatted;
+    }
+
+    private static function repeatCharWire(string $ch, int $n): string
+    {
+        if ($n <= 0) {
+            return '';
+        }
+        $out = '';
+        $i = 0;
+        while ($i < $n) {
+            $out .= $ch;
+            ++$i;
+        }
+
+        return $out;
     }
 }
