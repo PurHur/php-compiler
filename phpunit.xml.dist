@@ -269,6 +269,8 @@
             <file>./test/compliance/InheritedPropertyDefaults31895JITTest.php</file>
             <file>./test/compliance/DynamicPropAssignWithGetNoSet31949VMTest.php</file>
             <file>./test/compliance/DynamicPropAssignWithGetNoSet31949JITTest.php</file>
+            <file>./test/compliance/ListDestructUndefKeyLine31994VMTest.php</file>
+            <file>./test/compliance/ListDestructUndefKeyLine31994JITTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147JITTest.php</file>
             <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
