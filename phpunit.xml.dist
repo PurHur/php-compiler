@@ -333,6 +333,8 @@
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
             <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
             <file>./test/unit/IntMinModuloNegOne31968AotTest.php</file>
+            <file>./test/compliance/DomCreateElementValue32292JITTest.php</file>
+            <file>./test/unit/DomCreateElementValue32292AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>
