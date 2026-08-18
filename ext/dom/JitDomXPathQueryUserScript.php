@@ -259,11 +259,11 @@ final class JitDomXPathQueryUserScript
     {
         $trimmed = trim($exprLit);
         // Host-fold named axes / `..` (#31773), `//*[last()]` / `[position()…]` (#31923),
-        // and `@*` attribute-axis wildcards (#32003). Flattened descendant `[last()]`
-        // is wrong; user-script AOT ABI aborts on these paths.
+        // and abbreviated attribute axis `@*` / `@name` (#32003, #32032). Flattened
+        // descendant `[last()]` is wrong; user-script AOT ABI aborts on these paths.
         $positional = (bool) preg_match('~\[(?:last\(\)|position\(\))~i', $trimmed);
-        $attrStar = str_contains($trimmed, '@*');
-        if (!str_contains($trimmed, '::') && !str_contains($trimmed, '..') && !$positional && !$attrStar) {
+        $attrAxis = self::isHostFoldAttributeAxis($trimmed);
+        if (!str_contains($trimmed, '::') && !str_contains($trimmed, '..') && !$positional && !$attrAxis) {
             return null;
         }
         if (!\extension_loaded('dom') || !\class_exists(\DOMDocument::class, false)) {
@@ -304,14 +304,24 @@ final class JitDomXPathQueryUserScript
             if ($first instanceof \DOMNode) {
                 $tag = $first->nodeName;
                 if ('#document' !== $tag && '' !== $tag) {
-                    $text = $first instanceof \DOMElement ? (string) $first->textContent : '';
                     self::$lastCacheKey = 'xpath-axis-'.md5($trimmed);
-                    $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
                     $cacheKey = $context->builder->load(
                         $context->constantStringFromString(self::$lastCacheKey)
                     );
                     $nullDoc = $context->getTypeFromString('__object__*')->constNull();
-                    DomUserScriptElementCacheLlvm::store($context, $nullDoc, $cacheKey, $element);
+                    if ($first instanceof \DOMAttr) {
+                        $node = JitDomAttributeNodeNS::materializeAttrFromLiterals(
+                            $context,
+                            (string) ($first->namespaceURI ?? ''),
+                            $first->nodeName,
+                            $first->value,
+                            JitDomAttributeNodeNS::attrClassForUserScriptCache()
+                        );
+                    } else {
+                        $text = $first instanceof \DOMElement ? (string) $first->textContent : '';
+                        $node = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+                    }
+                    DomUserScriptElementCacheLlvm::store($context, $nullDoc, $cacheKey, $node);
                 }
             }
         }
@@ -401,5 +411,13 @@ final class JitDomXPathQueryUserScript
     private static function registeredNamespaces(): array
     {
         return JitDomXPathRegisterUserScript::namespaces();
+    }
+
+    /**
+     * Abbreviated XPath attribute axis (@name / @*), not predicate [@attr] (#32003, #32032).
+     */
+    private static function isHostFoldAttributeAxis(string $expr): bool
+    {
+        return 1 === preg_match('~(?:^|/)@(?:[\w.*:-]+|\*)~', $expr);
     }
 }
