@@ -931,6 +931,8 @@
             <file>./test/compliance/DefineExcessArgc30573JITTest.php</file>
             <file>./test/compliance/DefineNullCaseInsensitive31406VMTest.php</file>
             <file>./test/compliance/DefineNullCaseInsensitive31406JITTest.php</file>
+            <file>./test/compliance/DefineInsideFunction32039VMTest.php</file>
+            <file>./test/compliance/DefineInsideFunction32039JITTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583VMTest.php</file>
             <file>./test/compliance/FlockExcessArgc30583JITTest.php</file>
             <file>./test/compliance/FlockNullOperationSoftVMTest.php</file>
