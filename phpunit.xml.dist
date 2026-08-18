@@ -94,6 +94,7 @@
             <file>./test/compliance/SoapVarEncNameNsVMTest.php</file>
             <file>./test/compliance/SoapVarEncObjectVMTest.php</file>
             <file>./test/compliance/SoapParamRpcNameVMTest.php</file>
+            <file>./test/compliance/Soap12EncArrayItemTypeVMTest.php</file>
             <file>./test/compliance/EvalEmptyReturnsFalse31914JITTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
