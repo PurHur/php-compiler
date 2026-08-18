@@ -224,12 +224,14 @@ final class HelperRuntimeCache
         // when the committed per-arch cache was present and current. Measured: ~517s to compile
         // `<?php echo "hi\n";` on a fresh tree, 5s once warm (#24302).
         //
-        // The consumption path already reads prelinkedUnitsDir() alongside unitsDir(), so when the
-        // committed cache is current there is nothing to emit — warming is pure waste. Drop the
-        // marker and skip.
-        if (self::committedCacheIsCurrent()) {
+        // helperIndex() already skips stale units per fingerprint and NestedJIT fills gaps, so a
+        // patches/ or composer.lock change that drifts core_fingerprint must NOT launch a 410-unit
+        // emit from `phpc build` / aot-smoke (120s timeout, rc=124). Presence of committed unit.o
+        // files is enough to skip the corpus warmup (#32122). Maintainers refresh with
+        // emit-helper-runtime-object.php --prelink or --refresh-global-fingerprints.
+        if (self::committedCacheHasUnits()) {
             @mkdir(\dirname($marker), 0755, true);
-            @file_put_contents($marker, 'ok (committed prelink current) '.gmdate('c')."\n");
+            @file_put_contents($marker, 'ok (committed units present; skip corpus warmup) '.gmdate('c')."\n");
 
             return;
         }
@@ -250,30 +252,16 @@ final class HelperRuntimeCache
     }
 
     /**
-     * Is the committed per-arch cache usable as-is for this build (#24302)?
+     * Committed per-arch cache has objects we can skip whole-corpus warmup for (#24302 / #32122).
      *
-     * Deliberately conservative: it must exist, carry a core_fingerprint equal to the live one
-     * (or an equivalent LLVM-path alias — #24381), and actually contain units. Any doubt falls
-     * through to the warmup, so a stale or partial committed cache still gets emitted rather
-     * than silently producing a build with missing helpers.
+     * Core-fingerprint drift is not a reason to emit 410 units from a user-script compile.
+     * helperIndex() still skips stale units per fingerprint; NestedJIT fills gaps. Only a missing
+     * or empty committed tree (wrong arch / incomplete clone) falls through to warmup.
      */
-    private static function committedCacheIsCurrent(): bool
+    private static function committedCacheHasUnits(): bool
     {
         $unitsDir = self::prelinkedUnitsDir();
-        $manifestPath = \dirname($unitsDir).'/manifest.json';
-        if (!is_file($manifestPath) || !is_dir($unitsDir)) {
-            return false;
-        }
-        $raw = @file_get_contents($manifestPath);
-        if (false === $raw) {
-            return false;
-        }
-        $manifest = json_decode($raw, true);
-        if (!\is_array($manifest)) {
-            return false;
-        }
-        $committed = (string) ($manifest['core_fingerprint'] ?? '');
-        if ('' === $committed || !self::coreFingerprintMatches($committed)) {
+        if (!is_dir($unitsDir)) {
             return false;
         }
         $entries = @scandir($unitsDir);
@@ -281,7 +269,11 @@ final class HelperRuntimeCache
             return false;
         }
         foreach ($entries as $entry) {
-            if ('.' !== $entry && '..' !== $entry && is_dir($unitsDir.'/'.$entry)) {
+            if ('.' === $entry || '..' === $entry) {
+                continue;
+            }
+            $dir = $unitsDir.'/'.$entry;
+            if (is_dir($dir) && is_file($dir.'/unit.o') && is_file($dir.'/unit.bc')) {
                 return true;
             }
         }

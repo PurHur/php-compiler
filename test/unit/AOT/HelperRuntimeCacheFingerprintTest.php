@@ -74,6 +74,26 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         $this->assertTrue(HelperRuntimeCache::coreFingerprintMatches($live));
     }
 
+    public function testWarmupSkipsCorpusEmitWhenCommittedUnitsExistRegardlessOfCoreFingerprint(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $source = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString('committedCacheHasUnits', $source);
+        $this->assertStringContainsString('skip corpus warmup', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/function committedCacheHasUnits\(\): bool\s*\{[^}]*coreFingerprintMatches/s',
+            $source,
+            'warmup skip must not require core_fingerprint match (#32122)'
+        );
+        $ref = new \ReflectionClass(HelperRuntimeCache::class);
+        $m = $ref->getMethod('committedCacheHasUnits');
+        $m->setAccessible(true);
+        $this->assertTrue(
+            (bool) $m->invoke(null),
+            'committed helper-runtime units must skip hello-world corpus warmup'
+        );
+    }
+
     public function testCoreFingerprintIgnoresJitPhpContent(): void
     {
         $root = \dirname(__DIR__, 3);

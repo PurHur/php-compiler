@@ -5,8 +5,9 @@
 # This is the first thing a new user does, and until 2026-07-28 it cost ~9 minutes
 # (#24302): warmForUserAotBuild() re-emitted the entire helper corpus on every clean
 # checkout, because its only guard was a marker file under the gitignored
-# build/helper-runtime-cache. #24351 made it skip that when the committed per-arch cache
-# is current, taking the same build to ~5 seconds.
+# build/helper-runtime-cache. #24351 skipped that when the committed per-arch cache
+# matched core_fingerprint (~5s). #32122 also skips when units exist but the fingerprint
+# drifted (patches/lock) — otherwise aot-smoke hits compile rc=124 inside 120s.
 #
 # Nothing was watching that number, so this exists to keep it from drifting back. It
 # points PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR at a fresh temp directory, so it measures
