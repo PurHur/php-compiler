@@ -2827,6 +2827,10 @@ final class VmSoapClient
 
             return '<'.$qtag.$xmlnsAttr.' xsi:type="'.$structType.'">'.$child.'</'.$qtag.'>';
         }
+        // php-src to_xml_map — APACHE_MAP is {apache}Map with item/key/value (#32222).
+        if (\is_array($inner) && SoapConstants::APACHE_MAP === $encType) {
+            return self::encodeApacheMap($qtag, $xmlnsAttr, $inner, $literal, $state, $ctx);
+        }
         // SOAP_ENC_ARRAY / untyped arrays stay on the generic array path.
         if (
             \is_array($inner)
@@ -2855,6 +2859,33 @@ final class VmSoapClient
         $xsi = $qname[0].':'.$qname[1];
 
         return '<'.$qtag.$xmlnsAttr.' xsi:type="'.\htmlspecialchars($xsi, \ENT_XML1).'">'.$text.'</'.$qtag.'>';
+    }
+
+    /**
+     * php-src to_xml_map — APACHE_MAP item/key/value (#32222).
+     *
+     * @param array<string|int, mixed> $map
+     */
+    private static function encodeApacheMap(
+        string $qtag,
+        string $xmlnsAttr,
+        array $map,
+        bool $literal,
+        ?SoapClientState $state,
+        ?Context $ctx
+    ): string {
+        $child = '';
+        foreach ($map as $k => $v) {
+            $keyXml = self::encodeParam('key', $k, $state, $ctx);
+            $valXml = self::encodeParam('value', $v, $state, $ctx);
+            $child .= '<item>'.$keyXml.$valXml.'</item>';
+        }
+        $ns = ' xmlns:ns2="'.\htmlspecialchars(SoapConstants::APACHE_NAMESPACE, \ENT_XML1).'"';
+        if ($literal) {
+            return '<'.$qtag.$xmlnsAttr.$ns.'>'.$child.'</'.$qtag.'>';
+        }
+
+        return '<'.$qtag.$xmlnsAttr.$ns.' xsi:type="ns2:Map">'.$child.'</'.$qtag.'>';
     }
 
     /**
