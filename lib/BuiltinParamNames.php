@@ -125,7 +125,8 @@ final class BuiltinParamNames
             // php-src ext/intl/collator/collator.stub.php — OOP getSortKey(string $string); InternalArgInfo still coll/str (#28785)
             'collator::getsortkey' => ['string'],
             'messageformatter::create' => ['locale', 'pattern'],
-            'messageformatter::format' => ['args'],
+            // php-src ext/intl/msgformat/msgformat.stub.php — InternalArgInfo still args (#25230)
+            'messageformatter::format' => ['values'],
             // php-src ext/intl/dateformat/dateformat.stub.php — InternalArgInfo still args (#23667)
             'intldateformatter::format' => ['datetime'],
             'messageformatter::setpattern' => ['pattern'],

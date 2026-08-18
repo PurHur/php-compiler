@@ -4575,6 +4575,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($procParse, 'position', 'numfmt_parse_currency'));
     }
 
+    /** @covers issue #25230 */
+    public function testMessageFormatterFormatStubNamedValues(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('MessageFormatter::format');
+        self::assertSame(['values'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'values', 'MessageFormatter::format'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'args', 'MessageFormatter::format'));
+        self::assertSame(['values'], BuiltinParamNames::paramNamesForInternalFunction('MessageFormatter::format'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('MessageFormatter', 'format'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('MessageFormatter', 'format'));
+    }
+
     /** @covers issue #24504 */
     public function testMsgfmtFormatMessageStubNamedValues(): void
     {
