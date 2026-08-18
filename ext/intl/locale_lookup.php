@@ -55,6 +55,6 @@ final class locale_lookup extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \RuntimeException('locale_lookup() JIT lowering not implemented; use VM');
+        return JitLocaleLookup::lookup($context, ...$args);
     }
 }

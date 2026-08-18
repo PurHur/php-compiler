@@ -1734,6 +1734,8 @@ class Context {
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         // Locale::acceptFromHttp — avoid ExternalMethod silent NULL on thin AOT (#28656).
         $this->functionProxies['locale::acceptfromhttp'] = new \PHPCompiler\ext\intl\LocaleAcceptFromHttp();
+        // Locale::lookup — RFC 4647 via JitLocaleLookup / VmLocale (#32118).
+        $this->functionProxies['locale::lookup'] = new \PHPCompiler\ext\intl\LocaleLookup();
         // NumberFormatter::create / format — avoid ExternalMethod silent NULL on thin AOT (#27385, #28648).
         $this->functionProxies['numberformatter::create'] = new Call\NumberFormatterCreate();
         $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();

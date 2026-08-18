@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7578 |
-| Phase A inventory files (M2 ratio SSOT) | 7578 |
+| PHP files on vm.php path | 7581 |
+| Phase A inventory files (M2 ratio SSOT) | 7581 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24233 |
+| Source constructs flagged (warnings) | 24237 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -562,7 +562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 73 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
-| `ext/dom/VmDomLiving.php` | 0 | 20 |
+| `ext/dom/VmDomLiving.php` | 0 | 19 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 17 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
@@ -1154,6 +1154,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitIntlDateFormatterCreate.php` | 0 | 7 |
 | `ext/intl/JitIntlDateFormatterFormat.php` | 0 | 3 |
+| `ext/intl/JitLocaleLookup.php` | 0 | 3 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
 | `ext/intl/JitMessageFormatterConstruct.php` | 0 | 5 |
 | `ext/intl/JitMessageFormatterFormat.php` | 0 | 4 |
@@ -1183,6 +1184,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleGetScript.php` | 0 | 2 |
 | `ext/intl/LocaleIsRightToLeft.php` | 0 | 2 |
 | `ext/intl/LocaleLookup.php` | 0 | 3 |
+| `ext/intl/LocaleLookupJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleMinimizeSubtags.php` | 0 | 2 |
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
@@ -5666,6 +5668,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ListSpreadTailRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/LocaleLookupRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleParser.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleStartupRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAbs.php` | 0 | 1 |
@@ -11528,18 +11531,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 284)
 - new Variable (line 312)
 - new DOMException (line 359)
-- new DOMException (line 459)
-- new DOMException (line 464)
-- new DOMException (line 471)
-- new DOMException (line 505)
-- new Exception (line 693)
-- new DOMException (line 719)
-- new Variable (line 725)
-- new Variable (line 759)
-- new ObjectEntry (line 2146)
-- new HashTable (line 2170)
-- new Variable (line 2172)
-- 77 class method(s)
+- new DOMException (line 460)
+- new DOMException (line 466)
+- new DOMException (line 502)
+- new Exception (line 690)
+- new DOMException (line 716)
+- new Variable (line 722)
+- new Variable (line 756)
+- new ObjectEntry (line 2415)
+- new HashTable (line 2439)
+- new Variable (line 2441)
+- 89 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -15868,6 +15870,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 48)
 - 4 class method(s)
 
+### `ext/intl/JitLocaleLookup.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 39)
+- 5 class method(s)
+
 ### `ext/intl/JitLocaleParser.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16061,9 +16070,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/LocaleLookup.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new ArgumentCountError (line 33)
-- 4 class method(s)
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 36)
+- 5 class method(s)
+
+### `ext/intl/LocaleLookupJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/intl/LocaleMinimizeSubtags.php`
 
@@ -24097,27 +24111,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/random/RandomizerBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new SecureInstance (line 74)
-- new Random\RandomError (line 106)
-- new Random\BrokenRandomEngineError (line 175)
-- new ClassEntry (line 310)
-- new Mt19937Construct (line 314)
-- new ClassEntry (line 340)
-- new Variable (line 344)
-- new RandomizerConstruct (line 346)
-- new Mt19937Instance (line 480)
-- new ArgumentCountError (line 550)
-- new Mt19937Instance (line 578)
-- new Variable (line 617)
-- new Variable (line 626)
-- new ObjectEntry (line 647)
-- new SecureInstance (line 649)
-- new ArgumentCountError (line 737)
-- new ArgumentCountError (line 804)
-- new Variable (line 885)
-- new HashTable (line 887)
-- new ArgumentCountError (line 904)
-- new ArgumentCountError (line 968)
+- new SecureInstance (line 75)
+- new Random\RandomError (line 107)
+- new Random\BrokenRandomEngineError (line 176)
+- new ClassEntry (line 311)
+- new Mt19937Construct (line 315)
+- new ClassEntry (line 341)
+- new Variable (line 345)
+- new RandomizerConstruct (line 347)
+- new Mt19937Instance (line 494)
+- new ArgumentCountError (line 564)
+- new Mt19937Instance (line 592)
+- new Variable (line 631)
+- new Variable (line 640)
+- new ObjectEntry (line 661)
+- new SecureInstance (line 663)
+- new ArgumentCountError (line 751)
+- new ArgumentCountError (line 818)
+- new Variable (line 899)
+- new HashTable (line 901)
+- new ArgumentCountError (line 918)
+- new ArgumentCountError (line 982)
 - 57 class method(s)
 - 4 closure(s)
 
@@ -46610,7 +46624,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 2322)
+- new InternalArgInfo (line 2333)
 - 24 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46626,8 +46640,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2709)
-- new ArgumentCountError (line 2720)
+- new ArgumentCountError (line 2713)
+- new ArgumentCountError (line 2724)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -49423,6 +49437,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `lib/JIT/Builtin/LocaleLookupRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/LocaleParser.php`
 
@@ -54234,37 +54253,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeZoneGetOffset (line 1728)
 - new Call\DateTimeZoneListIdentifiers (line 1730)
 - new Call\DateTimeZoneListAbbreviations (line 1732)
-- new Call\NumberFormatterCreate (line 1738)
-- new Call\NumberFormatterFormat (line 1739)
-- new Call\IntlDateFormatterCreate (line 1741)
-- new Call\IntlDateFormatterFormat (line 1742)
-- new Call\CollatorCompare (line 1744)
-- new Call\NormalizerNormalize (line 1746)
-- new Call\MessageFormatterConstruct (line 1748)
-- new Call\MessageFormatterFormat (line 1749)
-- new Call\TransliteratorCreate (line 1751)
-- new Call\TransliteratorTransliterate (line 1752)
-- new Call\FinfoConstruct (line 1754)
-- new Call\FinfoFile (line 1755)
-- new Call\FinfoBuffer (line 1756)
-- new Call\PdoConstruct (line 1758)
-- new Call\PdoGetAvailableDrivers (line 1759)
-- new Call\PdoQuote (line 1760)
-- new Call\DomXmlDocumentCreateFromString (line 1763)
-- new Call\DomHtmlDocumentCreateFromString (line 1764)
-- new Result (line 2143)
-- new Result (line 2165)
-- new Variable (line 2843)
-- new Variable (line 3066)
-- new Variable (line 3331)
-- new Variable (line 3389)
-- new VMVariable (line 3551)
-- new VMVariable (line 3567)
-- new VMVariable (line 3573)
-- new VMVariable (line 3579)
-- new VMVariable (line 3590)
-- new Variable (line 3620)
-- new Variable (line 3665)
+- new Call\NumberFormatterCreate (line 1740)
+- new Call\NumberFormatterFormat (line 1741)
+- new Call\IntlDateFormatterCreate (line 1743)
+- new Call\IntlDateFormatterFormat (line 1744)
+- new Call\CollatorCompare (line 1746)
+- new Call\NormalizerNormalize (line 1748)
+- new Call\MessageFormatterConstruct (line 1750)
+- new Call\MessageFormatterFormat (line 1751)
+- new Call\TransliteratorCreate (line 1753)
+- new Call\TransliteratorTransliterate (line 1754)
+- new Call\FinfoConstruct (line 1756)
+- new Call\FinfoFile (line 1757)
+- new Call\FinfoBuffer (line 1758)
+- new Call\PdoConstruct (line 1760)
+- new Call\PdoGetAvailableDrivers (line 1761)
+- new Call\PdoQuote (line 1762)
+- new Call\DomXmlDocumentCreateFromString (line 1765)
+- new Call\DomHtmlDocumentCreateFromString (line 1766)
+- new Result (line 2145)
+- new Result (line 2167)
+- new Variable (line 2845)
+- new Variable (line 3068)
+- new Variable (line 3333)
+- new Variable (line 3391)
+- new VMVariable (line 3553)
+- new VMVariable (line 3569)
+- new VMVariable (line 3575)
+- new VMVariable (line 3581)
+- new VMVariable (line 3592)
+- new Variable (line 3622)
+- new Variable (line 3667)
 - 112 class method(s)
 - 33 closure(s)
 
@@ -60692,24 +60711,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 1388)
 - new Variable (line 1390)
 - new AttributeEntry (line 2029)
-- new Variable (line 2593)
-- new ParameterMetadata (line 2599)
-- new CfgType\Nullable (line 2700)
-- new Variable (line 3674)
-- new Variable (line 3722)
-- new Variable (line 3781)
-- new ObjectEntry (line 4040)
-- new SourceLocation (line 4068)
-- new ParameterMetadata (line 4544)
-- new ObjectEntry (line 4616)
-- new ObjectEntry (line 4633)
-- new ObjectEntry (line 4858)
-- new ObjectEntry (line 4871)
-- new Variable (line 4951)
-- new ObjectEntry (line 5076)
-- new ObjectEntry (line 5096)
-- new Variable (line 5304)
-- new Variable (line 5502)
+- new Variable (line 2597)
+- new ParameterMetadata (line 2603)
+- new CfgType\Nullable (line 2704)
+- new Variable (line 3678)
+- new Variable (line 3726)
+- new Variable (line 3785)
+- new ObjectEntry (line 4044)
+- new SourceLocation (line 4072)
+- new ParameterMetadata (line 4548)
+- new ObjectEntry (line 4620)
+- new ObjectEntry (line 4637)
+- new ObjectEntry (line 4862)
+- new ObjectEntry (line 4875)
+- new Variable (line 4955)
+- new ObjectEntry (line 5080)
+- new ObjectEntry (line 5100)
+- new Variable (line 5308)
+- new Variable (line 5506)
 - 271 class method(s)
 - 4 closure(s)
 
