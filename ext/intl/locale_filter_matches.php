@@ -47,6 +47,6 @@ final class locale_filter_matches extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \RuntimeException('locale_filter_matches() JIT lowering not implemented; use VM');
+        return JitLocaleFilterMatches::filterMatches($context, ...$args);
     }
 }

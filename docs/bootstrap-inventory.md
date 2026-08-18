@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7583 |
-| Phase A inventory files (M2 ratio SSOT) | 7583 |
+| PHP files on vm.php path | 7586 |
+| Phase A inventory files (M2 ratio SSOT) | 7586 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24247 |
+| Source constructs flagged (warnings) | 24252 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1154,6 +1154,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitIntlDateFormatterCreate.php` | 0 | 7 |
 | `ext/intl/JitIntlDateFormatterFormat.php` | 0 | 3 |
+| `ext/intl/JitLocaleFilterMatches.php` | 0 | 3 |
 | `ext/intl/JitLocaleLookup.php` | 0 | 3 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
 | `ext/intl/JitMessageFormatterConstruct.php` | 0 | 5 |
@@ -1169,6 +1170,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleComposeLocale.php` | 0 | 2 |
 | `ext/intl/LocaleDefaultJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleFilterMatches.php` | 0 | 3 |
+| `ext/intl/LocaleFilterMatchesJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleGetAllVariants.php` | 0 | 4 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
 | `ext/intl/LocaleGetDisplayKeyword.php` | 0 | 3 |
@@ -5670,6 +5672,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ListSpreadTailRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/LocaleFilterMatchesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleLookupRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleParser.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleStartupRuntime.php` | 0 | 1 |
@@ -15872,6 +15875,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 48)
 - 4 class method(s)
 
+### `ext/intl/JitLocaleFilterMatches.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 35)
+- 3 class method(s)
+
 ### `ext/intl/JitLocaleLookup.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15972,8 +15982,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/LocaleFilterMatches.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 32)
+- 2 class method(s)
+
+### `ext/intl/LocaleFilterMatchesJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/intl/LocaleGetAllVariants.php`
@@ -49455,6 +49470,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `lib/JIT/Builtin/LocaleFilterMatchesRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/LocaleLookupRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -54270,37 +54290,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeZoneGetOffset (line 1728)
 - new Call\DateTimeZoneListIdentifiers (line 1730)
 - new Call\DateTimeZoneListAbbreviations (line 1732)
-- new Call\NumberFormatterCreate (line 1740)
-- new Call\NumberFormatterFormat (line 1741)
-- new Call\IntlDateFormatterCreate (line 1743)
-- new Call\IntlDateFormatterFormat (line 1744)
-- new Call\CollatorCompare (line 1746)
-- new Call\NormalizerNormalize (line 1748)
-- new Call\MessageFormatterConstruct (line 1750)
-- new Call\MessageFormatterFormat (line 1751)
-- new Call\TransliteratorCreate (line 1753)
-- new Call\TransliteratorTransliterate (line 1754)
-- new Call\FinfoConstruct (line 1756)
-- new Call\FinfoFile (line 1757)
-- new Call\FinfoBuffer (line 1758)
-- new Call\PdoConstruct (line 1760)
-- new Call\PdoGetAvailableDrivers (line 1761)
-- new Call\PdoQuote (line 1762)
-- new Call\DomXmlDocumentCreateFromString (line 1765)
-- new Call\DomHtmlDocumentCreateFromString (line 1766)
-- new Result (line 2145)
-- new Result (line 2167)
-- new Variable (line 2845)
-- new Variable (line 3068)
-- new Variable (line 3333)
-- new Variable (line 3391)
-- new VMVariable (line 3553)
-- new VMVariable (line 3569)
-- new VMVariable (line 3575)
-- new VMVariable (line 3581)
-- new VMVariable (line 3592)
-- new Variable (line 3622)
-- new Variable (line 3667)
+- new Call\NumberFormatterCreate (line 1742)
+- new Call\NumberFormatterFormat (line 1743)
+- new Call\IntlDateFormatterCreate (line 1745)
+- new Call\IntlDateFormatterFormat (line 1746)
+- new Call\CollatorCompare (line 1748)
+- new Call\NormalizerNormalize (line 1750)
+- new Call\MessageFormatterConstruct (line 1752)
+- new Call\MessageFormatterFormat (line 1753)
+- new Call\TransliteratorCreate (line 1755)
+- new Call\TransliteratorTransliterate (line 1756)
+- new Call\FinfoConstruct (line 1758)
+- new Call\FinfoFile (line 1759)
+- new Call\FinfoBuffer (line 1760)
+- new Call\PdoConstruct (line 1762)
+- new Call\PdoGetAvailableDrivers (line 1763)
+- new Call\PdoQuote (line 1764)
+- new Call\DomXmlDocumentCreateFromString (line 1767)
+- new Call\DomHtmlDocumentCreateFromString (line 1768)
+- new Result (line 2147)
+- new Result (line 2169)
+- new Variable (line 2847)
+- new Variable (line 3070)
+- new Variable (line 3335)
+- new Variable (line 3393)
+- new VMVariable (line 3555)
+- new VMVariable (line 3571)
+- new VMVariable (line 3577)
+- new VMVariable (line 3583)
+- new VMVariable (line 3594)
+- new Variable (line 3624)
+- new Variable (line 3669)
 - 112 class method(s)
 - 33 closure(s)
 
