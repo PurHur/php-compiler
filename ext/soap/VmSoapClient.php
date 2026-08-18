@@ -2446,12 +2446,13 @@ final class VmSoapClient
         $paramsXml = '';
         $args = $arguments;
         // Zend wraps document/literal params; RPC often uses a single array of named params.
-        // Do not unwrap SoapVar property bags (enc_type/enc_value) (#21046 / #32190).
+        // Do not unwrap SoapVar / SoapParam property bags (#21046 / #32190 / #32193).
         if (
             1 === \count($args)
             && \is_array($args[0])
             && !\array_is_list($args[0])
             && null === self::soapVarShape($args[0])
+            && null === self::soapParamShape($args[0])
         ) {
             $args = $args[0];
         }
@@ -2555,6 +2556,13 @@ final class VmSoapClient
         ?Context $ctx = null
     ): string {
         $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'param';
+        $soapParam = self::soapParamShape($value);
+        // php-src serialize_parameter — SoapParam param_name + param_data (#32193).
+        if (null !== $soapParam) {
+            $paramTag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $soapParam['name']) ?: $tag;
+
+            return self::encodeParam($paramTag, $soapParam['data'], $state, $ctx);
+        }
         $soapVar = self::soapVarShape($value);
         // SoapVar-shaped export + typemap to_xml (#21046; php_encoding.c to_xml_user).
         if (null !== $soapVar && null !== $state && null !== $ctx && [] !== $state->typemap && '' !== $soapVar['stype']) {
@@ -2734,6 +2742,33 @@ final class VmSoapClient
             'name' => $encName,
             'namens' => $encNamens,
         ];
+    }
+
+    /**
+     * Detect SoapParam property bag after exportArgTree (#32193).
+     *
+     * @return array{name: string, data: mixed}|null
+     */
+    private static function soapParamShape(mixed $value): ?array
+    {
+        if ($value instanceof \stdClass) {
+            $value = (array) $value;
+        }
+        if (!\is_array($value)) {
+            return null;
+        }
+        if (!\array_key_exists('param_name', $value) || !\array_key_exists('param_data', $value)) {
+            return null;
+        }
+        if (\array_key_exists('enc_type', $value)) {
+            return null;
+        }
+        $name = $value['param_name'];
+        if (!\is_string($name) || '' === $name) {
+            return null;
+        }
+
+        return ['name' => $name, 'data' => $value['param_data']];
     }
 
     /**
@@ -3662,6 +3697,16 @@ final class VmSoapClient
                         : null,
                     'enc_namens' => $obj->hasProperty('enc_namens')
                         ? self::exportArgTree($obj->getProperty('enc_namens'), $frame)
+                        : null,
+                ];
+            }
+            if (\strtolower($obj->class->name) === 'soapparam') {
+                return [
+                    'param_name' => $obj->hasProperty('param_name')
+                        ? self::exportArgTree($obj->getProperty('param_name'), $frame)
+                        : '',
+                    'param_data' => $obj->hasProperty('param_data')
+                        ? self::exportArgTree($obj->getProperty('param_data'), $frame)
                         : null,
                 ];
             }
