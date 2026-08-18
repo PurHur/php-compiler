@@ -38,6 +38,8 @@ final class JitArgon2Kernel
         Value $saltStr
     ): Value {
         LibcExtern::register($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         self::registerArgon2Decls($context);
 
         $strPtrTy = $context->getTypeFromString('__string__*');
@@ -158,6 +160,8 @@ final class JitArgon2Kernel
     public static function verify(Context $context, Value $passwordStr, Value $hashStr, Value $typeI64): Value
     {
         LibcExtern::register($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         self::registerArgon2Decls($context);
 
         $i32 = $context->getTypeFromString('int32');

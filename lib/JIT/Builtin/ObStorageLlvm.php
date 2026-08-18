@@ -1140,7 +1140,8 @@ final class ObStorageLlvm
         self::ensureExternal($context, 'write', $context->context->functionType($i64, false, $i32, $i8p, $i64));
         self::ensureExternal($context, 'fflush', $context->context->functionType($i32, false, $i8p));
         LibcExtern::ensureMemcpyDecl($context);
-        self::ensureExternal($context, 'malloc', $context->context->functionType($i8p, false, $sizeT));
+        // malloc after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         self::ensureExternal(
             $context,
             'snprintf',

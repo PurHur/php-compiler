@@ -46,6 +46,8 @@ final class JitOpensslCipherKernel
         }
 
         LibcExtern::register($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         self::ensureLibcrypto($context);
 
         self::implementIfMissing($context, self::EVP_ENCRYPT, 'ossl_llvm_encrypt_entry', self::emitCrypt(...), true);

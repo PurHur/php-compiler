@@ -128,9 +128,10 @@ final class JitFsGlobKernel
         // glob/scandir + module-local stat(2) after LibcExtern/Module always-on drop (#31403).
         // strdup(3) after always-on LibcExtern drop (#31534) — still required by emitGlobVec /
         // emitScandirVec (#31721 AOT FilesystemIterator/GlobIterator).
-        // memset(3) after always-on LibcExtern drop (#31863); malloc/free still come
-        // from LibcExtern (i8*). strcmp(3) after always-on drop (#31971).
+        // memset(3) after always-on LibcExtern drop (#31863). malloc/realloc/free after
+        // always-on drop (#32273). strcmp(3) after always-on drop (#31971).
         LibcExtern::ensureMemsetDecl($context);
+        LibcExtern::ensureMallocFamily($context);
         LibcExtern::ensureStrcmpDecl($context);
         foreach ([
             ['glob', $i32, [$i8p, $i32, $i8p, $i8p]],

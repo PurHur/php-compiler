@@ -261,14 +261,13 @@ final class PregExpandRuntime
 
     private static function ensureLibc(Context $context): void
     {
-        $voidTy = $context->getTypeFromString('void');
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
 
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         foreach (
             [
-                ['malloc', $i8p, [$sizeT]],
-                ['free', $voidTy, [$i8p]],
                 ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
                 ['strlen', $sizeT, [$i8p]],
             ] as [$name, $ret, $params]

@@ -56,6 +56,8 @@ final class JitHashCryptoKernel
         }
 
         LibcExtern::register($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         self::ensureLibcrypto($context);
 
         self::implementIfMissing($context, self::EVP_HASH, 'hc_llvm_hash_entry', self::emitHash(...));

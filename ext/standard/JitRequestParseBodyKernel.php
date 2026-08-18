@@ -42,6 +42,8 @@ final class JitRequestParseBodyKernel
         LibcExtern::register($context);
         // Module-local strncmp after LibcExtern always-on drop (#31839).
         LibcExtern::ensureStrncmp($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         StringGetenv::ensureLibcGetenv($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensurePopulateHelperCompiled($context);

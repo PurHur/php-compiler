@@ -133,12 +133,10 @@ final class StringZlibJit
 
     private static function ensureLibz(Context $context): void
     {
-        $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $i64p = $context->getTypeFromString('int64*');
-        $voidTy = $context->getTypeFromString('void');
 
         foreach ([
             ['compress2', $i32, [$i8p, $i64p, $i8p, $i64, $i32]],
@@ -152,13 +150,14 @@ final class StringZlibJit
             ['inflateInit2_', $i32, [$i8p, $i32, $i8p, $i32]],
             ['inflate', $i32, [$i8p, $i32]],
             ['inflateEnd', $i32, [$i8p]],
-            ['malloc', $i8p, [$i64]],
-            ['free', $voidTy, [$i8p]],
             // memset(3) via LibcExtern::ensureMemsetDecl after always-on drop (#31863).
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
         LibcExtern::ensureMemsetDecl($context);
+        // malloc/free after LibcExtern always-on drop (#32273) — canonical i8*/size_t,
+        // not i64 size (malloc.1 class, #31894 / #32122).
+        LibcExtern::ensureMallocFamily($context);
     }
 
     private static function ensureRuntimeHelpers(Context $context): void

@@ -71,10 +71,9 @@ final class OutputRewriteVarsStorage
 
     public static function ensureLibc(Context $context): void
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
         \PHPCompiler\JIT\LibcExtern::ensureMemcpyDecl($context);
-        \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, 'malloc', $context->context->functionType($i8p, false, $sizeT));
+        // malloc after LibcExtern always-on drop (#32273).
+        \PHPCompiler\JIT\LibcExtern::ensureMallocFamily($context);
     }
 
     /** Append name\\x1Evalue (with \\x1D separator when blob non-empty). */

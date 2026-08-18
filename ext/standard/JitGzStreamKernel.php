@@ -127,8 +127,10 @@ final class JitGzStreamKernel
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $voidTy = $context->getTypeFromString('void');
         // gzFile is an opaque pointer.
+        // malloc/free after LibcExtern always-on drop (#32273) — canonical i8*/size_t,
+        // not i64 size (malloc.1 class, #31894 / #32122).
+        LibcExtern::ensureMallocFamily($context);
         foreach ([
             ['gzopen', $i8p, [$i8p, $i8p]],
             ['gzwrite', $i32, [$i8p, $i8p, $i32]],
@@ -139,8 +141,6 @@ final class JitGzStreamKernel
             ['gzrewind', $i32, [$i8p]],
             ['gzeof', $i32, [$i8p]],
             ['gzgets', $i8p, [$i8p, $i8p, $i32]],
-            ['malloc', $i8p, [$i64]],
-            ['free', $voidTy, [$i8p]],
             ['strlen', $i64, [$i8p]],
         ] as [$name, $ret, $params]) {
             try {

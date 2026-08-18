@@ -52,6 +52,8 @@ final class JitMultipartKernel
         LibcExtern::ensureStrncmp($context);
         // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
         LibcExtern::ensureMemcpyDecl($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
         LibcExtern::ensureStrlenDecl($context);
         $libcStrlen = $context->lookupFunction('strlen');

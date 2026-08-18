@@ -10,12 +10,14 @@
 namespace PHPCompiler\JIT\Builtin\MemoryManager;
 
 use PHPCompiler\JIT\Builtin\MemoryManager;
+use PHPCompiler\JIT\LibcExtern;
 
 class Native extends MemoryManager {
 
     public function register(): void {
         parent::register();
-        // malloc/free/realloc are registered by LibcExtern before builtin register().
+        // malloc/realloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($this->context);
     } 
 
     public function implement(): void {
