@@ -32,6 +32,8 @@
             <file>./test/compliance/VMTest.php</file>
             <file>./test/compliance/DuplicateFunctionRedeclare31109VMTest.php</file>
             <file>./test/compliance/DuplicateFunctionRedeclare31109JITTest.php</file>
+            <file>./test/compliance/ClosureUseDuplicate32153VMTest.php</file>
+            <file>./test/compliance/ClosureUseDuplicate32153JITTest.php</file>
             <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013VMTest.php</file>
             <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013JITTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedVMTest.php</file>
