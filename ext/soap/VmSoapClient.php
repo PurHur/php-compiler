@@ -2796,6 +2796,10 @@ final class VmSoapClient
         $encType = $soapVar['type'] ?? 0;
         $inner = $soapVar['value'];
         $literal = null !== $state && SoapConstants::SOAP_LITERAL === $state->use;
+        // php-src to_xml_any — xmlStringTextNoenc; serialize_zval skips param rename (#32241).
+        if (SoapConstants::XSD_ANYXML === (int) $encType) {
+            return self::encodeSoapXsdAnyXml($inner);
+        }
         // php-src xmlNodeSetName(enc_name) (#32191).
         if (null !== $soapVar['name']) {
             $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $soapVar['name']) ?: $tag;
@@ -2862,6 +2866,27 @@ final class VmSoapClient
         $xsi = $qname[0].':'.$qname[1];
 
         return '<'.$qtag.$xmlnsAttr.' xsi:type="'.\htmlspecialchars($xsi, \ENT_XML1).'">'.$text.'</'.$qtag.'>';
+    }
+
+    /**
+     * php-src to_xml_any() — xmlNewTextLen + xmlStringTextNoenc (#32241).
+     *
+     * The fragment is a child of the parent (operation) node, unescaped, with no
+     * param wrapper and no xsi:type. serialize_zval only xmlNodeSetName()s nodes
+     * named NULL/"BOGUS"; xmlStringTextNoenc keeps the payload unwrapped.
+     */
+    private static function encodeSoapXsdAnyXml(mixed $inner): string
+    {
+        if (\is_array($inner)) {
+            $frag = '';
+            foreach ($inner as $v) {
+                $frag .= self::encodeSoapXsdAnyXml($v);
+            }
+
+            return $frag;
+        }
+
+        return self::soapVarRawString($inner);
     }
 
     /**
