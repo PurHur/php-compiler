@@ -835,6 +835,37 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function setAttributeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMElement::setAttributeNS', $extra, 3);
+        $namespace = self::nullableStringArg(
+            $extra[0] ?? self::missingArg('setAttributeNS', 0),
+            'setAttributeNS',
+            0
+        );
+        $qualifiedName = self::stringArg(
+            $extra[1] ?? self::missingArg('setAttributeNS', 1),
+            'DOMElement::setAttributeNS',
+            1,
+            'qualifiedName'
+        );
+        $value = self::stringArg(
+            $extra[2] ?? self::missingArg('setAttributeNS', 2),
+            'DOMElement::setAttributeNS',
+            2,
+            'value'
+        );
+        VmDom::rejectEmptyQualifiedName($qualifiedName, 'DOMElement::setAttributeNS', 2);
+        VmDom::setAttributeNS($ctx, $element, $namespace, $qualifiedName, $value);
+        $pos = strpos($qualifiedName, ':');
+        $localName = false === $pos ? $qualifiedName : substr($qualifiedName, $pos + 1);
+
+        return VmDom::getAttributeNodeNS($ctx, $element, $namespace, $localName);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function removeAttribute(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
         self::requireExactExtraArgCount('DOMElement::removeAttribute', $extra, 1);
@@ -846,6 +877,31 @@ final class VmDomJitDispatch
         );
         $var = new Variable();
         $var->bool(VmDom::removeAttributeNS($ctx, $element, null, $name));
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function removeAttributeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMElement::removeAttributeNS', $extra, 2);
+        $namespace = self::nullableStringArg(
+            $extra[0] ?? self::missingArg('removeAttributeNS', 0),
+            'removeAttributeNS',
+            0
+        );
+        $localName = self::stringArg(
+            $extra[1] ?? self::missingArg('removeAttributeNS', 1),
+            'DOMElement::removeAttributeNS',
+            1,
+            'localName'
+        );
+        VmDom::removeAttributeNS($ctx, $element, $namespace, $localName);
+        $var = new Variable();
+        // php-src dom_element_remove_attribute_ns() returns SUCCESS → null (#15358).
+        $var->null();
 
         return $var;
     }

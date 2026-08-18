@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -666,6 +667,65 @@ final class JitDomAttributeNodeNS
     }
 
     /**
+     * DOMElement::setAttributeNS() — user-script AOT live Attr cache (#32398).
+     * php-src: ext/dom/element.c PHP_METHOD(DOMElement, setAttributeNS) / xmlSetNsProp.
+     */
+    public static function invokeSetAttributeNS(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrns_cont');
+        if (!VmClassMethod::requireExactJitUserArgCount(
+            $context,
+            $args,
+            'DOMElement::setAttributeNS',
+            3
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $nsLit = self::compileTimeNullableStringArg($args[1]);
+        $qnameLit = self::compileTimeStringArg($args[2]);
+        $valueLit = self::compileTimeStringArg($args[3]);
+        if (null === $nsLit || null === $qnameLit || null === $valueLit) {
+            throw new \LogicException(
+                'DOMElement::setAttributeNS() user-script AOT requires compile-time namespace, name, and value'
+            );
+        }
+        // php-src xmlns / xmlns:* → nsDef, no Attr (#24538 / element.c).
+        if ('xmlns' === $qnameLit || str_starts_with($qnameLit, 'xmlns:')) {
+            return self::boxNullResult($context);
+        }
+        [, $local] = self::splitQualifiedName($qnameLit);
+        $attr = self::setAttributeNsLiteralReuseOrCreate($context, $nsLit, $qnameLit, $local, $valueLit);
+
+        return self::boxObjectResult($context, $attr);
+    }
+
+    /**
+     * DOMElement::removeAttributeNS() — user-script AOT (#32398, php-src returns null #15358).
+     */
+    public static function invokeRemoveAttributeNS(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattrns_cont');
+        if (!VmClassMethod::requireExactJitUserArgCount(
+            $context,
+            $args,
+            'DOMElement::removeAttributeNS',
+            2
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $nsLit = self::compileTimeNullableStringArg($args[1]);
+        $localLit = self::compileTimeStringArg($args[2]);
+        if (null === $nsLit || null === $localLit) {
+            throw new \LogicException(
+                'DOMElement::removeAttributeNS() user-script AOT requires compile-time namespace and localName'
+            );
+        }
+        DomUserScriptAttributeCacheLlvm::clearLiteral($context, $nsLit, $localLit);
+
+        return self::boxNullResult($context);
+    }
+
+    /**
      * Reuse cached Attr on rewrite so setAttribute() returns the same instance (#24538).
      */
     private static function setAttributeLiteralReuseOrCreate(
@@ -701,6 +761,54 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($doneBlock);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Reuse cached Attr on namespaced rewrite so getAttributeNS sees xmlSetNsProp (#32398).
+     */
+    private static function setAttributeNsLiteralReuseOrCreate(
+        Context $context,
+        string $namespace,
+        string $qualifiedName,
+        string $localName,
+        string $valueLit
+    ): Value {
+        $tag = (string) (self::$boxSeq++);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $existing = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $namespace, $localName);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $existing, $objPtr->constNull());
+        $createBlock = BasicBlockHelper::append($context, 'dom_setattrns_create_'.$tag);
+        $updateBlock = BasicBlockHelper::append($context, 'dom_setattrns_update_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_setattrns_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $context->builder->branchIf($isNull, $createBlock, $updateBlock);
+
+        $context->builder->positionAtEnd($createBlock);
+        $created = self::materializeAttrFromLiterals($context, $namespace, $qualifiedName, $valueLit);
+        DomUserScriptAttributeCacheLlvm::rememberCreate($namespace, $qualifiedName);
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, $namespace, $localName, $created, $valueLit);
+        $context->builder->store($created, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($updateBlock);
+        self::storeStringProperty($context, $existing, self::PROP_VALUE, $valueLit);
+        self::storeStringProperty($context, $existing, self::PROP_NODE_VALUE, $valueLit);
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, $namespace, $localName, $existing, $valueLit);
+        $context->builder->store($existing, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function compileTimeNullableStringArg(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return '';
+        }
+
+        return self::compileTimeStringArg($arg);
     }
 
     private static function boxBoolResult(Context $context, bool $value): Value
