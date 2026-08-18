@@ -1174,7 +1174,7 @@ final class MessageFormatterCreate extends VmClassMethod
     }
 }
 
-/** MessageFormatter::format() — php-src msgfmt_format (#6366). AOT: #28655. */
+/** MessageFormatter::format() — php-src msgfmt_format (#6366). AOT: #28655. Named $values (#25230). */
 final class MessageFormatterFormat extends VmClassMethod
 {
     public function __construct()
