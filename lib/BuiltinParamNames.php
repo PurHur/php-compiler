@@ -2079,6 +2079,9 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says input/mult (#23204)
             case 'str_repeat':
                 return ['string', 'times'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str (#23919)
+            case 'str_shuffle':
+                return ['string'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/from/to (#23215)
             // ?string $to = null (#23588)
             case 'strtr':
