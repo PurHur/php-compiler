@@ -36,6 +36,19 @@ final class VmIncludeTest extends TestCase
         );
     }
 
+    public function testIncludeSyntaxParseHelpersMatchZendChannel(): void
+    {
+        $parser = new \PhpParser\Error('Syntax error, unexpected T_LNUMBER, expecting \';\'', ['startLine' => 1]);
+        self::assertTrue(VmInclude::isCatchableSyntaxParseThrowable($parser));
+        self::assertSame(
+            'syntax error, unexpected T_LNUMBER, expecting \';\'',
+            VmInclude::syntaxParseMessage($parser)
+        );
+        self::assertSame(1, VmInclude::syntaxParseLine($parser));
+        self::assertTrue(VmInclude::isCatchableSyntaxParseThrowable(new \ParseError('syntax error, unexpected integer "2"')));
+        self::assertFalse(VmInclude::isCatchableSyntaxParseThrowable(new \RuntimeException('failed to open stream')));
+    }
+
     public function testShouldSkipSelfHostSpineCliIncludeWhenSelfHostAot(): void
     {
         $prev = getenv('PHP_COMPILER_SELFHOST_AOT');

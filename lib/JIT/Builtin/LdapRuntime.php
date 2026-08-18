@@ -9,9 +9,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 
 /**
  * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect /
- * ldap_connect_wallet / ldap_bind / ldap_unbind / ldap_errno / ldap_error / ldap_err2str /
- * ldap_set_option / ldap_get_option / ldap_start_tls / ldap_sasl_bind / ldap_compare / ldap_set_rebind_proc
- * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32107, #32109, #32121, #32147, #32148).
+ * ldap_connect_wallet / ldap_bind / ldap_bind_ext / ldap_unbind / ldap_errno / ldap_error /
+ * ldap_err2str / ldap_set_option / ldap_get_option / ldap_start_tls / ldap_sasl_bind /
+ * ldap_compare / ldap_set_rebind_proc
+ * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32107, #32109, #32121, #32146, #32147, #32148).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -39,6 +40,8 @@ final class LdapRuntime
     private const LDAP_LINK_REGISTER_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::registerHandleArgv';
 
     private const LDAP_BIND_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::bindArgv';
+
+    private const LDAP_BIND_EXT_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::bindExtArgv';
 
     private const LDAP_SASL_BIND_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::saslBindArgv';
 
@@ -79,6 +82,7 @@ final class LdapRuntime
     private const LINK_HELPERS = [
         self::LDAP_LINK_REGISTER_HELPER,
         self::LDAP_BIND_HELPER,
+        self::LDAP_BIND_EXT_HELPER,
         self::LDAP_SASL_BIND_HELPER,
         self::LDAP_UNBIND_HELPER,
         self::LDAP_ERRNO_HELPER,
@@ -194,6 +198,17 @@ final class LdapRuntime
             self::LINK_HELPER_PATH,
             self::LINK_HELPERS,
             '#32001'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_bind_ext',
+            'ldap_bind_ext_bridge_entry',
+            [$i64, $strPtr, $strPtr, $i64, $i64],
+            $valuePtr,
+            self::LDAP_BIND_EXT_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32146'
         );
         JitVmHelperLink::ensureBridge(
             $context,

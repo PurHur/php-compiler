@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\OpCode;
 
 /**
@@ -11,6 +12,7 @@ use PHPCompiler\OpCode;
  *
  * php-src: Zend/zend_execute.c — ZEND_INCLUDE_OR_EVAL, once-guard, return value
  * php-src: main/fopen_wrappers.c — missing-file stream + Failed opening diagnostics (#30029)
+ * php-src: Zend/zend_compile.c — include syntax failures become catchable ParseError (#32154)
  */
 final class VmInclude
 {
@@ -57,6 +59,75 @@ final class VmInclude
             $path,
             $includePath
         );
+    }
+
+    /**
+     * True when include/require compile failed with a Zend parser syntax error (#32154).
+     *
+     * php-src: zend_compile_file / ZEND_INCLUDE_OR_EVAL — syntax rejects throw catchable
+     * ParseError into the caller; they must not abort the process as parseAndCompile failure.
+     */
+    public static function isCatchableSyntaxParseThrowable(\Throwable $e): bool
+    {
+        if ($e instanceof \ParseError || $e instanceof \PhpParser\Error) {
+            return true;
+        }
+
+        return CompileFatal::isSyntaxParseErrorMessage(self::stripParserLineSuffix($e->getMessage()));
+    }
+
+    /**
+     * php-parser / CompileFatal text toward Zend "syntax error, …" (zend_language_parser.y).
+     */
+    public static function syntaxParseMessage(\Throwable $e): string
+    {
+        return self::normalizeSyntaxParseMessage($e->getMessage());
+    }
+
+    public static function normalizeSyntaxParseMessage(string $detail): string
+    {
+        $message = trim($detail);
+        if (str_starts_with(strtolower($message), 'parse error:')) {
+            $message = trim(substr($message, strlen('Parse error:')));
+        }
+        $message = self::stripParserLineSuffix($message);
+        if (str_starts_with($message, 'Syntax error,')) {
+            return 'syntax error,'.substr($message, strlen('Syntax error,'));
+        }
+
+        return $message;
+    }
+
+    public static function syntaxParseLine(\Throwable $e): int
+    {
+        if ($e instanceof \PhpParser\Error) {
+            $line = $e->getStartLine();
+            if ($line > 0) {
+                return $line;
+            }
+        }
+        if ($e instanceof CompileFatal && $e->sourceLine > 0) {
+            return $e->sourceLine;
+        }
+        if (preg_match('/\bon line (\d+)\b/', $e->getMessage(), $m)) {
+            return max(1, (int) $m[1]);
+        }
+        if ($e->getCode() > 0) {
+            return $e->getCode();
+        }
+
+        return 1;
+    }
+
+    /** php-parser appends " on line N"; Zend ParseError messages do not. */
+    public static function stripParserLineSuffix(string $message): string
+    {
+        $message = trim($message);
+        if (1 === preg_match('/^(.*) on line \d+$/', $message, $m)) {
+            return trim($m[1]);
+        }
+
+        return $message;
     }
 
     /**

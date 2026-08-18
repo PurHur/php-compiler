@@ -17,6 +17,9 @@ final class IncludeHelperShrinkTest extends TestCase
         $this->assertStringContainsString('IncludeJitHelper::', $source);
         $this->assertStringContainsString('IncludeBindingJitHelper::', $source);
         $this->assertStringContainsString('IncludeBindingEmitHelper::', $source);
+        $this->assertStringContainsString('VmInclude::isCatchableSyntaxParseThrowable', $source);
+        $this->assertStringContainsString('emitCatchableClassError', $source);
+        $this->assertStringContainsString("'ParseError'", $source);
         $this->assertStringNotContainsString('function shouldSkipSelfHostSpineCliInclude', $source);
         $this->assertStringNotContainsString('function shouldStubM3SidecarHostNonLiteralInclude', $source);
         $this->assertStringNotContainsString('function resolveLiteralPath', $source);

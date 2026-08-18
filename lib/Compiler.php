@@ -58,6 +58,7 @@ use PHPCompiler\Compiler\InterfaceMethodVisibilityCheck;
 use PHPCompiler\Compiler\EnumAbstractMethodCompileCheck;
 use PHPCompiler\Compiler\EnumBuiltinMethodRedeclareCheck;
 use PHPCompiler\Compiler\ClassConstDuplicateCheck;
+use PHPCompiler\Compiler\ClosureUseDuplicateCompileCheck;
 use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
@@ -14839,7 +14840,20 @@ class Compiler {
                     $closureUseVars[] = $useVar;
                 }
             }
+            // php-src zend_compile_closure_binding: $this, then lexical-table uniqueness (#32152, #32153).
             $this->assertNoThisInClosureUseVars($closureUseVars, $expr);
+            $dupUseName = ClosureUseDuplicateCompileCheck::firstDuplicateName($closureUseVars);
+            if (null !== $dupUseName) {
+                $sourceFile = $expr->getFile();
+                if ('' === $sourceFile) {
+                    $sourceFile = 'unknown';
+                }
+                $this->throwCompileError(
+                    ClosureUseDuplicateCompileCheck::messageFor($dupUseName),
+                    $sourceFile,
+                    $expr->getLine()
+                );
+            }
         }
         try {
             $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func, $closureUseVars);

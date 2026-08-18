@@ -1022,6 +1022,14 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
+            // include/require syntax errors are catchable ParseError in the caller (#32154);
+            // do not leak parseAndCompile / PhpParser / bundle_snippet on stderr.
+            if ($forIncludeTarget && VM\VmInclude::isCatchableSyntaxParseThrowable($e)) {
+                $detail = $this->compiler->getCompileAbortDetail();
+                $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
+                $this->recordLastParseFailure(sprintf('%s: %s', $filename, $primary));
+                throw $e;
+            }
             $this->emitParseCompileFailureStderr($filename, $e, isset($code) ? $code : null);
             throw $e;
         } finally {
