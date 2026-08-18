@@ -1231,12 +1231,21 @@ final class TryCatchHelper
             return;
         }
         $handler->finallyBodyCompiled = true;
-        $jit->compileFinallyAtEntry($func, $handler->finallyOp->block1, $handler->finallyBb, ...$args);
+        $compiledTail = $jit->compileFinallyAtEntry($func, $handler->finallyOp->block1, $handler->finallyBb, ...$args);
         $builder = $context->builder;
-        $builder->positionAtEnd($handler->finallyBb);
-        $finallyTail = $builder->getInsertBlock();
-        if (null !== $finallyTail && null === $finallyTail->getTerminator()) {
-            $builder->positionAtEnd($finallyTail);
+        // Prefer the live tail — boxed stores / extra BBs terminate finallyBb itself
+        // (`$x+=`, echo helpers). Repositioning at the start then skipped the epilogue
+        // branch whenever that entry already had a terminator; sealFunction emitted
+        // `ret void` on the open tail, so post-try/catch/finally code never ran (#32371).
+        // Same open-insert preference as catch-arm tails (#23641 / #24105).
+        $openTail = $builder->getInsertBlock();
+        if (null !== $openTail && null === $openTail->getTerminator()) {
+            $compiledTail = $openTail;
+        } elseif (null === $compiledTail || null !== $compiledTail->getTerminator()) {
+            $compiledTail = $handler->finallyBb;
+        }
+        if (null !== $compiledTail && null === $compiledTail->getTerminator()) {
+            $builder->positionAtEnd($compiledTail);
             $builder->branch(self::finallyEpilogueBbFor($jit, $func, $context, $handler, $args));
         }
     }
