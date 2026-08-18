@@ -1045,9 +1045,14 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('__compiler_assert_options', $fnAssertOptions);
         $i8p = $this->context->getTypeFromString('int8*');
-        $i64p = $this->context->getTypeFromString('int64*');
-        $charPtr = $this->context->getTypeFromString('char*');
-        $sizeT = $this->context->getTypeFromString('size_t');
+        // Dead always-on libc decls removed (#32173 / peer getrandom #32139):
+        // getloadavg(3) — user-script sys_getloadavg() is SysGetloadavgJitHelper / VmSys
+        //   / `__compiler_sys_getloadavg` (#12106); no NestedJIT lookup remains.
+        // sleep(3)/usleep(3) — SleepJitHelper / VmSleepPure / MathSleep (#9378).
+        // localtime/gmtime/strftime/strptime/timegm/mktime — MktimeJitHelper /
+        //   GmmktimeJitHelper / StrftimeJitHelper / StrptimeJitHelper /
+        //   FormatDatetimeJitHelper / VmDate (#9132). Live NestedJIT kernels keep
+        //   time/gettimeofday/getpid/getppid/strerror/getgid/getuid/geteuid/getpwuid.
         $libcFns = [
             'time' => [$i64, false, [$i8p]],
             'gettimeofday' => [$i32, false, [$i8p, $i8p]],
@@ -1058,15 +1063,6 @@ class Type extends Builtin {
             'getuid' => [$i32, false, []],
             'geteuid' => [$i32, false, []],
             'getpwuid' => [$i8p, false, [$i32]],
-            'localtime' => [$i8p, false, [$i64p]],
-            'gmtime' => [$i8p, false, [$i64p]],
-            'strftime' => [$sizeT, false, [$i8p, $sizeT, $charPtr, $i8p]],
-            'strptime' => [$charPtr, false, [$charPtr, $charPtr, $i8p]],
-            'timegm' => [$i64, false, [$i8p]],
-            'mktime' => [$i64, false, [$i8p]],
-            'sleep' => [$i32, false, [$i32]],
-            'usleep' => [$i32, false, [$i32]],
-            'getloadavg' => [$i32, false, [$double->pointerType(0), $i32]],
         ];
         foreach ($libcFns as $libcName => $spec) {
             [$ret, $vararg, $params] = $spec;
