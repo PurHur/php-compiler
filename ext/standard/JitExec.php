@@ -12,6 +12,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -49,10 +50,11 @@ final class JitExec
 
         $context->builder->positionAtEnd($okBlock);
         $lines = self::readLines($context, $capture);
-        if ($argc >= 2) {
+        // Densify pads omitted output when only result_code is named (#23625).
+        if ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             self::writeHashtableRef($context, $args[1], $lines);
         }
-        if ($argc >= 3) {
+        if ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             self::writeStatusRef($context, $args[2], self::readStatus($context, $capture));
         }
         $lastLine = self::lastLine($context, $lines);
@@ -76,7 +78,13 @@ final class JitExec
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
-        return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, false, 'passthru');
+        return self::runWithStdout(
+            $context,
+            $args[0],
+            ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1])) ? $args[1] : null,
+            false,
+            'passthru'
+        );
     }
 
     public static function system(Context $context, JITVariable ...$args): Value
@@ -87,7 +95,13 @@ final class JitExec
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
-        return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, true, 'system');
+        return self::runWithStdout(
+            $context,
+            $args[0],
+            ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1])) ? $args[1] : null,
+            true,
+            'system'
+        );
     }
 
     private static function runWithStdout(

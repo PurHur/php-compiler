@@ -233,6 +233,8 @@
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437JITTest.php</file>
+            <file>./test/compliance/ExecPassthruSystemNamed23625VMTest.php</file>
+            <file>./test/compliance/ExecPassthruSystemNamed23625JITTest.php</file>
             <file>./test/compliance/BaseConvertAddcslashesHashFileNamed23507VMTest.php</file>
             <file>./test/compliance/BaseConvertAddcslashesHashFileNamed23507JITTest.php</file>
             <file>./test/compliance/DebugPrintBacktraceVoid28909VMTest.php</file>

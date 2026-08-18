@@ -3636,6 +3636,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($cmd, 'str', 'escapeshellcmd'));
     }
 
+    /** @covers issue #23625 */
+    public function testExecPassthruSystemZendStubNamedParams(): void
+    {
+        $exec = BuiltinParamNames::forFunction('exec');
+        self::assertSame(['command', 'output=', 'result_code='], $exec);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($exec, 'command', 'exec'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($exec, 'output', 'exec'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($exec, 'result_code', 'exec'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($exec, 'return_value', 'exec'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('exec'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('exec'));
+        self::assertSame([1, 2], BuiltinByRefParams::forFunction('exec'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('exec'));
+
+        foreach (['passthru', 'system'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['command', 'result_code='], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'command', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'result_code', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'return_value', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame([1], BuiltinByRefParams::forFunction($fn));
+        }
+        self::assertSame('?false', BuiltinInternalArgInfo::returnTypeLabelForFunction('passthru'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('system'));
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
