@@ -8,13 +8,18 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * ldap_compare() for compiled JIT/AOT modules (#32121).
+ * ldap_compare() / ldap_count_entries() for compiled JIT/AOT modules (#32121, #32172).
  *
- * SSOT: {@see VmLdapCore::compare}
- * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_compare)
+ * SSOT: {@see VmLdapCore::compare} / {@see VmLdapNative::countEntries}
+ * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_compare) / ldap_count_entries
  */
 final class LdapResultJitHelper
 {
+    public static function registerHandleArgv(int $handle): void
+    {
+        VmLdapResult::claimPendingJitHandle($handle);
+    }
+
     public static function compareArgv(int $handle, string $dn, string $attribute, string $value): Variable
     {
         $conn = self::requireConnection($handle, 'ldap_compare');
@@ -27,6 +32,17 @@ final class LdapResultJitHelper
         }
 
         return $out;
+    }
+
+    public static function countEntriesArgv(int $connHandle, int $resultHandle): int
+    {
+        $conn = self::requireConnection($connHandle, 'ldap_count_entries');
+        $result = self::requireResult($resultHandle, 'ldap_count_entries');
+
+        return VmLdapNative::countEntries(
+            VmLdapConnection::native($conn),
+            VmLdapResult::resultNative($result)
+        );
     }
 
     private static function requireConnection(int $handle, string $function): ObjectEntry
@@ -44,5 +60,22 @@ final class LdapResultJitHelper
         }
 
         return $conn;
+    }
+
+    private static function requireResult(int $handle, string $function): ObjectEntry
+    {
+        if (VmLdapResult::isFreedLookupKey($handle)) {
+            throw new \TypeError(
+                $function.'(): supplied LDAP\\Result is not a valid ldap result resource'
+            );
+        }
+        $result = VmLdapResult::resultForLookupKey($handle);
+        if (null === $result) {
+            throw new \TypeError(
+                $function.'(): Argument #2 ($result) must be of type LDAP\\Result, mixed given'
+            );
+        }
+
+        return $result;
     }
 }

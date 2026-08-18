@@ -18,7 +18,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ldap_bind() / ldap_bind_ext() / ldap_sasl_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() / ldap_set_rebind_proc() (#32001, #32002, #32107, #32109, #32146, #32147, #32148). */
+/** LLVM lowering for ldap_bind() / ldap_bind_ext() / ldap_sasl_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() / ldap_set_rebind_proc() (#32001, #32002, #32107, #32109, #32146, #32147, #32148, #32172). */
 final class JitLdapLink
 {
     /** @param list<JITVariable> $args */
@@ -186,13 +186,16 @@ final class JitLdapLink
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_ldap_bind_ext'),
-            $handle,
-            $dn,
-            $password,
-            $hasDn,
-            $hasPassword
+        return JitLdapResult::registerReturnedResult(
+            $context,
+            $context->builder->call(
+                $context->lookupFunction('__compiler_ldap_bind_ext'),
+                $handle,
+                $dn,
+                $password,
+                $hasDn,
+                $hasPassword
+            )
         );
     }
 

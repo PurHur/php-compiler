@@ -22,11 +22,17 @@ final class VmLdapResult
 
     public const ENTRY_CLASS_NAME = 'LDAP\\ResultEntry';
 
-    /** @var array<int, array{native: \FFI\CData, freed: bool, connection_id: int}> */
+    /** @var array<int, array{native: \FFI\CData, freed: bool, connection_id: int, object: ObjectEntry}> */
     private static array $results = [];
 
     /** @var array<int, array{native: \FFI\CData, connection_id: int, result_id: int, ber: ?\FFI\CData}> */
     private static array $entries = [];
+
+    /** @var list<int> object ids from wrapResult awaiting JIT handle registration (#32172) */
+    private static array $pendingJitHandleIds = [];
+
+    /** @var array<int, int> JIT object address (ptrToInt) => object id */
+    private static array $jitHandleToId = [];
 
     public static function registerClasses(Context $ctx): void
     {
@@ -51,11 +57,57 @@ final class VmLdapResult
             'native' => $native,
             'freed' => false,
             'connection_id' => $connection->id,
+            'object' => $object,
         ];
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
 
         return $var;
+    }
+
+    /** Enqueue object id after ldap_bind_ext() NestedJIT helper wrap (#32172). */
+    public static function enqueuePendingJitHandle(int $objectId): void
+    {
+        self::$pendingJitHandleIds[] = $objectId;
+    }
+
+    /** Map compiled __object__* address to VM result state after Result wrap JIT (#32172). */
+    public static function claimPendingJitHandle(int $handle): void
+    {
+        if ($handle <= 0 || [] === self::$pendingJitHandleIds) {
+            return;
+        }
+        self::$jitHandleToId[$handle] = (int) \array_shift(self::$pendingJitHandleIds);
+    }
+
+    public static function resultForLookupKey(int $handle): ?ObjectEntry
+    {
+        if ($handle <= 0) {
+            return null;
+        }
+        $id = self::$jitHandleToId[$handle] ?? null;
+        if (null === $id || !isset(self::$results[$id])) {
+            return null;
+        }
+        $object = self::$results[$id]['object'];
+        if (!self::isLiveResult($object)) {
+            return null;
+        }
+
+        return $object;
+    }
+
+    public static function isFreedLookupKey(int $handle): bool
+    {
+        if ($handle <= 0) {
+            return false;
+        }
+        $id = self::$jitHandleToId[$handle] ?? null;
+        if (null === $id || !isset(self::$results[$id])) {
+            return false;
+        }
+
+        return (bool) self::$results[$id]['freed'];
     }
 
     public static function wrapEntry(\FFI\CData $native, Context $ctx, ObjectEntry $connection, int $resultId): Variable

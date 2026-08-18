@@ -33,6 +33,9 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LdapLinkJitHelper::getOptionValueArgv', $source);
         $this->assertStringContainsString('LdapLinkJitHelper::startTlsArgv', $source);
         $this->assertStringContainsString('LdapLinkJitHelper::setRebindProcClearArgv', $source);
+        $this->assertStringContainsString('LdapResultJitHelper::compareArgv', $source);
+        $this->assertStringContainsString('LdapResultJitHelper::registerHandleArgv', $source);
+        $this->assertStringContainsString('LdapResultJitHelper::countEntriesArgv', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('__compiler_ldap_escape', $source);
         $this->assertStringContainsString('__compiler_ldap_connect_wallet', $source);
@@ -49,8 +52,10 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_ldap_start_tls', $source);
         $this->assertStringContainsString('__compiler_ldap_set_rebind_proc', $source);
         $this->assertStringContainsString('__compiler_ldap_compare', $source);
+        $this->assertStringContainsString('__compiler_ldap_result_register', $source);
+        $this->assertStringContainsString('__compiler_ldap_count_entries', $source);
         $this->assertStringContainsString('ldap_connect_bridge_entry', $source);
-        $this->assertSame(19, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
+        $this->assertSame(21, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
