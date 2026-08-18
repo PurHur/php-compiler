@@ -2769,12 +2769,26 @@ final class VmSoapClient
             $qname = [$prefix, $soapVar['stype']];
         }
 
-        // SOAP_ENC_OBJECT / SOAP_ENC_ARRAY stay on the generic array path (#32192).
+        // php-src to_xml_object — SOAP_ENC_OBJECT is SOAP-ENC:Struct / enc:Struct (#32192).
+        if (\is_array($inner) && SoapConstants::SOAP_ENC_OBJECT === $encType) {
+            $child = '';
+            foreach ($inner as $k => $v) {
+                $child .= self::encodeParam(\is_int($k) ? 'item' : (string) $k, $v, $state, $ctx);
+            }
+            $structType = SoapConstants::SOAP_1_2 === ($state?->soapVersion ?? SoapConstants::SOAP_1_1)
+                ? 'enc:Struct'
+                : 'SOAP-ENC:Struct';
+            if ($literal) {
+                return '<'.$qtag.$xmlnsAttr.'>'.$child.'</'.$qtag.'>';
+            }
+
+            return '<'.$qtag.$xmlnsAttr.' xsi:type="'.$structType.'">'.$child.'</'.$qtag.'>';
+        }
+        // SOAP_ENC_ARRAY / untyped arrays stay on the generic array path.
         if (
             \is_array($inner)
             && (
-                SoapConstants::SOAP_ENC_OBJECT === $encType
-                || SoapConstants::SOAP_ENC_ARRAY === $encType
+                SoapConstants::SOAP_ENC_ARRAY === $encType
                 || SoapConstants::XSD_ANYTYPE === $encType
                 || 0 === $encType
             )
