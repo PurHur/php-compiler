@@ -9133,8 +9133,10 @@ restart:
                                 goto restart;
                             }
                             // Declared-but-UNDEF (e.g. after unset): BP_VAR_RW ++/-- warns like a read (#29241).
+                            // Magic __get supplies the value — no Undefined property (#31992, zend_object_handlers.c).
                             $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op)
-                                && $this->objectPropertySlotIsUndefinedForRwWarn($propertyObject, $name, $frame);
+                                && $this->objectPropertySlotIsUndefinedForRwWarn($propertyObject, $name, $frame)
+                                && !$this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
                             $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame, $op);
                             if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                                 VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
@@ -9346,7 +9348,9 @@ restart:
                             goto restart;
                         }
                         // Missing dynamic prop: create then Undefined property for ++/-- (BP_VAR_RW, #29241).
-                        $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op);
+                        // Magic __get supplies the value — no Undefined property (#31992, zend_object_handlers.c).
+                        $warnUndefAfterRw = $this->propertyFetchDestUsedAsIncDec($frame, $op)
+                            && !$this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
                         $writeLvalue = $this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame, $op);
                         if ($this->propertyFetchDestUsedAsLiveRefBinding($frame, $op)) {
                             VM\TypedPropertyCheck::prepareWritableByReference($writeLvalue);
