@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -187,6 +188,10 @@ final class ObjectStaticPropertyLlvm
         if (Variable::TYPE_VALUE === $entry['type']) {
             if ($forWrite) {
                 $loaded = self::ensureHeapValueBox($context, $entry['global'], $loaded);
+            } else {
+                // ZEND_FETCH_STATIC_PROP_R + zend_assign_to_variable copies the zval.
+                // Returning the module box aliases A::$a with $b (#32307, zend_hash.c zend_array_dup).
+                return self::copyBoxedStaticForRead($context, $loaded);
             }
             $var = new Variable(
                 $context,
@@ -198,11 +203,19 @@ final class ObjectStaticPropertyLlvm
             $var->staticPropertyType = $entry['type'];
             $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
             $var->staticPropertyDnfArms = $object->dnfArmsForStaticProperty($classId, $name);
-            if ($forWrite) {
-                $var->valueBoxAliasPtr = JitValueBox::normalizeValuePtr($context, $loaded);
-            }
+            $var->valueBoxAliasPtr = JitValueBox::normalizeValuePtr($context, $loaded);
 
             return $var;
+        }
+        if (!$forWrite && Variable::TYPE_HASHTABLE === $entry['type']) {
+            $loaded = self::duplicateHashtablePointer($context, $loaded);
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $loaded
+            );
         }
         $var = new Variable(
             $context,
@@ -216,6 +229,110 @@ final class ObjectStaticPropertyLlvm
         $var->staticPropertyDnfArms = $object->dnfArmsForStaticProperty($classId, $name);
 
         return $var;
+    }
+
+    /**
+     * ZEND_FETCH_STATIC_PROP_R: boxed statics must not return the module {@see __value__}
+     * pointer. Arrays are zend_array_dup'd so `$b = A::$a; $b[0] = 99` does not mutate
+     * `A::$a` (#32307; php-src Zend/zend_hash.c, Zend/zend_execute.c zend_assign_to_variable).
+     */
+    private static function copyBoxedStaticForRead(Context $context, Value $srcPtr): Variable
+    {
+        HashTableDuplicateRuntime::ensureLinked($context);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $nullPtr = $valuePtrTy->constNull();
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $srcPtr, $nullPtr);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $nullBlock = $fn->appendBasicBlock('static_prop_r_box_null');
+        $liveBlock = $fn->appendBasicBlock('static_prop_r_box_live');
+        $doneBlock = $fn->appendBasicBlock('static_prop_r_box_done');
+        $context->builder->branchIf($isNull, $nullBlock, $liveBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($liveBlock);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($srcPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        // Boxed arrays store JIT TYPE_HASHTABLE (7|IS_REFCOUNTED) or VM TYPE_ARRAY (6).
+        $isHtJit = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isHtVm = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
+        );
+        $isHt = $context->builder->or($isHtJit, $isHtVm);
+        $htBlock = $fn->appendBasicBlock('static_prop_r_box_ht');
+        $copyBlock = $fn->appendBasicBlock('static_prop_r_box_copy');
+        $context->builder->branchIf($isHt, $htBlock, $copyBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $srcPtr
+        );
+        $htCopy = self::duplicateHashtablePointer($context, $ht);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $destPtr,
+            $htCopy
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($copyBlock);
+        JitValueBox::copyFromPointer($context, $slot, $srcPtr);
+        $afterCopy = $context->builder->getInsertBlock();
+        if (null !== $afterCopy && null === $afterCopy->getTerminator()) {
+            $context->builder->branch($doneBlock);
+        }
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+    }
+
+    /**
+     * Duplicate a native {@see __hashtable__*} (null stays null).
+     * php-src: Zend/zend_hash.c zend_array_dup.
+     */
+    private static function duplicateHashtablePointer(Context $context, Value $srcHt): Value
+    {
+        HashTableDuplicateRuntime::ensureLinked($context);
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtrTy->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $srcHt, $nullHt);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $dupBlock = $fn->appendBasicBlock('static_prop_r_ht_dup');
+        $doneBlock = $fn->appendBasicBlock('static_prop_r_ht_done');
+        $entry = $context->builder->getInsertBlock();
+        $context->builder->branchIf($isNull, $doneBlock, $dupBlock);
+
+        $context->builder->positionAtEnd($dupBlock);
+        $copy = HashTableDuplicateRuntime::duplicate($context, $srcHt);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($htPtrTy, 'static_prop_r_ht_phi');
+        $phi->addIncoming($nullHt, $entry);
+        $phi->addIncoming($copy, $dupBlock);
+
+        return $phi;
     }
 
     /** isset(Class::$prop) without reading uninitialized typed slots (#15112, zend_object_handlers.c). */

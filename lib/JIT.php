@@ -10042,7 +10042,13 @@ class JIT {
                     $classId = $this->context->type->object->resolveClassId($classOp);
                     $className = $this->context->type->object->classNameForId($classId);
                     if ($nameOp instanceof Operand\Literal) {
-                        $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                        $destSlot = (int) $op->arg1;
+                        // FETCH_STATIC_PROP_W: assign / dim-write / dim-RW must alias the module
+                        // slot. FETCH_R by-value copies (zend_array_dup) so `$b = A::$a` does not
+                        // share storage (#32307).
+                        $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsDimWriteContainer($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsDimRwContainer($block, $i, $destSlot);
                         if (!$forWrite) {
                             $hookFetched = JIT\PropertyHookDispatch::tryEmitStaticPropertyGet(
                                 $this->context,
