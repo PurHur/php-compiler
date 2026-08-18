@@ -6,13 +6,14 @@ namespace PHPCompiler\ext\curl;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\CurlShareStrerrorRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\VmMath;
 use PHPLLVM\Value;
 
 /**
- * curl_share_strerror() — libcurl share error string (php-src ext/curl/share.c; #20531).
+ * curl_share_strerror() — libcurl share error string (php-src ext/curl/share.c; #20531, #32340 JIT/AOT).
  *
  * Reflection stub: int $error_code → ?string (#27810; curl.stub.php via
  * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
@@ -41,6 +42,13 @@ final class curl_share_strerror extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('curl_share_strerror() is not implemented for JIT in this compiler build (issue #20531)');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(\sprintf(
+                'curl_share_strerror() expects exactly 1 argument, %d given',
+                \count($args)
+            ));
+        }
+
+        return CurlShareStrerrorRuntime::strerror($context, $args[0]);
     }
 }

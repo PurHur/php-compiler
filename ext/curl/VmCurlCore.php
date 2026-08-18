@@ -148,13 +148,13 @@ final class VmCurlCore
     }
 
     /**
-     * libcurl curl_share_strerror() — php-src curl_share_strerror() (#20531).
+     * libcurl curl_share_strerror() — php-src curl_share_strerror() (#20531, #32340).
      *
      * Unknown codes return "CURLSHcode unknown" (libcurl never returns NULL for these).
      */
     public static function shareStrerror(int $code): string
     {
-        return self::SHARE_ERRORS[$code] ?? 'CURLSHcode unknown';
+        return CurlShareStrerrorJitHelper::message($code);
     }
 
     /** @var array<int, string> php-src curl_multi_strerror / CURLM_* */
@@ -164,15 +164,5 @@ final class VmCurlCore
         2 => 'Invalid easy handle',
         3 => 'Out of memory',
         4 => 'Internal error',
-    ];
-
-    /** @var array<int, string> php-src curl_share_strerror / CURLSHE_* (#20531) */
-    private const SHARE_ERRORS = [
-        0 => 'No error',
-        1 => 'Unknown share option',
-        2 => 'Share currently in use',
-        3 => 'Invalid share handle',
-        4 => 'Out of memory',
-        5 => 'Feature not enabled in this library',
     ];
 }
