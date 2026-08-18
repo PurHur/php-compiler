@@ -885,6 +885,63 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Document-order elements matching getElementsByTagNameNS (#32415).
+     *
+     * php-src: ext/dom/php_dom.c php_dom_get_elements_by_tag_name_ns_helper —
+     * namespace "*" matches any URI (including empty); localName "*" matches any
+     * local name; otherwise xmlStrEqual on URI + local.
+     *
+     * @return list<array{local: string, prefix: string, qname: string, ns: string}>
+     */
+    public static function elementsByTagNameNSArgv(
+        string $xml,
+        string $namespaceUri,
+        string $localName
+    ): array {
+        $matches = [];
+        foreach (self::walkElementsInScopeNamespaces($xml) as $element) {
+            $ns = $element['inScope'][$element['prefix']] ?? '';
+            $nsMatch = '*' === $namespaceUri || $ns === $namespaceUri;
+            $nameMatch = '*' === $localName || $element['local'] === $localName;
+            if ($nsMatch && $nameMatch) {
+                $matches[] = [
+                    'local' => $element['local'],
+                    'prefix' => $element['prefix'],
+                    'qname' => $element['qname'],
+                    'ns' => $ns,
+                ];
+            }
+        }
+
+        return $matches;
+    }
+
+    public static function countElementsByTagNameNSArgv(
+        string $xml,
+        string $namespaceUri,
+        string $localName
+    ): int {
+        return \count(self::elementsByTagNameNSArgv($xml, $namespaceUri, $localName));
+    }
+
+    /**
+     * @return null|array{local: string, prefix: string, qname: string, ns: string}
+     */
+    public static function nthElementByTagNameNSArgv(
+        string $xml,
+        string $namespaceUri,
+        string $localName,
+        int $index
+    ): ?array {
+        if ($index < 0) {
+            return null;
+        }
+        $matches = self::elementsByTagNameNSArgv($xml, $namespaceUri, $localName);
+
+        return $matches[$index] ?? null;
+    }
+
+    /**
      * Document-order elements with in-scope prefix→URI maps (xml always present; #20097/#20206).
      *
      * @return list<array{local: string, prefix: string, qname: string, inScope: array<string, string>}>
