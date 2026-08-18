@@ -393,6 +393,9 @@ final class BuiltinInternalArgInfo
             // ext/intl/collator/collator.stub.php — InternalArgInfo int / Collator (missing |false / ?) (#25497)
             'collator_compare' => 'int|false',
             'collator_create' => '?Collator',
+            // ext/intl/php_intl.stub.php — InternalArgInfo string/bool (missing ?) (#25198)
+            'locale_lookup' => '?string',
+            'locale_filter_matches' => '?bool',
             // ext/intl/calendar/calendar.stub.php — @alias intlcal_create_instance; absent from InternalArgInfo (#27944)
             'intlcal_create_instance' => '?IntlCalendar',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
@@ -1027,6 +1030,19 @@ final class BuiltinInternalArgInfo
                 default => null,
             },
             'collator_create' => 0 === $index ? 'string' : null,
+            // ext/intl/php_intl.stub.php — array/string/bool/?string $defaultLocale = null (#25198)
+            'locale_lookup' => match ($index) {
+                0 => 'array',
+                1 => 'string',
+                2 => 'bool',
+                3 => '?string',
+                default => null,
+            },
+            'locale_filter_matches' => match ($index) {
+                0, 1 => 'string',
+                2 => 'bool',
+                default => null,
+            },
             // ext/intl/calendar/calendar.stub.php — $timezone untyped; ?string $locale = null (#27944)
             'intlcal_create_instance' => match ($index) {
                 0 => '',
@@ -1894,6 +1910,13 @@ final class BuiltinInternalArgInfo
             'simplexmlelement::addattribute' => 2 === $index ? '?string' : null,
             'simplexmlelement::children',
             'simplexmlelement::attributes' => 0 === $index ? '?string' : null,
+            // ext/intl/locale/locale.stub.php — ?string $defaultLocale = null (#25198)
+            'locale::lookup' => 3 === $index ? '?string' : null,
+            'locale::filtermatches' => match ($index) {
+                0, 1 => 'string',
+                2 => 'bool',
+                default => null,
+            },
             // ext/intl/spoofchecker/spoofchecker.stub.php — string $string / $string1/$string2 (#25055)
             'spoofchecker::issuspicious' => 0 === $index ? 'string' : null,
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,

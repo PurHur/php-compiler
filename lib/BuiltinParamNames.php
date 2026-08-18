@@ -118,6 +118,9 @@ final class BuiltinParamNames
             'recursiveregexiterator::__construct' => ['iterator', 'pattern', 'mode=', 'flags=', 'pregFlags='],
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
+            // php-src ext/intl/locale/locale.stub.php — InternalArgInfo still langtag/default (#25198)
+            'locale::lookup' => ['languageTag', 'locale', 'canonicalize=', 'defaultLocale='],
+            'locale::filtermatches' => ['languageTag', 'locale', 'canonicalize='],
             'collator::asort' => ['array', 'flags'],
             // php-src ext/intl/collator/collator.stub.php — OOP getSortKey(string $string); InternalArgInfo still coll/str (#28785)
             'collator::getsortkey' => ['string'],
@@ -2180,6 +2183,11 @@ final class BuiltinParamNames
                 return ['object', 'string1', 'string2'];
             case 'collator_create':
                 return ['locale'];
+            // php-src ext/intl/php_intl.stub.php — InternalArgInfo still langtag/default (#25198)
+            case 'locale_lookup':
+                return ['languageTag', 'locale', 'canonicalize=', 'defaultLocale='];
+            case 'locale_filter_matches':
+                return ['languageTag', 'locale', 'canonicalize='];
             // php-src ext/intl/calendar/calendar.stub.php — both optional; $timezone untyped (#27944)
             case 'intlcal_create_instance':
                 return ['timezone=', 'locale='];

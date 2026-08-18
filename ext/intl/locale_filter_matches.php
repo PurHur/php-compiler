@@ -29,7 +29,7 @@ final class locale_filter_matches extends Internal
                 $argc
             ));
         }
-        $langtag = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'locale_filter_matches', 0, 'langtag');
+        $langtag = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'locale_filter_matches', 0, 'languageTag');
         $locale = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'locale_filter_matches', 1, 'locale');
         $canonicalize = false;
         if ($argc >= 3) {
