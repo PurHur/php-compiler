@@ -16,12 +16,7 @@ echo 'matches_b_last=', $b->matches(':last-child') ? 'yes' : 'no', "\n";
 $closest = $b->closest('div:first-child, p:last-child');
 echo 'closest=', $closest !== null ? $closest->id : 'null', "\n";
 
-try {
-    $doc->querySelector('p:nth-child(2)');
-    echo "nth=ok\n";
-} catch (DOMException $e) {
-    echo 'nth=', $e->getMessage(), "\n";
-}
+echo 'nth=', $doc->querySelector('p:nth-child(2)') !== null ? 'yes' : 'no', "\n";
 try {
     $doc->querySelector('p:foo');
     echo "unknown=ok\n";
@@ -29,7 +24,7 @@ try {
     echo 'unknown=', $e->getMessage(), "\n";
 }
 
-// Text sibling before element → not :first-child
+// Text sibling before element still matches :first-child (element siblings only in css selectors).
 $doc2 = Dom\HTMLDocument::createFromString(
     '<html><body><div id="t">x<p id="p">y</p></div></body></html>'
 );

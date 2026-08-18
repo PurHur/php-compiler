@@ -952,17 +952,14 @@ final class VmDomLiving
     }
 
     /**
-     * Consume one simple selector, treating `[…]` (with quoted values) as atomic
-     * so `~` / `=` / spaces inside attribute selectors are not combinators (#32089).
+     * Consume one simple selector, treating `[…]` and pseudo-function `(…)` bodies
+     * as atomic so selector operators inside them are not combinators (#32089, #32108).
      */
     private static function takeSimpleSelectorToken(string $selector, int &$i, int $len): ?string
     {
         $start = $i;
         while ($i < $len) {
             $ch = $selector[$i];
-            if (ctype_space($ch) || '>' === $ch || '+' === $ch || '~' === $ch) {
-                break;
-            }
             if ('[' === $ch) {
                 $end = self::scanAttributeSelectorClose($selector, $i, $len);
                 if (null === $end) {
@@ -971,6 +968,17 @@ final class VmDomLiving
                 $i = $end;
                 continue;
             }
+            if ('(' === $ch) {
+                $end = self::scanParenthesisClose($selector, $i, $len);
+                if (null === $end) {
+                    return null;
+                }
+                $i = $end;
+                continue;
+            }
+            if (ctype_space($ch) || '>' === $ch || '+' === $ch || '~' === $ch) {
+                break;
+            }
             ++$i;
         }
         if ($i === $start) {
@@ -978,6 +986,54 @@ final class VmDomLiving
         }
 
         return substr($selector, $start, $i - $start);
+    }
+
+    /**
+     * @return int|null index after the matching `)`, or null if unclosed
+     */
+    private static function scanParenthesisClose(string $selector, int $i, int $len): ?int
+    {
+        if ($i >= $len || '(' !== $selector[$i]) {
+            return null;
+        }
+        ++$i;
+        $depth = 1;
+        $quote = null;
+        while ($i < $len) {
+            $ch = $selector[$i];
+            if (null !== $quote) {
+                if ('\\' === $ch && ($i + 1) < $len) {
+                    $i += 2;
+                    continue;
+                }
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                ++$i;
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                ++$i;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depth;
+                ++$i;
+                continue;
+            }
+            if (')' === $ch) {
+                --$depth;
+                ++$i;
+                if (0 === $depth) {
+                    return $i;
+                }
+                continue;
+            }
+            ++$i;
+        }
+
+        return null;
     }
 
     /**
@@ -1110,7 +1166,13 @@ final class VmDomLiving
     }
 
     /**
-     * @return array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>}|null
+     * @return array{
+     *   tag: ?string,
+     *   id: ?string,
+     *   classes: list<string>,
+     *   pseudos: list<array{name: string, arg: ?string}>,
+     *   attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>
+     * }|null
      */
     private static function parseSimpleSelector(string $selector): ?array
     {
@@ -1164,11 +1226,37 @@ final class VmDomLiving
             }
             if (':' === $ch) {
                 ++$i;
-                if (1 !== preg_match('/\G(?:first-child|last-child)/A', $selector, $m, 0, $i)) {
+                if (1 !== preg_match(
+                    '/\G(?:first-child|last-child|first-of-type|last-of-type|'
+                    .'nth-child|nth-last-child|nth-of-type|nth-last-of-type)/A',
+                    $selector,
+                    $m,
+                    0,
+                    $i
+                )) {
                     return null;
                 }
-                $pseudos[] = $m[0];
+                $name = strtolower($m[0]);
                 $i += \strlen($m[0]);
+                $arg = null;
+                if (str_starts_with($name, 'nth-')) {
+                    if ($i >= $len || '(' !== $selector[$i]) {
+                        return null;
+                    }
+                    $end = self::scanParenthesisClose($selector, $i, $len);
+                    if (null === $end) {
+                        return null;
+                    }
+                    $arg = trim(substr($selector, $i + 1, $end - $i - 2));
+                    if ('' === $arg) {
+                        return null;
+                    }
+                    if (null === self::parseNthExpression($arg)) {
+                        return null;
+                    }
+                    $i = $end;
+                }
+                $pseudos[] = ['name' => $name, 'arg' => $arg];
                 continue;
             }
 
@@ -1302,7 +1390,13 @@ final class VmDomLiving
     }
 
     /**
-     * @param array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>} $simple
+     * @param array{
+     *   tag: ?string,
+     *   id: ?string,
+     *   classes: list<string>,
+     *   pseudos: list<array{name: string, arg: ?string}>,
+     *   attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>
+     * } $simple
      */
     private static function elementMatchesSimple(ObjectEntry $element, array $simple): bool
     {
@@ -1337,15 +1431,7 @@ final class VmDomLiving
             }
         }
         foreach ($simple['pseudos'] as $pseudo) {
-            if ('first-child' === $pseudo) {
-                if (!self::elementIsNthChildEdge($element, true)) {
-                    return false;
-                }
-            } elseif ('last-child' === $pseudo) {
-                if (!self::elementIsNthChildEdge($element, false)) {
-                    return false;
-                }
-            } else {
+            if (!self::matchesStructuralPseudo($element, $pseudo['name'], $pseudo['arg'])) {
                 return false;
             }
         }
@@ -1413,29 +1499,132 @@ final class VmDomLiving
     }
 
     /**
-     * CSS :first-child / :last-child — element must be the first/last child node of its parent
-     * (any node type; leading/trailing text or comment disqualifies) — Selectors Level 3 / #20866.
+     * @return array{elementIndex: int, elementCount: int, typeIndex: int, typeCount: int}|null
      */
-    private static function elementIsNthChildEdge(ObjectEntry $element, bool $first): bool
+    private static function elementSiblingPositions(ObjectEntry $element): ?array
     {
         if (!DomRegistry::has($element)) {
-            return false;
+            return null;
         }
         $parentId = DomRegistry::state($element)->parentId;
         if (null === $parentId) {
-            return false;
+            return null;
         }
         $parent = DomRegistry::entry($parentId);
         if (null === $parent || !DomRegistry::has($parent)) {
-            return false;
+            return null;
         }
-        $childIds = DomRegistry::state($parent)->childIds;
-        if ([] === $childIds) {
-            return false;
+        $state = DomRegistry::state($element);
+        $name = strtolower($state->nodeName);
+        $elementIndex = 0;
+        $elementCount = 0;
+        $typeIndex = 0;
+        $typeCount = 0;
+        foreach (DomRegistry::state($parent)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || !VmDom::isElement($child)) {
+                continue;
+            }
+            ++$elementCount;
+            if ($childId === $element->id) {
+                $elementIndex = $elementCount;
+            }
+            if (strtolower(DomRegistry::state($child)->nodeName) === $name) {
+                ++$typeCount;
+                if ($childId === $element->id) {
+                    $typeIndex = $typeCount;
+                }
+            }
         }
-        $edgeId = $first ? $childIds[0] : $childIds[\count($childIds) - 1];
+        if (0 === $elementIndex || 0 === $elementCount || 0 === $typeIndex || 0 === $typeCount) {
+            return null;
+        }
 
-        return $edgeId === $element->id;
+        return [
+            'elementIndex' => $elementIndex,
+            'elementCount' => $elementCount,
+            'typeIndex' => $typeIndex,
+            'typeCount' => $typeCount,
+        ];
+    }
+
+    private static function matchesStructuralPseudo(ObjectEntry $element, string $name, ?string $arg): bool
+    {
+        $pos = self::elementSiblingPositions($element);
+        if (null === $pos) {
+            return false;
+        }
+
+        return match ($name) {
+            'first-child' => 1 === $pos['elementIndex'],
+            'last-child' => $pos['elementCount'] === $pos['elementIndex'],
+            'first-of-type' => 1 === $pos['typeIndex'],
+            'last-of-type' => $pos['typeCount'] === $pos['typeIndex'],
+            'nth-child' => null !== $arg && self::nthExpressionMatches($arg, $pos['elementIndex']),
+            'nth-last-child' => null !== $arg
+                && self::nthExpressionMatches($arg, $pos['elementCount'] - $pos['elementIndex'] + 1),
+            'nth-of-type' => null !== $arg && self::nthExpressionMatches($arg, $pos['typeIndex']),
+            'nth-last-of-type' => null !== $arg
+                && self::nthExpressionMatches($arg, $pos['typeCount'] - $pos['typeIndex'] + 1),
+            default => false,
+        };
+    }
+
+    private static function nthExpressionMatches(string $expression, int $index): bool
+    {
+        $parsed = self::parseNthExpression($expression);
+        if (null === $parsed) {
+            return false;
+        }
+        $a = $parsed['a'];
+        $b = $parsed['b'];
+        if (0 === $a) {
+            return $index === $b;
+        }
+        if ($a > 0) {
+            if ($index < $b) {
+                return false;
+            }
+
+            return 0 === (($index - $b) % $a);
+        }
+        if ($index > $b) {
+            return false;
+        }
+
+        return 0 === (($b - $index) % (-$a));
+    }
+
+    /**
+     * @return array{a: int, b: int}|null
+     */
+    private static function parseNthExpression(string $expression): ?array
+    {
+        $expr = strtolower(preg_replace('/\s+/', '', $expression) ?? '');
+        if ('' === $expr) {
+            return null;
+        }
+        if ('odd' === $expr) {
+            return ['a' => 2, 'b' => 1];
+        }
+        if ('even' === $expr) {
+            return ['a' => 2, 'b' => 0];
+        }
+        if (1 === preg_match('/^[+-]?\d+$/', $expr)) {
+            return ['a' => 0, 'b' => (int) $expr];
+        }
+        if (1 !== preg_match('/^([+-]?\d*)n([+-]\d+)?$/', $expr, $m)) {
+            return null;
+        }
+        $aRaw = $m[1] ?? '';
+        $a = match ($aRaw) {
+            '', '+' => 1,
+            '-' => -1,
+            default => (int) $aRaw,
+        };
+        $b = isset($m[2]) && '' !== $m[2] ? (int) $m[2] : 0;
+
+        return ['a' => $a, 'b' => $b];
     }
 
     private static function applyLivingElementClassMap(DomNodeState $state): void
