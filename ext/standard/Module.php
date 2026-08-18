@@ -1002,19 +1002,11 @@ class Module extends ModuleAbstract
         // strlen(3) dropped from always-on Module decls (#32068 / #31997 peer):
         // NestedJIT leaves call LibcExtern::ensureStrlenDecl before lookup;
         // user-script strlen() stays on ext/types JitStrlen / VmString.
-        try {
-            $context->lookupFunction('phpc_basetozval_result');
-        } catch (\Throwable $e) {
-            // `__string__*` ABI — NestedJIT-safe (peer #26884); was char*/i8* + strlen init.
-            $strPtr = $context->getTypeFromString('__string__*');
-            $i64 = $context->getTypeFromString('int64');
-            $i64Ptr = $context->getTypeFromString('int64*');
-            $doublePtr = $context->getTypeFromString('double*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $strPtr, $i64, $i64Ptr, $doublePtr);
-            $fn = $context->module->addFunction('phpc_basetozval_result', $ft);
-            $context->registerFunction('phpc_basetozval_result', $fn);
-        }
+        // phpc_basetozval_result leftover always-on dropped (#32420 / #32402 substr_compare peer):
+        // MathBaseConvertRuntime owns the `__string__*` ABI (getNamedFunction first);
+        // hexdec/bindec/octdec/base_convert call MathBaseConvert::ensureLinked before lookup.
+        // Body-less Module addFunction minted phpc_basetozval_result.1 on i32 vs NestedJIT i64
+        // ABI mismatch (#26511 / #31894 / #32122). User-script stays MathBaseConvertJitHelper / VmMath.
         // realpath(3) dropped from always-on Module decls (#30530): SysGetTempDirRuntime
         // NestedJIT leaf declares realpath module-locally (#29433); StringRealpath is PHP helper.
         // LibcExtern always-on realpath + dead strdup also dropped (#31534 / #30530 peer).

@@ -417,6 +417,9 @@ final class BuiltinParamNames
             case 'strrev':
             case 'str_rot13':
                 return ['string'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str (#23507)
+            case 'addcslashes':
+                return ['string', 'characters'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still text/phones, str, input (#23437)
             case 'soundex':
                 return ['string'];
@@ -1384,6 +1387,9 @@ final class BuiltinParamNames
             case 'dechex':
             case 'decoct':
                 return ['num'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still number/frombase/tobase (#23507)
+            case 'base_convert':
+                return ['num', 'from_base', 'to_base'];
             // php-src ext/standard/basic_functions.stub.php — offset=0 (#24896)
             // InternalArgInfo only lists format/data (no offset row).
             case 'unpack':
@@ -1578,6 +1584,9 @@ final class BuiltinParamNames
             // php-src ext/hash/hash.stub.php — InternalArgInfo still says raw_output (#24377)
             case 'hash_hmac_file':
                 return ['algo', 'filename', 'key', 'binary'];
+            // php-src ext/hash/hash.stub.php — InternalArgInfo still raw_output; omits options (#23507)
+            case 'hash_file':
+                return ['algo', 'filename', 'binary=', 'options='];
             // php-src ext/hash/hash.stub.php — InternalArgInfo still says raw_output (#23586)
             case 'hash_final':
                 return ['context', 'binary'];

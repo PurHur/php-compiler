@@ -3154,6 +3154,57 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_hmac_file'));
     }
 
+    /** @covers issue #23507 */
+    public function testBaseConvertAddcslashesHashFileDateFormatZendStubNamedParams(): void
+    {
+        $baseConvert = BuiltinParamNames::forFunction('base_convert');
+        self::assertSame(['num', 'from_base', 'to_base'], $baseConvert);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($baseConvert, 'num', 'base_convert'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($baseConvert, 'from_base', 'base_convert'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($baseConvert, 'to_base', 'base_convert'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($baseConvert, 'number', 'base_convert'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($baseConvert, 'frombase', 'base_convert'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($baseConvert, 'tobase', 'base_convert'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('base_convert'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('base_convert'));
+
+        $addcslashes = BuiltinParamNames::forFunction('addcslashes');
+        self::assertSame(['string', 'characters'], $addcslashes);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($addcslashes, 'string', 'addcslashes'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($addcslashes, 'characters', 'addcslashes'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($addcslashes, 'str', 'addcslashes'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('addcslashes'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('addcslashes'));
+
+        $dateFormat = BuiltinParamNames::forFunction('date_format');
+        self::assertSame(['object', 'format'], $dateFormat);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($dateFormat, 'object', 'date_format'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($dateFormat, 'format', 'date_format'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dateFormat, 'obj', 'date_format'));
+
+        $hashFile = BuiltinParamNames::forFunction('hash_file');
+        self::assertSame(['algo', 'filename', 'binary=', 'options='], $hashFile);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hashFile, 'algo', 'hash_file'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($hashFile, 'filename', 'hash_file'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($hashFile, 'binary', 'hash_file'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($hashFile, 'options', 'hash_file'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($hashFile, 'raw_output', 'hash_file'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('hash_file'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('hash_file'));
+        self::assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('hash_file', 3));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_file'));
+        $infoBinary = ['name' => 'binary', 'type' => 'bool', 'isOptional' => true];
+        $infoOptions = ['name' => 'options', 'type' => 'array', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('hash_file', 2, $infoBinary, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('hash_file', 3, $infoOptions, false));
+        $binary = new Variable();
+        $options = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($binary, 'hash_file', 2, $infoBinary));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($options, 'hash_file', 3, $infoOptions));
+        self::assertFalse($binary->toBool());
+        self::assertSame(Variable::TYPE_ARRAY, $options->type);
+    }
+
     /** @covers issue #25068 */
     public function testHashZendStubOptionalDefaults(): void
     {

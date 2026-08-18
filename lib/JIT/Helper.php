@@ -249,6 +249,21 @@ return_string:
                 goto return_long;
             }
         }
+        // bitwise_*_function: convert_to_long (zend_dval_to_lval) then i64 AND/OR/XOR (#32414).
+        if ($this->isBitwiseLogicOpcode($opcode->type)
+            && (Variable::TYPE_NATIVE_DOUBLE === $leftType || Variable::TYPE_NATIVE_DOUBLE === $rightType)
+            && $this->isBitwiseConvertibleOperandType($leftType)
+            && $this->isBitwiseConvertibleOperandType($rightType)
+        ) {
+            $result = $this->emitBitwiseWithFloatOperands(
+                $opcode,
+                $leftValue,
+                $rightValue,
+                $leftType,
+                $rightType
+            );
+            goto return_long;
+        }
         if (OpCode::TYPE_LOGICAL_XOR === $opcode->type) {
             $zeroI64 = $this->context->getTypeFromString('int64')->constInt(0, false);
             if (Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -366,6 +381,16 @@ restart:
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
                     case OpCode::TYPE_BITWISE_XOR:
+                        $leftLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                            $this->context,
+                            $leftValue
+                        );
+                        $rightLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                            $this->context,
+                            $rightValue
+                        );
+                        $result = $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightLong);
+                        goto return_long;
                     case OpCode::TYPE_SHIFT_LEFT:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         break;
@@ -418,23 +443,18 @@ restart:
                             $__right
                         );
                     case OpCode::TYPE_MINUS:
+                        $folded = JitLongArithOverflow::tryFoldBinary($this->context, $opcode->type, $left, $right);
+                        if (null !== $folded) {
+                            return $folded;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
 
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $result = $this->context->builder->subNoSignedWrap($leftValue, $__right);
-    
-                        goto return_long;
+                        return JitLongArithOverflow::binaryNativeLong(
+                            $this->context,
+                            $opcode->type,
+                            $leftValue,
+                            $__right
+                        );
                     case OpCode::TYPE_DIV:
                         // PHP `/` is always float (zend_div). Integer sdiv made `7/2` int(3) (#31968).
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
@@ -865,14 +885,13 @@ restart:
                         $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
                         goto return_double;
                     }
-                    if (OpCode::TYPE_PLUS === $opcode->type) {
-                        $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
-                    } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                        $result = $this->context->builder->subNoSignedWrap($leftLong, $rightLong);
-                    } else {
-                        $result = $this->context->builder->mulNoSignedWrap($leftLong, $rightLong);
-                    }
-                    goto return_long;
+                    // convert_to_long then ZEND_SIGNED_*_OVERFLOW (#32426 leftover of #31964).
+                    return JitLongArithOverflow::binaryNativeLong(
+                        $this->context,
+                        $opcode->type,
+                        $leftLong,
+                        $rightLong
+                    );
                 }
                 if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                     $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
@@ -915,6 +934,18 @@ restart:
                 );
                 goto return_bool;
             }
+            // convert_scalar_to_number on the value box (IS_NULL→0) then numeric-string ⊙ long
+            // (#32406 arith; #32417 bitwise/shift via #32407 native-long ⊙ string).
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                || OpCode::TYPE_MODULO === $opcode->type
+                || $this->isBitwiseLogicOpcode($opcode->type)
+                || OpCode::TYPE_SHIFT_LEFT === $opcode->type
+                || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
+            ) {
+                $rightType = Variable::TYPE_NATIVE_LONG;
+                $rightValue = JitLongArg::lower($this->context, $right, 'binary op boxed operand');
+                goto restart;
+            }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
@@ -953,6 +984,18 @@ restart:
                     $cmp
                 );
                 goto return_bool;
+            }
+            // convert_scalar_to_number on the value box (IS_NULL→0) then long ⊙ numeric-string
+            // (#32406 arith; #32417 bitwise/shift via #32407 native-long ⊙ string).
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                || OpCode::TYPE_MODULO === $opcode->type
+                || $this->isBitwiseLogicOpcode($opcode->type)
+                || OpCode::TYPE_SHIFT_LEFT === $opcode->type
+                || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
+            ) {
+                $leftType = Variable::TYPE_NATIVE_LONG;
+                $leftValue = JitLongArg::lower($this->context, $left, 'binary op boxed operand');
+                goto restart;
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
@@ -1813,6 +1856,12 @@ restart:
                 $result = $this->emitGuardedIntShift($opcode->type, $leftLong, $__right);
                 goto return_long;
             }
+            if ($this->isBitwiseLogicOpcode($opcode->type)) {
+                // bitwise_*_function: convert_to_long on the string (#32407).
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $result = $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightValue);
+                goto return_long;
+            }
             if (OpCode::TYPE_MODULO === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
@@ -1822,14 +1871,13 @@ restart:
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
-                if (OpCode::TYPE_PLUS === $opcode->type) {
-                    $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
-                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                    $result = $this->context->builder->subNoSignedWrap($leftLong, $__right);
-                } else {
-                    $result = $this->context->builder->mulNoSignedWrap($leftLong, $__right);
-                }
-                goto return_long;
+
+                return JitLongArithOverflow::binaryNativeLong(
+                    $this->context,
+                    $opcode->type,
+                    $leftLong,
+                    $__right
+                );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
                 $f64 = $this->context->getTypeFromString('double');
@@ -1901,6 +1949,12 @@ restart:
                 $result = $this->emitGuardedIntShift($opcode->type, $__left, $rightLong);
                 goto return_long;
             }
+            if ($this->isBitwiseLogicOpcode($opcode->type)) {
+                // bitwise_*_function: convert_to_long on the string (#32407).
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $result = $this->emitBitwiseLongOp($opcode->type, $leftValue, $rightLong);
+                goto return_long;
+            }
             if (OpCode::TYPE_MODULO === $opcode->type) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
@@ -1910,14 +1964,13 @@ restart:
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
-                if (OpCode::TYPE_PLUS === $opcode->type) {
-                    $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
-                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                    $result = $this->context->builder->subNoSignedWrap($__left, $rightLong);
-                } else {
-                    $result = $this->context->builder->mulNoSignedWrap($__left, $rightLong);
-                }
-                goto return_long;
+
+                return JitLongArithOverflow::binaryNativeLong(
+                    $this->context,
+                    $opcode->type,
+                    $__left,
+                    $rightLong
+                );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
                 $f64 = $this->context->getTypeFromString('double');
@@ -2274,6 +2327,75 @@ return_bool:
             OpCode::TYPE_SHIFT_RIGHT => $leftInt >> $rightInt,
             default => null,
         };
+    }
+
+    /** Zend bitwise_and/or/xor_function after convert_to_long (#32407). */
+    private function isBitwiseLogicOpcode(int $type): bool
+    {
+        return OpCode::TYPE_BITWISE_AND === $type
+            || OpCode::TYPE_BITWISE_OR === $type
+            || OpCode::TYPE_BITWISE_XOR === $type;
+    }
+
+    /** Operands bitwise_*_function can convert_to_long (#32414). */
+    private function isBitwiseConvertibleOperandType(int $type): bool
+    {
+        return Variable::TYPE_NATIVE_DOUBLE === $type
+            || Variable::TYPE_NATIVE_LONG === $type
+            || Variable::TYPE_NATIVE_BOOL === $type
+            || Variable::TYPE_STRING === $type;
+    }
+
+    /**
+     * Zend bitwise_and/or/xor_function: float operands zend_dval_to_lval, strings convert_to_long.
+     *
+     * php-src: Zend/zend_operators.c bitwise_*_function (#32414).
+     */
+    private function emitBitwiseWithFloatOperands(
+        OpCode $opcode,
+        $leftValue,
+        $rightValue,
+        int $leftType,
+        int $rightType
+    ) {
+        $leftLong = $this->coerceBitwiseOperandToLong($leftValue, $leftType);
+        $rightLong = $this->coerceBitwiseOperandToLong($rightValue, $rightType);
+
+        return $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightLong);
+    }
+
+    /** convert_to_long for a native bitwise operand already loaded (#32414). */
+    private function coerceBitwiseOperandToLong($value, int $type)
+    {
+        $i64 = $this->context->getTypeFromString('int64');
+        if (Variable::TYPE_NATIVE_DOUBLE === $type) {
+            return \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $this->context,
+                $value
+            );
+        }
+        if (Variable::TYPE_STRING === $type) {
+            return JitLongArg::lowerStringValue($this->context, $value);
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $type) {
+            return $this->context->builder->zExt($value, $i64);
+        }
+
+        return $this->context->builder->intCast($value, $i64);
+    }
+
+    /** LLVM and/or/xor on i64 operands (php-src bitwise_*_function). */
+    private function emitBitwiseLongOp(int $opType, $leftLong, $rightLong)
+    {
+        $__right = $this->context->builder->intCast($rightLong, $leftLong->typeOf());
+        if (OpCode::TYPE_BITWISE_AND === $opType) {
+            return $this->context->builder->bitwiseAnd($leftLong, $__right);
+        }
+        if (OpCode::TYPE_BITWISE_OR === $opType) {
+            return $this->context->builder->bitwiseOr($leftLong, $__right);
+        }
+
+        return $this->context->builder->bitwiseXor($leftLong, $__right);
     }
 
     /** Zend shift_left/right_function: negative count → catchable ArithmeticError (#21912). */

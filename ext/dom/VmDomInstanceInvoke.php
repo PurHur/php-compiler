@@ -89,6 +89,7 @@ final class VmDomInstanceInvoke
             'hasattributes' => VmDomJitDispatch::hasAttributes($self, $extra),
             'getnodepath' => VmDomJitDispatch::getNodePath($self, $extra),
             'getelementsbytagname' => VmDomJitDispatch::dispatchGetElementsByTagName($ctx, $self, $extra),
+            'getelementsbytagnamens' => VmDomJitDispatch::dispatchGetElementsByTagNameNS($ctx, $self, $extra),
             'count' => VmDomJitDispatch::dispatchCount($self, $extra),
             'hasattributens' => VmDomJitDispatch::hasAttributeNS($self, $extra),
             'getattributenode' => VmDomJitDispatch::getAttributeNode($ctx, $self, $extra),

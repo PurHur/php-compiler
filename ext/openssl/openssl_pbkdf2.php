@@ -21,7 +21,10 @@ use PHPLLVM\Value;
 
 /**
  * openssl_pbkdf2() — PKCS#5 v2 PBKDF2 (php-src ext/openssl/openssl.c PHP_FUNCTION(openssl_pbkdf2);
- * VM #6488, JIT/AOT leftover #32410 via HMAC over {@see __compiler_hash} (not HashCrypto HMAC).
+ * VM #6488. JIT/AOT leftover #32410: HMAC over {@see __compiler_hash} (not HashCrypto HMAC).
+ *
+ * Compile-time bake in {@see JitOpensslPbkdf2} (#32429) only handles literals; this path
+ * lowers runtime password/salt/key_length/iterations/digest_algo as well.
  */
 final class openssl_pbkdf2 extends Internal
 {

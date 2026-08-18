@@ -101,6 +101,7 @@
             <file>./test/compliance/SoapVarXsdDateAndTimeVMTest.php</file>
             <file>./test/compliance/SoapVarXsdGyearFamilyVMTest.php</file>
             <file>./test/compliance/SoapVarXsdAnyXmlVMTest.php</file>
+            <file>./test/compliance/SoapClientXsdScalarDecodeVMTest.php</file>
             <file>./test/compliance/EvalEmptyReturnsFalse31914JITTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
@@ -232,6 +233,8 @@
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437JITTest.php</file>
+            <file>./test/compliance/BaseConvertAddcslashesHashFileNamed23507VMTest.php</file>
+            <file>./test/compliance/BaseConvertAddcslashesHashFileNamed23507JITTest.php</file>
             <file>./test/compliance/DebugPrintBacktraceVoid28909VMTest.php</file>
             <file>./test/compliance/DebugPrintBacktraceVoid28909JITTest.php</file>
             <file>./test/compliance/CopyNamedParams23347VMTest.php</file>
@@ -335,6 +338,12 @@
             <file>./test/compliance/BoolNativeArith32337VMTest.php</file>
             <file>./test/compliance/BoolNativeArith32337JITTest.php</file>
             <file>./test/unit/BoolNativeArith32337AotTest.php</file>
+            <file>./test/compliance/LongStringBitwise32407VMTest.php</file>
+            <file>./test/compliance/LongStringBitwise32407JITTest.php</file>
+            <file>./test/unit/LongStringBitwise32407AotTest.php</file>
+            <file>./test/compliance/FloatBitwise32414VMTest.php</file>
+            <file>./test/compliance/FloatBitwise32414JITTest.php</file>
+            <file>./test/unit/FloatBitwise32414AotTest.php</file>
             <file>./test/compliance/IntMinModNegOne32285JITTest.php</file>
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
             <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
@@ -1222,6 +1231,7 @@
             <file>./test/aot/GzwriteBytesAotTest.php</file>
             <file>./test/aot/ExtensionLoadedObStartNamed23359AotTest.php</file>
             <file>./test/aot/MetaphoneSoundexCountCharsNamed23437AotTest.php</file>
+            <file>./test/aot/BaseConvertAddcslashesHashFileNamed23507AotTest.php</file>
             <file>./test/aot/IsUploadedFileNamed28853AotTest.php</file>
             <file>./test/aot/MbChrOrdAotTest.php</file>
             <file>./test/aot/DomXpathTreeAxesAotTest.php</file>

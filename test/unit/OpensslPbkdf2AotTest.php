@@ -81,6 +81,7 @@ final class OpensslPbkdf2AotTest extends TestCase
         $this->assertSame(
             "v1ok\n"
             ."v2ok\n"
+            ."v3ok\n"
             ."bool(false)\n"
             ."bool(false)\n"
             ."openssl_pbkdf2(): Argument #3 (\$key_length) must be greater than 0\n",
