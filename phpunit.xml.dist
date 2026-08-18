@@ -90,6 +90,7 @@
             <file>./test/compliance/Soap12ClientFaultReasonTextVMTest.php</file>
             <file>./test/compliance/Soap12ClientFaultDetailVMTest.php</file>
             <file>./test/compliance/Soap11ClientFaultActorDetailVMTest.php</file>
+            <file>./test/compliance/SoapVarXsdEncTypeVMTest.php</file>
             <file>./test/compliance/EvalEmptyReturnsFalse31914JITTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>

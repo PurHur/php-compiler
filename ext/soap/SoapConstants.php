@@ -198,4 +198,75 @@ final class SoapConstants
             'XSD_1999_NAMESPACE' => self::XSD_1999_NAMESPACE,
         ];
     }
+
+    /**
+     * php-src php_encoding.h type_str + ns prefix for encoded xsi:type (#32190).
+     *
+     * @return array{0: string, 1: string}|null [prefix, localName] e.g. ['xsd','string']
+     */
+    public static function soapEncTypeXsiQName(int $encType): ?array
+    {
+        $xsd = [
+            self::XSD_STRING => 'string',
+            self::XSD_BOOLEAN => 'boolean',
+            self::XSD_DECIMAL => 'decimal',
+            self::XSD_FLOAT => 'float',
+            self::XSD_DOUBLE => 'double',
+            self::XSD_DURATION => 'duration',
+            self::XSD_DATETIME => 'dateTime',
+            self::XSD_TIME => 'time',
+            self::XSD_DATE => 'date',
+            self::XSD_GYEARMONTH => 'gYearMonth',
+            self::XSD_GYEAR => 'gYear',
+            self::XSD_GMONTHDAY => 'gMonthDay',
+            self::XSD_GDAY => 'gDay',
+            self::XSD_GMONTH => 'gMonth',
+            self::XSD_HEXBINARY => 'hexBinary',
+            self::XSD_BASE64BINARY => 'base64Binary',
+            self::XSD_ANYURI => 'anyURI',
+            self::XSD_QNAME => 'QName',
+            self::XSD_NOTATION => 'NOTATION',
+            self::XSD_NORMALIZEDSTRING => 'normalizedString',
+            self::XSD_TOKEN => 'token',
+            self::XSD_LANGUAGE => 'language',
+            self::XSD_NMTOKEN => 'NMTOKEN',
+            self::XSD_NMTOKENS => 'NMTOKENS',
+            self::XSD_NAME => 'Name',
+            self::XSD_NCNAME => 'NCName',
+            self::XSD_ID => 'ID',
+            self::XSD_IDREF => 'IDREF',
+            self::XSD_IDREFS => 'IDREFS',
+            self::XSD_ENTITY => 'ENTITY',
+            self::XSD_ENTITIES => 'ENTITIES',
+            self::XSD_INTEGER => 'integer',
+            self::XSD_NONPOSITIVEINTEGER => 'nonPositiveInteger',
+            self::XSD_NEGATIVEINTEGER => 'negativeInteger',
+            self::XSD_LONG => 'long',
+            self::XSD_INT => 'int',
+            self::XSD_SHORT => 'short',
+            self::XSD_BYTE => 'byte',
+            self::XSD_NONNEGATIVEINTEGER => 'nonNegativeInteger',
+            self::XSD_UNSIGNEDLONG => 'unsignedLong',
+            self::XSD_UNSIGNEDINT => 'unsignedInt',
+            self::XSD_UNSIGNEDSHORT => 'unsignedShort',
+            self::XSD_UNSIGNEDBYTE => 'unsignedByte',
+            self::XSD_POSITIVEINTEGER => 'positiveInteger',
+            self::XSD_ANYTYPE => 'anyType',
+            self::XSD_1999_TIMEINSTANT => 'timeInstant',
+        ];
+        if (isset($xsd[$encType])) {
+            return ['xsd', $xsd[$encType]];
+        }
+        if (self::SOAP_ENC_OBJECT === $encType) {
+            return ['SOAP-ENC', 'Struct'];
+        }
+        if (self::SOAP_ENC_ARRAY === $encType) {
+            return ['SOAP-ENC', 'Array'];
+        }
+        if (self::APACHE_MAP === $encType) {
+            return ['apache', 'Map'];
+        }
+
+        return null;
+    }
 }

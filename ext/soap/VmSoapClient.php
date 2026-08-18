@@ -2446,7 +2446,7 @@ final class VmSoapClient
         $paramsXml = '';
         $args = $arguments;
         // Zend wraps document/literal params; RPC often uses a single array of named params.
-        // Do not unwrap SoapVar property bags (enc_stype/enc_value) used by typemap to_xml (#21046).
+        // Do not unwrap SoapVar property bags (enc_type/enc_value) (#21046 / #32190).
         if (
             1 === \count($args)
             && \is_array($args[0])
@@ -2555,27 +2555,29 @@ final class VmSoapClient
         ?Context $ctx = null
     ): string {
         $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'param';
+        $soapVar = self::soapVarShape($value);
         // SoapVar-shaped export + typemap to_xml (#21046; php_encoding.c to_xml_user).
-        if (null !== $state && null !== $ctx && [] !== $state->typemap) {
-            $soapVar = self::soapVarShape($value);
-            if (null !== $soapVar) {
-                $entry = self::findTypemapEntry(
-                    $state->typemap,
-                    $soapVar['stype'],
-                    $soapVar['ns']
-                );
-                if (null !== $entry && null !== $entry['to_xml']) {
-                    $xmlFrag = self::invokeTypemapToXml($ctx, $entry['to_xml'], $soapVar['value']);
-                    if (null !== $xmlFrag && '' !== $xmlFrag) {
-                        // to_xml returns a full element; wrap under the param tag name when needed.
-                        if (\str_starts_with(\ltrim($xmlFrag), '<')) {
-                            return $xmlFrag;
-                        }
-
-                        return '<'.$tag.'>'.\htmlspecialchars($xmlFrag, \ENT_XML1).'</'.$tag.'>';
+        if (null !== $soapVar && null !== $state && null !== $ctx && [] !== $state->typemap && '' !== $soapVar['stype']) {
+            $entry = self::findTypemapEntry(
+                $state->typemap,
+                $soapVar['stype'],
+                $soapVar['ns']
+            );
+            if (null !== $entry && null !== $entry['to_xml']) {
+                $xmlFrag = self::invokeTypemapToXml($ctx, $entry['to_xml'], $soapVar['value']);
+                if (null !== $xmlFrag && '' !== $xmlFrag) {
+                    // to_xml returns a full element; wrap under the param tag name when needed.
+                    if (\str_starts_with(\ltrim($xmlFrag), '<')) {
+                        return $xmlFrag;
                     }
+
+                    return '<'.$tag.'>'.\htmlspecialchars($xmlFrag, \ENT_XML1).'</'.$tag.'>';
                 }
             }
+        }
+        // php-src master_to_xml_int SoapVar: get_conversion(enc_type) + enc_value (#32190).
+        if (null !== $soapVar) {
+            return self::encodeSoapVar($tag, $soapVar, $state, $ctx);
         }
         if (null === $value) {
             return '<'.$tag.' xsi:nil="true"/>';
@@ -2693,9 +2695,12 @@ final class VmSoapClient
     }
 
     /**
-     * Detect SoapVar property bag after VmJson export.
+     * Detect SoapVar property bag after exportArgTree (#21046 / #32190).
      *
-     * @return array{stype: string, ns: string, value: mixed}|null
+     * php-src master_to_xml_int special-cases soap_var_class_entry even when
+     * enc_stype is null — only enc_type (long) + enc_value are required.
+     *
+     * @return array{type: ?int, stype: string, ns: string, value: mixed, name: ?string, namens: ?string}|null
      */
     private static function soapVarShape(mixed $value): ?array
     {
@@ -2705,20 +2710,158 @@ final class VmSoapClient
         if (!\is_array($value)) {
             return null;
         }
-        if (!\array_key_exists('enc_stype', $value) && !\array_key_exists('enc_value', $value)) {
+        if (!\array_key_exists('enc_type', $value) || !\array_key_exists('enc_value', $value)) {
+            return null;
+        }
+        $encType = $value['enc_type'];
+        if (!\is_int($encType) && !\is_float($encType)) {
             return null;
         }
         $stype = isset($value['enc_stype']) && \is_string($value['enc_stype']) ? $value['enc_stype'] : '';
         $ns = isset($value['enc_ns']) && \is_string($value['enc_ns']) ? $value['enc_ns'] : '';
-        if ('' === $stype) {
-            return null;
-        }
+        $encName = isset($value['enc_name']) && \is_string($value['enc_name']) && '' !== $value['enc_name']
+            ? $value['enc_name']
+            : null;
+        $encNamens = isset($value['enc_namens']) && \is_string($value['enc_namens']) && '' !== $value['enc_namens']
+            ? $value['enc_namens']
+            : null;
 
         return [
+            'type' => (int) $encType,
             'stype' => $stype,
             'ns' => $ns,
             'value' => $value['enc_value'] ?? null,
+            'name' => $encName,
+            'namens' => $encNamens,
         ];
+    }
+
+    /**
+     * php-src master_to_xml_int SoapVar branch — unwrap enc_value + XSD xsi:type (#32190).
+     *
+     * @param array{type: ?int, stype: string, ns: string, value: mixed, name: ?string, namens: ?string} $soapVar
+     */
+    private static function encodeSoapVar(
+        string $tag,
+        array $soapVar,
+        ?SoapClientState $state,
+        ?Context $ctx
+    ): string {
+        $encType = $soapVar['type'] ?? 0;
+        $inner = $soapVar['value'];
+        $literal = null !== $state && SoapConstants::SOAP_LITERAL === $state->use;
+        $qname = SoapConstants::soapEncTypeXsiQName((int) $encType);
+        if ('' !== $soapVar['stype']) {
+            $prefix = 'xsd';
+            if (
+                SoapConstants::SOAP_1_1_ENC_NAMESPACE === $soapVar['ns']
+                || SoapConstants::SOAP_1_2_ENC_NAMESPACE === $soapVar['ns']
+            ) {
+                $prefix = SoapConstants::SOAP_1_2 === ($state->soapVersion ?? SoapConstants::SOAP_1_1)
+                    ? 'enc'
+                    : 'SOAP-ENC';
+            }
+            $qname = [$prefix, $soapVar['stype']];
+        }
+
+        // SOAP_ENC_OBJECT / SOAP_ENC_ARRAY stay on the generic array path (#32192).
+        if (
+            \is_array($inner)
+            && (
+                SoapConstants::SOAP_ENC_OBJECT === $encType
+                || SoapConstants::SOAP_ENC_ARRAY === $encType
+                || SoapConstants::XSD_ANYTYPE === $encType
+                || 0 === $encType
+            )
+        ) {
+            return self::encodeParam($tag, $inner, $state, $ctx);
+        }
+
+        if (null === $inner) {
+            if ($literal) {
+                return '<'.$tag.'/>';
+            }
+
+            return '<'.$tag.' xsi:nil="true"/>';
+        }
+
+        $text = self::soapVarEncodedText((int) $encType, $inner);
+        if ($literal || null === $qname) {
+            return '<'.$tag.'>'.$text.'</'.$tag.'>';
+        }
+
+        $xsi = $qname[0].':'.$qname[1];
+
+        return '<'.$tag.' xsi:type="'.\htmlspecialchars($xsi, \ENT_XML1).'">'.$text.'</'.$tag.'>';
+    }
+
+    /** php-src to_xml_string / to_xml_bool / to_xml_base64 / to_xml_hexbin (#32190). */
+    private static function soapVarEncodedText(int $encType, mixed $value): string
+    {
+        if (SoapConstants::XSD_BOOLEAN === $encType) {
+            return self::soapVarIsTrue($value) ? 'true' : 'false';
+        }
+        if (SoapConstants::XSD_BASE64BINARY === $encType) {
+            return \base64_encode(self::soapVarRawString($value));
+        }
+        if (SoapConstants::XSD_HEXBINARY === $encType) {
+            return \strtoupper(\bin2hex(self::soapVarRawString($value)));
+        }
+        if (\in_array($encType, [
+            SoapConstants::XSD_FLOAT,
+            SoapConstants::XSD_DOUBLE,
+        ], true)) {
+            return \htmlspecialchars((string) (float) $value, \ENT_XML1);
+        }
+        if (\in_array($encType, [
+            SoapConstants::XSD_INT,
+            SoapConstants::XSD_INTEGER,
+            SoapConstants::XSD_LONG,
+            SoapConstants::XSD_SHORT,
+            SoapConstants::XSD_BYTE,
+            SoapConstants::XSD_NONPOSITIVEINTEGER,
+            SoapConstants::XSD_NEGATIVEINTEGER,
+            SoapConstants::XSD_NONNEGATIVEINTEGER,
+            SoapConstants::XSD_POSITIVEINTEGER,
+            SoapConstants::XSD_UNSIGNEDLONG,
+            SoapConstants::XSD_UNSIGNEDINT,
+            SoapConstants::XSD_UNSIGNEDSHORT,
+            SoapConstants::XSD_UNSIGNEDBYTE,
+        ], true)) {
+            return (string) (int) $value;
+        }
+
+        return \htmlspecialchars(self::soapVarRawString($value), \ENT_XML1);
+    }
+
+    private static function soapVarIsTrue(mixed $value): bool
+    {
+        if (\is_bool($value)) {
+            return $value;
+        }
+        if (\is_int($value) || \is_float($value)) {
+            return 0 !== $value;
+        }
+        if (\is_string($value)) {
+            return '' !== $value && '0' !== $value;
+        }
+
+        return null !== $value;
+    }
+
+    private static function soapVarRawString(mixed $value): string
+    {
+        if (\is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+        if (\is_array($value) || \is_object($value)) {
+            return 'Array';
+        }
+        if (null === $value) {
+            return '';
+        }
+
+        return (string) $value;
     }
 
     /**
