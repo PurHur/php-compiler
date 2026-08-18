@@ -329,6 +329,8 @@
             <file>./test/unit/IntDivAlwaysFloat31968AotTest.php</file>
             <file>./test/compliance/FloatIncDecStaysFloat32281JITTest.php</file>
             <file>./test/unit/FloatIncDecStaysFloat32281AotTest.php</file>
+            <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
+            <file>./test/unit/IntMinModuloNegOne31968AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>

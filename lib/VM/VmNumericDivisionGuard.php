@@ -43,6 +43,69 @@ final class VmNumericDivisionGuard
         $context->builder->positionAtEnd($okBlock);
     }
 
+    /**
+     * PHP `%` on zend_long: zero divisor throws; ZEND_LONG_MIN % -1 is 0.
+     *
+     * LLVM `srem` of INT_MIN and -1 is undefined (x86 SIGFPE / wrap). php-src
+     * `mod_function()` special-cases that pair before `%`.
+     *
+     * @see php-src Zend/zend_operators.c mod_function()
+     */
+    public static function signedRemPhpLong(Context $context, Value $dividend, Value $divisor): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $left = $context->builder->intCast($dividend, $i64);
+        $right = $context->builder->intCast($divisor, $i64);
+
+        if (
+            Value::KIND_CONSTANT_INT === $left->getKind()
+            && Value::KIND_CONSTANT_INT === $right->getKind()
+        ) {
+            $l = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($left->value);
+            $r = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($right->value);
+            if (0 === $r) {
+                self::emitZeroLongDivisorGuard($context, $right, 'Modulo by zero');
+
+                return $i64->constInt(0, false);
+            }
+            if (\PHP_INT_MIN === $l && -1 === $r) {
+                return $i64->constInt(0, false);
+            }
+
+            return $i64->constInt($l % $r, true);
+        }
+
+        self::emitZeroLongDivisorGuard($context, $right, 'Modulo by zero');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mod_intmin_cont');
+        $intMin = $i64->constInt(\PHP_INT_MIN, true);
+        $negOne = $i64->constInt(-1, true);
+        $overflow = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $left, $intMin),
+            $context->builder->icmp(Builder::INT_EQ, $right, $negOne)
+        );
+        $zeroBlock = BasicBlockHelper::append($context, 'mod_intmin_negone');
+        $remBlock = BasicBlockHelper::append($context, 'mod_srem');
+        $doneBlock = BasicBlockHelper::append($context, 'mod_done');
+        $context->builder->branchIf($overflow, $zeroBlock, $remBlock);
+
+        $context->builder->positionAtEnd($zeroBlock);
+        $zero = $i64->constInt(0, false);
+        $zeroEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($remBlock);
+        $rem = $context->builder->signedRem($left, $right);
+        $remEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'mod_result');
+        $phi->addIncoming($zero, $zeroEnd);
+        $phi->addIncoming($rem, $remEnd);
+
+        return $phi;
+    }
+
     /** intdiv(PHP_INT_MIN, -1) — php-src ext/standard/math.c (#4724). */
     public static function emitIntMinNegOneOverflowGuard(
         Context $context,
