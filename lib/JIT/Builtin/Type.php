@@ -937,9 +937,11 @@ class Type extends Builtin {
             $fntypeSuperglobalName
         );
         $this->context->registerFunction('__compiler_is_superglobal_name', $fnSuperglobalName);
-        $fntypeGetrandom = $this->context->context->functionType($i64, false, $i8p, $sizeT, $i32);
-        $fnGetrandom = $this->context->module->addFunction('getrandom', $fntypeGetrandom);
-        $this->context->registerFunction('getrandom', $fnGetrandom);
+        // getrandom(3) always-on decl removed (#32139): user-script random_bytes()
+        // remains PHP helpers (`RandomBytesJitHelper` / `StringRandomBytes` /
+        // `__compiler_random_bytes`) and NestedJIT uses /dev/urandom via
+        // JitRandomBytesKernel open/read (#29531 / #31817). No NestedJIT getrandom
+        // lookups remain. Peer sprintf drop (#32110).
         $fntypeExit = $this->context->context->functionType($void, false, $i32);
         $fnExit = $this->context->module->addFunction('exit', $fntypeExit);
         $this->context->registerFunction('exit', $fnExit);
