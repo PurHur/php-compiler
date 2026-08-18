@@ -3004,6 +3004,21 @@ class Context {
         if (null === $slot || !isset($block->constants[$slot])) {
             return false;
         }
+        // Function formals carry their default in ARG_RECV / call-site filling.
+        // Rematerializing that constant as the CV makes `f($x = 1); f(7)` and
+        // `__construct(public $x = 1); new C(7)` ignore the argument (#32349).
+        if (null !== $block->func) {
+            $opName = OperandName::resolve($op);
+            foreach ($block->func->params as $param) {
+                if ($param->result === $op) {
+                    return false;
+                }
+                $paramName = OperandName::resolve($param->result);
+                if (null !== $opName && null !== $paramName && $opName === $paramName) {
+                    return false;
+                }
+            }
+        }
         $constVm = $block->constants[$slot];
         // #28038 stopped treating named CVs as embedded name-string literals. Call-arg
         // lowering can still leave TYPE_STRING placeholders on the CV's real slot while

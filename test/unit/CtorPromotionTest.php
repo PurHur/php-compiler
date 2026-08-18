@@ -40,6 +40,7 @@ class A {
     public function __construct(public $x = 1) {}
 }
 echo (new A())->x, "\n";
+echo (new A(7))->x, "\n";
 class B {
     public function __construct(public mixed $y = 2) {}
 }
@@ -48,7 +49,7 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'ctor_promotion_untyped.php'));
         $out = ob_get_clean();
-        $this->assertSame("1\n2\n", $out);
+        $this->assertSame("1\n7\n2\n", $out);
     }
 
     public function testProtectedPromotedProperty(): void

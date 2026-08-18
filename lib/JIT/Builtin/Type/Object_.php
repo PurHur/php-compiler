@@ -7379,7 +7379,7 @@ class Object_ extends Type {
         ObjectExitStatusLlvm::emitExitStatusObjectGuard($this, $context, $objPtr, $typeErrorGiven);
     }
 
-    public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
+    public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name, bool $forWrite = false): Variable
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');
         $nameLc = strtolower($name);
@@ -7405,7 +7405,7 @@ class Object_ extends Type {
             );
         }
 
-        return ObjectInstancePropertyLlvm::propertyFetchOrdinary($this, $obj, $class, $name, $classId);
+        return ObjectInstancePropertyLlvm::propertyFetchOrdinary($this, $obj, $class, $name, $classId, $forWrite);
     }
 
     /**
