@@ -18,6 +18,9 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\BuiltinExceptionSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\standard\VmCallable;
+use PHPCompiler\ext\standard\VmDate;
+use PHPCompiler\ext\standard\VmDatePure;
+use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPCompiler\ext\standard\VmHttpBuildQuery;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmStreamContext;
@@ -2916,6 +2919,10 @@ final class VmSoapClient
     /** php-src to_xml_string / to_xml_bool / to_xml_base64 / to_xml_hexbin (#32190). */
     private static function soapVarEncodedText(int $encType, mixed $value): string
     {
+        // php-src to_xml_datetime_ex IS_LONG — localtime + strftime + tzbuf (#32237).
+        if (SoapConstants::XSD_DATETIME === $encType && \is_int($value)) {
+            return self::formatSoapXsdDatetimeTimestamp($value);
+        }
         if (SoapConstants::XSD_BOOLEAN === $encType) {
             return self::soapVarIsTrue($value) ? 'true' : 'false';
         }
@@ -2950,6 +2957,46 @@ final class VmSoapClient
         }
 
         return \htmlspecialchars(self::soapVarRawString($value), \ENT_XML1);
+    }
+
+    /**
+     * php-src to_xml_datetime() / to_xml_datetime_ex() for IS_LONG (#32237).
+     *
+     * strftime("%Y-%m-%dT%H:%M:%S") plus timezone suffix; "+00:00" becomes "Z".
+     */
+    private static function formatSoapXsdDatetimeTimestamp(int $timestamp): string
+    {
+        $tzName = VmDate::defaultTimezoneGet();
+        $offset = VmDateTimeNative::timezoneOffsetSeconds($tzName, $timestamp);
+        $tm = VmDatePure::gmtime($timestamp + $offset);
+        if (null === $tm) {
+            return (string) $timestamp;
+        }
+        $text = \sprintf(
+            '%04d-%02d-%02dT%02d:%02d:%02d',
+            $tm['tm_year'] + 1900,
+            $tm['tm_mon'] + 1,
+            $tm['tm_mday'],
+            $tm['tm_hour'],
+            $tm['tm_min'],
+            $tm['tm_sec']
+        );
+
+        return \htmlspecialchars($text.self::soapXsdTimezoneSuffix($offset), \ENT_XML1);
+    }
+
+    /** php-src to_xml_datetime_ex tzbuf — Z when offset is 0, else ±HH:MM. */
+    private static function soapXsdTimezoneSuffix(int $offsetSeconds): string
+    {
+        if (0 === $offsetSeconds) {
+            return 'Z';
+        }
+        $sign = $offsetSeconds < 0 ? '-' : '+';
+        $abs = \abs($offsetSeconds);
+        $hours = intdiv($abs, 3600);
+        $minutes = intdiv($abs % 3600, 60);
+
+        return \sprintf('%s%02d:%02d', $sign, $hours, $minutes);
     }
 
     private static function soapVarIsTrue(mixed $value): bool
