@@ -78,4 +78,28 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertSame('', $emptyUser['user']);
         $this->assertSame($emptyUser, ParseUrlJitHelper::parseUrlAssoc('http://:pass@h/'));
     }
+
+    /** php-src url.c file:/// empty host is valid; http:/// is not (#32085). */
+    public function testParseUrlFileTripleSlashEmptyHost(): void
+    {
+        $triple = VmString::parseUrl('file:///tmp/x');
+        $this->assertSame(['scheme' => 'file', 'path' => '/tmp/x'], $triple);
+        $this->assertSame($triple, ParseUrlJitHelper::parseUrlAssoc('file:///tmp/x'));
+
+        $root = VmString::parseUrl('file:///');
+        $this->assertSame(['scheme' => 'file', 'path' => '/'], $root);
+        $this->assertSame($root, ParseUrlJitHelper::parseUrlAssoc('file:///'));
+
+        $host = VmString::parseUrl('file://localhost/tmp/x');
+        $this->assertSame(['scheme' => 'file', 'host' => 'localhost', 'path' => '/tmp/x'], $host);
+
+        $this->assertFalse(VmString::parseUrl('file://'));
+        $this->assertNull(ParseUrlJitHelper::parseUrlAssoc('file://'));
+        $this->assertFalse(VmString::parseUrl('http:///tmp/x'));
+
+        $drive = VmString::parseUrl('file:///c:/somedir/file.txt');
+        $this->assertSame(['scheme' => 'file', 'path' => 'c:/somedir/file.txt'], $drive);
+        $this->assertSame('/tmp/x', VmString::parseUrl('file:///tmp/x', \PHP_URL_PATH));
+        $this->assertNull(VmString::parseUrl('file:///tmp/x', \PHP_URL_HOST));
+    }
 }

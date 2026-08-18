@@ -2331,11 +2331,22 @@ final class VmString
         if (preg_match('#^([a-z][a-z0-9+.-]*):#i', $rest, $m)) {
             $scheme = strtolower($m[1]);
             $rest = substr($rest, strlen($m[0]));
-            $auth = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
-            if (null === $auth) {
-                return false;
+            // php-src url.c php_url_parse_ex2: file:/// skips host parse (empty
+            // authority) and may drop the extra slash before a Windows drive
+            // (file:///c:/...). Other schemes still reject empty host (#32085).
+            if ('file' === $scheme && str_starts_with($rest, '///')) {
+                if (\strlen($rest) > 4 && ':' === $rest[4]) {
+                    $rest = substr($rest, 3);
+                } else {
+                    $rest = substr($rest, 2);
+                }
+            } else {
+                $auth = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
+                if (null === $auth) {
+                    return false;
+                }
+                $hadAuthority = $auth;
             }
-            $hadAuthority = $auth;
         } elseif (str_starts_with($rest, '//')) {
             $auth = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
             if (null === $auth) {
