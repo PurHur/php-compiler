@@ -6150,4 +6150,53 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #24375 */
+    public function testGettextFamilyZendStubNamedParams(): void
+    {
+        $gettext = BuiltinParamNames::forFunction('gettext');
+        self::assertSame(['message'], $gettext);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gettext, 'message', 'gettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gettext, 'msgid', 'gettext'));
+        self::assertSame(['message'], BuiltinParamNames::forFunction('_'));
+
+        $ngettext = BuiltinParamNames::forFunction('ngettext');
+        self::assertSame(['singular', 'plural', 'count'], $ngettext);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ngettext, 'singular', 'ngettext'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ngettext, 'plural', 'ngettext'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($ngettext, 'count', 'ngettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ngettext, 'msgid1', 'ngettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ngettext, 'msgid2', 'ngettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ngettext, 'n', 'ngettext'));
+
+        $dgettext = BuiltinParamNames::forFunction('dgettext');
+        self::assertSame(['domain', 'message'], $dgettext);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($dgettext, 'domain', 'dgettext'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($dgettext, 'message', 'dgettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dgettext, 'domain_name', 'dgettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dgettext, 'msgid', 'dgettext'));
+
+        $dngettext = BuiltinParamNames::forFunction('dngettext');
+        self::assertSame(['domain', 'singular', 'plural', 'count'], $dngettext);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($dngettext, 'singular', 'dngettext'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($dngettext, 'plural', 'dngettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dngettext, 'msgid1', 'dngettext'));
+
+        $bind = BuiltinParamNames::forFunction('bindtextdomain');
+        self::assertSame(['domain', 'directory'], $bind);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($bind, 'domain', 'bindtextdomain'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($bind, 'directory', 'bindtextdomain'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bind, 'domain_name', 'bindtextdomain'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bind, 'dir', 'bindtextdomain'));
+
+        $dcgettext = BuiltinParamNames::forFunction('dcgettext');
+        self::assertSame(['domain', 'message', 'category'], $dcgettext);
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dcgettext, 'domain_name', 'dcgettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dcgettext, 'msgid', 'dcgettext'));
+
+        $dcngettext = BuiltinParamNames::forFunction('dcngettext');
+        self::assertSame(['domain', 'singular', 'plural', 'count', 'category'], $dcngettext);
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dcngettext, 'msgid1', 'dcngettext'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dcngettext, 'n', 'dcngettext'));
+    }
+
 }
