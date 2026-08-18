@@ -42,6 +42,12 @@ final class SubstrCompareRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents($this->repoRoot.'/ext/standard/substr_compare.php');
         $this->assertStringContainsString('StringSubstrCompare::ensureLinked', $builtin);
         $this->assertStringContainsString('no phpc_substr_compare.c', $builtin);
+
+        $module = (string) file_get_contents($this->repoRoot.'/ext/standard/Module.php');
+        $this->assertStringContainsString('#32402', $module);
+        $this->assertStringNotContainsString("lookupFunction('substr_compare')", $module);
+        $this->assertStringNotContainsString("addFunction('substr_compare'", $module);
+        $this->assertStringContainsString('getNamedFunction', $bridge);
     }
 
     public function testSubstrCompareJitHelperDelegatesToVmString(): void

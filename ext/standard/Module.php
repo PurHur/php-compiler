@@ -977,16 +977,10 @@ class Module extends ModuleAbstract
         // strcoll(3) not always-on in Module/LibcExtern (#31498 / #31458 peer):
         // StringStrcoll declares libc strcoll module-locally for __compiler_strcoll.
         StringStrcoll::ensureLinked($context);
-        try {
-            $context->lookupFunction('substr_compare');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i64 = $context->getTypeFromString('int64');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i64, $i64, $i32);
-            $fn = $context->module->addFunction('substr_compare', $ft);
-            $context->registerFunction('substr_compare', $fn);
-        }
+        // substr_compare leftover always-on dropped (#32402 / #32382 strncmp peer):
+        // StringSubstrCompare::implementBridge owns the i8* ABI (getNamedFunction first);
+        // user-script substr_compare() stays on SubstrCompareJitHelper / VmString (#13536).
+        // Body-less Module addFunction minted substr_compare.1 on ABI mismatch (#31894 / #32122).
         // libc strspn/strcspn — never emit PHP bridges under these names (#26861).
         \PHPCompiler\JIT\LibcExtern::register($context);
         StringStrspn::ensureLinked($context);
