@@ -304,6 +304,67 @@ PHP;
         );
     }
 
+    /** Issue #32083: instance-method FCC must not poison later static::class / : static. */
+    public function testVmInstanceMethodFccDoesNotPoisonLaterStatic(): void
+    {
+        $code = <<<'PHP'
+<?php
+class FM {
+    public function m($x) { return $x * 2; }
+}
+$c = (new FM())->m(...);
+echo "fcc=", $c(4), "\n";
+class Base {
+    public static function who() { return static::class; }
+}
+class Child extends Base {}
+echo "lsb=", Base::who(), " ", Child::who(), "\n";
+class A3 {
+    public function f(): object { return new stdClass(); }
+}
+class B3 extends A3 {
+    public function f(): static { return $this; }
+}
+echo "ret=", get_class((new B3())->f()), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'fcc_poisons_static.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "fcc=8\nlsb=Base Child\nret=B3\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #32083: isolated static::class / : static (no preceding FCC) still match Zend. */
+    public function testVmIsolatedStaticClassAndReturnTypeStillMatchZend(): void
+    {
+        $code = <<<'PHP'
+<?php
+class Base {
+    public static function who() { return static::class; }
+}
+class Child extends Base {}
+echo "lsb=", Base::who(), " ", Child::who(), "\n";
+class A3 {
+    public function f(): object { return new stdClass(); }
+}
+class B3 extends A3 {
+    public function f(): static { return $this; }
+}
+echo "ret=", get_class((new B3())->f()), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'isolated_static.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "lsb=Base Child\nret=B3\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #6851: enum case value as first-class callable must compile then Error at runtime. */
     public function testVmEnumCaseValueFirstClassCallableThrowsError(): void
     {
