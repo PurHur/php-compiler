@@ -430,14 +430,18 @@ restart:
     
                         goto return_long;
                     case OpCode::TYPE_DIV:
+                        // PHP `/` is always float (zend_div). Integer sdiv made `7/2` int(3) (#31968).
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                        $f64 = $this->context->getTypeFromString('double');
+                        $leftDouble = $this->context->builder->siToFp($leftValue, $f64);
+                        $rightDouble = $this->context->builder->siToFp($__right, $f64);
+                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
                             $this->context,
-                            $__right,
+                            $rightDouble,
                             'Division by zero'
                         );
-                        $result = $this->context->builder->signedDiv($leftValue, $__right);
-                        goto return_long;
+                        $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
+                        goto return_double;
                     case OpCode::TYPE_MODULO:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         JitNumericDivisionGuard::emitZeroLongDivisorGuard(
