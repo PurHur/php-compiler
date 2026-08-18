@@ -21,6 +21,14 @@ final class MissingTraitFatalQuotesTest extends TestCase
         );
     }
 
+    public function testRequiredNotAddedMessageHelper(): void
+    {
+        $this->assertSame(
+            "Required Trait DA wasn't added to DD",
+            TraitCompositionConflictMessage::requiredNotAdded('DA', 'DD')
+        );
+    }
+
     public function testVmRuntimeFatalIncludesQuotesAndFraming(): void
     {
         $runtime = new Runtime();

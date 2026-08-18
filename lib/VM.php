@@ -19923,6 +19923,35 @@ restart:
         );
     }
 
+    /**
+     * Precedence/alias trait must be a direct {@code use} on the composing class
+     * (Zend/zend_inheritance.c zend_check_trait_usage, #32130).
+     *
+     * @param array<string, string> $usedTraitNameByLc
+     */
+    protected function throwIfAdaptationTraitNotDirectlyUsed(
+        string $referencedName,
+        ClassEntry $entry,
+        array $usedTraitNameByLc,
+        bool $unknownIsCouldNotFind = true,
+    ): void {
+        $lc = strtolower(ltrim($referencedName, '\\'));
+        if (isset($usedTraitNameByLc[$lc])) {
+            return;
+        }
+        $found = $this->context->classes[$lc] ?? null;
+        $existsAsTrait = null !== $found && $found->isTrait;
+        if (!$existsAsTrait && !$unknownIsCouldNotFind) {
+            return;
+        }
+        TraitCompositionConflictMessage::throwUnresolvedAdaptationTrait(
+            $referencedName,
+            $entry->name,
+            $existsAsTrait,
+            $existsAsTrait ? $found->name : null,
+        );
+    }
+
     protected function flushDeferredClassConstants(): void
     {
         if ([] === $this->context->deferredClassConstants) {
@@ -20163,10 +20192,11 @@ restart:
             if ('' === $winnerTraitLc) {
                 throw new \LogicException('Trait precedence adaptation must specify a trait');
             }
-            if (!isset($usedTraitNameByLc[$winnerTraitLc])) {
-                // Zend: "Could not find trait X" (even though this name is in an insteadof list).
-                throw new \LogicException('Could not find trait ' . (string) ($adaptation['trait'] ?? ''));
-            }
+            $this->throwIfAdaptationTraitNotDirectlyUsed(
+                (string) ($adaptation['trait'] ?? ''),
+                $entry,
+                $usedTraitNameByLc,
+            );
             $methodLc = strtolower((string) $adaptation['method']);
             if (!isset($perTraitMethods[$winnerTraitLc][$methodLc])) {
                 throw new \LogicException(
@@ -20178,9 +20208,11 @@ restart:
             }
             foreach ($adaptation['insteadof'] as $loserTrait) {
                 $loserLc = strtolower(ltrim((string) $loserTrait, '\\'));
-                if (!isset($usedTraitNameByLc[$loserLc])) {
-                    throw new \LogicException('Could not find trait ' . (string) $loserTrait);
-                }
+                $this->throwIfAdaptationTraitNotDirectlyUsed(
+                    (string) $loserTrait,
+                    $entry,
+                    $usedTraitNameByLc,
+                );
                 if (!isset($perTraitMethods[$loserLc][$methodLc])) {
                     throw new \LogicException(
                         'A precedence rule was defined for '
@@ -20237,6 +20269,15 @@ restart:
             $traitLcFilter = null !== ($adaptation['trait'] ?? null)
                 ? strtolower(ltrim((string) $adaptation['trait'], '\\'))
                 : null;
+            if (null !== $traitLcFilter) {
+                // Existing unused trait: Zend required-not-added before alias-method checks (#32130).
+                $this->throwIfAdaptationTraitNotDirectlyUsed(
+                    (string) $adaptation['trait'],
+                    $entry,
+                    $usedTraitNameByLc,
+                    false,
+                );
+            }
             $newName = $adaptation['newName'] ?? null;
             $newModifier = $adaptation['newModifier'] ?? null;
             if (null === $newName && null === $newModifier) {

@@ -159,6 +159,99 @@ PHP;
         $this->assertSame('1', $this->runVm($code));
     }
 
+    /** Nested trait named in insteadof must be a direct use (zend_check_trait_usage, #32130). */
+    public function testDiamondInsteadofRequiresDirectUse(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait DA {}
+trait DB { use DA; }
+trait DC { use DA; }
+class DD {
+    use DB, DC {
+        DA::m insteadof DB, DC;
+    }
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'trait_diamond_insteadof.php');
+        try {
+            $rt->run($block);
+            $this->fail('expected required-trait fatal');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString("Required Trait DA wasn't added", $e->getMessage());
+            $this->assertStringContainsString("wasn't added to DD", $e->getMessage());
+            $this->assertStringNotContainsString('Could not find trait DA', $e->getMessage());
+        }
+    }
+
+    /** Existing unused insteadof loser uses the same required-trait wording (#32130). */
+    public function testInsteadofUnusedLoserTraitRequiresDirectUse(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T1 { public function f() {} }
+trait T2 { public function f() {} }
+trait T3 { public function f() {} }
+class C {
+    use T1, T2 { T1::f insteadof T3; }
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'trait_insteadof_unused_loser.php');
+        try {
+            $rt->run($block);
+            $this->fail('expected required-trait fatal');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString("Required Trait T3 wasn't added to C", $e->getMessage());
+            $this->assertStringNotContainsString('Could not find trait T3', $e->getMessage());
+        }
+    }
+
+    /** Unknown insteadof name stays "Could not find trait" (zend_traits_init_trait_structures). */
+    public function testInsteadofUnknownTraitStillCouldNotFind(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T1 { public function f() {} }
+trait T2 { public function f() {} }
+class C {
+    use T1, T2 { T1::f insteadof T3; }
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'trait_insteadof_unknown.php');
+        try {
+            $rt->run($block);
+            $this->fail('expected could-not-find-trait fatal');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('Could not find trait T3', $e->getMessage());
+            $this->assertStringNotContainsString("Required Trait T3", $e->getMessage());
+        }
+    }
+
+    /** Alias naming a nested unused trait uses required-not-added (#32130). */
+    public function testAliasUnusedExistingTraitRequiresDirectUse(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait DA { public function m() { return 1; } }
+trait DB { use DA; }
+class DD {
+    use DB { DA::m as mm; }
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'trait_alias_unused.php');
+        try {
+            $rt->run($block);
+            $this->fail('expected required-trait fatal');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString("Required Trait DA wasn't added to DD", $e->getMessage());
+            $this->assertStringNotContainsString('Could not find trait DA', $e->getMessage());
+        }
+    }
+
     /** Alias onto an existing composed name uses Zend collision wording (#25080). */
     public function testTraitAsAliasOntoExistingNameIsCollisionFatal(): void
     {
