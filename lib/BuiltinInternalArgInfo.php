@@ -378,6 +378,8 @@ final class BuiltinInternalArgInfo
             'openssl_seal' => 'int|false',
             // ext/openssl/openssl.stub.php — InternalArgInfo omits return (#28368)
             'openssl_error_string' => 'string|false',
+            // ext/openssl/openssl.stub.php — PHP_FUNCTION(openssl_pbkdf2) (#6488 leftover)
+            'openssl_pbkdf2' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27916)
             'openssl_cipher_key_length' => 'int|false',
             // ext/openssl/openssl.stub.php — InternalArgInfo resource/int/bool (pre-8.0) (#28567)

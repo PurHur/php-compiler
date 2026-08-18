@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7620 |
-| Phase A inventory files (M2 ratio SSOT) | 7620 |
+| PHP files on vm.php path | 7621 |
+| Phase A inventory files (M2 ratio SSOT) | 7621 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 24331 |
@@ -5772,6 +5772,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/OpensslEncryptRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/OpensslMethodsCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslMethodsRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/OpensslPbkdf2Runtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
@@ -50042,6 +50043,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `lib/JIT/Builtin/OpensslPbkdf2Runtime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/OpensslSignCrypto.php`
 
