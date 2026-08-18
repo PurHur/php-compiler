@@ -372,7 +372,8 @@ final class BuiltinParamNames
             'closure::bind' => ['closure', 'newThis', 'newScope='],
             'closure::bindto' => ['newThis', 'newScope='],
             'closure::call' => ['newThis', '...args'],
-            // php-src ext/random/randomizer.stub.php — missing from InternalArgInfo (#26257)
+            // php-src ext/random/randomizer.stub.php — missing from InternalArgInfo (#26257, #27626)
+            'random\\randomizer::getbytes' => ['length'],
             'random\\randomizer::getfloat' => ['min', 'max', 'boundary='],
             'random\\randomizer::getbytesfromstring' => ['string', 'length'],
             'random\\randomizer::nextfloat' => [],

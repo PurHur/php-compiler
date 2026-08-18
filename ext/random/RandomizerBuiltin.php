@@ -361,6 +361,12 @@ final class RandomizerBuiltin
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
+        $entry->methodNames['getbytes'] = 'getBytes';
+        // php-src randomizer.stub.php — public function getBytes(int $length): string (#27626)
+        $getBytesRet = ReflectionTypeSupport::cfgTypeFromLabel('string');
+        if (null !== $getBytesRet) {
+            $entry->methodReturnDeclaredTypes['getbytes'] = $getBytesRet;
+        }
 
         if (CompilerVersion::supportsRandomIntervalBoundary()) {
             foreach ([
