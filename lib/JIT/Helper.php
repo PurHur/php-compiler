@@ -871,6 +871,21 @@ restart:
                     goto return_long;
                 }
                 if (JitValueNumeric::isArithOpcode($opcode->type)) {
+                    // _is_numeric_string_ex: overflow digit strings are IS_DOUBLE (#32432).
+                    if ($this->numericStringPromotesToDouble($left)
+                        || $this->numericStringPromotesToDouble($right)
+                    ) {
+                        $rightDouble = JitLongArg::lowerStringToDouble($this->context, $rightValue);
+                        $promoted = $this->emitNumericStringNativeDoubleOp(
+                            $opcode,
+                            $leftValue,
+                            $rightDouble,
+                            true
+                        );
+                        if (null !== $promoted) {
+                            return $promoted;
+                        }
+                    }
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                     $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                     if (OpCode::TYPE_DIV === $opcode->type) {
@@ -885,14 +900,13 @@ restart:
                         $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
                         goto return_double;
                     }
-                    if (OpCode::TYPE_PLUS === $opcode->type) {
-                        $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
-                    } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                        $result = $this->context->builder->subNoSignedWrap($leftLong, $rightLong);
-                    } else {
-                        $result = $this->context->builder->mulNoSignedWrap($leftLong, $rightLong);
-                    }
-                    goto return_long;
+                    // convert_to_long then ZEND_SIGNED_*_OVERFLOW (#32426 leftover of #31964).
+                    return JitLongArithOverflow::binaryNativeLong(
+                        $this->context,
+                        $opcode->type,
+                        $leftLong,
+                        $rightLong
+                    );
                 }
                 if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                     $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
@@ -1869,17 +1883,31 @@ restart:
                 $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $__right);
                 goto return_long;
             }
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                && $this->numericStringPromotesToDouble($left)
+            ) {
+                $f64 = $this->context->getTypeFromString('double');
+                $rightDouble = $this->context->builder->siToFp($rightValue, $f64);
+                $promoted = $this->emitNumericStringNativeDoubleOp(
+                    $opcode,
+                    $leftValue,
+                    $rightDouble,
+                    true
+                );
+                if (null !== $promoted) {
+                    return $promoted;
+                }
+            }
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
-                if (OpCode::TYPE_PLUS === $opcode->type) {
-                    $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
-                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                    $result = $this->context->builder->subNoSignedWrap($leftLong, $__right);
-                } else {
-                    $result = $this->context->builder->mulNoSignedWrap($leftLong, $__right);
-                }
-                goto return_long;
+
+                return JitLongArithOverflow::binaryNativeLong(
+                    $this->context,
+                    $opcode->type,
+                    $leftLong,
+                    $__right
+                );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
                 $f64 = $this->context->getTypeFromString('double');
@@ -1963,17 +1991,31 @@ restart:
                 $result = JitNumericDivisionGuard::signedModulo($this->context, $__left, $rightLong);
                 goto return_long;
             }
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                && $this->numericStringPromotesToDouble($right)
+            ) {
+                $f64 = $this->context->getTypeFromString('double');
+                $leftDouble = $this->context->builder->siToFp($leftValue, $f64);
+                $promoted = $this->emitNumericStringNativeDoubleOp(
+                    $opcode,
+                    $rightValue,
+                    $leftDouble,
+                    false
+                );
+                if (null !== $promoted) {
+                    return $promoted;
+                }
+            }
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
-                if (OpCode::TYPE_PLUS === $opcode->type) {
-                    $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
-                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                    $result = $this->context->builder->subNoSignedWrap($__left, $rightLong);
-                } else {
-                    $result = $this->context->builder->mulNoSignedWrap($__left, $rightLong);
-                }
-                goto return_long;
+
+                return JitLongArithOverflow::binaryNativeLong(
+                    $this->context,
+                    $opcode->type,
+                    $__left,
+                    $rightLong
+                );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
                 $f64 = $this->context->getTypeFromString('double');
@@ -2498,6 +2540,19 @@ return_bool:
         }
 
         return null;
+    }
+
+    /**
+     * Zend `_is_numeric_string_ex`: overflow / exponent / fractional strings are IS_DOUBLE (#32432).
+     */
+    private function numericStringPromotesToDouble(Variable $var): bool
+    {
+        $s = $var->compileTimeString;
+        if (null === $s || !is_numeric($s)) {
+            return false;
+        }
+
+        return !\PHPCompiler\VM\Variable::isIntegralNumericString($s);
     }
 
     /**

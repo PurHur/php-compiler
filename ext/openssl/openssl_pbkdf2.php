@@ -13,7 +13,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pbkdf2() — PKCS#5 v2 PBKDF2 (php-src ext/openssl/kdf.c; issue #6488).
+ * openssl_pbkdf2() — PKCS#5 v2 PBKDF2 (php-src ext/openssl/openssl.c / kdf.c; #6488, JIT/AOT #32410).
+ *
+ * VM: {@see VmOpenssl::pbkdf2}. JIT/AOT: {@see JitOpensslPbkdf2} compile-time bake via {@see \PHPCompiler\ext\standard\VmHashNative::hashPbkdf2}.
  */
 final class openssl_pbkdf2 extends Internal
 {
@@ -59,8 +61,13 @@ final class openssl_pbkdf2 extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pbkdf2() is not implemented for JIT in this compiler build (issue #6488)'
-        );
+        $argc = \count($args);
+        if ($argc < 4 || $argc > 5) {
+            throw new \ArgumentCountError(
+                'openssl_pbkdf2() expects 4 or 5 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslPbkdf2::invoke($context, ...$args);
     }
 }
