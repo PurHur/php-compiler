@@ -4544,6 +4544,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($procParse, 'position', 'numfmt_parse_currency'));
     }
 
+    /** @covers issue #24504 */
+    public function testMsgfmtFormatMessageStubNamedValues(): void
+    {
+        $names = BuiltinParamNames::forFunction('msgfmt_format_message');
+        self::assertSame(['locale', 'pattern', 'values'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'values', 'msgfmt_format_message'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'args', 'msgfmt_format_message'));
+        self::assertSame(
+            ['locale', 'pattern', 'values'],
+            BuiltinParamNames::paramNamesForInternalFunction('msgfmt_format_message')
+        );
+        $method = BuiltinParamNames::forClassMethod('MessageFormatter::formatMessage');
+        self::assertSame(['locale', 'pattern', 'values'], $method);
+        self::assertSame(
+            2,
+            BuiltinParamNames::lookupNamedParamIndex($method, 'values', 'MessageFormatter::formatMessage')
+        );
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($method, 'args', 'MessageFormatter::formatMessage'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('msgfmt_format_message'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('msgfmt_format_message'));
+    }
+
     /** @covers issue #23667 */
     public function testIntlDateFormatterFormatStubNamedDatetime(): void
     {

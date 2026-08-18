@@ -477,7 +477,7 @@ final class VmMessageFormatter
         $var = $var->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $var->type) {
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($args) must be of type array, %s given',
+                '%s(): Argument #%d ($values) must be of type array, %s given',
                 $function,
                 $position + 1,
                 ReflectionSupport::valueTypeLabelPublic($var)
