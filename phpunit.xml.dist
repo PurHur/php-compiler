@@ -97,6 +97,7 @@
             <file>./test/compliance/Soap12EncArrayItemTypeVMTest.php</file>
             <file>./test/compliance/Soap11EncArrayXsiTypeVMTest.php</file>
             <file>./test/compliance/SoapVarApacheMapVMTest.php</file>
+            <file>./test/compliance/SoapVarXsdDatetimeVMTest.php</file>
             <file>./test/compliance/EvalEmptyReturnsFalse31914JITTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
