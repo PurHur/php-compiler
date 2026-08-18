@@ -72,6 +72,34 @@ final class UndefinedVariableHelper
         if (isset($context->namedVariableBindings[$resolved])) {
             return;
         }
+        self::emitAssignedFlagGuard($context, $name);
+    }
+
+    /**
+     * ZEND_CHECK_UNDEFINED_VAR for named CVs, including bound-but-unassigned locals.
+     *
+     * TYPE_ASSIGN of `@$undef` inside a function/closure must still record
+     * error_get_last() (Zend EG(last_error) under ZEND_BEGIN_SILENCE, #32041).
+     * {@see guardBeforeRuntimeRead} skips names already in namedVariableBindings
+     * (#31101); assign RHS cannot.
+     */
+    public static function guardBeforeNamedLocalRead(Context $context, Operand $op, Variable $var): void
+    {
+        if (self::shouldSkipGuards()) {
+            return;
+        }
+        if ($var->includeBinding) {
+            return;
+        }
+        $name = self::resolveTrackableName($op, $var);
+        if (null === $name) {
+            return;
+        }
+        self::emitAssignedFlagGuard($context, $name);
+    }
+
+    private static function emitAssignedFlagGuard(Context $context, string $name): void
+    {
         UndefinedVariableRuntime::ensureLinked($context);
         if (null === BasicBlockHelper::tryGetInsertBlock($context)) {
             return;

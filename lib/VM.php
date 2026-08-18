@@ -11550,6 +11550,16 @@ restart:
             return !$this->isFunctionStaticInitializedForFrame($frame, $staticKey);
         }
         if (null === $frame->block || $frame->block->inheritUndefinedLocals) {
+            // ErrorSuppress / CFG branch blocks inherit parent CVs so unnamed temps
+            // do not warn. Named locals still need ZEND_CHECK_UNDEFINED_VAR when `@`
+            // is active so silenced `$undef` records error_get_last() (#32041).
+            if (
+                $this->context->errors->isSilenced()
+                && Variable::TYPE_NULL === $resolved->type
+            ) {
+                return !isset($frame->initializedSlots[$slot]);
+            }
+
             return false;
         }
         if (null !== $name && $frame->block->declaresGlobalName($name)) {
