@@ -109,6 +109,41 @@ final class ObjectStaticPropertyLlvm
         $context->builder->returnVoid();
     }
 
+    /**
+     * ZEND_MAKE_REF / FETCH_STATIC_PROP_W: the module slot must hold a heap {@see __value__}
+     * so `$r = &Class::$prop` aliases mutate that box (#32036, zend_variables.c).
+     */
+    private static function ensureHeapValueBox(Context $context, Value $global, Value $loaded): Value
+    {
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $nullPtr = $valuePtrTy->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $loaded, $nullPtr);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $allocBlock = $fn->appendBasicBlock('static_prop_box_alloc');
+        $doneBlock = $fn->appendBasicBlock('static_prop_box_ready');
+        $entryBlock = $context->builder->getInsertBlock();
+        $context->builder->branchIf($isNull, $allocBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($allocBlock);
+        $valueType = $context->getTypeFromString('__value__');
+        $heapVal = $context->memory->malloc($valueType);
+        $heapPtr = $context->builder->pointerCast($heapVal, $valuePtrTy);
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($heapVal, $valueMap['type'])
+        );
+        $context->builder->store($heapPtr, $global);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($valuePtrTy, 'static_prop_box_phi');
+        $phi->addIncoming($heapPtr, $allocBlock);
+        $phi->addIncoming($loaded, $entryBlock);
+
+        return $phi;
+    }
+
     public static function fetch(Object_ $object, int $classId, string $name, bool $forWrite = false): Variable
     {
         $entry = $object->staticPropertyGlobalEntry($classId, $name);
@@ -149,6 +184,9 @@ final class ObjectStaticPropertyLlvm
         }
         $loaded = $context->builder->load($entry['global']);
         if (Variable::TYPE_VALUE === $entry['type']) {
+            if ($forWrite) {
+                $loaded = self::ensureHeapValueBox($context, $entry['global'], $loaded);
+            }
             $var = new Variable(
                 $context,
                 Variable::TYPE_VALUE,
@@ -159,14 +197,17 @@ final class ObjectStaticPropertyLlvm
             $var->staticPropertyType = $entry['type'];
             $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
             $var->staticPropertyDnfArms = $object->dnfArmsForStaticProperty($classId, $name);
+            if ($forWrite) {
+                $var->valueBoxAliasPtr = JitValueBox::normalizeValuePtr($context, $loaded);
+            }
 
             return $var;
         }
         $var = new Variable(
             $context,
             $entry['type'],
-            Variable::KIND_VALUE,
-            $loaded
+            $forWrite ? Variable::KIND_VARIABLE : Variable::KIND_VALUE,
+            $forWrite ? $entry['global'] : $loaded
         );
         $var->staticPropertyGlobal = $entry['global'];
         $var->staticPropertyType = $entry['type'];

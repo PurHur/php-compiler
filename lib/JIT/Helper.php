@@ -2156,6 +2156,10 @@ return_bool:
                 $this->context->getTypeFromString($llvmType)
             );
         }
+        // `$r = &Class::$prop` aliases must reload the module global, not the fetch snapshot (#32036).
+        if (null !== $variable->staticPropertyGlobal) {
+            return $this->context->builder->load($variable->staticPropertyGlobal);
+        }
         if ($variable->kind === Variable::KIND_VALUE) {
             if ($variable->functionStaticGlobal) {
                 return $this->context->builder->load($variable->value);
@@ -2182,6 +2186,9 @@ return_bool:
             }
 
             return $var->objectPropertyType;
+        }
+        if (null !== $var->staticPropertyGlobal && null !== $var->staticPropertyType) {
+            return $var->staticPropertyType;
         }
 
         return $var->type;
