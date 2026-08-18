@@ -118,6 +118,8 @@ final class BuiltinInternalArgInfo
             'strstr', 'stristr', 'strchr', 'strrchr' => 'string|false',
             // ext/standard/string.stub.php — chop rtrim alias absent from InternalArgInfo (#28255, re-#24039)
             'chop' => 'string',
+            // ext/standard/string.stub.php — InternalArgInfo return empty (#23919)
+            'str_shuffle' => 'string',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472)
             'highlight_string', 'highlight_file', 'show_source' => 'string|bool',
             // ext/standard/basic_functions.stub.php — PHP 8.4; InternalArgInfo bool → true (#25453, #28239)
