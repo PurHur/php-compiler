@@ -549,16 +549,16 @@ final class TryCatchHelper
     ): void {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $insert) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'catchable_error_resume');
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        }
         $handler = self::resolveThrowHandler($context);
         if (null === $handler) {
             ErrorRaise::emitRaise($context, $message);
 
             return;
-        }
-        $insert = BasicBlockHelper::tryGetInsertBlock($context);
-        if (null === $insert) {
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'catchable_error_resume');
-            $insert = BasicBlockHelper::tryGetInsertBlock($context);
         }
         if (null === $insert) {
             ErrorRaise::emitRaise($context, $message);

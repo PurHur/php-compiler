@@ -39,4 +39,17 @@ final class SnprintfRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#32092', $date);
         $this->assertStringNotContainsString('function ensureSnprintf', $date);
     }
+
+    public function testWeakRefRegistryUsesCanonicalSnprintfPrototype(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/WeakRefRegistryRuntime.php');
+        $this->assertStringContainsString(
+            "functionType(\$i32, true, \$i8p, \$sizeT, \$i8p)",
+            $source
+        );
+        $this->assertStringNotContainsString(
+            "functionType(\$i32, true, \$i8p, \$sizeT, \$i8p, \$i8p)",
+            $source
+        );
+    }
 }
