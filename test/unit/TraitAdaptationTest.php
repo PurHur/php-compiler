@@ -282,6 +282,27 @@ PHP;
         }
     }
 
+    /** Parent class in {@code insteadof} matches Zend zend_check_trait_usage (#32129). */
+    public function testInsteadofParentClassIsNotATraitFatal(): void
+    {
+        $code = <<<'PHP'
+<?php
+class P {}
+trait T { public function m() {} }
+class C extends P { use T { T::m insteadof P; } }
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'trait_insteadof_parent.php');
+        try {
+            $rt->run($block);
+            $this->fail('expected insteadof parent class fatal');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('Class P is not a trait', $e->getMessage());
+            $this->assertStringContainsString("Only traits may be used in 'as' and 'insteadof' statements", $e->getMessage());
+            $this->assertStringNotContainsString('Could not find trait P', $e->getMessage());
+        }
+    }
+
     private function runVm(string $code): string
     {
         $rt = new Runtime();

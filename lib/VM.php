@@ -19940,7 +19940,7 @@ restart:
 
     /**
      * Precedence/alias trait must be a direct {@code use} on the composing class
-     * (Zend/zend_inheritance.c zend_check_trait_usage, #32130).
+     * (Zend/zend_inheritance.c zend_check_trait_usage, #32129 / #32130).
      *
      * @param array<string, string> $usedTraitNameByLc
      */
@@ -19956,6 +19956,17 @@ restart:
         }
         $found = $this->context->classes[$lc] ?? null;
         $existsAsTrait = null !== $found && $found->isTrait;
+        $existsAsNonTrait = null !== $found && !$found->isTrait;
+        if ($existsAsNonTrait) {
+            TraitCompositionConflictMessage::throwUnresolvedAdaptationTrait(
+                $referencedName,
+                $entry->name,
+                false,
+                null,
+                true,
+                $found->name,
+            );
+        }
         if (!$existsAsTrait && !$unknownIsCouldNotFind) {
             return;
         }
@@ -20286,6 +20297,7 @@ restart:
                 : null;
             if (null !== $traitLcFilter) {
                 // Existing unused trait: Zend required-not-added before alias-method checks (#32130).
+                // Declared class: Zend "not a trait" (#32129).
                 $this->throwIfAdaptationTraitNotDirectlyUsed(
                     (string) $adaptation['trait'],
                     $entry,
