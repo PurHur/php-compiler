@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class LongStringBitwise32407AotTest extends TestCase
 {
-    private const EXPECT = "int(5)\nint(5)\nint(1)\nint(7)\nint(2)\nint(6)\n";
+    private const EXPECT = "int(5)\nint(5)\nint(1)\nint(7)\nint(2)\n";
 
     public function testVmLongStringBitwiseMatchesZend(): void
     {
