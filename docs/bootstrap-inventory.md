@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7596 |
-| Phase A inventory files (M2 ratio SSOT) | 7596 |
+| PHP files on vm.php path | 7598 |
+| Phase A inventory files (M2 ratio SSOT) | 7598 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24286 |
+| Source constructs flagged (warnings) | 24289 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -206,6 +206,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFileSerializeDeny.php` | 0 | 3 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
+| `ext/curl/CurlShareStrerrorJitHelper.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
 | `ext/curl/Module.php` | 0 | 37 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
@@ -245,7 +246,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_share_init.php` | 0 | 2 |
 | `ext/curl/curl_share_init_persistent.php` | 0 | 2 |
 | `ext/curl/curl_share_setopt.php` | 0 | 2 |
-| `ext/curl/curl_share_strerror.php` | 0 | 2 |
+| `ext/curl/curl_share_strerror.php` | 0 | 3 |
 | `ext/curl/curl_strerror.php` | 0 | 2 |
 | `ext/curl/curl_unescape.php` | 0 | 3 |
 | `ext/curl/curl_upkeep.php` | 0 | 2 |
@@ -5533,6 +5534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CopyRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Crc32Runtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CtypeRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/CurlShareStrerrorRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateMutationRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateTimeFormatRuntime.php` | 0 | 1 |
@@ -8722,6 +8724,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/curl/CurlShareStrerrorJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/curl/CurlStringFileBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9029,7 +9036,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/curl_share_strerror.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 46)
 - 2 class method(s)
 
 ### `ext/curl/curl_strerror.php`
@@ -48757,6 +48765,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/CurlShareStrerrorRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/DateIntervalFormatRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -54870,11 +54883,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 201)
 - new Variable (line 205)
 - new Variable (line 207)
-- new Variable (line 2017)
-- new Variable (line 2021)
-- new Variable (line 2329)
+- new Variable (line 2039)
+- new Variable (line 2043)
 - new Variable (line 2351)
-- new Variable (line 2362)
+- new Variable (line 2373)
+- new Variable (line 2384)
 - 12 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
