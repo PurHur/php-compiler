@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: DOMCharacterData::replaceData xmlTextReplace (#32391).
+ * AOT: DOMCharacterData::replaceData xmlTextReplace (#32391) + catchable INDEX_SIZE_ERR (#32392).
  *
  * @see php-src ext/dom/characterdata.c PHP_METHOD(DOMCharacterData, replaceData)
  *
@@ -36,6 +36,14 @@ final class DomReplaceDataAotTest extends TestCase
         $this->assertSame(self::EXPECTED, $this->compileAndRun('issue_dom_replacedata_aot.php'));
     }
 
+    public function testAotReplaceDataIndexSizeError(): void
+    {
+        $this->assertSame(
+            "Index Size Error\nIndex Size Error\nIndex Size Error\nab\n",
+            $this->compileAndRun('issue_dom_replacedata_index_aot.php')
+        );
+    }
+
     public function testVmReplaceDataIndexSizeError(): void
     {
         $runtime = new Runtime();
@@ -46,7 +54,7 @@ final class DomReplaceDataAotTest extends TestCase
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'issue_dom_replacedata_index_aot.php'));
         $out = (string) ob_get_clean();
-        $this->assertSame("Index Size Error\nIndex Size Error\nab\n", $out);
+        $this->assertSame("Index Size Error\nIndex Size Error\nIndex Size Error\nab\n", $out);
     }
 
     public function testAotAllowlistIncludesReplaceData(): void
@@ -63,7 +71,7 @@ final class DomReplaceDataAotTest extends TestCase
         }
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/'.$reproBasename;
-        $bin = sys_get_temp_dir().'/phpc_issue_32391_'.getmypid().'_'.md5($reproBasename).'.bin';
+        $bin = sys_get_temp_dir().'/phpc_dom_replacedata_'.getmypid().'_'.md5($reproBasename).'.bin';
         $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
