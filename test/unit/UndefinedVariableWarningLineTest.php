@@ -55,6 +55,46 @@ PHP
         );
     }
 
+    public function testEncapsedUndefinedVariableWarningCitesExpressionLine(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_undef_var_encapsed_line.php';
+        [, $stderr] = $this->runVmScript($script, 0);
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_encapsed_line\.php on line 3/m',
+            $stderr
+        );
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_encapsed_line\.php on line 4/m',
+            $stderr
+        );
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_encapsed_line\.php on line 5/m',
+            $stderr
+        );
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_encapsed_line\.php on line 6/m',
+            $stderr
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_encapsed_line\.php on line 2/m',
+            $stderr
+        );
+    }
+
+    public function testHeredocUndefinedVariableWarningCitesBodyLine(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_undef_var_heredoc_line.php';
+        [, $stderr] = $this->runVmScript($script, 0);
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_heredoc_line\.php on line 4\s*$/m',
+            $stderr
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_heredoc_line\.php on line 2/m',
+            $stderr
+        );
+    }
+
     /**
      * @return array{0: string, 1: string}
      */

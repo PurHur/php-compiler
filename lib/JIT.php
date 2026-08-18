@@ -8135,6 +8135,10 @@ class JIT {
 
         for ($i = $startIndex, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; ++$i) {
             $op = $block->opCodes[$i];
+            // Current opline for runtime warnings (encapsed CONCAT FETCH_R, #32034).
+            if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
+                $this->context->callSiteLine = $op->sourceLocation->startLine;
+            }
             if (
                 null !== $block->func
                 && '{main}' === $block->func->name

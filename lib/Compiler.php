@@ -4042,7 +4042,7 @@ class Compiler {
                 }
                 $parts[] = $replaced;
             }
-            $concat = new Op\Expr\ConcatList($parts);
+            $concat = new Op\Expr\ConcatList($parts, $flattened->getAttributes());
             $concat->result = $flattened->result;
             $this->compileOp($concat, $block);
             $var = $this->compileOperand($concat->result, $block, true);
@@ -5495,7 +5495,7 @@ class Compiler {
             return null;
         }
         $parts = array_reverse($parts);
-        $list = new Op\Expr\ConcatList($parts);
+        $list = new Op\Expr\ConcatList($parts, $outer->getAttributes());
         $list->result = $outer->result;
 
         return $list;
@@ -5528,7 +5528,7 @@ class Compiler {
             return null;
         }
         $parts = array_reverse($parts);
-        $list = new Op\Expr\ConcatList($parts);
+        $list = new Op\Expr\ConcatList($parts, $topConcat->getAttributes());
         $list->result = $topConcat->result;
 
         return $list;
@@ -5763,15 +5763,17 @@ class Compiler {
             $readSlot = $this->compileOperand($part, $block, true);
             $fresh = new Operand\Temporary();
             $writeSlot = $block->forceFreshVarSlot($fresh);
-            $block->addOpCode(new OpCode(
+            $assignOp = new OpCode(
                 OpCode::TYPE_ASSIGN,
                 $writeSlot,
                 $writeSlot,
                 $readSlot
-            ));
+            );
+            $this->assignConcatListSourceMetadata($assignOp, $concat);
+            $block->addOpCode($assignOp);
             $parts[] = $fresh;
         }
-        $materialized = new Op\Expr\ConcatList($parts);
+        $materialized = new Op\Expr\ConcatList($parts, $concat->getAttributes());
         $materialized->result = $concat->result;
 
         return $materialized;
@@ -5824,6 +5826,54 @@ class Compiler {
         $this->compileEmbeddedExprForOperand($part, $block);
 
         return $this->compileOperand($part, $block, true);
+    }
+
+    /**
+     * CONCAT/CAST_STRING from encapsed ConcatList must carry the user site so
+     * Undefined variable warnings do not inherit the prior statement's opline (#32034).
+     *
+     * php-src: Zend/zend_compile.c zend_compile_encapsed_string — FETCH_R lineno is the
+     * interpolated expression, not the previous statement.
+     */
+    private function addConcatListOpCode(Block $block, OpCode $opcode, Op\Expr\ConcatList $concat): void
+    {
+        $this->assignConcatListSourceMetadata($opcode, $concat);
+        $block->addOpCode($opcode);
+    }
+
+    private function assignConcatListSourceMetadata(OpCode $opcode, Op\Expr\ConcatList $concat): void
+    {
+        $this->assignSourceMetadata($opcode, $concat);
+        $line = $this->concatListWarningLine($concat);
+        if ($line <= 0) {
+            return;
+        }
+        $loc = $opcode->sourceLocation;
+        if (null !== $loc && $loc->startLine === $line) {
+            return;
+        }
+        $opcode->sourceLocation = new SourceLocation(
+            $loc?->docComment,
+            $line,
+            $loc?->endLine ?? max(0, (int) $concat->getAttribute('endLine', 0)),
+            $loc?->filename ?? (string) $concat->getAttribute('filename', '')
+        );
+    }
+
+    /**
+     * Heredoc ConcatList startLine is the `<<<LABEL` opener; Zend FETCH_R cites the body
+     * (php-parser String_::KIND_HEREDOC === 3, #32034).
+     */
+    private function concatListWarningLine(Op\Expr\ConcatList $concat): int
+    {
+        $start = max(0, $concat->getLine());
+        $end = max(0, (int) $concat->getAttribute('endLine', 0));
+        $kind = (int) $concat->getAttribute('kind', 0);
+        if (3 === $kind && $end > $start && $start > 0) {
+            return $start + 1;
+        }
+
+        return $start;
     }
 
     /** Concat destination must not alias an active catch variable slot (#17384). */
@@ -12954,20 +13004,20 @@ class Compiler {
                 $empty = new Operand\Literal('');
                 $empty->type = Type::string();
                 $emptySlot = $this->compileOperand($empty, $block, true);
-                $block->addOpCode(new OpCode(
+                $this->addConcatListOpCode($block, new OpCode(
                     OpCode::TYPE_ASSIGN,
                     $return,
                     $return,
                     $emptySlot
-                ));
+                ), $op);
             } elseif (1 === $total) {
                 // Zend string context for a lone encapsed variable (#4785) — not a plain assign.
                 $part = $this->compileConcatListPart($op->list[0], $block);
-                $block->addOpCode(new OpCode(
+                $this->addConcatListOpCode($block, new OpCode(
                     OpCode::TYPE_CAST_STRING,
                     $return,
                     $part
-                ));
+                ), $op);
             } else {
                 // Encapsed ConcatList used to emit in-place CONCAT($return, $return, $right).
                 // Reusing one dead-temp slot for every link intermittently heap-corrupts under
@@ -12980,12 +13030,12 @@ class Compiler {
                     $dest = $isLast
                         ? $return
                         : $block->forceFreshVarSlot(new Temporary());
-                    $block->addOpCode(new OpCode(
+                    $this->addConcatListOpCode($block, new OpCode(
                         OpCode::TYPE_CONCAT,
                         $dest,
                         $acc,
                         $right
-                    ));
+                    ), $op);
                     $acc = $dest;
                 }
             }
