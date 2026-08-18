@@ -71,7 +71,7 @@ final class JitParseUrl
             }
             if (null !== $urlLiteral) {
                 $result = VmString::parseUrl($urlLiteral, -1);
-                // Invalid port / empty host → false (php-src url.c); do not throw (#22822).
+                // Invalid port / empty non-file host → false (php-src url.c); do not throw (#22822, #32085).
                 if (false === $result) {
                     return self::materializeVmResult($context, false);
                 }
