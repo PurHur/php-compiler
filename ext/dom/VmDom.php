@@ -9667,8 +9667,8 @@ final class VmDom
             return $format ? str_repeat('  ', $depth).$comment : $comment;
         }
         if (self::isProcessingInstruction($entry)) {
-            $pi = DomRegistry::state($entry);
-            $out = '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
+            // libxml xmlNodeDump matches C14N PI form: empty data omits the space (#32331).
+            $out = self::c14nSerializeProcessingInstruction($entry);
 
             return $format ? str_repeat('  ', $depth).$out : $out;
         }

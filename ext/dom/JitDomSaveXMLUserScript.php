@@ -103,7 +103,8 @@ final class JitDomSaveXMLUserScript
     }
 
     /**
-     * Dump createComment/createTextNode (and createElement) without a loadXML tag literal.
+     * Dump createComment/createTextNode/createCDATASection/createProcessingInstruction
+     * (and createElement) without a loadXML tag literal.
      *
      * php-src: ext/dom/document.c saveXML → xmlNodeDump
      */
@@ -143,6 +144,8 @@ final class JitDomSaveXMLUserScript
         $bbText = BasicBlockHelper::append($context, 'dom_savexml_text');
         $bbCdataCheck = BasicBlockHelper::append($context, 'dom_savexml_check_cdata');
         $bbCdata = BasicBlockHelper::append($context, 'dom_savexml_cdata');
+        $bbPiCheck = BasicBlockHelper::append($context, 'dom_savexml_check_pi');
+        $bbPi = BasicBlockHelper::append($context, 'dom_savexml_pi');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
         $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
@@ -178,7 +181,7 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $nameStr, $cdataLit),
             $zero
         );
-        $context->builder->branchIf($isCdata, $bbCdata, $bbElement);
+        $context->builder->branchIf($isCdata, $bbCdata, $bbPiCheck);
 
         $context->builder->positionAtEnd($bbCdata);
         $cdataOpen = $context->builder->load($context->constantStringFromString('<![CDATA['));
@@ -189,6 +192,63 @@ final class JitDomSaveXMLUserScript
             $cdataClose
         );
         $context->builder->store(self::boxStringValue($context, $cdataXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        // createProcessingInstruction seeds tagName=#pi (#32331). Fetch only after
+        // comment/text/cdata branches — those stand-ins never set tagName (SIGSEGV #32315).
+        $context->builder->positionAtEnd($bbPiCheck);
+        $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            'tagName',
+            $elementClassId
+        );
+        $tagNameStr = $context->helper->loadValue($tagVar);
+        $piLit = $context->builder->load($context->constantStringFromString(JitDomCreateProcessingInstruction::TAG_PI));
+        $isPi = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagNameStr, $piLit),
+            $zero
+        );
+        $context->builder->branchIf($isPi, $bbPi, $bbElement);
+
+        $context->builder->positionAtEnd($bbPi);
+        $piOpen = $context->builder->load($context->constantStringFromString('<?'));
+        $piClose = $context->builder->load($context->constantStringFromString('?>'));
+        $piSpace = $context->builder->load($context->constantStringFromString(' '));
+        $dataLen = $context->builder->load(
+            $context->builder->structGep($textStr, $context->structFieldMap['__string__']['length'])
+        );
+        $dataEmpty = $context->builder->icmp(Builder::INT_EQ, $dataLen, $zero);
+        $bbPiEmpty = BasicBlockHelper::append($context, 'dom_savexml_pi_empty');
+        $bbPiData = BasicBlockHelper::append($context, 'dom_savexml_pi_data');
+        $bbPiMerge = BasicBlockHelper::append($context, 'dom_savexml_pi_merge');
+        $piSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+        $context->builder->branchIf($dataEmpty, $bbPiEmpty, $bbPiData);
+        $context->builder->positionAtEnd($bbPiEmpty);
+        $emptyPi = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $piOpen, $nameStr),
+            $piClose
+        );
+        $context->builder->store($emptyPi, $piSlot);
+        $context->builder->branch($bbPiMerge);
+        $context->builder->positionAtEnd($bbPiData);
+        $withData = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat($context, $piOpen, $nameStr),
+                $piSpace
+            ),
+            $textStr
+        );
+        $dataPi = JitStringConcat::concat($context, $withData, $piClose);
+        $context->builder->store($dataPi, $piSlot);
+        $context->builder->branch($bbPiMerge);
+        $context->builder->positionAtEnd($bbPiMerge);
+        $context->builder->store(self::boxStringValue($context, $context->builder->load($piSlot)), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElement);
