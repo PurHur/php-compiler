@@ -2992,11 +2992,10 @@ final class VmSoapClient
     }
 
     /**
-     * php-src to_xml_datetime_ex() IS_OBJECT DateTimeInterface (#32269 / #32270).
+     * php-src to_xml_datetime_ex() IS_OBJECT DateTimeInterface (#32269 / #32270 / #32271).
      *
      * DateTime / DateTimeImmutable, or the json-wire bag exportArgTree emits
      * ({@see \PHPCompiler\VM\DateTimeSupport::exportZendJsonWireDateTimeLike}).
-     * gYear* object formats are sibling #32271.
      */
     private static function formatSoapXsdTemporalDateTimeObject(int $encType, mixed $value): ?string
     {
@@ -3004,6 +3003,11 @@ final class VmSoapClient
             SoapConstants::XSD_DATETIME => 'Y-m-d\TH:i:s.up',
             SoapConstants::XSD_DATE => 'Y-m-dp',
             SoapConstants::XSD_TIME => 'H:i:s.up',
+            SoapConstants::XSD_GYEAR => 'Yp',
+            SoapConstants::XSD_GYEARMONTH => 'Y-mp',
+            SoapConstants::XSD_GMONTHDAY => '--m-dp',
+            SoapConstants::XSD_GDAY => '---dp',
+            SoapConstants::XSD_GMONTH => '--m--p',
             default => null,
         };
         if (null === $format) {
