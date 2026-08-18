@@ -1031,6 +1031,62 @@ PHP;
         }
     }
 
+    /**
+     * CSS :has() relative selectors on Dom\ ParentNode (#32165, php-src parentnode.c / lexbor).
+     */
+    public function test_dom_parent_node_css_has(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32165)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_dom_qsa_has.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_has.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                "div:has(p.foo)=d1 [d1]\n"
+                ."div:has(p)=d1 [d1,d2]\n"
+                ."div:has(> p)=d1 [d1,d2]\n"
+                ."div:has(> span)=d4 [d4]\n"
+                ."h1:has(+ h2)=h1 [h1]\n"
+                ."div:has(+ p)=d4 [d4]\n"
+                ."div:has(~ p)=d4 [d4]\n"
+                ."section:has(div > span)=sec [sec]\n"
+                ."div:has(:not(p.foo))=d2 [d2,d4]\n"
+                .":has(p.foo)=root [root,d1]\n"
+                ."p:has(span)=null []\n"
+                ."section:has(p, span)=sec [sec]\n"
+                ."div:has(p, span)=d1 [d1,d2,d4]\n"
+                ."div:not(:has(p))=d3 [d3,d4]\n"
+                .":has(> p)=d1 [d1,d2,sec]\n"
+                ."div:has(p.foo):has(p)=d1 [d1]\n"
+                ."matches_d1_has_foo=yes\n"
+                ."matches_d2_has_foo=no\n"
+                ."matches_p1_has_p=no\n"
+                ."matches_d1_has_child_p=yes\n"
+                ."closest=sec\n"
+                ."bad[:has()]=SyntaxError\n"
+                ."bad[:has]=SyntaxError\n"
+                ."bad[div:has(]=SyntaxError\n"
+                ."bad[:has(())]=SyntaxError\n"
+                ."bad[:has(>)]=SyntaxError\n"
+                ."bad[p:has(> )]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');

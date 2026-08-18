@@ -102,7 +102,7 @@ final class ldap_bind_ext extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_bind_ext() is not implemented for JIT in this compiler build (issue #22164)');
+        return JitLdapLink::invokeBindExt($context, $args);
     }
 }
 
@@ -228,7 +228,7 @@ final class ldap_set_rebind_proc extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_set_rebind_proc() is not implemented for JIT in this compiler build (issue #22226)');
+        return JitLdapLink::invokeSetRebindProc($context, $args);
     }
 }
 

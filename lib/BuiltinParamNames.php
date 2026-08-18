@@ -1667,6 +1667,22 @@ final class BuiltinParamNames
             // php-src ext/json/json.stub.php — missing from InternalArgInfo (#23876)
             case 'json_validate':
                 return ['json', 'depth=', 'flags='];
+            // php-src ext/zip/php_zip.stub.php — InternalArgInfo zip_entry_close still zip_ent (#24666)
+            case 'zip_open':
+                return ['filename'];
+            case 'zip_close':
+            case 'zip_read':
+                return ['zip'];
+            case 'zip_entry_open':
+                return ['zip_dp', 'zip_entry', 'mode='];
+            case 'zip_entry_close':
+            case 'zip_entry_name':
+            case 'zip_entry_compressedsize':
+            case 'zip_entry_filesize':
+            case 'zip_entry_compressionmethod':
+                return ['zip_entry'];
+            case 'zip_entry_read':
+                return ['zip_entry', 'len='];
             // php-src ext/ldap/ldap.stub.php — InternalArgInfo still link/host/base_dn/attrs (#24665)
             case 'ldap_connect':
                 return ['uri=', 'port='];

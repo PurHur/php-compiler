@@ -26,7 +26,7 @@ final class zip_entry_open extends ZipProceduralFunction
         if (null === $frame->returnVar) {
             return;
         }
-        $archive = VmZipProcedural::requireArchiveHandle($frame->calledArgs[0], 'zip_entry_open', 1);
+        $archive = VmZipProcedural::requireArchiveHandle($frame->calledArgs[0], 'zip_entry_open', 1, 'zip_dp');
         $entry = VmZipProcedural::requireEntryHandle($frame->calledArgs[1], 'zip_entry_open', 2);
         $mode = 3 === $argc
             ? VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'zip_entry_open', 3, 'mode')

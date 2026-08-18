@@ -358,6 +358,9 @@ patch_already_applied() {
     php-cfg-loop-resolver-break-outside-context.patch)
       grep -q "not in the 'loop' or 'switch' context" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php" 2>/dev/null
       ;;
+    php-cfg-loop-resolver-break-continue-positive.patch)
+      grep -q "operator accepts only positive integers" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php" 2>/dev/null
+      ;;
     php-cfg-no-arrow-function.patch)
       ! grep -q 'fn (Op\\Type $t) => ' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php" 2>/dev/null
       ;;
@@ -735,6 +738,42 @@ if old not in text:
 path.write_text(text.replace(old, new, 1))
 PY
   echo "Applied php-cfg-loop-resolver-continue-switch-warning.patch (level overlay)"
+}
+
+apply_php_cfg_loop_resolver_break_continue_positive_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php"
+  if grep -q "operator accepts only positive integers" "$target" 2>/dev/null; then
+    echo "Skip php-cfg-loop-resolver-break-continue-positive overlay (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if "operator accepts only positive integers" in text:
+    raise SystemExit(0)
+old = """            $num = $node->num->value;
+            if ($num < 1 || $num > \\count($stack)) {
+                throw new \\LogicException('Too high of a count for '.$node->getType());
+            }
+"""
+new = """            $num = $node->num->value;
+            $keyword = 'Stmt_Break' === $node->getType() ? 'break' : 'continue';
+            if ($num < 1) {
+                throw new \\LogicException(sprintf(\"'%s' operator accepts only positive integers\", $keyword));
+            }
+            if ($num > \\count($stack)) {
+                throw new \\LogicException(sprintf(\"Cannot '%s' %d levels\", $keyword, $num));
+            }
+"""
+if old not in text:
+    sys.stderr.write("php-cfg-loop-resolver-break-continue-positive: LoopResolver anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-loop-resolver-break-continue-positive.patch (overlay)"
 }
 
 apply_php_cfg_arrow_function_overlay() {
@@ -6561,6 +6600,11 @@ apply_patch() {
       return 0
     fi
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-loop-resolver-break-continue-positive.patch" ]]; then
+    if apply_php_cfg_loop_resolver_break_continue_positive_overlay; then
+      return 0
+    fi
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-yield-keyed.patch" ]]; then
     apply_php_cfg_yield_keyed_overlay
     return $?
@@ -6979,6 +7023,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-loop-resolver-nested.patch"
   apply_patch "$PATCH_DIR/php-cfg-loop-resolver-continue-switch-warning.patch"
   apply_patch "$PATCH_DIR/php-cfg-loop-resolver-break-outside-context.patch"
+  apply_patch "$PATCH_DIR/php-cfg-loop-resolver-break-continue-positive.patch"
   apply_patch "$PATCH_DIR/php-cfg-no-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-no-closure-preg-replace-callback.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"

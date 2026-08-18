@@ -83,6 +83,7 @@ class Runtime {
     public Traverser $preprocessor;
     public Traverser $postprocessor;
     private Ast\AbstractEnumMarker $abstractEnumMarker;
+    private ?Ast\BreakContinueOperandCompileCheck $breakContinueOperandCompileCheck = null;
     private Ast\ConfusableBuiltinTypeHintCheck $confusableBuiltinTypeHintCheck;
     public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
@@ -155,6 +156,8 @@ class Runtime {
         $astTraverser->addVisitor(new GroupUseStripper());
         $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
         $astTraverser->addVisitor($this->abstractEnumMarker);
+        $this->breakContinueOperandCompileCheck = new Ast\BreakContinueOperandCompileCheck();
+        $astTraverser->addVisitor($this->breakContinueOperandCompileCheck);
         $this->sealedClassAnnotator = new SealedClassAnnotator();
         $astTraverser->addVisitor($this->sealedClassAnnotator);
         $this->staticClassAnnotator = new StaticClassAnnotator();
@@ -504,8 +507,13 @@ class Runtime {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
         }
         $this->resetParserNameResolverState();
+        if (null !== $this->breakContinueOperandCompileCheck) {
+            $this->breakContinueOperandCompileCheck->setSourceFile($filename);
+        }
         try {
             $script = $this->parser->parse($code, $filename);
+        } catch (\LogicException $e) {
+            Ast\BreakContinueOperandCompileCheck::rethrowAsCompileFatal($e, $filename);
         } finally {
             $this->abstractEnumMarker->clear();
         }
@@ -562,9 +570,14 @@ class Runtime {
         }
         $fileStrictTypes = $this->detectFileStrictTypes($code, $filename);
         $this->resetParserNameResolverState();
+        if (null !== $this->breakContinueOperandCompileCheck) {
+            $this->breakContinueOperandCompileCheck->setSourceFile($filename);
+        }
         try {
             $script = $this->parser->parse($code, $filename);
             $this->confusableBuiltinTypeHintCheck->emitPending($this->vmContext, $filename);
+        } catch (\LogicException $e) {
+            Ast\BreakContinueOperandCompileCheck::rethrowAsCompileFatal($e, $filename);
         } finally {
             $this->abstractEnumMarker->clear();
             $this->confusableBuiltinTypeHintCheck->clearPending();
@@ -1009,6 +1022,14 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
+            // include/require syntax errors are catchable ParseError in the caller (#32154);
+            // do not leak parseAndCompile / PhpParser / bundle_snippet on stderr.
+            if ($forIncludeTarget && VM\VmInclude::isCatchableSyntaxParseThrowable($e)) {
+                $detail = $this->compiler->getCompileAbortDetail();
+                $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
+                $this->recordLastParseFailure(sprintf('%s: %s', $filename, $primary));
+                throw $e;
+            }
             $this->emitParseCompileFailureStderr($filename, $e, isset($code) ? $code : null);
             throw $e;
         } finally {

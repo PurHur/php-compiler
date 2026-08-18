@@ -20,7 +20,7 @@ final class zip_close extends ZipProceduralFunction
         if (null === $frame->returnVar) {
             return;
         }
-        $handle = VmZipProcedural::requireArchiveHandle($frame->calledArgs[0], 'zip_close', 1);
+        $handle = VmZipProcedural::requireArchiveHandle($frame->calledArgs[0], 'zip_close', 1, 'zip');
         $frame->returnVar->bool(VmZipProcedural::zipClose($handle));
     }
 }

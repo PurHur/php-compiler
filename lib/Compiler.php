@@ -58,6 +58,7 @@ use PHPCompiler\Compiler\InterfaceMethodVisibilityCheck;
 use PHPCompiler\Compiler\EnumAbstractMethodCompileCheck;
 use PHPCompiler\Compiler\EnumBuiltinMethodRedeclareCheck;
 use PHPCompiler\Compiler\ClassConstDuplicateCheck;
+use PHPCompiler\Compiler\ClosureUseDuplicateCompileCheck;
 use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
@@ -1076,6 +1077,26 @@ class Compiler {
                 continue;
             }
             $this->throwCompileError('Cannot declare promoted property outside a constructor');
+        }
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c zend_compile_closure_binding() — $this is never a legal use() name (#32152).
+     *
+     * @param list<Operand\BoundVariable> $closureUseVars
+     */
+    protected function assertNoThisInClosureUseVars(array $closureUseVars, Op $source): void
+    {
+        foreach ($closureUseVars as $useVar) {
+            if ('this' !== $this->boundVariableName($useVar)) {
+                continue;
+            }
+            $detail = 'Cannot use $this as lexical variable';
+            $sourceFile = $source->getFile();
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            $this->throwCompileError($detail, $sourceFile, $source->getLine());
         }
     }
 
@@ -14818,6 +14839,20 @@ class Compiler {
                 if ($useVar instanceof Operand\BoundVariable) {
                     $closureUseVars[] = $useVar;
                 }
+            }
+            // php-src zend_compile_closure_binding: $this, then lexical-table uniqueness (#32152, #32153).
+            $this->assertNoThisInClosureUseVars($closureUseVars, $expr);
+            $dupUseName = ClosureUseDuplicateCompileCheck::firstDuplicateName($closureUseVars);
+            if (null !== $dupUseName) {
+                $sourceFile = $expr->getFile();
+                if ('' === $sourceFile) {
+                    $sourceFile = 'unknown';
+                }
+                $this->throwCompileError(
+                    ClosureUseDuplicateCompileCheck::messageFor($dupUseName),
+                    $sourceFile,
+                    $expr->getLine()
+                );
             }
         }
         try {

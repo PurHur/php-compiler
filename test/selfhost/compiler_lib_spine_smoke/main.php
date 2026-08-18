@@ -5070,6 +5070,7 @@ require_once __DIR__.'/../../../lib/AbstractEnumSourceRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/AbstractEnumMarker.php';
 require_once __DIR__.'/../../../lib/Ast/AssertExprMessageRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/AsymmetricVisibilityRewriter.php';
+require_once __DIR__.'/../../../lib/Ast/BreakContinueOperandCompileCheck.php';
 require_once __DIR__.'/../../../lib/Ast/CatchIntersectionAttacher.php';
 require_once __DIR__.'/../../../lib/Ast/CatchIntersectionSupport.php';
 require_once __DIR__.'/../../../lib/Ast/CloneWithDesugar.php';

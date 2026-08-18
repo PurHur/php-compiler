@@ -32,6 +32,8 @@
             <file>./test/compliance/VMTest.php</file>
             <file>./test/compliance/DuplicateFunctionRedeclare31109VMTest.php</file>
             <file>./test/compliance/DuplicateFunctionRedeclare31109JITTest.php</file>
+            <file>./test/compliance/ClosureUseDuplicate32153VMTest.php</file>
+            <file>./test/compliance/ClosureUseDuplicate32153JITTest.php</file>
             <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013VMTest.php</file>
             <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013JITTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedVMTest.php</file>
@@ -77,6 +79,8 @@
             <file>./test/compliance/IncludeInheritsThisJITTest.php</file>
             <file>./test/compliance/IncludeInheritsClassScopeVMTest.php</file>
             <file>./test/compliance/IncludeInheritsClassScopeJITTest.php</file>
+            <file>./test/compliance/IncludeParseError32154VMTest.php</file>
+            <file>./test/compliance/IncludeParseError32154JITTest.php</file>
             <file>./test/compliance/EvalInheritsThisVMTest.php</file>
             <file>./test/compliance/EvalInheritsThisJITTest.php</file>
             <file>./test/compliance/EvalEmptyReturnsFalse31914VMTest.php</file>
@@ -140,6 +144,10 @@
             <file>./test/compliance/TraitDiamondInsteadofRequiredNotAddedJITTest.php</file>
             <file>./test/compliance/TraitInsteadofParentVMTest.php</file>
             <file>./test/compliance/TraitInsteadofParentJITTest.php</file>
+            <file>./test/compliance/ClosureUseThis32152VMTest.php</file>
+            <file>./test/compliance/ClosureUseThis32152JITTest.php</file>
+            <file>./test/compliance/ContinueZero32155VMTest.php</file>
+            <file>./test/compliance/ContinueZero32155JITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignJITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimRwVMTest.php</file>
@@ -262,8 +270,12 @@
             <file>./test/compliance/LdapSetGetOption32107JITTest.php</file>
             <file>./test/compliance/LdapStartTls32109VMTest.php</file>
             <file>./test/compliance/LdapStartTls32109JITTest.php</file>
+            <file>./test/compliance/LdapBindExt32146VMTest.php</file>
+            <file>./test/compliance/LdapBindExt32146JITTest.php</file>
             <file>./test/compliance/LdapSaslBind32147VMTest.php</file>
             <file>./test/compliance/LdapSaslBind32147JITTest.php</file>
+            <file>./test/compliance/LdapSetRebindProc32148VMTest.php</file>
+            <file>./test/compliance/LdapSetRebindProc32148JITTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947VMTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947JITTest.php</file>
             <file>./test/compliance/ArrayAccessIncByValue32015VMTest.php</file>
