@@ -366,6 +366,9 @@
             <file>./test/compliance/VarDumpInfNan32321VMTest.php</file>
             <file>./test/compliance/VarDumpInfNan32321JITTest.php</file>
             <file>./test/unit/VarDumpInfNan32321AotTest.php</file>
+            <file>./test/compliance/CtorPromoUntyped32349VMTest.php</file>
+            <file>./test/compliance/CtorPromoUntyped32349JITTest.php</file>
+            <file>./test/unit/CtorPromoUntyped32349AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>

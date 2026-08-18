@@ -7793,6 +7793,13 @@ class Object_ extends Type {
             }
         }
 
+        // Heap-box a generic __value__ only with an open insert BB. Parentless
+        // malloc/GEP fails module verify on untyped ctor promotion (#32349).
+        BasicBlockHelper::ensureOpenInsertBlock($this->context, 'property_store_value_box');
+        if (null === BasicBlockHelper::tryGetInsertBlock($this->context)) {
+            return;
+        }
+
         $valueType = $this->context->getTypeFromString('__value__');
         $heapVal = $this->context->memory->malloc($valueType);
         $heapPtr = $this->context->builder->pointerCast(
