@@ -141,6 +141,9 @@ final class FatalSite
             if (OpCode::TYPE_PRINT === $op->type && null !== $op->arg3 && (int) $op->arg3 > 0) {
                 return (int) $op->arg3;
             }
+            if (OpCode::TYPE_NEW === $op->type && null !== $op->arg3 && (int) $op->arg3 > 0) {
+                return (int) $op->arg3;
+            }
             if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
                 return $op->sourceLocation->startLine;
             }
