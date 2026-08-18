@@ -22,7 +22,19 @@ final class StringBitwiseNotRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('bitwise_not_loop', $source);
         $this->assertStringNotContainsString('bitwise_not_body', $source);
-        $this->assertLessThan(140, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('emitBinary', $source);
+    }
+
+    public function testStringBitwiseBinaryJitHelperMatchesZendByteWise(): void
+    {
+        $this->assertSame('A', StringBitwiseNotJitHelper::bitwiseAndArgv('AB', 'A'));
+        $this->assertSame('CC', StringBitwiseNotJitHelper::bitwiseOrArgv('A', 'BC'));
+        $this->assertSame("\x02", StringBitwiseNotJitHelper::bitwiseXorArgv('AB', 'C'));
+        $this->assertSame('03', \bin2hex(StringBitwiseNotJitHelper::bitwiseXorArgv('a', 'b')));
+        $this->assertSame('x', StringBitwiseNotJitHelper::bitwiseOrArgv('', 'x'));
+        $this->assertSame('', StringBitwiseNotJitHelper::bitwiseAndArgv('xy', ''));
+        $this->assertSame('3', StringBitwiseNotJitHelper::bitwiseAndArgv('7', '3'));
     }
 
     public function testStringBitwiseNotJitHelperMatchesVmStringOperand(): void

@@ -228,11 +228,16 @@ return_string:
             || OpCode::TYPE_SHIFT_LEFT === $opcode->type
             || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
         ) {
-            $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
-            if (null !== $folded) {
-                $result = $this->context->getTypeFromString('int64')->constInt($folded, false);
+            // string⊙string is byte-wise; do not convert_to_long-fold (#32431).
+            $foldLeft = $this->operandJitType($left);
+            $foldRight = $this->operandJitType($right);
+            if (!(Variable::TYPE_STRING === $foldLeft && Variable::TYPE_STRING === $foldRight)) {
+                $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
+                if (null !== $folded) {
+                    $result = $this->context->getTypeFromString('int64')->constInt($folded, false);
 
-                goto return_long;
+                    goto return_long;
+                }
             }
         }
         $leftValue = $this->loadValue($left);
@@ -906,6 +911,15 @@ restart:
                         $opcode->type,
                         $leftLong,
                         $rightLong
+                    );
+                }
+                if ($this->isBitwiseLogicOpcode($opcode->type)) {
+                    // bitwise_*_function string/string is byte-wise LLVM (#32431 leftover of #32407).
+                    return Builtin\StringBitwiseNot::emitBinary(
+                        $this->context,
+                        $opcode->type,
+                        $leftValue,
+                        $rightValue
                     );
                 }
                 if (OpCode::TYPE_SPACESHIP === $opcode->type) {
