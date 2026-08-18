@@ -201,6 +201,8 @@ final class BootstrapCompileSmokeM3Emit
         $nullStr = $strPtr->constNull();
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($ok);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $phpcStr = $context->builder->call(
             $context->lookupFunction('__string__init'),
@@ -235,6 +237,8 @@ final class BootstrapCompileSmokeM3Emit
         $nullStr = $strPtr->constNull();
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($ok);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $env);
         $phpcStr = $context->builder->call(
             $context->lookupFunction('__string__init'),

@@ -19,6 +19,7 @@ use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -179,6 +180,8 @@ final class WeakMapMethod implements Call
             $classCstr,
             $handle
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
 
         if ([] !== $context->tryCatch->handlerStack) {
@@ -273,6 +276,8 @@ final class WeakMapMethod implements Call
         $buf = $context->builder->alloca($i8, 32, 'weakmap_key_buf');
         $sizeT = $context->getTypeFromString('size_t');
         WeakRefSetup::formatObjectKey($context, $keyObj, $buf, $sizeT->constInt(32, false));
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call(
             $context->lookupFunction('strlen'),
             $buf

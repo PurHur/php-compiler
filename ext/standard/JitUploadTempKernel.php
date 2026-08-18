@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -257,6 +258,8 @@ final class JitUploadTempKernel
         $i64 = $context->getTypeFromString('int64');
         $charPtr = $context->getTypeFromString('char*');
         $i8p = $context->getTypeFromString('int8*');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
 
         return $context->builder->call(

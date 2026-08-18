@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -247,6 +248,8 @@ final class JitStreamMetaThinAot
 
     private static function stringFromCstr(Context $context, Value $cstr): Value
     {
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $i64 = $context->getTypeFromString('int64');
         $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);

@@ -348,6 +348,8 @@ final class ObStorageLlvm
         $work = $fn->appendBasicBlock('oec_work');
         $context->builder->branchIf($isNull, $done, $work);
         $context->builder->positionAtEnd($work);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $s);
         $context->builder->call($context->lookupFunction('__phpc_ob_append_bytes'), $s, $len);
         $context->builder->branch($done);
@@ -696,6 +698,8 @@ final class ObStorageLlvm
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(

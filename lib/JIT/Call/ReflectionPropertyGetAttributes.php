@@ -14,6 +14,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -61,6 +62,8 @@ final class ReflectionPropertyGetAttributes implements Call
             $propSafe,
             $i
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $nameLen = $context->builder->call(
             $context->lookupFunction('strlen'),
             $context->builder->pointerCast($namePtr, $i8p)

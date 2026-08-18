@@ -82,6 +82,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'strcmp',
             'strtol',
             'strtod',
+            'strlen',
         ];
     }
 
@@ -92,7 +93,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988/#31997)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988/#31997/#32068)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -122,6 +123,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31971', $source);
         $this->assertStringContainsString('#31988', $source);
         $this->assertStringContainsString('#31997', $source);
+        $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
         $this->assertStringContainsString('ensureMemcpyDecl', $source);
@@ -129,6 +131,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStrcmpDecl', $source);
         $this->assertStringContainsString('ensureStrtolDecl', $source);
         $this->assertStringContainsString('ensureStrtodDecl', $source);
+        $this->assertStringContainsString('ensureStrlenDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
     }
@@ -370,6 +373,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strtod (#31997)'
         );
+        $this->assertStringNotContainsString(
+            "'strlen' =>",
+            $source,
+            'LibcExtern must not declare libc strlen (#32068)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
@@ -383,6 +391,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31954', $source);
         $this->assertStringContainsString('#31971', $source);
         $this->assertStringContainsString('#31997', $source);
+        $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
@@ -390,6 +399,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureMemcmpDecl', $source);
         $this->assertStringContainsString('ensureStrcmpDecl', $source);
         $this->assertStringContainsString('ensureStrtodDecl', $source);
+        $this->assertStringContainsString('ensureStrlenDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
         $this->assertStringContainsString('ensureStrncmp', $source);
@@ -712,6 +722,69 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $module = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
         $this->assertStringNotContainsString("addFunction('strtod'", $module);
         $this->assertStringContainsString('#31997', $module);
+    }
+
+    public function testNestedJitConsumersEnsureStrlenDeclAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'ext/standard/JitEnvLocalKernel.php',
+            'ext/standard/JitParseStrUserScriptCstrKernel.php',
+            'ext/standard/JitMultipartKernel.php',
+            'ext/standard/JitSessionStorageKernel.php',
+            'lib/JIT/Builtin/CliArgvRuntime.php',
+            'lib/JIT/Builtin/GetcwdJit.php',
+            'lib/JIT/Builtin/ObOutputJitBridge.php',
+            'lib/JIT/Builtin/VarFetchRuntime.php',
+            'lib/JIT/JitReferencableCheck.php',
+            'lib/JIT/BootstrapCompileSmokeM3Emit.php',
+            'ext/types/strlen.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            if ('ext/types/strlen.php' === $rel) {
+                $this->assertStringContainsString('JitStrlen::lowerLength', $source);
+                $this->assertStringNotContainsString("lookupFunction('strlen')", $source);
+
+                continue;
+            }
+            $this->assertStringContainsString(
+                'LibcExtern::ensureStrlenDecl',
+                $source,
+                "{$rel} must call LibcExtern::ensureStrlenDecl after #32068"
+            );
+            $this->assertStringContainsString('#32068', $source);
+        }
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringContainsString('ensureStrlenDecl', $libc);
+        $this->assertStringContainsString('#32068', $libc);
+        $this->assertStringNotContainsString("'strlen' =>", $libc);
+        $module = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringNotContainsString("addFunction('strlen'", $module);
+        $this->assertStringContainsString('#32068', $module);
+
+        $root = dirname(__DIR__, 2);
+        $missing = [];
+        foreach (['lib', 'ext'] as $dir) {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root.'/'.$dir, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if ('php' !== $file->getExtension()) {
+                    continue;
+                }
+                $path = $file->getPathname();
+                if (str_ends_with($path, '/lib/JIT/LibcExtern.php')) {
+                    continue;
+                }
+                $source = (string) file_get_contents($path);
+                if (!str_contains($source, "lookupFunction('strlen')")) {
+                    continue;
+                }
+                if (!str_contains($source, 'LibcExtern::ensureStrlenDecl')) {
+                    $missing[] = substr($path, strlen($root) + 1);
+                }
+            }
+        }
+        $this->assertSame([], $missing, 'NestedJIT strlen lookups must call ensureStrlenDecl (#32068)');
     }
 
     public function testNestedJitConsumersLookupCompilerStrcasecmpAfterLibcExternDrop(): void

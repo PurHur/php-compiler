@@ -337,6 +337,8 @@ final class JitSuperglobalRefreshKernel
         $script = $context->builder->load($scriptNameSlot);
         $uri = $context->builder->load($requestUriSlot);
         $empty = self::literalCstr($context, '');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $scriptLen = $context->builder->call($context->lookupFunction('strlen'), $script);
         $uriLen = $context->builder->call($context->lookupFunction('strlen'), $uri);
         $cmp = $context->builder->call(
@@ -473,6 +475,8 @@ final class JitSuperglobalRefreshKernel
     {
         $i64 = $context->getTypeFromString('int64');
         $cstr = $context->builder->load($cstrSlot);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $lenI64 = $context->builder->zExt($len, $i64);
 

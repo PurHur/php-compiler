@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\VmVarFetchJitHelper;
 use PHPLLVM\Builder;
@@ -118,6 +119,8 @@ final class VarFetchRuntime
         self::ensureCstrExternals($context);
         $i64 = $context->getTypeFromString('int64');
         $charPtr = $context->getTypeFromString('char*');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
 
         return $context->builder->call(
@@ -129,21 +132,12 @@ final class VarFetchRuntime
 
     private static function ensureCstrExternals(Context $context): void
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $charPtr = $context->getTypeFromString('char*');
 
-        try {
-            $context->lookupFunction('strlen');
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction(
-                'strlen',
-                $context->context->functionType($sizeT, false, $i8p)
-            );
-            $context->registerFunction('strlen', $fn);
-        }
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         try {
             $context->lookupFunction('__string__init');
         } catch (\Throwable) {

@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -189,6 +190,8 @@ final class JitStreamCapsKernel
         $context->builder->branchIf($isNull, $fail, $body);
 
         $context->builder->positionAtEnd($body);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $path);
         $uriObj = $context->builder->call(
             $context->lookupFunction('__string__init'),

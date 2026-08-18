@@ -102,6 +102,8 @@ final class JitReferencableCheck
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
@@ -121,6 +123,8 @@ final class JitReferencableCheck
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(

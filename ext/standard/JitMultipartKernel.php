@@ -52,6 +52,8 @@ final class JitMultipartKernel
         LibcExtern::ensureStrncmp($context);
         // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
         LibcExtern::ensureMemcpyDecl($context);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         $context->registerFunction('strlen', $libcStrlen);
@@ -126,6 +128,8 @@ final class JitMultipartKernel
         $context->builder->positionAtEnd($entry);
         $hay = $fn->getParam(0);
         $needle = $fn->getParam(1);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $nlen = $context->builder->call($context->lookupFunction('strlen'), $needle);
         $emptyNeedle = $context->builder->icmp(
             Builder::INT_EQ,
@@ -319,6 +323,8 @@ final class JitMultipartKernel
             $sizeT->constInt(19, false)
         );
         $isMp = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $bodyLen = $context->builder->call($context->lookupFunction('strlen'), $body);
         $bodyOk = $context->builder->icmp(
             Builder::INT_UGT,
@@ -397,6 +403,8 @@ final class JitMultipartKernel
         $context->builder->store($semi, $endSlot);
         $context->builder->branch($afterBoundBb);
         $context->builder->positionAtEnd($bareEndEos);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $eos = $context->builder->inBoundsGEP(
             $afterEq,
             $context->builder->call($context->lookupFunction('strlen'), $afterEq)
@@ -547,6 +555,8 @@ final class JitMultipartKernel
         $context->builder->branchIf($nextNull, $noNextBb, $haveNextBb);
 
         $context->builder->positionAtEnd($noNextBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $eos2 = $context->builder->inBoundsGEP(
             $partStart,
             $context->builder->call($context->lookupFunction('strlen'), $partStart)

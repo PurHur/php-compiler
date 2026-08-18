@@ -150,6 +150,8 @@ final class SocketErrorRuntime
         $context->builder->returnValue($fallback);
 
         $context->builder->positionAtEnd($okBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $str = $context->builder->call(
             $context->lookupFunction('__string__init'),

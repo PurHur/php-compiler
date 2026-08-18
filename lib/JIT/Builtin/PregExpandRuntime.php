@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -150,6 +151,8 @@ final class PregExpandRuntime
 
         $context->builder->positionAtEnd($expandBody);
         $replStr = self::bytesToString($context, $repl, $replLen);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $subjLen = $context->builder->call($context->lookupFunction('strlen'), $subj);
         $subjStr = self::bytesToString(
             $context,

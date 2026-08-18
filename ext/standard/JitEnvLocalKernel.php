@@ -179,6 +179,8 @@ final class JitEnvLocalKernel
         $context->builder->branchIf($nameNull, $missBb, $bodyBb);
 
         $context->builder->positionAtEnd($bodyBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $nameLen = $context->builder->call($context->lookupFunction('strlen'), $nameCstr);
         $nameLenI64 = $nameLen->typeOf() === $i64
             ? $nameLen
@@ -244,6 +246,8 @@ final class JitEnvLocalKernel
 
         $context->builder->positionAtEnd($bodyBb);
         $i64 = $context->getTypeFromString('int64');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $settingCstr);
         $lenI64 = $len->typeOf() === $i64
             ? $len
@@ -278,6 +282,8 @@ final class JitEnvLocalKernel
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $src);
         $buf = $context->builder->call(
             $context->lookupFunction('malloc'),

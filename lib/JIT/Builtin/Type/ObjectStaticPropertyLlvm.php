@@ -16,6 +16,7 @@ use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -435,6 +436,8 @@ final class ObjectStaticPropertyLlvm
             ),
             $nameData
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call(
             $context->lookupFunction('strlen'),
             $bufPtr

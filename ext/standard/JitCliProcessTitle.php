@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -57,6 +58,8 @@ final class JitCliProcessTitle
         $context->builder->store($buf, $ptrGlobal);
         $context->builder->store($titleLen, $lenGlobal);
 
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $commLen = $context->builder->call(
             $context->lookupFunction('strlen'),
             $titleCStr

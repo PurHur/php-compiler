@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassProperty;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -119,6 +120,8 @@ final class ReflectionPropertyGetMangledNameRuntime
 
         // Dynamic / unknown: Zend-shaped fallback is the unmangled property name.
         $context->builder->positionAtEnd($fallbackBlock);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $propLen = $context->builder->call(
             $context->lookupFunction('strlen'),
             $propCstr

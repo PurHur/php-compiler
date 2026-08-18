@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -59,6 +60,8 @@ final class ReflectionMethodGetNamedArguments implements Call
             $methodSafe,
             $i
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $nameLen = $context->builder->call(
             $context->lookupFunction('strlen'),
             $context->builder->pointerCast($namePtr, $i8p)

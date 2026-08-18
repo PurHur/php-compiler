@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -206,6 +207,8 @@ final class FsDirRuntime
         $context->builder->positionAtEnd($noticeDo);
         $message = VmFsTempnam::NOTICE_MESSAGE;
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(

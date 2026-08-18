@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -161,6 +162,8 @@ final class StringCaseCompare
 
         $isNull = $context->builder->icmp(Builder::INT_EQ, $cstr, $null);
         $ptr = $context->builder->select($isNull, $emptyPtr, $cstr);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $ptr);
         $lenI64 = $len->typeOf() === $i64
             ? $len

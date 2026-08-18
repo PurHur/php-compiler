@@ -565,6 +565,8 @@ final class JitSessionStorageKernel
             $context->builder->trunc($idLen, $i32),
             $idPtr
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $pathLen = $context->builder->call($context->lookupFunction('strlen'), $pathPtr);
 
         return $context->builder->call(
@@ -997,6 +999,8 @@ final class JitSessionStorageKernel
         $context->builder->branch($bbSanitize);
 
         $context->builder->positionAtEnd($bbEndNul);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $valueLenRaw = $context->builder->call(
             $context->lookupFunction('strlen'),
             $context->builder->load($valueStartSlot)

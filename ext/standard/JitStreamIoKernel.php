@@ -1069,6 +1069,8 @@ final class JitStreamIoKernel
         $context->builder->branch($failBb);
 
         $context->builder->positionAtEnd($makeBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $gotLen = $context->builder->call($context->lookupFunction('strlen'), $buf);
         $gotLenI64 = $context->builder->zExt($gotLen, $i64);
         $result = $context->builder->call($context->lookupFunction('__string__init'), $gotLenI64, $buf);
