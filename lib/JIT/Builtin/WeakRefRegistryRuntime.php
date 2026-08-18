@@ -920,7 +920,7 @@ final class WeakRefRegistryRuntime
         self::ensureExternal(
             $context,
             'snprintf',
-            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p, $i8p)
+            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
         );
         self::ensureExternal(
             $context,

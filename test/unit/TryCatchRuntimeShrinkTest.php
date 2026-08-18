@@ -31,4 +31,17 @@ final class TryCatchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmTryCatch::encodedTypesMatchClassName', $source);
         $this->assertStringContainsString('getActiveContext', $source);
     }
+
+    public function testCatchableClassErrorReopensInsertBlockBeforeFallbackRaise(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/TryCatchHelper.php');
+        $this->assertStringContainsString(
+            "BasicBlockHelper::ensureOpenInsertBlock(\$context, 'catchable_error_resume')",
+            $source
+        );
+        $this->assertMatchesRegularExpression(
+            "/ensureOpenInsertBlock\\(\\\$context, 'catchable_error_resume'\\).*?resolveThrowHandler\\(\\\$context\\)/s",
+            $source
+        );
+    }
 }
