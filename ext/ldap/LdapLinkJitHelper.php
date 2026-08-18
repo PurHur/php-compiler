@@ -7,11 +7,11 @@ namespace PHPCompiler\ext\ldap;
 use PHPCompiler\VM\ObjectEntry;
 
 /**
- * ldap_bind() / ldap_unbind() / ldap_close() / ldap_set_option() / ldap_get_option()
- * for compiled JIT/AOT modules (#32001, #32002, #32107).
+ * ldap_bind() / ldap_unbind() / ldap_close() / ldap_set_option() / ldap_get_option() /
+ * ldap_start_tls() for compiled JIT/AOT modules (#32001, #32002, #32107, #32109).
  *
- * SSOT: {@see VmLdapCore::bind} / {@see VmLdapConnection::close} / {@see VmLdapNative::setOptionInt}
- * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_unbind / ldap_set_option / ldap_get_option
+ * SSOT: {@see VmLdapCore::bind} / {@see VmLdapConnection::close} / {@see VmLdapNative::startTlsSync}
+ * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_set_option / ldap_start_tls
  */
 final class LdapLinkJitHelper
 {
@@ -118,6 +118,27 @@ final class LdapLinkJitHelper
     public static function getOptionValueArgv(): int
     {
         return self::$lastGetOptionValue;
+    }
+
+    /**
+     * ldap_start_tls() — STARTTLS on a live link (php-src ext/ldap/ldap.c; #32109).
+     */
+    public static function startTlsArgv(int $handle): bool
+    {
+        $conn = self::requireConnection($handle, 'ldap_start_tls');
+        $ld = VmLdapConnection::native($conn);
+        $rc = VmLdapNative::startTlsSync($ld);
+        VmLdapConnection::setErrno($conn, $rc);
+        if (VmLdapNative::LDAP_SUCCESS !== $rc) {
+            @\trigger_error(
+                'ldap_start_tls(): Unable to start TLS: '.VmLdapNative::err2string($rc),
+                \E_USER_WARNING
+            );
+
+            return false;
+        }
+
+        return true;
     }
 
     private static int $lastGetOptionValue = 0;

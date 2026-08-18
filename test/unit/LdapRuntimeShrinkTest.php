@@ -29,6 +29,7 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LdapLinkJitHelper::setOptionIntArgv', $source);
         $this->assertStringContainsString('LdapLinkJitHelper::getOptionIntOkArgv', $source);
         $this->assertStringContainsString('LdapLinkJitHelper::getOptionValueArgv', $source);
+        $this->assertStringContainsString('LdapLinkJitHelper::startTlsArgv', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('__compiler_ldap_escape', $source);
         $this->assertStringContainsString('__compiler_ldap_connect_wallet', $source);
@@ -40,9 +41,10 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_ldap_set_option', $source);
         $this->assertStringContainsString('__compiler_ldap_get_option', $source);
         $this->assertStringContainsString('__compiler_ldap_get_option_value', $source);
+        $this->assertStringContainsString('__compiler_ldap_start_tls', $source);
         $this->assertStringContainsString('__compiler_ldap_compare', $source);
         $this->assertStringContainsString('ldap_connect_bridge_entry', $source);
-        $this->assertSame(15, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
+        $this->assertSame(16, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -50,6 +52,6 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('ensureEscapeHelperCompiled', $source);
         $this->assertStringNotContainsString('implementEscapeBridge', $source);
-        $this->assertLessThan(290, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(310, \substr_count($source, "\n") + 1);
     }
 }
