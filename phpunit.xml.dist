@@ -152,6 +152,8 @@
             <file>./test/compliance/ContinueZero32155JITTest.php</file>
             <file>./test/compliance/GlobalThis32180VMTest.php</file>
             <file>./test/compliance/GlobalThis32180JITTest.php</file>
+            <file>./test/compliance/ParamThis32179VMTest.php</file>
+            <file>./test/compliance/ParamThis32179JITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignJITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimRwVMTest.php</file>

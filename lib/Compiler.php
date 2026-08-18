@@ -1021,6 +1021,29 @@ class Compiler {
     }
 
     /**
+     * php-src: Zend/zend_compile.c zend_compile_params() — $this is never a legal parameter name (#32179).
+     *
+     * @param list<Op\Expr\Param> $params
+     */
+    protected function assertNoThisAsParameter(array $params): void
+    {
+        foreach ($params as $param) {
+            if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
+                continue;
+            }
+            if ('this' !== $param->name->value) {
+                continue;
+            }
+            $detail = 'Cannot use $this as parameter';
+            $sourceFile = $param->getFile();
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            $this->throwCompileError($detail, $sourceFile, $param->getLine());
+        }
+    }
+
+    /**
      * @param list<Op\Expr\Param> $params
      */
     protected function assertVariadicParamIsLast(array $params): void
@@ -1174,6 +1197,7 @@ class Compiler {
             }
             if ([] !== $params) {
                 $this->assertNoDuplicateParameterNames($params);
+                $this->assertNoThisAsParameter($params);
                 $this->assertNoDuplicateParameterAttributes($params, $func);
                 $this->assertReadonlyParamOnlyInConstructor($params, $func);
                 $this->assertVariadicParamIsLast($params);
@@ -7301,6 +7325,9 @@ class Compiler {
         // php-src Zend/zend_compile.c — duplicate params fatal before property promotion
         // registers (`Redefinition of parameter $name`, not `Cannot redeclare Class::$name`) (#29979).
         $this->assertNoDuplicateParameterNames($child->func->params);
+        // Abstract/interface methods skip compileCfgBlock — still reject `$this` as a param
+        // (zend_compile_params, #32179).
+        $this->assertNoThisAsParameter($child->func->params);
         foreach ($child->func->params as $param) {
             $methodBlock = new Block(null);
             $methodBlock->func = $child->func;
