@@ -4781,7 +4781,12 @@ final class VmDateTimeNative
         return $mdays[$month - 1];
     }
 
-    /** Howard Hinnant days_from_civil — calendar days since 1970-01-01 (#31055). */
+    /**
+     * Howard Hinnant days_from_civil — calendar days since 1970-01-01 (#31055, #32062).
+     *
+     * March-based year: Jan/Feb remap to months 13/14 of the previous year. Decrementing
+     * `$y` for `month <= 2` without that remap over-counts ~365 days across Q1 spans.
+     */
     private static function civilDaysSinceEpoch(int $year, int $month, int $day): int
     {
         $y = $year;
@@ -4790,7 +4795,7 @@ final class VmDateTimeNative
         }
         $era = intdiv($y >= 0 ? $y : $y - 399, 400);
         $yoe = $y - $era * 400;
-        $doy = intdiv(153 * ($month - 1) + 2, 5) + $day - 1;
+        $doy = intdiv(153 * ($month + ($month > 2 ? -3 : 9)) + 2, 5) + $day - 1;
         $doe = $yoe * 365 + intdiv($yoe, 4) - intdiv($yoe, 100) + $doy;
 
         return $era * 146097 + $doe - 719468;

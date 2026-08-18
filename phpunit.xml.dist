@@ -866,6 +866,8 @@
             <file>./test/compliance/DateTimeSetTimestampGetLastErrorsExcessArgc30991JITTest.php</file>
             <file>./test/compliance/DateTimeDiffDstHours30970VMTest.php</file>
             <file>./test/compliance/DateTimeDiffDstHours30970JITTest.php</file>
+            <file>./test/compliance/DateTimeDiffDaysPctA32062VMTest.php</file>
+            <file>./test/compliance/DateTimeDiffDaysPctA32062JITTest.php</file>
             <file>./test/compliance/DateTimeCreateFromTimestampNan31119VMTest.php</file>
             <file>./test/compliance/DateTimeCreateFromTimestampNan31119JITTest.php</file>
             <file>./test/compliance/Xoshiro256StarStarGenerate31053VMTest.php</file>
