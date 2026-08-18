@@ -282,6 +282,8 @@
             <file>./test/compliance/ListDestructUndefKeyLine31994JITTest.php</file>
             <file>./test/compliance/EncapsedUndefVarWarningLine32034VMTest.php</file>
             <file>./test/compliance/EncapsedUndefVarWarningLine32034JITTest.php</file>
+            <file>./test/compliance/NestedFrameWarningLine32040VMTest.php</file>
+            <file>./test/compliance/NestedFrameWarningLine32040JITTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147VMTest.php</file>
             <file>./test/compliance/VarDumpUninitTypedProperty31147JITTest.php</file>
             <file>./test/compliance/InOperatorPhpSrcReject31158VMTest.php</file>
