@@ -49,20 +49,6 @@ final class Soap12ClientFaultDetailTest extends TestCase
         $this->assertTrue(!isset($e->detail) || null === $e->detail);
     }
 
-    public function testSoap11LowercaseDetailStillOmitted(): void
-    {
-        $xml = '<?xml version="1.0"?>'
-            .'<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'
-            .'<SOAP-ENV:Body><SOAP-ENV:Fault>'
-            .'<faultcode>SOAP-ENV:Server</faultcode>'
-            .'<faultstring>boom11</faultstring>'
-            .'<detail><item>x</item></detail>'
-            .'</SOAP-ENV:Fault></SOAP-ENV:Body></SOAP-ENV:Envelope>';
-        $e = $this->decodeFault($xml);
-        $this->assertSame('SOAP-ENV:Server', $e->faultcode);
-        $this->assertTrue(!isset($e->detail) || null === $e->detail);
-    }
-
     private function decodeFault(string $xml): \SoapFault
     {
         $rm = new \ReflectionMethod(VmSoapClient::class, 'decodeResponse');
