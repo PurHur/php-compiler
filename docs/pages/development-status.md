@@ -15,7 +15,7 @@ permalink: /development-status.html
 | **North star** | Compiler compiles itself without Zend ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **v1.1.0 theme** | M5 fast-path stability; enum/property hooks; `preg_match` JIT; `spl_autoload*`; php-in-PHP JIT helpers ([#78](https://github.com/PurHur/php-compiler/issues/78)) |
 | **Wave 3** | Language **7410/7412** · Stdlib **7410/7412** on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **7570** / **7572** (2 deferred: #24115, #27103) |
+| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **7588** / **7590** (2 deferred: #24115, #27103) |
 | **Builtin matrix** | **1555** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
@@ -92,7 +92,7 @@ See [`docs/bootstrap-selfhost.md`](https://github.com/PurHur/php-compiler/blob/m
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | ✅ **7570** / **7572** (2 deferred: #24115, #27103) |
+| **M2** — Spine toward full inventory | ✅ **7588** / **7590** (2 deferred: #24115, #27103) |
 | **M3** — Native compiles PHP (no Zend emit) | ✅ Smoke + inventory argv driver strict native |
 | **M4** — Bootstrap loop (next revision) | ✅ `bootstrap-loop-probe` full ladder |
 | **M5** — Full self-host, no `vendor/` cold boot | ✅ Presenter strict + compiled-only empty `build/` cold boot ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
