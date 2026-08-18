@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathBaseConvert;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -64,6 +65,10 @@ final class base_convert_ extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'base_convert', 3)) {
             return $context->builder->load($context->constantStringFromString(''));
         }
+        $folded = self::tryFoldCompileTime($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
         $num = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base_convert', 0, 'num')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'base_convert', 0, 'num');
@@ -86,5 +91,35 @@ final class base_convert_ extends Internal
         $fn = $context->lookupFunction('phpc_base_convert');
 
         return $context->builder->call($fn, $num, $fromBase, $toBase);
+    }
+
+    /**
+     * All three args compile-time — Zend math.c at emit time (#31966).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function tryFoldCompileTime(Context $context, array $args): ?Value
+    {
+        $num = JitStringArg::compileTimeLiteral($args[0]);
+        if (null === $num && null !== $args[0]->compileTimeLong) {
+            $num = (string) $args[0]->compileTimeLong;
+        }
+        if (null === $num) {
+            return null;
+        }
+        $from = $args[1]->compileTimeLong;
+        $to = $args[2]->compileTimeLong;
+        if (null === $from || null === $to) {
+            return null;
+        }
+        if ($from < 2 || $from > 36 || $to < 2 || $to > 36) {
+            return null;
+        }
+        $out = VmMath::baseConvert($num, (int) $from, (int) $to);
+        if (VmMath::takeInvalidRadixCharsDeprecation()) {
+            return null;
+        }
+
+        return $context->builder->load($context->constantStringFromString($out));
     }
 }

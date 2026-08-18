@@ -1259,9 +1259,9 @@ final class JitFilter
         $nullEnd = $context->getTypeFromString('int8*')->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
         $i32 = $context->getTypeFromString('int32');
-        $parsed = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $parsed = $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,

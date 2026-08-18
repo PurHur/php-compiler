@@ -324,6 +324,11 @@ final class JitValueBox
                 $strPtr = Variable::KIND_VALUE === $value->kind && null !== $value->value
                     ? $value->value
                     : JitStringArg::lowerDominating($context, $value, 'value box assign');
+                $strTy = $context->getStringFromType($strPtr->typeOf());
+                if (JitStringArg::isStringPtrPtrType($strTy)) {
+                    // Function-static / alloca slots are __string__**; writeString wants * (#31966).
+                    $strPtr = $context->builder->load($strPtr);
+                }
                 $owned = $context->builder->call(
                     $context->lookupFunction('__string__separate'),
                     $strPtr

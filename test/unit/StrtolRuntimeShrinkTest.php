@@ -34,4 +34,39 @@ final class StrtolRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LibcExtern::ensureStrtolDecl', $source);
         $this->assertStringContainsString('#31988', $source);
     }
+
+    /**
+     * #31989 rewrite assigned ensureStrtolDecl()'s void return to $parsed/$raw and
+     * dropped the strtol() Value — HashTableWriteLlvm.php even failed to parse,
+     * so every AOT compile aborted (#31966).
+     */
+    public function testEnsureStrtolDeclDoesNotStealCallResult(): void
+    {
+        foreach ([
+            'lib/JIT/HashTableWriteLlvm.php',
+            'lib/JIT/HashTableMergeLlvm.php',
+            'lib/JIT/JitLongArg.php',
+            'lib/VM/VmUnaryPlus.php',
+            'lib/VM/VmValueCompare.php',
+            'ext/standard/JitSessionStorageKernel.php',
+            'ext/standard/JitSleep.php',
+            'ext/standard/JitChr.php',
+            'ext/standard/JitIntdiv.php',
+            'ext/standard/JitImageTypeArg.php',
+            'ext/filter/JitFilter.php',
+        ] as $rel) {
+            $path = __DIR__.'/../../'.$rel;
+            $source = (string) file_get_contents($path);
+            $this->assertDoesNotMatchRegularExpression(
+                '/\$\w+\s*=\s*\/\/ strtol\(3\) via LibcExtern::ensureStrtolDecl/',
+                $source,
+                "{$rel} must not assign ensureStrtolDecl() void to the strtol result"
+            );
+            try {
+                token_get_all($source);
+            } catch (\ParseError $e) {
+                $this->fail("{$rel} must parse after #31989 strtol rewrite: ".$e->getMessage());
+            }
+        }
+    }
 }

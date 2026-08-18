@@ -41,6 +41,10 @@ final class JitPow
         $slotPtr = JitValueBox::pointer($context, $slot);
 
         if (self::preferIntegerPowPath(...$args)) {
+            $folded = self::tryFoldCompileTimeIntegerPow($context, $slot, $slotPtr, $args[0], $args[1]);
+            if (null !== $folded) {
+                return $folded;
+            }
             PowIntRuntime::ensureLinked($context);
             $baseL = JitLongArg::lower($context, $args[0], 'pow() base');
             $expL = JitLongArg::lower($context, $args[1], 'pow() exponent');
@@ -79,6 +83,33 @@ final class JitPow
             $slotPtr,
             $result
         );
+
+        return $slotPtr;
+    }
+
+    /**
+     * Both operands compile-time ints — Zend `**` at emit time (#31966).
+     */
+    private static function tryFoldCompileTimeIntegerPow(
+        Context $context,
+        Value $slot,
+        Value $slotPtr,
+        JITVariable $base,
+        JITVariable $exp
+    ): ?Value {
+        if (null === $base->compileTimeLong || null === $exp->compileTimeLong) {
+            return null;
+        }
+        $result = $base->compileTimeLong ** $exp->compileTimeLong;
+        if (\is_int($result)) {
+            JitValueBox::writeLong($context, $slot, $context->constantFromInteger($result));
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $context->constantFromFloat((float) $result)
+            );
+        }
 
         return $slotPtr;
     }

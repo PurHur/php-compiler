@@ -199,11 +199,14 @@ final class ReflectionBuiltinHelper
         if (null !== $ctx) {
             $lc = strtolower(ltrim($className, '\\'));
             $entry = $ctx->classes[$lc] ?? null;
-            $exists = null !== $entry
-                && \PHPCompiler\ext\standard\VmReflection::propertyExistsOnClass($entry, $property, $ctx);
-            $i1 = $context->getTypeFromString('int1');
+            if (null !== $entry) {
+                $exists = \PHPCompiler\ext\standard\VmReflection::propertyExistsOnClass($entry, $property, $ctx);
+                $i1 = $context->getTypeFromString('int1');
 
-            return $i1->constInt($exists ? 1 : 0, false);
+                return $i1->constInt($exists ? 1 : 0, false);
+            }
+            // AOT user classes live in the LLVM object table, not the compile-time VM
+            // class map — a miss here is not "property missing" (#31966).
         }
         $object = self::objectBuiltin($context);
         if (!$object->hasUserDeclaredClass($className)) {

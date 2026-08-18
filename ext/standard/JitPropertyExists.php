@@ -43,6 +43,20 @@ final class JitPropertyExists
         }
         $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
         if (null !== $classLiteral) {
+            $propLiteral = JitStringArg::compileTimeLiteral($propertyArg);
+            if (
+                null !== $propLiteral
+                && $context->type->object->hasUserDeclaredClass($classLiteral)
+            ) {
+                // Same-unit class: LLVM object table (static props included). NestedJIT
+                // VmReflection misses AOT classes and returned false (#31966). Autoload for
+                // not-yet-loaded names still uses the runtime helper (#26407).
+                return ReflectionBuiltinHelper::propertyExistsLiteral(
+                    $context,
+                    $classLiteral,
+                    $propLiteral
+                );
+            }
             // Runtime helper — autoloads like zend_lookup_class (#26407). Compile-time
             // fold would skip registered autoloaders for not-yet-loaded class strings.
             return self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);

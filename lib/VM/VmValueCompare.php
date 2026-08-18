@@ -1008,9 +1008,9 @@ final class VmValueCompare
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_strlong_strtol_end');
         $nullEnd = $i8p->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
-        $parsed = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $parsed = $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,

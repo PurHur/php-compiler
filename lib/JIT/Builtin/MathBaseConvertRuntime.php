@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -115,9 +116,18 @@ final class MathBaseConvertRuntime
         }
 
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
-        $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
+        $savedLowering = $context->loweringLlvmFunction;
+        $savedActive = $context->activeFunction;
+        $context->activeFunction = $name;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        try {
+            $emit($context, $fn);
+            $context->registerFunction($name, $fn);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
@@ -160,12 +170,12 @@ final class MathBaseConvertRuntime
 
         // Pass `__string__*` straight through — i8*/__string__init round-trip made NestedJIT
         // string offsets ints so ord() TypeError'd under thin AOT (#26884).
-        $result = $context->builder->call(
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::BASE_CONVERT),
-            $fn->getParam(0),
-            $fromI64,
-            $toI64
+            [$fn->getParam(0), $fromI64, $toI64]
         );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
         self::emitInvalidRadixCharsDeprecationIfNeeded($context);
         $context->builder->returnValue($result);
     }

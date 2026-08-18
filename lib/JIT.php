@@ -10638,7 +10638,7 @@ class JIT {
                         $this->context->getVariableFromOp($block->getOperand($op->arg3))
                     );
                     $this->context->powReturnValueBox = false;
-                    $this->assignOperandValue($block->getOperand($op->arg1), $powResult);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $powResult, true);
                     break;
                 case OpCode::TYPE_POST_INC:
                     $this->compileIncDecOp($block, $op, true, false);
@@ -15845,12 +15845,7 @@ class JIT {
             return false;
         }
         $mainScriptGlobal = $block->isMainScript() && !$this->context->isForeachByRefLocalName($name, $block);
-        $resolved = $this->context->resolveRefAliasName($name);
-        $importedGlobal = isset($this->context->jitImportedGlobalNames[$name])
-            || (
-                isset($this->context->namedVariableBindings[$resolved])
-                && $this->context->namedVariableBindings[$resolved]->functionStaticGlobal
-            );
+        $importedGlobal = isset($this->context->jitImportedGlobalNames[$name]);
         if (!$mainScriptGlobal && !$importedGlobal) {
             return false;
         }
@@ -15919,7 +15914,9 @@ class JIT {
             isset($this->context->namedVariableBindings[$resolved])
             && $this->context->namedVariableBindings[$resolved]->functionStaticGlobal
         ) {
-            return $this->context->ensureScriptGlobal($name);
+            // Nested-function `static $s` is a module box, not $GLOBALS. Echo must
+            // read that binding — ensureScriptGlobal() allocated a second empty slot (#31966).
+            return $this->context->namedVariableBindings[$resolved];
         }
 
         return null;
