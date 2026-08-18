@@ -884,10 +884,9 @@ class Type extends Builtin {
         $fntypeStripcslashes = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnStripcslashes = $this->context->module->addFunction('__compiler_stripcslashes', $fntypeStripcslashes);
         $this->context->registerFunction('__compiler_stripcslashes', $fnStripcslashes);
-        $i32 = $this->context->getTypeFromString('int32');
-        $fntypeSubstrReplace = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i64, $i64, $i32);
-        $fnSubstrReplace = $this->context->module->addFunction('__compiler_substr_replace', $fntypeSubstrReplace);
-        $this->context->registerFunction('__compiler_substr_replace', $fnSubstrReplace);
+        // __compiler_substr_replace always-on shell removed (#32250): user-script
+        // substr_replace() stays VmString / ext/standard/substr_replace.php. No
+        // NestedJIT lookupFunction remains.
         $fntypePregMatch = $this->context->context->functionType(
             $i64,
             false,
@@ -992,14 +991,9 @@ class Type extends Builtin {
         );
         $fnDiFmt = $this->context->module->addFunction('__compiler_date_interval_format', $fntypeDiFmt);
         $this->context->registerFunction('__compiler_date_interval_format', $fnDiFmt);
-        $fntypeIdate = $this->context->context->functionType(
-            $i64,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $i64
-        );
-        $fnIdate = $this->context->module->addFunction('__compiler_idate', $fntypeIdate);
-        $this->context->registerFunction('__compiler_idate', $fnIdate);
+        // __compiler_idate always-on shell removed (#32250): user-script idate()
+        // stays JitIdate IR / IdateJitHelper (#26900). StringIdate::implement()
+        // is an intentional no-op.
         $fntypeUndefKeyStr = $this->context->context->functionType(
             $void,
             false,
@@ -1097,11 +1091,8 @@ class Type extends Builtin {
             $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
         );
         $this->context->registerFunction('__phpc_scandir_vec', $fnScandirVec);
-        $fnFileVec = $this->context->module->addFunction(
-            '__phpc_file_vec',
-            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
-        );
-        $this->context->registerFunction('__phpc_file_vec', $fnFileVec);
+        // __phpc_file_vec always-on shell removed (#32250): leftover sibling of
+        // live __phpc_glob_vec / __phpc_scandir_vec; zero NestedJIT consumers.
         $fnStrvecFree = $this->context->module->addFunction(
             '__phpc_strvec_free',
             $this->context->context->functionType($void, false, $i8ppPtr, $i32)
@@ -1140,11 +1131,9 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $strPtr, $valuePtr)
         );
         $this->context->registerFunction('__phpc_parse_url_assoc', $fnParseUrlAssoc);
-        $fnGetdate = $this->context->module->addFunction(
-            '__compiler_getdate',
-            $this->context->context->functionType($void, false, $i64, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_getdate', $fnGetdate);
+        // __compiler_getdate always-on shell removed (#32250): user-script getdate()
+        // stays JitGetdate IR / GetdateJitHelper (#26900). StringGetdate::implement()
+        // is an intentional no-op.
         $fnLocaltime = $this->context->module->addFunction(
             '__compiler_localtime',
             $this->context->context->functionType($void, false, $i64, $i1, $valuePtr)
@@ -1330,16 +1319,8 @@ class Type extends Builtin {
             $fntypeXmlrpcEncodeValue
         );
         $this->context->registerFunction('__compiler_xmlrpc_encode_value', $fnXmlrpcEncodeValue);
-        $fntypeXmlrpcEncodeArray = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__hashtable__*')
-        );
-        $fnXmlrpcEncodeArray = $this->context->module->addFunction(
-            '__compiler_xmlrpc_encode_array',
-            $fntypeXmlrpcEncodeArray
-        );
-        $this->context->registerFunction('__compiler_xmlrpc_encode_array', $fnXmlrpcEncodeArray);
+        // __compiler_xmlrpc_encode_array always-on shell removed (#32250): leftover;
+        // StringXmlrpc ABI is __compiler_xmlrpc_encode_value + __compiler_xmlrpc_decode.
         $fnXmlrpcDecode = $this->context->module->addFunction(
             '__compiler_xmlrpc_decode',
             $this->context->context->functionType($void, false, $strPtr, $valuePtr)
