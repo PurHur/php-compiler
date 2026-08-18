@@ -7772,7 +7772,7 @@ restart:
                         $frame->callArgs = [];
                         $frame->callArgEntries = [];
                         // Null ctor stub: drop Class::__construct so later builtins use real names (#10009).
-                        if (null === $frame->pendingOutboundCallRestore) {
+                        if ([] === $frame->pendingOutboundCallRestore) {
                             $frame->builtinCalleeQualifiedMethod = null;
                         }
                         $this->restorePendingOutboundCallAfterInlineNew($frame);
@@ -18374,7 +18374,7 @@ restart:
         if (null === $frame->call) {
             return;
         }
-        $frame->pendingOutboundCallRestore = [
+        $frame->pendingOutboundCallRestore[] = [
             'call' => $frame->call,
             'callArgs' => $frame->callArgs,
             'callArgEntries' => $frame->callArgEntries,
@@ -18385,16 +18385,15 @@ restart:
 
     private function restorePendingOutboundCallAfterInlineNew(Frame $frame): void
     {
-        if (null === $frame->pendingOutboundCallRestore) {
+        if ([] === $frame->pendingOutboundCallRestore) {
             return;
         }
-        $saved = $frame->pendingOutboundCallRestore;
+        $saved = array_pop($frame->pendingOutboundCallRestore);
         $frame->call = $saved['call'];
         $frame->callArgs = $saved['callArgs'];
         $frame->callArgEntries = $saved['callArgEntries'];
         $frame->callSiteLine = $saved['callSiteLine'];
         $frame->builtinCalleeQualifiedMethod = $saved['builtinCalleeQualifiedMethod'];
-        $frame->pendingOutboundCallRestore = null;
     }
 
     /**
