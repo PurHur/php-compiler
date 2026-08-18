@@ -9,7 +9,6 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -28,13 +27,10 @@ final class JitDomSaveXMLUserScript
     public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
     {
         // saveXML($node) after textContent mutation: serialize from node slots (#23251).
-        // Explicit node: null is document-wide (same as omitted) — do not treat as an object (#25182).
-        if (\count($args) >= 2
-            && !NamedOptionalCallArgs::isOmittedOptional($args[1])
-            && JITVariable::TYPE_NULL !== $args[1]->type
-            && !($args[1]->isNullConstant ?? false)
-        ) {
-            $serialized = self::trySerializeNode($context, $args[1]);
+        // `saveXML(options: …)` must not treat int arg #1 as $node (#32018 / #25182).
+        [$nodeArg] = JitDomSaveSerializationArgs::parse($args);
+        if (JitDomSaveSerializationArgs::isNodeScoped($nodeArg)) {
+            $serialized = self::trySerializeNode($context, $nodeArg);
             if (null !== $serialized) {
                 return $serialized;
             }
