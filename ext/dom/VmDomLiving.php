@@ -432,9 +432,10 @@ final class VmDomLiving
      * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580, #20689, #20866).
      *
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
-     * descendant / child (`>`) / adjacent-sibling (`+`) / general-sibling (`~`)
-     * combinators, and comma selector lists (CSS Selectors Level 3 /
-     * php-src Dom\* lexbor; #32061).
+     * CSS attribute selectors (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`, `*=`,
+     * optional `i` flag), descendant / child (`>`) / adjacent-sibling (`+`) /
+     * general-sibling (`~`) combinators, and comma selector lists (CSS
+     * Selectors Level 3 / php-src Dom\* lexbor; #32061, #32089).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -889,7 +890,7 @@ final class VmDomLiving
      * `>` (child), `+` (adjacent sibling), or `~` (general sibling). Leading,
      * trailing, or doubled combinators → null (SyntaxError).
      *
-     * @return list<array{combinator: string, simple: array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>}}>|null
+     * @return list<array{combinator: string, simple: array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>}}>|null
      */
     private static function parseCompoundSelector(string $selector): ?array
     {
@@ -928,13 +929,11 @@ final class VmDomLiving
             if (!$expectSimple) {
                 return null;
             }
-            $start = $i;
-            while ($i < $len && !ctype_space($selector[$i])
-                && '>' !== $selector[$i] && '+' !== $selector[$i] && '~' !== $selector[$i]
-            ) {
-                ++$i;
+            $token = self::takeSimpleSelectorToken($selector, $i, $len);
+            if (null === $token) {
+                return null;
             }
-            $simple = self::parseSimpleSelector(substr($selector, $start, $i - $start));
+            $simple = self::parseSimpleSelector($token);
             if (null === $simple) {
                 return null;
             }
@@ -950,6 +949,72 @@ final class VmDomLiving
         }
 
         return $parts;
+    }
+
+    /**
+     * Consume one simple selector, treating `[…]` (with quoted values) as atomic
+     * so `~` / `=` / spaces inside attribute selectors are not combinators (#32089).
+     */
+    private static function takeSimpleSelectorToken(string $selector, int &$i, int $len): ?string
+    {
+        $start = $i;
+        while ($i < $len) {
+            $ch = $selector[$i];
+            if (ctype_space($ch) || '>' === $ch || '+' === $ch || '~' === $ch) {
+                break;
+            }
+            if ('[' === $ch) {
+                $end = self::scanAttributeSelectorClose($selector, $i, $len);
+                if (null === $end) {
+                    return null;
+                }
+                $i = $end;
+                continue;
+            }
+            ++$i;
+        }
+        if ($i === $start) {
+            return null;
+        }
+
+        return substr($selector, $start, $i - $start);
+    }
+
+    /**
+     * @return int|null index after the matching `]`, or null if unclosed
+     */
+    private static function scanAttributeSelectorClose(string $selector, int $i, int $len): ?int
+    {
+        if ($i >= $len || '[' !== $selector[$i]) {
+            return null;
+        }
+        ++$i;
+        $quote = null;
+        while ($i < $len) {
+            $ch = $selector[$i];
+            if (null !== $quote) {
+                if ('\\' === $ch && ($i + 1) < $len) {
+                    $i += 2;
+                    continue;
+                }
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                ++$i;
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                ++$i;
+                continue;
+            }
+            if (']' === $ch) {
+                return $i + 1;
+            }
+            ++$i;
+        }
+
+        return null;
     }
 
     /**
@@ -1045,7 +1110,7 @@ final class VmDomLiving
     }
 
     /**
-     * @return array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>}|null
+     * @return array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>}|null
      */
     private static function parseSimpleSelector(string $selector): ?array
     {
@@ -1053,44 +1118,191 @@ final class VmDomLiving
         if ('' === $selector) {
             return null;
         }
-        // Type selector must not absorb `:` (pseudos); colon in tags was a silent misparse (#20866).
-        // Optional trailing :first-child / :last-child only — other :foo → SyntaxError via null.
-        if (!preg_match(
-            '/^(\*|([a-zA-Z][\w-]*))?(#[\w-]+)?((?:\.[\w-]+)*)((?::(?:first-child|last-child))*)$/',
-            $selector,
-            $m
-        )) {
+        $len = \strlen($selector);
+        $i = 0;
+        $universal = false;
+        $tag = null;
+        if ($i < $len && '*' === $selector[$i]) {
+            $universal = true;
+            ++$i;
+        } elseif ($i < $len && 1 === preg_match('/\G[a-zA-Z][\w-]*/A', $selector, $m, 0, $i)) {
+            $tag = strtolower($m[0]);
+            $i += \strlen($m[0]);
+        }
+        $id = null;
+        $classes = [];
+        $pseudos = [];
+        $attrs = [];
+        while ($i < $len) {
+            $ch = $selector[$i];
+            if ('#' === $ch) {
+                ++$i;
+                if (1 !== preg_match('/\G[\w-]+/A', $selector, $m, 0, $i)) {
+                    return null;
+                }
+                $id = $m[0];
+                $i += \strlen($m[0]);
+                continue;
+            }
+            if ('.' === $ch) {
+                ++$i;
+                if (1 !== preg_match('/\G[\w-]+/A', $selector, $m, 0, $i)) {
+                    return null;
+                }
+                $classes[] = $m[0];
+                $i += \strlen($m[0]);
+                continue;
+            }
+            if ('[' === $ch) {
+                $parsed = self::parseAttributeSelector($selector, $i, $len);
+                if (null === $parsed) {
+                    return null;
+                }
+                $attrs[] = $parsed['attr'];
+                $i = $parsed['end'];
+                continue;
+            }
+            if (':' === $ch) {
+                ++$i;
+                if (1 !== preg_match('/\G(?:first-child|last-child)/A', $selector, $m, 0, $i)) {
+                    return null;
+                }
+                $pseudos[] = $m[0];
+                $i += \strlen($m[0]);
+                continue;
+            }
+
             return null;
         }
-        $tagPart = $m[1] ?? '';
-        $universal = '*' === $tagPart;
-        $tag = ($universal || '' === $tagPart) ? null : strtolower($tagPart);
-        $id = isset($m[3]) && '' !== $m[3] ? substr($m[3], 1) : null;
-        $classes = [];
-        if (isset($m[4]) && '' !== $m[4]) {
-            foreach (explode('.', ltrim($m[4], '.')) as $class) {
-                if ('' !== $class) {
-                    $classes[] = $class;
-                }
-            }
-        }
-        $pseudos = [];
-        if (isset($m[5]) && '' !== $m[5]) {
-            if (preg_match_all('/:(first-child|last-child)/', $m[5], $pm) > 0) {
-                foreach ($pm[1] as $pseudo) {
-                    $pseudos[] = $pseudo;
-                }
-            }
-        }
-        if (!$universal && null === $tag && null === $id && [] === $classes && [] === $pseudos) {
+        if (!$universal && null === $tag && null === $id && [] === $classes && [] === $pseudos && [] === $attrs) {
             return null;
         }
 
-        return ['tag' => $tag, 'id' => $id, 'classes' => $classes, 'pseudos' => $pseudos];
+        return ['tag' => $tag, 'id' => $id, 'classes' => $classes, 'pseudos' => $pseudos, 'attrs' => $attrs];
     }
 
     /**
-     * @param array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>} $simple
+     * CSS3 attribute selector at `$i` (`[` … `]`). php-src lexbor / Selectors Level 3 (#32089).
+     *
+     * @return array{attr: array{name: string, op: ?string, value: ?string, i: bool}, end: int}|null
+     */
+    private static function parseAttributeSelector(string $selector, int $i, int $len): ?array
+    {
+        if ($i >= $len || '[' !== $selector[$i]) {
+            return null;
+        }
+        ++$i;
+        while ($i < $len && ctype_space($selector[$i])) {
+            ++$i;
+        }
+        if (1 !== preg_match('/\G[A-Za-z_][\w:-]*/A', $selector, $m, 0, $i)) {
+            return null;
+        }
+        $name = $m[0];
+        $i += \strlen($name);
+        while ($i < $len && ctype_space($selector[$i])) {
+            ++$i;
+        }
+        if ($i < $len && ']' === $selector[$i]) {
+            return [
+                'attr' => ['name' => $name, 'op' => null, 'value' => null, 'i' => false],
+                'end' => $i + 1,
+            ];
+        }
+        $op = null;
+        if (($i + 1) < $len && '=' === $selector[$i + 1]
+            && ('~' === $selector[$i] || '|' === $selector[$i] || '^' === $selector[$i]
+                || '$' === $selector[$i] || '*' === $selector[$i])
+        ) {
+            $op = $selector[$i].'=';
+            $i += 2;
+        } elseif ($i < $len && '=' === $selector[$i]) {
+            $op = '=';
+            ++$i;
+        } else {
+            return null;
+        }
+        while ($i < $len && ctype_space($selector[$i])) {
+            ++$i;
+        }
+        $value = self::parseAttributeSelectorValue($selector, $i, $len);
+        if (null === $value) {
+            return null;
+        }
+        $i = $value['end'];
+        while ($i < $len && ctype_space($selector[$i])) {
+            ++$i;
+        }
+        $ci = false;
+        if ($i < $len && ('i' === $selector[$i] || 'I' === $selector[$i])
+            && (($i + 1) >= $len || !ctype_alnum($selector[$i + 1]))
+        ) {
+            $ci = true;
+            ++$i;
+            while ($i < $len && ctype_space($selector[$i])) {
+                ++$i;
+            }
+        } elseif ($i < $len && ('s' === $selector[$i] || 'S' === $selector[$i])
+            && (($i + 1) >= $len || !ctype_alnum($selector[$i + 1]))
+        ) {
+            ++$i;
+            while ($i < $len && ctype_space($selector[$i])) {
+                ++$i;
+            }
+        }
+        if ($i >= $len || ']' !== $selector[$i]) {
+            return null;
+        }
+
+        return [
+            'attr' => ['name' => $name, 'op' => $op, 'value' => $value['value'], 'i' => $ci],
+            'end' => $i + 1,
+        ];
+    }
+
+    /**
+     * @return array{value: string, end: int}|null
+     */
+    private static function parseAttributeSelectorValue(string $selector, int $i, int $len): ?array
+    {
+        if ($i >= $len) {
+            return null;
+        }
+        $ch = $selector[$i];
+        if ('"' === $ch || "'" === $ch) {
+            $quote = $ch;
+            ++$i;
+            $value = '';
+            while ($i < $len && $selector[$i] !== $quote) {
+                if ('\\' === $selector[$i] && ($i + 1) < $len) {
+                    $value .= $selector[$i + 1];
+                    $i += 2;
+                    continue;
+                }
+                $value .= $selector[$i];
+                ++$i;
+            }
+            if ($i >= $len || $selector[$i] !== $quote) {
+                return null;
+            }
+
+            return ['value' => $value, 'end' => $i + 1];
+        }
+        $start = $i;
+        while ($i < $len && ']' !== $selector[$i] && '"' !== $selector[$i] && "'" !== $selector[$i]
+            && !ctype_space($selector[$i])
+        ) {
+            ++$i;
+        }
+        if ($i === $start) {
+            return null;
+        }
+
+        return ['value' => substr($selector, $start, $i - $start), 'end' => $i];
+    }
+
+    /**
+     * @param array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>} $simple
      */
     private static function elementMatchesSimple(ObjectEntry $element, array $simple): bool
     {
@@ -1119,6 +1331,11 @@ final class VmDomLiving
                 }
             }
         }
+        foreach ($simple['attrs'] as $attr) {
+            if (!self::elementMatchesAttributeSelector($element, $attr)) {
+                return false;
+            }
+        }
         foreach ($simple['pseudos'] as $pseudo) {
             if ('first-child' === $pseudo) {
                 if (!self::elementIsNthChildEdge($element, true)) {
@@ -1134,6 +1351,65 @@ final class VmDomLiving
         }
 
         return true;
+    }
+
+    /**
+     * CSS3 attribute selector match (php-src lexbor / Selectors Level 3; #32089).
+     *
+     * HTML documents ASCII-lowercase the selector attribute name before compare
+     * (php-src #17802 / WHATWG case-sensitivity of selectors). Empty `~=` `^=`
+     * `$=` `*=` values match nothing.
+     *
+     * @param array{name: string, op: ?string, value: ?string, i: bool} $attr
+     */
+    private static function elementMatchesAttributeSelector(ObjectEntry $element, array $attr): bool
+    {
+        $state = DomRegistry::state($element);
+        $name = $attr['name'];
+        $owner = VmDom::ownerDocumentEntry($element);
+        $html = null !== $owner && self::CLASS_HTML_DOCUMENT === strtolower($owner->class->name);
+        if ($html) {
+            $name = strtolower($name);
+        }
+        if (!\array_key_exists($name, $state->attributes)) {
+            return false;
+        }
+        if (null === $attr['op']) {
+            return true;
+        }
+        $actual = (string) $state->attributes[$name];
+        $want = (string) $attr['value'];
+        if ($attr['i']) {
+            $actual = strtolower($actual);
+            $want = strtolower($want);
+        }
+
+        return match ($attr['op']) {
+            '=' => $actual === $want,
+            '~=' => self::attributeIncludesWord($actual, $want),
+            '|=' => $actual === $want || str_starts_with($actual, $want.'-'),
+            '^=' => '' !== $want && str_starts_with($actual, $want),
+            '$=' => '' !== $want && str_ends_with($actual, $want),
+            '*=' => '' !== $want && str_contains($actual, $want),
+            default => false,
+        };
+    }
+
+    private static function attributeIncludesWord(string $actual, string $want): bool
+    {
+        if ('' === $want || str_contains($want, ' ') || str_contains($want, "\t")
+            || str_contains($want, "\n") || str_contains($want, "\r")
+        ) {
+            return false;
+        }
+        $words = preg_split('/\s+/', trim($actual)) ?: [];
+        foreach ($words as $word) {
+            if ($word === $want) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
