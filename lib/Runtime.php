@@ -518,8 +518,8 @@ class Runtime {
         }
         try {
             $script = $this->parser->parse($code, $filename);
-        } catch (\LogicException $e) {
-            Ast\BreakContinueOperandCompileCheck::rethrowAsCompileFatal($e, $filename);
+        } catch (\Throwable $e) {
+            $this->rethrowParserPipelineFailure($e, $filename);
         } finally {
             $this->abstractEnumMarker->clear();
         }
@@ -585,8 +585,8 @@ class Runtime {
         try {
             $script = $this->parser->parse($code, $filename);
             $this->confusableBuiltinTypeHintCheck->emitPending($this->vmContext, $filename);
-        } catch (\LogicException $e) {
-            Ast\BreakContinueOperandCompileCheck::rethrowAsCompileFatal($e, $filename);
+        } catch (\Throwable $e) {
+            $this->rethrowParserPipelineFailure($e, $filename);
         } finally {
             $this->abstractEnumMarker->clear();
             $this->confusableBuiltinTypeHintCheck->clearPending();
@@ -623,6 +623,25 @@ class Runtime {
     public function resetParserNameResolverBeforeParse(): void
     {
         $this->resetParserNameResolverState();
+    }
+
+    /**
+     * Map php-parser / php-cfg internals to Zend CompileFatal (#32207, #32254).
+     *
+     * @return never
+     */
+    private function rethrowParserPipelineFailure(\Throwable $e, string $filename): never
+    {
+        if ($e instanceof CompileFatal) {
+            throw $e;
+        }
+        if ($e instanceof \PhpParser\Error) {
+            CompileFatal::rethrowUseAsSpecialClassName($e, $filename);
+        }
+        if ($e instanceof \LogicException) {
+            Ast\BreakContinueOperandCompileCheck::rethrowAsCompileFatal($e, $filename);
+        }
+        throw $e;
     }
 
     /** php-parser NameResolver aliases persist across traversals on one PHPCfg Parser (#1416). */

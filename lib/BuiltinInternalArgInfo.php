@@ -198,6 +198,9 @@ final class BuiltinInternalArgInfo
             'getrusage' => 'array|false',
             // ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783)
             'posix_times' => 'array|false',
+            // ext/posix/posix.stub.php — InternalArgInfo return array / omitted (#27736)
+            'posix_getrlimit' => 'array|false',
+            'posix_setrlimit' => 'bool',
             // ext/posix/posix.stub.php — PHP 8.3+; absent from InternalArgInfo (#27918)
             'posix_sysconf' => 'int',
             'posix_pathconf', 'posix_fpathconf' => 'int|false',
@@ -809,6 +812,11 @@ final class BuiltinInternalArgInfo
             'posix_fpathconf' => match ($index) {
                 0 => '',
                 1 => 'int',
+                default => null,
+            },
+            // php-src ext/posix/posix.stub.php — InternalArgInfo omits posix_setrlimit (#27736)
+            'posix_setrlimit' => match ($index) {
+                0, 1, 2 => 'int',
                 default => null,
             },
             // ext/random/random.stub.php — int $seed = 0, int $mode = MT_RAND_MT19937 (#23596)

@@ -960,6 +960,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_times'));
     }
 
+    /** php-src ext/posix/posix.stub.php — getrlimit |false; setrlimit omitted (#27736). */
+    public function testPosixRlimitReflectionStubTypes(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_getrlimit'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_setrlimit'));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('posix_setrlimit', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('posix_setrlimit', 1));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('posix_setrlimit', 2));
+        $res = BuiltinInternalArgInfo::paramInfoForFunction('posix_setrlimit', 0);
+        $this->assertNotNull($res);
+        $this->assertSame('resource', $res['name']);
+        $this->assertSame('int', $res['type']);
+        $this->assertFalse($res['isOptional']);
+        $soft = BuiltinInternalArgInfo::paramInfoForFunction('posix_setrlimit', 1);
+        $this->assertNotNull($soft);
+        $this->assertSame('soft_limit', $soft['name']);
+        $hard = BuiltinInternalArgInfo::paramInfoForFunction('posix_setrlimit', 2);
+        $this->assertNotNull($hard);
+        $this->assertSame('hard_limit', $hard['name']);
+    }
+
     /** php-src ext/posix/posix.stub.php — PHP 8.3+ sysconf family absent from InternalArgInfo (#27918). */
     public function testPosixSysconfFamilyReflectionStubTypes(): void
     {

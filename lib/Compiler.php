@@ -7191,6 +7191,32 @@ class Compiler {
     }
 
     /**
+     * php-src zend_compile_class_const_declaration() + zend_check_const_and_trait_alias_name() (#32251).
+     * Declared class/interface/trait/enum constant named `class` (any case) is a compile fatal;
+     * `Foo::class` the pseudo-constant is a fetch, not a declaration.
+     */
+    protected function rejectReservedClassConstName(?string $constName, Op\Terminal\Const_ $const): void
+    {
+        if (null === $constName || '' === $constName) {
+            return;
+        }
+        $unqualified = $constName;
+        if (str_contains($constName, '\\')) {
+            $parts = explode('\\', $constName);
+            $unqualified = $parts[count($parts) - 1];
+        }
+        if ('class' !== strtolower($unqualified)) {
+            return;
+        }
+        $detail = "A class constant must not be called 'class'; it is reserved for class name fetching";
+        $sourceFile = $const->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $const->getLine());
+    }
+
+    /**
      * php-src zend_assert_valid_class_name() — compile fatal before TYPE_DECLARE_* (#32206).
      * Message shape is PHP 8.2/8.3: Cannot use '%s' as class name as it is reserved.
      */
@@ -9518,6 +9544,7 @@ class Compiler {
     {
         $this->rejectStaticScopeInCompileTimeConstExpr($child->valueBlock, $child, $child->value);
         $constName = $this->staticNameFromOperand($child->name);
+        $this->rejectReservedClassConstName($constName, $child);
         if (null !== $constName && null !== $this->compilingClassLc) {
             // Case-sensitive — const A and const a are distinct (#25929).
             $constKey = ClassConstName::key($constName);
@@ -12160,6 +12187,16 @@ class Compiler {
     }
 
     /**
+     * Zend zend_compile_new() → zend_ensure_valid_class_fetch_type() — `new self/parent/static`
+     * in a named free function is a compile-time fatal even when unused (#32252, re-#32227).
+     */
+    protected function rejectPseudoClassNewOutsideClassScope(Op\Expr\New_ $expr, Block $block): void
+    {
+        $keyword = $this->firstClassCallableScopeKeyword($expr->class);
+        $this->rejectPseudoClassFetchOutsideKnownClassScope($keyword, $block, $expr);
+    }
+
+    /**
      * @param null|'parent'|'self'|'static' $keyword
      */
     protected function rejectPseudoClassFetchOutsideKnownClassScope(?string $keyword, Block $block, Op $source): void
@@ -14794,6 +14831,7 @@ class Compiler {
                     $calleeName
                 );
             case Op\Expr\New_::class:
+                $this->rejectPseudoClassNewOutsideClassScope($expr, $block);
                 // Abstract/enum `new` is a runtime Error when NEW executes (Zend zend_execute.c),
                 // not a unit-wide compile fatal — dead `if (false) { new Abstract; }` must load (#25787 / re-#3385).
                 $className = $this->literalScopeClassName($expr->class);
@@ -15789,6 +15827,7 @@ class Compiler {
      */
     private function compileNewExprForThrow(Op\Expr\New_ $expr, Block $block): array
     {
+        $this->rejectPseudoClassNewOutsideClassScope($expr, $block);
         // Same as Op\Expr\New_:: class path — defer abstract/enum instantiate to runtime (#25787).
         $className = $this->literalScopeClassName($expr->class);
         $resultSlot = $block->forceFreshVarSlot($expr->result);

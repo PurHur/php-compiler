@@ -426,6 +426,9 @@ final class BuiltinParamNames
                 return ['path', 'name'];
             case 'posix_fpathconf':
                 return ['file_descriptor', 'name'];
+            // php-src ext/posix/posix.stub.php — InternalArgInfo omits posix_setrlimit entirely (#27736)
+            case 'posix_setrlimit':
+                return ['resource', 'soft_limit', 'hard_limit'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/salt=
             // ($salt required; optionality override in BuiltinInternalArgInfo, #23264 / #28920)
             case 'crypt':
