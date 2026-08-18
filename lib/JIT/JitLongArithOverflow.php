@@ -167,6 +167,11 @@ final class JitLongArithOverflow
 
     private static function extractConstantLong(Context $context, Variable $var): ?int
     {
+        // ConstFetch of PHP_INT_MIN/MAX is a load of a module global with
+        // compileTimeLong — not KIND_CONSTANT_INT (#32309).
+        if (null !== $var->compileTimeLong) {
+            return $var->compileTimeLong;
+        }
         if (Variable::KIND_VALUE !== $var->kind
             || null === $var->value
             || LlvmValue::KIND_CONSTANT_INT !== $var->value->getKind()
