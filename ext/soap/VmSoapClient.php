@@ -2919,9 +2919,12 @@ final class VmSoapClient
     /** php-src to_xml_string / to_xml_bool / to_xml_base64 / to_xml_hexbin (#32190). */
     private static function soapVarEncodedText(int $encType, mixed $value): string
     {
-        // php-src to_xml_datetime_ex IS_LONG — localtime + strftime + tzbuf (#32237).
-        if (SoapConstants::XSD_DATETIME === $encType && \is_int($value)) {
-            return self::formatSoapXsdDatetimeTimestamp($value);
+        // php-src to_xml_datetime_ex IS_LONG — localtime + strftime + tzbuf (#32237 / #32239).
+        if (\is_int($value)) {
+            $temporal = self::formatSoapXsdTemporalTimestamp($encType, $value);
+            if (null !== $temporal) {
+                return $temporal;
+            }
         }
         if (SoapConstants::XSD_BOOLEAN === $encType) {
             return self::soapVarIsTrue($value) ? 'true' : 'false';
@@ -2960,27 +2963,38 @@ final class VmSoapClient
     }
 
     /**
-     * php-src to_xml_datetime() / to_xml_datetime_ex() for IS_LONG (#32237).
+     * php-src to_xml_datetime_ex() for IS_LONG (#32237 / #32239).
      *
-     * strftime("%Y-%m-%dT%H:%M:%S") plus timezone suffix; "+00:00" becomes "Z".
+     * dateTime: "%Y-%m-%dT%H:%M:%S"; date: "%Y-%m-%d"; time: "%H:%M:%S"; plus tzbuf (`Z` for UTC).
      */
-    private static function formatSoapXsdDatetimeTimestamp(int $timestamp): string
+    private static function formatSoapXsdTemporalTimestamp(int $encType, int $timestamp): ?string
     {
+        $kind = match ($encType) {
+            SoapConstants::XSD_DATETIME => 'datetime',
+            SoapConstants::XSD_DATE => 'date',
+            SoapConstants::XSD_TIME => 'time',
+            default => null,
+        };
+        if (null === $kind) {
+            return null;
+        }
         $tzName = VmDate::defaultTimezoneGet();
         $offset = VmDateTimeNative::timezoneOffsetSeconds($tzName, $timestamp);
         $tm = VmDatePure::gmtime($timestamp + $offset);
         if (null === $tm) {
             return (string) $timestamp;
         }
-        $text = \sprintf(
-            '%04d-%02d-%02dT%02d:%02d:%02d',
-            $tm['tm_year'] + 1900,
-            $tm['tm_mon'] + 1,
-            $tm['tm_mday'],
-            $tm['tm_hour'],
-            $tm['tm_min'],
-            $tm['tm_sec']
-        );
+        $year = $tm['tm_year'] + 1900;
+        $month = $tm['tm_mon'] + 1;
+        $day = $tm['tm_mday'];
+        $hour = $tm['tm_hour'];
+        $minute = $tm['tm_min'];
+        $second = $tm['tm_sec'];
+        $text = match ($kind) {
+            'datetime' => \sprintf('%04d-%02d-%02dT%02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second),
+            'date' => \sprintf('%04d-%02d-%02d', $year, $month, $day),
+            'time' => \sprintf('%02d:%02d:%02d', $hour, $minute, $second),
+        };
 
         return \htmlspecialchars($text.self::soapXsdTimezoneSuffix($offset), \ENT_XML1);
     }
