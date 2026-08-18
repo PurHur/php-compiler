@@ -337,6 +337,8 @@
             <file>./test/unit/DomCreateElementValue32292AotTest.php</file>
             <file>./test/compliance/CastIntFloatCallArg32293JITTest.php</file>
             <file>./test/unit/CastIntFloatCallArg32293AotTest.php</file>
+            <file>./test/compliance/AsortNatural32295JITTest.php</file>
+            <file>./test/unit/AsortNatural32295AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>

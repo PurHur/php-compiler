@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\NaturalSortRuntime;
 use PHPCompiler\JIT\Builtin\ValueSortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -16,6 +17,7 @@ use PHPLLVM\Value;
  *
  * VM: key-preserving value sort via {@see VmArray::asortCopy()}.
  * JIT/AOT: packed list via SortJitHelper; string-key via __hashtable__sortStringKeyValues.
+ * SORT_NATURAL / SORT_NATURAL|SORT_FLAG_CASE reuse natsort LLVM (#32295 / #26975).
  */
 final class asort_ extends Internal
 {
@@ -92,7 +94,14 @@ final class asort_ extends Internal
             return;
         }
         if (StdlibConstants::SORT_NATURAL === $sortType) {
-            throw new \LogicException('asort() flags are not supported in JIT/AOT in this compiler build');
+            // php-src php_array_data_compare PHP_SORT_NATURAL ≡ php_natsort (#32295).
+            if (0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)) {
+                NaturalSortRuntime::natcasesortByValue($context, $array);
+            } else {
+                NaturalSortRuntime::natsortByValue($context, $array);
+            }
+
+            return;
         }
         ValueSortRuntime::asortByValue($context, $array);
     }

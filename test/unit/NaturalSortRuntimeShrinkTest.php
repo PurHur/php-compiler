@@ -32,8 +32,15 @@ final class NaturalSortRuntimeShrinkTest extends TestCase
 
         $natsort = (string) file_get_contents(__DIR__.'/../../ext/standard/natsort_.php');
         $natcasesort = (string) file_get_contents(__DIR__.'/../../ext/standard/natcasesort_.php');
+        $asort = (string) file_get_contents(__DIR__.'/../../ext/standard/asort_.php');
         $this->assertStringContainsString('NaturalSortRuntime::natsortByValue', $natsort);
         $this->assertStringContainsString('NaturalSortRuntime::natcasesortByValue', $natcasesort);
+        $this->assertStringContainsString('NaturalSortRuntime::natsortByValue', $asort);
+        $this->assertStringContainsString('NaturalSortRuntime::natcasesortByValue', $asort);
+        $this->assertStringNotContainsString(
+            'asort() flags are not supported in JIT/AOT',
+            $asort
+        );
     }
 
     public function testNaturalCompareJitHelperDoesNotCallVmString(): void
