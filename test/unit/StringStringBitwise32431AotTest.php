@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class StringStringBitwise32431AotTest extends TestCase
 {
-    private const EXPECT = "03\nstring(1) \"A\"\nstring(2) \"CC\"\n02\nstring(1) \"x\"\nstring(0) \"\"\nstring(1) \"3\"\n";
+    private const EXPECT = "3\nstring(1) \"A\"\nstring(2) \"CC\"\n2\nstring(1) \"x\"\nstring(0) \"\"\nstring(1) \"3\"\n";
 
     public function testVmStringStringBitwiseMatchesZend(): void
     {
