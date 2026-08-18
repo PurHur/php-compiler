@@ -61,6 +61,7 @@ final class JitDomCreateTextNode
     public static function materialize(Context $context, string $data = ''): Value
     {
         self::$lastMaterializedData = $data;
+        JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -80,6 +81,7 @@ final class JitDomCreateTextNode
     public static function overwriteCharacterData(Context $context, Value $obj, string $data): void
     {
         self::$lastMaterializedData = $data;
+        JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -90,6 +92,8 @@ final class JitDomCreateTextNode
 
     private static function materializeFromRuntimeData(Context $context, JITVariable $dataArg): Value
     {
+        self::$lastMaterializedData = null;
+        JitDomSubstringData::remember(null);
         $dataStr = self::loadStringArg($context, $dataArg);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);

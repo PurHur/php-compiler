@@ -142,6 +142,10 @@ final class DomInstanceMethodJit
         'domattr::isid' => true,
         'dom\\attr::isid' => true,
         'domelement::toggleattribute' => true,
+        'domtext::substringdata' => true,
+        'domcomment::substringdata' => true,
+        'domcdatasection::substringdata' => true,
+        'domcharacterdata::substringdata' => true,
         'domnode::clonenode' => true,
         'domelement::clonenode' => true,
         'domtext::clonenode' => true,
@@ -534,6 +538,15 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domtext::substringdata' === $lc
+                || 'domcomment::substringdata' === $lc
+                || 'domcdatasection::substringdata' === $lc
+                || 'domcharacterdata::substringdata' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomCharacterDataSubstringData();
+
+                return;
+            }
             if ('domnode::clonenode' === $lc
                 || 'domelement::clonenode' === $lc
                 || 'domtext::clonenode' === $lc
@@ -813,6 +826,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::replacechildren');
             self::ensureProxy($context, 'domdocumentfragment::replacechildren');
             self::ensureProxy($context, 'domelement::toggleattribute');
+            self::ensureProxy($context, 'domtext::substringdata');
+            self::ensureProxy($context, 'domcomment::substringdata');
+            self::ensureProxy($context, 'domcdatasection::substringdata');
+            self::ensureProxy($context, 'domcharacterdata::substringdata');
             self::ensureProxy($context, 'domnode::clonenode');
             self::ensureProxy($context, 'domelement::clonenode');
             self::ensureProxy($context, 'domtext::clonenode');
@@ -949,8 +966,10 @@ final class DomInstanceMethodJit
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild', 'clonenode'],
-        'domtext' => ['splittext'],
-        'domcdatasection' => ['splittext'],
+        'domtext' => ['substringdata', 'splittext'],
+        'domcomment' => ['substringdata'],
+        'domcdatasection' => ['substringdata', 'splittext'],
+        'domcharacterdata' => ['substringdata'],
         'domelement' => ['setattribute', 'removeattribute', 'setidattribute', 'setidattributens', 'setidattributenode'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
