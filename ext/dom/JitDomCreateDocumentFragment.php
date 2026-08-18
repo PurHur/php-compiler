@@ -16,6 +16,7 @@ use PHPLLVM\Value;
  * Uses a DOMElement stand-in (same pattern as {@see JitDomCreateComment}) because
  * allocating an unregistered DOMDocumentFragment class aborts LLVM codegen in standalone AOT.
  * Stores ownerDocument = creating document so `$frag->ownerDocument === $doc` matches php-src.
+ * Seeds empty textContent / INNER_XML so saveXML slot fetches are defined (#32334).
  *
  * php-src: ext/dom/document.c — dom_document_create_document_fragment
  */
@@ -24,6 +25,8 @@ final class JitDomCreateDocumentFragment
     private const CLASS_STANDIN = 'DOMElement';
 
     private const PROP_NODE_NAME = 'nodeName';
+
+    private const PROP_TEXT_CONTENT = 'textContent';
 
     private const PROP_OWNER_DOCUMENT = 'ownerDocument';
 
@@ -43,6 +46,10 @@ final class JitDomCreateDocumentFragment
         $objectType->markObjectConstructed($obj);
 
         self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, '#document-fragment');
+        // saveXML fetches textContent/INNER_XML on every node (#32315). Empty fragment
+        // xmlNodeDump is "" (php-src ext/dom/document.c → xmlNewDocFragment).
+        self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, '');
+        self::storeStringLiteral($context, $obj, VmDom::PROP_USER_SCRIPT_INNER_XML, '');
         // DOMNode::$ownerDocument is a TYPE_VALUE slot (nullable object); match declared layout.
         $ownerVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
         $objectType->propertyStore(
@@ -60,6 +67,12 @@ final class JitDomCreateDocumentFragment
     ): void {
         if (!$objectType->hasProperty($classId, self::PROP_NODE_NAME)) {
             $objectType->defineProperty($classId, self::PROP_NODE_NAME, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
+            $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
+            $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
         }
         if (!$objectType->hasProperty($classId, self::PROP_OWNER_DOCUMENT)) {
             $objectType->defineProperty($classId, self::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);

@@ -84,6 +84,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'metaphone_soundex_count_chars_named_23437.phpt',
         'debug_print_backtrace_void_28909.phpt',
         'array_callable_static_invoke.phpt',
+        'dom_createdocumentfragment_savexml.phpt',
     ];
 
     /**
