@@ -1810,18 +1810,58 @@ final class JitFilter
             return $context->builder->load($context->constantStringFromString(''));
         }
         if (JITVariable::TYPE_NATIVE_LONG === $value->type) {
-            return $context->builder->call(
-                $context->lookupFunction('sprintf'),
-                $context->builder->load($context->constantStringFromString('%ld')),
+            $sizeT = $context->getTypeFromString('size_t');
+            $charPtr = $context->getTypeFromString('char*');
+            $i64 = $context->getTypeFromString('int64');
+            $bufSize = $sizeT->constInt(64, false);
+            $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+            $bufChar = $context->builder->pointerCast($buf, $charPtr);
+            $fmt = $context->builder->pointerCast($context->constantFromString('%ld'), $charPtr);
+            // sprintf(3) always-on drop (#32110): use module-local snprintf.
+            LibcExtern::ensureSnprintf($context);
+            $written = $context->builder->call(
+                $context->lookupFunction('snprintf'),
+                $bufChar,
+                $bufSize,
+                $fmt,
                 $context->helper->loadValue($value)
             );
+            $len = $context->builder->zExt($written, $i64);
+            $str = $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $len,
+                $bufChar
+            );
+            $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+
+            return $str;
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $value->type) {
-            return $context->builder->call(
-                $context->lookupFunction('sprintf'),
-                $context->builder->load($context->constantStringFromString('%F')),
+            $sizeT = $context->getTypeFromString('size_t');
+            $charPtr = $context->getTypeFromString('char*');
+            $i64 = $context->getTypeFromString('int64');
+            $bufSize = $sizeT->constInt(64, false);
+            $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+            $bufChar = $context->builder->pointerCast($buf, $charPtr);
+            $fmt = $context->builder->pointerCast($context->constantFromString('%F'), $charPtr);
+            // sprintf(3) always-on drop (#32110): use module-local snprintf.
+            LibcExtern::ensureSnprintf($context);
+            $written = $context->builder->call(
+                $context->lookupFunction('snprintf'),
+                $bufChar,
+                $bufSize,
+                $fmt,
                 $context->helper->loadValue($value)
             );
+            $len = $context->builder->zExt($written, $i64);
+            $str = $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $len,
+                $bufChar
+            );
+            $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+
+            return $str;
         }
         if (JITVariable::TYPE_NATIVE_BOOL === $value->type) {
             $id = (string) (++self::$blockSerial);

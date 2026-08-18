@@ -17,28 +17,9 @@ use PHPCompiler\JIT\Builtin;
 class Output extends Builtin {
 
     public function register(): void {
-        
-
-        $fntype___cfcd208495d565ef66e7dff9f98764da = $this->context->context->functionType(
-                $this->context->getTypeFromString('int32'),
-                true ,  
-                $this->context->getTypeFromString('char*')
-                , $this->context->getTypeFromString('char*')
-                 
-            );
-            $fn___cfcd208495d565ef66e7dff9f98764da = $this->context->module->addFunction('sprintf', $fntype___cfcd208495d565ef66e7dff9f98764da);
-            
-            
-            $fn___cfcd208495d565ef66e7dff9f98764da->addAttributeAtIndex(1 + 1, $this->context->attributes['readonly'], 0);
-                    $fn___cfcd208495d565ef66e7dff9f98764da->addAttributeAtIndex(1 + 1, $this->context->attributes['nocapture'], 0);
-                
-             
-            $this->context->registerFunction('sprintf', $fn___cfcd208495d565ef66e7dff9f98764da);
-        
-
-        
-    
-
+        // sprintf(3) always-on decl removed (#32110): user-script sprintf()/printf()
+        // remain PHP helpers (`__compiler_sprintf`/`__compiler_printf`) and
+        // NestedJIT leaves use LibcExtern::ensureSnprintf() at call sites.
     }
 
 }

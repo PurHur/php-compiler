@@ -2238,7 +2238,15 @@ final class HashTableWriteLlvm
         $buf = $context->builder->alloca($context->getTypeFromString('int8'), $sizeT->constInt(32, false), 'spl_key_buf');
         $bufC = $context->builder->pointerCast($buf, $i8p);
         $fmt = $context->builder->pointerCast($context->constantFromString('%zu'), $i8p);
-        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $ptrInt);
+        // sprintf(3) always-on drop (#32110): module-local snprintf via LibcExtern.
+        LibcExtern::ensureSnprintf($context);
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufC,
+            $sizeT->constInt(32, false),
+            $fmt,
+            $ptrInt
+        );
         // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
         LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
