@@ -2012,6 +2012,48 @@ final class HashTableWriteLlvm
     }
 
     /**
+     * Copy the packed slot into a FETCH_DIM_W lvalue box so ++/-- sees the current long (#32305).
+     *
+     * @see php-src Zend/zend_vm_def.h ZEND_FETCH_DIM_W / ZEND_POST_INC
+     */
+    public static function hydrateIndexWriteLvalue(Context $context, Variable $lvalue): void
+    {
+        if (null === $lvalue->writableHt || null === $lvalue->writableIndex) {
+            return;
+        }
+        $ht = $lvalue->writableHt;
+        $index = $lvalue->writableIndex;
+        $tag = 'idxhyd'.(string) self::nextSeq();
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $miss = BasicBlockHelper::append($context, 'ht_idx_hyd_miss_'.$tag);
+        $fill = BasicBlockHelper::append($context, 'ht_idx_hyd_fill_'.$tag);
+        $context->builder->branchIf($isSet, $fill, $miss);
+        $context->builder->positionAtEnd($miss);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $ht,
+            $index
+        );
+        $context->builder->branch($fill);
+        $context->builder->positionAtEnd($fill);
+        $entry = HashTableReadLlvm::listEntryPointer($context, $ht, $index);
+        JitValueBox::copyFromPointer($context, $lvalue->value, $entry);
+    }
+
+    /** Store a FETCH_DIM_W ++/-- box back into the packed hashtable (#32305). */
+    public static function commitIndexWriteLvalue(Context $context, Variable $lvalue): void
+    {
+        if (null === $lvalue->writableHt || null === $lvalue->writableIndex) {
+            return;
+        }
+        self::setAtIndex($context, $lvalue->writableHt, $lvalue->writableIndex, $lvalue);
+    }
+
+    /**
      * TYPE_OBJECT dim write: resource → index lvalue; else Illegal offset TypeError (#29550).
      */
     public static function prepareResourceOrIllegalObjectKeyWrite(

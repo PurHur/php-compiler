@@ -345,6 +345,9 @@
             <file>./test/unit/NullDecrementNoop32297AotTest.php</file>
             <file>./test/compliance/ArrayCallableStatic32299JITTest.php</file>
             <file>./test/unit/ArrayCallableStatic32299AotTest.php</file>
+            <file>./test/compliance/FunctionStaticArrayInc32305VMTest.php</file>
+            <file>./test/compliance/FunctionStaticArrayInc32305JITTest.php</file>
+            <file>./test/unit/FunctionStaticArrayInc32305AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>

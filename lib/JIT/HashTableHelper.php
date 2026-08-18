@@ -186,6 +186,16 @@ final class HashTableHelper
         return HashTableWriteLlvm::prepareIndexWrite($context, $ht, $index);
     }
 
+    public static function hydrateIndexWriteLvalue(Context $context, Variable $lvalue): void
+    {
+        HashTableWriteLlvm::hydrateIndexWriteLvalue($context, $lvalue);
+    }
+
+    public static function commitIndexWriteLvalue(Context $context, Variable $lvalue): void
+    {
+        HashTableWriteLlvm::commitIndexWriteLvalue($context, $lvalue);
+    }
+
     /** TYPE_OBJECT dim write: resource warn+cast or Illegal offset (#29550). */
     public static function prepareResourceOrIllegalObjectKeyWrite(
         Context $context,
