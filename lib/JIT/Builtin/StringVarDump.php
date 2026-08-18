@@ -220,10 +220,10 @@ final class StringVarDump
             $context->lookupFunction('__value__readDouble'),
             $arg
         );
-        // php-src var.c php_var_dump IS_DOUBLE uses zend_gcvt tokens INF/NAN, not libc
-        // snprintf "inf"/"nan" from __phpc_ob_echo_double (#32321; E-form peer #32316).
+        // php-src var.c php_var_dump IS_DOUBLE: %.*H PG(serialize_precision) (#32328)
+        // with zend_gcvt INF/NAN tokens, not libc snprintf "inf"/"nan" (#32321 / #32316).
         ValueEchoHelper::echoLiteral($context, 'float(');
-        $formatted = ZendDoubleStringRuntime::formatGcvt($context, $doubleVal);
+        $formatted = ZendDoubleStringRuntime::formatVarDumpH($context, $doubleVal);
         ValueEchoHelper::echoStringVariable(
             $context,
             new JitVariable(
