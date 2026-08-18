@@ -352,6 +352,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('call_user_func'));
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('call_user_func'));
         self::assertSame(['callback', 'args'], BuiltinParamNames::forFunction('call_user_func_array'));
+        self::assertSame(['callback', 'args'], BuiltinParamNames::forFunction('forward_static_call'));
         self::assertSame(['callback', 'args'], BuiltinParamNames::forFunction('forward_static_call_array'));
         self::assertTrue(BuiltinParamNames::forwardsNamedArgsIntoVariadic('call_user_func'));
         self::assertTrue(BuiltinParamNames::forwardsNamedArgsIntoVariadic('ReflectionFunction::invoke'));
@@ -405,6 +406,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('forward_static_call_array'));
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('forward_static_call_array'));
         self::assertNull(BuiltinParamNames::variadicParamIndexForFunction('forward_static_call_array'));
+    }
+
+    /** @covers issue #24040 — InternalArgInfo function_name/parmeter/...] vs stub callback + ...args */
+    public function testForwardStaticCallNamedParamMetadata(): void
+    {
+        $names = BuiltinParamNames::forFunction('forward_static_call');
+        self::assertSame(['callback', 'args'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', 'forward_static_call'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'args', 'forward_static_call'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'function_name', 'forward_static_call'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'parmeter', 'forward_static_call'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('forward_static_call'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('forward_static_call'));
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('forward_static_call'));
+        self::assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('forward_static_call'));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverride('forward_static_call', 0));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('forward_static_call', 1));
     }
 
     /** @covers issue #23380 — stub shape callback + ...args (basic_functions.stub.php) */

@@ -1793,7 +1793,9 @@ final class BuiltinParamNames
                 return ['callback', 'args'];
             case 'call_user_func_array':
                 return ['callback', 'args'];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still function/parameters (#26237)
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still
+            // function_name/parmeter/...] (#24040); array sibling still function/parameters (#26237)
+            case 'forward_static_call':
             case 'forward_static_call_array':
                 return ['callback', 'args'];
             // php-src ext/standard/type.stub.php — syntax_only=false; &$callable_name=null (#28312, #30242)
