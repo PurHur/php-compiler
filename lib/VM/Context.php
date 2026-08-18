@@ -755,7 +755,12 @@ class Context {
     public function recordIncludedFile(string $path): void
     {
         $normalized = ScriptStack::normalize($path);
-        if ('' !== $normalized && !ScriptStack::isVirtualCompileUnit($normalized)) {
+        if ('' === $normalized) {
+            return;
+        }
+        // Zend: EG(included_files) keys all successful include/require paths; once kinds skip when present.
+        $this->loadedCompileUnits[$normalized] = true;
+        if (!ScriptStack::isVirtualCompileUnit($normalized)) {
             $this->includedFiles[] = $normalized;
         }
     }

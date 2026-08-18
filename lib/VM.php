@@ -4301,7 +4301,6 @@ class VM {
         if ($this->context->isCompileUnitLoaded($resolved)) {
             return;
         }
-        $this->context->markCompileUnitLoaded($resolved);
         $this->context->recordIncludedFile($resolved);
 
         $savedStack = $this->context->swapRunStack(null);
@@ -9968,9 +9967,6 @@ restart:
                             $frame->scope[$op->arg2]->bool(true);
                         }
                         break;
-                    }
-                    if ($once) {
-                        $this->context->markCompileUnitLoaded($resolved);
                     }
                     $this->context->recordIncludedFile($resolved);
                     $this->context->scriptStack->push($resolved);
