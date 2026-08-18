@@ -64,9 +64,11 @@ final class JitDomSubstringData
             }
         }
 
-        $data = self::$lastMaterializedData;
-        $offset = $args[1]->compileTimeLong ?? null;
-        $count = $args[2]->compileTimeLong ?? null;
+        $data = $args[0]->compileTimeDomTextData
+            ?? JitDomCreateTextNode::$lastMaterializedData
+            ?? self::$lastMaterializedData;
+        $offset = self::compileTimeLong($args[1] ?? null);
+        $count = self::compileTimeLong($args[2] ?? null);
         if (null === $data || null === $offset || null === $count) {
             throw new \LogicException(
                 'DOMCharacterData::substringData() user-script AOT requires compile-time data, offset, and count'
@@ -89,6 +91,24 @@ final class JitDomSubstringData
         }
 
         return self::boxConstantString($context, substr($data, $offset, $count));
+    }
+
+    private static function compileTimeLong(?JITVariable $arg): ?int
+    {
+        if (null === $arg) {
+            return null;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return $arg->compileTimeLong;
+        }
+        if (null !== $arg->compileTimeFloat) {
+            return (int) $arg->compileTimeFloat;
+        }
+        if (null !== $arg->compileTimeString && is_numeric($arg->compileTimeString)) {
+            return (int) $arg->compileTimeString;
+        }
+
+        return null;
     }
 
     private static function boxConstantString(Context $context, string $lit): Value

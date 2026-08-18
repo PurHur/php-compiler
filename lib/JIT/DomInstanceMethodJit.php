@@ -149,6 +149,8 @@ final class DomInstanceMethodJit
         'domnode::clonenode' => true,
         'domelement::clonenode' => true,
         'domtext::clonenode' => true,
+        'domtext::splittext' => true,
+        'domcdatasection::splittext' => true,
         'domcomment::clonenode' => true,
         'domdocumentfragment::clonenode' => true,
         'domattr::clonenode' => true,
@@ -556,6 +558,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domtext::splittext' === $lc || 'domcdatasection::splittext' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomTextSplitText();
+
+                return;
+            }
             if ('domnode::contains' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeContains();
 
@@ -826,6 +833,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::clonenode');
             self::ensureProxy($context, 'domelement::clonenode');
             self::ensureProxy($context, 'domtext::clonenode');
+            self::ensureProxy($context, 'domtext::splittext');
+            self::ensureProxy($context, 'domcdatasection::splittext');
             self::ensureProxy($context, 'domcomment::clonenode');
             self::ensureProxy($context, 'domdocumentfragment::clonenode');
             self::ensureProxy($context, 'domattr::clonenode');
@@ -957,9 +966,9 @@ final class DomInstanceMethodJit
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild', 'clonenode'],
-        'domtext' => ['substringdata'],
+        'domtext' => ['substringdata', 'splittext'],
         'domcomment' => ['substringdata'],
-        'domcdatasection' => ['substringdata'],
+        'domcdatasection' => ['substringdata', 'splittext'],
         'domcharacterdata' => ['substringdata'],
         'domelement' => ['setattribute', 'removeattribute', 'setidattribute', 'setidattributens', 'setidattributenode'],
         'domattr' => ['isid'],

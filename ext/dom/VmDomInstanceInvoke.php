@@ -114,6 +114,7 @@ final class VmDomInstanceInvoke
             'normalize' => VmDomJitDispatch::normalize($ctx, $self, $extra),
             'normalizedocument' => VmDomJitDispatch::normalizeDocument($ctx, $self, $extra),
             'createtextnode' => VmDomJitDispatch::createTextNode($ctx, $self, $extra),
+            'splittext' => VmDomJitDispatch::splitText($ctx, $self, $extra),
             'query' => VmDomJitDispatch::xpathQuery($ctx, $self, $extra),
             'evaluate' => VmDomJitDispatch::xpathEvaluate($ctx, $self, $extra),
             'registernamespace' => VmDomJitDispatch::xpathRegisterNamespace($self, $extra),

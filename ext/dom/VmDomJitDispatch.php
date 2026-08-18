@@ -1340,6 +1340,33 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMText::splitText() — AOT/JIT (php-src ext/dom/text.c xmlTextSplitText) (#32362).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function splitText(VmContext $ctx, ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMText::splitText', $extra, 1);
+        $offsetVar = ($extra[0] ?? self::missingArg('splitText', 0))->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $offsetVar->type && Variable::TYPE_FLOAT !== $offsetVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMText::splitText(): Argument #1 ($offset) must be of type int, %s given',
+                VmDom::typeLabel($offsetVar)
+            ));
+        }
+        $tail = VmDom::textSplitText($ctx, $node, $offsetVar->toInt());
+        $result = new Variable();
+        if (null === $tail) {
+            $result->bool(false);
+
+            return $result;
+        }
+        $result->object($tail);
+
+        return $result;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function isEqualNode(ObjectEntry $node, array $extra): Variable

@@ -21,6 +21,9 @@ use PHPLLVM\Value;
  */
 final class JitDomCreateTextNode
 {
+    /** Compile-time data of the last materialized text stand-in (#32362). */
+    public static ?string $lastMaterializedData = null;
+
     private const CLASS_STANDIN = 'DOMElement';
 
     private const PROP_NODE_NAME = 'nodeName';
@@ -57,6 +60,7 @@ final class JitDomCreateTextNode
 
     public static function materialize(Context $context, string $data = ''): Value
     {
+        self::$lastMaterializedData = $data;
         JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
@@ -73,8 +77,22 @@ final class JitDomCreateTextNode
         return $obj;
     }
 
+    /** Rewrite data/nodeValue/textContent on an existing text stand-in (#32362). */
+    public static function overwriteCharacterData(Context $context, Value $obj, string $data): void
+    {
+        self::$lastMaterializedData = $data;
+        JitDomSubstringData::remember($data);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_STANDIN);
+        self::ensurePropertyLayout($objectType, $classId);
+        self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
+        self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
+        self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
+    }
+
     private static function materializeFromRuntimeData(Context $context, JITVariable $dataArg): Value
     {
+        self::$lastMaterializedData = null;
         JitDomSubstringData::remember(null);
         $dataStr = self::loadStringArg($context, $dataArg);
         $objectType = $context->type->object;
