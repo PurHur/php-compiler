@@ -40,11 +40,14 @@ final class JitGcCollectCyclesStandaloneKernel
             'phpc_gc_clear_slots_pointing_to' => [$voidTy, false, [$i8p]],
         ];
         foreach ($internals as $name => [$ret, $vararg, $params]) {
-            if (null !== $context->module->getNamedFunction($name)) {
-                continue;
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, $vararg, ...$params)
+                );
             }
-            $ft = $context->context->functionType($ret, $vararg, ...$params);
-            $context->registerFunction($name, $context->module->addFunction($name, $ft));
+            $context->registerFunction($name, $fn);
         }
 
         self::implementSlotReadObject($context);
