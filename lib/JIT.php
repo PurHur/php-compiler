@@ -8250,6 +8250,12 @@ class JIT {
                     } elseif (null !== $aliasOp && $this->context->coalesceAssignTargets->contains($aliasOp)) {
                         $coalesceTarget = $aliasOp;
                     }
+                    // ??= onto Class::$prop: persist through staticPropertyGlobal before the
+                    // coalesce phi rewrite replaces the lvalue with a stack slot (#32035,
+                    // #20877, #31965). The phi slot still runs so merge-block uses dominate.
+                    if (null !== $coalesceTarget && $this->operandIsStaticPropertyLvalue($coalesceTarget)) {
+                        $this->assignOperand($coalesceTarget, $value, false);
+                    }
                     $forceCoalesce = null !== $coalesceTarget;
                     $srcOp = $block->getOperand($rhsSlot);
                     $isNullSource = $value->isNullConstant
@@ -23350,10 +23356,27 @@ class JIT {
         return $dest;
     }
 
+    /**
+     * True when {@see $op} is already a class static property lvalue (module global).
+     * ??= must store through staticPropertyGlobal before phi-slot rewrite (#32035).
+     */
+    private function operandIsStaticPropertyLvalue(Operand $op): bool
+    {
+        if (!$this->context->hasVariableOp($op)) {
+            return false;
+        }
+        $var = $this->context->getVariableFromOp($op);
+
+        return null !== $var->staticPropertyGlobal;
+    }
+
     private function ensureCoalesceMergeStackSlot(Operand $mergeOp): void
     {
         if ($this->context->hasVariableOp($mergeOp)) {
             $var = $this->context->getVariableFromOp($mergeOp);
+            if (null !== $var->staticPropertyGlobal) {
+                return;
+            }
             if (Variable::TYPE_VALUE === $var->type && Variable::KIND_VARIABLE === $var->kind) {
                 return;
             }

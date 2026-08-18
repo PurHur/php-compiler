@@ -249,6 +249,7 @@
             <file>./test/compliance/ArrayAccessAssignOp31947JITTest.php</file>
             <file>./test/compliance/ArrayAccessIncByValue32015VMTest.php</file>
             <file>./test/compliance/ArrayAccessIncByValue32015JITTest.php</file>
+            <file>./test/compliance/StaticPropertyCoalesceAssign32035VMTest.php</file>
             <file>./test/compliance/IntArithOverflowPromote31964JITTest.php</file>
             <file>./test/unit/IntArithOverflowPromote31964AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
