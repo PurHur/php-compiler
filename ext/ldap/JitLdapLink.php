@@ -18,7 +18,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ldap_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() (#32001, #32002, #32107, #32109). */
+/** LLVM lowering for ldap_bind() / ldap_sasl_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() (#32001, #32002, #32107, #32109, #32147). */
 final class JitLdapLink
 {
     /** @param list<JITVariable> $args */
@@ -75,6 +75,64 @@ final class JitLdapLink
             $password,
             $hasDn,
             $hasPassword
+        );
+
+        return self::boolFromI1($context, $ok);
+    }
+
+    /**
+     * ldap_sasl_bind() — optional SASL string args + hasMask (php-src HAVE_LDAP_SASL; #32147).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeSaslBind(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 8) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_sasl_bind() expects between 1 and 8 arguments, %d given',
+                $argc
+            ));
+        }
+
+        $handle = self::lowerConnectionHandle($context, $args[0], 'ldap_sasl_bind');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $names = ['dn', 'password', 'mech', 'realm', 'authc_id', 'authz_id', 'props'];
+        $hasMask = 0;
+        $lowered = [];
+        for ($i = 1; $i <= 7; ++$i) {
+            if ($argc > $i) {
+                $hasMask |= 1 << ($i - 1);
+                $lowered[] = JitStringBuiltinArg::lowerNullableString(
+                    $context,
+                    $args[$i],
+                    'ldap_sasl_bind',
+                    $i,
+                    $names[$i - 1]
+                );
+            } else {
+                $lowered[] = $strPtr->constNull();
+            }
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        LdapRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $ok = $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_sasl_bind'),
+            $handle,
+            $lowered[0],
+            $lowered[1],
+            $lowered[2],
+            $lowered[3],
+            $lowered[4],
+            $lowered[5],
+            $lowered[6],
+            $i64->constInt($hasMask, false)
         );
 
         return self::boolFromI1($context, $ok);

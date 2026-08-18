@@ -7,11 +7,13 @@ namespace PHPCompiler\ext\ldap;
 use PHPCompiler\VM\ObjectEntry;
 
 /**
- * ldap_bind() / ldap_unbind() / ldap_close() / ldap_set_option() / ldap_get_option() /
- * ldap_start_tls() for compiled JIT/AOT modules (#32001, #32002, #32107, #32109).
+ * ldap_bind() / ldap_sasl_bind() / ldap_unbind() / ldap_close() / ldap_set_option() /
+ * ldap_get_option() / ldap_start_tls() for compiled JIT/AOT modules
+ * (#32001, #32002, #32107, #32109, #32147).
  *
- * SSOT: {@see VmLdapCore::bind} / {@see VmLdapConnection::close} / {@see VmLdapNative::startTlsSync}
- * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_set_option / ldap_start_tls
+ * SSOT: {@see VmLdapCore::bind} / {@see VmLdapCore::saslBind} / {@see VmLdapConnection::close}
+ * / {@see VmLdapNative::startTlsSync}
+ * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_sasl_bind / ldap_set_option / ldap_start_tls
  */
 final class LdapLinkJitHelper
 {
@@ -28,6 +30,34 @@ final class LdapLinkJitHelper
             $conn,
             1 === $hasDn ? $dn : null,
             1 === $hasPassword ? $password : null
+        );
+    }
+
+    /**
+     * ldap_sasl_bind() — $hasMask bits 0–6 mark which optional string args were passed (#32147).
+     */
+    public static function saslBindArgv(
+        int $handle,
+        ?string $dn,
+        ?string $password,
+        ?string $mech,
+        ?string $realm,
+        ?string $authcId,
+        ?string $authzId,
+        ?string $props,
+        int $hasMask
+    ): bool {
+        $conn = self::requireConnection($handle, 'ldap_sasl_bind');
+
+        return VmLdapCore::saslBind(
+            $conn,
+            (1 & $hasMask) !== 0 ? $dn : null,
+            (2 & $hasMask) !== 0 ? $password : null,
+            (4 & $hasMask) !== 0 ? $mech : null,
+            (8 & $hasMask) !== 0 ? $realm : null,
+            (16 & $hasMask) !== 0 ? $authcId : null,
+            (32 & $hasMask) !== 0 ? $authzId : null,
+            (64 & $hasMask) !== 0 ? $props : null
         );
     }
 
