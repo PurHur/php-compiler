@@ -1612,6 +1612,22 @@ final class BuiltinParamNames
             // php-src ext/iconv/iconv.stub.php — InternalArgInfo still says charset (#24378)
             case 'iconv_mime_decode_headers':
                 return ['headers', 'mode=', 'encoding='];
+            // php-src ext/gettext/gettext.stub.php — InternalArgInfo still msgid*/domain_name/dir (#24375)
+            case 'gettext':
+            case '_':
+                return ['message'];
+            case 'ngettext':
+                return ['singular', 'plural', 'count'];
+            case 'dgettext':
+                return ['domain', 'message'];
+            case 'dcgettext':
+                return ['domain', 'message', 'category'];
+            case 'dngettext':
+                return ['domain', 'singular', 'plural', 'count'];
+            case 'dcngettext':
+                return ['domain', 'singular', 'plural', 'count', 'category'];
+            case 'bindtextdomain':
+                return ['domain', 'directory'];
             case 'base64_decode':
                 return ['string', 'strict'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str (#23257)
