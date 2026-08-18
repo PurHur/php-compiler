@@ -70,6 +70,45 @@ final class JitDomGetElementsByTagName
         return $listObj;
     }
 
+    /**
+     * DOMDocument::getElementsByTagNameNS() — user-script AOT (#32415).
+     *
+     * php-src: ext/dom/php_dom.c PHP_METHOD(DOMDocument, getElementsByTagNameNS).
+     */
+    public static function invokeNS(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 3) {
+            throw new \LogicException(
+                'DOMDocument::getElementsByTagNameNS() expects receiver, namespace, and localName'
+            );
+        }
+
+        // Z_PARAM_STR localName under strict_types — null must TypeError (#29959 peer).
+        if ($context->callerStrictTypes && JITVariable::TYPE_NULL === $args[2]->type) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'DOMDocument::getElementsByTagNameNS(): Argument #2 ($localName) must be of type string, null given'
+            );
+
+            return self::boxNullResult($context);
+        }
+
+        if (JitDomGetElementsByTagNameUserScript::shouldUse($context)) {
+            $us = JitDomGetElementsByTagNameUserScript::tryInvokeNS($context, ...$args);
+            if (null !== $us) {
+                return $us;
+            }
+            throw new \LogicException(
+                'DOMDocument::getElementsByTagNameNS() user-script AOT requires compile-time namespace, localName, and loadXML'
+            );
+        }
+
+        throw new \LogicException(
+            'DOMDocument::getElementsByTagNameNS() JIT helper is user-script AOT only in this build'
+        );
+    }
+
     private static function boxObjectResult(Context $context, Value $object): Value
     {
         $slot = JitValueBox::alloc($context);

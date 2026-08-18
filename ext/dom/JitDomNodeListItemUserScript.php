@@ -41,6 +41,12 @@ final class JitDomNodeListItemUserScript
             return self::materializeNthQueryMatch($context, $xml, $queryTag, $index);
         }
 
+        // getElementsByTagNameNS live list: materialize Nth NS match (#32415).
+        $nsQuery = JitDomGetElementsByTagNameUserScript::lastNsQuery();
+        if (null !== $xml && null !== $nsQuery) {
+            return self::materializeNthNsMatch($context, $xml, $nsQuery[0], $nsQuery[1], $index);
+        }
+
         // Legacy XPath evaluate/query cache hit (item(0) only).
         if (0 === $index) {
             $cacheKey = JitDomXPathQueryUserScript::lastCacheKey();
@@ -77,6 +83,39 @@ final class JitDomNodeListItemUserScript
         );
 
         return self::boxObject($context, $firstObj);
+    }
+
+    /**
+     * Materialize getElementsByTagNameNS() NodeList::item($index) (#32415).
+     *
+     * php-src: ext/dom/nodelist.c php_dom_nodelist_item + php_dom.c NS helper.
+     */
+    private static function materializeNthNsMatch(
+        Context $context,
+        string $xml,
+        string $namespaceUri,
+        string $localName,
+        int $index
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_ns_nth');
+        $match = DomParseSimpleXmlJitHelper::nthElementByTagNameNSArgv(
+            $xml,
+            $namespaceUri,
+            $localName,
+            $index
+        );
+        if (null === $match) {
+            return self::boxNull($context);
+        }
+        $ns = '' === $match['ns'] ? '' : $match['ns'];
+        $element = JitDomCreateElementNS::materializeElementNSFromLiterals(
+            $context,
+            $ns,
+            $match['qname'],
+            ''
+        );
+
+        return self::boxObject($context, $element);
     }
 
     /**

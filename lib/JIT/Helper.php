@@ -249,6 +249,21 @@ return_string:
                 goto return_long;
             }
         }
+        // bitwise_*_function: convert_to_long (zend_dval_to_lval) then i64 AND/OR/XOR (#32414).
+        if ($this->isBitwiseLogicOpcode($opcode->type)
+            && (Variable::TYPE_NATIVE_DOUBLE === $leftType || Variable::TYPE_NATIVE_DOUBLE === $rightType)
+            && $this->isBitwiseConvertibleOperandType($leftType)
+            && $this->isBitwiseConvertibleOperandType($rightType)
+        ) {
+            $result = $this->emitBitwiseWithFloatOperands(
+                $opcode,
+                $leftValue,
+                $rightValue,
+                $leftType,
+                $rightType
+            );
+            goto return_long;
+        }
         if (OpCode::TYPE_LOGICAL_XOR === $opcode->type) {
             $zeroI64 = $this->context->getTypeFromString('int64')->constInt(0, false);
             if (Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -366,6 +381,16 @@ restart:
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
                     case OpCode::TYPE_BITWISE_XOR:
+                        $leftLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                            $this->context,
+                            $leftValue
+                        );
+                        $rightLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                            $this->context,
+                            $rightValue
+                        );
+                        $result = $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightLong);
+                        goto return_long;
                     case OpCode::TYPE_SHIFT_LEFT:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         break;
@@ -2318,6 +2343,53 @@ return_bool:
         return OpCode::TYPE_BITWISE_AND === $type
             || OpCode::TYPE_BITWISE_OR === $type
             || OpCode::TYPE_BITWISE_XOR === $type;
+    }
+
+    /** Operands bitwise_*_function can convert_to_long (#32414). */
+    private function isBitwiseConvertibleOperandType(int $type): bool
+    {
+        return Variable::TYPE_NATIVE_DOUBLE === $type
+            || Variable::TYPE_NATIVE_LONG === $type
+            || Variable::TYPE_NATIVE_BOOL === $type
+            || Variable::TYPE_STRING === $type;
+    }
+
+    /**
+     * Zend bitwise_and/or/xor_function: float operands zend_dval_to_lval, strings convert_to_long.
+     *
+     * php-src: Zend/zend_operators.c bitwise_*_function (#32414).
+     */
+    private function emitBitwiseWithFloatOperands(
+        OpCode $opcode,
+        $leftValue,
+        $rightValue,
+        int $leftType,
+        int $rightType
+    ) {
+        $leftLong = $this->coerceBitwiseOperandToLong($leftValue, $leftType);
+        $rightLong = $this->coerceBitwiseOperandToLong($rightValue, $rightType);
+
+        return $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightLong);
+    }
+
+    /** convert_to_long for a native bitwise operand already loaded (#32414). */
+    private function coerceBitwiseOperandToLong($value, int $type)
+    {
+        $i64 = $this->context->getTypeFromString('int64');
+        if (Variable::TYPE_NATIVE_DOUBLE === $type) {
+            return \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $this->context,
+                $value
+            );
+        }
+        if (Variable::TYPE_STRING === $type) {
+            return JitLongArg::lowerStringValue($this->context, $value);
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $type) {
+            return $this->context->builder->zExt($value, $i64);
+        }
+
+        return $this->context->builder->intCast($value, $i64);
     }
 
     /** LLVM and/or/xor on i64 operands (php-src bitwise_*_function). */
