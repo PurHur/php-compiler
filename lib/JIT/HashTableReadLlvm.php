@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -646,7 +647,7 @@ final class HashTableReadLlvm
     private static function emitUndefinedArrayKeyWarningForDim(Context $context, Variable $dim): void
     {
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        \PHPCompiler\ext\standard\StringTriggerErrorJit::implement($context);
+        StringTriggerErrorJit::implement($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
