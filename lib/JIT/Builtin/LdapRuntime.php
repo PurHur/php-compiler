@@ -10,8 +10,8 @@ use PHPCompiler\JIT\JitVmHelperLink;
 /**
  * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect /
  * ldap_connect_wallet / ldap_bind / ldap_unbind / ldap_errno / ldap_error / ldap_err2str /
- * ldap_set_option / ldap_get_option / ldap_start_tls / ldap_sasl_bind / ldap_compare
- * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32107, #32109, #32121, #32147).
+ * ldap_set_option / ldap_get_option / ldap_start_tls / ldap_sasl_bind / ldap_compare / ldap_set_rebind_proc
+ * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32107, #32109, #32121, #32147, #32148).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -58,6 +58,8 @@ final class LdapRuntime
 
     private const LDAP_START_TLS_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::startTlsArgv';
 
+    private const LDAP_SET_REBIND_PROC_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::setRebindProcClearArgv';
+
     private const LDAP_COMPARE_HELPER = 'PHPCompiler\\ext\\ldap\\LdapResultJitHelper::compareArgv';
 
     /** @var list<string> */
@@ -86,6 +88,7 @@ final class LdapRuntime
         self::LDAP_GET_OPTION_HELPER,
         self::LDAP_GET_OPTION_VALUE_HELPER,
         self::LDAP_START_TLS_HELPER,
+        self::LDAP_SET_REBIND_PROC_HELPER,
     ];
 
     /** @var list<string> */
@@ -290,6 +293,17 @@ final class LdapRuntime
             self::LINK_HELPER_PATH,
             self::LINK_HELPERS,
             '#32109'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_set_rebind_proc',
+            'ldap_set_rebind_proc_bridge_entry',
+            [$i64],
+            $context->getTypeFromString('int1'),
+            self::LDAP_SET_REBIND_PROC_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32148'
         );
         JitVmHelperLink::ensureBridge(
             $context,
