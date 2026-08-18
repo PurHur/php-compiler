@@ -2750,6 +2750,11 @@ final class VmSoapClient
         $encType = $soapVar['type'] ?? 0;
         $inner = $soapVar['value'];
         $literal = null !== $state && SoapConstants::SOAP_LITERAL === $state->use;
+        // php-src xmlNodeSetName(enc_name) (#32191).
+        if (null !== $soapVar['name']) {
+            $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $soapVar['name']) ?: $tag;
+        }
+        [$qtag, $xmlnsAttr] = self::soapVarQualifiedTag($tag, $soapVar, $state);
         $qname = SoapConstants::soapEncTypeXsiQName((int) $encType);
         if ('' !== $soapVar['stype']) {
             $prefix = 'xsd';
@@ -2779,20 +2784,45 @@ final class VmSoapClient
 
         if (null === $inner) {
             if ($literal) {
-                return '<'.$tag.'/>';
+                return '<'.$qtag.$xmlnsAttr.'/>';
             }
 
-            return '<'.$tag.' xsi:nil="true"/>';
+            return '<'.$qtag.$xmlnsAttr.' xsi:nil="true"/>';
         }
 
         $text = self::soapVarEncodedText((int) $encType, $inner);
         if ($literal || null === $qname) {
-            return '<'.$tag.'>'.$text.'</'.$tag.'>';
+            return '<'.$qtag.$xmlnsAttr.'>'.$text.'</'.$qtag.'>';
         }
 
         $xsi = $qname[0].':'.$qname[1];
 
-        return '<'.$tag.' xsi:type="'.\htmlspecialchars($xsi, \ENT_XML1).'">'.$text.'</'.$tag.'>';
+        return '<'.$qtag.$xmlnsAttr.' xsi:type="'.\htmlspecialchars($xsi, \ENT_XML1).'">'.$text.'</'.$qtag.'>';
+    }
+
+    /**
+     * php-src master_to_xml_int — xmlNodeSetName(enc_name) + xmlSetNs(enc_namens) (#32191).
+     *
+     * Envelope already declares xmlns:ns1 as the request URI; reuse that prefix when
+     * enc_namens matches (Zend encode_add_ns).
+     *
+     * @param array{type: ?int, stype: string, ns: string, value: mixed, name: ?string, namens: ?string} $soapVar
+     * @return array{0: string, 1: string} [qualified local name, extra xmlns attr]
+     */
+    private static function soapVarQualifiedTag(string $tag, array $soapVar, ?SoapClientState $state): array
+    {
+        if (null === $soapVar['namens'] || '' === $soapVar['namens']) {
+            return [$tag, ''];
+        }
+        $ns = $soapVar['namens'];
+        if (null !== $state && $ns === $state->uri) {
+            return ['ns1:'.$tag, ''];
+        }
+
+        return [
+            'ns2:'.$tag,
+            ' xmlns:ns2="'.\htmlspecialchars($ns, \ENT_XML1).'"',
+        ];
     }
 
     /** php-src to_xml_string / to_xml_bool / to_xml_base64 / to_xml_hexbin (#32190). */
