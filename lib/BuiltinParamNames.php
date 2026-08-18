@@ -2169,6 +2169,11 @@ final class BuiltinParamNames
             // php-src ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
             case 'datefmt_format_object':
                 return ['datetime', 'format=', 'locale='];
+            // php-src ext/intl/collator/collator.stub.php — InternalArgInfo still str1/str2/coll (#25497)
+            case 'collator_compare':
+                return ['object', 'string1', 'string2'];
+            case 'collator_create':
+                return ['locale'];
             // php-src ext/intl/calendar/calendar.stub.php — both optional; $timezone untyped (#27944)
             case 'intlcal_create_instance':
                 return ['timezone=', 'locale='];

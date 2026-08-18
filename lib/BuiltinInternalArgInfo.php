@@ -390,6 +390,9 @@ final class BuiltinInternalArgInfo
             'idn_to_ascii', 'idn_to_utf8' => 'string|false',
             // ext/intl/php_intl.stub.php — absent from InternalArgInfo (#25200)
             'datefmt_format_object' => 'string|false',
+            // ext/intl/collator/collator.stub.php — InternalArgInfo int / Collator (missing |false / ?) (#25497)
+            'collator_compare' => 'int|false',
+            'collator_create' => '?Collator',
             // ext/intl/calendar/calendar.stub.php — @alias intlcal_create_instance; absent from InternalArgInfo (#27944)
             'intlcal_create_instance' => '?IntlCalendar',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
@@ -1013,6 +1016,13 @@ final class BuiltinInternalArgInfo
                 2 => '?string',
                 default => null,
             },
+            // ext/intl/collator/collator.stub.php — Collator $object, string $string1/$string2 (#25497)
+            'collator_compare' => match ($index) {
+                0 => 'Collator',
+                1, 2 => 'string',
+                default => null,
+            },
+            'collator_create' => 0 === $index ? 'string' : null,
             // ext/intl/calendar/calendar.stub.php — $timezone untyped; ?string $locale = null (#27944)
             'intlcal_create_instance' => match ($index) {
                 0 => '',
