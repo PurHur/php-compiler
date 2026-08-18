@@ -131,6 +131,11 @@ final class Variable {
     public ?int $compileTimeDomChildIndex = null;
 
     /**
+     * Character-data payload of a createTextNode / splitText stand-in (#32362).
+     */
+    public ?string $compileTimeDomTextData = null;
+
+    /**
      * DatePeriod end-date form — ordered Unix timestamps for foreach snapshot (#26772).
      *
      * @var list<int>|null
