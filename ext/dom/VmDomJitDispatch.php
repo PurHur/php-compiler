@@ -1540,6 +1540,30 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMCharacterData::appendData() — php-src characterdata.c xmlTextConcat (#32376).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function appendData(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMCharacterData::appendData', $extra, 1);
+        if (!VmDom::isCharacterData($node)) {
+            throw new \TypeError('DOMCharacterData::appendData() must be called on a character data node');
+        }
+        $arg = self::stringArg(
+            $extra[0] ?? self::missingArg('appendData', 0),
+            'DOMCharacterData::appendData',
+            0,
+            'data'
+        );
+        VmDom::characterDataAppendData($node, $arg);
+        $result = new Variable();
+        $result->bool(true);
+
+        return $result;
+    }
+
+    /**
      * DOMNode::C14N() — inclusive/exclusive canonical XML (#19467).
      *
      * @param list<Variable> $extra
