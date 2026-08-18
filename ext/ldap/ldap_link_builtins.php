@@ -165,7 +165,7 @@ final class ldap_sasl_bind extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_sasl_bind() is not implemented for JIT in this compiler build (issue #22176)');
+        return JitLdapLink::invokeSaslBind($context, $args);
     }
 }
 
