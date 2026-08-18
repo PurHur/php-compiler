@@ -258,10 +258,12 @@ final class JitDomXPathQueryUserScript
     private static function tryHostTreeAxisCompileTime(Context $context, string $xml, string $exprLit): ?Value
     {
         $trimmed = trim($exprLit);
-        // Host-fold named axes / `..` (#31773) and `//*[last()]` / `[position()…]` (#31923).
-        // Flattened descendant `[last()]` is wrong; user-script AOT ABI aborts on these paths.
+        // Host-fold named axes / `..` (#31773), `//*[last()]` / `[position()…]` (#31923),
+        // and `@*` attribute-axis wildcards (#32003). Flattened descendant `[last()]`
+        // is wrong; user-script AOT ABI aborts on these paths.
         $positional = (bool) preg_match('~\[(?:last\(\)|position\(\))~i', $trimmed);
-        if (!str_contains($trimmed, '::') && !str_contains($trimmed, '..') && !$positional) {
+        $attrStar = str_contains($trimmed, '@*');
+        if (!str_contains($trimmed, '::') && !str_contains($trimmed, '..') && !$positional && !$attrStar) {
             return null;
         }
         if (!\extension_loaded('dom') || !\class_exists(\DOMDocument::class, false)) {

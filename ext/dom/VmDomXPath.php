@@ -1585,6 +1585,9 @@ final class VmDomXPath
         array $namespaces
     ): bool {
         $test = trim($test);
+        if (VmDom::isAttr($node)) {
+            return self::attributeMatchesPathTest($node, $test, $namespaces);
+        }
         if ('node()' === $test) {
             return self::isXPathAnyNode($node);
         }
@@ -1804,6 +1807,10 @@ final class VmDomXPath
         }
         if ('.' === $segment) {
             return ['axis' => 'self', 'testSegment' => 'node()'];
+        }
+        // Abbreviated attribute axis: @* / @name / @prefix:local (#32003).
+        if (preg_match('~^@(\*|(?:[\w.-]+:)?[\w.-]+)$~', $segment, $attrAbbrev)) {
+            return ['axis' => 'attribute', 'testSegment' => $attrAbbrev[1]];
         }
         if (preg_match(
             '~^(ancestor-or-self|descendant-or-self|following-sibling|preceding-sibling|ancestor|attribute|child|descendant|following|namespace|parent|preceding|self)::(.*)$~is',
@@ -2285,6 +2292,53 @@ final class VmDomXPath
         }
 
         return [$local, $namespaces[$prefix]];
+    }
+
+    /**
+     * Attribute-axis node test (XPath 1.0 principal node type = attribute; #32003).
+     *
+     * `@*` / `attribute::*` / `attribute::node()` match every Attr on the axis.
+     * Unprefixed name tests match null-namespace local names only; prefixed tests
+     * use the registered namespace URI. `xmlns` declarations live on the namespace
+     * axis, not here (libxml / php-src xpath.c).
+     *
+     * @param array<string, string> $namespaces
+     */
+    private static function attributeMatchesPathTest(
+        ObjectEntry $attr,
+        string $test,
+        array $namespaces
+    ): bool {
+        if ('node()' === $test || '*' === $test) {
+            return true;
+        }
+        if (self::isNodeTypeTestName($test)) {
+            return false;
+        }
+        [$localName, $namespaceUri] = self::resolveQName($test, $namespaces);
+
+        return self::attributeMatchesName($attr, $localName, $namespaceUri);
+    }
+
+    private static function attributeMatchesName(
+        ObjectEntry $attr,
+        string $localName,
+        ?string $namespaceUri
+    ): bool {
+        $name = VmDom::readLocalName($attr);
+        $nameMatch = '*' === $localName || $name === $localName;
+        if (!$nameMatch) {
+            return false;
+        }
+        $ns = VmDom::readNamespaceUri($attr) ?? '';
+        if (null !== $namespaceUri) {
+            return '*' === $namespaceUri || $ns === $namespaceUri;
+        }
+        if ('*' === $localName) {
+            return true;
+        }
+
+        return '' === $ns;
     }
 
     private static function elementMatchesTag(
