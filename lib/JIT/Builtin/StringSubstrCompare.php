@@ -16,6 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for substr_compare via SubstrCompareJitHelper PHP (#13536, #21816).
  *
+ * Module-local owner after leftover Module.php always-on drop (#32402 / #32382 peer).
  * Replaces ~289 LOC LLVM in StringSubstrCompareJit.php. Keeps i8* ABI for callers.
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringSubstrCount #21773).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}

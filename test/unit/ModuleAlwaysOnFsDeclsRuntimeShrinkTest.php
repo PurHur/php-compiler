@@ -34,6 +34,7 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
             'strcoll', // #31498 — StringStrcoll module-local trampoline
             'strncmp', // #32382 — leftover Module always-on after LibcExtern #31839
             'strlen', // #32068 — leftover Module always-on already dropped
+            'substr_compare', // #32402 — leftover Module always-on after StringSubstrCompare PHP
         ];
     }
 
@@ -55,11 +56,12 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31498', $source);
         $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('#32382', $source);
+        $this->assertStringContainsString('#32402', $source);
         foreach ($this->deletedDecls() as $sym) {
             $this->assertStringNotContainsString(
                 "lookupFunction('{$sym}')",
                 $source,
-                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32068/#32382)"
+                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32068/#32382/#32402)"
             );
             $this->assertStringNotContainsString(
                 "addFunction('{$sym}'",
