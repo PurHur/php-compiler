@@ -3130,6 +3130,8 @@ class Compiler {
                         // Fusion skips AssignRef, which is where rejectThisReassignment normally fires.
                         // Zend zend_compile_foreach: foreach (... as &$this) is Cannot re-assign $this (#32205).
                         $this->rejectThisReassignment($assign->var);
+                        // Fusion also skips zend_ensure_writable_variable: foreach (... as &$GLOBALS) (#32229).
+                        $this->rejectGlobalsWrite($assign->var, $assign, $block);
                         $destSlot = $this->compileOperand($assign->var, $block, false);
                         $this->registerForeachByRefLoopVarBindings($block, $assign, $iter, $destSlot);
                         $block->addOpCode(new OpCode(
@@ -14157,6 +14159,7 @@ class Compiler {
         // php-cfg may clear write after SSA replace; read still names the lvalue (#4946).
         $write = $expr->write ?? $expr->read;
         $this->rejectThisReassignment($write);
+        $this->rejectGlobalsWrite($write, $expr, $block);
         $this->rejectNullsafeInWriteContext($write, $block);
         $this->rejectNewExprInWriteContext($write, $block, null, null, $expr);
         $this->rejectArrayLiteralInWriteContext($write, $block, $expr);
@@ -14292,6 +14295,7 @@ class Compiler {
             case Op\Expr\Assign::class:
                 if (!$this->assignIsListSpread($expr)) {
                     $this->rejectThisReassignment($expr->var);
+                    $this->rejectGlobalsWrite($expr->var, $expr, $block);
                     $this->rejectNullsafeInWriteContext($expr->var, $block);
                     $this->rejectNewExprInWriteContext($expr->var, $block, $expr->expr, $expr);
                     $this->rejectArrayLiteralInWriteContext($expr->var, $block, $expr);
@@ -14948,6 +14952,7 @@ class Compiler {
                 return $this->compileIn($expr, $block);
             case Op\Expr\AssignRef::class:
                 $this->rejectThisReassignment($expr->var);
+                $this->rejectGlobalsWrite($expr->var, $expr, $block);
                 $this->rejectNullsafeInWriteContext($expr->var, $block);
                 $this->rejectNewExprInWriteContext($expr->var, $block, null, null, $expr);
                 $this->rejectArrayLiteralInWriteContext($expr->var, $block, $expr);
@@ -44038,6 +44043,7 @@ class Compiler {
                 foreach ($terminal->exprs as $unsetExpr) {
                     $this->rejectThisUnset($unsetExpr);
                     if ($unsetExpr instanceof Operand) {
+                        $this->rejectGlobalsWrite($unsetExpr, $terminal, $block);
                         $this->rejectNewExprInWriteContext($unsetExpr, $block, null, null, $terminal);
                         $this->rejectArrayLiteralInWriteContext($unsetExpr, $block, $terminal);
                         $this->rejectGlobalConstInWriteContext($unsetExpr, $block, $terminal);
@@ -60247,6 +60253,49 @@ class Compiler {
     }
 
     /**
+     * Zend zend_compile.c zend_ensure_writable_variable(): bare $GLOBALS is not a write target (#32229).
+     * Indexed $GLOBALS[$name] remains legal. Message matches php-src exactly.
+     *
+     * @return never
+     */
+    protected function rejectGlobalsWrite($var, ?Op $source = null, ?Block $block = null): void
+    {
+        if (!$var instanceof Operand) {
+            return;
+        }
+        if (!$this->isBareGlobalsVariable($var, $block)) {
+            return;
+        }
+        $detail = '$GLOBALS can only be modified using the $GLOBALS[$name] = $value syntax';
+        if (null !== $source) {
+            $sourceFile = $source->getFile();
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            $this->throwCompileError($detail, $sourceFile, $source->getLine());
+        }
+        $this->throwCompileError($detail);
+    }
+
+    /**
+     * True for `$GLOBALS` itself, not `$GLOBALS[$name]` / `$GLOBALS->x` (#32229).
+     */
+    private function isBareGlobalsVariable(Operand $operand, ?Block $block = null): bool
+    {
+        if (null !== $this->unwrapArrayDimFetch($operand)) {
+            return false;
+        }
+        if (null !== $this->unwrapPropertyFetch($operand)) {
+            return false;
+        }
+        if (null !== $block && null !== $this->findArrayDimFetchForResult($operand, $block)) {
+            return false;
+        }
+
+        return 'GLOBALS' === $this->baseVariableName($operand);
+    }
+
+    /**
      * Zend zend_compile.c: unset($this) is a compile-time fatal (#5436).
      *
      * @return never
@@ -60663,6 +60712,7 @@ class Compiler {
                 continue;
             }
             $this->rejectThisReassignment($op->var);
+            $this->rejectGlobalsWrite($op->var, $op, $block);
             $this->rejectNullsafeInWriteContext($op->var, $block);
             if (
                 !$this->lvalueIsWritableListDestructTarget($op->var, $block)
