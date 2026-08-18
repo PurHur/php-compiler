@@ -258,6 +258,8 @@
             <file>./test/compliance/ForeachByrefUnsetRefcount31936JITTest.php</file>
             <file>./test/compliance/ForeachByrefAppend32128VMTest.php</file>
             <file>./test/compliance/ForeachByrefAppend32128JITTest.php</file>
+            <file>./test/compliance/LdapSetGetOption32107VMTest.php</file>
+            <file>./test/compliance/LdapSetGetOption32107JITTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947VMTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947JITTest.php</file>
             <file>./test/compliance/ArrayAccessIncByValue32015VMTest.php</file>

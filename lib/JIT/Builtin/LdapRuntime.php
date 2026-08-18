@@ -10,7 +10,8 @@ use PHPCompiler\JIT\JitVmHelperLink;
 /**
  * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect /
  * ldap_connect_wallet / ldap_bind / ldap_unbind / ldap_errno / ldap_error / ldap_err2str /
- * ldap_compare (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32121).
+ * ldap_set_option / ldap_get_option / ldap_compare
+ * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32107, #32121).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -47,6 +48,12 @@ final class LdapRuntime
 
     private const LDAP_ERR2STR_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::err2strArgv';
 
+    private const LDAP_SET_OPTION_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::setOptionIntArgv';
+
+    private const LDAP_GET_OPTION_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::getOptionIntOkArgv';
+
+    private const LDAP_GET_OPTION_VALUE_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::getOptionValueArgv';
+
     private const LDAP_COMPARE_HELPER = 'PHPCompiler\\ext\\ldap\\LdapResultJitHelper::compareArgv';
 
     /** @var list<string> */
@@ -70,6 +77,9 @@ final class LdapRuntime
         self::LDAP_ERRNO_HELPER,
         self::LDAP_ERROR_HELPER,
         self::LDAP_ERR2STR_HELPER,
+        self::LDAP_SET_OPTION_HELPER,
+        self::LDAP_GET_OPTION_HELPER,
+        self::LDAP_GET_OPTION_VALUE_HELPER,
     ];
 
     /** @var list<string> */
@@ -219,6 +229,39 @@ final class LdapRuntime
             self::LINK_HELPER_PATH,
             self::LINK_HELPERS,
             '#32106'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_set_option',
+            'ldap_set_option_bridge_entry',
+            [$i64, $i64, $i64, $i64, $i64],
+            $context->getTypeFromString('int1'),
+            self::LDAP_SET_OPTION_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32107'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_get_option',
+            'ldap_get_option_bridge_entry',
+            [$i64, $i64, $i64],
+            $i64,
+            self::LDAP_GET_OPTION_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32107'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_get_option_value',
+            'ldap_get_option_value_bridge_entry',
+            [],
+            $i64,
+            self::LDAP_GET_OPTION_VALUE_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32107'
         );
         JitVmHelperLink::ensureBridge(
             $context,
