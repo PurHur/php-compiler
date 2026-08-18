@@ -167,6 +167,8 @@
             <file>./test/compliance/CatchThis32204JITTest.php</file>
             <file>./test/compliance/ReservedClassName32206VMTest.php</file>
             <file>./test/compliance/ReservedClassName32206JITTest.php</file>
+            <file>./test/compliance/ReservedGlobalConst32228VMTest.php</file>
+            <file>./test/compliance/ReservedGlobalConst32228JITTest.php</file>
             <file>./test/compliance/ForeachByRefThis32205VMTest.php</file>
             <file>./test/compliance/ForeachByRefThis32205JITTest.php</file>
             <file>./test/compliance/DeclareStrictTypesMidfile32182VMTest.php</file>

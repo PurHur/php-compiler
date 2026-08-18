@@ -7160,6 +7160,35 @@ class Compiler {
     ];
 
     /**
+     * php-src zend_compile_const_decl() + zend_get_special_const() (#32228).
+     * File-scope `const true` / `false` / `null` (any case, any namespace prefix) is a
+     * compile fatal. Message preserves the source spelling of the unqualified name.
+     * `define('true', 1)` stays a runtime warning — do not call this from the define() path.
+     */
+    protected function rejectReservedGlobalConstName(Op\Terminal\Const_ $const): void
+    {
+        $name = $this->staticNameFromOperand($const->name);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $unqualified = $name;
+        if (str_contains($name, '\\')) {
+            $parts = explode('\\', $name);
+            $unqualified = $parts[count($parts) - 1];
+        }
+        $lc = strtolower($unqualified);
+        if ('true' !== $lc && 'false' !== $lc && 'null' !== $lc) {
+            return;
+        }
+        $detail = sprintf("Cannot redeclare constant '%s'", $unqualified);
+        $sourceFile = $const->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $const->getLine());
+    }
+
+    /**
      * php-src zend_assert_valid_class_name() — compile fatal before TYPE_DECLARE_* (#32206).
      * Message shape is PHP 8.2/8.3: Cannot use '%s' as class name as it is reserved.
      */
@@ -11541,6 +11570,7 @@ class Compiler {
 
     protected function prescanGlobalConstTerminal(Op\Terminal\Const_ $const, Block $block): void
     {
+        $this->rejectReservedGlobalConstName($const);
         $name = $this->staticNameFromOperand($const->name);
         if (null === $name) {
             return;
@@ -11651,6 +11681,11 @@ class Compiler {
     protected function storeCompileTimeGlobalConst(string $name, Variable $value): void
     {
         $lc = strtolower($name);
+        // File-scope `const true` is a compile fatal (#32228); define('true') must not
+        // fold later ConstFetch of the special name (zend_get_special_const).
+        if ('true' === $lc || 'false' === $lc || 'null' === $lc) {
+            return;
+        }
         if (isset($this->compileTimeGlobalConsts[$lc])) {
             return;
         }
@@ -45201,6 +45236,7 @@ class Compiler {
 
     protected function compileGlobalConst(Op\Terminal\Const_ $const, Block $block): OpCode
     {
+        $this->rejectReservedGlobalConstName($const);
         $this->rejectFinalGlobalTypedConstantIfUnsupported($const);
         $valueSlot = $this->tryFoldGlobalConstValueSlot($const, $block);
         if (null === $valueSlot) {
