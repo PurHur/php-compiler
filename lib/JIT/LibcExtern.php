@@ -46,7 +46,11 @@ final class LibcExtern
             // memchr dropped (#31655): JitTempnamKernel::ensureLibc declares memchr(3)
             // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
             // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
-            'strlen' => [$sizeT, false, [$i8p]],
+            // strlen dropped (#32068): NestedJIT leaves call ensureStrlenDecl before lookup
+            // (session/stream/ob/parse_str/CLI/Reflection/env + string helpers); kernels that
+            // already declare i8* strlen module-locally stay as-is. EMBED MCJIT still gets
+            // implementStrlenBody after ensureStrlenDecl (#98 / #21109). Peer strtod drop
+            // (#31997). User-script strlen() stays on ext/types JitStrlen / VmString — not libc.
             // strcmp dropped (#31971): NestedJIT leaves call ensureStrcmpDecl before lookup
             // (enum/CLI/stream/minmax/hash + Reflection); kernels that already declare i8*
             // strcmp module-locally stay as-is. EMBED MCJIT still gets implementStrcmpBody
@@ -692,6 +696,32 @@ final class LibcExtern
     }
 
     /**
+     * Module-local strlen(3) after LibcExtern always-on drop (#32068).
+     *
+     * User-script strlen() stays on ext/types JitStrlen / VmString; NestedJIT C-string
+     * length leaves call this before lookupFunction('strlen'). Peer: ensureStrtodDecl (#31997).
+     */
+    public static function ensureStrlenDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strlen');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->getNamedFunction('strlen');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'strlen',
+                $context->context->functionType($sizeT, false, $i8p)
+            );
+        }
+        $context->registerFunction('strlen', $fn);
+    }
+
+    /**
      * Module-local strtod(3) after LibcExtern always-on drop (#31997).
      *
      * User-script floatval()/is_numeric() stay on ext/standard PHP; NestedJIT numeric-parse
@@ -720,6 +750,7 @@ final class LibcExtern
 
     private static function implementStrlenBody(Context $context): void
     {
+        self::ensureStrlenDecl($context);
         $fn = $context->module->getNamedFunction('strlen');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;

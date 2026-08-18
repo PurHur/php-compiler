@@ -328,6 +328,8 @@ final class CliArgvRuntime
 
         $context->builder->positionAtEnd($loopBody);
         $cstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $str = $context->builder->call(
             $context->lookupFunction('__string__init'),
@@ -364,6 +366,8 @@ final class CliArgvRuntime
 
         // strcmp(3) after always-on LibcExtern drop (#31971).
         LibcExtern::ensureStrcmpDecl($context);
+        // strlen(3) after always-on LibcExtern drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         foreach (
             [
                 'strcmp' => [$i32, false, [$i8p, $i8p]],

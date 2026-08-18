@@ -51,6 +51,8 @@ final class JitLibcryptKernel
         $context->builder->branchIf($isNull, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($okBlock);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $resultCstr);
         $lenForCmp = $len->typeOf() === $i64
             ? $len

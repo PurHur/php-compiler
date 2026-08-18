@@ -2239,6 +2239,8 @@ final class HashTableWriteLlvm
         $bufC = $context->builder->pointerCast($buf, $i8p);
         $fmt = $context->builder->pointerCast($context->constantFromString('%zu'), $i8p);
         $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $ptrInt);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
         $lenI64 = $context->getTypeFromString('int64');
         $lenForInit = $len->typeOf() === $lenI64

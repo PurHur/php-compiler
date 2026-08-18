@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -320,6 +321,9 @@ final class ScopeBuiltinRuntime
         // constantFromString yields [N x i8]*; strlen/__string__init need i8* (#30778).
         $i8p = $context->bytePtr($namePtr);
 
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
+
         return $context->builder->call(
             $context->lookupFunction('__string__init'),
             $context->builder->zExt(
@@ -392,6 +396,8 @@ final class ScopeBuiltinRuntime
 
         self::ensureJitHelperCompiled($context);
         $i64 = $context->getTypeFromString('int64');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $namePtr);
         $lenI64 = $context->builder->zExt($len, $i64);
         $strPtr = $context->builder->call(

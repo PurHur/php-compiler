@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -48,6 +49,8 @@ final class EmbedObEchoBridge
             $work
         );
         $context->builder->positionAtEnd($work);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         self::emitWrite($context, $s, $context->builder->call($context->lookupFunction('strlen'), $s));
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);

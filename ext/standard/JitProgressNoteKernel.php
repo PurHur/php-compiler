@@ -281,6 +281,8 @@ final class JitProgressNoteKernel
     {
         $i64 = $context->getTypeFromString('int64');
         $charPtr = $context->getTypeFromString('char*');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
 
         return $context->builder->call(
@@ -349,6 +351,8 @@ final class JitProgressNoteKernel
         $zeroByte = $i8->constInt(0, false);
         $zeroSize = $sizeT->constInt(0, false);
 
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $msg);
         $clamp = self::appendBlock($fn, 'pn_clamp_len');
         $okLen = self::appendBlock($fn, 'pn_ok_len');

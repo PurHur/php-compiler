@@ -1011,6 +1011,9 @@ class Module extends ModuleAbstract
         // strtod(3) dropped from always-on Module decls (#31997 / #31988 peer):
         // NestedJIT leaves call LibcExtern::ensureStrtodDecl before lookup;
         // user-script floatval()/is_numeric() stay on ext/standard PHP.
+        // strlen(3) dropped from always-on Module decls (#32068 / #31997 peer):
+        // NestedJIT leaves call LibcExtern::ensureStrlenDecl before lookup;
+        // user-script strlen() stays on ext/types JitStrlen / VmString.
         try {
             $context->lookupFunction('phpc_basetozval_result');
         } catch (\Throwable $e) {
@@ -1023,15 +1026,6 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $strPtr, $i64, $i64Ptr, $doublePtr);
             $fn = $context->module->addFunction('phpc_basetozval_result', $ft);
             $context->registerFunction('phpc_basetozval_result', $fn);
-        }
-        try {
-            $context->lookupFunction('strlen');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $ft = $context->context->functionType($sizeT, false, $i8p);
-            $fn = $context->module->addFunction('strlen', $ft);
-            $context->registerFunction('strlen', $fn);
         }
         // realpath(3) dropped from always-on Module decls (#30530): SysGetTempDirRuntime
         // NestedJIT leaf declares realpath module-locally (#29433); StringRealpath is PHP helper.

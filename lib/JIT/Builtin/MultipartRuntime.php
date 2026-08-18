@@ -59,6 +59,8 @@ final class MultipartRuntime
         // MultipartNativeJitHelper here (#5965). ParseStr Nested link rebinds
         // strlen to PHP __string__strlen; restore libc before cstr LLVM emit.
         LibcExtern::register($context);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         $context->registerFunction('strlen', $libcStrlen);
@@ -167,6 +169,8 @@ final class MultipartRuntime
         }
 
         LibcExtern::register($context);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         self::ensureFilesystemPrerequisites($context);

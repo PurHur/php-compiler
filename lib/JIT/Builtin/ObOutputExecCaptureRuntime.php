@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -329,6 +330,8 @@ final class ObOutputExecCaptureRuntime
         $i32 = $context->getTypeFromString('int32');
         $sizeT = $context->getTypeFromString('size_t');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(

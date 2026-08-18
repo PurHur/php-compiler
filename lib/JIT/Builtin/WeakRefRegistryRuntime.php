@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -333,6 +334,8 @@ final class WeakRefRegistryRuntime
             $checkKey
         );
         $context->builder->positionAtEnd($checkKey);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $keyLen, $sizeT->constInt(0, false)),
@@ -416,6 +419,8 @@ final class WeakRefRegistryRuntime
         );
 
         $context->builder->positionAtEnd($checkKeyBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $keyLen, $sizeT->constInt(0, false)),
@@ -864,6 +869,8 @@ final class WeakRefRegistryRuntime
     {
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
 
         return $context->builder->call(

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -62,6 +63,8 @@ final class JitGetCurrentUser
         $context->builder->branchIf($isEmpty, $failBlock, $doWrite);
 
         $context->builder->positionAtEnd($doWrite);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $namePtr);
         $lenI64 = $context->builder->zExt($len, $i64);
         $resultStr = $context->builder->call(

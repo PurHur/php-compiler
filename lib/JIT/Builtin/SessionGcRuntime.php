@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -168,6 +169,8 @@ final class SessionGcRuntime
             $context->constantFromString($msg),
             $i8p
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),

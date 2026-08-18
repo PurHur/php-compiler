@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -102,6 +103,8 @@ final class GetcwdJit
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($okBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $resolved);
         $str = $context->builder->call(
             $context->lookupFunction('__string__init'),
@@ -174,13 +177,7 @@ final class GetcwdJit
         $context->registerFunction('getcwd', $fn);
         $context->registerFunction(self::COMPILER_GETCWD, $fn);
 
-        // strlen for NestedJIT leaf path length
-        try {
-            $context->lookupFunction('strlen');
-        } catch (\Throwable $e) {
-            $strlenFt = $context->context->functionType($i64, false, $i8p);
-            $strlenFn = $context->module->addFunction('strlen', $strlenFt);
-            $context->registerFunction('strlen', $strlenFn);
-        }
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
     }
 }

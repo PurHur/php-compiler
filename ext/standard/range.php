@@ -22,6 +22,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -368,6 +369,8 @@ final class range extends Internal
             $paramName
         );
         $msg = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),

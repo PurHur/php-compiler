@@ -11,6 +11,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -43,6 +44,8 @@ final class JitRequestBody
 
         $context->builder->positionAtEnd($bodyBlock);
         $i64 = $context->getTypeFromString('int64');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $env);
         $lenI64 = $context->builder->zExt($len, $i64);
         $bodyStr = $context->builder->call(

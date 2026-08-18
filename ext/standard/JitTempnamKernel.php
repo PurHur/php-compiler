@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\SysGetTempDirRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -277,6 +278,8 @@ final class JitTempnamKernel
 
         $context->builder->positionAtEnd($copyBlock);
         $start = $context->builder->load($startSlot);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $baseLen = $context->builder->call($context->lookupFunction('strlen'), $start);
         $maxCopy = $sizeT->constInt(63, false);
         $copyLen = $context->builder->select(
@@ -382,6 +385,8 @@ final class JitTempnamKernel
         $i32 = $context->getTypeFromString('int32');
         $message = VmFsTempnam::NOTICE_MESSAGE;
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
@@ -403,6 +408,8 @@ final class JitTempnamKernel
 
     private static function cstrToString(Context $context, Value $cstr): Value
     {
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $i64 = $context->getTypeFromString('int64');
 

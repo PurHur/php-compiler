@@ -182,6 +182,8 @@ final class JitGethostnameKernel
         $i64 = $context->getTypeFromString('int64');
         $fn = $context->builder->getInsertBlock()->getParent();
 
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $rawLen = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
         $lenI64 = $rawLen->typeOf() === $i64 ? $rawLen : $context->builder->zExt($rawLen, $i64);
         $lenSlot = $context->builder->alloca($i64, 1, 'gethostname_trim_len');

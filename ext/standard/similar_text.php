@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -120,6 +121,8 @@ final class similar_text extends Internal
     ): void {
         $double = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $strlenFn = $context->lookupFunction('strlen');
         $len1 = $context->builder->zExt($context->builder->call($strlenFn, $strData0), $i64);
         $len2 = $context->builder->zExt($context->builder->call($strlenFn, $strData1), $i64);

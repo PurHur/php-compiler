@@ -423,6 +423,8 @@ final class StringStrspn
             $empty,
             $cstr
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $use);
 
         return $context->builder->call(

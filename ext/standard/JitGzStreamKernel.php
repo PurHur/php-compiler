@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -379,6 +380,8 @@ final class JitGzStreamKernel
         $context->builder->branch($fail);
 
         $context->builder->positionAtEnd($ok);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $buf);
         $str = $context->builder->call($context->lookupFunction('__string__init'), $len, $buf);
         $context->builder->call($context->lookupFunction('free'), $buf);

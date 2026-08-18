@@ -322,6 +322,8 @@ final class JitParseStrUserScriptCstrKernel
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
         $cstr = $fn->getParam(0);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $ret = $context->builder->call(
             $context->lookupFunction('__string__init'),
@@ -492,6 +494,8 @@ final class JitParseStrUserScriptCstrKernel
 
         $context->builder->positionAtEnd($moveBb);
         $start = $context->builder->load($startSlot);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $restLen = $context->builder->call($context->lookupFunction('strlen'), $start);
         $restLenPlus = $context->builder->add($restLen, $one);
         $context->builder->call(
@@ -503,6 +507,8 @@ final class JitParseStrUserScriptCstrKernel
         $context->builder->branch($tailBb);
 
         $context->builder->positionAtEnd($tailBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $s);
         $endSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $context->builder->store($context->builder->inBoundsGEP($s, $len), $endSlot);
@@ -939,6 +945,8 @@ final class JitParseStrUserScriptCstrKernel
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $body);
         $one = $i64->constInt(1, false);
         $copy = $context->builder->pointerCast(
@@ -1013,6 +1021,8 @@ final class JitParseStrUserScriptCstrKernel
         $context->builder->positionAtEnd($noEqBb);
         $pair = $context->builder->load($pairSlot);
         $context->builder->store($pair, $keySlot);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $pairLen = $context->builder->call($context->lookupFunction('strlen'), $pair);
         $context->builder->store($context->builder->inBoundsGEP($pair, $pairLen), $valSlot);
         $context->builder->branch($processBb);

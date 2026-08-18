@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -152,6 +153,8 @@ final class JitFsGlob
         $context->builder->store($sizeT->constInt(0, false), $iSlot);
         $setString = $context->lookupFunction('__hashtable__setStringAt');
         $stringInit = $context->lookupFunction('__string__init');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $strlenFn = $context->lookupFunction('strlen');
         $loopHead = BasicBlockHelper::append($context, $tag.'_head');
         $loopBody = BasicBlockHelper::append($context, $tag.'_body');

@@ -340,6 +340,8 @@ final class StringGetenv
         $context->builder->branchIf($isNull, $missBb, $hitBb);
 
         $context->builder->positionAtEnd($hitBb);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $len = $context->builder->call($context->lookupFunction('strlen'), $envRaw);
         $lenI64 = $len->typeOf() === $i64
             ? $len

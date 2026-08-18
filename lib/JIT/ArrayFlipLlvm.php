@@ -214,6 +214,8 @@ final class ArrayFlipLlvm
             ),
             $i8p
         );
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),

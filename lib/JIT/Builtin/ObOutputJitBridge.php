@@ -11,6 +11,7 @@ use PHPCompiler\ext\standard\ob_get_flush;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -436,6 +437,8 @@ final class ObOutputJitBridge
         $i32 = $context->getTypeFromString('int32');
         $sizeT = $context->getTypeFromString('size_t');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
@@ -543,6 +546,8 @@ final class ObOutputJitBridge
         $i32 = $context->getTypeFromString('int32');
         $doubleTy = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
+        // strlen(3) via LibcExtern::ensureStrlenDecl after always-on drop (#32068).
+        LibcExtern::ensureStrlenDecl($context);
         foreach (
             [
                 'strlen' => [$sizeT, false, $i8p],
