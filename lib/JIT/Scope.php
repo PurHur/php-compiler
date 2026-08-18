@@ -28,12 +28,12 @@ class Scope {
     public array $args = [];
 
     /**
-     * Saved FUNCCALL_INIT state while a nested FUNCCALL_INIT runs for an inline call arg
-     * (peer VM {@see \PHPCompiler\Frame::$pendingOutboundCallRestore}; #15217 / #27242).
+     * Nested FUNCCALL_INIT save stack (peer VM {@see \PHPCompiler\Frame::$pendingOutboundCallRestore};
+     * #15217 / #27242 / #32064).
      *
-     * @var array{toCall: Call, args: array, argOperands: array}|null
+     * @var list<array{toCall: Call, args: array, argOperands: array}>
      */
-    public ?array $pendingOutboundCallRestore = null;
+    public array $pendingOutboundCallRestore = [];
 
     /** Original method name when dispatching via __call / __callStatic (#146, #4022). */
     public ?string $magicCallMethodName = null;

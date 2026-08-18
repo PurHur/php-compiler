@@ -22093,7 +22093,7 @@ class JIT {
         if (null === $this->context->scope->toCall) {
             return;
         }
-        $this->context->scope->pendingOutboundCallRestore = [
+        $this->context->scope->pendingOutboundCallRestore[] = [
             'toCall' => $this->context->scope->toCall,
             'args' => $this->context->scope->args,
             'argOperands' => $this->context->scope->argOperands,
@@ -22109,14 +22109,13 @@ class JIT {
 
     private function restoreJitPendingOutboundCall(): void
     {
-        $saved = $this->context->scope->pendingOutboundCallRestore;
-        if (null === $saved) {
+        if ([] === $this->context->scope->pendingOutboundCallRestore) {
             return;
         }
+        $saved = array_pop($this->context->scope->pendingOutboundCallRestore);
         $this->context->scope->toCall = $saved['toCall'];
         $this->context->scope->args = $saved['args'];
         $this->context->scope->argOperands = $saved['argOperands'];
-        $this->context->scope->pendingOutboundCallRestore = null;
     }
 
     /**

@@ -123,11 +123,15 @@ class Frame {
     public array $initializedSlots = [];
 
     /**
-     * Saved FUNCCALL_INIT state while TYPE_NEW runs for an inline `new` call arg (#15217).
+     * Nested FUNCCALL_INIT / inline `new` save stack (#15217, #32064).
      *
-     * @var array{call: Func, callArgs: list<Variable>, callArgEntries: list<array{0: string, 1?: mixed, 2?: Variable}>, callSiteLine: int, builtinCalleeQualifiedMethod: ?string}|null
+     * A single slot lost the outer callee when three INITs stacked — `var_dump(htmlspecialchars_decode())`
+     * then `var_dump(html_entity_decode(..., 'UTF-8'))` EXEC'd the entity call with `call === null`
+     * and left a NULL return (php-src html.c has no cross-call clobber).
+     *
+     * @var list<array{call: Func, callArgs: list<Variable>, callArgEntries: list<array{0: string, 1?: mixed, 2?: Variable}>, callSiteLine: int, builtinCalleeQualifiedMethod: ?string}>
      */
-    public ?array $pendingOutboundCallRestore = null;
+    public array $pendingOutboundCallRestore = [];
 
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;

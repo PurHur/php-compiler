@@ -13,7 +13,11 @@ final class HtmlentitiesJITTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['htmlentities_jit.phpt', 'html_entity_decode_ent_html5_jit.phpt'] as $file) {
+        foreach ([
+            'htmlentities_jit.phpt',
+            'html_entity_decode_ent_html5_jit.phpt',
+            'html_entity_decode_after_hs_decode_jit.phpt',
+        ] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
                 $file

@@ -18,6 +18,7 @@ final class HtmlentitiesVMTest extends BaseTest
             'htmlentities_reflection_defaults.phpt',
             'html_entity_decode.phpt',
             'html_entity_decode_ent_html5.phpt',
+            'html_entity_decode_after_hs_decode.phpt',
         ] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
