@@ -864,6 +864,10 @@ final class BuiltinInternalArgInfo
             'gettype' => 0 === $index ? 'mixed' : null,
             // Zend/zend_builtin_functions.stub.php — mixed $value; InternalArgInfo untyped (#26375)
             'get_debug_type' => 0 === $index ? 'mixed' : null,
+            // ext/ctype/ctype.stub.php — mixed $text; InternalArgInfo untyped (#26183, re-#23192)
+            'ctype_alnum', 'ctype_alpha', 'ctype_cntrl', 'ctype_digit', 'ctype_graph',
+            'ctype_lower', 'ctype_print', 'ctype_punct', 'ctype_space', 'ctype_upper',
+            'ctype_xdigit' => 0 === $index ? 'mixed' : null,
             // ext/standard/type.stub.php — mixed $value; InternalArgInfo empty / aliases absent (#28312)
             'is_numeric', 'is_string', 'is_int', 'is_integer', 'is_long', 'is_float', 'is_double',
             'is_bool', 'is_null', 'is_array', 'is_object', 'is_resource', 'is_scalar'
