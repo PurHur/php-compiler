@@ -185,7 +185,7 @@ restart:
                         $i64 = $this->context->getTypeFromString('int64');
                         $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
                         $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
+                        $result = JitNumericDivisionGuard::signedModulo(
                             $this->context,
                             $leftLong,
                             $rightLong
@@ -243,7 +243,7 @@ restart:
                         }
                         goto return_long;
                     case OpCode::TYPE_MODULO:
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
+                        $result = JitNumericDivisionGuard::signedModulo(
                             $this->context,
                             $leftValue,
                             $rightValue
@@ -397,7 +397,7 @@ restart:
                 if (OpCode::TYPE_MODULO === $opcode->type) {
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                     $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
-                    $result = JitNumericDivisionGuard::signedRemPhpLong(
+                    $result = JitNumericDivisionGuard::signedModulo(
                         $this->context,
                         $leftLong,
                         $rightLong

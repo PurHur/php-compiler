@@ -355,11 +355,7 @@ restart:
                         $i64 = $this->context->getTypeFromString('int64');
                         $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
                         $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
-                            $this->context,
-                            $leftLong,
-                            $rightLong
-                        );
+                        $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
@@ -447,12 +443,7 @@ restart:
                         $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
                         goto return_double;
                     case OpCode::TYPE_MODULO:
-                        $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
-                            $this->context,
-                            $leftValue,
-                            $__right
-                        );
+                        $result = JitNumericDivisionGuard::signedModulo($this->context, $leftValue, $rightValue);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
@@ -828,11 +819,7 @@ restart:
                 if (OpCode::TYPE_MODULO === $opcode->type) {
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                     $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
-                    $result = JitNumericDivisionGuard::signedRemPhpLong(
-                        $this->context,
-                        $leftLong,
-                        $rightLong
-                    );
+                    $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
                     goto return_long;
                 }
                 if (JitValueNumeric::isArithOpcode($opcode->type)) {
@@ -953,11 +940,7 @@ restart:
             if (OpCode::TYPE_MODULO === $opcode->type) {
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                $result = JitNumericDivisionGuard::signedRemPhpLong(
-                    $this->context,
-                    $leftLong,
-                    $rightLong
-                );
+                $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
                 goto return_long;
             }
             switch ($opcode->type) {
@@ -1044,11 +1027,7 @@ restart:
                 }
                 switch ($opcode->type) {
                     case OpCode::TYPE_MODULO:
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
-                            $this->context,
-                            $leftLong,
-                            $__right
-                        );
+                        $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $__right);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                         $result = $this->context->builder->bitwiseAnd($leftLong, $__right);
@@ -1115,7 +1094,7 @@ restart:
                         $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                         $i64 = $this->context->getTypeFromString('int64');
                         $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
+                        $result = JitNumericDivisionGuard::signedModulo(
                             $this->context,
                             $leftLong,
                             $rightLong
@@ -1207,11 +1186,7 @@ restart:
                 }
                 switch ($opcode->type) {
                     case OpCode::TYPE_MODULO:
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
-                            $this->context,
-                            $__left,
-                            $rightLong
-                        );
+                        $result = JitNumericDivisionGuard::signedModulo($this->context, $__left, $rightLong);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                         $result = $this->context->builder->bitwiseAnd($__left, $rightLong);
@@ -1276,7 +1251,7 @@ restart:
                         $i64 = $this->context->getTypeFromString('int64');
                         $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
                         $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                        $result = JitNumericDivisionGuard::signedRemPhpLong(
+                        $result = JitNumericDivisionGuard::signedModulo(
                             $this->context,
                             $leftLong,
                             $rightLong
@@ -1813,11 +1788,7 @@ restart:
             if (OpCode::TYPE_MODULO === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
-                $result = JitNumericDivisionGuard::signedRemPhpLong(
-                    $this->context,
-                    $leftLong,
-                    $__right
-                );
+                $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $__right);
                 goto return_long;
             }
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
@@ -1887,11 +1858,7 @@ restart:
             if (OpCode::TYPE_MODULO === $opcode->type) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
-                $result = JitNumericDivisionGuard::signedRemPhpLong(
-                    $this->context,
-                    $__left,
-                    $rightLong
-                );
+                $result = JitNumericDivisionGuard::signedModulo($this->context, $__left, $rightLong);
                 goto return_long;
             }
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
@@ -1927,11 +1894,7 @@ restart:
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $i64 = $this->context->getTypeFromString('int64');
                 $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
-                $result = JitNumericDivisionGuard::signedRemPhpLong(
-                    $this->context,
-                    $leftLong,
-                    $rightLong
-                );
+                $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
                 goto return_long;
             }
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
@@ -1949,11 +1912,7 @@ restart:
                 $i64 = $this->context->getTypeFromString('int64');
                 $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
-                $result = JitNumericDivisionGuard::signedRemPhpLong(
-                    $this->context,
-                    $leftLong,
-                    $rightLong
-                );
+                $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
                 goto return_long;
             }
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);

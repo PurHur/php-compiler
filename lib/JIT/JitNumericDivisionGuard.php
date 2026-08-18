@@ -25,11 +25,11 @@ final class JitNumericDivisionGuard
     }
 
     /**
-     * PHP `%` — ZEND_LONG_MIN % -1 is 0 (zend_operators.c mod_function).
+     * Integer `%` with Zend LONG_MIN/-1 → 0 (#32285).
      */
-    public static function signedRemPhpLong(Context $context, Value $dividend, Value $divisor): Value
+    public static function signedModulo(Context $context, Value $dividend, Value $divisor): Value
     {
-        return VmNumericDivisionGuard::signedRemPhpLong($context, $dividend, $divisor);
+        return VmNumericDivisionGuard::signedModulo($context, $dividend, $divisor);
     }
 
     public static function emitIntMinNegOneOverflowGuard(

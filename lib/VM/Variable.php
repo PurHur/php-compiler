@@ -3265,6 +3265,10 @@ restart:
                 if (0 === $rightLong) {
                     throw new \DivisionByZeroError('Modulo by zero');
                 }
+                // zend_operators.c mod_function: UNEXPECTED(op2 == -1) → 0 (#32285).
+                if (-1 === $rightLong) {
+                    return 0;
+                }
 
                 return self::numericToZendLong($left) % $rightLong;
             case OpCode::TYPE_POW:

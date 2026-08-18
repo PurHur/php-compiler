@@ -2648,7 +2648,8 @@ final class VmSoapClient
         string $tag,
         array $value,
         SoapClientState $state,
-        ?Context $ctx = null
+        ?Context $ctx = null,
+        string $xmlnsAttr = ''
     ): string {
         $inner = '';
         foreach ($value as $v) {
@@ -2668,7 +2669,62 @@ final class VmSoapClient
             $attrs .= ' xsi:type="SOAP-ENC:Array"';
         }
 
-        return '<'.$tag.$attrs.'>'.$inner.'</'.$tag.'>';
+        return '<'.$tag.$xmlnsAttr.$attrs.'>'.$inner.'</'.$tag.'>';
+    }
+
+    /**
+     * php-src to_xml_array via SoapVar SOAP_ENC_ARRAY (#32284).
+     *
+     * Associative maps still emit item children (ZEND_HASH_FOREACH_VAL_IND).
+     * Traversable is copied first (zend_ce_traversable iterator).
+     */
+    private static function encodeSoapEncArray(
+        string $qtag,
+        string $xmlnsAttr,
+        mixed $inner,
+        bool $literal,
+        ?SoapClientState $state,
+        ?Context $ctx
+    ): string {
+        if (null === $inner) {
+            if ($literal) {
+                return '<'.$qtag.$xmlnsAttr.'/>';
+            }
+            $arrayType = SoapConstants::SOAP_1_2 === ($state?->soapVersion ?? SoapConstants::SOAP_1_1)
+                ? 'enc:Array'
+                : 'SOAP-ENC:Array';
+
+            return '<'.$qtag.$xmlnsAttr.' xsi:type="'.$arrayType.'" xsi:nil="true"/>';
+        }
+        $list = self::soapEncArrayValues($inner);
+        $state ??= new SoapClientState();
+        if ($literal) {
+            $child = '';
+            foreach ($list as $v) {
+                $child .= self::encodeParam('item', $v, $state, $ctx);
+            }
+
+            return '<'.$qtag.$xmlnsAttr.'>'.$child.'</'.$qtag.'>';
+        }
+
+        return self::encodeSoapEncodedListArray($qtag, $list, $state, $ctx, $xmlnsAttr);
+    }
+
+    /**
+     * php-src to_xml_array — values only; Traversable copied to array first (#32284).
+     *
+     * @return list<mixed>
+     */
+    private static function soapEncArrayValues(mixed $inner): array
+    {
+        if ($inner instanceof \Traversable) {
+            return \array_values(\iterator_to_array($inner, false));
+        }
+        if (\is_array($inner)) {
+            return \array_values($inner);
+        }
+
+        return [];
     }
 
     /**
@@ -2838,12 +2894,15 @@ final class VmSoapClient
         if (\is_array($inner) && SoapConstants::APACHE_MAP === $encType) {
             return self::encodeApacheMap($qtag, $xmlnsAttr, $inner, $literal, $state, $ctx);
         }
-        // SOAP_ENC_ARRAY / untyped arrays stay on the generic array path.
+        // php-src to_xml_array — SOAP_ENC_ARRAY always values-as-<item>, including string keys (#32284).
+        if (SoapConstants::SOAP_ENC_ARRAY === $encType) {
+            return self::encodeSoapEncArray($qtag, $xmlnsAttr, $inner, $literal, $state, $ctx);
+        }
+        // Untyped arrays stay on the generic array path.
         if (
             \is_array($inner)
             && (
-                SoapConstants::SOAP_ENC_ARRAY === $encType
-                || SoapConstants::XSD_ANYTYPE === $encType
+                SoapConstants::XSD_ANYTYPE === $encType
                 || 0 === $encType
             )
         ) {
