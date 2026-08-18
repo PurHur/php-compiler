@@ -260,22 +260,20 @@ final class CharsetEngine
 
     private static function utf8ToAscii(string $input, int $flags): string|false
     {
-        $latin1 = self::utf8ToLatin1($input, $flags);
-        if (false === $latin1) {
+        $codepoints = self::utf8Codepoints($input, $flags);
+        if (null === $codepoints) {
             return false;
         }
 
         $out = '';
-        $len = \strlen($latin1);
-        for ($i = 0; $i < $len; ++$i) {
-            $byte = \ord($latin1[$i]);
-            if ($byte <= 0x7F) {
-                $out .= $latin1[$i];
+        foreach ($codepoints as $cp) {
+            if ($cp <= 0x7F) {
+                $out .= \chr($cp);
 
                 continue;
             }
             if ($flags & self::FLAG_TRANSLIT) {
-                $translit = self::transliterateLatin1($byte);
+                $translit = self::transliterateCodepoint($cp);
                 if (null !== $translit) {
                     $out .= $translit;
 
@@ -549,9 +547,12 @@ final class CharsetEngine
         return [0xD800 | (($cp >> 10) & 0x3FF), 0xDC00 | ($cp & 0x3FF)];
     }
 
-    private static function transliterateLatin1(int $byte): ?string
+    /**
+     * glibc/libiconv //TRANSLIT subset — Latin-1 accents + common UTF-8 symbols (php-src iconv.c).
+     */
+    private static function transliterateCodepoint(int $cp): ?string
     {
-        static $map = [
+        static $latin1 = [
             0xC0 => 'A', 0xC1 => 'A', 0xC2 => 'A', 0xC3 => 'A', 0xC4 => 'A', 0xC5 => 'A',
             0xC6 => 'AE', 0xC7 => 'C',
             0xC8 => 'E', 0xC9 => 'E', 0xCA => 'E', 0xCB => 'E',
@@ -571,7 +572,22 @@ final class CharsetEngine
             0xF9 => 'u', 0xFA => 'u', 0xFB => 'u', 0xFC => 'u',
             0xFD => 'y', 0xFE => 'th', 0xFF => 'y',
         ];
+        static $unicode = [
+            0x00A0 => ' ',   // NBSP
+            0x00A3 => 'GBP', // pound
+            0x00A5 => 'JPY', // yen
+            0x00A9 => '(C)', // copyright
+            0x00B0 => '?',   // degree — glibc on pinned image
+            0x2013 => '-',   // en dash
+            0x2014 => '--',  // em dash
+            0x2026 => '...', // ellipsis
+            0x20AC => 'EUR', // euro (#32103)
+        ];
 
-        return $map[$byte] ?? null;
+        if ($cp <= 0xFF) {
+            return $latin1[$cp] ?? ($unicode[$cp] ?? null);
+        }
+
+        return $unicode[$cp] ?? null;
     }
 }
