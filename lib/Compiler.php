@@ -7191,6 +7191,32 @@ class Compiler {
     }
 
     /**
+     * php-src zend_compile_class_const_declaration() + zend_check_const_and_trait_alias_name() (#32251).
+     * Declared class/interface/trait/enum constant named `class` (any case) is a compile fatal;
+     * `Foo::class` the pseudo-constant is a fetch, not a declaration.
+     */
+    protected function rejectReservedClassConstName(?string $constName, Op\Terminal\Const_ $const): void
+    {
+        if (null === $constName || '' === $constName) {
+            return;
+        }
+        $unqualified = $constName;
+        if (str_contains($constName, '\\')) {
+            $parts = explode('\\', $constName);
+            $unqualified = $parts[count($parts) - 1];
+        }
+        if ('class' !== strtolower($unqualified)) {
+            return;
+        }
+        $detail = "A class constant must not be called 'class'; it is reserved for class name fetching";
+        $sourceFile = $const->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $const->getLine());
+    }
+
+    /**
      * php-src zend_assert_valid_class_name() — compile fatal before TYPE_DECLARE_* (#32206).
      * Message shape is PHP 8.2/8.3: Cannot use '%s' as class name as it is reserved.
      */
@@ -9518,6 +9544,7 @@ class Compiler {
     {
         $this->rejectStaticScopeInCompileTimeConstExpr($child->valueBlock, $child, $child->value);
         $constName = $this->staticNameFromOperand($child->name);
+        $this->rejectReservedClassConstName($constName, $child);
         if (null !== $constName && null !== $this->compilingClassLc) {
             // Case-sensitive — const A and const a are distinct (#25929).
             $constKey = ClassConstName::key($constName);
