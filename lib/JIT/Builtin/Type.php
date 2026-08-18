@@ -540,15 +540,10 @@ class Type extends Builtin {
             $fntypeGetResourceType
         );
         $this->context->registerFunction('__compiler_get_resource_type', $fnGetResourceType);
-        $fntypeMkdir = $this->context->context->functionType(
-            $i32,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $i64,
-            $i32
-        );
-        $fnMkdir = $this->context->module->addFunction('__compiler_mkdir', $fntypeMkdir);
-        $this->context->registerFunction('__compiler_mkdir', $fnMkdir);
+        // __compiler_mkdir always-on shell removed (#32438): user-script mkdir() stays
+        // MkdirJitHelper / StringMkdir / VmFsDirNative. NestedJIT/AOT bridge is
+        // FsDirRuntime (getNamedFunction first). Leftover Type addFunction vs
+        // Runtime ABI drift mints mkdir.1 (#31894 / #32122).
         $fntypeCopy = $this->context->context->functionType(
             $i32,
             false,
@@ -1392,9 +1387,9 @@ class Type extends Builtin {
         );
         $fnPhpcRunCommand = $this->context->module->addFunction('__compiler_phpc_run_command', $fntypePhpcRunCommand);
         $this->context->registerFunction('__compiler_phpc_run_command', $fnPhpcRunCommand);
-        $fntypeSysGetTempDir = $this->context->context->functionType($strPtr, false);
-        $fnSysGetTempDir = $this->context->module->addFunction('__compiler_sys_get_temp_dir', $fntypeSysGetTempDir);
-        $this->context->registerFunction('__compiler_sys_get_temp_dir', $fnSysGetTempDir);
+        // __compiler_sys_get_temp_dir always-on shell removed (#32438): user-script
+        // sys_get_temp_dir() stays SysGetTempDirJitHelper / SysGetTempDirRuntime
+        // (NestedJIT leaf is __compiler_sys_get_temp_dir_leaf). Peer mkdir drop.
         $i64 = $this->context->getTypeFromString('int64');
         $fntypeGetprotobynumber = $this->context->context->functionType($strPtr, false, $i64);
         $fnGetprotobynumber = $this->context->module->addFunction(
@@ -1415,14 +1410,10 @@ class Type extends Builtin {
         $fntypeGetservbyname = $this->context->context->functionType($void, false, $strPtr, $strPtr, $valuePtr);
         $fnGetservbyname = $this->context->module->addFunction('__phpc_getservbyname', $fntypeGetservbyname);
         $this->context->registerFunction('__phpc_getservbyname', $fnGetservbyname);
-        $fntypeTempnam = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
-        $fnTempnam = $this->context->module->addFunction('__compiler_tempnam', $fntypeTempnam);
-        $this->context->registerFunction('__compiler_tempnam', $fnTempnam);
-        $i64 = $this->context->getTypeFromString('int64');
-        $i32 = $this->context->getTypeFromString('int32');
-        $fntypeFtok = $this->context->context->functionType($i64, false, $strPtr, $i32);
-        $fnFtok = $this->context->module->addFunction('__compiler_ftok', $fntypeFtok);
-        $this->context->registerFunction('__compiler_ftok', $fnFtok);
+        // __compiler_tempnam / __compiler_ftok always-on shells removed (#32438):
+        // user-script tempnam() stays TempnamJitHelper; ftok() stays FtokJitHelper
+        // / FtokRuntime::ensureLinked / NestedJIT JitFtokKernel. FsDirRuntime owns
+        // the tempnam AOT bridge (getNamedFunction first). Peer mkdir drop.
         $fntypeHttpBuildQuery = $this->context->context->functionType(
             $strPtr,
             false,
