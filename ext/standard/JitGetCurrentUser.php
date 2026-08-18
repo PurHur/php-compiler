@@ -27,6 +27,9 @@ final class JitGetCurrentUser
 
     public static function invoke(Context $context): Value
     {
+        // geteuid(2)/getpwuid(3) via module-local decls after Type $libcFns drop (#32217).
+        self::ensureLibcGeteuid($context);
+        self::ensureLibcGetpwuid($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
@@ -97,5 +100,36 @@ final class JitGetCurrentUser
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    /** Module-local geteuid(2) after Type $libcFns drop (#32217). */
+    private static function ensureLibcGeteuid(Context $context): void
+    {
+        try {
+            $context->lookupFunction('geteuid');
+        } catch (\Throwable) {
+            $i32 = $context->getTypeFromString('int32');
+            $fn = $context->module->addFunction(
+                'geteuid',
+                $context->context->functionType($i32, false)
+            );
+            $context->registerFunction('geteuid', $fn);
+        }
+    }
+
+    /** Module-local getpwuid(3) after Type $libcFns drop (#32217). */
+    private static function ensureLibcGetpwuid(Context $context): void
+    {
+        try {
+            $context->lookupFunction('getpwuid');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $fn = $context->module->addFunction(
+                'getpwuid',
+                $context->context->functionType($i8p, false, $i32)
+            );
+            $context->registerFunction('getpwuid', $fn);
+        }
     }
 }
