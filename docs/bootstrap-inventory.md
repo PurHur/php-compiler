@@ -10349,7 +10349,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateCDATASection.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 125)
+- new JITVariable (line 131)
 - 8 class method(s)
 
 ### `ext/dom/JitDomCreateComment.php`
@@ -10412,7 +10412,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateTextNode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 141)
+- new JITVariable (line 148)
 - 9 class method(s)
 
 ### `ext/dom/JitDomDeleteData.php`
