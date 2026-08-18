@@ -8141,6 +8141,9 @@ class JIT {
             ) {
                 JIT\Progress::noteFunction('{main}:op='.$i.':type='.$op->type);
             }
+            // Folded TYPE_ENUM_CASE slots (script CLASS_CONST_FETCH is often eliminated)
+            // hoist as null value-boxes before DECLARE_ENUM. Rebind now that enums exist (#31967).
+            $this->rebindEnumCaseConstantSlots($block, $op);
             switch ($op->type) {
                 case OpCode::TYPE_ARG_RECV:
                     $recvSlot = $op->arg2 + $thisParamOffset;
@@ -12286,48 +12289,10 @@ class JIT {
                 case OpCode::TYPE_DECLARE_ENUM:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
-                    if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'enum', $nameOp->value)) {
+                    if ($this->context->type->object->isRegisteredEnumLc(strtolower($nameOp->value))) {
                         break;
                     }
-                    if ([] !== $op->classImplements) {
-                        JIT\ImplementsHierarchyJitGuard::emitBeforeDeclare(
-                            $this->context,
-                            $nameOp->value,
-                            $op->classImplements,
-                            $block->scriptPath(),
-                            $op->sourceLocation,
-                            null,
-                            true
-                        );
-                    }
-                    $this->context->pushScope();
-                    $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
-                    $this->context->scope->className = strtolower($nameOp->value);
-                    if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
-                        $this->context->type->object->markAttributeClass($nameOp->value);
-                    }
-                    if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
-                        $this->context->type->object->setEnumBackedType(
-                            $this->context->scope->classId,
-                            $block->constants[$op->arg2]->toString()
-                        );
-                    }
-                    if (null !== $this->context->runtime->vmContext) {
-                        $this->context->runtime->vmContext->enums[strtolower($nameOp->value)] = true;
-                    }
-                    $this->compileClass($op->block1, $this->context->scope->classId);
-                    if ([] !== $op->classImplements) {
-                        $this->context->type->object->setClassInterfaces(
-                            $nameOp->value,
-                            $op->classImplements
-                        );
-                    }
-                    $this->context->type->object->inheritInterfaceConstants(
-                        $this->context->scope->classId,
-                        $nameOp->value
-                    );
-                    $this->context->type->object->finishEnumClass($this->context->scope->classId);
-                    $this->context->popScope();
+                    $this->jitCompileDeclareEnum($block, $op);
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $nameOp = $block->getOperand($op->arg1);
@@ -12335,6 +12300,11 @@ class JIT {
                     if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'class', $nameOp->value)) {
                         break;
                     }
+                    // php-cfg may emit DECLARE_CLASS before DECLARE_ENUM in the same
+                    // script block; compile enums first so class-const `E::X` can
+                    // attach the singleton. Must run before pushScope so Enum::from
+                    // lowering does not leak into the enclosing class function (#31967).
+                    $this->jitCompilePendingEnumsInBlock($block);
                     $declareParentLc = null;
                     if (null !== $op->arg2) {
                         $earlyParent = $block->getOperand($op->arg2);
@@ -12399,6 +12369,20 @@ class JIT {
                     if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
                         $this->context->type->object->markAttributeClass($nameOp->value);
                     }
+                    // Zend evaluates class-const expressions after implements are attached
+                    // (zend_inheritance.c). AOT const rematerialization needs the same order
+                    // so `const Y = self::X` can see interface X (#31967).
+                    if ([] !== $op->classImplements) {
+                        $this->context->type->object->setClassInterfaces(
+                            $nameOp->value,
+                            $op->classImplements
+                        );
+                        $this->seedVmClassEntryInterfaces($nameOp->value, $op->classImplements);
+                    }
+                    $this->context->type->object->inheritInterfaceConstants(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     if ($parentOp instanceof Operand\Literal) {
                         $this->context->type->object->inheritReadonlyFromParent(
@@ -15244,6 +15228,38 @@ class JIT {
                         $classId,
                         (string) $name->value
                     );
+                    $enumCaseRef = null;
+                    if (
+                        !($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare)
+                    ) {
+                        $enumCaseRef = $this->tryResolveEnumCaseClassConstInit($block, $op->arg2);
+                        if (
+                            null === $enumCaseRef
+                            && isset($block->constants[$op->arg2])
+                            && \PHPCompiler\VM\Variable::TYPE_ENUM_CASE === $block->constants[$op->arg2]->type
+                        ) {
+                            $enumCaseRef = $this->tryEnumCaseRefFromVmConstant($block->constants[$op->arg2]);
+                        }
+                    }
+                    if (null !== $enumCaseRef) {
+                        $this->context->type->object->defineClassConstEnumCaseRef(
+                            $classId,
+                            $name->value,
+                            $enumCaseRef[0],
+                            $enumCaseRef[1]
+                        );
+                        $this->context->type->object->defineClassConstVisibility(
+                            $classId,
+                            $name->value,
+                            $op->classConstVisibilityFlags
+                        );
+                        $this->context->type->object->defineClassConstDeprecated(
+                            $classId,
+                            $name->value,
+                            $op->deprecatedMetadata
+                        );
+                        break;
+                    }
                     if (!isset($block->constants[$op->arg2])) {
                         if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                             break;
@@ -21474,7 +21490,23 @@ class JIT {
 
                 return;
             }
-            throw new \LogicException('Static call class must be a literal');
+            $methodLc = strtolower((string) $nameOp->value);
+            $candidates = $this->buildRuntimeStaticMethodCandidatesByClassId($methodLc, false);
+            if ([] === $candidates) {
+                throw new \LogicException('Call to undefined method '.$nameOp->value.'()');
+            }
+            // `$obj::method()` / `$class::method()` — ZEND_INIT_STATIC_METHOD_CALL (#31967).
+            $this->context->scope->toCall = new JIT\Call\RuntimeIndirectStaticMethodCall(
+                $methodLc,
+                $candidates,
+                $block,
+                false,
+                $classVar,
+                $classOp
+            );
+            $this->context->scope->args = [];
+
+            return;
         }
         $selfScope = 'self' === strtolower((string) $classOp->value);
         $staticScope = 'static' === strtolower((string) $classOp->value);
@@ -22938,6 +22970,120 @@ class JIT {
         return $value;
     }
 
+    /**
+     * Compile DECLARE_ENUM ops in $block that have not been registered yet (#31967).
+     */
+    private function jitCompilePendingEnumsInBlock(Block $block): void
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_ENUM !== $op->type) {
+                continue;
+            }
+            $nameOp = $block->getOperand($op->arg1);
+            if (!$nameOp instanceof Operand\Literal) {
+                continue;
+            }
+            if ($this->context->type->object->isRegisteredEnumLc(strtolower($nameOp->value))) {
+                continue;
+            }
+            $this->jitCompileDeclareEnum($block, $op);
+        }
+    }
+
+    private function jitCompileDeclareEnum(Block $block, OpCode $op): void
+    {
+        $nameOp = $block->getOperand($op->arg1);
+        assert($nameOp instanceof Operand\Literal);
+        if ($this->emitDuplicateClassLikeDeclareFatalIfNeeded($op, $block, 'enum', $nameOp->value)) {
+            return;
+        }
+        if ([] !== $op->classImplements) {
+            JIT\ImplementsHierarchyJitGuard::emitBeforeDeclare(
+                $this->context,
+                $nameOp->value,
+                $op->classImplements,
+                $block->scriptPath(),
+                $op->sourceLocation,
+                null,
+                true
+            );
+        }
+        $this->context->pushScope();
+        $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
+        $this->context->scope->className = strtolower($nameOp->value);
+        if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
+            $this->context->type->object->markAttributeClass($nameOp->value);
+        }
+        if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
+            $this->context->type->object->setEnumBackedType(
+                $this->context->scope->classId,
+                $block->constants[$op->arg2]->toString()
+            );
+        }
+        if (null !== $this->context->runtime->vmContext) {
+            $this->context->runtime->vmContext->enums[strtolower($nameOp->value)] = true;
+        }
+        $this->compileClass($op->block1, $this->context->scope->classId);
+        if ([] !== $op->classImplements) {
+            $this->context->type->object->setClassInterfaces(
+                $nameOp->value,
+                $op->classImplements
+            );
+        }
+        $this->context->type->object->inheritInterfaceConstants(
+            $this->context->scope->classId,
+            $nameOp->value
+        );
+        $this->context->type->object->finishEnumClass($this->context->scope->classId);
+        $this->context->popScope();
+    }
+
+    /**
+     * Replace hoisted null placeholders with enum-case singletons once the enum exists (#31967).
+     *
+     * php-cfg folds `C::K` / `E::X` into Block::$constants (vm type 9) and drops the
+     * CLASS_CONST_FETCH opcode, so makeVariableFromOp must rematerialize after DECLARE_ENUM.
+     */
+    private function rebindEnumCaseConstantSlots(Block $block, OpCode $op): void
+    {
+        foreach ([$op->arg1, $op->arg2, $op->arg3] as $slot) {
+            if (null === $slot || !isset($block->constants[$slot])) {
+                continue;
+            }
+            $vm = $block->constants[$slot];
+            if (VM\Variable::TYPE_ENUM_CASE !== $vm->type) {
+                continue;
+            }
+            $operand = $block->getOperand((int) $slot);
+            if (null === $operand) {
+                continue;
+            }
+            try {
+                $this->context->scope->variables[$operand] = JIT\VmConstantJit::toVariable($this->context, $vm);
+            } catch (\LogicException) {
+                continue;
+            }
+        }
+    }
+
+    /**
+     * Attach implements[] on the VM ClassEntry before compiling class-const expressions (#31967).
+     *
+     * @param list<string> $implements
+     */
+    private function seedVmClassEntryInterfaces(string $className, array $implements): void
+    {
+        $vmContext = $this->context->runtime->vmContext ?? null;
+        if (null === $vmContext) {
+            return;
+        }
+        $lc = strtolower(ltrim($className, '\\'));
+        if (!isset($vmContext->classes[$lc])) {
+            $vmContext->classes[$lc] = new VM\ClassEntry($className);
+        }
+        $vmContext->classes[$lc]->interfaces = $implements;
+    }
+
     private function jitVariableFromVmConstant(VM\Variable $vm): Variable {
         return JIT\VmConstantJit::toVariable($this->context, $vm);
     }
@@ -23827,15 +23973,57 @@ class JIT {
         }
         $enumClassOp = $block->getOperand($fetchOp->arg2);
         $caseOp = $block->getOperand($fetchOp->arg3);
-        if (!$enumClassOp instanceof Operand\Literal || !$caseOp instanceof Operand\Literal) {
+        $enumName = null;
+        $caseName = null;
+        if ($enumClassOp instanceof Operand\Literal) {
+            $enumName = (string) $enumClassOp->value;
+        } elseif (isset($block->constants[$fetchOp->arg2])
+            && \PHPCompiler\VM\Variable::TYPE_STRING === $block->constants[$fetchOp->arg2]->type) {
+            $enumName = $block->constants[$fetchOp->arg2]->toString();
+        }
+        if ($caseOp instanceof Operand\Literal) {
+            $caseName = (string) $caseOp->value;
+        } elseif (isset($block->constants[$fetchOp->arg3])
+            && \PHPCompiler\VM\Variable::TYPE_STRING === $block->constants[$fetchOp->arg3]->type) {
+            $caseName = $block->constants[$fetchOp->arg3]->toString();
+        }
+        if (null === $enumName || null === $caseName) {
             return null;
         }
-        $enumClassId = $this->context->type->object->lookup(strtolower($enumClassOp->value));
+        $enumLc = strtolower(ltrim($enumName, '\\'));
+        if (!$this->context->type->object->isRegisteredEnumLc($enumLc)) {
+            return null;
+        }
+        $enumClassId = $this->context->type->object->lookup($enumLc);
         if (!$this->context->type->object->isEnumClassId($enumClassId)) {
             return null;
         }
 
-        return [$enumClassId, strtolower($caseOp->value)];
+        return [$enumClassId, \PHPCompiler\ClassConstName::key($caseName)];
+    }
+
+    /**
+     * Map a folded TYPE_ENUM_CASE VM slot to the JIT enum singleton (#31967).
+     *
+     * @return array{0: int, 1: string}|null
+     */
+    private function tryEnumCaseRefFromVmConstant(VM\Variable $vm): ?array
+    {
+        if (VM\Variable::TYPE_ENUM_CASE !== $vm->type) {
+            return null;
+        }
+        $case = $vm->toEnumCase();
+        $enumLc = strtolower(ltrim($case->enumClass->name, '\\'));
+        if (!$this->context->type->object->hasDeclaredClass($enumLc)
+            || !$this->context->type->object->isRegisteredEnumLc($enumLc)) {
+            return null;
+        }
+        $enumClassId = $this->context->type->object->lookup($enumLc);
+        if (!$this->context->type->object->isEnumClassId($enumClassId)) {
+            return null;
+        }
+
+        return [$enumClassId, \PHPCompiler\ClassConstName::key($case->caseName)];
     }
 
     private function ensureJitFunctionStatic(string $storageKey): Variable

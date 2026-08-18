@@ -64,22 +64,33 @@ final class BackedEnumFromJit
         );
 
         $restore = $context->builder->getInsertBlock();
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         $entry = $fn->appendBasicBlock('entry');
+        // ParentFunction prefers loweringLlvmFunction over the insert block (#31101).
+        // finishEnumClass runs while the script/class function is still the owner, so
+        // from()/tryFrom body would otherwise leak into a void function (#31967).
+        $context->activeFunction = $lc;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
         $context->builder->positionAtEnd($entry);
-        $arg = $fn->getParam(0);
+        try {
+            $arg = $fn->getParam(0);
 
-        if ('string' === $backedType) {
-            self::emitStringBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
-        } elseif ('int' === $backedType) {
-            self::emitIntBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
-        } else {
-            throw new \LogicException('Unsupported enum backing type for JIT from(): '.$backedType);
-        }
-
-        if (null !== $restore) {
-            $context->builder->positionAtEnd($restore);
-        } else {
-            $context->builder->clearInsertionPosition();
+            if ('string' === $backedType) {
+                self::emitStringBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
+            } elseif ('int' === $backedType) {
+                self::emitIntBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
+            } else {
+                throw new \LogicException('Unsupported enum backing type for JIT from(): '.$backedType);
+            }
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $restore) {
+                $context->builder->positionAtEnd($restore);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 

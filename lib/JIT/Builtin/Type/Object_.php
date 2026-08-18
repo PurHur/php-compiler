@@ -5692,6 +5692,17 @@ class Object_ extends Type {
         $this->classConstDisplayNames[$classId][$key] = $name;
         $this->classConstDeclaringLc[$classId][$key] = strtolower(ltrim($this->classNameForId($classId), '\\'));
         unset($this->classConstMapGlobals[$classId]);
+        if (VMVariable::TYPE_ENUM_CASE === $value->type) {
+            $case = $value->toEnumCase();
+            $this->defineClassConstEnumCaseRef(
+                $classId,
+                $name,
+                $this->lookup(strtolower(ltrim($case->enumClass->name, '\\'))),
+                $case->caseName
+            );
+
+            return;
+        }
         if (VMVariable::TYPE_ARRAY === $value->type) {
             $table = $value->toArray();
             if (!$table instanceof \PHPCompiler\VM\HashTable) {
@@ -5755,6 +5766,35 @@ class Object_ extends Type {
         $this->rejectIncompatibleTraitClassConstOverride($classId, $key, $name, $entry);
         unset($this->traitConstSources[$classId][$key]);
         $this->classConstants[$classId][$key] = $entry;
+        $this->syncClassConstToVmContext($classId, $key, $value);
+    }
+
+    /**
+     * Mirror scalar class constants into the VM class table so AOT const-expr
+     * rematerialization can resolve {@code self::X} inherited from interfaces (#31967).
+     *
+     * parseAndCompile in MODE_AOT does not run DECLARE_CLASS on vmContext, so
+     * ClassConstMaterializer otherwise creates an empty ClassEntry with no interfaces.
+     *
+     * php-src: Zend/zend_inheritance.c zend_do_inherit_class_constant
+     */
+    private function syncClassConstToVmContext(int $classId, string $key, VMVariable $value): void
+    {
+        $vmContext = $this->context->runtime->vmContext ?? null;
+        if (null === $vmContext) {
+            return;
+        }
+        $display = $this->classNameForId($classId);
+        $lc = strtolower(ltrim($display, '\\'));
+        if (!isset($vmContext->classes[$lc])) {
+            $vmContext->classes[$lc] = new \PHPCompiler\VM\ClassEntry($display);
+        }
+        if ($this->isInterfaceClassLc($lc)) {
+            $vmContext->classes[$lc]->isInterface = true;
+        }
+        $copy = new VMVariable();
+        $copy->copyFrom($value);
+        $vmContext->classes[$lc]->constants[$key] = $copy;
     }
 
     /**
@@ -6708,20 +6748,24 @@ class Object_ extends Type {
             ObjectStaticPropertyInitLlvm::initStringDefault($this, $global, $default);
         }
         if (Variable::TYPE_HASHTABLE === $jitType) {
-            if (null === $default || VMVariable::TYPE_ARRAY === $default->type) {
+            if (null === $default) {
                 if (!ObjectStaticPropertyInitLlvm::deferHashtableInitInAot($this, $classId)) {
                     ObjectStaticPropertyInitLlvm::initHashtableEmpty($this, $global);
                 }
+            } elseif (VMVariable::TYPE_ARRAY === $default->type) {
+                if (!ObjectStaticPropertyInitLlvm::deferHashtableInitInAot($this, $classId)) {
+                    ObjectStaticPropertyInitLlvm::initHashtableFromVmArray($this, $global, $default);
+                }
             } else {
                 throw new \LogicException(
-                    'Static array property default must be an empty array literal for '.$this->classNameForId($classId).'::'.$name
+                    'Static array property default must be an array literal for '.$this->classNameForId($classId).'::'.$name
                 );
             }
         }
         if (Variable::TYPE_VALUE === $jitType && null !== $default && EnumCaseSupport::isEnumCaseVariable($default)) {
             ObjectStaticPropertyInitLlvm::initValueEnumCase($this, $global, $default);
         } elseif (Variable::TYPE_VALUE === $jitType && null !== $default && VMVariable::TYPE_ARRAY === $default->type) {
-            ObjectStaticPropertyInitLlvm::initValueEmptyArray($this, $global);
+            ObjectStaticPropertyInitLlvm::initValueArrayDefault($this, $global, $default);
         } elseif (Variable::TYPE_VALUE === $jitType && null !== $default && VMVariable::TYPE_NULL !== $default->type) {
             ObjectStaticPropertyInitLlvm::initValueScalarDefault($this, $global, $default);
         } elseif (Variable::TYPE_VALUE === $jitType && (null === $default || VMVariable::TYPE_NULL === $default->type)) {
