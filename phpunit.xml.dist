@@ -604,6 +604,8 @@
             <file>./test/compliance/CollatorCreateNullTypeErrorJITTest.php</file>
             <file>./test/compliance/CollatorGetSortKeyNamed28785VMTest.php</file>
             <file>./test/compliance/CollatorGetSortKeyNamed28785JITTest.php</file>
+            <file>./test/compliance/CollatorCompareReflection25497VMTest.php</file>
+            <file>./test/compliance/CollatorCompareReflection25497JITTest.php</file>
             <file>./test/compliance/IntlCalendarCreateInstanceNamed28482VMTest.php</file>
             <file>./test/compliance/IntlCalendarCreateInstanceNamed28482JITTest.php</file>
             <file>./test/compliance/IntlcalCreateInstanceNamed27944VMTest.php</file>

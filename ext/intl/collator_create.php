@@ -16,6 +16,7 @@ use PHPLLVM\Value;
 /**
  * collator_create() — procedural alias of Collator::create (php-src collator_create.c; #5747).
  *
+ * Reflection return ?Collator via {@see \PHPCompiler\BuiltinInternalArgInfo} (#25497).
  * Z_PARAM_STR $locale — null TypeError (#29933).
  */
 final class collator_create extends Internal
