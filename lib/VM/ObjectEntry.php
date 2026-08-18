@@ -280,6 +280,7 @@ class ObjectEntry {
         $var = new Variable(Variable::TYPE_NULL);
         $var->objectPropertyOwner = $this;
         $var->objectPropertyName = $name;
+        $var->objectPropertyRwFresh = true;
         $this->properties[$name] = $var;
 
         return $var;
