@@ -1421,8 +1421,8 @@ final class BuiltinInternalArgInfo
             'filter_input' => 3 === $index ? 'array|int' : null,
             // ext/standard/file.stub.php — &$would_block untyped; InternalArgInfo int (#23352)
             'flock' => 2 === $index ? '' : null,
-            // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)
-            'hash' => 3 === $index ? 'array' : null,
+            // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068, #23507)
+            'hash', 'hash_file' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — bool $before_needle = false; InternalArgInfo omits 3rd (#25758)
             'strchr' => 2 === $index ? 'bool' : null,
             // ext/standard/string.stub.php — array|string unions; &$count = null untyped (#23588 / #24886)
