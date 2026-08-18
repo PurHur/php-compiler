@@ -16,6 +16,22 @@ $isatty = posix_isatty(0);
 var_export(is_bool($isatty));
 echo "\n";
 
+$rf = new ReflectionFunction('posix_isatty');
+$params = $rf->getParameters();
+echo $params[0]->getName(), "\n";
+var_export($params[0]->hasType());
+echo "\n";
+
+$named = posix_isatty(file_descriptor: 0);
+var_export(is_bool($named));
+echo "\n";
+
+if (\defined('STDOUT')) {
+    $namedResource = posix_isatty(file_descriptor: STDOUT);
+    var_export(is_bool($namedResource));
+    echo "\n";
+}
+
 $tty = @posix_ttyname(0);
 var_export(false === $tty || (is_string($tty) && str_starts_with($tty, '/dev/')));
 echo "\n";
@@ -29,6 +45,10 @@ echo "\n";
 getlogin_yes
 ttyname_yes
 isatty_yes
+true
+true
+file_descriptor
+false
 true
 true
 true

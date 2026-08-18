@@ -29,7 +29,12 @@ final class posix_isatty extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $fd = VmPosix::coerceIntArg($frame->calledArgs[0], 'posix_isatty', 0, 'file_descriptor');
+        $fd = VmPosix::resolveFileDescriptorArg($frame->calledArgs[0], 'posix_isatty', 0);
+        if (null === $fd) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $frame->returnVar->bool(VmPosix::isatty($fd));
     }
 
