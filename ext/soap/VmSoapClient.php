@@ -2934,6 +2934,7 @@ final class VmSoapClient
             $faultEl = $fault->item(0);
             $code = 'Client';
             $string = 'SOAP Fault';
+            $actor = null;
             $detail = null;
             if ($faultEl instanceof \DOMElement) {
                 foreach ($faultEl->childNodes as $child) {
@@ -2959,13 +2960,17 @@ final class VmSoapClient
                     } elseif ('faultstring' === $ln) {
                         $string = \trim($child->textContent);
                     }
-                    if ('Detail' === $ln) {
-                        // php-src php_packet_soap.c SOAP 1.2: master_to_zval(Detail) (#32047).
+                    if ('faultactor' === $ln) {
+                        // php-src php_packet_soap.c SOAP 1.1 only (#32048).
+                        $actor = \trim($child->textContent);
+                    }
+                    if ('Detail' === $ln || 'detail' === $ln) {
+                        // php-src php_packet_soap.c Detail / detail (#32047 / #32048).
                         $detail = self::soapFaultDetailValue($child);
                     }
                 }
             }
-            throw new \SoapFault($code, $string, null, $detail);
+            throw new \SoapFault($code, $string, $actor, $detail);
         }
 
         $body = $xpath->query('//SOAP-ENV:Body/*|//env:Body/*');
