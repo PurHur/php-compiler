@@ -4571,6 +4571,7 @@ final class VmDateTimeNative
             $earlierUs,
             $laterUs,
             $invert,
+            $targetEarlier,
             $tzName
         ): array {
             $tm1 = self::localtime($earlier);
@@ -4618,10 +4619,10 @@ final class VmDateTimeNative
                 $h += 24;
                 --$d;
             }
-            // timelib_do_rel_normalize — keep borrowing months until d >= 0 (#22849).
-            // One-shot borrow left month-end → next-month-1st with negative d (m=1,d=-1).
-            $monthCursor = $m2;
-            $yearCursor = $y2;
+            // timelib_do_rel_normalize(invert ? one : two) — inverted diffs borrow
+            // month lengths from the earlier civil date (#32075, #22849).
+            $monthCursor = $targetEarlier ? $m1 : $m2;
+            $yearCursor = $targetEarlier ? $y1 : $y2;
             while ($d < 0) {
                 --$monthCursor;
                 if ($monthCursor < 1) {

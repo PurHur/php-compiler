@@ -870,6 +870,8 @@
             <file>./test/compliance/DateTimeDiffDaysPctA32062JITTest.php</file>
             <file>./test/compliance/DateTimeDiffDaysTod32074VMTest.php</file>
             <file>./test/compliance/DateTimeDiffDaysTod32074JITTest.php</file>
+            <file>./test/compliance/DateTimeDiffInvertMd32075VMTest.php</file>
+            <file>./test/compliance/DateTimeDiffInvertMd32075JITTest.php</file>
             <file>./test/compliance/DateTimeCreateFromTimestampNan31119VMTest.php</file>
             <file>./test/compliance/DateTimeCreateFromTimestampNan31119JITTest.php</file>
             <file>./test/compliance/Xoshiro256StarStarGenerate31053VMTest.php</file>
