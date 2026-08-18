@@ -37,4 +37,17 @@ final class MtRandLcgBuiltinTest extends TestCase
         self::assertEqualsWithDelta(0.94359739042414, VmCombinedLcg::value(), 1e-10);
         self::assertEqualsWithDelta(0.90831884935795, VmCombinedLcg::value(), 1e-10);
     }
+
+    public function testSeedWithModePhpDiffersFromMt19937(): void
+    {
+        VmMt19937::seed(1, VmMt19937::MT_RAND_PHP);
+        $phpMode = VmMt19937::mtRand31();
+        VmMt19937::seed(1, VmMt19937::MT_RAND_MT19937);
+        $mtMode = VmMt19937::mtRand31();
+        self::assertNotSame($phpMode, $mtMode);
+
+        VmMt19937::resetForTests();
+        \PHPCompiler\ext\standard\RandJitHelper::seedWithMode(1, VmMt19937::MT_RAND_PHP);
+        self::assertSame($phpMode, VmMt19937::mtRand31());
+    }
 }

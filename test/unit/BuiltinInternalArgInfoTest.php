@@ -2603,4 +2603,35 @@ final class BuiltinInternalArgInfoTest extends TestCase
             BuiltinInternalDefaultValues::isAvailable('is_callable', 2, $name, false)
         );
     }
+
+    /** ext/random/random.stub.php — mt_srand/srand seed+mode optional ints, void (#23596). */
+    public function testMtSrandSrandReflectionStubTypes(): void
+    {
+        foreach (['mt_srand', 'srand'] as $fn) {
+            $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            $this->assertSame(['seed=', 'mode='], BuiltinParamNames::forFunction($fn), $fn);
+            $this->assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+            $this->assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
+            $seed = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($seed, $fn);
+            $this->assertSame('seed', $seed['name'], $fn);
+            $this->assertSame('int', $seed['type'], $fn);
+            $this->assertTrue($seed['isOptional'], $fn);
+            $mode = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            $this->assertNotNull($mode, $fn);
+            $this->assertSame('mode', $mode['name'], $fn);
+            $this->assertSame('int', $mode['type'], $fn);
+            $this->assertTrue($mode['isOptional'], $fn);
+            $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'seed',
+                $fn
+            ), $fn);
+            $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+                BuiltinParamNames::forFunction($fn),
+                'mode',
+                $fn
+            ), $fn);
+        }
+    }
 }

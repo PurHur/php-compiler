@@ -27,12 +27,15 @@ final class Rand
 
     private const SEED = 'PHPCompiler\\ext\\standard\\RandJitHelper::seed';
 
+    private const SEED_WITH_MODE = 'PHPCompiler\\ext\\standard\\RandJitHelper::seedWithMode';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::MT_RAND31,
         self::RAND_RANGE,
         self::MT_RAND_RANGE,
         self::SEED,
+        self::SEED_WITH_MODE,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -43,6 +46,11 @@ final class Rand
     public static function seed(Context $context): LlvmFunction
     {
         return self::helperFunction($context, self::SEED);
+    }
+
+    public static function seedWithMode(Context $context): LlvmFunction
+    {
+        return self::helperFunction($context, self::SEED_WITH_MODE);
     }
 
     public static function mtRand31(Context $context): LlvmFunction

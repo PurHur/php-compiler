@@ -33,6 +33,7 @@ final class RandRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmMt19937::randRange', $source);
         $this->assertStringContainsString('VmMt19937::range', $source);
         $this->assertStringContainsString('VmMt19937::seed', $source);
+        $this->assertStringContainsString('function seedWithMode', $source);
     }
 
     public function testRandJitHelperMatchesVmMt19937(): void
