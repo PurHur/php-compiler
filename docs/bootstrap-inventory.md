@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7590 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24260 |
+| Source constructs flagged (warnings) | 24261 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1419,7 +1419,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/JitLdapDn.php` | 0 | 3 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
 | `ext/ldap/JitLdapLink.php` | 0 | 12 |
-| `ext/ldap/JitLdapResult.php` | 0 | 2 |
+| `ext/ldap/JitLdapResult.php` | 0 | 3 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
 | `ext/ldap/LdapDnJitHelper.php` | 0 | 3 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
@@ -18618,21 +18618,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 29)
 - new ArgumentCountError (line 92)
 - new ArgumentCountError (line 146)
-- new ArgumentCountError (line 204)
-- new ArgumentCountError (line 232)
-- new ArgumentCountError (line 265)
-- new ArgumentCountError (line 293)
-- new ArgumentCountError (line 319)
-- new ArgumentCountError (line 345)
-- new ArgumentCountError (line 371)
-- new ArgumentCountError (line 404)
+- new ArgumentCountError (line 207)
+- new ArgumentCountError (line 235)
+- new ArgumentCountError (line 268)
+- new ArgumentCountError (line 296)
+- new ArgumentCountError (line 322)
+- new ArgumentCountError (line 348)
+- new ArgumentCountError (line 374)
+- new ArgumentCountError (line 407)
 - 25 class method(s)
 
 ### `ext/ldap/JitLdapResult.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
-- 5 class method(s)
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 58)
+- 11 class method(s)
 
 ### `ext/ldap/LdapConstants.php`
 
@@ -18665,8 +18666,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/LdapResultJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 22)
-- 2 class method(s)
+- new Variable (line 27)
+- 5 class method(s)
 
 ### `ext/ldap/LdapSerializeDeny.php`
 
@@ -18789,13 +18790,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapResult.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 34)
-- new ClassEntry (line 39)
-- new ObjectEntry (line 48)
-- new Variable (line 55)
-- new ObjectEntry (line 64)
-- new Variable (line 72)
-- 11 class method(s)
+- new ClassEntry (line 40)
+- new ClassEntry (line 45)
+- new ObjectEntry (line 54)
+- new Variable (line 62)
+- new ObjectEntry (line 116)
+- new Variable (line 124)
+- 15 class method(s)
 
 ### `ext/ldap/ldap_connect.php`
 
@@ -25458,7 +25459,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/SoapConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/soap/SoapExtensionPolicy.php`
 
@@ -25583,46 +25584,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMDocument (line 1926)
 - new SoapFault (line 1928)
 - new DOMXPath (line 1930)
-- new Variable (line 2898)
-- new DOMDocument (line 2924)
-- new SoapFault (line 2926)
-- new DOMXPath (line 2928)
-- new SoapFault (line 2973)
-- new SoapTypemapFromXml (line 3185)
-- new SoapMappedObject (line 3212)
-- new Variable (line 3290)
-- new Variable (line 3298)
-- new ObjectEntry (line 3319)
-- new Variable (line 3325)
-- new HashTable (line 3331)
-- new Variable (line 3341)
-- new stdClass (line 3355)
-- new ObjectEntry (line 3363)
-- new Variable (line 3370)
-- new Variable (line 3378)
-- new HashTable (line 3405)
-- new ObjectEntry (line 3423)
-- new ArgumentCountError (line 3713)
-- new Variable (line 3740)
-- new HashTable (line 3755)
-- new Variable (line 3763)
-- new Variable (line 3771)
-- new ArgumentCountError (line 3809)
-- new ArgumentCountError (line 3814)
-- new ArgumentCountError (line 3873)
-- new ArgumentCountError (line 3901)
-- new HashTable (line 3942)
-- new Variable (line 3945)
-- new HashTable (line 3967)
-- new Variable (line 3970)
-- new ArgumentCountError (line 4070)
-- new HashTable (line 4100)
-- new HashTable (line 4103)
-- new Variable (line 4106)
-- new Variable (line 4125)
-- new ArgumentCountError (line 4144)
-- new ArgumentCountError (line 4174)
-- 102 class method(s)
+- new Variable (line 3120)
+- new DOMDocument (line 3146)
+- new SoapFault (line 3148)
+- new DOMXPath (line 3150)
+- new SoapFault (line 3195)
+- new SoapTypemapFromXml (line 3407)
+- new SoapMappedObject (line 3434)
+- new Variable (line 3512)
+- new Variable (line 3520)
+- new ObjectEntry (line 3541)
+- new Variable (line 3547)
+- new HashTable (line 3553)
+- new Variable (line 3563)
+- new stdClass (line 3577)
+- new ObjectEntry (line 3585)
+- new Variable (line 3592)
+- new Variable (line 3600)
+- new HashTable (line 3627)
+- new ObjectEntry (line 3645)
+- new ArgumentCountError (line 3945)
+- new Variable (line 3972)
+- new HashTable (line 3987)
+- new Variable (line 3995)
+- new Variable (line 4003)
+- new ArgumentCountError (line 4041)
+- new ArgumentCountError (line 4046)
+- new ArgumentCountError (line 4105)
+- new ArgumentCountError (line 4133)
+- new HashTable (line 4174)
+- new Variable (line 4177)
+- new HashTable (line 4199)
+- new Variable (line 4202)
+- new ArgumentCountError (line 4302)
+- new HashTable (line 4332)
+- new HashTable (line 4335)
+- new Variable (line 4338)
+- new Variable (line 4357)
+- new ArgumentCountError (line 4376)
+- new ArgumentCountError (line 4406)
+- 108 class method(s)
 
 ### `ext/soap/VmSoapEncoding.php`
 
