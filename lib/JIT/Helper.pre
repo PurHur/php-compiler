@@ -185,7 +185,11 @@ restart:
                         $i64 = $this->context->getTypeFromString('int64');
                         $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
                         $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
-                        $result = $this->context->builder->signedRem($leftLong, $rightLong);
+                        $result = JitNumericDivisionGuard::signedModulo(
+                            $this->context,
+                            $leftLong,
+                            $rightLong
+                        );
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
@@ -239,14 +243,11 @@ restart:
                         }
                         goto return_long;
                     case OpCode::TYPE_MODULO:
-                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                        $result = JitNumericDivisionGuard::signedModulo(
                             $this->context,
-                            $rightValue,
-                            'Modulo by zero'
+                            $leftValue,
+                            $rightValue
                         );
-                        compile {
-                            $result = $leftValue % $rightValue;
-                        }
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                         compile {
@@ -396,12 +397,11 @@ restart:
                 if (OpCode::TYPE_MODULO === $opcode->type) {
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                     $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
-                    JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                    $result = JitNumericDivisionGuard::signedModulo(
                         $this->context,
-                        $rightLong,
-                        'Modulo by zero'
+                        $leftLong,
+                        $rightLong
                     );
-                    $result = $this->context->builder->signedRem($leftLong, $rightLong);
                     goto return_long;
                 }
                 $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
