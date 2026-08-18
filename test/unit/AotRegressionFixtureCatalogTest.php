@@ -75,6 +75,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'property_exists_static_31966.phpt',
         'function_static_string_write_31966.phpt',
         'static_property_assign_ref_32036.phpt',
+        'static_array_byvalue_copy_32307.phpt',
         'str_shuffle_named_params.phpt',
         'metaphone_soundex_count_chars_named_23437.phpt',
         'debug_print_backtrace_void_28909.phpt',
