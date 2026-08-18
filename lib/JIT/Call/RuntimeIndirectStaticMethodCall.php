@@ -39,6 +39,7 @@ final class RuntimeIndirectStaticMethodCall implements Call
         public readonly array $candidatesByClassId,
         public readonly Block $enclosingBlock,
         public readonly bool $bindCallerThis = false,
+        public readonly ?Value $runtimeClassId = null,
     ) {
     }
 
@@ -50,7 +51,7 @@ final class RuntimeIndirectStaticMethodCall implements Call
 
         // Same LSB class-id path as static::CONST / static::class — must not call
         // emitEffectiveLateStaticClassId here: ensureLinked clears the insert block (#19614).
-        $classId = ClassConstFetchHelper::emitStaticKeywordClassIdForPseudoConst(
+        $classId = $this->runtimeClassId ?? ClassConstFetchHelper::emitStaticKeywordClassIdForPseudoConst(
             $context->type->object,
             $this->enclosingBlock
         );

@@ -273,9 +273,12 @@ trait ClassConstFetchHelperTrait
         if (Variable::TYPE_OBJECT === $classVar->type) {
             $context = $objectType->jitContext();
             $objMap = $context->structFieldMap['__object__'];
+            $objPtr = Variable::KIND_VARIABLE === $classVar->kind
+                ? $context->builder->load($classVar->value)
+                : $classVar->value;
 
             return $context->builder->load(
-                $context->builder->structGep($classVar->value, $objMap['class_id'])
+                $context->builder->structGep($objPtr, $objMap['class_id'])
             );
         }
         // Zend: class operand must be string or object — not bool/int/float/null/array (#30059).

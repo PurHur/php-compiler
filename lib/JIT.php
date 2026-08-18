@@ -7985,6 +7985,15 @@ class JIT {
             if ($this->context->coalesceAssignTargets->contains($operand)) {
                 continue;
             }
+            $slot = $block->slotForOperand($operand);
+            // Folded enum cases must wait until DECLARE_ENUM (classes are hoisted first, #31967).
+            if (
+                null !== $slot
+                && isset($block->constants[$slot])
+                && VM\Variable::TYPE_ENUM_CASE === $block->constants[$slot]->type
+            ) {
+                continue;
+            }
             $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
         }
         $blockKey = spl_object_id($block);
@@ -12322,7 +12331,15 @@ class JIT {
                         $this->context->scope->classId,
                         $nameOp->value
                     );
+                    $savedEnumInsert = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
                     $this->context->type->object->finishEnumClass($this->context->scope->classId);
+                    if (null !== $savedEnumInsert) {
+                        JIT\BasicBlockHelper::restoreInsertBlock($this->context, $savedEnumInsert);
+                    }
+                    $this->context->type->object->flushPendingEnumCaseClassConsts(strtolower($nameOp->value));
+                    if (null !== $savedEnumInsert) {
+                        JIT\BasicBlockHelper::restoreInsertBlock($this->context, $savedEnumInsert);
+                    }
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
@@ -12395,6 +12412,14 @@ class JIT {
                     if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
                         $this->context->type->object->markAttributeClass($nameOp->value);
                     }
+                    // Register implements before compileClass so `const Y = self::X` can
+                    // resolve interface constants (zend_constants.c / #31967).
+                    if ([] !== $op->classImplements) {
+                        $this->context->type->object->setClassInterfaces(
+                            $nameOp->value,
+                            $op->classImplements
+                        );
+                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     if ($parentOp instanceof Operand\Literal) {
                         $this->context->type->object->inheritReadonlyFromParent(
@@ -12408,12 +12433,6 @@ class JIT {
                         $this->context->type->object->inheritParentStaticProperties(
                             $this->context->scope->classId,
                             strtolower(ltrim($parentOp->value, '\\'))
-                        );
-                    }
-                    if ([] !== $op->classImplements) {
-                        $this->context->type->object->setClassInterfaces(
-                            $nameOp->value,
-                            $op->classImplements
                         );
                     }
                     $this->context->type->object->inheritInterfaceConstants(
@@ -21458,7 +21477,7 @@ class JIT {
 
                 return;
             }
-            // Runtime variable classname: resolve via emitResolveClassId guards (#30059).
+            // Runtime `$obj::method()` / `$className::method()` — dispatch by class_id (#31967).
             $classVar = $this->context->getVariableFromOp($classOp);
             if (
                 JIT\Variable::TYPE_OBJECT !== $classVar->type
@@ -21473,7 +21492,27 @@ class JIT {
 
                 return;
             }
-            throw new \LogicException('Static call class must be a literal');
+            $methodLc = strtolower($nameOp->value);
+            $candidates = $this->buildRuntimeStaticMethodCandidatesByClassId($methodLc);
+            if ([] === $candidates) {
+                throw new \LogicException('Static call class must be a literal');
+            }
+            $classIdVal = JIT\ClassConstFetchHelper::emitResolveClassId(
+                $this->context->type->object,
+                $block,
+                $classVar,
+                $classOp
+            );
+            $this->context->scope->toCall = new JIT\Call\RuntimeIndirectStaticMethodCall(
+                $methodLc,
+                $candidates,
+                $block,
+                false,
+                $classIdVal
+            );
+            $this->context->scope->args = [];
+
+            return;
         }
         $selfScope = 'self' === strtolower((string) $classOp->value);
         $staticScope = 'static' === strtolower((string) $classOp->value);
@@ -22913,11 +22952,23 @@ class JIT {
             !isset($block->constants[$op->arg2])
             || $block->constants[$op->arg2]->is(VM\Variable::TYPE_NULL)
         ) {
-            $vm = new VM($this->context->runtime->vmContext);
-            $className = $this->context->type->object->classNameForId($classId);
-            $rootBlock = $this->context->jitFunctionRootBlock ?? $this->context->jitEnclosingBlock;
-            VM\ClassConstMaterializer::seedReferencedClasses($vm, $rootBlock, $block, $op->arg2);
-            $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2, $className);
+            // Resolve from JIT class/enum maps first. AOT DECLARE_* does not seed VM
+            // ClassEntry tables the materializer walks for `self::X` / `E::Case` (#31967).
+            if (null !== $this->tryResolveEnumCaseClassConstInit($block, $op->arg2)) {
+                $value = new VM\Variable();
+                $value->null();
+            } else {
+                $inherited = $this->tryResolveInheritedClassConstInit($block, $op->arg2, $classId);
+                if (null !== $inherited) {
+                    $value = $inherited;
+                } else {
+                    $vm = new VM($this->context->runtime->vmContext);
+                    $className = $this->context->type->object->classNameForId($classId);
+                    $rootBlock = $this->context->jitFunctionRootBlock ?? $this->context->jitEnclosingBlock;
+                    VM\ClassConstMaterializer::seedReferencedClasses($vm, $rootBlock, $block, $op->arg2);
+                    $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2, $className);
+                }
+            }
         } else {
             $value = $block->constants[$op->arg2];
         }
@@ -23796,19 +23847,11 @@ class JIT {
     /**
      * Resolve `public const X = SomeEnum::Case` when VM materialization lacks the enum (#4445).
      *
-     * @return array{0: int, 1: string}|null enum class id + case key (lowercase)
+     * @return array{0: int, 1: string}|null enum class id + case-sensitive key (#25910)
      */
     private function tryResolveEnumCaseClassConstInit(Block $block, int $valueSlot): ?array
     {
-        $fetchOp = null;
-        foreach ($block->opCodes as $initOp) {
-            if (OpCode::TYPE_DECLARE_CLASS_CONST === $initOp->type && $valueSlot === $initOp->arg2) {
-                break;
-            }
-            if (OpCode::TYPE_CLASS_CONST_FETCH === $initOp->type) {
-                $fetchOp = $initOp;
-            }
-        }
+        $fetchOp = $this->classConstFetchOpForInitSlot($block, $valueSlot);
         if (null === $fetchOp) {
             return null;
         }
@@ -23817,12 +23860,74 @@ class JIT {
         if (!$enumClassOp instanceof Operand\Literal || !$caseOp instanceof Operand\Literal) {
             return null;
         }
-        $enumClassId = $this->context->type->object->lookup(strtolower($enumClassOp->value));
-        if (!$this->context->type->object->isEnumClassId($enumClassId)) {
+        $enumLc = strtolower(ltrim((string) $enumClassOp->value, '\\'));
+        if (!$this->context->type->object->isEnumClassLc($enumLc)) {
+            return null;
+        }
+        $enumClassId = $this->context->type->object->lookup($enumLc);
+
+        return [$enumClassId, \PHPCompiler\ClassConstName::key((string) $caseOp->value)];
+    }
+
+    /**
+     * `const Y = self::X` when X is inherited from an interface already compiled in JIT (#31967).
+     *
+     * php-src: Zend/zend_constants.c — zend_get_class_constant_ex walks interfaces.
+     */
+    private function tryResolveInheritedClassConstInit(Block $block, int $valueSlot, int $classId): ?VM\Variable
+    {
+        $fetchOp = $this->classConstFetchOpForInitSlot($block, $valueSlot);
+        if (null === $fetchOp) {
+            return null;
+        }
+        $classOp = $block->getOperand($fetchOp->arg2);
+        $constOp = $block->getOperand($fetchOp->arg3);
+        if (!$classOp instanceof Operand\Literal || !$constOp instanceof Operand\Literal) {
+            return null;
+        }
+        $object = $this->context->type->object;
+        $className = (string) $classOp->value;
+        $lc = strtolower(ltrim($className, '\\'));
+        $fromId = $classId;
+        if ('parent' === $lc) {
+            $parentLc = $object->parentClassLc($object->classNameForId($classId));
+            if (null === $parentLc || !$object->hasDeclaredClass($parentLc)) {
+                return null;
+            }
+            $fromId = $object->lookup($parentLc);
+        } elseif ('self' !== $lc && 'static' !== $lc) {
+            if (!$object->hasDeclaredClass($lc)) {
+                return null;
+            }
+            $fromId = $object->lookup($lc);
+        }
+        $constKey = \PHPCompiler\ClassConstName::key((string) $constOp->value);
+        $holdingId = $object->resolveClassConstHoldingId($fromId, $constKey);
+        if (null === $holdingId) {
             return null;
         }
 
-        return [$enumClassId, strtolower($caseOp->value)];
+        return $object->vmScalarFromClassConst($holdingId, $constKey);
+    }
+
+    private function classConstFetchOpForInitSlot(Block $block, int $valueSlot): ?OpCode
+    {
+        $matched = null;
+        $lastFetch = null;
+        foreach ($block->opCodes as $initOp) {
+            if (OpCode::TYPE_DECLARE_CLASS_CONST === $initOp->type && $valueSlot === $initOp->arg2) {
+                break;
+            }
+            if (OpCode::TYPE_CLASS_CONST_FETCH !== $initOp->type) {
+                continue;
+            }
+            $lastFetch = $initOp;
+            if ($valueSlot === $initOp->arg1) {
+                $matched = $initOp;
+            }
+        }
+
+        return $matched ?? $lastFetch;
     }
 
     private function ensureJitFunctionStatic(string $storageKey): Variable

@@ -53,9 +53,18 @@ final class VmConstantJit
                 return $nullVar;
             case VmVariable::TYPE_ARRAY:
                 return self::arrayVariable($context, $vm);
+            case VmVariable::TYPE_ENUM_CASE:
+                return self::enumCaseVariable($context, $vm);
             default:
                 throw new \LogicException('Unsupported compile-time constant for JIT (vm type '.$vm->type.')');
         }
+    }
+
+    private static function enumCaseVariable(Context $context, VmVariable $vm): Variable
+    {
+        $case = $vm->toEnumCase();
+
+        return $context->type->object->jitEnumCaseNamed($case->enumClass->name, $case->caseName);
     }
 
     private static function arrayVariable(Context $context, VmVariable $vm): Variable

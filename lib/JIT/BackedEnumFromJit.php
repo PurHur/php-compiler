@@ -64,22 +64,31 @@ final class BackedEnumFromJit
         );
 
         $restore = $context->builder->getInsertBlock();
+        $savedLowering = $context->loweringLlvmFunction;
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
+        // String from() uses parentFunction() for normalize blocks; if loweringLlvmFunction
+        // is parked on __init__/main, those blocks land in the wrong function (#31967).
+        if ('string' === $backedType) {
+            $context->loweringLlvmFunction = $fn;
+        }
         $arg = $fn->getParam(0);
 
-        if ('string' === $backedType) {
-            self::emitStringBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
-        } elseif ('int' === $backedType) {
-            self::emitIntBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
-        } else {
-            throw new \LogicException('Unsupported enum backing type for JIT from(): '.$backedType);
-        }
-
-        if (null !== $restore) {
-            $context->builder->positionAtEnd($restore);
-        } else {
-            $context->builder->clearInsertionPosition();
+        try {
+            if ('string' === $backedType) {
+                self::emitStringBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
+            } elseif ('int' === $backedType) {
+                self::emitIntBackedBody($context, $object, $classId, $className, $caseKeys, $arg, $isTry);
+            } else {
+                throw new \LogicException('Unsupported enum backing type for JIT from(): '.$backedType);
+            }
+        } finally {
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $restore) {
+                $context->builder->positionAtEnd($restore);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 

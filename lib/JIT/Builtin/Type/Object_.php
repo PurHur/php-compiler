@@ -132,6 +132,13 @@ class Object_ extends Type {
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
 
+    /**
+     * `const X = E::Case` when E is compiled after the holding class (hoisted DECLARE_CLASS, #31967).
+     *
+     * @var list<array{0: int, 1: string, 2: string, 3: string}> holdingId, constName, enumLc, caseKey
+     */
+    private array $pendingEnumCaseClassConsts = [];
+
     /** @var array<int, array<string, int>> class id => const lc => visibility flags (#4651, #6664) */
     private array $constVisibility = [];
 
@@ -2054,8 +2061,11 @@ class Object_ extends Type {
 
     public function jitEnumCaseFromBacking(int $classId, string $caseKey): Variable
     {
+        $caseKey = \PHPCompiler\ClassConstName::key($caseKey);
         if (!isset($this->classConstants[$classId][$caseKey])) {
-            throw new \LogicException("Unknown enum case: {$caseKey}");
+            throw new \LogicException(
+                'Unknown enum case: '.$this->classNameForId($classId).'::'.$caseKey
+            );
         }
 
         $globalName = $this->ensureEnumCaseSingletonGlobal($classId, $caseKey);
@@ -2067,6 +2077,20 @@ class Object_ extends Type {
         $var->compileTimeEnumCase = ['classId' => $classId, 'caseKey' => $caseKey];
 
         return $var;
+    }
+
+    /**
+     * Enum case object by name without {@see lookup()} stub registration (#31967).
+     */
+    public function jitEnumCaseNamed(string $enumName, string $caseKey): Variable
+    {
+        $enumLc = strtolower(ltrim($enumName, '\\'));
+        $caseKey = \PHPCompiler\ClassConstName::key($caseKey);
+        if (!$this->isEnumClassLc($enumLc) || !isset($this->classes[$enumLc])) {
+            throw new \LogicException("Unknown enum case: {$enumName}::{$caseKey}");
+        }
+
+        return $this->jitEnumCaseFromBacking($this->classes[$enumLc], $caseKey);
     }
 
     public function allocEnumCaseSingletonIr(int $classId, string $caseName, Variable $backingJit): Variable
@@ -5692,6 +5716,22 @@ class Object_ extends Type {
         $this->classConstDisplayNames[$classId][$key] = $name;
         $this->classConstDeclaringLc[$classId][$key] = strtolower(ltrim($this->classNameForId($classId), '\\'));
         unset($this->classConstMapGlobals[$classId]);
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+            if (null === $enumClass) {
+                throw new \LogicException('Class constant enum case requires enum class');
+            }
+            $caseKey = \PHPCompiler\ClassConstName::key(EnumCaseSupport::enumCaseNameForVariable($value));
+            $enumLc = strtolower(ltrim($enumClass->name, '\\'));
+            if (!$this->isEnumClassLc($enumLc)) {
+                $this->queueEnumCaseClassConst($classId, $name, $enumLc, $caseKey);
+
+                return;
+            }
+            $this->defineClassConstEnumCaseRef($classId, $name, $this->lookup($enumLc), $caseKey);
+
+            return;
+        }
         if (VMVariable::TYPE_ARRAY === $value->type) {
             $table = $value->toArray();
             if (!$table instanceof \PHPCompiler\VM\HashTable) {
@@ -5723,6 +5763,11 @@ class Object_ extends Type {
             if (EnumCaseSupport::isEnumCase($object)) {
                 $enumClassLc = strtolower($object->class->name);
                 $caseKey = \PHPCompiler\ClassConstName::key((string) ($object->enumCaseName ?? ''));
+                if (!$this->isEnumClassLc($enumClassLc)) {
+                    $this->queueEnumCaseClassConst($classId, $name, $enumClassLc, $caseKey);
+
+                    return;
+                }
                 $this->defineClassConstEnumCaseRef($classId, $key, $this->lookup($enumClassLc), $caseKey);
 
                 return;
@@ -5796,6 +5841,46 @@ class Object_ extends Type {
         });
     }
 
+    public function queueEnumCaseClassConst(
+        int $holdingClassId,
+        string $constName,
+        string $enumLc,
+        string $caseKey
+    ): void {
+        $this->pendingEnumCaseClassConsts[] = [
+            $holdingClassId,
+            $constName,
+            strtolower(ltrim($enumLc, '\\')),
+            \PHPCompiler\ClassConstName::key($caseKey),
+        ];
+    }
+
+    public function flushPendingEnumCaseClassConsts(?string $onlyEnumLc = null): void
+    {
+        if (null !== $onlyEnumLc) {
+            $onlyEnumLc = strtolower(ltrim($onlyEnumLc, '\\'));
+        }
+        $kept = [];
+        foreach ($this->pendingEnumCaseClassConsts as $item) {
+            [$holdingId, $constName, $enumLc, $caseKey] = $item;
+            if (null !== $onlyEnumLc && $enumLc !== $onlyEnumLc) {
+                $kept[] = $item;
+                continue;
+            }
+            if (!$this->isEnumClassLc($enumLc) || !isset($this->classes[$enumLc])) {
+                $kept[] = $item;
+                continue;
+            }
+            $enumId = $this->classes[$enumLc];
+            if (!isset($this->classConstants[$enumId][$caseKey])) {
+                $kept[] = $item;
+                continue;
+            }
+            $this->bindEnumCaseClassConst($holdingId, $constName, $enumId, $caseKey);
+        }
+        $this->pendingEnumCaseClassConsts = $kept;
+    }
+
     public function defineClassConstEnumCaseRef(
         int $holdingClassId,
         string $constName,
@@ -5805,13 +5890,27 @@ class Object_ extends Type {
         $constKey = \PHPCompiler\ClassConstName::key($constName);
         $this->classConstDisplayNames[$holdingClassId][$constKey] = $constName;
         $caseKey = \PHPCompiler\ClassConstName::key($caseKey);
-        if (!$this->isEnumClassId($enumClassId)) {
-            throw new \LogicException('Class constant enum case reference requires an enum class id');
+        if (!$this->isEnumClassId($enumClassId) || '' === $caseKey || !isset($this->classConstants[$enumClassId][$caseKey])) {
+            $enumLc = strtolower(ltrim($this->classNameForId($enumClassId), '\\'));
+            if ('' === $enumLc) {
+                throw new \LogicException('Class constant enum case reference requires an enum class id');
+            }
+            $this->queueEnumCaseClassConst($holdingClassId, $constName, $enumLc, $caseKey);
+
+            return;
         }
-        if ('' === $caseKey || !isset($this->classConstants[$enumClassId][$caseKey])) {
-            $enumLc = $this->classNameForId($enumClassId);
-            throw new \LogicException("Unknown enum case for class constant: {$enumLc}::{$caseKey}");
-        }
+        $this->bindEnumCaseClassConst($holdingClassId, $constName, $enumClassId, $caseKey);
+    }
+
+    private function bindEnumCaseClassConst(
+        int $holdingClassId,
+        string $constName,
+        int $enumClassId,
+        string $caseKey
+    ): void {
+        $constKey = \PHPCompiler\ClassConstName::key($constName);
+        $this->classConstDisplayNames[$holdingClassId][$constKey] = $constName;
+        $caseKey = \PHPCompiler\ClassConstName::key($caseKey);
         $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
         $entry = [
             'type' => Variable::TYPE_OBJECT,
@@ -5819,6 +5918,7 @@ class Object_ extends Type {
         ];
         $this->rejectIncompatibleTraitClassConstOverride($holdingClassId, $constKey, $constName, $entry);
         unset($this->traitConstSources[$holdingClassId][$constKey]);
+        unset($this->classConstMapGlobals[$holdingClassId]);
         $this->classConstants[$holdingClassId][$constKey] = $entry;
     }
 
@@ -6450,9 +6550,23 @@ class Object_ extends Type {
             }
             $parentLc = $this->parentClassLc($this->classNameForId($currentId));
             if (null === $parentLc || !isset($this->classes[$parentLc])) {
-                return null;
+                break;
             }
             $currentId = $this->classes[$parentLc];
+        }
+
+        $classLc = strtolower(ltrim($this->classNameForId($classId), '\\'));
+        foreach ($this->allInterfacesForClassLc($classLc) as $ifaceLc) {
+            if ($ifaceLc === $classLc || !isset($this->classes[$ifaceLc])) {
+                continue;
+            }
+            $ifaceId = $this->classes[$ifaceLc];
+            if (isset($this->classConstants[$ifaceId][$constKey])) {
+                $vis = $this->constVisibility($ifaceId, $constKey);
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
+                    return $ifaceId;
+                }
+            }
         }
 
         return null;
@@ -6582,6 +6696,43 @@ class Object_ extends Type {
         }
 
         return $out;
+    }
+
+    /**
+     * Scalar class-constant value as a VM variable for AOT const-expr lowering (#31967).
+     */
+    public function vmScalarFromClassConst(int $classId, string $constKey): ?VMVariable
+    {
+        $key = \PHPCompiler\ClassConstName::key($constKey);
+        $entry = $this->classConstants[$classId][$key] ?? null;
+        if (null === $entry || !array_key_exists('value', $entry)) {
+            return null;
+        }
+        $v = new VMVariable();
+        switch ($entry['type']) {
+            case Variable::TYPE_NATIVE_LONG:
+                $v->int((int) $entry['value']);
+
+                return $v;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $v->float((float) $entry['value']);
+
+                return $v;
+            case Variable::TYPE_NATIVE_BOOL:
+                $v->bool((bool) $entry['value']);
+
+                return $v;
+            case Variable::TYPE_STRING:
+                $v->string((string) $entry['value']);
+
+                return $v;
+            case Variable::TYPE_NULL:
+                $v->null();
+
+                return $v;
+            default:
+                return null;
+        }
     }
 
     public function classConstDisplayName(int $classId, string $constKey): string

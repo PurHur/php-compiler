@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
@@ -522,6 +523,25 @@ final class ObjectStaticPropertyLlvm
             return;
         }
 
+        if (0 !== ($value->type & Variable::IS_NATIVE_ARRAY)) {
+            HashTableWriteLlvm::promoteNativeArrayVariableToHashtable($context, $value);
+        }
+
+        if (Variable::TYPE_NULL === $value->type && null !== $value->value) {
+            $llvmTy = $context->getStringFromType($value->value->typeOf());
+            if (str_contains($llvmTy, '__hashtable__')) {
+                $value->type = Variable::TYPE_HASHTABLE;
+            } elseif (str_contains($llvmTy, '__value__')) {
+                $ptr = Variable::KIND_VARIABLE === $value->kind
+                    ? JitValueBox::pointer($context, $value->value)
+                    : $value->value;
+                $context->builder->store($ptr, $global);
+                $value->addref();
+
+                return;
+            }
+        }
+
         $heapVal = $context->memory->malloc($valueType);
         $heapPtr = $context->builder->pointerCast($heapVal, $valuePtrTy);
         $valueMap = $context->structFieldMap['__value__'];
@@ -581,10 +601,7 @@ final class ObjectStaticPropertyLlvm
                 $context->helper->loadValue($value)
             );
         } else {
-            throw new \LogicException(
-                'JIT static property boxed store does not support value type '
-                .Variable::getStringType($value->type)
-            );
+            JitValueBox::assignToPointer($context, $heapPtr, $value);
         }
 
         $context->builder->store($heapPtr, $global);
