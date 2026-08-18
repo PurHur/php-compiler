@@ -6,8 +6,11 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
 /** Locale::getDisplayName() — OOP wrapper for {@see VmLocale::getDisplayName()} (#6696). */
 final class LocaleGetDisplayName extends VmClassMethod
@@ -59,5 +62,10 @@ final class LocaleGetDisplayName extends VmClassMethod
             return;
         }
         $frame->returnVar->string($name);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        return JitLocaleGetDisplayName::getDisplayName($context, ...$args);
     }
 }

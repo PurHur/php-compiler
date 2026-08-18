@@ -146,6 +146,8 @@
             <file>./test/compliance/TraitInsteadofParentJITTest.php</file>
             <file>./test/compliance/ClosureUseThis32152VMTest.php</file>
             <file>./test/compliance/ClosureUseThis32152JITTest.php</file>
+            <file>./test/compliance/StaticThis32181VMTest.php</file>
+            <file>./test/compliance/StaticThis32181JITTest.php</file>
             <file>./test/compliance/ContinueZero32155VMTest.php</file>
             <file>./test/compliance/ContinueZero32155JITTest.php</file>
             <file>./test/compliance/GlobalThis32180VMTest.php</file>
@@ -678,6 +680,8 @@
             <file>./test/compliance/LocaleLookupJit32118JITTest.php</file>
             <file>./test/compliance/LocaleFilterMatchesJit32119VMTest.php</file>
             <file>./test/compliance/LocaleFilterMatchesJit32119JITTest.php</file>
+            <file>./test/compliance/LocaleGetDisplayNameJit32120VMTest.php</file>
+            <file>./test/compliance/LocaleGetDisplayNameJit32120JITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictJITTest.php</file>
             <file>./test/compliance/IsASubclassNullAllowStringStrictVMTest.php</file>

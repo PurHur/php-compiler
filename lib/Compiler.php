@@ -1117,6 +1117,22 @@ class Compiler {
     }
 
     /**
+     * php-src: Zend/zend_compile.c zend_compile_static_var() — $this is never a legal function-static name (#32181).
+     */
+    protected function assertNoThisAsStaticVariable(string $varName, Op $source): void
+    {
+        if ('this' !== $varName) {
+            return;
+        }
+        $detail = 'Cannot use $this as static variable';
+        $sourceFile = $source->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $source->getLine());
+    }
+
+    /**
      * @param list<Operand\BoundVariable> $closureUseVars
      */
     protected function registerClosureUseCapturesOnBlock(Block $funcBlock, array $closureUseVars): void
@@ -17182,6 +17198,7 @@ class Compiler {
             $this->throwCompileLogic('Function-local static requires a function context');
         }
         $varName = $this->resolveSimpleVariableName($terminal->var);
+        $this->assertNoThisAsStaticVariable($varName, $terminal);
         $storageKey = $this->functionStaticStorageKey($block->func, $varName);
         $keyVar = new Variable(Variable::TYPE_STRING);
         $keyVar->string($storageKey);
