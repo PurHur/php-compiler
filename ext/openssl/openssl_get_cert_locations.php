@@ -11,7 +11,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_get_cert_locations() — default CA path metadata (#6560, ext/openssl/openssl.c).
+ * openssl_get_cert_locations() — default CA path metadata (#6560 VM, JIT/AOT #32388 via HashTable bake).
+ *
+ * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_get_cert_locations)
+ * / X509_get_default_cert_file / openssl.cafile.
  */
 final class openssl_get_cert_locations extends Internal
 {
@@ -35,8 +38,13 @@ final class openssl_get_cert_locations extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_get_cert_locations() is not implemented for JIT in this compiler build (issue #6560)'
-        );
+        $argc = \count($args);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(
+                'openssl_get_cert_locations() expects exactly 0 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslMethods::certLocations($context);
     }
 }
