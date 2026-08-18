@@ -676,10 +676,17 @@ final class ObjectStaticPropertyLlvm
         $valuePtrTy = $context->getTypeFromString('__value__*');
 
         if (Variable::TYPE_VALUE === $value->type) {
-            $ptr = Variable::KIND_VARIABLE === $value->kind
+            // zend_assign_to_variable copies the zval into the property. Storing a stack
+            // `__value__*` here made `self::$x++` persist a dead alloca — next read was 0/NULL
+            // (#32313, Zend/zend_variables.c).
+            $srcPtr = Variable::KIND_VARIABLE === $value->kind
                 ? JitValueBox::pointer($context, $value->value)
                 : $value->value;
-            $context->builder->store($ptr, $global);
+            $srcPtr = JitValueBox::normalizeValuePtr($context, $srcPtr);
+            $loaded = $context->builder->load($global);
+            $heapPtr = self::ensureHeapValueBox($context, $global, $loaded);
+            JitValueBox::copyIntoPointer($context, $heapPtr, $srcPtr);
+            $context->builder->store($heapPtr, $global);
             $value->addref();
 
             return;
