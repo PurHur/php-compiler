@@ -1409,6 +1409,7 @@ require_once __DIR__.'/../../../ext/openssl/JitOpensslCipherKeyLength.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslCipherKernel.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslDigest.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslEncrypt.php';
+require_once __DIR__.'/../../../ext/openssl/JitOpensslError.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslMethods.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslSign.php';
 require_once __DIR__.'/../../../ext/openssl/Module.php';

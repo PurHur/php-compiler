@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7593 |
-| Phase A inventory files (M2 ratio SSOT) | 7593 |
+| PHP files on vm.php path | 7594 |
+| Phase A inventory files (M2 ratio SSOT) | 7594 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24278 |
+| Source constructs flagged (warnings) | 24282 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1747,6 +1747,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslDigest.php` | 0 | 1 |
 | `ext/openssl/JitOpensslEncrypt.php` | 0 | 1 |
+| `ext/openssl/JitOpensslError.php` | 0 | 1 |
 | `ext/openssl/JitOpensslMethods.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
 | `ext/openssl/Module.php` | 0 | 67 |
@@ -1791,7 +1792,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_dh_compute_key.php` | 0 | 2 |
 | `ext/openssl/openssl_digest.php` | 0 | 3 |
 | `ext/openssl/openssl_encrypt.php` | 0 | 3 |
-| `ext/openssl/openssl_error_string.php` | 0 | 2 |
+| `ext/openssl/openssl_error_string.php` | 0 | 3 |
 | `ext/openssl/openssl_free_key.php` | 0 | 2 |
 | `ext/openssl/openssl_get_cert_locations.php` | 0 | 2 |
 | `ext/openssl/openssl_get_cipher_methods.php` | 0 | 3 |
@@ -6599,7 +6600,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableValuesLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableWriteLlvm.php` | 0 | 26 |
 | `lib/JIT/HeaderCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/Helper.php` | 0 | 7 |
+| `lib/JIT/Helper.php` | 0 | 9 |
 | `lib/JIT/ImplementsHierarchyJitGuard.php` | 0 | 1 |
 | `lib/JIT/InArrayLlvm.php` | 0 | 2 |
 | `lib/JIT/InOperatorHelper.php` | 0 | 2 |
@@ -21362,6 +21363,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `ext/openssl/JitOpensslError.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/openssl/JitOpensslMethods.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21704,6 +21710,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
+- new ArgumentCountError (line 48)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_free_key.php`
@@ -52015,7 +52022,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringVarDump.php`
 
 **Warnings** (review for bootstrap subset):
-- new JitVariable (line 227)
+- new JitVariable (line 229)
 - 9 class method(s)
 
 ### `lib/JIT/Builtin/StringVarExport.php`
@@ -52363,7 +52370,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ZendDoubleStringRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `lib/JIT/Builtin/ZlibRuntime.php`
 
@@ -54849,10 +54856,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 201)
 - new Variable (line 205)
 - new Variable (line 207)
-- new Variable (line 2016)
-- new Variable (line 2020)
-- new Variable (line 2302)
-- 11 class method(s)
+- new Variable (line 2017)
+- new Variable (line 2021)
+- new Variable (line 2329)
+- new Variable (line 2351)
+- new Variable (line 2362)
+- 12 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
 
@@ -55020,7 +55029,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitLongArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/JitLongArithOverflow.php`
 
@@ -55140,11 +55149,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitValueNumeric.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 129)
-- new Variable (line 178)
-- new Variable (line 230)
-- new Variable (line 270)
-- 9 class method(s)
+- new Variable (line 233)
+- new Variable (line 282)
+- new Variable (line 334)
+- new Variable (line 380)
+- 11 class method(s)
 
 ### `lib/JIT/JitVmHelperLink.php`
 
