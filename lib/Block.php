@@ -1689,8 +1689,13 @@ class Block {
                 $return->closureCall = $frame->closureCall;
             }
             // Bound Closure::bind/bindTo scope must survive ?? / if / try CFG edges (#24335).
-            // Methods fall back to func->class; top-level bound closures only have calledClass.
-            if (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            // Copy only on same-function CFG continuations — nested calls must not inherit the
+            // caller's LSB (instance-method FCC would poison later static:: / : static, #32083).
+            if (
+                $this->isSameFunctionCfgEdge($frame)
+                && null !== $frame->calledClass
+                && '' !== $frame->calledClass
+            ) {
                 $return->calledClass = $frame->calledClass;
             }
             if (null !== $frame->scopeClass && '' !== $frame->scopeClass) {
@@ -1720,6 +1725,21 @@ class Block {
             }
         }
         return $return;
+    }
+
+    /**
+     * Same user function / {main} CFG continuation — not a nested call (#24335 vs #32083).
+     *
+     * php-src: called_scope is per execute_data; ZEND_AST_CALLABLE_CONVERT must not change
+     * later methods' late-static scope (Zend/zend_execute.c).
+     */
+    private function isSameFunctionCfgEdge(Frame $frame): bool
+    {
+        if (null === $frame->block || null === $this->func || null === $frame->block->func) {
+            return false;
+        }
+
+        return $this->func === $frame->block->func;
     }
 
     /**

@@ -19000,12 +19000,11 @@ restart:
     protected function initClosureCall(Frame $frame, ClosureState $state): void
     {
         if (null !== $state->methodName && null !== $state->methodReceiver) {
-            $calledScope = $this->closureCalledScopeClass($state);
-            if (null !== $calledScope && '' !== $calledScope) {
-                $frame->calledClass = $calledScope;
-            }
+            // Callee LSB is applied in applyClosureBinding — do not write the FCC class onto
+            // the caller frame (that poisoned later static:: / : static in the unit, #32083).
             $this->initMethodCall($frame, $state->methodReceiver, $state->methodName);
             $frame->closureCall = null;
+            $frame->pendingClosureInvoke = $state;
 
             return;
         }
@@ -19016,13 +19015,10 @@ restart:
             && null !== $state->wrappedFunc
             && null === $state->methodReceiver
         ) {
-            $calledScope = $this->closureCalledScopeClass($state);
-            if (null !== $calledScope && '' !== $calledScope) {
-                $frame->calledClass = $calledScope;
-            }
             $frame->magicCallMethodName = $state->methodName;
             $frame->call = $state->wrappedFunc;
             $frame->closureCall = null;
+            $frame->pendingClosureInvoke = $state;
             $frame->callArgs = [];
             $frame->callArgEntries = [];
             $frame->builtinCalleeQualifiedMethod = null;
@@ -19030,12 +19026,9 @@ restart:
             return;
         }
         if (null !== $state->wrappedFunc) {
-            $calledScope = $this->closureCalledScopeClass($state);
-            if (null !== $calledScope && '' !== $calledScope) {
-                $frame->calledClass = $calledScope;
-            }
             $frame->call = $state->wrappedFunc;
             $frame->closureCall = null;
+            $frame->pendingClosureInvoke = $state;
             // Scoped parent/self FCC (#17655/#26630) and fromCallable instance wrappers clear
             // methodReceiver and call wrappedFunc directly. Instance methods still need $this
             // as callArgs[0] so user args land at ARG_RECV indices 1..n (#27834).
