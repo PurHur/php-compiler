@@ -329,6 +329,9 @@
             <file>./test/unit/IntDivAlwaysFloat31968AotTest.php</file>
             <file>./test/compliance/FloatIncDecStaysFloat32281JITTest.php</file>
             <file>./test/unit/FloatIncDecStaysFloat32281AotTest.php</file>
+            <file>./test/compliance/UnaryMinusNegInf32317VMTest.php</file>
+            <file>./test/compliance/UnaryMinusNegInf32317JITTest.php</file>
+            <file>./test/unit/UnaryMinusNegInf32317AotTest.php</file>
             <file>./test/compliance/IntMinModNegOne32285JITTest.php</file>
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
             <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
@@ -352,6 +355,9 @@
             <file>./test/compliance/StaticPropMethodInc32313JITTest.php</file>
             <file>./test/unit/StaticPropMethodInc32313AotTest.php</file>
             <file>./test/unit/JsonEncodeInfNan32326AotTest.php</file>
+            <file>./test/compliance/VarDumpInfNan32321VMTest.php</file>
+            <file>./test/compliance/VarDumpInfNan32321JITTest.php</file>
+            <file>./test/unit/VarDumpInfNan32321AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>
