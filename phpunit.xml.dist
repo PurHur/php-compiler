@@ -99,6 +99,7 @@
             <file>./test/compliance/SoapVarApacheMapVMTest.php</file>
             <file>./test/compliance/SoapVarXsdDatetimeVMTest.php</file>
             <file>./test/compliance/SoapVarXsdDateAndTimeVMTest.php</file>
+            <file>./test/compliance/SoapVarXsdGyearFamilyVMTest.php</file>
             <file>./test/compliance/EvalEmptyReturnsFalse31914JITTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
