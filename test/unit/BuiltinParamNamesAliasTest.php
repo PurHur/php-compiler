@@ -4809,6 +4809,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'res', 'get_resource_type'));
     }
 
+    /** @covers issue #23359 */
+    public function testExtensionLoadedObStartZendStubNamedParams(): void
+    {
+        $el = BuiltinParamNames::forFunction('extension_loaded');
+        self::assertSame(['extension'], $el);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($el, 'extension', 'extension_loaded'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($el, 'extension_name', 'extension_loaded'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('extension_loaded'));
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('extension_loaded'));
+        self::assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('extension_loaded', 0)['type'] ?? null);
+
+        $ob = BuiltinParamNames::forFunction('ob_start');
+        self::assertSame(['callback=', 'chunk_size=', 'flags='], $ob);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ob, 'callback', 'ob_start'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ob, 'chunk_size', 'ob_start'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($ob, 'flags', 'ob_start'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ob, 'user_function', 'ob_start'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('ob_start'));
+        self::assertSame('?callable', BuiltinInternalArgInfo::stubParamTypeOverride('ob_start', 0));
+        self::assertSame('?callable', BuiltinInternalArgInfo::paramInfoForFunction('ob_start', 0)['type'] ?? null);
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('ob_start'));
+    }
+
     /** @covers issue #23381 */
     public function testGetResourcesZendStubNamedParamsType(): void
     {

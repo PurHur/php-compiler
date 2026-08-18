@@ -1566,6 +1566,9 @@ final class BuiltinParamNames
                 return ['table=', 'flags=', 'encoding='];
             case 'ob_get_status':
                 return ['full_status='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says user_function (#23359)
+            case 'ob_start':
+                return ['callback=', 'chunk_size=', 'flags='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says flag (#24455)
             case 'ob_implicit_flush':
                 return ['enable='];
@@ -1873,6 +1876,9 @@ final class BuiltinParamNames
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says function_name (#23435)
             case 'function_exists':
                 return ['function'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says extension_name (#23359)
+            case 'extension_loaded':
+                return ['extension'];
             // php-src Zend/zend_builtin_functions.stub.php — class/alias required; autoload=true (#23422, #25388)
             // InternalArgInfo still marks all three optional (`=`) with bool infer → false.
             case 'class_alias':
