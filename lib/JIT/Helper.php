@@ -871,6 +871,21 @@ restart:
                     goto return_long;
                 }
                 if (JitValueNumeric::isArithOpcode($opcode->type)) {
+                    // _is_numeric_string_ex: overflow digit strings are IS_DOUBLE (#32432).
+                    if ($this->numericStringPromotesToDouble($left)
+                        || $this->numericStringPromotesToDouble($right)
+                    ) {
+                        $rightDouble = JitLongArg::lowerStringToDouble($this->context, $rightValue);
+                        $promoted = $this->emitNumericStringNativeDoubleOp(
+                            $opcode,
+                            $leftValue,
+                            $rightDouble,
+                            true
+                        );
+                        if (null !== $promoted) {
+                            return $promoted;
+                        }
+                    }
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                     $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                     if (OpCode::TYPE_DIV === $opcode->type) {
@@ -1868,6 +1883,21 @@ restart:
                 $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $__right);
                 goto return_long;
             }
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                && $this->numericStringPromotesToDouble($left)
+            ) {
+                $f64 = $this->context->getTypeFromString('double');
+                $rightDouble = $this->context->builder->siToFp($rightValue, $f64);
+                $promoted = $this->emitNumericStringNativeDoubleOp(
+                    $opcode,
+                    $leftValue,
+                    $rightDouble,
+                    true
+                );
+                if (null !== $promoted) {
+                    return $promoted;
+                }
+            }
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
@@ -1960,6 +1990,21 @@ restart:
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
                 $result = JitNumericDivisionGuard::signedModulo($this->context, $__left, $rightLong);
                 goto return_long;
+            }
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                && $this->numericStringPromotesToDouble($right)
+            ) {
+                $f64 = $this->context->getTypeFromString('double');
+                $leftDouble = $this->context->builder->siToFp($leftValue, $f64);
+                $promoted = $this->emitNumericStringNativeDoubleOp(
+                    $opcode,
+                    $rightValue,
+                    $leftDouble,
+                    false
+                );
+                if (null !== $promoted) {
+                    return $promoted;
+                }
             }
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
@@ -2495,6 +2540,19 @@ return_bool:
         }
 
         return null;
+    }
+
+    /**
+     * Zend `_is_numeric_string_ex`: overflow / exponent / fractional strings are IS_DOUBLE (#32432).
+     */
+    private function numericStringPromotesToDouble(Variable $var): bool
+    {
+        $s = $var->compileTimeString;
+        if (null === $s || !is_numeric($s)) {
+            return false;
+        }
+
+        return !\PHPCompiler\VM\Variable::isIntegralNumericString($s);
     }
 
     /**
