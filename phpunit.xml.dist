@@ -138,6 +138,8 @@
             <file>./test/compliance/TraitParentTypehintJITTest.php</file>
             <file>./test/compliance/TraitDiamondInsteadofRequiredNotAddedVMTest.php</file>
             <file>./test/compliance/TraitDiamondInsteadofRequiredNotAddedJITTest.php</file>
+            <file>./test/compliance/TraitInsteadofParentVMTest.php</file>
+            <file>./test/compliance/TraitInsteadofParentJITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignJITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimRwVMTest.php</file>

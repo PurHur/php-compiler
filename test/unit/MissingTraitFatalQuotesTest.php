@@ -29,6 +29,14 @@ final class MissingTraitFatalQuotesTest extends TestCase
         );
     }
 
+    public function testNotATraitForAdaptationMessageMatchesZend(): void
+    {
+        $this->assertSame(
+            "Class P is not a trait, Only traits may be used in 'as' and 'insteadof' statements",
+            TraitCompositionConflictMessage::notATraitForAdaptation('P')
+        );
+    }
+
     public function testVmRuntimeFatalIncludesQuotesAndFraming(): void
     {
         $runtime = new Runtime();

@@ -15514,7 +15514,7 @@ class JIT {
 
     /**
      * Precedence/alias trait must be a direct {@code use} on the composing class
-     * (Zend/zend_inheritance.c zend_check_trait_usage, #32130).
+     * (Zend/zend_inheritance.c zend_check_trait_usage, #32129 / #32130).
      *
      * @param array<string, string> $usedTraitNameByLc
      */
@@ -15530,6 +15530,25 @@ class JIT {
         }
         $object = $this->context->type->object;
         $existsAsTrait = $object->hasDeclaredClass($lc) && $object->isTraitClass($lc);
+        $existsAsNonTrait = $object->hasDeclaredClass($lc) && !$object->isTraitClass($lc);
+        $declaredName = null;
+        if ($existsAsTrait || $existsAsNonTrait) {
+            try {
+                $declaredName = $object->classNameForId($object->lookup($lc));
+            } catch (\LogicException $e) {
+                $declaredName = ltrim($referencedName, '\\');
+            }
+        }
+        if ($existsAsNonTrait) {
+            VM\TraitCompositionConflictMessage::throwUnresolvedAdaptationTrait(
+                $referencedName,
+                $className,
+                false,
+                null,
+                true,
+                $declaredName,
+            );
+        }
         if (!$existsAsTrait && !$unknownIsCouldNotFind) {
             return;
         }
@@ -15537,7 +15556,7 @@ class JIT {
             $referencedName,
             $className,
             $existsAsTrait,
-            $existsAsTrait ? $object->classNameForId($object->lookup($lc)) : null,
+            $existsAsTrait ? $declaredName : null,
         );
     }
 

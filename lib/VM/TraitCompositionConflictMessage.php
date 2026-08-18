@@ -18,6 +18,17 @@ final class TraitCompositionConflictMessage
     }
 
     /**
+     * Non-trait name in {@code insteadof}/{@code as} — zend_inheritance.c zend_check_trait_usage (#32129).
+     */
+    public static function notATraitForAdaptation(string $className): string
+    {
+        return sprintf(
+            "Class %s is not a trait, Only traits may be used in 'as' and 'insteadof' statements",
+            $className
+        );
+    }
+
+    /**
      * Adaptation names a trait that exists but is not in the composing class {@code use} list.
      *
      * php-src: Zend/zend_inheritance.c {@code zend_check_trait_usage}
@@ -33,10 +44,10 @@ final class TraitCompositionConflictMessage
     }
 
     /**
-     * Precedence/alias trait not on the composing class — Zend {@code zend_check_trait_usage}.
+     * Precedence/alias name not a used trait — Zend {@code zend_check_trait_usage}.
      *
-     * Existing trait not in {@code use} → {@see requiredNotAdded}; unknown name →
-     * {@code Could not find trait} (zend_traits_init_trait_structures).
+     * Declared non-trait → {@see notATraitForAdaptation} (#32129); existing trait not in
+     * {@code use} → {@see requiredNotAdded} (#32130); unknown name → {@code Could not find trait}.
      *
      * @return never
      */
@@ -45,7 +56,14 @@ final class TraitCompositionConflictMessage
         string $className,
         bool $existsAsTrait,
         ?string $declaredTraitName = null,
+        bool $existsAsNonTrait = false,
+        ?string $declaredClassName = null,
     ): void {
+        if ($existsAsNonTrait) {
+            throw new \LogicException(self::notATraitForAdaptation(
+                $declaredClassName ?? ltrim($referencedName, '\\')
+            ));
+        }
         if ($existsAsTrait) {
             throw new \LogicException(self::requiredNotAdded(
                 $declaredTraitName ?? $referencedName,
