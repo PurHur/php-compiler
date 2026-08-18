@@ -142,9 +142,14 @@ final class VmCurlCore
         return $ht;
     }
 
-    public static function multiStrerror(int $code): ?string
+    /**
+     * libcurl curl_multi_strerror() — php-src curl_multi_strerror() (#16659, #32352).
+     *
+     * Unknown codes return "Unknown error" (libcurl never returns NULL for these).
+     */
+    public static function multiStrerror(int $code): string
     {
-        return self::MULTI_ERRORS[$code] ?? null;
+        return CurlStrerrorJitHelper::multi($code);
     }
 
     /**
@@ -156,13 +161,4 @@ final class VmCurlCore
     {
         return CurlShareStrerrorJitHelper::message($code);
     }
-
-    /** @var array<int, string> php-src curl_multi_strerror / CURLM_* */
-    private const MULTI_ERRORS = [
-        0 => 'No error',
-        1 => 'Invalid multi handle',
-        2 => 'Invalid easy handle',
-        3 => 'Out of memory',
-        4 => 'Internal error',
-    ];
 }
