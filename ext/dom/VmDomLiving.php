@@ -432,8 +432,9 @@ final class VmDomLiving
      * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580, #20689, #20866).
      *
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
-     * space-separated descendants, and comma selector lists (CSS Selectors Level 3 /
-     * php-src Dom\* lexbor).
+     * descendant / child (`>`) / adjacent-sibling (`+`) / general-sibling (`~`)
+     * combinators, and comma selector lists (CSS Selectors Level 3 /
+     * php-src Dom\* lexbor; #32061).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -487,14 +488,17 @@ final class VmDomLiving
     }
 
     /**
-     * Match one selector group (no top-level commas) — descendant combinator only.
+     * Match one selector group (no top-level commas).
+     *
+     * Combinators: descendant (whitespace), child `>`, adjacent sibling `+`,
+     * general sibling `~` (CSS Selectors Level 3 / php-src lexbor; #32061).
      *
      * @return list<int>
      */
     private static function querySelectorAllIdsOneGroup(ObjectEntry $root, string $selectors): array
     {
-        $parts = preg_split('/\s+/', $selectors) ?: [];
-        if ([] === $parts || (1 === \count($parts) && '' === $parts[0])) {
+        $compound = self::parseCompoundSelector($selectors);
+        if (null === $compound || [] === $compound) {
             throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
         }
 
@@ -503,29 +507,25 @@ final class VmDomLiving
             array_unshift($candidates, $root);
         }
 
-        $filtered = $candidates;
-        foreach ($parts as $i => $part) {
-            $simple = self::parseSimpleSelector($part);
-            if (null === $simple) {
-                throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
-            }
-            if (0 === $i) {
-                $filtered = array_values(array_filter(
-                    $filtered,
-                    static fn (ObjectEntry $el): bool => self::elementMatchesSimple($el, $simple)
-                ));
-                continue;
-            }
+        $filtered = array_values(array_filter(
+            $candidates,
+            static fn (ObjectEntry $el): bool => self::elementMatchesSimple($el, $compound[0]['simple'])
+        ));
+
+        $n = \count($compound);
+        for ($i = 1; $i < $n; $i++) {
+            $comb = $compound[$i]['combinator'];
+            $simple = $compound[$i]['simple'];
             $next = [];
             $seen = [];
-            foreach ($filtered as $ancestor) {
-                foreach (self::collectDescendantElements($ancestor) as $desc) {
-                    if (isset($seen[$desc->id])) {
+            foreach ($filtered as $left) {
+                foreach (self::elementsReachedByCombinator($left, $comb) as $cand) {
+                    if (isset($seen[$cand->id])) {
                         continue;
                     }
-                    if (self::elementMatchesSimple($desc, $simple)) {
-                        $seen[$desc->id] = true;
-                        $next[] = $desc;
+                    if (self::elementMatchesSimple($cand, $simple)) {
+                        $seen[$cand->id] = true;
+                        $next[] = $cand;
                     }
                 }
             }
@@ -880,6 +880,168 @@ final class VmDomLiving
             }
             self::collectDescendantElementsRecursive($child, $out);
         }
+    }
+
+    /**
+     * Tokenize one selector group into combinator + simple-selector steps (#32061).
+     *
+     * First step has combinator `""`. Subsequent steps use ` ` (descendant),
+     * `>` (child), `+` (adjacent sibling), or `~` (general sibling). Leading,
+     * trailing, or doubled combinators → null (SyntaxError).
+     *
+     * @return list<array{combinator: string, simple: array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>}}>|null
+     */
+    private static function parseCompoundSelector(string $selector): ?array
+    {
+        $selector = trim($selector);
+        $len = \strlen($selector);
+        if (0 === $len) {
+            return null;
+        }
+        $parts = [];
+        $i = 0;
+        $expectSimple = true;
+        $combinator = '';
+        while ($i < $len) {
+            $skippedWs = false;
+            while ($i < $len && ctype_space($selector[$i])) {
+                $skippedWs = true;
+                ++$i;
+            }
+            if ($i >= $len) {
+                break;
+            }
+            $ch = $selector[$i];
+            if ('>' === $ch || '+' === $ch || '~' === $ch) {
+                if ($expectSimple) {
+                    return null;
+                }
+                $combinator = $ch;
+                $expectSimple = true;
+                ++$i;
+                continue;
+            }
+            if ($skippedWs && !$expectSimple && [] !== $parts) {
+                $combinator = ' ';
+                $expectSimple = true;
+            }
+            if (!$expectSimple) {
+                return null;
+            }
+            $start = $i;
+            while ($i < $len && !ctype_space($selector[$i])
+                && '>' !== $selector[$i] && '+' !== $selector[$i] && '~' !== $selector[$i]
+            ) {
+                ++$i;
+            }
+            $simple = self::parseSimpleSelector(substr($selector, $start, $i - $start));
+            if (null === $simple) {
+                return null;
+            }
+            $parts[] = [
+                'combinator' => [] === $parts ? '' : $combinator,
+                'simple' => $simple,
+            ];
+            $combinator = '';
+            $expectSimple = false;
+        }
+        if ($expectSimple || [] === $parts) {
+            return null;
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Elements reachable from $left via one CSS combinator (#32061).
+     *
+     * @return list<ObjectEntry>
+     */
+    private static function elementsReachedByCombinator(ObjectEntry $left, string $combinator): array
+    {
+        return match ($combinator) {
+            ' ' => self::collectDescendantElements($left),
+            '>' => self::collectChildElements($left),
+            '+' => self::nextElementSiblingList($left),
+            '~' => self::followingElementSiblings($left),
+            default => [],
+        };
+    }
+
+    /**
+     * Direct element children only — text/comment siblings are skipped (CSS `>`).
+     *
+     * @return list<ObjectEntry>
+     */
+    private static function collectChildElements(ObjectEntry $parent): array
+    {
+        $out = [];
+        if (!DomRegistry::has($parent)) {
+            return $out;
+        }
+        foreach (DomRegistry::state($parent)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && VmDom::isElement($child)) {
+                $out[] = $child;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<ObjectEntry>
+     */
+    private static function nextElementSiblingList(ObjectEntry $element): array
+    {
+        $next = self::nextElementSibling($element);
+
+        return null === $next ? [] : [$next];
+    }
+
+    private static function nextElementSibling(ObjectEntry $element): ?ObjectEntry
+    {
+        foreach (self::followingElementSiblings($element) as $sib) {
+            return $sib;
+        }
+
+        return null;
+    }
+
+    /**
+     * Following element siblings in tree order (CSS `~` / `+`; non-elements skipped).
+     *
+     * @return list<ObjectEntry>
+     */
+    private static function followingElementSiblings(ObjectEntry $element): array
+    {
+        $out = [];
+        if (!DomRegistry::has($element)) {
+            return $out;
+        }
+        $parentId = DomRegistry::state($element)->parentId;
+        if (null === $parentId) {
+            return $out;
+        }
+        $parent = DomRegistry::entry($parentId);
+        if (null === $parent || !DomRegistry::has($parent)) {
+            return $out;
+        }
+        $found = false;
+        foreach (DomRegistry::state($parent)->childIds as $childId) {
+            if (!$found) {
+                if ($childId === $element->id) {
+                    $found = true;
+                }
+                continue;
+            }
+            $sib = DomRegistry::entry($childId);
+            if (null !== $sib && VmDom::isElement($sib)) {
+                $out[] = $sib;
+            }
+        }
+
+        return $out;
     }
 
     /**

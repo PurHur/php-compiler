@@ -225,6 +225,7 @@ dom/dom_parent_child_node_interfaces
 dom/dom_parentnode_children_htmlcollection
 dom/dom_parentnode_children_htmlcollection_85
 dom/dom_parentnode_element_navigation
+dom/dom_qsa_combinators
 dom/dom_qsa_first_last_child
 dom/dom_reflection_method_name_casing
 dom/dom_remove_replace_detach_links
