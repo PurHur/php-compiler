@@ -1367,6 +1367,23 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMText::isWhitespaceInElementContent() — php-src text.c xmlIsBlankNode (#32396).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function isWhitespaceInElementContent(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMText::isWhitespaceInElementContent', $extra, 0);
+        if (!VmDom::isTextOrCdataNode($node)) {
+            throw new \TypeError('DOMText::isWhitespaceInElementContent() must be called on a text node');
+        }
+        $result = new Variable();
+        $result->bool(VmDom::textIsWhitespaceInElementContent($node));
+
+        return $result;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function isEqualNode(ObjectEntry $node, array $extra): Variable

@@ -115,6 +115,8 @@ final class VmDomInstanceInvoke
             'normalizedocument' => VmDomJitDispatch::normalizeDocument($ctx, $self, $extra),
             'createtextnode' => VmDomJitDispatch::createTextNode($ctx, $self, $extra),
             'splittext' => VmDomJitDispatch::splitText($ctx, $self, $extra),
+            'iswhitespaceinelementcontent' => VmDomJitDispatch::isWhitespaceInElementContent($self, $extra),
+            'iselementcontentwhitespace' => VmDomJitDispatch::isWhitespaceInElementContent($self, $extra),
             'query' => VmDomJitDispatch::xpathQuery($ctx, $self, $extra),
             'evaluate' => VmDomJitDispatch::xpathEvaluate($ctx, $self, $extra),
             'registernamespace' => VmDomJitDispatch::xpathRegisterNamespace($self, $extra),
