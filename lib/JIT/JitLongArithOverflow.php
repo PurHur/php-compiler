@@ -9,16 +9,18 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
- * JIT long + / * with PHP_INT overflow → double promotion (#31964).
+ * JIT long + / - / * with PHP_INT overflow → double promotion (#31964, #32422).
  *
- * @see php-src Zend/zend_operators.h ZEND_SIGNED_ADD_OVERFLOW /
- *      ZEND_LONG_MUL_OVERFLOW / add_function / mul_function
+ * @see php-src Zend/zend_operators.h fast_long_add/sub_function /
+ *      ZEND_LONG_MUL_OVERFLOW / add_function / sub_function / mul_function
  */
 final class JitLongArithOverflow
 {
     public static function supportsOpcode(int $opType): bool
     {
-        return OpCode::TYPE_PLUS === $opType || OpCode::TYPE_MUL === $opType;
+        return OpCode::TYPE_PLUS === $opType
+            || OpCode::TYPE_MINUS === $opType
+            || OpCode::TYPE_MUL === $opType;
     }
 
     /**
@@ -38,13 +40,19 @@ final class JitLongArithOverflow
         if (null === $a || null === $b) {
             return null;
         }
-        $result = OpCode::TYPE_PLUS === $opType ? ($a + $b) : ($a * $b);
+        if (OpCode::TYPE_PLUS === $opType) {
+            $result = $a + $b;
+        } elseif (OpCode::TYPE_MINUS === $opType) {
+            $result = $a - $b;
+        } else {
+            $result = $a * $b;
+        }
         if (\is_int($result)) {
             return new Variable(
                 $context,
                 Variable::TYPE_NATIVE_LONG,
                 Variable::KIND_VALUE,
-                $context->constantFromInteger($result, 'long')
+                $context->constantFromInteger($result, 'int64')
             );
         }
 
@@ -88,9 +96,7 @@ final class JitLongArithOverflow
         $a = $context->builder->intCast($left, $i64);
         $b = $context->builder->intCast($right, $i64);
 
-        $overflow = OpCode::TYPE_PLUS === $opType
-            ? self::signedAddOverflow($context, $a, $b)
-            : self::signedMulOverflow($context, $a, $b);
+        $overflow = self::signedOverflow($context, $opType, $a, $b);
 
         $ovBlock = BasicBlockHelper::append($context, 'vbox_arith_overflow');
         $okBlock = BasicBlockHelper::append($context, 'vbox_arith_ok');
@@ -100,9 +106,7 @@ final class JitLongArithOverflow
         $context->builder->positionAtEnd($ovBlock);
         $ad = $context->builder->siToFp($a, $f64);
         $bd = $context->builder->siToFp($b, $f64);
-        $fd = OpCode::TYPE_PLUS === $opType
-            ? $context->builder->fadd($ad, $bd)
-            : $context->builder->fmul($ad, $bd);
+        $fd = self::overflowToDouble($context, $opType, $ad, $bd);
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $slotPtr,
@@ -111,9 +115,7 @@ final class JitLongArithOverflow
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $lres = OpCode::TYPE_PLUS === $opType
-            ? $context->builder->add($a, $b)
-            : $context->builder->mul($a, $b);
+        $lres = self::noOverflowLong($context, $opType, $a, $b);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $slotPtr,
@@ -123,6 +125,54 @@ final class JitLongArithOverflow
 
         $context->builder->positionAtEnd($doneBlock);
         JitValueBox::publishAfterWrite($context, $slotPtr);
+    }
+
+    private static function signedOverflow(
+        Context $context,
+        int $opType,
+        LlvmValue $a,
+        LlvmValue $b
+    ): LlvmValue {
+        if (OpCode::TYPE_PLUS === $opType) {
+            return self::signedAddOverflow($context, $a, $b);
+        }
+        if (OpCode::TYPE_MINUS === $opType) {
+            return self::signedSubOverflow($context, $a, $b);
+        }
+
+        return self::signedMulOverflow($context, $a, $b);
+    }
+
+    private static function overflowToDouble(
+        Context $context,
+        int $opType,
+        LlvmValue $ad,
+        LlvmValue $bd
+    ): LlvmValue {
+        if (OpCode::TYPE_PLUS === $opType) {
+            return $context->builder->fadd($ad, $bd);
+        }
+        if (OpCode::TYPE_MINUS === $opType) {
+            return $context->builder->fsub($ad, $bd);
+        }
+
+        return $context->builder->fmul($ad, $bd);
+    }
+
+    private static function noOverflowLong(
+        Context $context,
+        int $opType,
+        LlvmValue $a,
+        LlvmValue $b
+    ): LlvmValue {
+        if (OpCode::TYPE_PLUS === $opType) {
+            return $context->builder->add($a, $b);
+        }
+        if (OpCode::TYPE_MINUS === $opType) {
+            return $context->builder->sub($a, $b);
+        }
+
+        return $context->builder->mul($a, $b);
     }
 
     /**
@@ -145,6 +195,26 @@ final class JitLongArithOverflow
         $ovIfBNonPos = $context->builder->and($bNonPos, $aLtMinMinusB);
 
         return $context->builder->or($ovIfBPos, $ovIfBNonPos);
+    }
+
+    /**
+     * Portable fast_long_sub_function overflow: operand signs differ and
+     * the wrapping result's sign differs from op1.
+     *
+     * @see php-src Zend/zend_operators.h fast_long_sub_function (#32422)
+     */
+    private static function signedSubOverflow(Context $context, LlvmValue $a, LlvmValue $b): LlvmValue
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, true);
+        $aNeg = $context->builder->icmp(Builder::INT_SLT, $a, $zero);
+        $bNeg = $context->builder->icmp(Builder::INT_SLT, $b, $zero);
+        $diff = $context->builder->sub($a, $b);
+        $resNeg = $context->builder->icmp(Builder::INT_SLT, $diff, $zero);
+        $opsDiffer = $context->builder->xor($aNeg, $bNeg);
+        $resDiffersFromA = $context->builder->xor($aNeg, $resNeg);
+
+        return $context->builder->and($opsDiffer, $resDiffersFromA);
     }
 
     /**

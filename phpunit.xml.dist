@@ -328,6 +328,9 @@
             <file>./test/compliance/ArrayAccessIncByValue32015JITTest.php</file>
             <file>./test/compliance/IntArithOverflowPromote31964JITTest.php</file>
             <file>./test/unit/IntArithOverflowPromote31964AotTest.php</file>
+            <file>./test/compliance/IntSubOverflowPromote32422VMTest.php</file>
+            <file>./test/compliance/IntSubOverflowPromote32422JITTest.php</file>
+            <file>./test/unit/IntSubOverflowPromote32422AotTest.php</file>
             <file>./test/compliance/IntDivAlwaysFloat31968JITTest.php</file>
             <file>./test/unit/IntDivAlwaysFloat31968AotTest.php</file>
             <file>./test/compliance/FloatIncDecStaysFloat32281JITTest.php</file>

@@ -443,23 +443,18 @@ restart:
                             $__right
                         );
                     case OpCode::TYPE_MINUS:
+                        $folded = JitLongArithOverflow::tryFoldBinary($this->context, $opcode->type, $left, $right);
+                        if (null !== $folded) {
+                            return $folded;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
 
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $result = $this->context->builder->subNoSignedWrap($leftValue, $__right);
-    
-                        goto return_long;
+                        return JitLongArithOverflow::binaryNativeLong(
+                            $this->context,
+                            $opcode->type,
+                            $leftValue,
+                            $__right
+                        );
                     case OpCode::TYPE_DIV:
                         // PHP `/` is always float (zend_div). Integer sdiv made `7/2` int(3) (#31968).
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
