@@ -55,6 +55,7 @@ final class DomInstanceMethodJit
         'domdocument::createcomment' => true,
         'domdocument::createtextnode' => true,
         'domdocument::createcdatasection' => true,
+        'domdocument::createprocessinginstruction' => true,
         'domdocument::createattributens' => true,
         'domdocument::createattribute' => true,
         'domdocument::load' => true,
@@ -260,6 +261,12 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::createcdatasection' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateCDATASection();
+
+                return;
+            }
+            if ('domdocument::createprocessinginstruction' === $lc) {
+                // User-script AOT (#32331) — peer createComment/createTextNode (#32315).
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateProcessingInstruction();
 
                 return;
             }
@@ -747,6 +754,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::createcomment');
             self::ensureProxy($context, 'domdocument::createtextnode');
             self::ensureProxy($context, 'domdocument::createcdatasection');
+            self::ensureProxy($context, 'domdocument::createprocessinginstruction');
             self::ensureProxy($context, 'domdocument::load');
             self::ensureProxy($context, 'domdocument::loadhtml');
             self::ensureProxy($context, 'domdocument::loadhtmlfile');

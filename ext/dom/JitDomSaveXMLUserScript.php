@@ -103,9 +103,10 @@ final class JitDomSaveXMLUserScript
     }
 
     /**
-     * Dump createComment/createTextNode (and createElement) without a loadXML tag literal.
+     * Dump createComment/createTextNode/createProcessingInstruction (and createElement)
+     * without a loadXML tag literal.
      *
-     * php-src: ext/dom/document.c saveXML → xmlNodeDump
+     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331)
      */
     private static function serializeUserScriptNode(
         Context $context,
@@ -143,6 +144,10 @@ final class JitDomSaveXMLUserScript
         $bbText = BasicBlockHelper::append($context, 'dom_savexml_text');
         $bbCdataCheck = BasicBlockHelper::append($context, 'dom_savexml_check_cdata');
         $bbCdata = BasicBlockHelper::append($context, 'dom_savexml_cdata');
+        $bbPiCheck = BasicBlockHelper::append($context, 'dom_savexml_check_pi');
+        $bbPi = BasicBlockHelper::append($context, 'dom_savexml_pi');
+        $bbPiEmpty = BasicBlockHelper::append($context, 'dom_savexml_pi_empty');
+        $bbPiData = BasicBlockHelper::append($context, 'dom_savexml_pi_data');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
         $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
@@ -178,7 +183,7 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $nameStr, $cdataLit),
             $zero
         );
-        $context->builder->branchIf($isCdata, $bbCdata, $bbElement);
+        $context->builder->branchIf($isCdata, $bbCdata, $bbPiCheck);
 
         $context->builder->positionAtEnd($bbCdata);
         $cdataOpen = $context->builder->load($context->constantStringFromString('<![CDATA['));
@@ -189,6 +194,66 @@ final class JitDomSaveXMLUserScript
             $cdataClose
         );
         $context->builder->store(self::boxStringValue($context, $cdataXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbPiCheck);
+        $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            'tagName',
+            $elementClassId
+        );
+        $tagStr = $context->helper->loadValue($tagVar);
+        $piKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateProcessingInstruction::TAG_KIND)
+        );
+        $isPi = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $piKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isPi, $bbPi, $bbElement);
+
+        $context->builder->positionAtEnd($bbPi);
+        // libxml xmlNodeDump PI: lt-query + target + optional space+data + query-gt (#32331).
+        $emptyLit = $context->builder->load($context->constantStringFromString(''));
+        $dataEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $textStr, $emptyLit),
+            $zero
+        );
+        $context->builder->branchIf($dataEmpty, $bbPiEmpty, $bbPiData);
+
+        $context->builder->positionAtEnd($bbPiEmpty);
+        $piOpen = $context->builder->load($context->constantStringFromString('<?'));
+        $piClose = $context->builder->load($context->constantStringFromString('?>'));
+        $piEmptyXml = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $piOpen, $nameStr),
+            $piClose
+        );
+        $context->builder->store(self::boxStringValue($context, $piEmptyXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbPiData);
+        $piOpenData = $context->builder->load($context->constantStringFromString('<?'));
+        $piSpace = $context->builder->load($context->constantStringFromString(' '));
+        $piCloseData = $context->builder->load($context->constantStringFromString('?>'));
+        $piDataXml = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat(
+                    $context,
+                    JitStringConcat::concat($context, $piOpenData, $nameStr),
+                    $piSpace
+                ),
+                $textStr
+            ),
+            $piCloseData
+        );
+        $context->builder->store(self::boxStringValue($context, $piDataXml), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElement);
