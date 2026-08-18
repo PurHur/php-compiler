@@ -1,5 +1,5 @@
 --TEST--
-stdlib SoapClient features SOAP_USE_XSI_ARRAY_TYPE (#21715)
+stdlib SoapClient features SOAP_USE_XSI_ARRAY_TYPE (#21715 / #32221 Zend Array xsi:type)
 --FILE--
 <?php
 $resp = __DIR__ . '/test/fixtures/soap/echo.response.xml';
@@ -30,7 +30,7 @@ echo "\n";
 ?>
 --EXPECT--
 plain_arrayType=1
-plain_xsi_array=0
+plain_xsi_array=1
 feat_arrayType=1
 feat_xsi_array=1
-diff=1
+diff=0

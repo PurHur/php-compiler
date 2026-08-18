@@ -2661,9 +2661,8 @@ final class VmSoapClient
         } else {
             $arrayType = $itemXsd.'['.$count.']';
             $attrs = ' SOAP-ENC:arrayType="'.\htmlspecialchars($arrayType, \ENT_XML1).'"';
-            if (0 !== ($state->features & SoapConstants::SOAP_USE_XSI_ARRAY_TYPE)) {
-                $attrs .= ' xsi:type="SOAP-ENC:Array"';
-            }
+            // php-src to_xml_array always set_ns_and_type(SOAP_ENC_ARRAY) for SOAP_ENCODED (#32221).
+            $attrs .= ' xsi:type="SOAP-ENC:Array"';
         }
 
         return '<'.$tag.$attrs.'>'.$inner.'</'.$tag.'>';
