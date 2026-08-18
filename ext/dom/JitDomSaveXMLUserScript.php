@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -81,8 +82,146 @@ final class JitDomSaveXMLUserScript
         if (!$objectType->hasProperty($elementClassId, 'tagName')) {
             $objectType->defineProperty($elementClassId, 'tagName', JITVariable::TYPE_STRING);
         }
-        // loadXML documentElement temps often lose DOMElement type (#23251). createElement
-        // without loadXML seeds tagName (#32292 / php-src document.c xmlNodeDump).
+        if (!$objectType->hasProperty($elementClassId, 'nodeName')) {
+            $objectType->defineProperty($elementClassId, 'nodeName', JITVariable::TYPE_STRING);
+        }
+        // createComment/createTextNode seed nodeName but not tagName — fetching tagName
+        // SIGSEGVs (#32315). libxml xmlNodeDump: comment `<!--data-->`, text = data.
+        // Skip when loadXML supplies the root tag from the compile-time literal (#23251).
+        if (!$useXmlLitTag) {
+            return self::serializeUserScriptNode($context, $objectType, $node, $elementClassId);
+        }
+
+        return self::serializeElementNode(
+            $context,
+            $objectType,
+            $node,
+            $elementClassId,
+            true,
+            (string) $xmlLit
+        );
+    }
+
+    /**
+     * Dump createComment/createTextNode (and createElement) without a loadXML tag literal.
+     *
+     * php-src: ext/dom/document.c saveXML → xmlNodeDump
+     */
+    private static function serializeUserScriptNode(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $node,
+        int $elementClassId
+    ): Value {
+        $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            'nodeName',
+            $elementClassId
+        );
+        $nameStr = $context->helper->loadValue($nameVar);
+        $textVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            'textContent',
+            $elementClassId
+        );
+        $textStr = $context->helper->loadValue($textVar);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $commentLit = $context->builder->load($context->constantStringFromString('#comment'));
+        $isComment = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $commentLit),
+            $zero
+        );
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $bbComment = BasicBlockHelper::append($context, 'dom_savexml_comment');
+        $bbCheckText = BasicBlockHelper::append($context, 'dom_savexml_check_text');
+        $bbText = BasicBlockHelper::append($context, 'dom_savexml_text');
+        $bbCdataCheck = BasicBlockHelper::append($context, 'dom_savexml_check_cdata');
+        $bbCdata = BasicBlockHelper::append($context, 'dom_savexml_cdata');
+        $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
+        $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
+        $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
+
+        $context->builder->positionAtEnd($bbComment);
+        $commentOpen = $context->builder->load($context->constantStringFromString('<!--'));
+        $commentClose = $context->builder->load($context->constantStringFromString('-->'));
+        $commentXml = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $commentOpen, $textStr),
+            $commentClose
+        );
+        $context->builder->store(self::boxStringValue($context, $commentXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbCheckText);
+        $textLit = $context->builder->load($context->constantStringFromString('#text'));
+        $isText = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $textLit),
+            $zero
+        );
+        $context->builder->branchIf($isText, $bbText, $bbCdataCheck);
+
+        $context->builder->positionAtEnd($bbText);
+        $context->builder->store(self::boxStringValue($context, $textStr), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbCdataCheck);
+        $cdataLit = $context->builder->load($context->constantStringFromString('#cdata-section'));
+        $isCdata = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $cdataLit),
+            $zero
+        );
+        $context->builder->branchIf($isCdata, $bbCdata, $bbElement);
+
+        $context->builder->positionAtEnd($bbCdata);
+        $cdataOpen = $context->builder->load($context->constantStringFromString('<![CDATA['));
+        $cdataClose = $context->builder->load($context->constantStringFromString(']]>'));
+        $cdataXml = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $cdataOpen, $textStr),
+            $cdataClose
+        );
+        $context->builder->store(self::boxStringValue($context, $cdataXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbElement);
+        $elemXml = self::serializeElementNode(
+            $context,
+            $objectType,
+            $node,
+            $elementClassId,
+            false,
+            null
+        );
+        $context->builder->store($elemXml, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Element dump: `<tag xmlns?>body</tag>` or self-closing `<tag/>`.
+     *
+     * loadXML documentElement temps often lose DOMElement type (#23251). createElement
+     * without loadXML seeds tagName (#32292 / php-src document.c xmlNodeDump).
+     */
+    private static function serializeElementNode(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $node,
+        int $elementClassId,
+        bool $useXmlLitTag,
+        ?string $xmlLit
+    ): Value {
         if ($useXmlLitTag) {
             $tagStr = $context->builder->load(
                 $context->constantStringFromString(DomParseSimpleXmlJitHelper::rootTagArgv((string) $xmlLit))
