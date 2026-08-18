@@ -130,6 +130,7 @@ final class VmDomInstanceInvoke
             'rename' => VmDomJitDispatch::rename($ctx, $self, $extra),
             'substringdata' => VmDomJitDispatch::substringData($self, $extra),
             'appenddata' => VmDomJitDispatch::appendData($self, $extra),
+            'insertdata' => VmDomJitDispatch::insertData($self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
     }

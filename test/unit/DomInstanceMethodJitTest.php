@@ -56,6 +56,8 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertFalse(DomInstanceMethodJit::isDomInstanceMethodProxy('object::substringdata'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domtext::appenddata'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domcharacterdata::appenddata'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domtext::insertdata'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domcharacterdata::insertdata'));
         } finally {
             putenv('PHP_COMPILER_AOT_USER_SCRIPT');
         }

@@ -150,6 +150,10 @@ final class DomInstanceMethodJit
         'domcomment::appenddata' => true,
         'domcdatasection::appenddata' => true,
         'domcharacterdata::appenddata' => true,
+        'domtext::insertdata' => true,
+        'domcomment::insertdata' => true,
+        'domcdatasection::insertdata' => true,
+        'domcharacterdata::insertdata' => true,
         'domnode::clonenode' => true,
         'domelement::clonenode' => true,
         'domtext::clonenode' => true,
@@ -560,6 +564,15 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domtext::insertdata' === $lc
+                || 'domcomment::insertdata' === $lc
+                || 'domcdatasection::insertdata' === $lc
+                || 'domcharacterdata::insertdata' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomCharacterDataInsertData();
+
+                return;
+            }
             if ('domnode::clonenode' === $lc
                 || 'domelement::clonenode' === $lc
                 || 'domtext::clonenode' === $lc
@@ -847,6 +860,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domcomment::appenddata');
             self::ensureProxy($context, 'domcdatasection::appenddata');
             self::ensureProxy($context, 'domcharacterdata::appenddata');
+            self::ensureProxy($context, 'domtext::insertdata');
+            self::ensureProxy($context, 'domcomment::insertdata');
+            self::ensureProxy($context, 'domcdatasection::insertdata');
+            self::ensureProxy($context, 'domcharacterdata::insertdata');
             self::ensureProxy($context, 'domnode::clonenode');
             self::ensureProxy($context, 'domelement::clonenode');
             self::ensureProxy($context, 'domtext::clonenode');
@@ -983,10 +1000,10 @@ final class DomInstanceMethodJit
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild', 'clonenode'],
-        'domtext' => ['substringdata', 'splittext', 'appenddata'],
-        'domcomment' => ['substringdata', 'appenddata'],
-        'domcdatasection' => ['substringdata', 'splittext', 'appenddata'],
-        'domcharacterdata' => ['substringdata', 'appenddata'],
+        'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata'],
+        'domcomment' => ['substringdata', 'appenddata', 'insertdata'],
+        'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata'],
+        'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata'],
         'domelement' => ['setattribute', 'removeattribute', 'setidattribute', 'setidattributens', 'setidattributenode'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
