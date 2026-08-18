@@ -2795,6 +2795,10 @@ final class VmSoapClient
     ): string {
         $encType = $soapVar['type'] ?? 0;
         $inner = $soapVar['value'];
+        // php-src to_xml_any — xmlStringTextNoenc child of the parent, no wrapper / xsi:type (#32241).
+        if (SoapConstants::XSD_ANYXML === $encType) {
+            return self::encodeSoapVarAnyXml($inner, $state, $ctx);
+        }
         $literal = null !== $state && SoapConstants::SOAP_LITERAL === $state->use;
         // php-src xmlNodeSetName(enc_name) (#32191).
         if (null !== $soapVar['name']) {
@@ -2914,6 +2918,51 @@ final class VmSoapClient
             'ns2:'.$tag,
             ' xmlns:ns2="'.\htmlspecialchars($ns, \ENT_XML1).'"',
         ];
+    }
+
+    /**
+     * php-src to_xml_any() — insert serialized payload as xmlStringTextNoenc (#32241).
+     *
+     * Arrays recurse with get_conversion(XSD_ANYXML); scalars use zval_get_string
+     * without htmlspecialchars (libxml text-noenc). Nested SoapVar bags still go
+     * through encodeSoapVar so enc_type other than ANYXML keeps its wrapper.
+     */
+    private static function encodeSoapVarAnyXml(mixed $value, ?SoapClientState $state, ?Context $ctx): string
+    {
+        $nested = self::soapVarShape($value);
+        if (null !== $nested) {
+            return self::encodeSoapVar('item', $nested, $state, $ctx);
+        }
+        if (\is_array($value)) {
+            $out = '';
+            foreach ($value as $el) {
+                $out .= self::encodeSoapVarAnyXml($el, $state, $ctx);
+            }
+
+            return $out;
+        }
+
+        return self::soapVarAnyXmlScalar($value);
+    }
+
+    /** php-src get_serialization_string_from_zval → zval_get_string, unescaped. */
+    private static function soapVarAnyXmlScalar(mixed $value): string
+    {
+        if (\is_bool($value)) {
+            return $value ? '1' : '';
+        }
+        if (null === $value) {
+            return '';
+        }
+        if (\is_object($value)) {
+            if ($value instanceof \Stringable || \method_exists($value, '__toString')) {
+                return (string) $value;
+            }
+
+            return '';
+        }
+
+        return (string) $value;
     }
 
     /** php-src to_xml_string / to_xml_bool / to_xml_base64 / to_xml_hexbin (#32190). */
