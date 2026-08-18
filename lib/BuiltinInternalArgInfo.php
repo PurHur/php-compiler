@@ -194,6 +194,11 @@ final class BuiltinInternalArgInfo
             'net_get_interfaces' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28916)
             'inet_pton', 'inet_ntop' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return int (missing |false) (#23357)
+            'ip2long' => 'int|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#23357)
+            'long2ip' => 'string|false',
+            'gethostbyaddr' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28000)
             'gethostname' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28334)
