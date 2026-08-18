@@ -9298,6 +9298,9 @@ final class VmDom
         if (self::isCommentNode($entry)) {
             return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
+        if (self::isAttr($entry)) {
+            return self::serializeAttributeNodeXml(DomRegistry::state($entry));
+        }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
@@ -9675,8 +9678,22 @@ final class VmDom
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
         }
+        // libxml xmlNodeDump XML_ATTRIBUTE_NODE: leading space + name="value" (#32351).
+        if (self::isAttr($entry)) {
+            $out = self::serializeAttributeNodeXml(DomRegistry::state($entry));
+
+            return $format ? str_repeat('  ', $depth).$out : $out;
+        }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
+    /**
+     * xmlNodeDump of XML_ATTRIBUTE_NODE — php-src document.c saveXML (#32351).
+     */
+    private static function serializeAttributeNodeXml(DomNodeState $state): string
+    {
+        return ' '.self::escapeName($state->nodeName).'="'.self::escapeAttr($state->textContent ?? '').'"';
     }
 
     /**
