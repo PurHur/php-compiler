@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
@@ -311,7 +312,8 @@ final class JitDate
             $charPtr = $context->getTypeFromString('char*');
             $buf = $context->builder->alloca($i8, 24, 'u_buf');
             $bufChar = $context->builder->pointerCast($buf, $charPtr);
-            self::ensureSnprintf($context);
+            // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+            LibcExtern::ensureSnprintf($context);
             $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $charPtr);
             $written = $context->builder->call(
                 $context->lookupFunction('snprintf'),
@@ -369,7 +371,8 @@ final class JitDate
         $charPtr = $context->getTypeFromString('char*');
         $buf = $context->builder->alloca($i8, $bufSize, 'civil_buf');
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
-        self::ensureSnprintf($context);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $fmt = $context->builder->pointerCast($context->constantFromString($printfFmt), $charPtr);
         $callArgs = [$bufChar, $sizeT->constInt($bufSize, false), $fmt];
         foreach ($keys as $key) {
@@ -383,24 +386,6 @@ final class JitDate
             $len,
             $bufChar
         );
-    }
-
-    private static function ensureSnprintf(Context $context): void
-    {
-        if (null === $context->module->getNamedFunction('snprintf')) {
-            $charPtr = $context->getTypeFromString('char*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $context->module->addFunction(
-                'snprintf',
-                $context->context->functionType(
-                    $context->getTypeFromString('int32'),
-                    true,
-                    $charPtr,
-                    $sizeT,
-                    $charPtr
-                )
-            );
-        }
     }
 
     public static function formatStrftime(Context $context, bool $gmt, JITVariable ...$args): Value

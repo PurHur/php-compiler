@@ -894,6 +894,8 @@ final class JitMultipartKernel
         );
         // size as decimal string via snprintf into small alloca
         $sizeBuf = $context->builder->alloca($i8, 32, 'mp_size_'.$tag);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $context->builder->pointerCast($sizeBuf, $i8p),

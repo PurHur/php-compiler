@@ -35,7 +35,7 @@ final class JitNlLanginfo
         } else {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'nl_langinfo_leaf_setup');
         }
-        self::ensureSnprintf($context);
+        LibcExtern::ensureSnprintf($context);
         self::ensureLibcNlLanginfo($context);
 
         $itemVal = self::jitIntArgI32($context, $item);
@@ -154,6 +154,8 @@ final class JitNlLanginfo
         );
         $msgSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(64));
         $msg = $context->builder->pointerCast($msgSlot, $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $msg,
@@ -184,22 +186,6 @@ final class JitNlLanginfo
                 $context->context->functionType($i8p, false, $i32)
             );
             $context->registerFunction('nl_langinfo', $fn);
-        }
-    }
-
-    private static function ensureSnprintf(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $sizeT = $context->getTypeFromString('size_t');
-        try {
-            $context->lookupFunction('snprintf');
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction(
-                'snprintf',
-                $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
-            );
-            $context->registerFunction('snprintf', $fn);
         }
     }
 

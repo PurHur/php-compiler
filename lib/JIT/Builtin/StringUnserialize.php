@@ -14,6 +14,7 @@ use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -397,6 +398,8 @@ final class StringUnserialize
             $context->constantFromString('unserialize(): Error at offset %d of %d bytes'),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

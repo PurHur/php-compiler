@@ -471,6 +471,8 @@ final class WeakRefRegistryRuntime
 
         $context->builder->positionAtEnd($workBb);
         $formatted = $context->builder->call(self::helperFunction($context, self::FORMAT_KEY), $objPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $buf,

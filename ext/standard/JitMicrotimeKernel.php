@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -113,6 +114,8 @@ final class JitMicrotimeKernel
             $context->constantFromString('%.8f %ld'),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

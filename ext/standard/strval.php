@@ -22,6 +22,7 @@ use PHPCompiler\VM;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VmResourceIdString;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -302,6 +303,8 @@ final class strval extends Internal
             $context->constantFromString($format),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

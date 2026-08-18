@@ -543,6 +543,8 @@ final class JitIntdiv
         $fmt = $context->builder->pointerCast($context->constantFromString('%s%g%s'), $charPtr);
         $prefixPtr = $context->builder->pointerCast($context->constantFromString($prefix), $charPtr);
         $suffixPtr = $context->builder->pointerCast($context->constantFromString($suffix), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

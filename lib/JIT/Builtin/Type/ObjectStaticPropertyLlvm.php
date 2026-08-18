@@ -15,8 +15,8 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
-use PHPLLVM;
 use PHPCompiler\JIT\LibcExtern;
+use PHPLLVM;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -426,6 +426,8 @@ final class ObjectStaticPropertyLlvm
             $context->builder->structGep($runtimeNameStr, $nameMap['value']),
             $i8p
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufPtr,

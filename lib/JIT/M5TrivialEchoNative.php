@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPLLVM\Builder;
 use PHPCompiler\JIT\LibcExtern;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -635,6 +635,8 @@ final class M5TrivialEchoNative
 
         $numBuf = $b->arrayAlloca($i8, $i64->constInt(32, false));
         $fmt = $b->pointerCast($context->constantFromString('%ld'), $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $nwritten = $b->call(
             $context->lookupFunction('snprintf'),
             $numBuf,
@@ -874,6 +876,8 @@ final class M5TrivialEchoNative
         $sum = $b->add($left, $right);
         $numBuf = $b->arrayAlloca($i8, $i64->constInt(32, false));
         $fmt = $b->pointerCast($context->constantFromString('%ld'), $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $nwritten = $b->call(
             $context->lookupFunction('snprintf'),
             $numBuf,

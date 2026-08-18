@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -144,6 +145,8 @@ final class JitFtok
         $errMsg = $context->builder->call($context->lookupFunction('strerror'), $errnoVal);
         $msgSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(256));
         $msg = $context->builder->pointerCast($msgSlot, $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $msg,

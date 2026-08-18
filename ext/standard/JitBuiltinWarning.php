@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StatPathRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -48,6 +49,8 @@ final class JitBuiltinWarning
             $charPtr
         );
         $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,
@@ -86,6 +89,8 @@ final class JitBuiltinWarning
             $charPtr
         );
         $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,
@@ -172,6 +177,8 @@ final class JitBuiltinWarning
             $charPtr
         );
         $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,
@@ -209,6 +216,8 @@ final class JitBuiltinWarning
             $charPtr
         );
         $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

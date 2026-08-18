@@ -169,6 +169,8 @@ final class WeakMapMethod implements Call
         $handle = $context->builder->ptrToInt($keyObj, $i64);
         $buf = $context->builder->alloca($i8->arrayType(512), 1, 'weakmap_miss_msg');
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufPtr,

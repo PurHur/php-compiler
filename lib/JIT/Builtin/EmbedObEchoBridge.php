@@ -260,6 +260,8 @@ final class EmbedObEchoBridge
                 $fn->getParam(0)
             );
         } else {
+            // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+            LibcExtern::ensureSnprintf($context);
             $n = $context->builder->call(
                 $context->lookupFunction('snprintf'),
                 $bufPtr,

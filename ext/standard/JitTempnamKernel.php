@@ -314,6 +314,8 @@ final class JitTempnamKernel
 
         $context->builder->branch($format);
         $context->builder->positionAtEnd($format);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $n = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $tpl,
