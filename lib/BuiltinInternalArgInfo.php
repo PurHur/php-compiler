@@ -786,6 +786,8 @@ final class BuiltinInternalArgInfo
             'round' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
                 ? 'RoundingMode|int'
                 : null,
+            // php-src ext/posix/posix.stub.php — posix_isatty($file_descriptor): bool (untyped; accepts int|resource) (#28899)
+            'posix_isatty' => 0 === $index ? '' : null,
             // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)
             'number_format' => match ($index) {
                 0 => 'float',
