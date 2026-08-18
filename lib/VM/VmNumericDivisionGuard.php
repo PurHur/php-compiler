@@ -11,7 +11,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * SSOT for JIT / and % zero-divisor guards (#5006, zend_operators.c, #9976).
+ * SSOT for JIT / and % zero-divisor guards (#5006, zend_operators.c, #9976)
+ * and PHP_INT_MIN % -1 → 0 (#32285).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitNumericDivisionGuard}
  */
@@ -41,6 +42,39 @@ final class VmNumericDivisionGuard
         $context->builder->positionAtEnd($errBlock);
         TryCatchHelper::emitCatchableClassError($context, 'DivisionByZeroError', $message);
         $context->builder->positionAtEnd($okBlock);
+    }
+
+    /**
+     * zend_operators.c mod_function: n % -1 is 0. LLVM srem(INT_MIN, -1) is poison (#32285).
+     */
+    public static function signedModulo(Context $context, Value $dividend, Value $divisor): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mod_srem_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $left = $context->builder->intCast($dividend, $i64);
+        $right = $context->builder->intCast($divisor, $i64);
+        self::emitZeroLongDivisorGuard($context, $right, 'Modulo by zero');
+        $negOne = $i64->constInt(-1, true);
+        $isNegOne = $context->builder->icmp(Builder::INT_EQ, $right, $negOne);
+        $neg1Block = BasicBlockHelper::append($context, 'mod_neg1_zero');
+        $sremBlock = BasicBlockHelper::append($context, 'mod_srem');
+        $doneBlock = BasicBlockHelper::append($context, 'mod_done');
+        $context->builder->branchIf($isNegOne, $neg1Block, $sremBlock);
+
+        $context->builder->positionAtEnd($neg1Block);
+        $zero = $i64->constInt(0, false);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($sremBlock);
+        $rem = $context->builder->signedRem($left, $right);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'mod_result');
+        $phi->addIncoming($zero, $neg1Block);
+        $phi->addIncoming($rem, $sremBlock);
+
+        return $phi;
     }
 
     /** intdiv(PHP_INT_MIN, -1) — php-src ext/standard/math.c (#4724). */
