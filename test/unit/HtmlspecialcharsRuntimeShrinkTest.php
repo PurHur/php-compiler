@@ -52,6 +52,22 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $this->assertSame('a(b', HtmlspecialcharsJitHelper::htmlspecialchars("a\xC3\x28b", $flags));
     }
 
+    public function testHtmlspecialcharsJitHelperEntDisallowedMatchesVmString(): void
+    {
+        $flags = ENT_DISALLOWED | ENT_HTML5;
+        $fffd = "\xEF\xBF\xBD";
+        foreach (["\x01", "\x7F", "a\x01b\x7Fc", "\t", "\u{FDD0}", 'ok'] as $s) {
+            $this->assertSame(
+                VmString::htmlspecialchars($s, $flags, 'UTF-8', true),
+                HtmlspecialcharsJitHelper::htmlspecialchars($s, $flags),
+                'ENT_DISALLOWED mismatch for '.bin2hex($s)
+            );
+        }
+        $this->assertSame($fffd, HtmlspecialcharsJitHelper::htmlspecialchars("\x01", $flags));
+        $this->assertSame('a'.$fffd.'b'.$fffd.'c', HtmlspecialcharsJitHelper::htmlspecialchars("a\x01b\x7Fc", $flags));
+        $this->assertSame("\x01", HtmlspecialcharsJitHelper::htmlspecialchars("\x01", ENT_HTML5));
+    }
+
     public function testHtmlspecialcharsExDoubleEncodeFalseMatchesVmString(): void
     {
         $flags = ENT_QUOTES;

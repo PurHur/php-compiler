@@ -29,10 +29,14 @@ final class HtmlEntitiesJitHelper
             return '';
         }
         // ENT_IGNORE: skip illegal UTF-8 bytes (php-src html.c / #32063).
-        if (0 !== ($flags & ENT_IGNORE) && self::utf8ValidWidthAt($string, $i) < 1) {
+        if (0 !== ($flags & \ENT_IGNORE) && self::utf8ValidWidthAt($string, $i) < 1) {
             return self::escapeFrom($string, $flags, $i + 1, $doubleEncode);
         }
         $char = self::copyBytes($string, $i, $width);
+        if (0 !== ($flags & \ENT_DISALLOWED)
+            && !self::unicodeCpIsAllowed(self::utf8CodePointAt($string, $i), $flags)) {
+            return "\xEF\xBF\xBD".self::escapeFrom($string, $flags, $i + $width, $doubleEncode);
+        }
         if ('&' === $char && !$doubleEncode) {
             $entityLen = self::existingEntityLen($string, $i);
             if ($entityLen > 0) {
@@ -330,6 +334,58 @@ final class HtmlEntitiesJitHelper
             '♥' => '&hearts;',
             '♦' => '&diams;',
         ];
+    }
+
+    /**
+     * php-src html.c unicode_cp_is_allowed(). ENT_HTML5 == DOC_TYPE_MASK (48).
+     * NestedJIT-safe: integer compares only (#32084).
+     */
+    public static function unicodeCpIsAllowed(int $uniCp, int $flags): bool
+    {
+        $documentType = $flags & \ENT_HTML5;
+        if (\ENT_XML1 === $documentType || \ENT_XHTML === $documentType) {
+            return ($uniCp >= 0x20 && $uniCp <= 0xD7FF)
+                || (0x0A === $uniCp || 0x09 === $uniCp || 0x0D === $uniCp)
+                || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF && 0xFFFE !== $uniCp && 0xFFFF !== $uniCp);
+        }
+        if (\ENT_HTML5 === $documentType) {
+            return ($uniCp >= 0x20 && $uniCp <= 0x7E)
+                || ($uniCp >= 0x09 && $uniCp <= 0x0D && 0x0B !== $uniCp)
+                || ($uniCp >= 0xA0 && $uniCp <= 0xD7FF)
+                || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF
+                    && (($uniCp & 0xFFFF) < 0xFFFE)
+                    && ($uniCp < 0xFDD0 || $uniCp > 0xFDEF));
+        }
+
+        return ($uniCp >= 0x20 && $uniCp <= 0x7E)
+            || (0x0A === $uniCp || 0x09 === $uniCp || 0x0D === $uniCp)
+            || ($uniCp >= 0xA0 && $uniCp <= 0xD7FF)
+            || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF);
+    }
+
+    /** UTF-8 scalar at $i (php-src get_next_char). NestedJIT-safe: no strlen/substr. */
+    public static function utf8CodePointAt(string $string, int $i): int
+    {
+        $byte = \ord($string[$i]);
+        if ($byte < 0x80) {
+            return $byte;
+        }
+        if (($byte & 0xE0) === 0xC0 && isset($string[$i + 1])) {
+            return (($byte & 0x1F) << 6) | (\ord($string[$i + 1]) & 0x3F);
+        }
+        if (($byte & 0xF0) === 0xE0 && isset($string[$i + 1]) && isset($string[$i + 2])) {
+            return (($byte & 0x0F) << 12)
+                | ((\ord($string[$i + 1]) & 0x3F) << 6)
+                | (\ord($string[$i + 2]) & 0x3F);
+        }
+        if (($byte & 0xF8) === 0xF0 && isset($string[$i + 1]) && isset($string[$i + 2]) && isset($string[$i + 3])) {
+            return (($byte & 0x07) << 18)
+                | ((\ord($string[$i + 1]) & 0x3F) << 12)
+                | ((\ord($string[$i + 2]) & 0x3F) << 6)
+                | (\ord($string[$i + 3]) & 0x3F);
+        }
+
+        return $byte;
     }
 
     public static function utf8CharWidth(string $string, int $i): int
