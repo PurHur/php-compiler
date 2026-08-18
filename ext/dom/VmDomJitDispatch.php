@@ -1564,6 +1564,37 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMCharacterData::insertData() — php-src characterdata.c xmlTextInsert (#32380).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function insertData(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMCharacterData::insertData', $extra, 2);
+        if (!VmDom::isCharacterData($node)) {
+            throw new \TypeError('DOMCharacterData::insertData() must be called on a character data node');
+        }
+        $offsetVar = ($extra[0] ?? self::missingArg('insertData', 0))->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $offsetVar->type && Variable::TYPE_FLOAT !== $offsetVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMCharacterData::insertData(): Argument #1 ($offset) must be of type int, %s given',
+                VmDom::typeLabel($offsetVar)
+            ));
+        }
+        $arg = self::stringArg(
+            $extra[1] ?? self::missingArg('insertData', 1),
+            'DOMCharacterData::insertData',
+            1,
+            'data'
+        );
+        VmDom::characterDataInsertData($node, $offsetVar->toInt(), $arg);
+        $result = new Variable();
+        $result->bool(true);
+
+        return $result;
+    }
+
+    /**
      * DOMNode::C14N() — inclusive/exclusive canonical XML (#19467).
      *
      * @param list<Variable> $extra
