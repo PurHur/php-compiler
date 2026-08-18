@@ -232,9 +232,15 @@ final class ParseUrlRuntime
     {
         try {
             $context->lookupFunction($name);
+
+            return;
         } catch (\Throwable) {
-            $context->registerFunction($name, $context->module->addFunction($name, $ft));
         }
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn) {
+            $fn = $context->module->addFunction($name, $ft);
+        }
+        $context->registerFunction($name, $fn);
     }
 
     private static function registerLinkedRuntime(Context $context): void

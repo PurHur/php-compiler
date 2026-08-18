@@ -169,11 +169,11 @@ final class GcCollectCyclesRuntime
         \PHPLLVM\Type $returnType,
         array $paramTypes
     ): void {
-        if (null !== $context->module->getNamedFunction($name)) {
-            return;
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn) {
+            $fnType = $context->context->functionType($returnType, false, ...$paramTypes);
+            $fn = $context->module->addFunction($name, $fnType);
         }
-        $fnType = $context->context->functionType($returnType, false, ...$paramTypes);
-        $fn = $context->module->addFunction($name, $fnType);
         $context->registerFunction($name, $fn);
     }
 
@@ -571,11 +571,14 @@ final class GcCollectCyclesRuntime
             'phpc_object_release_storage' => [$voidTy, false, [$i8p]],
         ];
         foreach ($internals as $name => [$ret, $vararg, $params]) {
-            if (null !== $context->module->getNamedFunction($name)) {
-                continue;
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, $vararg, ...$params)
+                );
             }
-            $ft = $context->context->functionType($ret, $vararg, ...$params);
-            $context->registerFunction($name, $context->module->addFunction($name, $ft));
+            $context->registerFunction($name, $fn);
         }
 
         self::implementIndexOf($context);

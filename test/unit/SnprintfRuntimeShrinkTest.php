@@ -40,6 +40,45 @@ final class SnprintfRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function ensureSnprintf', $date);
     }
 
+    public function testFloatFormattersReuseNamedSnprintfNotSnprintfDotOne(): void
+    {
+        $files = [
+            __DIR__.'/../../lib/JIT/Builtin/ZendDoubleStringRuntime.php',
+            __DIR__.'/../../lib/JIT/Builtin/SprintfSnprintfRuntime.php',
+            __DIR__.'/../../lib/JIT/Builtin/NumberFormatRuntime.php',
+            __DIR__.'/../../lib/JIT/Builtin/BackedEnumFromRuntime.php',
+        ];
+        foreach ($files as $path) {
+            $src = (string) file_get_contents($path);
+            $this->assertStringContainsString('LibcExtern::ensureSnprintf', $src, $path);
+            $this->assertStringContainsString('#32122', $src, $path);
+            $this->assertStringNotContainsString(
+                "'snprintf' => [\$i32, true, [\$charPtr, \$sizeT, \$charPtr]]",
+                $src,
+                $path
+            );
+        }
+        $enum = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/BackedEnumFromRuntime.php');
+        $this->assertStringNotContainsString("['snprintf', \$i32, [\$charPtr, \$sizeT, \$charPtr]]", $enum);
+    }
+
+    public function testGcInternalsRegisterExistingNamedFunctions(): void
+    {
+        $gc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
+        $this->assertStringContainsString('$context->registerFunction($name, $fn);', $gc);
+        $this->assertStringNotContainsString(
+            "if (null !== \$context->module->getNamedFunction(\$name)) {\n                continue;",
+            $gc
+        );
+        $standalone = (string) file_get_contents(
+            __DIR__.'/../../ext/standard/JitGcCollectCyclesStandaloneKernel.php'
+        );
+        $this->assertStringContainsString('$context->registerFunction($name, $fn);', $standalone);
+        $parseUrl = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlRuntime.php');
+        $this->assertStringContainsString('getNamedFunction($name)', $parseUrl);
+        $this->assertStringContainsString('$context->registerFunction($name, $fn);', $parseUrl);
+    }
+
     public function testWeakRefRegistryUsesCanonicalSnprintfPrototype(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/WeakRefRegistryRuntime.php');

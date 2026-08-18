@@ -477,21 +477,29 @@ final class BackedEnumFromRuntime
 
     private static function ensureExternals(Context $context): void
     {
-        $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
         $longTy = $context->getTypeFromString('int64');
         $i8pp = $context->getTypeFromString('int8**');
-        $charPtr = $context->getTypeFromString('char*');
         $int32 = $context->getTypeFromString('int32');
+        // Canonical vararg snprintf via LibcExtern — a non-vararg addFunction('snprintf')
+        // silently becomes snprintf.1 and Module.php:180 aborts (#32122 / #31894).
+        LibcExtern::ensureSnprintf($context);
         foreach ([
-            ['snprintf', $i32, [$charPtr, $sizeT, $charPtr]],
             ['strtol', $longTy, [$i8p, $i8pp, $int32]],
         ] as [$name, $ret, $params]) {
-            if (null === $context->module->getNamedFunction($name)) {
-                $ft = $context->context->functionType($ret, false, ...$params);
-                $context->registerFunction($name, $context->module->addFunction($name, $ft));
+            try {
+                $context->lookupFunction($name);
+                continue;
+            } catch (\Throwable) {
             }
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
         }
     }
 

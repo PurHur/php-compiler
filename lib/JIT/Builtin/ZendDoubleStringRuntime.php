@@ -739,9 +739,11 @@ final class ZendDoubleStringRuntime
         $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
         $fmtPtr = $context->builder->pointerCast($context->constantFromString($fmt), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        // Always reuse the named decl — addFunction('snprintf') without getNamedFunction
+        // silently creates snprintf.1 and Module.php:180 aborts (#32122 / #31894).
+        LibcExtern::ensureSnprintf($context);
         if (null === $precisionArg) {
-            // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
-            LibcExtern::ensureSnprintf($context);
             $written = $context->builder->call(
                 $context->lookupFunction('snprintf'),
                 $bufChar,
@@ -772,8 +774,6 @@ final class ZendDoubleStringRuntime
 
     private static function ensureDecls(Context $context): void
     {
-        $double = $context->getTypeFromString('double');
-        $i32 = $context->getTypeFromString('int32');
         $charPtr = $context->getTypeFromString('char*');
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
@@ -781,9 +781,9 @@ final class ZendDoubleStringRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $voidTy = $context->getTypeFromString('void');
 
+        LibcExtern::ensureSnprintf($context);
         foreach (
             [
-                'snprintf' => [$i32, true, [$charPtr, $sizeT, $charPtr]],
                 '__mm__malloc' => [$i8p, false, [$sizeT]],
                 '__mm__free' => [$voidTy, false, [$i8p]],
                 '__string__init' => [$strPtr, false, [$i64, $charPtr]],
@@ -792,10 +792,18 @@ final class ZendDoubleStringRuntime
         ) {
             try {
                 $context->lookupFunction($name);
+                continue;
             } catch (\Throwable) {
-                $ft = $context->context->functionType($ret, $vararg, ...$params);
-                $context->registerFunction($name, $context->module->addFunction($name, $ft));
             }
+            // Reuse the module symbol when lookupFunction misses the registry (#32122 / #31894).
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, $vararg, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
         }
     }
 }

@@ -192,17 +192,15 @@ final class SprintfSnprintfRuntime
     {
         $double = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $charPtr = $context->getTypeFromString('char*');
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
 
+        LibcExtern::ensureSnprintf($context);
         foreach (
             [
-                'snprintf' => [$i32, true, [$charPtr, $sizeT, $charPtr]],
                 '__mm__malloc' => [$i8p, false, [$sizeT]],
                 '__mm__free' => [$voidTy, false, [$i8p]],
                 '__string__init' => [$strPtr, false, [$i64, $i8p]],
@@ -214,10 +212,18 @@ final class SprintfSnprintfRuntime
         ) {
             try {
                 $context->lookupFunction($name);
+                continue;
             } catch (\Throwable) {
-                $ft = $context->context->functionType($ret, $vararg, ...$params);
-                $context->registerFunction($name, $context->module->addFunction($name, $ft));
             }
+            // Reuse the module symbol when lookupFunction misses the registry (#32122 / #31894).
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, $vararg, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
         }
         LibcExtern::ensureMemcpyImplemented($context);
     }
