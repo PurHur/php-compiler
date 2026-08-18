@@ -1627,6 +1627,44 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMCharacterData::replaceData() — php-src characterdata.c replace_data (#32392).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function replaceData(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMCharacterData::replaceData', $extra, 3);
+        if (!VmDom::isCharacterData($node)) {
+            throw new \TypeError('DOMCharacterData::replaceData() must be called on a character data node');
+        }
+        $offsetVar = ($extra[0] ?? self::missingArg('replaceData', 0))->resolveIndirect();
+        $countVar = ($extra[1] ?? self::missingArg('replaceData', 1))->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $offsetVar->type && Variable::TYPE_FLOAT !== $offsetVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMCharacterData::replaceData(): Argument #1 ($offset) must be of type int, %s given',
+                VmDom::typeLabel($offsetVar)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $countVar->type && Variable::TYPE_FLOAT !== $countVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMCharacterData::replaceData(): Argument #2 ($count) must be of type int, %s given',
+                VmDom::typeLabel($countVar)
+            ));
+        }
+        $arg = self::stringArg(
+            $extra[2] ?? self::missingArg('replaceData', 2),
+            'DOMCharacterData::replaceData',
+            2,
+            'data'
+        );
+        VmDom::characterDataReplaceData($node, $offsetVar->toInt(), $countVar->toInt(), $arg);
+        $result = new Variable();
+        $result->bool(true);
+
+        return $result;
+    }
+
+    /**
      * DOMNode::C14N() — inclusive/exclusive canonical XML (#19467).
      *
      * @param list<Variable> $extra
