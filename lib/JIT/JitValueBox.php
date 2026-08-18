@@ -148,6 +148,9 @@ final class JitValueBox
             return self::valuePtrFromNativeVariable($context, $var);
         }
         if (Variable::KIND_VALUE === $var->kind && $var->functionStaticGlobal) {
+            // Undefined `$u ?? …` loads phpc_script_global_*; parentless load fails
+            // module verify after NestedJIT helper link (#32445).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'script_global_load');
             return self::normalizeValuePtr($context, $context->builder->load($var->value));
         }
         if (Variable::KIND_VARIABLE === $var->kind) {
