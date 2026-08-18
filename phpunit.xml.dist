@@ -176,6 +176,8 @@
             <file>./test/compliance/ForeachByRefThis32205JITTest.php</file>
             <file>./test/compliance/ExtractThis32226VMTest.php</file>
             <file>./test/compliance/ExtractThis32226JITTest.php</file>
+            <file>./test/compliance/GlobalsWrite32229VMTest.php</file>
+            <file>./test/compliance/GlobalsWrite32229JITTest.php</file>
             <file>./test/compliance/DeclareStrictTypesMidfile32182VMTest.php</file>
             <file>./test/compliance/DeclareStrictTypesMidfile32182JITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
