@@ -6018,6 +6018,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateComment.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateDocumentFragment.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateElement.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateElementNS.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateTextNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomLivingDocumentCreateElement.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomLivingDocumentCreateElementNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentGetElementById.php';
