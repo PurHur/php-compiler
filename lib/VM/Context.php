@@ -582,6 +582,11 @@ class Context {
      */
     public function defineConstant(string $name, Variable $value, bool $caseInsensitive = false, ?string $filename = null): bool
     {
+        // php-src zend_register_constant() + zend_get_special_const() — define('true') warns (#32228).
+        $lc = strtolower($name);
+        if ('true' === $lc || 'false' === $lc || 'null' === $lc) {
+            return false;
+        }
         if (isset($this->constants[$name])) {
             return false;
         }
