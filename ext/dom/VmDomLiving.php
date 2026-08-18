@@ -433,11 +433,12 @@ final class VmDomLiving
      *
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
      * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:empty`, `:only-child`,
-     * `:only-of-type`, `:root`, CSS attribute selectors (`[attr]`, `=`, `~=`,
-     * `|=`, `^=`, `$=`, `*=`, optional `i` flag), descendant / child (`>`) /
-     * adjacent-sibling (`+`) / general-sibling (`~`) combinators, and comma
-     * selector lists (CSS Selectors Level 3 / php-src Dom\* lexbor; #32061,
-     * #32089, #32108, #32132).
+     * `:only-of-type`, `:root`, `:not()` / `:is()` / `:where()` (selector-list
+     * args), CSS attribute selectors (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`,
+     * `*=`, optional `i` flag), descendant / child (`>`) / adjacent-sibling
+     * (`+`) / general-sibling (`~`) combinators, and comma selector lists
+     * (CSS Selectors Level 3–4 / php-src Dom\* lexbor; #32061, #32089,
+     * #32108, #32132, #32150).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -458,18 +459,14 @@ final class VmDomLiving
         if ('' === $selectors) {
             throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
         }
-        // CSS selector lists: "a, b" unions groups (php-src Dom\* / lexbor; #20689).
-        $groups = preg_split('/\s*,\s*/', $selectors) ?: [];
-        if ([] === $groups) {
+        // CSS selector lists: "a, b" unions groups. Commas inside :is()/:not()
+        // / [attr="a,b"] are not list separators (php-src Dom\* / lexbor; #20689, #32150).
+        $groups = self::splitSelectorList($selectors);
+        if (null === $groups || [] === $groups) {
             throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
         }
         $matchIds = [];
         foreach ($groups as $group) {
-            $group = trim($group);
-            if ('' === $group) {
-                // Empty group ("p,,span" / trailing ",") — SyntaxError like lexbor.
-                throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
-            }
             foreach (self::querySelectorAllIdsOneGroup($root, $group) as $id) {
                 $matchIds[$id] = true;
             }
@@ -1242,7 +1239,8 @@ final class VmDomLiving
                 if (1 !== preg_match(
                     '/\G(?:first-child|last-child|first-of-type|last-of-type|'
                     .'only-child|only-of-type|empty|root|'
-                    .'nth-child|nth-last-child|nth-of-type|nth-last-of-type)/A',
+                    .'nth-child|nth-last-child|nth-of-type|nth-last-of-type|'
+                    .'not|is|where)/A',
                     $selector,
                     $m,
                     0,
@@ -1266,6 +1264,19 @@ final class VmDomLiving
                         return null;
                     }
                     if (null === self::parseNthExpression($arg)) {
+                        return null;
+                    }
+                    $i = $end;
+                } elseif ('not' === $name || 'is' === $name || 'where' === $name) {
+                    if ($i >= $len || '(' !== $selector[$i]) {
+                        return null;
+                    }
+                    $end = self::scanParenthesisClose($selector, $i, $len);
+                    if (null === $end) {
+                        return null;
+                    }
+                    $arg = trim(substr($selector, $i + 1, $end - $i - 2));
+                    if (null === self::parseLogicalPseudoArgument($name, $arg)) {
                         return null;
                     }
                     $i = $end;
@@ -1570,6 +1581,9 @@ final class VmDomLiving
         if ('root' === $name) {
             return self::elementIsCssRoot($element);
         }
+        if ('not' === $name || 'is' === $name || 'where' === $name) {
+            return self::matchesLogicalPseudo($element, $name, $arg);
+        }
         $pos = self::elementSiblingPositions($element);
         if (null === $pos) {
             return false;
@@ -1590,6 +1604,261 @@ final class VmDomLiving
                 && self::nthExpressionMatches($arg, $pos['typeCount'] - $pos['typeIndex'] + 1),
             default => false,
         };
+    }
+
+    /**
+     * Parse `:not()` / `:is()` / `:where()` argument. Empty `:not()` is invalid;
+     * empty `:is()`/`:where()` is a valid match-nothing list (Selectors 4
+     * forgiving list / php-src lexbor; #32150).
+     *
+     * @return list<string>|null
+     */
+    private static function parseLogicalPseudoArgument(string $name, string $arg): ?array
+    {
+        if ('' === $arg) {
+            return 'not' === $name ? null : [];
+        }
+        $groups = self::splitSelectorList($arg);
+        if (null === $groups || [] === $groups) {
+            return null;
+        }
+        foreach ($groups as $group) {
+            if (null === self::parseCompoundSelector($group)) {
+                return null;
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Comma-split a selector list, ignoring commas inside `()` / `[]`.
+     *
+     * @return list<string>|null
+     */
+    private static function splitSelectorList(string $selectors): ?array
+    {
+        $len = \strlen($selectors);
+        $groups = [];
+        $start = 0;
+        $i = 0;
+        while ($i < $len) {
+            $ch = $selectors[$i];
+            if ('[' === $ch) {
+                $end = self::scanAttributeSelectorClose($selectors, $i, $len);
+                if (null === $end) {
+                    return null;
+                }
+                $i = $end;
+                continue;
+            }
+            if ('(' === $ch) {
+                $end = self::scanParenthesisClose($selectors, $i, $len);
+                if (null === $end) {
+                    return null;
+                }
+                $i = $end;
+                continue;
+            }
+            if (',' === $ch) {
+                $group = trim(substr($selectors, $start, $i - $start));
+                if ('' === $group) {
+                    return null;
+                }
+                $groups[] = $group;
+                ++$i;
+                $start = $i;
+                continue;
+            }
+            ++$i;
+        }
+        $group = trim(substr($selectors, $start));
+        if ('' === $group) {
+            return null;
+        }
+        $groups[] = $group;
+
+        return $groups;
+    }
+
+    /**
+     * CSS4 `:not()` / `:is()` / `:where()` against the candidate element
+     * (php-src lexbor / Selectors Level 4; #32150).
+     */
+    private static function matchesLogicalPseudo(ObjectEntry $element, string $name, ?string $arg): bool
+    {
+        $groups = self::parseLogicalPseudoArgument($name, null === $arg ? '' : $arg);
+        if (null === $groups) {
+            return false;
+        }
+        $any = false;
+        foreach ($groups as $group) {
+            $compound = self::parseCompoundSelector($group);
+            if (null === $compound) {
+                continue;
+            }
+            if (self::elementMatchesCompoundFromSubject($element, $compound)) {
+                $any = true;
+                break;
+            }
+        }
+
+        return 'not' === $name ? !$any : $any;
+    }
+
+    /**
+     * Match a compound selector with `$subject` as the rightmost simple
+     * selector (CSS `:is()` / `:not()` argument semantics).
+     *
+     * @param list<array{combinator: string, simple: array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<array{name: string, arg: ?string}>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>}}> $compound
+     */
+    private static function elementMatchesCompoundFromSubject(ObjectEntry $subject, array $compound): bool
+    {
+        $n = \count($compound);
+        if ($n < 1) {
+            return false;
+        }
+        if (!self::elementMatchesSimple($subject, $compound[$n - 1]['simple'])) {
+            return false;
+        }
+        if (1 === $n) {
+            return true;
+        }
+
+        return self::elementMatchesCompoundPrefix($subject, $compound, $n - 1);
+    }
+
+    /**
+     * @param list<array{combinator: string, simple: array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<array{name: string, arg: ?string}>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>}}> $compound
+     */
+    private static function elementMatchesCompoundPrefix(ObjectEntry $right, array $compound, int $rightIndex): bool
+    {
+        $comb = $compound[$rightIndex]['combinator'];
+        $leftSimple = $compound[$rightIndex - 1]['simple'];
+        foreach (self::elementsReachedByCombinatorReverse($right, $comb) as $left) {
+            if (!self::elementMatchesSimple($left, $leftSimple)) {
+                continue;
+            }
+            if (1 === $rightIndex) {
+                return true;
+            }
+            if (self::elementMatchesCompoundPrefix($left, $compound, $rightIndex - 1)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Reverse of `elementsReachedByCombinator` — left-hand matches reachable
+     * from a right-hand subject (for `:is(div > p)` / `:not(a ~ b)`).
+     *
+     * @return list<ObjectEntry>
+     */
+    private static function elementsReachedByCombinatorReverse(ObjectEntry $right, string $combinator): array
+    {
+        return match ($combinator) {
+            ' ' => self::ancestorElements($right),
+            '>' => self::parentElementList($right),
+            '+' => self::previousElementSiblingList($right),
+            '~' => self::precedingElementSiblings($right),
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<ObjectEntry>
+     */
+    private static function parentElementList(ObjectEntry $element): array
+    {
+        $parent = self::parentElement($element);
+
+        return null === $parent ? [] : [$parent];
+    }
+
+    private static function parentElement(ObjectEntry $element): ?ObjectEntry
+    {
+        if (!DomRegistry::has($element)) {
+            return null;
+        }
+        $parentId = DomRegistry::state($element)->parentId;
+        if (null === $parentId) {
+            return null;
+        }
+        $parent = DomRegistry::entry($parentId);
+        if (null === $parent || !VmDom::isElement($parent)) {
+            return null;
+        }
+
+        return $parent;
+    }
+
+    /**
+     * Element ancestors, nearest first (CSS descendant combinator reverse).
+     *
+     * @return list<ObjectEntry>
+     */
+    private static function ancestorElements(ObjectEntry $element): array
+    {
+        $out = [];
+        $current = self::parentElement($element);
+        while (null !== $current) {
+            $out[] = $current;
+            $current = self::parentElement($current);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<ObjectEntry>
+     */
+    private static function previousElementSiblingList(ObjectEntry $element): array
+    {
+        $prev = self::previousElementSibling($element);
+
+        return null === $prev ? [] : [$prev];
+    }
+
+    private static function previousElementSibling(ObjectEntry $element): ?ObjectEntry
+    {
+        $preceding = self::precedingElementSiblings($element);
+        $n = \count($preceding);
+
+        return $n > 0 ? $preceding[$n - 1] : null;
+    }
+
+    /**
+     * Preceding element siblings in tree order (CSS `~` / `+` reverse).
+     *
+     * @return list<ObjectEntry>
+     */
+    private static function precedingElementSiblings(ObjectEntry $element): array
+    {
+        $out = [];
+        if (!DomRegistry::has($element)) {
+            return $out;
+        }
+        $parentId = DomRegistry::state($element)->parentId;
+        if (null === $parentId) {
+            return $out;
+        }
+        $parent = DomRegistry::entry($parentId);
+        if (null === $parent || !DomRegistry::has($parent)) {
+            return $out;
+        }
+        foreach (DomRegistry::state($parent)->childIds as $childId) {
+            if ($childId === $element->id) {
+                break;
+            }
+            $sib = DomRegistry::entry($childId);
+            if (null !== $sib && VmDom::isElement($sib)) {
+                $out[] = $sib;
+            }
+        }
+
+        return $out;
     }
 
     /**

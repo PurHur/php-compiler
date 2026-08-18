@@ -972,6 +972,65 @@ PHP;
         }
     }
 
+    /**
+     * CSS :not / :is / :where on Dom\ ParentNode (#32150, php-src parentnode.c / lexbor).
+     */
+    public function test_dom_parent_node_css_not_is_where(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32150)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_dom_qsa_not_is_where.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_not_is_where.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                ":not(p)=root [root,art,s1,main,sec,d1,d2]\n"
+                ."p:not(.foo)=p1 [p1,p2,p3,pn]\n"
+                .":not(.foo)=root [root,art,p1,main,p2,sec,p3,d1,d2,pn]\n"
+                ."p:not(#p1)=p2 [p2,p3,pf,pn]\n"
+                .":is(article, main)=art [art,main]\n"
+                .":is(article, main) p=p1 [p1,p2]\n"
+                .":where(article, main) p=p1 [p1,p2]\n"
+                .":not(article, main, section)=root [root,p1,s1,p2,p3,d1,pf,d2,pn]\n"
+                ."p:not(:first-child)=null []\n"
+                .":is(p, span).foo=s1 [s1,pf]\n"
+                .":not(p.foo)=root [root,art,p1,s1,main,p2,sec,p3,d1,d2,pn]\n"
+                .":is(article > p)=p1 [p1]\n"
+                .":not(article > p)=root [root,art,s1,main,p2,sec,p3,d1,pf,d2,pn]\n"
+                .":not(:not(p))=p1 [p1,p2,p3,pf,pn]\n"
+                ."matches_p1_not_span=yes\n"
+                ."matches_p1_not_p=no\n"
+                ."matches_pf_not_foo=no\n"
+                ."matches_art_is=yes\n"
+                ."matches_p1_is_p=yes\n"
+                ."matches_p1_is_child=yes\n"
+                ."matches_p2_is_art_child=no\n"
+                ."closest=art\n"
+                ."bad[:not()]=SyntaxError\n"
+                ."bad[:is()]=null\n"
+                ."bad[:where()]=null\n"
+                ."bad[:not]=SyntaxError\n"
+                ."bad[:is]=SyntaxError\n"
+                ."bad[p:not(]=SyntaxError\n"
+                ."bad[:not(())]=SyntaxError\n"
+                ."bad[:unknown(p)]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
