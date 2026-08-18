@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 /**
  * Native-type (object) cast lowering — extracted from CastHelper (#10244).
  *
- * php-src: Zend/zend_operators.c — convert_to_object / cast_object (#30098, #30793).
+ * php-src: Zend/zend_operators.c — convert_to_object / cast_object (#30098, #30793, #32448).
  */
 final class CastObjectNativeJit
 {
@@ -32,6 +32,20 @@ final class CastObjectNativeJit
         }
         if (Variable::TYPE_VALUE === $src->type) {
             return CastObjectValueBoxJit::emit($context, $src, $block, $op);
+        }
+        // Native literals stay unboxed; convert_to_object still wraps them as
+        // stdClass->{scalar} (IS_NULL → empty). Boxed foreach operands already
+        // hit TYPE_VALUE (#30098); (object)1 aborted as int64 (#32448).
+        if (Variable::TYPE_NULL === $src->type) {
+            return CastObjectFromHashtableJit::emitEmptyStdClass($context);
+        }
+        if (
+            Variable::TYPE_NATIVE_LONG === $src->type
+            || Variable::TYPE_NATIVE_DOUBLE === $src->type
+            || Variable::TYPE_NATIVE_BOOL === $src->type
+            || Variable::TYPE_STRING === $src->type
+        ) {
+            return CastObjectFromHashtableJit::emitScalarStdClass($context, $src);
         }
 
         throw new \LogicException(
