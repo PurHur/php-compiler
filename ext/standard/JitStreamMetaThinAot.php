@@ -332,11 +332,12 @@ final class JitStreamMetaThinAot
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
+        // Module-local strncmp after leftover Module always-on drop (#32382 / #31839).
+        LibcExtern::ensureStrncmp($context);
 
         foreach ([
             ['feof', $i32, [$i8p]],
             ['strlen', $sizeT, [$i8p]],
-            ['strncmp', $i32, [$i8p, $i8p, $sizeT]],
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['__hashtable__alloc', $htPtr, []],
             ['__hashtable__setStringKeyString', $void, [$htPtr, $strPtr, $strPtr]],

@@ -243,9 +243,11 @@ final class JitStreamIoKernel
         // Module-local stdio after LibcExtern always-on drop (#31606 / fopen family #31764).
         // Module-local close(2) after open/close/read/write always-on drop (#31817).
         // strcmp(3) after always-on LibcExtern drop (#31971).
+        // strncmp(3) after leftover Module always-on drop (#32382 / #31839).
         // malloc/free after always-on LibcExtern drop (#32273).
         // __phpc_resolve_stream after always-on LibcExtern drop (#32287).
         LibcExtern::ensureStrcmpDecl($context);
+        LibcExtern::ensureStrncmp($context);
         LibcExtern::ensureMallocFamily($context);
         LibcExtern::ensureResolveStreamDecl($context);
         $i32 = $context->getTypeFromString('int32');
@@ -271,7 +273,6 @@ final class JitStreamIoKernel
             ['strlen', $sizeT, [$i8p]],
             ['ferror', $i32, [$i8p]],
             ['strcmp', $i32, [$i8p, $i8p]],
-            ['strncmp', $i32, [$i8p, $i8p, $sizeT]],
             ['dup', $i32, [$i32]],
             ['fdopen', $i8p, [$i32, $i8p]],
             ['close', $i32, [$i32]],
