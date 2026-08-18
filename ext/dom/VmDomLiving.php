@@ -434,12 +434,12 @@ final class VmDomLiving
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
      * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:nth-child(An+B of S)` /
      * `:nth-last-child(An+B of S)`, `:empty`, `:only-child`, `:only-of-type`,
-     * `:root`, `:not()` / `:is()` / `:where()` (selector-list args), `:has()`
-     * (relative selector-list args), CSS attribute selectors (`[attr]`, `=`,
-     * `~=`, `|=`, `^=`, `$=`, `*=`, optional `i` flag), descendant / child
+     * `:root`, `:checked`, `:not()` / `:is()` / `:where()` (selector-list args),
+     * `:has()` (relative selector-list args), CSS attribute selectors (`[attr]`,
+     * `=`, `~=`, `|=`, `^=`, `$=`, `*=`, optional `i` flag), descendant / child
      * (`>`) / adjacent-sibling (`+`) / general-sibling (`~`) combinators, and
      * comma selector lists (CSS Selectors Level 3–4 / php-src Dom\* lexbor;
-     * #32061, #32089, #32108, #32132, #32150, #32165, #32185).
+     * #32061, #32089, #32108, #32132, #32150, #32165, #32185, #32211).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -1252,7 +1252,7 @@ final class VmDomLiving
                 ++$i;
                 if (1 !== preg_match(
                     '/\G(?:first-child|last-child|first-of-type|last-of-type|'
-                    .'only-child|only-of-type|empty|root|'
+                    .'only-child|only-of-type|empty|root|checked|'
                     .'nth-child|nth-last-child|nth-of-type|nth-last-of-type|'
                     .'not|is|where|has)/A',
                     $selector,
@@ -1598,6 +1598,9 @@ final class VmDomLiving
         }
         if ('root' === $name) {
             return self::elementIsCssRoot($element);
+        }
+        if ('checked' === $name) {
+            return self::elementIsCssChecked($element);
         }
         if ('not' === $name || 'is' === $name || 'where' === $name) {
             return self::matchesLogicalPseudo($element, $name, $arg);
@@ -2095,6 +2098,40 @@ final class VmDomLiving
         }
 
         return VmDom::isDocument($parent) || VmDom::isDocumentFragment($parent);
+    }
+
+    /**
+     * CSS `:checked` — HTML-namespace checkbox/radio `input` with `checked`,
+     * or HTML-namespace `option` with `selected` (php-src lexbor /
+     * `pseudo_classes_checked.phpt`; #32211). Local names are case-sensitive
+     * (`<A>` in XHTML is not `a`). Default `input` type is `text`.
+     */
+    private static function elementIsCssChecked(ObjectEntry $element): bool
+    {
+        if (!VmDom::isElement($element) || !DomRegistry::has($element)) {
+            return false;
+        }
+        $state = DomRegistry::state($element);
+        if (self::HTML_NS !== ($state->namespaceUri ?? '')) {
+            return false;
+        }
+        $local = $state->localName ?? $state->nodeName;
+        if ('input' === $local) {
+            $type = strtolower((string) (VmDom::getAttribute($element, 'type') ?? 'text'));
+            if ('' === $type) {
+                $type = 'text';
+            }
+            if ('checkbox' !== $type && 'radio' !== $type) {
+                return false;
+            }
+
+            return VmDom::hasAttribute($element, 'checked');
+        }
+        if ('option' === $local) {
+            return VmDom::hasAttribute($element, 'selected');
+        }
+
+        return false;
     }
 
     private static function nthExpressionMatches(string $expression, int $index): bool

@@ -1137,6 +1137,54 @@ PHP;
         }
     }
 
+    /**
+     * CSS :checked on Dom\ ParentNode (#32211, php-src parentnode.c / lexbor).
+     */
+    public function test_dom_parent_node_css_checked(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32211)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_dom_qsa_checked.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_checked.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                ":checked=cb [cb,rd,opt,cbup]\n"
+                ."input:checked=cb [cb,rd,cbup]\n"
+                ."option:checked=opt [opt]\n"
+                .":is(:checked)=cb [cb,rd,opt,cbup]\n"
+                ."input:not(:checked)=plain [plain,uncb,txt,def]\n"
+                ."#optnn:checked=null []\n"
+                ."#txt:checked=null []\n"
+                ."#def:checked=null []\n"
+                ."#uncb:checked=null []\n"
+                ."matches_cb=yes\n"
+                ."matches_opt=yes\n"
+                ."matches_optnn=no\n"
+                ."matches_txt=no\n"
+                ."closest=opt\n"
+                ."loose_xhtml_opt=yes\n"
+                ."loose_nons_opt=no\n"
+                ."html_checked=[hcb,hrd,hopt]\n"
+                ."bad[:checked()]=SyntaxError\n"
+                ."bad[:checked(1)]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
