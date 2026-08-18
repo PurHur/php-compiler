@@ -7,7 +7,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
- * VM: $obj->n++ with __get only invokes __get, no Undefined property (#32016).
+ * VM: $obj->n++ with __get only invokes __get — no Undefined property (#32016).
  */
 final class MagicPropGetOnlyIncNoUndefWarnVMTest extends BaseTest
 {

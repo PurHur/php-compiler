@@ -7,7 +7,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
- * JIT: $obj->n++ with __get only invokes __get, no Undefined property (#32016).
+ * JIT: $obj->n++ with __get only invokes __get — no Undefined property (#32016).
  */
 final class MagicPropGetOnlyIncNoUndefWarnJITTest extends BaseTest
 {

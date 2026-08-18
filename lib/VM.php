@@ -3577,8 +3577,11 @@ class VM {
         }
         $meta = $this->classPropertyMeta($object, $name, $frame);
         if (null === $meta) {
-            // Live dynamic slots are read from storage (zend_std_read_property, #31949).
-            return !$object->hasProperty($name);
+            if (!$object->hasProperty($name)) {
+                return true;
+            }
+            // get_property_ptr_ptr may allocate a fresh dynamic slot before ++/-- (#32016).
+            return $object->getProperty($name)->objectPropertyRwFresh;
         }
         if ($this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, $meta->getVisibility)) {
             return true;
@@ -3878,18 +3881,6 @@ class VM {
             );
             $this->raiseUncaughtException($thrown);
         }
-        if (!$object->class->allowsDynamicProperties) {
-            if (\PHPCompiler\CompilerVersion::supportsDynamicPropertyCreationDeprecation()) {
-                $scriptPath = $frame->scriptPath;
-                $this->context->errors->deprecatedDynamicProperty(
-                    $object->class->name,
-                    $name,
-                    '' !== $scriptPath && '-' !== $scriptPath ? $scriptPath : null,
-                    $this->context,
-                    $frame
-                );
-            }
-        }
         // ++/-- with __get only: defer slot allocation so RMW reads via __get (#32016, zend_object_handlers.c).
         if (
             null !== $op
@@ -3902,6 +3893,18 @@ class VM {
             $proxy->magicSetName = $name;
 
             return $proxy;
+        }
+        if (!$object->class->allowsDynamicProperties) {
+            if (\PHPCompiler\CompilerVersion::supportsDynamicPropertyCreationDeprecation()) {
+                $scriptPath = $frame->scriptPath;
+                $this->context->errors->deprecatedDynamicProperty(
+                    $object->class->name,
+                    $name,
+                    '' !== $scriptPath && '-' !== $scriptPath ? $scriptPath : null,
+                    $this->context,
+                    $frame
+                );
+            }
         }
 
         return $object->allocateProperty($name);

@@ -96,6 +96,12 @@ final class Variable {
 
     public ?string $objectPropertyName = null;
 
+    /**
+     * Set when get_property_ptr_ptr allocates a dynamic slot before the first user write (#32016).
+     * While true, reads route through __get even though hasProperty() is already true.
+     */
+    public bool $objectPropertyRwFresh = false;
+
     /** Declaring class (lowercase) for static property hook set dispatch (#4751). */
     public ?string $staticPropertyClassLc = null;
 
@@ -1767,6 +1773,9 @@ final class Variable {
                 break;
             default:
                 throw new \LogicException("Unsupported type copy: {$var->type}");
+        }
+        if (null !== $this->objectPropertyOwner) {
+            $this->objectPropertyRwFresh = false;
         }
     }
 
