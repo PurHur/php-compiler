@@ -4766,6 +4766,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'res', 'get_resource_type'));
     }
 
+    /** @covers issue #23381 */
+    public function testGetResourcesZendStubNamedParamsType(): void
+    {
+        $names = BuiltinParamNames::forFunction('get_resources');
+        self::assertSame(['type='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'type', 'get_resources'));
+        // InternalArgInfo typo / pre-stub name must not resolve (Zend rejects $resource_type)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'resource_type', 'get_resources'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'resouce_type', 'get_resources'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('get_resources', 0));
+        self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_resources'));
+    }
+
     /** @covers issue #23937 */
     public function testStreamSocketServerZendStubNamedParams(): void
     {

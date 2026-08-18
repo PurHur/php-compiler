@@ -914,6 +914,10 @@ final class BuiltinInternalDefaultValues
         'rewinddir' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — ?string $type = null (#23381)
+        'get_resources' => [
+            0 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — bool $associative = false; $context = null (#25780)
         'get_headers' => [
             1 => ['kind' => 'bool', 'value' => false],
