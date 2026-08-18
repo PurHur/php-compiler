@@ -434,12 +434,13 @@ final class VmDomLiving
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
      * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:nth-child(An+B of S)` /
      * `:nth-last-child(An+B of S)`, `:empty`, `:only-child`, `:only-of-type`,
-     * `:root`, `:checked`, `:not()` / `:is()` / `:where()` (selector-list args),
-     * `:has()` (relative selector-list args), CSS attribute selectors (`[attr]`,
-     * `=`, `~=`, `|=`, `^=`, `$=`, `*=`, optional `i` flag), descendant / child
-     * (`>`) / adjacent-sibling (`+`) / general-sibling (`~`) combinators, and
-     * comma selector lists (CSS Selectors Level 3–4 / php-src Dom\* lexbor;
-     * #32061, #32089, #32108, #32132, #32150, #32165, #32185, #32211).
+     * `:root`, `:checked`, `:disabled` / `:enabled`, `:not()` / `:is()` /
+     * `:where()` (selector-list args), `:has()` (relative selector-list args),
+     * CSS attribute selectors (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`, `*=`,
+     * optional `i` flag), descendant / child (`>`) / adjacent-sibling (`+`) /
+     * general-sibling (`~`) combinators, and comma selector lists (CSS
+     * Selectors Level 3–4 / php-src Dom\* lexbor; #32061, #32089, #32108,
+     * #32132, #32150, #32165, #32185, #32211, #32235).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -1252,7 +1253,7 @@ final class VmDomLiving
                 ++$i;
                 if (1 !== preg_match(
                     '/\G(?:first-child|last-child|first-of-type|last-of-type|'
-                    .'only-child|only-of-type|empty|root|checked|'
+                    .'only-child|only-of-type|empty|root|checked|disabled|enabled|'
                     .'nth-child|nth-last-child|nth-of-type|nth-last-of-type|'
                     .'not|is|where|has)/A',
                     $selector,
@@ -1601,6 +1602,12 @@ final class VmDomLiving
         }
         if ('checked' === $name) {
             return self::elementIsCssChecked($element);
+        }
+        if ('disabled' === $name) {
+            return self::elementIsCssDisabled($element);
+        }
+        if ('enabled' === $name) {
+            return !self::elementIsCssDisabled($element);
         }
         if ('not' === $name || 'is' === $name || 'where' === $name) {
             return self::matchesLogicalPseudo($element, $name, $arg);
@@ -2129,6 +2136,119 @@ final class VmDomLiving
         }
         if ('option' === $local) {
             return VmDom::hasAttribute($element, 'selected');
+        }
+
+        return false;
+    }
+
+    /**
+     * CSS `:disabled` — php-src adapted lexbor
+     * (`lxb_selectors_pseudo_class_disabled`; #32235).
+     *
+     * HTML-namespace `button`/`input`/`select`/`textarea`/`optgroup`/`fieldset`
+     * with a `disabled` attribute, plus nested HTML-namespace `fieldset`
+     * descendants of a disabled fieldset that has a `legend` child and are not
+     * inside that first legend. Non-HTML-namespace elements never match.
+     * `:enabled` is the negation.
+     */
+    private static function elementIsCssDisabled(ObjectEntry $element): bool
+    {
+        if (!self::elementIsHtmlNamespace($element)) {
+            return false;
+        }
+        $local = self::elementCssLocalName($element);
+        $hasDisabled = VmDom::hasAttribute($element, 'disabled');
+        if ($hasDisabled && (
+            'button' === $local
+            || 'input' === $local
+            || 'select' === $local
+            || 'textarea' === $local
+            || 'optgroup' === $local
+            || 'fieldset' === $local
+        )) {
+            return true;
+        }
+        if ('fieldset' !== $local) {
+            return false;
+        }
+        if (!DomRegistry::has($element)) {
+            return false;
+        }
+        $parentId = DomRegistry::state($element)->parentId;
+        while (null !== $parentId) {
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent || !VmDom::isElement($parent) || !DomRegistry::has($parent)) {
+                break;
+            }
+            if (self::elementIsHtmlNamed($parent, 'fieldset')
+                && VmDom::hasAttribute($parent, 'disabled')
+            ) {
+                $legend = self::firstHtmlLegendChild($parent);
+                if (null !== $legend) {
+                    return !self::elementHasAncestor($element, $legend);
+                }
+            }
+            $parentId = DomRegistry::state($parent)->parentId;
+        }
+
+        return false;
+    }
+
+    private static function elementIsHtmlNamespace(ObjectEntry $element): bool
+    {
+        if (!VmDom::isElement($element) || !DomRegistry::has($element)) {
+            return false;
+        }
+
+        return self::HTML_NS === (DomRegistry::state($element)->namespaceUri ?? '');
+    }
+
+    private static function elementCssLocalName(ObjectEntry $element): string
+    {
+        $state = DomRegistry::state($element);
+
+        return $state->localName ?? $state->nodeName;
+    }
+
+    private static function elementIsHtmlNamed(ObjectEntry $element, string $local): bool
+    {
+        return self::elementIsHtmlNamespace($element)
+            && $local === self::elementCssLocalName($element);
+    }
+
+    private static function firstHtmlLegendChild(ObjectEntry $parent): ?ObjectEntry
+    {
+        if (!DomRegistry::has($parent)) {
+            return null;
+        }
+        foreach (DomRegistry::state($parent)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || !VmDom::isElement($child)) {
+                continue;
+            }
+            if (self::elementIsHtmlNamed($child, 'legend')) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    private static function elementHasAncestor(ObjectEntry $node, ObjectEntry $ancestor): bool
+    {
+        if (!DomRegistry::has($node)) {
+            return false;
+        }
+        $parentId = DomRegistry::state($node)->parentId;
+        while (null !== $parentId) {
+            if ($parentId === $ancestor->id) {
+                return true;
+            }
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent || !DomRegistry::has($parent)) {
+                return false;
+            }
+            $parentId = DomRegistry::state($parent)->parentId;
         }
 
         return false;

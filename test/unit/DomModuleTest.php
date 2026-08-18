@@ -1185,6 +1185,57 @@ PHP;
         }
     }
 
+    /**
+     * CSS :disabled/:enabled on Dom\ ParentNode (#32235, php-src parentnode.c / adapted lexbor).
+     */
+    public function test_dom_parent_node_css_disabled_enabled(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32235)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_dom_qsa_disabled_enabled.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_disabled_enabled.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                ":disabled=btnd [btnd,inp,sel,ta,og,fs0,fs1p,fsleg,fs3]\n"
+                .":enabled=html [html,btn,btnnn,opt,fs1,legend,div,fs2,div]\n"
+                ."button:disabled=btnd [btnd]\n"
+                ."button:enabled=btn [btn,btnnn]\n"
+                .":is(:disabled)=btnd [btnd,inp,sel,ta,og,fs0,fs1p,fsleg,fs3]\n"
+                ."button:not(:disabled)=btn [btn,btnnn]\n"
+                ."#btnnn:disabled=null []\n"
+                ."#fs1:disabled=null []\n"
+                ."#fs2:disabled=null []\n"
+                ."#fs3:disabled=fs3 [fs3]\n"
+                ."#opt:disabled=null []\n"
+                ."matches_btnd=yes\n"
+                ."matches_btn=no\n"
+                ."matches_fs3=yes\n"
+                ."matches_fs1=no\n"
+                ."matches_opt=no\n"
+                ."enabled_btn=yes\n"
+                ."enabled_btnd=no\n"
+                ."closest_fs3=fs3\n"
+                ."html_disabled=[hbtnd,hinp,hfs]\n"
+                ."bad[:disabled()]=SyntaxError\n"
+                ."bad[:enabled(1)]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
