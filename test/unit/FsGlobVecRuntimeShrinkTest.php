@@ -132,4 +132,17 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $this->assertLessThan(85, \substr_count($gi, "\n") + 1);
         $this->assertLessThan(85, \substr_count($di, "\n") + 1);
     }
+
+    public function testStringDirFactoryUsesHelperBridgeNotLibcKernel(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringDirFactory.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('DirSnapshotJitHelper', $source);
+        $this->assertStringNotContainsString('JitFsGlobKernel::implement', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('emitThinAotBridge', $source);
+        $this->assertStringNotContainsString('__phpc_scandir_vec', $source);
+        $this->assertStringContainsString('#32027', $source);
+        $this->assertLessThan(95, \substr_count($source, "\n") + 1);
+    }
 }
