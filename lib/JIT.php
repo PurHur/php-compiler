@@ -12182,6 +12182,12 @@ class JIT {
                     $this->propagateDomCloneNodeCompileTimeTag(
                         $block->getOperand($op->arg1)
                     );
+                    $this->propagateDomCreateTextNodeCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomTextSplitTextCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
                     $this->propagateBcMathNumberMethodCompileTime(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -14367,6 +14373,46 @@ class JIT {
             return;
         }
         $this->context->getVariableFromOp($result)->compileTimeDomTagName = $tag;
+    }
+
+    /** Remember createTextNode('lit') data on the result Variable for splitText (#32362). */
+    private function propagateDomCreateTextNodeCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateTextNode)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomTextData($result, $data);
+    }
+
+    /** Remember splitText() tail data on the result Variable (#32362). */
+    private function propagateDomTextSplitTextCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomTextSplitText)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomSplitText::$lastResultData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomTextData($result, $data);
+    }
+
+    private function bindCompileTimeDomTextData(Operand $result, string $data): void
+    {
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomTextData = $data;
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomTextData = $data;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
     }
 
     /** Folded BcMath\Number::{add,mul} result metadata for (string) cast / further ops (#26803). */
@@ -18270,6 +18316,9 @@ class JIT {
         // firstChild/lastChild index for thin-AOT replaceChild INNER_XML rebuild (#28671).
         if ($force || null !== $src->compileTimeDomChildIndex) {
             $dest->compileTimeDomChildIndex = $src->compileTimeDomChildIndex;
+        }
+        if ($force || null !== $src->compileTimeDomTextData) {
+            $dest->compileTimeDomTextData = $src->compileTimeDomTextData;
         }
     }
 
@@ -23816,6 +23865,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomChildIndex && null === $dest->compileTimeDomChildIndex) {
             $dest->compileTimeDomChildIndex = $source->compileTimeDomChildIndex;
+        }
+        if (null !== $source->compileTimeDomTextData && null === $dest->compileTimeDomTextData) {
+            $dest->compileTimeDomTextData = $source->compileTimeDomTextData;
         }
         $this->foldCompileTimeStringFromSlot($block, $sourceSlot, $dest);
     }
