@@ -2384,7 +2384,9 @@ final class VmString
         $rest = $url;
         $hadAuthority = false;
 
-        if (preg_match('#^([a-z][a-z0-9+.-]*):#i', $rest, $m)) {
+        // php-src url.c php_url_parse_ex2: scheme = 1*[ alpha | digit | "+" | "-" | "." ]
+        // (not RFC 3986 ALPHA-only). Digit-leading schemes such as 0://host are valid (#32086).
+        if (preg_match('#^([a-z0-9+.-]+):#i', $rest, $m)) {
             $scheme = strtolower($m[1]);
             $rest = substr($rest, strlen($m[0]));
             // php-src url.c php_url_parse_ex2: file:/// skips host parse (empty
@@ -2402,6 +2404,13 @@ final class VmString
                     return false;
                 }
                 $hadAuthority = $auth;
+            }
+        } elseif ('' !== $rest && ':' === $rest[0]) {
+            // php-src: leading colon (e == s) goes to parse_port. Lone ':' and
+            // ':80' fail (empty host after an optional port). '://host' is just_path.
+            $afterColon = substr($rest, 1);
+            if ('' === $afterColon || 1 === preg_match('#^\d{1,5}(/|$)#', $afterColon)) {
+                return false;
             }
         } elseif (str_starts_with($rest, '//')) {
             $auth = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);

@@ -102,4 +102,32 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertSame('/tmp/x', VmString::parseUrl('file:///tmp/x', \PHP_URL_PATH));
         $this->assertNull(VmString::parseUrl('file:///tmp/x', \PHP_URL_HOST));
     }
+
+    /** php-src url.c: digit-leading scheme is valid; leading ':' is false (#32086). */
+    public function testParseUrlDigitLeadingSchemeAndLoneColon(): void
+    {
+        $this->assertFalse(VmString::parseUrl(':'));
+        $this->assertFalse(VmString::parseUrl(':80'));
+        $this->assertNull(ParseUrlJitHelper::parseUrlAssoc(':'));
+        $this->assertNull(ParseUrlJitHelper::parseUrlAssoc(':80'));
+        $this->assertFalse(VmString::parseUrl(':', \PHP_URL_PATH));
+
+        $zero = VmString::parseUrl('0://host');
+        $this->assertSame(['scheme' => '0', 'host' => 'host'], $zero);
+        $this->assertSame($zero, ParseUrlJitHelper::parseUrlAssoc('0://host'));
+        $this->assertSame('0', VmString::parseUrl('0://host', \PHP_URL_SCHEME));
+
+        $digit = VmString::parseUrl('1http://example.com');
+        $this->assertSame(['scheme' => '1http', 'host' => 'example.com'], $digit);
+        $this->assertSame($digit, ParseUrlJitHelper::parseUrlAssoc('1http://example.com'));
+        $this->assertSame('example.com', VmString::parseUrl('1http://example.com', \PHP_URL_HOST));
+
+        $this->assertSame(['scheme' => 'http', 'host' => 'example.com'], VmString::parseUrl('http://example.com'));
+        $this->assertSame(['scheme' => 'mailto', 'path' => 'user@example.com'], VmString::parseUrl('mailto:user@example.com'));
+        $this->assertSame(
+            ['scheme' => 'file', 'host' => 'localhost', 'path' => '/tmp/x'],
+            VmString::parseUrl('file://localhost/tmp/x')
+        );
+        $this->assertSame(['path' => '://host'], VmString::parseUrl('://host'));
+    }
 }
