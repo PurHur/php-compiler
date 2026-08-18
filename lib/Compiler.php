@@ -1080,6 +1080,26 @@ class Compiler {
     }
 
     /**
+     * php-src: Zend/zend_compile.c zend_compile_closure_binding() — $this is never a legal use() name (#32152).
+     *
+     * @param list<Operand\BoundVariable> $closureUseVars
+     */
+    protected function assertNoThisInClosureUseVars(array $closureUseVars, Op $source): void
+    {
+        foreach ($closureUseVars as $useVar) {
+            if ('this' !== $this->boundVariableName($useVar)) {
+                continue;
+            }
+            $detail = 'Cannot use $this as lexical variable';
+            $sourceFile = $source->getFile();
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            $this->throwCompileError($detail, $sourceFile, $source->getLine());
+        }
+    }
+
+    /**
      * @param list<Operand\BoundVariable> $closureUseVars
      */
     protected function registerClosureUseCapturesOnBlock(Block $funcBlock, array $closureUseVars): void
@@ -14819,6 +14839,7 @@ class Compiler {
                     $closureUseVars[] = $useVar;
                 }
             }
+            $this->assertNoThisInClosureUseVars($closureUseVars, $expr);
         }
         try {
             $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func, $closureUseVars);
