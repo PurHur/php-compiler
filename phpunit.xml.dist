@@ -811,6 +811,8 @@
             <file>./test/compliance/NormalizerNormalizeReflectionVMTest.php</file>
             <file>./test/compliance/IdnToAsciiReflectionVMTest.php</file>
             <file>./test/compliance/DatefmtFormatObjectReflectionVMTest.php</file>
+            <file>./test/compliance/IntlDateFormatterFormatNamed23667VMTest.php</file>
+            <file>./test/compliance/IntlDateFormatterFormatNamed23667JITTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681VMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681JITTest.php</file>
             <file>./test/compliance/GetdateStrtotimeArgc30714VMTest.php</file>

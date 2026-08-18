@@ -123,6 +123,8 @@ final class BuiltinParamNames
             'collator::getsortkey' => ['string'],
             'messageformatter::create' => ['locale', 'pattern'],
             'messageformatter::format' => ['args'],
+            // php-src ext/intl/dateformat/dateformat.stub.php — InternalArgInfo still args (#23667)
+            'intldateformatter::format' => ['datetime'],
             'messageformatter::setpattern' => ['pattern'],
             'messageformatter::getpattern' => [],
             'messageformatter::formatmessage' => ['locale', 'pattern', 'args'],

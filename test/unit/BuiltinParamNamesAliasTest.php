@@ -4544,6 +4544,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($procParse, 'position', 'numfmt_parse_currency'));
     }
 
+    /** @covers issue #23667 */
+    public function testIntlDateFormatterFormatStubNamedDatetime(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('IntlDateFormatter::format');
+        self::assertSame(['datetime'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'IntlDateFormatter::format'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'args', 'IntlDateFormatter::format'));
+        self::assertSame(['datetime'], BuiltinParamNames::paramNamesForInternalFunction('IntlDateFormatter::format'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('IntlDateFormatter', 'format'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('IntlDateFormatter', 'format'));
+    }
+
     /** @covers issue #23455 */
     public function testSimpleXmlLoadStubNamedParamsResolve(): void
     {
