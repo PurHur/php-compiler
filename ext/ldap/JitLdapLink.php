@@ -18,7 +18,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ldap_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() (#32001, #32002, #32107, #32109). */
+/** LLVM lowering for ldap_bind() / ldap_bind_ext() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() (#32001, #32002, #32107, #32109, #32146). */
 final class JitLdapLink
 {
     /** @param list<JITVariable> $args */
@@ -78,6 +78,64 @@ final class JitLdapLink
         );
 
         return self::boolFromI1($context, $ok);
+    }
+
+    /** @param list<JITVariable> $args */
+    public static function invokeBindExt(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_bind_ext() expects between 1 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+
+        $handle = self::lowerConnectionHandle($context, $args[0], 'ldap_bind_ext');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        if ($argc >= 2) {
+            $hasDn = $i64->constInt(1, false);
+            $dn = JitStringBuiltinArg::lowerNullableString(
+                $context,
+                $args[1],
+                'ldap_bind_ext',
+                1,
+                'dn'
+            );
+        } else {
+            $hasDn = $i64->constInt(0, false);
+            $dn = $strPtr->constNull();
+        }
+        if ($argc >= 3) {
+            $hasPassword = $i64->constInt(1, false);
+            $password = JitStringBuiltinArg::lowerNullableString(
+                $context,
+                $args[2],
+                'ldap_bind_ext',
+                2,
+                'password'
+            );
+        } else {
+            $hasPassword = $i64->constInt(0, false);
+            $password = $strPtr->constNull();
+        }
+        // arg 4 ($controls) accepted; ignored in v1 (same as VM execute()).
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        LdapRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_bind_ext'),
+            $handle,
+            $dn,
+            $password,
+            $hasDn,
+            $hasPassword
+        );
     }
 
     /** @param list<JITVariable> $args */

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7578 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24230 |
+| Source constructs flagged (warnings) | 24233 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -562,7 +562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 73 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
-| `ext/dom/VmDomLiving.php` | 0 | 20 |
+| `ext/dom/VmDomLiving.php` | 0 | 19 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 17 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
@@ -1412,13 +1412,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/BuiltinClasses.php` | 0 | 1 |
 | `ext/ldap/JitLdapDn.php` | 0 | 3 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
-| `ext/ldap/JitLdapLink.php` | 0 | 9 |
+| `ext/ldap/JitLdapLink.php` | 0 | 10 |
 | `ext/ldap/JitLdapResult.php` | 0 | 2 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
 | `ext/ldap/LdapDnJitHelper.php` | 0 | 3 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
-| `ext/ldap/LdapLinkJitHelper.php` | 0 | 1 |
+| `ext/ldap/LdapLinkJitHelper.php` | 0 | 2 |
 | `ext/ldap/LdapResultJitHelper.php` | 0 | 2 |
 | `ext/ldap/LdapSerializeDeny.php` | 0 | 3 |
 | `ext/ldap/Module.php` | 0 | 60 |
@@ -4366,7 +4366,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/move_uploaded_file.php` | 0 | 1 |
 | `ext/standard/mt_getrandmax.php` | 0 | 1 |
 | `ext/standard/mt_rand.php` | 0 | 2 |
-| `ext/standard/mt_srand.php` | 0 | 2 |
+| `ext/standard/mt_srand.php` | 0 | 3 |
 | `ext/standard/natcasesort_.php` | 0 | 1 |
 | `ext/standard/natsort_.php` | 0 | 1 |
 | `ext/standard/net_get_interfaces.php` | 0 | 2 |
@@ -4573,7 +4573,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/spl_object_id.php` | 0 | 1 |
 | `ext/standard/sprintf_.php` | 0 | 1 |
 | `ext/standard/sqrt.php` | 0 | 1 |
-| `ext/standard/srand.php` | 0 | 2 |
+| `ext/standard/srand.php` | 0 | 3 |
 | `ext/standard/sscanf.php` | 0 | 2 |
 | `ext/standard/stat_.php` | 0 | 1 |
 | `ext/standard/str_contains.php` | 0 | 2 |
@@ -11528,18 +11528,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 284)
 - new Variable (line 312)
 - new DOMException (line 359)
-- new DOMException (line 459)
-- new DOMException (line 464)
-- new DOMException (line 471)
-- new DOMException (line 505)
-- new Exception (line 693)
-- new DOMException (line 719)
-- new Variable (line 725)
-- new Variable (line 759)
-- new ObjectEntry (line 2146)
-- new HashTable (line 2170)
-- new Variable (line 2172)
-- 77 class method(s)
+- new DOMException (line 460)
+- new DOMException (line 466)
+- new DOMException (line 502)
+- new Exception (line 690)
+- new DOMException (line 716)
+- new Variable (line 722)
+- new Variable (line 756)
+- new ObjectEntry (line 2415)
+- new HashTable (line 2439)
+- new Variable (line 2441)
+- 89 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -18570,13 +18569,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - new ArgumentCountError (line 88)
-- new ArgumentCountError (line 116)
-- new ArgumentCountError (line 142)
-- new ArgumentCountError (line 168)
-- new ArgumentCountError (line 194)
-- new ArgumentCountError (line 220)
-- new ArgumentCountError (line 253)
-- 18 class method(s)
+- new ArgumentCountError (line 146)
+- new ArgumentCountError (line 174)
+- new ArgumentCountError (line 200)
+- new ArgumentCountError (line 226)
+- new ArgumentCountError (line 252)
+- new ArgumentCountError (line 278)
+- new ArgumentCountError (line 311)
+- 19 class method(s)
 
 ### `ext/ldap/JitLdapResult.php`
 
@@ -18609,7 +18609,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/LdapLinkJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- new Variable (line 56)
+- 12 class method(s)
 
 ### `ext/ldap/LdapResultJitHelper.php`
 
@@ -33951,7 +33952,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/RandJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/RandomBytesJitHelper.php`
 
@@ -40238,7 +40239,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/mt_srand.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 62)
 - 2 class method(s)
 
 ### `ext/standard/natcasesort_.php`
@@ -41423,7 +41425,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/srand.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 62)
 - 2 class method(s)
 
 ### `ext/standard/sscanf.php`
@@ -46607,7 +46610,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 2318)
+- new InternalArgInfo (line 2322)
 - 24 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46623,8 +46626,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2705)
-- new ArgumentCountError (line 2716)
+- new ArgumentCountError (line 2709)
+- new ArgumentCountError (line 2720)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -50093,7 +50096,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Rand.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/RangeIntRuntime.php`
 

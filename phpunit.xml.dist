@@ -262,6 +262,8 @@
             <file>./test/compliance/LdapSetGetOption32107JITTest.php</file>
             <file>./test/compliance/LdapStartTls32109VMTest.php</file>
             <file>./test/compliance/LdapStartTls32109JITTest.php</file>
+            <file>./test/compliance/LdapBindExt32146VMTest.php</file>
+            <file>./test/compliance/LdapBindExt32146JITTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947VMTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947JITTest.php</file>
             <file>./test/compliance/ArrayAccessIncByValue32015VMTest.php</file>

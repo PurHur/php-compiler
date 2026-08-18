@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ldap;
 
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmActiveContextJitHelper;
 
 /**
- * ldap_bind() / ldap_unbind() / ldap_close() / ldap_set_option() / ldap_get_option() /
- * ldap_start_tls() for compiled JIT/AOT modules (#32001, #32002, #32107, #32109).
+ * ldap_bind() / ldap_bind_ext() / ldap_unbind() / ldap_close() / ldap_set_option() /
+ * ldap_get_option() / ldap_start_tls() for compiled JIT/AOT modules
+ * (#32001, #32002, #32107, #32109, #32146).
  *
- * SSOT: {@see VmLdapCore::bind} / {@see VmLdapConnection::close} / {@see VmLdapNative::startTlsSync}
- * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_set_option / ldap_start_tls
+ * SSOT: {@see VmLdapCore::bind} / {@see VmLdapCore::bindExt} / {@see VmLdapConnection::close} /
+ * {@see VmLdapNative::startTlsSync}
+ * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_bind_ext / ldap_set_option / ldap_start_tls
  */
 final class LdapLinkJitHelper
 {
@@ -29,6 +33,33 @@ final class LdapLinkJitHelper
             1 === $hasDn ? $dn : null,
             1 === $hasPassword ? $password : null
         );
+    }
+
+    /**
+     * ldap_bind_ext() — async simple bind → LDAP\Result|false (php-src ext/ldap/ldap.c; #32146).
+     *
+     * $controls is accepted by the builtin and ignored in v1 (same as VM execute()).
+     */
+    public static function bindExtArgv(int $handle, ?string $dn, ?string $password, int $hasDn, int $hasPassword): Variable
+    {
+        $conn = self::requireConnection($handle, 'ldap_bind_ext');
+        $dnArg = 1 === $hasDn ? $dn : null;
+        $passwordArg = 1 === $hasPassword ? $password : null;
+        if (null !== $dnArg && str_contains($dnArg, "\0")) {
+            throw new \TypeError('ldap_bind_ext(): Argument #2 ($dn) must not contain null bytes');
+        }
+        if (null !== $passwordArg && str_contains($passwordArg, "\0")) {
+            throw new \TypeError('ldap_bind_ext(): Argument #3 ($password) must not contain null bytes');
+        }
+        $result = VmLdapCore::bindExt($conn, $dnArg, $passwordArg, VmActiveContextJitHelper::resolve());
+        if (false === $result) {
+            $out = new Variable();
+            $out->bool(false);
+
+            return $out;
+        }
+
+        return $result;
     }
 
     public static function unbindArgv(int $handle): bool
@@ -146,17 +177,15 @@ final class LdapLinkJitHelper
     private static function requireConnection(int $handle, string $function): ObjectEntry
     {
         if (VmLdapConnection::isClosedLookupKey($handle)) {
-            throw new \TypeError(\sprintf(
-                '%s(): supplied LDAP\\Connection is not a valid ldap link resource',
-                $function
-            ));
+            throw new \TypeError(
+                $function.'(): supplied LDAP\\Connection is not a valid ldap link resource'
+            );
         }
         $conn = VmLdapConnection::connectionForLookupKey($handle);
         if (null === $conn) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #1 ($ldap) must be of type LDAP\\Connection, mixed given',
-                $function
-            ));
+            throw new \TypeError(
+                $function.'(): Argument #1 ($ldap) must be of type LDAP\\Connection, mixed given'
+            );
         }
 
         return $conn;
