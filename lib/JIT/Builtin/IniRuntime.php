@@ -500,6 +500,15 @@ final class IniRuntime
         return $context->builder->load(self::globalPtr($context, self::G_PRECISION, $i32));
     }
 
+    /** Load PG(serialize_precision) for php_var_dump %.*H (#32328). */
+    public static function loadSerializePrecision(Context $context): Value
+    {
+        self::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+
+        return $context->builder->load(self::globalPtr($context, self::G_SERIALIZE_PRECISION, $i32));
+    }
+
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         return JitVmHelperLink::lookupCompiled($context, $logical, '#21200');
