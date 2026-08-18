@@ -127,7 +127,7 @@ final class StrIncdecJitHelper
         $i = 0;
         $len = self::byteLen($s);
         if (0 === $len) {
-            return 0;
+            return 3;
         }
         while ($i < $len && (' ' === $s[$i] || "\t" === $s[$i])) {
             $i = $i + 1;

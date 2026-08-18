@@ -70,7 +70,7 @@ final class is_numeric extends Internal
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_STRING:
-                return $this->stringIsNumeric($context, $this->jitString($context, $args[0], 'is_numeric() argument #1'));
+                return self::llvmStringIsNumeric($context, $this->jitString($context, $args[0], 'is_numeric() argument #1'));
             case JITVariable::TYPE_OBJECT:
             case JITVariable::TYPE_HASHTABLE:
                 return $context->constantFromBool(false);
@@ -108,7 +108,7 @@ final class is_numeric extends Internal
         }
     }
 
-    private function stringIsNumeric(Context $context, Value $strPtr): Value
+    public static function llvmStringIsNumeric(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
@@ -172,7 +172,7 @@ final class is_numeric extends Internal
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
         $longNumeric = $this->longIsNumeric($context, $longVal);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $stringNumeric = $this->stringIsNumeric($context, $stringVal);
+        $stringNumeric = self::llvmStringIsNumeric($context, $stringVal);
         $numeric = $context->builder->select(
             $isLong,
             $longNumeric,

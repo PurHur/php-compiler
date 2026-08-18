@@ -19070,7 +19070,8 @@ class JIT {
 
         if (Variable::TYPE_STRING === $read->type) {
             // Runtime string ++/--: zend increment_string / numeric convert (#32435).
-            // Fallback binaryOp (string+1) SIGSEGVs compile or prints 1.
+            // Rebind the CV to a value box — dest type can change (string 'a'++ stays
+            // string, '9'++ becomes int) and storing a box into a __string__* slot SIGSEGVs.
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
             $str = $this->context->helper->loadValue($read);
             $slot = JIT\JitValueBox::alloc($this->context);
@@ -19079,13 +19080,17 @@ class JIT {
             $newVar = new Variable(
                 $this->context,
                 Variable::TYPE_VALUE,
-                Variable::KIND_VALUE,
-                $writePtr
+                Variable::KIND_VARIABLE,
+                $slot
             );
             if (!$prefix) {
                 $this->assignOperand($resultOp, $read, true);
             }
-            $this->assignOperand($writeOp, $newVar, true);
+            $this->context->setVariableOp($writeOp, $newVar);
+            $resolved = JIT\OperandName::resolve($writeOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $newVar);
+            }
             if ($prefix) {
                 $this->assignOperand($resultOp, $newVar, true);
             }

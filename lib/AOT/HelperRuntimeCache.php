@@ -125,9 +125,6 @@ final class HelperRuntimeCache
         // NestedJIT of NestedJIT-safe incrementArgv/decrementArgv matches VM/JIT (O=0 OK).
         'phpcompiler\\ext\\standard\\strincdecjithelper::incrementargv' => true,
         'phpcompiler\\ext\\standard\\strincdecjithelper::decrementargv' => true,
-        // #32435 — NestedJIT increment_string() / numeric kind (not helper-runtime unit.o).
-        'phpcompiler\\ext\\standard\\strincdecjithelper::operatorincrement' => true,
-        'phpcompiler\\ext\\standard\\strincdecjithelper::numericincdeckind' => true,
         // #27069 — NestedJIT CsvStrGetcsvJitHelper (no VmFs) into user AOT; prelinked
         // CsvJitHelper TU + whole-file NestedJIT of fgetcsvArgv/VmFs SIGSEGVd.
         'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::strgetcsvargv' => true,
