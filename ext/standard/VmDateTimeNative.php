@@ -4637,6 +4637,13 @@ final class VmDateTimeNative
             }
 
             $days = \abs(self::civilDaysSinceEpoch($y2, $m2, $d2) - self::civilDaysSinceEpoch($y1, $m1, $d1));
+            // timelib_diff_days — civil epoch-day delta, then decrement when later
+            // wall-clock time-of-day is before earlier (#32074). Not SSE/86400 (#31055).
+            $earliestTod = $h1 * 3600 + $i1 * 60 + $s1 + ($earlierUs / 1_000_000.0);
+            $latestTod = $h2 * 3600 + $i2 * 60 + $s2 + ($laterUs / 1_000_000.0);
+            if ($latestTod < $earliestTod && $days > 0) {
+                --$days;
+            }
 
             // timelib_diff_with_tzid — elapsed h/i across DST after civil normalize (#30970).
             if (null === self::parseNumericTimezoneOffset($tzName)) {
