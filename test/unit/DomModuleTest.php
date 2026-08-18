@@ -858,6 +858,60 @@ PHP;
         }
     }
 
+    /**
+     * CSS attribute selectors on Dom\ ParentNode (#32089, php-src parentnode.c / lexbor).
+     */
+    public function test_dom_parent_node_css_attribute_selectors(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32089)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_32089_dom_qsa_attr.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_attr.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                "[hidden]=s\n"
+                ."[id=\"p\"]=p\n"
+                ."[id=p]=p\n"
+                ."[class~=\"y\"]=p\n"
+                ."[id^=\"p\"]=p\n"
+                ."[id$=\"2\"]=p2\n"
+                ."[id*=\"p\"]=p\n"
+                ."[lang|=\"en\"]=p2\n"
+                ."span[hidden]=s\n"
+                ."div[class=\"box\"]=d\n"
+                ."[data-x=\"1\"]=d\n"
+                ."p[class~=\"x\"]=p\n"
+                ."div > [hidden]=s\n"
+                ."p[id] + span=s\n"
+                ."[id=\"P\" i]=p\n"
+                ."[class=\"x y\"]=p\n"
+                ."div[id]=d\n"
+                ."qsa_id=4\n"
+                ."matches_hidden=yes\n"
+                ."matches_p_hidden=no\n"
+                ."closest=d\n"
+                ."bad[[]=SyntaxError\n"
+                ."bad[[]]=SyntaxError\n"
+                ."bad[[=x]]=SyntaxError\n"
+                ."bad[[attr=]]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
