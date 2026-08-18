@@ -545,6 +545,35 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Parse a single element's outer markup into tag / attr suffix / inner XML.
+     *
+     * Used by {@see JitDomCloneNode} (php-src xmlDocCopyNode). Attr suffix keeps the
+     * leading space so saveXML can concat it onto the open tag (xmlns attr slot).
+     *
+     * @return null|array{tag: string, attrs: string, inner: string}
+     */
+    public static function parseElementMarkupArgv(string $markup): ?array
+    {
+        $markup = trim($markup);
+        if (1 !== preg_match('/^<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)(\/?)>/', $markup, $el)) {
+            return null;
+        }
+        $tag = $el[1];
+        $attrs = rtrim($el[2] ?? '', " \t/");
+        $selfClosing = '/' === ($el[3] ?? '');
+        if ($selfClosing) {
+            return ['tag' => $tag, 'attrs' => $attrs, 'inner' => ''];
+        }
+        $openLen = \strlen($el[0]);
+        $close = stripos($markup, '</'.$tag.'>');
+        $inner = false === $close
+            ? substr($markup, $openLen)
+            : substr($markup, $openLen, $close - $openLen);
+
+        return ['tag' => $tag, 'attrs' => $attrs, 'inner' => $inner];
+    }
+
+    /**
      * Replace the outer markup of direct child {@code $index} under the document
      * element — used by thin-AOT replaceChild so saveXML keeps siblings (#28671).
      *

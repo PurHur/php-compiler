@@ -86,6 +86,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'array_callable_static_invoke.phpt',
         'dom_createdocumentfragment_savexml.phpt',
         'dom_createentityreference_savexml.phpt',
+        'dom_clonenode_savexml.phpt',
     ];
 
     /**
