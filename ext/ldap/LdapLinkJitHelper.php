@@ -60,6 +60,7 @@ final class LdapLinkJitHelper
 
             return $out;
         }
+        VmLdapResult::enqueuePendingJitHandle($result->toObject()->id);
 
         return $result;
     }

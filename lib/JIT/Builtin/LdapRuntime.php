@@ -11,8 +11,8 @@ use PHPCompiler\JIT\JitVmHelperLink;
  * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect /
  * ldap_connect_wallet / ldap_bind / ldap_bind_ext / ldap_unbind / ldap_errno / ldap_error /
  * ldap_err2str / ldap_set_option / ldap_get_option / ldap_start_tls / ldap_sasl_bind /
- * ldap_compare / ldap_set_rebind_proc
- * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32107, #32109, #32121, #32146, #32147, #32148).
+ * ldap_compare / ldap_set_rebind_proc / ldap_count_entries
+ * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32107, #32109, #32121, #32146, #32147, #32148, #32172).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -65,6 +65,10 @@ final class LdapRuntime
 
     private const LDAP_COMPARE_HELPER = 'PHPCompiler\\ext\\ldap\\LdapResultJitHelper::compareArgv';
 
+    private const LDAP_RESULT_REGISTER_HELPER = 'PHPCompiler\\ext\\ldap\\LdapResultJitHelper::registerHandleArgv';
+
+    private const LDAP_COUNT_ENTRIES_HELPER = 'PHPCompiler\\ext\\ldap\\LdapResultJitHelper::countEntriesArgv';
+
     /** @var list<string> */
     private const ESCAPE_HELPERS = [
         self::LDAP_ESCAPE_HELPER,
@@ -98,6 +102,8 @@ final class LdapRuntime
     /** @var list<string> */
     private const RESULT_HELPERS = [
         self::LDAP_COMPARE_HELPER,
+        self::LDAP_RESULT_REGISTER_HELPER,
+        self::LDAP_COUNT_ENTRIES_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -330,6 +336,28 @@ final class LdapRuntime
             self::RESULT_HELPER_PATH,
             self::RESULT_HELPERS,
             '#32121'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_result_register',
+            'ldap_result_register_bridge_entry',
+            [$i64],
+            $context->getTypeFromString('void'),
+            self::LDAP_RESULT_REGISTER_HELPER,
+            self::RESULT_HELPER_PATH,
+            self::RESULT_HELPERS,
+            '#32172'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_count_entries',
+            'ldap_count_entries_bridge_entry',
+            [$i64, $i64],
+            $i64,
+            self::LDAP_COUNT_ENTRIES_HELPER,
+            self::RESULT_HELPER_PATH,
+            self::RESULT_HELPERS,
+            '#32172'
         );
 
         if (null !== $savedBlock) {

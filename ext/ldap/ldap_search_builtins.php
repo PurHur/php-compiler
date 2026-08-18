@@ -177,7 +177,7 @@ final class ldap_count_entries extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_count_entries() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapResult::invokeCountEntries($context, $args);
     }
 }
 
