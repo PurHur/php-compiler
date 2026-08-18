@@ -33,6 +33,14 @@ final class DynamicObjectReadonlyGuard
         }
 
         ErrorRaise::ensureLinked($context);
+        // NestedJIT / ctor entry can clear the insert block. Resume on the
+        // function's last open BB so the dynamic_readonly GEP stays reachable
+        // (ZEND_ASSIGN_OBJ, #32363).
+        BasicBlockHelper::positionAfterPrematureVoidReturn($context, 'dyn_readonly_resume');
+        $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $entry) {
+            return;
+        }
         $obj = $lvalue->objectPropertyReceiver;
         $objMap = $context->structFieldMap['__object__'];
         $flag = $context->builder->load(
@@ -44,12 +52,6 @@ final class DynamicObjectReadonlyGuard
             $flag,
             $i8->constInt(0, false)
         );
-
-        // NestedJIT / pending-Error body emission can clear the insert block (#26756 / #26826).
-        $entry = BasicBlockHelper::tryGetInsertBlock($context);
-        if (null === $entry) {
-            return;
-        }
         $fn = $entry->getParent();
         assert($fn instanceof \PHPLLVM\Value\Function_);
         $allowBlock = $fn->appendBasicBlock('dyn_readonly_allow');

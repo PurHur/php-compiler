@@ -160,13 +160,11 @@ final class BasicBlockHelper
         if (null === $term) {
             return;
         }
-        if (
-            $term instanceof \PHPLLVM\Value\Instruction
-            && $term->isAReturnInst()
-            && 0 === $term->getNumOperands()
-        ) {
+        if (self::isVoidReturnTerminator($context, $term)) {
             $next = self::append($context, $label);
-            $term->eraseFromParent();
+            if ($term instanceof \PHPLLVM\Value\Instruction) {
+                $term->eraseFromParent();
+            }
             $context->builder->positionAtEnd($insert);
             $context->builder->branch($next);
             $context->builder->positionAtEnd($next);
@@ -177,7 +175,70 @@ final class BasicBlockHelper
     }
 
     /**
+     * Resume lowering when the insert BB was cleared or sealed before a property store (#32363).
+     *
+     * php-llvm {@see BasicBlock::getNext} is swapped (LLVMGetPreviousBasicBlock), so a
+     * {@code lastOpenBasicBlock} walk that used it only inspected the entry BB and then
+     * {@see ensureOpenInsertBlock} appended a predecessor-less continuation. Walk forward
+     * like {@see sealFunction} and park on the real open tail.
+     */
+    public static function positionAfterPrematureVoidReturn(Context $context, string $label): void
+    {
+        $insert = self::tryGetInsertBlock($context);
+        if (null === $insert) {
+            self::ensureOpenInsertBlock($context, $label);
+
+            return;
+        }
+        $term = $insert->getTerminator();
+        if (null === $term) {
+            return;
+        }
+        if (self::isVoidReturnTerminator($context, $term)) {
+            $next = self::append($context, $label);
+            if ($term instanceof \PHPLLVM\Value\Instruction) {
+                $term->eraseFromParent();
+            }
+            $context->builder->positionAtEnd($insert);
+            $context->builder->branch($next);
+            $context->builder->positionAtEnd($next);
+
+            return;
+        }
+        self::ensureOpenInsertBlock($context, $label);
+    }
+
+    /**
+     * php-llvm {@code isAReturnInst()} TypeErrors (LLVMIsA* is a pointer, {@code fromBool}
+     * wants int). Detect {@code ret void} via opcode.
+     */
+    private static function isVoidReturnTerminator(Context $context, $term): bool
+    {
+        if (!$term instanceof \PHPLLVM\LLVMAbstract\Value) {
+            return false;
+        }
+        try {
+            $opcode = $context->llvm->lib->LLVMGetInstructionOpcode($term->value);
+            if (\llvm\llvm::LLVMRet !== $opcode) {
+                return false;
+            }
+
+            return 0 === $term->getNumOperands();
+        } catch (\Throwable) {
+            try {
+                return str_contains($term->toString(), 'ret void');
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+    }
+
+    /**
      * Last basic block in $fn that still lacks a terminator (may be mid-lower open tail).
+     *
+     * php-llvm swaps {@code getNext}/{@code getPrevious} on basic blocks
+     * ({@code getPrevious()} == LLVMGetNextBasicBlock). Walk first→last the same way
+     * {@see sealFunction} does, otherwise only the entry BB is inspected (#32363).
      */
     public static function lastOpenBasicBlock(Function_ $fn): ?BasicBlock
     {
@@ -190,7 +251,7 @@ final class BasicBlockHelper
             if (null === $block->getTerminator()) {
                 $open = $block;
             }
-            $block = $block->getNext();
+            $block = $block->getPrevious();
         }
 
         return $open;
