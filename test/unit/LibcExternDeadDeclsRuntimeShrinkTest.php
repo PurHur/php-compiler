@@ -87,6 +87,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'malloc',
             'realloc',
             'free',
+            '__phpc_resolve_stream',
         ];
     }
 
@@ -97,7 +98,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988/#31997/#32068/#32092/#32273)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988/#31997/#32068/#32092/#32273/#32287)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -130,6 +131,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('#32092', $source);
         $this->assertStringContainsString('#32273', $source);
+        $this->assertStringContainsString('#32287', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
         $this->assertStringContainsString('ensureMemcpyDecl', $source);
@@ -140,6 +142,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStrlenDecl', $source);
         $this->assertStringContainsString('ensureSnprintf', $source);
         $this->assertStringContainsString('ensureMallocFamily', $source);
+        $this->assertStringContainsString('ensureResolveStreamDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
     }
@@ -406,6 +409,12 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc free (#32273)'
         );
+        $this->assertStringNotContainsString(
+            "'__phpc_resolve_stream' =>",
+            $source,
+            'LibcExtern must not always-declare __phpc_resolve_stream (#32287)'
+        );
+        $this->assertStringContainsString('#32287', $source);
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
@@ -422,6 +431,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('#32092', $source);
         $this->assertStringContainsString('#32273', $source);
+        $this->assertStringContainsString('#32287', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
@@ -432,6 +442,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStrlenDecl', $source);
         $this->assertStringContainsString('ensureSnprintf', $source);
         $this->assertStringContainsString('ensureMallocFamily', $source);
+        $this->assertStringContainsString('ensureResolveStreamDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
         $this->assertStringContainsString('ensureStrncmp', $source);
@@ -1098,5 +1109,51 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("['realpath', \$i8p, [\$i8p, \$i8p]]", $source);
         $this->assertStringContainsString("lookupFunction('realpath')", $source);
         $this->assertStringNotContainsString('LibcExtern::register', $source);
+    }
+
+    public function testNestedJitStreamLeavesEnsureResolveStreamAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'ext/standard/JitStreamIoKernel.php',
+            'ext/standard/JitStreamSyncKernel.php',
+            'lib/JIT/Builtin/StreamGlobalsJit.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensureResolveStreamDecl',
+                $source,
+                "{$rel} must call LibcExtern::ensureResolveStreamDecl after #32287"
+            );
+            $this->assertStringContainsString('#32287', $source);
+        }
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringContainsString('ensureResolveStreamDecl', $libc);
+        $this->assertStringContainsString('#32287', $libc);
+        $this->assertStringNotContainsString("'__phpc_resolve_stream' =>", $libc);
+
+        $root = dirname(__DIR__, 2);
+        $missing = [];
+        foreach (['lib', 'ext'] as $dir) {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root.'/'.$dir, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if ('php' !== $file->getExtension()) {
+                    continue;
+                }
+                $path = $file->getPathname();
+                if (str_ends_with($path, '/lib/JIT/LibcExtern.php')) {
+                    continue;
+                }
+                $source = (string) file_get_contents($path);
+                if (!str_contains($source, "lookupFunction('__phpc_resolve_stream')")) {
+                    continue;
+                }
+                if (!str_contains($source, 'LibcExtern::ensureResolveStreamDecl')) {
+                    $missing[] = substr($path, strlen($root) + 1);
+                }
+            }
+        }
+        $this->assertSame([], $missing, 'NestedJIT __phpc_resolve_stream lookups must call ensureResolveStreamDecl (#32287)');
     }
 }

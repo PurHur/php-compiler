@@ -244,8 +244,10 @@ final class JitStreamIoKernel
         // Module-local close(2) after open/close/read/write always-on drop (#31817).
         // strcmp(3) after always-on LibcExtern drop (#31971).
         // malloc/free after always-on LibcExtern drop (#32273).
+        // __phpc_resolve_stream after always-on LibcExtern drop (#32287).
         LibcExtern::ensureStrcmpDecl($context);
         LibcExtern::ensureMallocFamily($context);
+        LibcExtern::ensureResolveStreamDecl($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
@@ -253,7 +255,6 @@ final class JitStreamIoKernel
         $strPtr = $context->getTypeFromString('__string__*');
 
         foreach ([
-            ['__phpc_resolve_stream', $i8p, [$i64]],
             ['__string__strlen', $i64, [$strPtr]],
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['fwrite', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],

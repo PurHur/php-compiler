@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 /**
  * LLVM stream handle-table globals + __phpc_resolve_stream (#5343 phase 5).
@@ -85,6 +86,9 @@ final class StreamGlobalsJit
 
     private static function implementResolveStream(Context $context): void
     {
+        // Module-local decl after LibcExtern always-on drop (#32287) — getNamedFunction
+        // first so a NestedJIT ensureExternal catch cannot mint __phpc_resolve_stream.1.
+        LibcExtern::ensureResolveStreamDecl($context);
         $probe = $context->module->getNamedFunction('__phpc_resolve_stream');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__phpc_resolve_stream', $probe);
