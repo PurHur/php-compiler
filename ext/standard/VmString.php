@@ -1055,8 +1055,32 @@ final class VmString
         return true;
     }
 
-    /** Replace invalid UTF-8 byte sequences with U+FFFD (php-src ext/standard/html.c ENT_SUBSTITUTE). */
-    private static function utf8SubstituteInvalidSequences(string $string): string
+    /**
+     * Rewrite invalid UTF-8 per htmlspecialchars/htmlentities flags (php-src html.c
+     * php_escape_html_entities_ex). ENT_IGNORE is checked first (skip the illegal
+     * byte), then ENT_SUBSTITUTE (U+FFFD); otherwise conversion failure → null.
+     */
+    private static function utf8SanitizeForHtmlFlags(string $string, int $flags): ?string
+    {
+        if (self::isValidUtf8($string)) {
+            return $string;
+        }
+        if (0 !== ($flags & ENT_IGNORE)) {
+            return self::utf8RewriteInvalidSequences($string, false);
+        }
+        if (0 !== ($flags & ENT_SUBSTITUTE)) {
+            return self::utf8RewriteInvalidSequences($string, true);
+        }
+
+        return null;
+    }
+
+    /**
+     * Drop or replace invalid UTF-8 bytes (php-src get_next_char + ENT_HTML_*_ERRORS).
+     * Illegal sequences advance one byte so a following valid lead (e.g. "(" after
+     * "\xC3") is kept — php-src UTR #36 strategy 2 / ENT_IGNORE (#32063).
+     */
+    private static function utf8RewriteInvalidSequences(string $string, bool $substitute): string
     {
         $out = '';
         $len = self::byteLength($string);
@@ -1065,7 +1089,9 @@ final class VmString
                 $out .= \substr($string, $i, $need + 1);
                 $i += $need + 1;
             } else {
-                $out .= "\xEF\xBF\xBD";
+                if ($substitute) {
+                    $out .= "\xEF\xBF\xBD";
+                }
                 ++$i;
             }
         }
@@ -2836,12 +2862,11 @@ final class VmString
         if (!self::isUtf8Encoding($encoding)) {
             return \htmlspecialchars($string, $flags, $encoding, $doubleEncode);
         }
-        if (!self::isValidUtf8($string)) {
-            if (0 === ($flags & ENT_SUBSTITUTE)) {
-                return '';
-            }
-            $string = self::utf8SubstituteInvalidSequences($string);
+        $sanitized = self::utf8SanitizeForHtmlFlags($string, $flags);
+        if (null === $sanitized) {
+            return '';
         }
+        $string = $sanitized;
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
@@ -2975,12 +3000,11 @@ final class VmString
         if (!self::isUtf8Encoding($encoding)) {
             return \htmlentities($string, $flags, $encoding, $doubleEncode);
         }
-        if (!self::isValidUtf8($string)) {
-            if (0 === ($flags & ENT_SUBSTITUTE)) {
-                return '';
-            }
-            $string = self::utf8SubstituteInvalidSequences($string);
+        $sanitized = self::utf8SanitizeForHtmlFlags($string, $flags);
+        if (null === $sanitized) {
+            return '';
         }
+        $string = $sanitized;
         $entries = self::htmlEntitiesMapForFlags($flags);
         $out = '';
         $len = self::byteLength($string);

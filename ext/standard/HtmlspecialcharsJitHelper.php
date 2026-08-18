@@ -8,7 +8,8 @@ namespace PHPCompiler\ext\standard;
  * Lowered into JIT/AOT modules for htmlspecialchars() runtime (#9445, #20487, #27290, php-in-PHP).
  *
  * Escape subset mirrors {@see VmString::htmlspecialchars()} / php-src ext/standard/html.c
- * for & < > " ' plus double_encode=false entity preservation. Self-contained for NestedJIT (#16075).
+ * for & < > " ' plus double_encode=false entity preservation and ENT_IGNORE (#32063).
+ * Self-contained for NestedJIT (#16075).
  *
  * NestedJIT / AOT cannot lower a loop-carried string accumulator when branches
  * compare string offsets (method-return / dynamic args returned empty — #25345).
@@ -32,6 +33,18 @@ final class HtmlspecialcharsJitHelper
     {
         if (!isset($string[$i])) {
             return '';
+        }
+        // ENT_IGNORE: skip illegal UTF-8 bytes; copy valid multi-byte sequences whole
+        // so continuation bytes are not mistaken for illegal leads (php-src html.c / #32063).
+        if (0 !== ($flags & ENT_IGNORE)) {
+            $validWidth = self::utf8ValidWidthAt($string, $i);
+            if ($validWidth < 1) {
+                return self::escapeFrom($string, $flags, $i + 1, $doubleEncode);
+            }
+            if ($validWidth > 1) {
+                return self::copyBytes($string, $i, $validWidth)
+                    .self::escapeFrom($string, $flags, $i + $validWidth, $doubleEncode);
+            }
         }
         $ch = $string[$i];
         if ('&' === $ch && !$doubleEncode) {
@@ -62,6 +75,71 @@ final class HtmlspecialcharsJitHelper
         }
 
         return $ch.$rest;
+    }
+
+    /**
+     * Width of a well-formed UTF-8 sequence at $i, or 0 if illegal (php-src html.c
+     * get_next_char / utf8_lead+utf8_trail). NestedJIT-safe: no strlen/substr.
+     */
+    public static function utf8ValidWidthAt(string $string, int $i): int
+    {
+        if (!isset($string[$i])) {
+            return 0;
+        }
+        $byte = \ord($string[$i]);
+        if ($byte < 0x80) {
+            return 1;
+        }
+        if (($byte & 0xE0) === 0xC0) {
+            if (!isset($string[$i + 1])) {
+                return 0;
+            }
+            $next = \ord($string[$i + 1]);
+            if (($next & 0xC0) !== 0x80) {
+                return 0;
+            }
+            $cp = (($byte & 0x1F) << 6) | ($next & 0x3F);
+            if ($cp < 0x80) {
+                return 0;
+            }
+
+            return 2;
+        }
+        if (($byte & 0xF0) === 0xE0) {
+            if (!isset($string[$i + 1]) || !isset($string[$i + 2])) {
+                return 0;
+            }
+            $n1 = \ord($string[$i + 1]);
+            $n2 = \ord($string[$i + 2]);
+            if (($n1 & 0xC0) !== 0x80 || ($n2 & 0xC0) !== 0x80) {
+                return 0;
+            }
+            $cp = (($byte & 0x0F) << 12) | (($n1 & 0x3F) << 6) | ($n2 & 0x3F);
+            if ($cp < 0x800 || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+                return 0;
+            }
+
+            return 3;
+        }
+        if (($byte & 0xF8) === 0xF0) {
+            if (!isset($string[$i + 1]) || !isset($string[$i + 2]) || !isset($string[$i + 3])) {
+                return 0;
+            }
+            $n1 = \ord($string[$i + 1]);
+            $n2 = \ord($string[$i + 2]);
+            $n3 = \ord($string[$i + 3]);
+            if (($n1 & 0xC0) !== 0x80 || ($n2 & 0xC0) !== 0x80 || ($n3 & 0xC0) !== 0x80) {
+                return 0;
+            }
+            $cp = (($byte & 0x07) << 18) | (($n1 & 0x3F) << 12) | (($n2 & 0x3F) << 6) | ($n3 & 0x3F);
+            if ($cp < 0x10000) {
+                return 0;
+            }
+
+            return 4;
+        }
+
+        return 0;
     }
 
     /** Named / numeric entity length at $i when double_encode=false (php-src html.c). */
