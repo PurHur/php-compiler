@@ -121,6 +121,11 @@ final class Variable {
     public ?string $compileTimeDomTagName = null;
 
     /**
+     * Escaped inner XML / text of a createElement($name, $value) result (#32361).
+     */
+    public ?string $compileTimeDomInnerXml = null;
+
+    /**
      * Direct-child index under a loadXML root when fetched via firstChild/lastChild (#28671).
      */
     public ?int $compileTimeDomChildIndex = null;

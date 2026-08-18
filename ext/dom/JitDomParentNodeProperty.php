@@ -120,8 +120,8 @@ final class JitDomParentNodeProperty
         $context->builder->positionAtEnd($afterFreed);
         // #27411: synced first/last that exclude this node ⇒ stale parentNode (replaceChild).
         // Unsynced null first+last ⇒ trust parentNode (appendChild may not write firstChild).
-        $firstSlot = $objectType->propertySlotFor($parentObj, self::CLASS_NODE, VmDom::PROP_FIRST_CHILD);
-        $lastSlot = $objectType->propertySlotFor($parentObj, self::CLASS_NODE, VmDom::PROP_LAST_CHILD);
+        $firstSlot = $objectType->propertySlotFor($parentObj, self::CLASS_ELEMENT, VmDom::PROP_FIRST_CHILD);
+        $lastSlot = $objectType->propertySlotFor($parentObj, self::CLASS_ELEMENT, VmDom::PROP_LAST_CHILD);
         $firstPtr = $context->builder->load($firstSlot);
         $lastPtr = $context->builder->load($lastSlot);
         $firstMissing = $context->builder->icmp(Builder::INT_EQ, $firstPtr, $voidPtr->constNull());
@@ -255,10 +255,10 @@ final class JitDomParentNodeProperty
 
     private static function ensureChildLinkProps(Object_ $objectType): void
     {
-        $nodeClassId = $objectType->lookup(self::CLASS_NODE);
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            if (!$objectType->hasProperty($nodeClassId, $prop)) {
-                $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
     }

@@ -43,7 +43,9 @@ final class JitDomSaveXMLUserScript
 
         $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xmlLit || '' === trim($xmlLit)) {
-            return null;
+            // No loadXML literal: dump documentElement slots (createElement+appendChild).
+            // NestedJIT DomSaveXMLRuntime SIGSEGVs after c:main_before_php (#32361).
+            return self::trySerializeDocumentFromSlots($context);
         }
         // Document-wide constant replay is only valid for pure user-script loads (#26757).
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
@@ -56,6 +58,58 @@ final class JitDomSaveXMLUserScript
             : '<?xml version="1.0"?>'."\n".$trimmed."\n";
 
         return self::boxConstantString($context, $out);
+    }
+
+    /**
+     * Document-wide saveXML() without a loadXML literal — xmlDocDumpMemory of the
+     * createElement+appendChild tree (#32361 / php-src ext/dom/document.c).
+     */
+    private static function trySerializeDocumentFromSlots(Context $context): Value
+    {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach (['tagName', 'nodeName', 'textContent', VmDom::PROP_USER_SCRIPT_INNER_XML, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
+        $decl = $context->builder->load(
+            $context->constantStringFromString("<?xml version=\"1.0\"?>\n")
+        );
+        $nl = $context->builder->load($context->constantStringFromString("\n"));
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $bbEmpty = BasicBlockHelper::append($context, 'dom_savexml_doc_empty');
+        $bbDump = BasicBlockHelper::append($context, 'dom_savexml_doc_dump');
+        $bbDone = BasicBlockHelper::append($context, 'dom_savexml_doc_done');
+        $pinned = DomUserScriptPinnedRootLlvm::load($context);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        if (null === $pinned) {
+            return self::boxStringValue($context, $decl);
+        }
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $pinned, $objPtrTy->constNull());
+        $context->builder->branchIf($isNull, $bbEmpty, $bbDump);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $context->builder->store(self::boxStringValue($context, $decl), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDump);
+        $bodyStr = self::serializeElementMarkup(
+            $context,
+            $objectType,
+            $pinned,
+            $elementClassId,
+            false,
+            null
+        );
+        $withDecl = JitStringConcat::concat($context, $decl, $bodyStr);
+        $full = JitStringConcat::concat($context, $withDecl, $nl);
+        $context->builder->store(self::boxStringValue($context, $full), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function trySerializeNode(Context $context, JITVariable $nodeVar): ?Value
@@ -366,6 +420,23 @@ final class JitDomSaveXMLUserScript
         bool $useXmlLitTag,
         ?string $xmlLit
     ): Value {
+        return self::boxStringValue(
+            $context,
+            self::serializeElementMarkup($context, $objectType, $node, $elementClassId, $useXmlLitTag, $xmlLit)
+        );
+    }
+
+    /**
+     * Element dump markup ({@code __string__*}) for xmlNodeDump / xmlDocDumpMemory wrap (#32361).
+     */
+    private static function serializeElementMarkup(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $node,
+        int $elementClassId,
+        bool $useXmlLitTag,
+        ?string $xmlLit
+    ): Value {
         if ($useXmlLitTag) {
             $tagStr = $context->builder->load(
                 $context->constantStringFromString(DomParseSimpleXmlJitHelper::rootTagArgv((string) $xmlLit))
@@ -475,7 +546,7 @@ final class JitDomSaveXMLUserScript
         $context->builder->positionAtEnd($bbXmlMerge);
         $xml = $context->builder->load($xmlSlot);
 
-        return self::boxStringValue($context, $xml);
+        return $xml;
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

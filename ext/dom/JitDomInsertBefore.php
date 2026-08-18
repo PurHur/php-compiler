@@ -101,24 +101,32 @@ final class JitDomInsertBefore
             }
         }
 
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+
         $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
         $refJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $refChild);
         $parentJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
 
         // Sibling links: new ↔ ref (php-src xmlAddPrevSibling).
         $objectType->propertyStore(
-            $objectType->propertySlotFor($newChild, 'DOMNode', VmDom::PROP_NEXT_SIBLING),
+            $objectType->propertySlotFor($newChild, 'DOMElement', VmDom::PROP_NEXT_SIBLING),
             $refJit,
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($refChild, 'DOMNode', VmDom::PROP_PREVIOUS_SIBLING),
+            $objectType->propertySlotFor($refChild, 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING),
             $newJit,
             JITVariable::TYPE_VALUE
         );
 
         // firstChild ← newChild when inserting before the current first (issue repro).
-        $firstSlot = $objectType->propertySlotFor($parent, 'DOMNode', VmDom::PROP_FIRST_CHILD);
+        // DOMElement layout — peer LiveSlots; DOMNode firstChild clobbers tagName (#32361).
+        $firstSlot = $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_FIRST_CHILD);
         $firstPtr = $context->builder->load($firstSlot);
         $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstPtr, $voidPtr->constNull());
         $setFirst = BasicBlockHelper::append($context, 'dom_ib_set_first');

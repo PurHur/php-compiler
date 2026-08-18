@@ -71,10 +71,10 @@ final class JitDomNodeListItem
                 $objectType->defineProperty($listClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
-        $nodeClassId = $objectType->lookup('DOMNode');
+        $elementClassId = $objectType->lookup('DOMElement');
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            if (!$objectType->hasProperty($nodeClassId, $prop)) {
-                $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
 
@@ -206,7 +206,7 @@ final class JitDomNodeListItem
 
         $context->builder->positionAtEnd($fallback);
         $childRaw = $context->builder->load(
-            $objectType->propertySlotFor($owner, 'DOMNode', $ownerChildProp)
+            $objectType->propertySlotFor($owner, 'DOMElement', $ownerChildProp)
         );
         $childSlotNull = $context->builder->icmp(Builder::INT_EQ, $childRaw, $voidPtr->constNull());
         $writeNull = BasicBlockHelper::append($context, 'dom_nli_'.$pinProp.'_null');

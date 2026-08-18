@@ -14341,7 +14341,14 @@ class JIT {
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
-        $this->context->getVariableFromOp($result)->compileTimeDomTagName = $tag;
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeDomTagName = $tag;
+        $valueArg = $callArgs[2] ?? null;
+        $inner = '';
+        if ($valueArg instanceof Variable && null !== $valueArg->compileTimeString) {
+            $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        }
+        $resultVar->compileTimeDomInnerXml = $inner;
     }
 
     /**
@@ -18256,6 +18263,9 @@ class JIT {
     {
         if ($force || null !== $src->compileTimeDomTagName) {
             $dest->compileTimeDomTagName = $src->compileTimeDomTagName;
+        }
+        if ($force || null !== $src->compileTimeDomInnerXml) {
+            $dest->compileTimeDomInnerXml = $src->compileTimeDomInnerXml;
         }
         // firstChild/lastChild index for thin-AOT replaceChild INNER_XML rebuild (#28671).
         if ($force || null !== $src->compileTimeDomChildIndex) {
@@ -23800,6 +23810,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomTagName && null === $dest->compileTimeDomTagName) {
             $dest->compileTimeDomTagName = $source->compileTimeDomTagName;
+        }
+        if (null !== $source->compileTimeDomInnerXml && null === $dest->compileTimeDomInnerXml) {
+            $dest->compileTimeDomInnerXml = $source->compileTimeDomInnerXml;
         }
         if (null !== $source->compileTimeDomChildIndex && null === $dest->compileTimeDomChildIndex) {
             $dest->compileTimeDomChildIndex = $source->compileTimeDomChildIndex;

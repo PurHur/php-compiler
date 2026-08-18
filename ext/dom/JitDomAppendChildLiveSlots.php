@@ -16,9 +16,9 @@ use PHPLLVM\Value;
  * Thin-AOT LLVM slot sync for Element DOMNode::appendChild() (#27476).
  *
  * Peer {@see JitDomInsertBefore}: skip NestedJIT for createElement nodes.
- * Parent firstChild/lastChild use DOMNode (matches syncChildLinkSlots +
- * JitDomNodeChildProperty). Sibling/parentNode on children use DOMElement
- * (createElement layout; DOMNode sibling aliases parentNode).
+ * Parent firstChild/lastChild use DOMElement (createElement layout). DOMNode
+ * first/last on an Element allocation aliases tagName/nodeName (#32361 / #24973).
+ * Sibling/parentNode on children use DOMElement (DOMNode sibling aliases parentNode).
  * Move detection uses first/last identity — parentNode slots are unreliable after
  * lastChild stores on thin AOT (#27476).
  *
@@ -177,22 +177,19 @@ final class JitDomAppendChildLiveSlots
     private static function ensureLayout(Context $context): void
     {
         $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
         $elementClassId = $objectType->lookup('DOMElement');
         $listClassId = $objectType->lookup('DOMNodeList');
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            if (!$objectType->hasProperty($nodeClassId, $prop)) {
-                $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
         foreach ([
             VmDom::PROP_NEXT_SIBLING,
             VmDom::PROP_PREVIOUS_SIBLING,
             VmDom::PROP_PARENT_NODE,
-            // Do NOT define childNodes/firstChild/lastChild on DOMElement here —
-            // createElement already baked those (sans childNodes); mid-function
-            // defineProperty after allocate OOBs Element-typed $el->childNodes (#24973).
-            // Stores/fetches for first/last/childNodes use DOMNode (peer insertBefore).
+            // firstChild/lastChild are defined on DOMElement above (createElement layout;
+            // DOMNode indices clobber tagName, #32361). childNodes stays on DOMNode.
         ] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
@@ -217,9 +214,9 @@ final class JitDomAppendChildLiveSlots
         string $prop,
         JITVariable $value
     ): void {
-        // DOMNode — same as syncChildLinkSlots / JitDomInsertBefore / property fetch.
+        // DOMElement — createElement layout; DOMNode first/last clobbers tagName (#32361).
         $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($parent, 'DOMNode', $prop),
+            $context->type->object->propertySlotFor($parent, 'DOMElement', $prop),
             $value,
             JITVariable::TYPE_VALUE
         );
@@ -231,7 +228,7 @@ final class JitDomAppendChildLiveSlots
         string $prop,
         string $label
     ): Value {
-        return self::loadLink($context, $obj, 'DOMNode', $prop, $label);
+        return self::loadLink($context, $obj, 'DOMElement', $prop, $label);
     }
 
     private static function storeSibling(

@@ -300,12 +300,12 @@ final class JitDomElementTextContent
             $textNode
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($receiver, 'DOMNode', VmDom::PROP_FIRST_CHILD),
+            $objectType->propertySlotFor($receiver, 'DOMElement', VmDom::PROP_FIRST_CHILD),
             $textJit,
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($receiver, 'DOMNode', VmDom::PROP_LAST_CHILD),
+            $objectType->propertySlotFor($receiver, 'DOMElement', VmDom::PROP_LAST_CHILD),
             $textJit,
             JITVariable::TYPE_VALUE
         );
