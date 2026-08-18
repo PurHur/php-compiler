@@ -466,16 +466,14 @@ final class VmPosix
     /**
      * posix_times() — process times (php-src ext/posix/posix.c; #7173).
      *
-     * @return array{ticks: int, utime: int, stime: int, cutime: int, cstime: int}
+     * Returns null when the times cannot be read so callers can RETURN_FALSE
+     * like php-src (`times()` failure → false, #28783).
+     *
+     * @return array{ticks: int, utime: int, stime: int, cutime: int, cstime: int}|null
      */
-    public static function times(): array
+    public static function times(): ?array
     {
-        $pure = VmPosixTimesPure::times();
-        if (null !== $pure) {
-            return $pure;
-        }
-
-        throw new \Error('posix_times() is not available in this compiler build');
+        return VmPosixTimesPure::times();
     }
 
     /**
