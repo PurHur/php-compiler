@@ -335,6 +335,8 @@
             <file>./test/unit/IntMinModuloNegOne31968AotTest.php</file>
             <file>./test/compliance/DomCreateElementValue32292JITTest.php</file>
             <file>./test/unit/DomCreateElementValue32292AotTest.php</file>
+            <file>./test/compliance/DomCreateElementNSValue32302JITTest.php</file>
+            <file>./test/unit/DomCreateElementNSValue32302AotTest.php</file>
             <file>./test/compliance/CastIntFloatCallArg32293JITTest.php</file>
             <file>./test/unit/CastIntFloatCallArg32293AotTest.php</file>
             <file>./test/compliance/AsortNatural32295JITTest.php</file>

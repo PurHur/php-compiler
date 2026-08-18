@@ -235,6 +235,12 @@ final class VmDom
     public const PROP_USER_SCRIPT_INNER_XML = '__phpcUserScriptInnerXml';
 
     /**
+     * User-script AOT: ` xmlns:prefix="uri"` / ` xmlns="uri"` for saveXML($node)
+     * after createElementNS (libxml xmlNodeDump nsDef; #32302).
+     */
+    public const PROP_USER_SCRIPT_XMLNS_ATTR = '__phpcUserScriptXmlnsAttr';
+
+    /**
      * Thin-AOT childNodes NodeList → owning node, for item() walks without DomRegistry (#27410).
      */
     public const PROP_CHILD_NODES_OWNER = '__phpcChildNodesOwner';

@@ -261,7 +261,12 @@ final class JitDomCreateElement
     ): void {
         $objectType = $context->type->object;
         $classId = $objectType->lookup($className);
-        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue', VmDom::PROP_USER_SCRIPT_INNER_XML] as $prop) {
+        foreach ([
+            self::PROP_TEXT_CONTENT,
+            'nodeValue',
+            VmDom::PROP_USER_SCRIPT_INNER_XML,
+            VmDom::PROP_USER_SCRIPT_XMLNS_ATTR,
+        ] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
             }
@@ -285,6 +290,8 @@ final class JitDomCreateElement
             ? ''
             : htmlspecialchars($textContent, ENT_QUOTES | ENT_XML1, 'UTF-8');
         self::storeUserScriptInnerXml($context, $element, $inner, $className);
+        // Non-NS createElement: empty suffix so saveXML fetch does not SIGSEGV (#32302).
+        self::storeUserScriptXmlnsAttr($context, $element, '', $className);
     }
 
     /** Seed/replace {@see VmDom::PROP_USER_SCRIPT_INNER_XML} for AOT saveXML (#26757 / #26765). */
@@ -308,6 +315,31 @@ final class JitDomCreateElement
         $objectType->propertyStore(
             $objectType->propertySlotFor($element, $className, VmDom::PROP_USER_SCRIPT_INNER_XML),
             $innerVar,
+            JITVariable::TYPE_STRING
+        );
+    }
+
+    /** Seed {@see VmDom::PROP_USER_SCRIPT_XMLNS_ATTR} for AOT saveXML nsDef (#32302). */
+    public static function storeUserScriptXmlnsAttr(
+        Context $context,
+        Value $element,
+        string $xmlnsAttr,
+        string $className = self::CLASS_ELEMENT
+    ): void {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup($className);
+        if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR)) {
+            $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR, JITVariable::TYPE_STRING);
+        }
+        $attrStr = $context->builder->load($context->constantStringFromString($xmlnsAttr));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $attrStr
+        );
+        $attrVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, $className, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR),
+            $attrVar,
             JITVariable::TYPE_STRING
         );
     }
@@ -352,6 +384,8 @@ final class JitDomCreateElement
             'nodeValue' => JITVariable::TYPE_STRING,
             // ParentNode append/prepend → saveXML child markup (#26765).
             VmDom::PROP_USER_SCRIPT_INNER_XML => JITVariable::TYPE_STRING,
+            // createElementNS nsDef on node-scoped saveXML (#32302).
+            VmDom::PROP_USER_SCRIPT_XMLNS_ATTR => JITVariable::TYPE_STRING,
             // DomNodeLiveMutationRuntime::syncElementNavSlots (appendChild path).
             VmDom::PROP_FIRST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
             VmDom::PROP_LAST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
