@@ -519,6 +519,6 @@ final class ldap_start_tls extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_start_tls() is not implemented for JIT in this compiler build (issue #21852)');
+        return JitLdapLink::invokeStartTls($context, $args);
     }
 }

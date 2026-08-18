@@ -18,7 +18,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ldap_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() (#32001, #32002, #32107). */
+/** LLVM lowering for ldap_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() (#32001, #32002, #32107, #32109). */
 final class JitLdapLink
 {
     /** @param list<JITVariable> $args */
@@ -102,6 +102,32 @@ final class JitLdapLink
 
         $ok = $context->builder->call(
             $context->lookupFunction('__compiler_ldap_unbind'),
+            $handle
+        );
+
+        return self::boolFromI1($context, $ok);
+    }
+
+    /** @param list<JITVariable> $args */
+    public static function invokeStartTls(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_start_tls() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+
+        $handle = self::lowerConnectionHandle($context, $args[0], 'ldap_start_tls');
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        LdapRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $ok = $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_start_tls'),
             $handle
         );
 
