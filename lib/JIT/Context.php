@@ -1738,6 +1738,8 @@ class Context {
         $this->functionProxies['locale::lookup'] = new \PHPCompiler\ext\intl\LocaleLookup();
         // Locale::filterMatches — prefix filter via JitLocaleFilterMatches / VmLocale (#32119).
         $this->functionProxies['locale::filtermatches'] = new \PHPCompiler\ext\intl\LocaleFilterMatches();
+        // Locale::getDisplayName — ICU display name via JitLocaleGetDisplayName / VmLocale (#32120).
+        $this->functionProxies['locale::getdisplayname'] = new \PHPCompiler\ext\intl\LocaleGetDisplayName();
         // NumberFormatter::create / format — avoid ExternalMethod silent NULL on thin AOT (#27385, #28648).
         $this->functionProxies['numberformatter::create'] = new Call\NumberFormatterCreate();
         $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();
