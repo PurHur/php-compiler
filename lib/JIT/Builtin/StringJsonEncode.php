@@ -126,7 +126,8 @@ final class StringJsonEncode
 
     /**
      * Scalar float fast path via {@see ZendDoubleStringRuntime} — NestedJIT `(string)` on
-     * float SIGSEGVs (#31963). Other types still use {@see JsonEncodeNestedJitHelper}.
+     * float SIGSEGVs (#31963). INF/NAN must not become JSON tokens (#32326).
+     * Other types still use {@see JsonEncodeNestedJitHelper}.
      */
     private static function implementJsonEncodeValueBridge(Context $context): void
     {
@@ -140,6 +141,7 @@ final class StringJsonEncode
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         ZendDoubleStringRuntime::ensureLinked($context);
+        StringJsonDecode::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -185,8 +187,21 @@ final class StringJsonEncode
             $context->registerFunction('__value__readDouble', $readDouble);
         }
         $dbl = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
-        $formatted = ZendDoubleStringRuntime::format($context, $dbl);
-        $context->builder->returnValue($formatted);
+        // php_json_encode_double: INF/NAN is JSON_ERROR_INF_OR_NAN, not a token (#32326).
+        $savedLowering = $context->loweringLlvmFunction;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : $savedLowering;
+        try {
+            $context->builder->returnValue(
+                ZendDoubleStringRuntime::jsonEncodeNumberOrNull(
+                    $context,
+                    $fn instanceof LlvmFunction ? $fn : $context->loweringLlvmFunction,
+                    $dbl,
+                    $fn->getParam(1)
+                )
+            );
+        } finally {
+            $context->loweringLlvmFunction = $savedLowering;
+        }
 
         $context->builder->positionAtEnd($helperBb);
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::ENCODE_VALUE_HELPER, '#20816');

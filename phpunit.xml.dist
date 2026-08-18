@@ -354,6 +354,7 @@
             <file>./test/compliance/StaticPropMethodInc32313VMTest.php</file>
             <file>./test/compliance/StaticPropMethodInc32313JITTest.php</file>
             <file>./test/unit/StaticPropMethodInc32313AotTest.php</file>
+            <file>./test/unit/JsonEncodeInfNan32326AotTest.php</file>
             <file>./test/compliance/VarDumpInfNan32321VMTest.php</file>
             <file>./test/compliance/VarDumpInfNan32321JITTest.php</file>
             <file>./test/unit/VarDumpInfNan32321AotTest.php</file>
