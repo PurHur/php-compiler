@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7589 |
-| Phase A inventory files (M2 ratio SSOT) | 7589 |
+| PHP files on vm.php path | 7590 |
+| Phase A inventory files (M2 ratio SSOT) | 7590 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24257 |
+| Source constructs flagged (warnings) | 24260 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5300,6 +5300,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/SealedClassPreprocessor.php` | 0 | 1 |
 | `lib/Ast/StaticClassAnnotator.php` | 0 | 1 |
 | `lib/Ast/StaticClassPreprocessor.php` | 0 | 2 |
+| `lib/Ast/StrictTypesDeclareCompileCheck.php` | 0 | 2 |
 | `lib/Ast/TryCatchElseAttacher.php` | 0 | 1 |
 | `lib/Ast/TryCatchElseSupport.php` | 0 | 1 |
 | `lib/Ast/TypedFunctionStaticRewriter.php` | 0 | 1 |
@@ -6770,7 +6771,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 43 |
+| `lib/Runtime.php` | 0 | 44 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 19 |
@@ -11539,17 +11540,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 284)
 - new Variable (line 312)
 - new DOMException (line 359)
-- new DOMException (line 460)
-- new DOMException (line 466)
-- new DOMException (line 502)
-- new Exception (line 690)
-- new DOMException (line 716)
-- new Variable (line 722)
-- new Variable (line 756)
-- new ObjectEntry (line 2529)
-- new HashTable (line 2553)
-- new Variable (line 2555)
-- 92 class method(s)
+- new DOMException (line 461)
+- new DOMException (line 467)
+- new DOMException (line 503)
+- new Exception (line 691)
+- new DOMException (line 717)
+- new Variable (line 723)
+- new Variable (line 757)
+- new ObjectEntry (line 2643)
+- new HashTable (line 2667)
+- new Variable (line 2669)
+- 96 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -24154,19 +24155,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 341)
 - new Variable (line 345)
 - new RandomizerConstruct (line 347)
-- new Mt19937Instance (line 494)
-- new ArgumentCountError (line 564)
-- new Mt19937Instance (line 592)
-- new Variable (line 631)
-- new Variable (line 640)
-- new ObjectEntry (line 661)
-- new SecureInstance (line 663)
-- new ArgumentCountError (line 751)
-- new ArgumentCountError (line 818)
-- new Variable (line 899)
-- new HashTable (line 901)
-- new ArgumentCountError (line 918)
-- new ArgumentCountError (line 982)
+- new Mt19937Instance (line 500)
+- new ArgumentCountError (line 570)
+- new Mt19937Instance (line 598)
+- new Variable (line 637)
+- new Variable (line 646)
+- new ObjectEntry (line 667)
+- new SecureInstance (line 669)
+- new ArgumentCountError (line 757)
+- new ArgumentCountError (line 824)
+- new Variable (line 905)
+- new HashTable (line 907)
+- new ArgumentCountError (line 924)
+- new ArgumentCountError (line 988)
 - 57 class method(s)
 - 4 closure(s)
 
@@ -46587,6 +46588,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileFatal (line 35)
 - 3 class method(s)
 
+### `lib/Ast/StrictTypesDeclareCompileCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 120)
+- 6 class method(s)
+
 ### `lib/Ast/TryCatchElseAttacher.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46666,7 +46673,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 2333)
+- new InternalArgInfo (line 2334)
 - 24 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46682,8 +46689,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2729)
-- new ArgumentCountError (line 2740)
+- new ArgumentCountError (line 2730)
+- new ArgumentCountError (line 2741)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -55978,48 +55985,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Runtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new NodeTraverser (line 149)
-- new Ast\ConfusableBuiltinTypeHintCheck (line 151)
-- new MultiBlockNameResolver (line 153)
-- new Ast\EnumCaseImportRewriter (line 154)
-- new GroupUseStripper (line 156)
-- new Ast\AbstractEnumMarker (line 157)
-- new Ast\BreakContinueOperandCompileCheck (line 159)
-- new SealedClassAnnotator (line 161)
-- new StaticClassAnnotator (line 163)
-- new Ast\EnumPropertyCompileCheck (line 165)
-- new Ast\ReadonlyClassTraitPropertyCompileCheck (line 166)
-- new Ast\GeneratorYieldSourceMarker (line 167)
-- new Ast\AssertExprMessageRewriter (line 169)
-- new ReadonlyFunctionAnnotator (line 170)
-- new TryCatchElseAttacher (line 171)
-- new CatchIntersectionAttacher (line 172)
-- new Parser (line 173)
-- new ParserFactory (line 174)
-- new Traverser (line 178)
-- new InOperatorResolver (line 179)
-- new ExitFunctionResolver (line 180)
-- new VoidCastResolver (line 181)
-- new Visitor\Simplifier (line 182)
-- new Visitor\DeadBlockEliminator (line 183)
-- new Traverser (line 184)
-- new Visitor\PhiResolver (line 185)
-- new NullSafeLivenessDetector (line 186)
-- new Optimizer\AssignOp (line 187)
-- new CompilerTypeReconstructor (line 189)
-- new Compiler (line 207)
-- new VMContext (line 212)
-- new VM (line 218)
-- new JIT (line 328)
-- new JITContext (line 342)
-- new SealedClassPreprocessor (line 415)
-- new StaticClassPreprocessor (line 418)
-- new SourcePreprocessor\PropertyHooks (line 421)
-- new State (line 588)
-- new ReflectionProperty (line 622)
-- new ReflectionProperty (line 625)
-- new LintCompiler (line 1057)
-- new Variable (line 1188)
+- new NodeTraverser (line 150)
+- new Ast\ConfusableBuiltinTypeHintCheck (line 152)
+- new MultiBlockNameResolver (line 154)
+- new Ast\EnumCaseImportRewriter (line 155)
+- new GroupUseStripper (line 157)
+- new Ast\AbstractEnumMarker (line 158)
+- new Ast\BreakContinueOperandCompileCheck (line 160)
+- new Ast\StrictTypesDeclareCompileCheck (line 162)
+- new SealedClassAnnotator (line 164)
+- new StaticClassAnnotator (line 166)
+- new Ast\EnumPropertyCompileCheck (line 168)
+- new Ast\ReadonlyClassTraitPropertyCompileCheck (line 169)
+- new Ast\GeneratorYieldSourceMarker (line 170)
+- new Ast\AssertExprMessageRewriter (line 172)
+- new ReadonlyFunctionAnnotator (line 173)
+- new TryCatchElseAttacher (line 174)
+- new CatchIntersectionAttacher (line 175)
+- new Parser (line 176)
+- new ParserFactory (line 177)
+- new Traverser (line 181)
+- new InOperatorResolver (line 182)
+- new ExitFunctionResolver (line 183)
+- new VoidCastResolver (line 184)
+- new Visitor\Simplifier (line 185)
+- new Visitor\DeadBlockEliminator (line 186)
+- new Traverser (line 187)
+- new Visitor\PhiResolver (line 188)
+- new NullSafeLivenessDetector (line 189)
+- new Optimizer\AssignOp (line 190)
+- new CompilerTypeReconstructor (line 192)
+- new Compiler (line 210)
+- new VMContext (line 215)
+- new VM (line 221)
+- new JIT (line 331)
+- new JITContext (line 345)
+- new SealedClassPreprocessor (line 418)
+- new StaticClassPreprocessor (line 421)
+- new SourcePreprocessor\PropertyHooks (line 424)
+- new State (line 597)
+- new ReflectionProperty (line 631)
+- new ReflectionProperty (line 634)
+- new LintCompiler (line 1066)
+- new Variable (line 1197)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
