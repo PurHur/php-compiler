@@ -97,6 +97,8 @@ final class SoapConstants
     /** php-src php_encoding.h string namespaces (#21624). */
     public const XSD_NAMESPACE = 'http://www.w3.org/2001/XMLSchema';
     public const XSD_1999_NAMESPACE = 'http://www.w3.org/1999/XMLSchema';
+    /** php-src php_encoding.h APACHE_NAMESPACE (#32222). */
+    public const APACHE_NAMESPACE = 'http://xml.apache.org/xml-soap';
     /** php-src php_soap.h SOAP_1_1_ENV_NAMESPACE / SOAP_1_2_ENV_NAMESPACE (#31956). */
     public const SOAP_1_1_ENV_NAMESPACE = 'http://schemas.xmlsoap.org/soap/envelope/';
     public const SOAP_1_2_ENV_NAMESPACE = 'http://www.w3.org/2003/05/soap-envelope';
