@@ -55,6 +55,43 @@ PHP
         );
     }
 
+    /** Issue #32040 — function-body fetch line, not the inner() call. */
+    public function testFunctionBodyUndefinedVariableWarningUsesReadSite(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_undef_var_function_line.php';
+        [, $stderr] = $this->runVmScript($script, 0);
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_function_line\.php on line 6\s*$/m',
+            $stderr
+        );
+        $this->assertStringNotContainsString('on line 8', $stderr);
+    }
+
+    /** Issue #32040 — method-body fetch line, not the ->go() call. */
+    public function testMethodBodyUndefinedVariableWarningUsesReadSite(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_undef_var_method_line.php';
+        [, $stderr] = $this->runVmScript($script, 0);
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_method_line\.php on line 8\s*$/m',
+            $stderr
+        );
+        $this->assertStringNotContainsString('on line 11', $stderr);
+    }
+
+    /** Issue #32040 — closure `%` E_DEPRECATED line, not `$fn()`. */
+    public function testClosureModuloDeprecationUsesOperatorSite(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_mod_float_closure_line.php';
+        [$stdout, $stderr] = $this->runVmScript($script, 0);
+        $this->assertSame("1\n", $stdout);
+        $this->assertMatchesRegularExpression(
+            '/Implicit conversion from float 5\.5 to int loses precision in .+maintainer_gap_mod_float_closure_line\.php on line 5\s*$/m',
+            $stderr
+        );
+        $this->assertStringNotContainsString('on line 7', $stderr);
+    }
+
     /**
      * @return array{0: string, 1: string}
      */

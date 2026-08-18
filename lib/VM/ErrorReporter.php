@@ -787,7 +787,22 @@ final class ErrorReporter
                 $walk = $walk->parent;
             }
             if ($line <= 0) {
-                $walk = $frame;
+                // This frame's pending FUNCCALL line, else the current opcode. Do not walk
+                // parent callSiteLine first — that is the DO_FCALL that entered this user
+                // function, while Zend uses EG(current_execute_data)->opline (#32040, #29665).
+                // Internal builtin frames have no opcodes; they fall through to the parent
+                // call site (#11163).
+                if ($frame->callSiteLine > 0) {
+                    $line = $frame->callSiteLine;
+                } else {
+                    $opcodeLine = FatalSite::lineFromOpcodes($frame);
+                    if ($opcodeLine > 0) {
+                        $line = $opcodeLine;
+                    }
+                }
+            }
+            if ($line <= 0) {
+                $walk = $frame->parent;
                 while (null !== $walk) {
                     if ($walk->callSiteLine > 0) {
                         $line = $walk->callSiteLine;

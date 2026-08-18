@@ -352,9 +352,14 @@ restart:
                             $rightValue,
                             'Modulo by zero'
                         );
-                        $i64 = $this->context->getTypeFromString('int64');
-                        $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
-                        $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
+                        $leftLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                            $this->context,
+                            $leftValue
+                        );
+                        $rightLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                            $this->context,
+                            $rightValue
+                        );
                         $result = $this->context->builder->signedRem($leftLong, $rightLong);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:

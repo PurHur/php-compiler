@@ -7963,6 +7963,11 @@ class JIT {
             $this->prescanFunctionImportedGlobals($block->func);
             $this->emitJitDestructAllowDelref($block);
         }
+        // Nested function/method/closure bodies must not inherit the caller's FUNCCALL or
+        // the FUNCDEF/CLOSURE definition line (#32040).
+        if (null !== $block->func && '{main}' !== $block->func->name) {
+            $this->context->callSiteLine = 0;
+        }
         $thisParamOffset = 0;
         if ($this->instanceMethodUsesThis($block) || $this->closureBodyUsesThis($block)) {
             $thisParamOffset = 1;
@@ -8135,6 +8140,11 @@ class JIT {
 
         for ($i = $startIndex, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; ++$i) {
             $op = $block->opCodes[$i];
+            // Bake this opcode's user site into helper warnings (undef-var / float→int)
+            // so nested function bodies do not inherit the caller's FUNCCALL line (#32040).
+            if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
+                $this->context->callSiteLine = $op->sourceLocation->startLine;
+            }
             if (
                 null !== $block->func
                 && '{main}' === $block->func->name
@@ -10262,6 +10272,14 @@ class JIT {
                     // echo/print $this in FLAG_STATIC / {main} / plain function (#31901).
                     if (JIT\UnboundThisGuard::emitIfProven($this->context, $this, $block, $echoOp)) {
                         break;
+                    }
+                    // ZEND_CHECK_UNDEFINED_VAR on echo/print CV (zend_execute.c, #32040).
+                    if ($echoOp instanceof Operand && !($echoOp instanceof Operand\Literal)) {
+                        JIT\UndefinedVariableHelper::guardBeforeNamedLocalRead(
+                            $this->context,
+                            $echoOp,
+                            $this->context->getVariableFromOp($echoOp)
+                        );
                     }
                     $scriptGlobalEchoName = (
                         OpCode::TYPE_ECHO === $op->type

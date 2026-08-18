@@ -559,7 +559,7 @@ final class JitIntdiv
             $context->builder->zExt($written, $sizeT),
             $i32->constInt(ErrorReporter::E_DEPRECATED, false),
             $emptyFile,
-            $i32->constInt(0, false)
+            $i32->constInt(max(0, $context->callSiteLine), false)
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
         $context->builder->branch($afterWarn);
@@ -582,7 +582,7 @@ final class JitIntdiv
             $sizeT->constInt(\strlen($message), false),
             $i32->constInt(ErrorReporter::E_DEPRECATED, false),
             $emptyFile,
-            $i32->constInt(0, false)
+            $i32->constInt(max(0, $context->callSiteLine), false)
         );
     }
 

@@ -3948,7 +3948,9 @@ class Compiler {
             ) {
                 $var = $this->compileOperand($prior->result, $block, true);
                 $line = $op->getLine();
-                $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
+                $echoOpcode = new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null);
+                $this->assignSourceMetadata($echoOpcode, $op);
+                $block->addOpCode($echoOpcode);
 
                 return $block;
             }
@@ -3957,7 +3959,9 @@ class Compiler {
         if (null !== $echoAfterAssign && $this->isStmtCoalesceLoweredBeforeEcho($ops, $echoIndex)) {
             $var = $this->compileOperand($echoAfterAssign, $block, true);
             $line = $op->getLine();
-            $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
+            $echoOpcode = new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null);
+            $this->assignSourceMetadata($echoOpcode, $op);
+            $block->addOpCode($echoOpcode);
 
             return $block;
         }
@@ -4052,6 +4056,7 @@ class Compiler {
         }
         $line = $op->getLine();
         $echoOpcode = new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null);
+        $this->assignSourceMetadata($echoOpcode, $op);
         $this->attachEchoScriptGlobalName($echoOpcode, $echoOperand, $block);
         $block->addOpCode($echoOpcode);
 
@@ -14274,13 +14279,15 @@ class Compiler {
                 return [$evalOp];
             case Op\Expr\Print_::class:
                 $line = $expr->getLine();
-
-                return [new OpCode(
+                $printOp = new OpCode(
                     $this->getOpCodeTypeFromUnaryOp($expr),
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->expr, $block, true),
                     $line > 0 ? $line : null
-                )];
+                );
+                $this->assignSourceMetadata($printOp, $expr);
+
+                return [$printOp];
             case Op\Expr\ArrayDimFetch::class:
                 $this->rejectArrayEmptyOffsetRead($expr, $block);
                 $mergeEcho = $this->mergeEchoSlotForBranch($block);
@@ -43566,6 +43573,7 @@ class Compiler {
                     $var,
                     $line > 0 ? $line : null
                 );
+                $this->assignSourceMetadata($echoOpcode, $terminal);
                 $this->attachEchoScriptGlobalName($echoOpcode, $terminal->expr, $block);
 
                 return [$echoOpcode];
