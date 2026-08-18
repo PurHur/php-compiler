@@ -74,7 +74,7 @@ final class strval extends Internal
                     null
                 );
             case JITVariable::TYPE_NATIVE_DOUBLE:
-                return \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::format(
+                return \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::formatGcvt(
                     $context,
                     $context->helper->loadValue($args[0])
                 );
@@ -161,7 +161,7 @@ final class strval extends Internal
         );
 
         $context->builder->positionAtEnd($doubleBlock);
-        $doubleStr = \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::format(
+        $doubleStr = \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::formatGcvt(
             $context,
             $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr)
         );

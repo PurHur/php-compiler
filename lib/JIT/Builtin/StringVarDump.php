@@ -220,9 +220,16 @@ final class StringVarDump
             $arg
         );
         ValueEchoHelper::echoLiteral($context, 'float(');
-        $context->builder->call(
-            $context->lookupFunction('__phpc_ob_echo_double'),
-            $doubleVal
+        // zend_gcvt / INF mapping — not libc %.14g `inf` / `1e+100` (#32316).
+        $formatted = ZendDoubleStringRuntime::formatGcvt($context, $doubleVal);
+        ValueEchoHelper::echoStringVariable(
+            $context,
+            new JitVariable(
+                $context,
+                JitVariable::TYPE_STRING,
+                JitVariable::KIND_VALUE,
+                $formatted
+            )
         );
         ValueEchoHelper::echoLiteral($context, ")\n");
         $context->builder->branch($done);
