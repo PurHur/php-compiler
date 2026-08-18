@@ -9,10 +9,10 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VmActiveContextJitHelper;
 
 /**
- * Lowered into JIT/AOT modules for ldap_dn2ufn() / ldap_explode_dn() / ldap_connect_wallet()
- * (#22212, #31984).
+ * Lowered into JIT/AOT modules for ldap_dn2ufn() / ldap_explode_dn() /
+ * ldap_connect() / ldap_connect_wallet() (#22212, #31984, #32000).
  *
- * SSOT: {@see VmLdapDn} / {@see LdapDnJitHelper::connect}
+ * SSOT: {@see VmLdapDn} / {@see VmLdapCore::connect} / {@see LdapDnJitHelper::connect}
  * php-src: ext/ldap/ldap.c
  */
 final class LdapDnJitHelper
@@ -74,5 +74,33 @@ final class LdapDnJitHelper
             $authMode,
             VmActiveContextJitHelper::resolve()
         );
+    }
+
+    /**
+     * ldap_connect() SSOT (php-src ldap_initialize; #3369 / #32000).
+     *
+     * $hasPort is 1 when the caller passed int $port (php-src Z_PARAM_LONG); 0 when omitted.
+     */
+    public static function connectUri(?string $uri, int $hasPort, int $port): Variable
+    {
+        $out = new Variable();
+        if (!VmLdapNative::available()) {
+            @\trigger_error('ldap_connect(): Could not create session handle', \E_USER_WARNING);
+            $out->bool(false);
+
+            return $out;
+        }
+        $ctx = VmActiveContextJitHelper::resolve();
+        if (null === $ctx) {
+            throw new \LogicException('ldap_connect() requires a VM context');
+        }
+        $result = VmLdapCore::connect($uri, 1 === $hasPort ? $port : null, $ctx);
+        if (false === $result) {
+            $out->bool(false);
+
+            return $out;
+        }
+
+        return $result;
     }
 }
