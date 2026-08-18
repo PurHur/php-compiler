@@ -41,6 +41,23 @@ final class JitValueNumeric
         );
     }
 
+    /** Boxed string stored as JIT TYPE_STRING (132), not VM TYPE_STRING (4). */
+    public static function valueIsJitString(Context $context, Variable $boxed): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+    }
+
     public static function valueIsString(Context $context, Variable $boxed): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
