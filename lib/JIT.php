@@ -10209,12 +10209,15 @@ class JIT {
                 case OpCode::TYPE_CAST_INT:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $long = ext\standard\JitZendScalarCast::emitIntCast($this->context, $value);
-                    $this->assignOperandValue($block->getOperand($op->arg1), $long);
+                    // Force: php-cfg leaves inline (int)/(float) call args on dead temps
+                    // while ARG_SEND is remapped to the cast result; empty usages would
+                    // skip the store and ARG_SEND would materialize NULL (#32293 / #28622).
+                    $this->assignOperandValue($block->getOperand($op->arg1), $long, true);
                     break;
                 case OpCode::TYPE_CAST_FLOAT:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $double = ext\standard\JitZendScalarCast::emitFloatCast($this->context, $value);
-                    $this->assignOperandValue($block->getOperand($op->arg1), $double);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $double, true);
                     break;
                 case OpCode::TYPE_CAST_STRING:
                     $castSrcOp = $block->getOperand($op->arg2);
