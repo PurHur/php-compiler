@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
@@ -56,9 +57,13 @@ final class JitUploadTempKernel
 
     public static function implement(Context $context): void
     {
+        // Restore caller insert block — clearInsertionPosition mid-user-compile
+        // leaves parentless __compiler_is_uploaded_file calls (#28853, peer #21109).
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
         $probe = $context->module->getNamedFunction('__compiler_is_uploaded_file');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
 
             return;
         }
@@ -70,7 +75,7 @@ final class JitUploadTempKernel
         self::implementIsUploadedFileBridge($context);
         self::implementMoveUploadedFileBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
     }
 
     private static function implementPathHasTraversalBridge(Context $context): void
