@@ -15,7 +15,8 @@ use PHPLLVM\Value;
  *
  * Uses a DOMElement stand-in (peer {@see JitDomCreateComment}) because allocating an
  * unregistered DOMText class aborts LLVM codegen in standalone AOT. Slot layout exposes
- * nodeName / nodeValue / textContent / data for property reads after loadXML whitespace.
+ * nodeName / nodeValue / textContent / data / wholeText for property reads after loadXML
+ * whitespace (#32395).
  *
  * php-src: ext/dom/document.c PHP_METHOD(DOMDocument, createTextNode)
  */
@@ -33,6 +34,8 @@ final class JitDomCreateTextNode
     private const PROP_TEXT_CONTENT = 'textContent';
 
     private const PROP_DATA = 'data';
+
+    private const PROP_WHOLE_TEXT = 'wholeText';
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
@@ -73,11 +76,12 @@ final class JitDomCreateTextNode
         self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
+        self::storeStringLiteral($context, $obj, self::PROP_WHOLE_TEXT, $data);
 
         return $obj;
     }
 
-    /** Rewrite data/nodeValue/textContent on an existing text stand-in (#32362). */
+    /** Rewrite data/nodeValue/textContent/wholeText on an existing text stand-in (#32362, #32395). */
     public static function overwriteCharacterData(Context $context, Value $obj, string $data): void
     {
         self::$lastMaterializedData = $data;
@@ -88,6 +92,7 @@ final class JitDomCreateTextNode
         self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
+        self::storeStringLiteral($context, $obj, self::PROP_WHOLE_TEXT, $data);
     }
 
     private static function materializeFromRuntimeData(Context $context, JITVariable $dataArg): Value
@@ -106,6 +111,7 @@ final class JitDomCreateTextNode
         self::storeStringValue($context, $obj, self::PROP_NODE_VALUE, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
+        self::storeStringValue($context, $obj, self::PROP_WHOLE_TEXT, $dataStr);
 
         return $obj;
     }
@@ -119,6 +125,7 @@ final class JitDomCreateTextNode
             self::PROP_NODE_VALUE,
             self::PROP_TEXT_CONTENT,
             self::PROP_DATA,
+            self::PROP_WHOLE_TEXT,
         ] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);

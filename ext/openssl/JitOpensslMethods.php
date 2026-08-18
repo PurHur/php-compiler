@@ -13,8 +13,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for openssl_get_cipher_methods()/openssl_get_md_methods() (#21103)
- * and openssl_get_curve_names() (#6560 VM, JIT/AOT #32364).
+ * LLVM lowering for openssl_get_cipher_methods()/openssl_get_md_methods() (#21103),
+ * openssl_get_curve_names() (#6560 VM, JIT/AOT #32364), and
+ * openssl_get_cert_locations() (#6560 VM, JIT/AOT #32388).
  */
 final class JitOpensslMethods
 {
@@ -36,6 +37,19 @@ final class JitOpensslMethods
     public static function curveNames(Context $context): Value
     {
         $htVar = HashTableHelper::variableFromVmHashTable($context, VmOpenssl::curveNames());
+
+        return $htVar->value;
+    }
+
+    /**
+     * openssl_get_cert_locations() — bake {@see VmOpenssl::certLocations()} like curve names (#32364).
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_get_cert_locations)
+     * / X509_get_default_cert_file / openssl.cafile / openssl.capath
+     */
+    public static function certLocations(Context $context): Value
+    {
+        $htVar = HashTableHelper::variableFromVmHashTable($context, VmOpenssl::certLocations());
 
         return $htVar->value;
     }

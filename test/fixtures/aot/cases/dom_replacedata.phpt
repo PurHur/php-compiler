@@ -1,11 +1,11 @@
 --TEST--
-AOT DOMCharacterData::replaceData createTextNode (ext/dom/characterdata.c replace_data)
+AOT DOMCharacterData::replaceData createTextNode (#32391, ext/dom/characterdata.c xmlTextReplace)
 --FILE--
 <?php
 declare(strict_types=1);
 $doc = new DOMDocument();
-$text = $doc->createTextNode('abcd');
-$text->replaceData(1, 2, 'XY');
+$text = $doc->createTextNode('axc');
+$text->replaceData(1, 1, 'b');
 echo $text->data, "\n";
 --EXPECT--
-aXYd
+abc

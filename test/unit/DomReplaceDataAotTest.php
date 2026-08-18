@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: DOMCharacterData::replaceData php-src replace_data (#32392).
+ * AOT: DOMCharacterData::replaceData xmlTextReplace (#32391) + catchable INDEX_SIZE_ERR (#32392).
  *
  * @see php-src ext/dom/characterdata.c PHP_METHOD(DOMCharacterData, replaceData)
  *
@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class DomReplaceDataAotTest extends TestCase
 {
-    private const EXPECTED = "aXYd\n";
+    private const EXPECTED = "abc\n";
 
     public function testVmReplaceData(): void
     {

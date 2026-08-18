@@ -1627,7 +1627,7 @@ final class VmDomJitDispatch
     }
 
     /**
-     * DOMCharacterData::replaceData() — php-src characterdata.c replace_data (#32392).
+     * DOMCharacterData::replaceData() — php-src characterdata.c (#32391, #32392).
      *
      * @param list<Variable> $extra
      */

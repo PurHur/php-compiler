@@ -16,13 +16,13 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT for DOMCharacterData::replaceData() (php-src replace_data).
+ * User-script AOT for DOMCharacterData::replaceData() (php-src xmlTextReplace).
  *
  * createTextNode stand-ins are unregistered DOMElement objects, so NestedJIT
- * DomRegistry replace would abort. Fold compile-time replace like
+ * DomRegistry replace would abort. Fold compile-time splice like
  * {@see JitDomDeleteData} / {@see JitDomInsertData}.
  *
- * php-src: ext/dom/characterdata.c PHP_METHOD(DOMCharacterData, replaceData)
+ * php-src: ext/dom/characterdata.c PHP_METHOD(DOMCharacterData, replaceData) (#32391)
  */
 final class JitDomReplaceData
 {
@@ -71,20 +71,22 @@ final class JitDomReplaceData
             }
         }
 
-        $head = $args[0]->compileTimeDomTextData
+        $data = $args[0]->compileTimeDomTextData
             ?? JitDomCreateTextNode::$lastMaterializedData
             ?? JitDomSubstringData::$lastMaterializedData;
         $offset = self::compileTimeLong($args[1] ?? null);
         $count = self::compileTimeLong($args[2] ?? null);
-        $insert = JitStringBuiltinArg::compileTimeLiteral($args[3])
-            ?? $args[3]->compileTimeString;
-        if (null === $head || null === $offset || null === $count || null === $insert) {
+        $repl = null;
+        if (isset($args[3])) {
+            $repl = JitStringBuiltinArg::compileTimeLiteral($args[3]) ?? $args[3]->compileTimeString;
+        }
+        if (null === $data || null === $offset || null === $count || null === $repl) {
             throw new \LogicException(
                 'DOMCharacterData::replaceData() user-script AOT requires compile-time data'
             );
         }
 
-        $len = \strlen($head);
+        $len = \strlen($data);
         if ($offset < 0 || $offset > $len || $count < 0) {
             TryCatchHelper::emitCatchableClassError(
                 $context,
@@ -103,7 +105,7 @@ final class JitDomReplaceData
             $count = $len - $offset;
         }
 
-        $combined = substr($head, 0, $offset).$insert.substr($head, $offset + $count);
+        $combined = substr($data, 0, $offset).$repl.substr($data, $offset + $count);
         $receiver = self::loadObjectArg($context, $args[0]);
         JitDomCreateTextNode::overwriteCharacterData($context, $receiver, $combined);
         $args[0]->compileTimeDomTextData = $combined;

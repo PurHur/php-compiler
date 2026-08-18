@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** DOMCharacterData::replaceData() — user-script AOT (php-src replace_data) (#32392). */
+/** DOMCharacterData::replaceData() — user-script AOT (php-src xmlTextReplace) (#32391). */
 final class DomCharacterDataReplaceData implements Call
 {
     public function call(Context $context, Variable ...$args): Value

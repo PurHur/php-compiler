@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7618 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24326 |
+| Source constructs flagged (warnings) | 24327 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1805,7 +1805,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_encrypt.php` | 0 | 3 |
 | `ext/openssl/openssl_error_string.php` | 0 | 3 |
 | `ext/openssl/openssl_free_key.php` | 0 | 2 |
-| `ext/openssl/openssl_get_cert_locations.php` | 0 | 2 |
+| `ext/openssl/openssl_get_cert_locations.php` | 0 | 3 |
 | `ext/openssl/openssl_get_cipher_methods.php` | 0 | 3 |
 | `ext/openssl/openssl_get_curve_names.php` | 0 | 3 |
 | `ext/openssl/openssl_get_md_methods.php` | 0 | 3 |
@@ -10347,7 +10347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateCDATASection.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 125)
+- new JITVariable (line 131)
 - 8 class method(s)
 
 ### `ext/dom/JitDomCreateComment.php`
@@ -10410,7 +10410,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateTextNode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 141)
+- new JITVariable (line 148)
 - 9 class method(s)
 
 ### `ext/dom/JitDomDeleteData.php`
@@ -21460,7 +21460,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/JitOpensslMethods.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/openssl/JitOpensslSign.php`
 
@@ -21811,7 +21811,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_get_cert_locations.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 43)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_get_cipher_methods.php`
