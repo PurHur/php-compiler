@@ -3890,6 +3890,19 @@ class VM {
                 );
             }
         }
+        // ++/-- with __get only: defer slot allocation so RMW reads via __get (#32016, zend_object_handlers.c).
+        if (
+            null !== $op
+            && $this->propertyFetchDestUsedAsIncDec($frame, $op)
+            && $this->hasInstanceMethod($object->class, '__get')
+            && !$this->propertyWriteUsesMagicSet($object, $name, $frame)
+        ) {
+            $proxy = new Variable();
+            $proxy->magicSetTarget = $object;
+            $proxy->magicSetName = $name;
+
+            return $proxy;
+        }
 
         return $object->allocateProperty($name);
     }
@@ -11071,6 +11084,68 @@ restart:
     }
 
     /**
+     * Store ++/-- result for magic-overloaded props: __set, or deprecated dynamic (#32016).
+     *
+     * @return null|Frame catch frame on visibility Error
+     */
+    private function commitMagicOverloadedPropertyIncDecWrite(
+        ObjectEntry $owner,
+        string $propName,
+        Variable $write,
+        Variable $working,
+        Frame $frame,
+        bool $writeUsesMagic,
+        bool $isMagicSetProxy
+    ): ?Frame {
+        if ($writeUsesMagic) {
+            $this->invokeMagicSet($owner, $propName, $working);
+
+            return null;
+        }
+        if ($isMagicSetProxy) {
+            $this->writeDynamicPropertyForMagicGetOnlyIncDec($owner, $propName, $working, $frame);
+
+            return null;
+        }
+        $catchFrame = $this->enforcePropertyVisibilityWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $catchFrame = $this->enforcePropertyWriteVisibility($owner, $propName, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $write->copyFrom($working);
+
+        return null;
+    }
+
+    /** __get without __set: ++/-- writes a deprecated dynamic property (#32016, zend_object_handlers.c). */
+    private function writeDynamicPropertyForMagicGetOnlyIncDec(
+        ObjectEntry $object,
+        string $name,
+        Variable $value,
+        Frame $frame
+    ): void {
+        if (!$object->class->allowsDynamicProperties) {
+            if (\PHPCompiler\CompilerVersion::supportsDynamicPropertyCreationDeprecation()) {
+                $scriptPath = $frame->scriptPath;
+                $this->context->errors->deprecatedDynamicProperty(
+                    $object->class->name,
+                    $name,
+                    '' !== $scriptPath && '-' !== $scriptPath ? $scriptPath : null,
+                    $this->context,
+                    $frame
+                );
+            }
+        }
+        $slot = $object->hasProperty($name)
+            ? $object->getProperty($name)
+            : $object->allocateProperty($name);
+        $slot->copyFrom($value);
+    }
+
+    /**
      * Pre/post increment/decrement with Zend bool→int coercion (#4727, #3552).
      * Rejects ++/-- on readonly properties after construction (#3149).
      * Inaccessible / overloaded props RMW via __get then __set (#25687, zend_object_handlers.c).
@@ -11251,19 +11326,17 @@ restart:
                 if (!$writeUsesMagic) {
                     VmIncDec::throwIfTypedPropertyRejectsOverflow($write, $before, $working, $increment);
                 }
-                if ($writeUsesMagic) {
-                    $this->invokeMagicSet($owner, $propName, $working);
-                } else {
-                    $catchFrame = $this->enforcePropertyVisibilityWrite($write, $frame);
-                    if (null !== $catchFrame) {
-                        return $catchFrame;
-                    }
-                    // Declared inaccessible without __set — visibility Error via owner metadata.
-                    $catchFrame = $this->enforcePropertyWriteVisibility($owner, $propName, $frame);
-                    if (null !== $catchFrame) {
-                        return $catchFrame;
-                    }
-                    $write->copyFrom($working);
+                $catchFrame = $this->commitMagicOverloadedPropertyIncDecWrite(
+                    $owner,
+                    $propName,
+                    $write,
+                    $working,
+                    $frame,
+                    $writeUsesMagic,
+                    $isMagicSetProxy
+                );
+                if (null !== $catchFrame) {
+                    return $catchFrame;
                 }
                 $result->copyFrom($working);
             } else {
@@ -11277,18 +11350,17 @@ restart:
                 if (!$writeUsesMagic) {
                     VmIncDec::throwIfTypedPropertyRejectsOverflow($write, $old, $working, $increment);
                 }
-                if ($writeUsesMagic) {
-                    $this->invokeMagicSet($owner, $propName, $working);
-                } else {
-                    $catchFrame = $this->enforcePropertyVisibilityWrite($write, $frame);
-                    if (null !== $catchFrame) {
-                        return $catchFrame;
-                    }
-                    $catchFrame = $this->enforcePropertyWriteVisibility($owner, $propName, $frame);
-                    if (null !== $catchFrame) {
-                        return $catchFrame;
-                    }
-                    $write->copyFrom($working);
+                $catchFrame = $this->commitMagicOverloadedPropertyIncDecWrite(
+                    $owner,
+                    $propName,
+                    $write,
+                    $working,
+                    $frame,
+                    $writeUsesMagic,
+                    $isMagicSetProxy
+                );
+                if (null !== $catchFrame) {
+                    return $catchFrame;
                 }
                 $result->copyFrom($old);
             }

@@ -539,6 +539,8 @@
             <file>./test/compliance/DynPropIncUndefinedWarnJITTest.php</file>
             <file>./test/compliance/MagicPropIncNoUndefWarnVMTest.php</file>
             <file>./test/compliance/MagicPropIncNoUndefWarnJITTest.php</file>
+            <file>./test/compliance/MagicPropGetOnlyIncNoUndefWarnVMTest.php</file>
+            <file>./test/compliance/MagicPropGetOnlyIncNoUndefWarnJITTest.php</file>
             <file>./test/compliance/MagicPropDecNoUndefWarnVMTest.php</file>
             <file>./test/compliance/MagicPropDecNoUndefWarnJITTest.php</file>
             <file>./test/compliance/XmlGetCurrentReflectionVMTest.php</file>

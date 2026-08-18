@@ -12845,6 +12845,39 @@ class JIT {
                             );
                             $lvalue->magicSetReceiver = $receiver;
                             $lvalue->magicSetName = $name->value;
+                            $lvalue->objectPropertyClassName = $declaringClass;
+                            if ($forceBranchMerge) {
+                                $this->assignOperand($result, $lvalue, true);
+                            } else {
+                                $this->context->scope->variables[$result] = $lvalue;
+                            }
+                            break;
+                        }
+                        if (
+                            $forWrite
+                            && !$this->context->type->object->hasProperty($classId, $name->value)
+                            && JIT\MagicMethodDispatch::hasInstanceMethod(
+                                $this->context->type->object,
+                                $classId,
+                                '__get'
+                            )
+                            && !JIT\MagicMethodDispatch::hasInstanceMethod(
+                                $this->context->type->object,
+                                $classId,
+                                '__set'
+                            )
+                            && $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
+                        ) {
+                            // Defer dynamic slot — ++/-- reads via __get (#32016, zend_object_handlers.c).
+                            $lvalue = new Variable(
+                                $this->context,
+                                Variable::TYPE_NULL,
+                                Variable::KIND_VALUE,
+                                $this->context->getTypeFromString('__value__*')->constNull()
+                            );
+                            $lvalue->magicSetReceiver = $receiver;
+                            $lvalue->magicSetName = $name->value;
+                            $lvalue->objectPropertyClassName = $declaringClass;
                             if ($forceBranchMerge) {
                                 $this->assignOperand($result, $lvalue, true);
                             } else {
@@ -18654,6 +18687,12 @@ class JIT {
             return;
         }
 
+        if (null !== $read->magicSetReceiver && null !== $read->magicSetName) {
+            $this->compileMagicPropertyIncDecOp($read, $resultOp, $increment, $prefix, $block, $op);
+
+            return;
+        }
+
         if (null !== $read->objectPropertySlot) {
             $this->compileObjectPropertyIncDecOp($read, $resultOp, $increment, $prefix);
 
@@ -19350,6 +19389,111 @@ class JIT {
                 );
             }
         );
+        if ($prefix) {
+            $this->assignOperand($resultOp, $newVal, true);
+        }
+    }
+
+    /**
+     * ++/-- on magic-backed undeclared props: __get then __set or deprecated dynamic (#31992, #32016).
+     */
+    private function compileMagicPropertyIncDecOp(
+        JIT\Variable $read,
+        \PHPCfg\Operand $resultOp,
+        bool $increment,
+        bool $prefix,
+        Block $block,
+        OpCode $incDecOp
+    ): void {
+        $declaringClass = $read->objectPropertyClassName ?? 'object';
+        $classId = $this->context->type->object->lookup($declaringClass);
+        $receiverVar = new Variable(
+            $this->context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $read->magicSetReceiver
+        );
+        $propName = $read->magicSetName;
+        $currentVal = JIT\MagicMethodDispatch::tryEmitMagicGet(
+            $this->context,
+            $read->magicSetReceiver,
+            $declaringClass,
+            $propName,
+            $block
+        );
+        if (null === $currentVal) {
+            $currentVar = new Variable(
+                $this->context,
+                Variable::TYPE_NULL,
+                Variable::KIND_VALUE,
+                $this->context->getTypeFromString('__value__*')->constNull()
+            );
+        } else {
+            $currentVar = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VALUE,
+                $currentVal
+            );
+        }
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $currentVar, true);
+        }
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $currentVar, $oneVar);
+        if (
+            JIT\MagicMethodDispatch::hasInstanceMethod(
+                $this->context->type->object,
+                $classId,
+                '__set'
+            )
+        ) {
+            JIT\MagicMethodDispatch::tryEmitMagicSet(
+                $this->context,
+                $receiverVar,
+                $propName,
+                $newVal,
+                $block
+            );
+        } else {
+            $deprecationLine = null !== $incDecOp->sourceLocation && $incDecOp->sourceLocation->startLine > 0
+                ? $incDecOp->sourceLocation->startLine
+                : 0;
+            JIT\DynamicPropertyDeprecationGuard::emitBeforeUndeclaredWrite(
+                $this->context,
+                $this->context->type->object,
+                $classId,
+                $declaringClass,
+                $propName,
+                $block->scriptPath(),
+                $deprecationLine
+            );
+            if (null === JIT\BasicBlockHelper::tryGetInsertBlock($this->context)) {
+                return;
+            }
+            $slot = $this->context->type->object->propertyFetch(
+                $read->magicSetReceiver,
+                $declaringClass,
+                $propName
+            );
+            $writeVar = $this->context->getVariableFromOp($slot);
+            JIT\ReadonlyClassGuard::emitStoreUnlessPending(
+                $this->context,
+                function () use ($writeVar, $newVal): void {
+                    $this->context->type->object->propertyStore(
+                        $writeVar->objectPropertySlot,
+                        $newVal,
+                        $writeVar->objectPropertyType
+                    );
+                }
+            );
+        }
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
         }
