@@ -17,6 +17,44 @@ final class TraitCompositionConflictMessage
         return sprintf('Trait "%s" not found', $traitName);
     }
 
+    /**
+     * Adaptation names a trait that exists but is not in the composing class {@code use} list.
+     *
+     * php-src: Zend/zend_inheritance.c {@code zend_check_trait_usage}
+     * ({@code Required Trait %s wasn't added to %s}, #32130).
+     */
+    public static function requiredNotAdded(string $traitName, string $className): string
+    {
+        return sprintf(
+            "Required Trait %s wasn't added to %s",
+            ltrim($traitName, '\\'),
+            ltrim($className, '\\'),
+        );
+    }
+
+    /**
+     * Precedence/alias trait not on the composing class — Zend {@code zend_check_trait_usage}.
+     *
+     * Existing trait not in {@code use} → {@see requiredNotAdded}; unknown name →
+     * {@code Could not find trait} (zend_traits_init_trait_structures).
+     *
+     * @return never
+     */
+    public static function throwUnresolvedAdaptationTrait(
+        string $referencedName,
+        string $className,
+        bool $existsAsTrait,
+        ?string $declaredTraitName = null,
+    ): void {
+        if ($existsAsTrait) {
+            throw new \LogicException(self::requiredNotAdded(
+                $declaredTraitName ?? $referencedName,
+                $className,
+            ));
+        }
+        throw new \LogicException('Could not find trait ' . $referencedName);
+    }
+
     public static function incompatibleProperty(
         string $firstTrait,
         string $secondTrait,

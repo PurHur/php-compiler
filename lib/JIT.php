@@ -15513,6 +15513,35 @@ class JIT {
     }
 
     /**
+     * Precedence/alias trait must be a direct {@code use} on the composing class
+     * (Zend/zend_inheritance.c zend_check_trait_usage, #32130).
+     *
+     * @param array<string, string> $usedTraitNameByLc
+     */
+    private function throwIfJitAdaptationTraitNotDirectlyUsed(
+        string $referencedName,
+        string $className,
+        array $usedTraitNameByLc,
+        bool $unknownIsCouldNotFind = true,
+    ): void {
+        $lc = strtolower(ltrim($referencedName, '\\'));
+        if (isset($usedTraitNameByLc[$lc])) {
+            return;
+        }
+        $object = $this->context->type->object;
+        $existsAsTrait = $object->hasDeclaredClass($lc) && $object->isTraitClass($lc);
+        if (!$existsAsTrait && !$unknownIsCouldNotFind) {
+            return;
+        }
+        VM\TraitCompositionConflictMessage::throwUnresolvedAdaptationTrait(
+            $referencedName,
+            $className,
+            $existsAsTrait,
+            $existsAsTrait ? $object->classNameForId($object->lookup($lc)) : null,
+        );
+    }
+
+    /**
      * Merge trait methods/constants onto a using class (Zend zend_compile_traits; #3238).
      *
      * @param list<string> $traitNames
@@ -15605,9 +15634,11 @@ class JIT {
             if ('' === $winnerTraitLc) {
                 throw new \LogicException('Trait precedence adaptation must specify a trait');
             }
-            if (!isset($usedTraitNameByLc[$winnerTraitLc])) {
-                throw new \LogicException('Could not find trait ' . (string) ($adaptation['trait'] ?? ''));
-            }
+            $this->throwIfJitAdaptationTraitNotDirectlyUsed(
+                (string) ($adaptation['trait'] ?? ''),
+                $className,
+                $usedTraitNameByLc,
+            );
             $methodLc = strtolower((string) $adaptation['method']);
             if (!isset($perTraitMethods[$winnerTraitLc][$methodLc])) {
                 throw new \LogicException(
@@ -15619,9 +15650,11 @@ class JIT {
             }
             foreach ($adaptation['insteadof'] as $loserTrait) {
                 $loserLc = strtolower(ltrim((string) $loserTrait, '\\'));
-                if (!isset($usedTraitNameByLc[$loserLc])) {
-                    throw new \LogicException('Could not find trait ' . (string) $loserTrait);
-                }
+                $this->throwIfJitAdaptationTraitNotDirectlyUsed(
+                    (string) $loserTrait,
+                    $className,
+                    $usedTraitNameByLc,
+                );
                 if (!isset($perTraitMethods[$loserLc][$methodLc])) {
                     throw new \LogicException(
                         'A precedence rule was defined for '
@@ -15667,6 +15700,14 @@ class JIT {
             $traitLcFilter = null !== ($adaptation['trait'] ?? null)
                 ? strtolower(ltrim((string) $adaptation['trait'], '\\'))
                 : null;
+            if (null !== $traitLcFilter) {
+                $this->throwIfJitAdaptationTraitNotDirectlyUsed(
+                    (string) $adaptation['trait'],
+                    $className,
+                    $usedTraitNameByLc,
+                    false,
+                );
+            }
             $newName = $adaptation['newName'] ?? null;
             $newModifier = $adaptation['newModifier'] ?? null;
             if (null === $newName && null === $newModifier) {
