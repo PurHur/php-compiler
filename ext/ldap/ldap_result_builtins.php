@@ -51,7 +51,7 @@ final class ldap_compare extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_compare() is not implemented for JIT in this compiler build (issue #22177)');
+        return JitLdapResult::invokeCompare($context, $args);
     }
 }
 

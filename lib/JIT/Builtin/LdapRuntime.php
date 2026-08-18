@@ -9,8 +9,8 @@ use PHPCompiler\JIT\JitVmHelperLink;
 
 /**
  * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect /
- * ldap_connect_wallet / ldap_bind / ldap_unbind / ldap_errno / ldap_error / ldap_err2str
- * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106).
+ * ldap_connect_wallet / ldap_bind / ldap_unbind / ldap_errno / ldap_error / ldap_err2str /
+ * ldap_compare (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106, #32121).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -22,6 +22,8 @@ final class LdapRuntime
     private const DN_HELPER_PATH = '/ext/ldap/LdapDnJitHelper.php';
 
     private const LINK_HELPER_PATH = '/ext/ldap/LdapLinkJitHelper.php';
+
+    private const RESULT_HELPER_PATH = '/ext/ldap/LdapResultJitHelper.php';
 
     private const LDAP_ESCAPE_HELPER = 'PHPCompiler\\ext\\ldap\\LdapEscapeJitHelper::ldapEscape';
 
@@ -45,6 +47,8 @@ final class LdapRuntime
 
     private const LDAP_ERR2STR_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::err2strArgv';
 
+    private const LDAP_COMPARE_HELPER = 'PHPCompiler\\ext\\ldap\\LdapResultJitHelper::compareArgv';
+
     /** @var list<string> */
     private const ESCAPE_HELPERS = [
         self::LDAP_ESCAPE_HELPER,
@@ -66,6 +70,11 @@ final class LdapRuntime
         self::LDAP_ERRNO_HELPER,
         self::LDAP_ERROR_HELPER,
         self::LDAP_ERR2STR_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const RESULT_HELPERS = [
+        self::LDAP_COMPARE_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -210,6 +219,17 @@ final class LdapRuntime
             self::LINK_HELPER_PATH,
             self::LINK_HELPERS,
             '#32106'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_compare',
+            'ldap_compare_bridge_entry',
+            [$i64, $strPtr, $strPtr, $strPtr],
+            $valuePtr,
+            self::LDAP_COMPARE_HELPER,
+            self::RESULT_HELPER_PATH,
+            self::RESULT_HELPERS,
+            '#32121'
         );
 
         if (null !== $savedBlock) {
