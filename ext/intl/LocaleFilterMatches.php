@@ -31,7 +31,7 @@ final class LocaleFilterMatches extends VmClassMethod
                 $argc
             ));
         }
-        $langtag = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'Locale::filterMatches', 0, 'langtag');
+        $langtag = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'Locale::filterMatches', 0, 'languageTag');
         $locale = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'Locale::filterMatches', 1, 'locale');
         $canonicalize = false;
         if ($argc >= 3) {

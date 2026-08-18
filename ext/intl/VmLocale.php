@@ -729,7 +729,7 @@ final class VmLocale
         foreach ($langtag as $tag) {
             if (!\is_string($tag)) {
                 throw new \TypeError(
-                    'Locale::lookup(): Argument #1 ($langtag) must only contain string values'
+                    'Locale::lookup(): Argument #1 ($languageTag) must only contain string values'
                 );
             }
             $norm = self::strToMatch($tag);

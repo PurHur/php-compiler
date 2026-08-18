@@ -35,7 +35,7 @@ final class LocaleLookup extends VmClassMethod
                 $argc
             ));
         }
-        $tags = self::coerceStringList($frame->calledArgs[0], 'Locale::lookup', 0, 'langtag');
+        $tags = self::coerceStringList($frame->calledArgs[0], 'Locale::lookup', 0, 'languageTag');
         $locale = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'Locale::lookup', 1, 'locale');
         $canonicalize = false;
         if ($argc >= 3) {
@@ -83,7 +83,7 @@ final class LocaleLookup extends VmClassMethod
             $value = $value->resolveIndirect();
             if (Variable::TYPE_STRING !== $value->type) {
                 throw new \TypeError(
-                    $function.'(): Argument #1 ($langtag) must only contain string values'
+                    $function.'(): Argument #1 ($languageTag) must only contain string values'
                 );
             }
             $out[] = $value->toString();

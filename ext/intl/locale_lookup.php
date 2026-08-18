@@ -30,7 +30,7 @@ final class locale_lookup extends Internal
                 $argc
             ));
         }
-        $tags = LocaleLookup::coerceStringList($frame->calledArgs[0], 'locale_lookup', 0, 'langtag');
+        $tags = LocaleLookup::coerceStringList($frame->calledArgs[0], 'locale_lookup', 0, 'languageTag');
         $locale = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'locale_lookup', 1, 'locale');
         $canonicalize = false;
         if ($argc >= 3) {
