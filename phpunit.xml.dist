@@ -338,6 +338,8 @@
             <file>./test/compliance/ExecFamilyReflectionReturnsVMTest.php</file>
             <file>./test/compliance/FsockopenReflectionVMTest.php</file>
             <file>./test/compliance/InetReflection28916VMTest.php</file>
+            <file>./test/compliance/InetNamedIp23357VMTest.php</file>
+            <file>./test/compliance/InetNamedIp23357JITTest.php</file>
             <file>./test/compliance/NlLanginfoReflectionReturnVMTest.php</file>
             <file>./test/compliance/NlLanginfoReflectionReturnJITTest.php</file>
             <file>./test/compliance/GettimeofdaySapiMbListReflection27906VMTest.php</file>

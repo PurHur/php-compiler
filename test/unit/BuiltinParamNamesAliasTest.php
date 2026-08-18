@@ -5943,6 +5943,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23357 */
+    public function testIp2longLong2ipGethostbyaddrStubNamesIp(): void
+    {
+        foreach (['ip2long', 'long2ip', 'gethostbyaddr'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['ip'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'ip', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ip_address', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'proper_address', $fn), $fn);
+        }
+        self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ip2long'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('long2ip'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gethostbyaddr'));
+    }
+
     /** @covers issue #28483 */
     public function testFstatStubReturnArrayFalse(): void
     {

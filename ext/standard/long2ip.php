@@ -12,6 +12,8 @@ use PHPLLVM\Value;
 
 /**
  * long2ip() — IPv4 dotted-quad from 32-bit integer (ext/standard/basic_functions.c, #3225).
+ *
+ * php-src stub names the parameter `$ip` (not historical `$proper_address`) — #23357.
  */
 final class long2ip extends Internal
 {
@@ -28,7 +30,8 @@ final class long2ip extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $properAddress = VmMath::parseChrCodepointForFrame($frame, 0, 'long2ip', 1, 'proper_address');
+        // php-src stub names the parameter `$ip` (not historical `$proper_address`) — #23357.
+        $properAddress = VmMath::parseChrCodepointForFrame($frame, 0, 'long2ip', 1, 'ip');
         $result = VmInet::long2ip($properAddress);
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -46,7 +49,7 @@ final class long2ip extends Internal
 
         return JitInet::long2ip(
             $context,
-            JitChr::lowerZParamLongArg($context, $args[0], 'long2ip', 1, 'proper_address')
+            JitChr::lowerZParamLongArg($context, $args[0], 'long2ip', 1, 'ip')
         );
     }
 }
