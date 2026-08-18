@@ -915,8 +915,14 @@ restart:
                 );
                 goto return_bool;
             }
-            // convert_scalar_to_number on the value box (IS_NULL→0) then numeric-string ⊙ long (#32406).
-            if (JitValueNumeric::isArithOpcode($opcode->type) || OpCode::TYPE_MODULO === $opcode->type) {
+            // convert_scalar_to_number on the value box (IS_NULL→0) then numeric-string ⊙ long
+            // (#32406 arith; #32417 bitwise/shift via #32407 native-long ⊙ string).
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                || OpCode::TYPE_MODULO === $opcode->type
+                || $this->isBitwiseLogicOpcode($opcode->type)
+                || OpCode::TYPE_SHIFT_LEFT === $opcode->type
+                || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
+            ) {
                 $rightType = Variable::TYPE_NATIVE_LONG;
                 $rightValue = JitLongArg::lower($this->context, $right, 'binary op boxed operand');
                 goto restart;
@@ -960,8 +966,14 @@ restart:
                 );
                 goto return_bool;
             }
-            // convert_scalar_to_number on the value box (IS_NULL→0) then long ⊙ numeric-string (#32406).
-            if (JitValueNumeric::isArithOpcode($opcode->type) || OpCode::TYPE_MODULO === $opcode->type) {
+            // convert_scalar_to_number on the value box (IS_NULL→0) then long ⊙ numeric-string
+            // (#32406 arith; #32417 bitwise/shift via #32407 native-long ⊙ string).
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                || OpCode::TYPE_MODULO === $opcode->type
+                || $this->isBitwiseLogicOpcode($opcode->type)
+                || OpCode::TYPE_SHIFT_LEFT === $opcode->type
+                || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
+            ) {
                 $leftType = Variable::TYPE_NATIVE_LONG;
                 $leftValue = JitLongArg::lower($this->context, $left, 'binary op boxed operand');
                 goto restart;
