@@ -18,12 +18,7 @@ echo 'matches_b_first=', $b->matches('p:first-child') ? 'yes' : 'no', "\n";
 echo 'matches_b_last=', $b->matches(':last-child') ? 'yes' : 'no', "\n";
 $closest = $b->closest('div:first-child, p:last-child');
 echo 'closest=', $closest !== null ? $closest->id : 'null', "\n";
-try {
-    $doc->querySelector('p:nth-child(2)');
-    echo "nth=ok\n";
-} catch (DOMException $e) {
-    echo 'nth=', $e->getMessage(), "\n";
-}
+echo 'nth=', $doc->querySelector('p:nth-child(2)') !== null ? 'yes' : 'no', "\n";
 try {
     $doc->querySelector('p:foo');
     echo "unknown=ok\n";
@@ -43,6 +38,6 @@ matches_a=yes
 matches_b_first=no
 matches_b_last=yes
 closest=b
-nth=SyntaxError
+nth=no
 unknown=SyntaxError
-text_before=no
+text_before=yes
