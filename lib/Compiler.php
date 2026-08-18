@@ -1156,6 +1156,29 @@ class Compiler {
     }
 
     /**
+     * php-src: Zend/zend_compile.c zend_compile_catch() — catch variable named $this is a compile-time fatal (#32204).
+     */
+    protected function assertNoThisAsCatchVariable(?Operand $catchVar, Op $source): void
+    {
+        if (null === $catchVar) {
+            return;
+        }
+        $name = $this->resolveCatchVariableName($catchVar);
+        if (null === $name) {
+            $name = $this->baseVariableName($catchVar);
+        }
+        if ('this' !== $name) {
+            return;
+        }
+        $detail = 'Cannot re-assign $this';
+        $sourceFile = $source->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $source->getLine());
+    }
+
+    /**
      * @param list<Operand\BoundVariable> $closureUseVars
      */
     protected function registerClosureUseCapturesOnBlock(Block $funcBlock, array $closureUseVars): void
@@ -13196,6 +13219,9 @@ class Compiler {
             }
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
+            foreach ($stmt->catchVars as $catchVar) {
+                $this->assertNoThisAsCatchVariable($catchVar, $stmt);
+            }
             // Reserve catch \$e slots before merge lowering allocates sibling temps (#9887).
             $reservedCatchVarSlots = [];
             foreach ($stmt->catches as $i => $catchBlock) {
