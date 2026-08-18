@@ -2880,6 +2880,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('copy'));
     }
 
+    /** @covers issue #23348 */
+    public function testRenameZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('rename');
+        self::assertSame(['from', 'to', 'context'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'from', 'rename'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'to', 'rename'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'rename'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'old_name', 'rename'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'new_name', 'rename'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('rename'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('rename'));
+    }
+
     /** @covers issue #23264 */
     public function testCryptQuotemetaStrrevStrRot13ZendStubNamedParams(): void
     {

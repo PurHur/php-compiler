@@ -177,6 +177,8 @@
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
             <file>./test/compliance/CopyNamedParams23347VMTest.php</file>
             <file>./test/compliance/CopyNamedParams23347JITTest.php</file>
+            <file>./test/compliance/RenameNamedParams23348VMTest.php</file>
+            <file>./test/compliance/RenameNamedParams23348JITTest.php</file>
             <file>./test/compliance/VarExportPrintRReflection23308VMTest.php</file>
             <file>./test/compliance/VarExportPrintRReflection23308JITTest.php</file>
             <file>./test/compliance/VsprintfVprintfReflection23333VMTest.php</file>
