@@ -302,13 +302,8 @@ final class JitValueNumeric
             case OpCode::TYPE_MUL:
                 return $context->builder->mulNoSignedWrap($left, $right);
             case OpCode::TYPE_DIV:
-                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
-                    $context,
-                    $right,
-                    'Division by zero'
-                );
-
-                return $context->builder->signedDiv($left, $right);
+                // Callers early-return DIV onto the float path (zend_div). Do not sdiv here (#31968).
+                throw new \LogicException('JitValueNumeric: int/int `/` must use emitDoubleOp');
             default:
                 throw new \LogicException('JitValueNumeric: unsupported long opcode');
         }
