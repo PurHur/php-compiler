@@ -1101,6 +1101,22 @@ class Compiler {
     }
 
     /**
+     * php-src: Zend/zend_compile.c zend_compile_global_var() — $this is never a legal global name (#32180).
+     */
+    protected function assertNoThisAsGlobalVariable(string $globalName, Op $source): void
+    {
+        if ('this' !== $globalName) {
+            return;
+        }
+        $detail = 'Cannot use $this as global variable';
+        $sourceFile = $source->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $source->getLine());
+    }
+
+    /**
      * php-src: Zend/zend_compile.c zend_compile_static_var() — $this is never a legal function-static name (#32181).
      */
     protected function assertNoThisAsStaticVariable(string $varName, Op $source): void
@@ -43850,6 +43866,7 @@ class Compiler {
                 return $ops;
             case 'Terminal_GlobalVar':
                 $globalName = $this->resolveSimpleVariableName($terminal->var);
+                $this->assertNoThisAsGlobalVariable($globalName, $terminal);
                 $nameVar = new Variable(Variable::TYPE_STRING);
                 $nameVar->string($globalName);
                 $nameOperand = new Operand\Literal($globalName);
