@@ -68,6 +68,7 @@ final class DomInstanceMethodJit
         'domdocument::savehtml' => true,
         'domdocument::savehtmlfile' => true,
         'domdocument::getelementsbytagname' => true,
+        'domdocument::getelementsbytagnamens' => true,
         'domdocument::appendchild' => true,
         'domnode::appendchild' => true,
         'domdocumentfragment::appendchild' => true,
@@ -534,6 +535,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domdocument::getelementsbytagnamens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentGetElementsByTagNameNS();
+
+                return;
+            }
             if ('domdocument::appendchild' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentAppendChild();
 
@@ -902,6 +908,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savehtml');
             self::ensureProxy($context, 'domdocument::savehtmlfile');
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
+            self::ensureProxy($context, 'domdocument::getelementsbytagnamens');
             self::ensureProxy($context, 'domdocument::appendchild');
             self::ensureProxy($context, 'domelement::appendchild');
             self::ensureProxy($context, 'domnode::appendchild');

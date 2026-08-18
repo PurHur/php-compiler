@@ -67,6 +67,7 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::setattributens'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::hasattributens'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::removeattributens'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domdocument::getelementsbytagnamens'));
         } finally {
             putenv('PHP_COMPILER_AOT_USER_SCRIPT');
         }

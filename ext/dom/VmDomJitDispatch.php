@@ -446,6 +446,54 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMDocument / DOMElement::getElementsByTagNameNS() (#32415).
+     *
+     * php-src: ext/dom/php_dom.c / element.c — exact user arity 2.
+     *
+     * @param list<Variable> $extra
+     */
+    public static function dispatchGetElementsByTagNameNS(
+        VmContext $ctx,
+        ObjectEntry $receiver,
+        array $extra
+    ): Variable {
+        if (VmDom::isDocument($receiver)) {
+            self::requireExactExtraArgCount('DOMDocument::getElementsByTagNameNS', $extra, 2);
+            $namespace = self::nullableStringArg(
+                $extra[0] ?? self::missingArg('getElementsByTagNameNS', 0),
+                'getElementsByTagNameNS',
+                0
+            );
+            $localName = self::stringArg(
+                $extra[1] ?? self::missingArg('getElementsByTagNameNS', 1),
+                'DOMDocument::getElementsByTagNameNS',
+                1,
+                'localName'
+            );
+
+            return VmDom::getElementsByTagNameNS($ctx, $receiver, $namespace ?? '', $localName);
+        }
+        if (VmDom::isElement($receiver)) {
+            self::requireExactExtraArgCount('DOMElement::getElementsByTagNameNS', $extra, 2);
+            $namespace = self::nullableStringArg(
+                $extra[0] ?? self::missingArg('getElementsByTagNameNS', 0),
+                'getElementsByTagNameNS',
+                0
+            );
+            $localName = self::stringArg(
+                $extra[1] ?? self::missingArg('getElementsByTagNameNS', 1),
+                'DOMElement::getElementsByTagNameNS',
+                1,
+                'localName'
+            );
+
+            return VmDom::getElementsByTagNameNSFromNode($ctx, $receiver, $namespace ?? '', $localName);
+        }
+
+        throw new \Error('Call to undefined method '.$receiver->class->name.'::getElementsByTagNameNS()');
+    }
+
+    /**
      * DOMNodeList::count() — exact user arity 0 (#31011; php-src nodelist.c).
      *
      * @param list<Variable> $extra

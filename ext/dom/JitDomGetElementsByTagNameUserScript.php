@@ -15,13 +15,29 @@ final class JitDomGetElementsByTagNameUserScript
 {
     private const CLASS_NODELIST = 'DOMNodeList';
 
+    private static ?string $lastNsUri = null;
+
+    private static ?string $lastNsLocal = null;
+
     public static function shouldUse(Context $context): bool
     {
         return JitDomLoadHTMLUserScript::shouldUse($context);
     }
 
+    /** @return null|array{0: string, 1: string} namespace URI + localName from last NS query (#32415). */
+    public static function lastNsQuery(): ?array
+    {
+        if (null === self::$lastNsUri || null === self::$lastNsLocal) {
+            return null;
+        }
+
+        return [self::$lastNsUri, self::$lastNsLocal];
+    }
+
     public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
     {
+        self::$lastNsUri = null;
+        self::$lastNsLocal = null;
         if (\count($args) < 2) {
             return null;
         }
@@ -45,6 +61,39 @@ final class JitDomGetElementsByTagNameUserScript
         $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tagLit);
         // Preserve live appendChild increments when re-querying the same tag (#28605).
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
+
+        return self::boxNodeList($context, $count);
+    }
+
+    /**
+     * DOMDocument::getElementsByTagNameNS() — compile-time live list (#32415).
+     *
+     * php-src: ext/dom/php_dom.c PHP_METHOD(DOMDocument, getElementsByTagNameNS).
+     */
+    public static function tryInvokeNS(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 3) {
+            return null;
+        }
+        $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $nsLit && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            $nsLit = '';
+        }
+        if ($context->callerStrictTypes && (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false))) {
+            return null;
+        }
+        $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $nsLit || null === $localLit) {
+            return null;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml) {
+            return null;
+        }
+        $count = DomParseSimpleXmlJitHelper::countElementsByTagNameNSArgv($xml, $nsLit, $localLit);
+        self::$lastNsUri = $nsLit;
+        self::$lastNsLocal = $localLit;
+        DomUserScriptLiveTagListLlvm::initCount($context, 'ns|'.$nsLit.'|'.$localLit, $count);
 
         return self::boxNodeList($context, $count);
     }
