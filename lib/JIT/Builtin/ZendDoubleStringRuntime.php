@@ -16,8 +16,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT float→string honoring PG(precision) (#21963).
  *
- * LLVM snprintf over {@see IniRuntime::loadPrecision()}.
- * Echo / `(string)` / var_dump then rewrite libc `%g` to zend_gcvt E-form (#32316).
+ * LLVM snprintf over {@see IniRuntime::loadPrecision()} (echo / `(string)`).
+ * var_dump uses {@see formatVarDumpH()} / {@see IniRuntime::loadSerializePrecision()} (#32328).
+ * Echo / `(string)` rewrite libc `%g` to zend_gcvt E-form (#32316).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmZendDoubleString}.
  * php-src: Zend/zend_operators.c — _convert_to_string float branch
  */
@@ -26,6 +27,14 @@ final class ZendDoubleStringRuntime
     private const ABI = '__compiler_zend_double_string';
 
     private const ENTRY = 'zend_double_string_entry';
+
+    /**
+     * Fresh ABI — not inside cached `__compiler_zend_double_string` helper-runtime.
+     * php_var_dump %.*H / PG(serialize_precision) (#32328).
+     */
+    private const H_ABI = '__compiler_zend_double_string_h';
+
+    private const H_ENTRY = 'zend_double_string_h_entry';
 
     /** Fresh ABI — not inside cached `__compiler_zend_double_string` helper-runtime (#32316). */
     private const ZENDIFY_ABI = '__compiler_zendify_snprintf_g';
@@ -42,12 +51,14 @@ final class ZendDoubleStringRuntime
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::implement($context);
+        self::ensureHLinked($context);
         self::ensureZendifyLinked($context);
     }
 
     /**
-     * convert_to_string / echo / var_dump float display (zend_gcvt).
+     * convert_to_string / echo float display (zend_gcvt / PG(precision)).
      * json_encode keeps {@see format()} then {@see jsonEncodeNumberOrNull()} (#32326).
+     * var_dump uses {@see formatVarDumpH()} / PG(serialize_precision) (#32328).
      */
     public static function formatGcvt(Context $context, Value $doubleVal): Value
     {
@@ -120,6 +131,16 @@ final class ZendDoubleStringRuntime
         return $phi;
     }
 
+    /**
+     * php_var_dump IS_DOUBLE: zend_strpprintf("%.*H", PG(serialize_precision)) (#32328).
+     *
+     * Distinct from {@see formatGcvt()} — echo stays on PG(precision).
+     */
+    public static function formatVarDumpH(Context $context, Value $doubleVal): Value
+    {
+        return self::zendifyGcvt($context, self::formatH($context, $doubleVal));
+    }
+
     public static function format(Context $context, Value $doubleVal): Value
     {
         if (NestedJitCompileScope::isActive()) {
@@ -130,6 +151,21 @@ final class ZendDoubleStringRuntime
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI),
+            $doubleVal
+        );
+    }
+
+    /** %.*H / PG(serialize_precision); default -1 → %.16g dtoa (#32328). */
+    public static function formatH(Context $context, Value $doubleVal): Value
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return self::snprintfCall($context, $doubleVal, '%.16g', null);
+        }
+
+        self::ensureHLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::H_ABI),
             $doubleVal
         );
     }
@@ -215,21 +251,85 @@ final class ZendDoubleStringRuntime
                 $context->context->functionType($strPtr, false, $double)
             );
 
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         $entry = $fn->appendBasicBlock(self::ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $result = self::emitBody($context, $fn, $fn->getParam(0));
-        $context->builder->returnValue($result);
         $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        $context->activeFunction = self::ABI;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        $context->builder->positionAtEnd($entry);
+        try {
+            $result = self::emitBody($context, $fn, $fn->getParam(0), false);
+            $context->builder->returnValue($result);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
-    private static function emitBody(Context $context, LlvmFunction $fn, Value $val): Value
+    private static function ensureHLinked(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::H_ABI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::H_ABI, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        IniRuntime::ensureLinked($context);
+        self::ensureDecls($context);
+
+        $double = $context->getTypeFromString('double');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::H_ABI,
+                $context->context->functionType($strPtr, false, $double)
+            );
+
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
+        $entry = $fn->appendBasicBlock(self::H_ENTRY);
+        $context->registerFunction(self::H_ABI, $fn);
+        $context->activeFunction = self::H_ABI;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        $context->builder->positionAtEnd($entry);
+        try {
+            $result = self::emitBody($context, $fn, $fn->getParam(0), true);
+            $context->builder->returnValue($result);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
+    }
+
+    private static function emitBody(
+        Context $context,
+        LlvmFunction $fn,
+        Value $val,
+        bool $useSerializePrecision
+    ): Value {
         $s = ++self::$seq;
         $i32 = $context->getTypeFromString('int32');
         $strPtr = $context->getTypeFromString('__string__*');
@@ -276,13 +376,25 @@ final class ZendDoubleStringRuntime
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($okBb);
-        $prec = IniRuntime::loadPrecision($context);
-        $useDefault = $context->builder->icmp(
-            Builder::INT_EQ,
-            $prec,
-            $i32->constInt(0, false)
-        );
-        $prec = $context->builder->select($useDefault, $i32->constInt(14, true), $prec);
+        if ($useSerializePrecision) {
+            // php_var_dump %.*H — PG(serialize_precision) default -1, not PG(precision) 14 (#32328).
+            $prec = IniRuntime::loadSerializePrecision($context);
+            $isZeroPrec = $context->builder->icmp(
+                Builder::INT_EQ,
+                $prec,
+                $i32->constInt(0, false)
+            );
+            // zend_gcvt: ndigit <= 0 becomes 1 (Zend/zend_strtod.c).
+            $prec = $context->builder->select($isZeroPrec, $i32->constInt(1, true), $prec);
+        } else {
+            $prec = IniRuntime::loadPrecision($context);
+            $useDefault = $context->builder->icmp(
+                Builder::INT_EQ,
+                $prec,
+                $i32->constInt(0, false)
+            );
+            $prec = $context->builder->select($useDefault, $i32->constInt(14, true), $prec);
+        }
         $isNegPrec = $context->builder->icmp(Builder::INT_SLT, $prec, $i32->constInt(0, false));
         $dtoaBb = $fn->appendBasicBlock('zds_dtoa_'.$s);
         $precBb = $fn->appendBasicBlock('zds_prec_'.$s);
@@ -290,9 +402,45 @@ final class ZendDoubleStringRuntime
         $context->builder->branchIf($isNegPrec, $dtoaBb, $precBb);
 
         $context->builder->positionAtEnd($dtoaBb);
-        // raw already %.16g — reuse for precision=-1
-        $context->builder->branch($joinBb);
-        $dtoaEnd = $dtoaBb;
+        if ($useSerializePrecision) {
+            // dtoa mode 0: shortest round-trip. %.16g misses 0.1+0.2; %.17g overshoots 1/3 (#32328).
+            LibcExtern::ensureStrtodDecl($context);
+            $strMap = $context->structFieldMap['__string__'];
+            $charPtr = $context->builder->structGep($raw, $strMap['value']);
+            $endNull = $context->getTypeFromString('int8**')->constNull();
+            $parsed = $context->builder->call(
+                $context->lookupFunction('strtod'),
+                $charPtr,
+                $endNull
+            );
+            $roundTrip = $context->builder->fcmp(Builder::REAL_OEQ, $parsed, $val);
+            $keep16 = $fn->appendBasicBlock('zds_keep16_'.$s);
+            $use17 = $fn->appendBasicBlock('zds_use17_'.$s);
+            $dtoaJoin = $fn->appendBasicBlock('zds_dtoa_join_'.$s);
+            $context->builder->branchIf($roundTrip, $keep16, $use17);
+
+            $context->builder->positionAtEnd($keep16);
+            $keep16End = $keep16;
+            $context->builder->branch($dtoaJoin);
+
+            $context->builder->positionAtEnd($use17);
+            $raw17 = self::snprintfCall($context, $val, '%.17g', null);
+            $use17End = $context->builder->getInsertBlock();
+            $context->builder->branch($dtoaJoin);
+
+            $context->builder->positionAtEnd($dtoaJoin);
+            $dtoaPhi = $context->builder->phi($strPtr);
+            $dtoaPhi->addIncoming($raw, $keep16End);
+            $dtoaPhi->addIncoming($raw17, $use17End);
+            $dtoaVal = $dtoaPhi;
+            $dtoaEnd = $dtoaJoin;
+            $context->builder->branch($joinBb);
+        } else {
+            // raw already %.16g — reuse for precision=-1
+            $dtoaVal = $raw;
+            $dtoaEnd = $dtoaBb;
+            $context->builder->branch($joinBb);
+        }
 
         $context->builder->positionAtEnd($precBb);
         $precStr = self::snprintfCall($context, $val, '%.*g', $prec);
@@ -301,7 +449,7 @@ final class ZendDoubleStringRuntime
 
         $context->builder->positionAtEnd($joinBb);
         $okPhi = $context->builder->phi($strPtr);
-        $okPhi->addIncoming($raw, $dtoaEnd);
+        $okPhi->addIncoming($dtoaVal, $dtoaEnd);
         $okPhi->addIncoming($precStr, $precEnd);
         $okEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);

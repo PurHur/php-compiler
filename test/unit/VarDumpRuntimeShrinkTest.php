@@ -55,6 +55,8 @@ final class VarDumpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NestedVmActiveContextLlvm::ensureMethod', $source);
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('implementThinScalarBridge', $source);
+        $this->assertStringContainsString('formatVarDumpH', $source);
+        $this->assertStringContainsString('serialize_precision', $source);
     }
 
     public function testVarDumpBuiltinUsesStringVarDumpBridge(): void

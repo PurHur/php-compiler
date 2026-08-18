@@ -86,7 +86,8 @@ final class JitDomSaveXMLUserScript
             $objectType->defineProperty($elementClassId, 'nodeName', JITVariable::TYPE_STRING);
         }
         // createComment/createTextNode/createDocumentFragment seed nodeName but not
-        // tagName — fetching tagName SIGSEGVs (#32315 / #32334). libxml xmlNodeDump:
+        // tagName — fetching tagName SIGSEGVs (#32315 / #32334). Check fragment
+        // nodeName before the PI `#pi` tagName discriminator (#32331). libxml xmlNodeDump:
         // comment `<!--data-->`, text = data, fragment = children only (empty → "").
         // Skip when loadXML supplies the root tag from the compile-time literal (#23251).
         if (!$useXmlLitTag) {
@@ -104,10 +105,10 @@ final class JitDomSaveXMLUserScript
     }
 
     /**
-     * Dump createComment/createTextNode/createCDATASection/createDocumentFragment
-     * (and createElement) without a loadXML tag literal.
+     * Dump createComment/createTextNode/createCDATASection/createDocumentFragment/
+     * createProcessingInstruction (and createElement) without a loadXML tag literal.
      *
-     * php-src: ext/dom/document.c saveXML → xmlNodeDump
+     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331 / #32334)
      */
     private static function serializeUserScriptNode(
         Context $context,
@@ -147,6 +148,10 @@ final class JitDomSaveXMLUserScript
         $bbCdata = BasicBlockHelper::append($context, 'dom_savexml_cdata');
         $bbFragCheck = BasicBlockHelper::append($context, 'dom_savexml_check_frag');
         $bbFrag = BasicBlockHelper::append($context, 'dom_savexml_frag');
+        $bbPiCheck = BasicBlockHelper::append($context, 'dom_savexml_check_pi');
+        $bbPi = BasicBlockHelper::append($context, 'dom_savexml_pi');
+        $bbPiEmpty = BasicBlockHelper::append($context, 'dom_savexml_pi_empty');
+        $bbPiData = BasicBlockHelper::append($context, 'dom_savexml_pi_data');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
         $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
@@ -202,7 +207,8 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $nameStr, $fragLit),
             $zero
         );
-        $context->builder->branchIf($isFrag, $bbFrag, $bbElement);
+        // Fragment stand-ins never set tagName — check nodeName before the PI tagName fetch (#32334).
+        $context->builder->branchIf($isFrag, $bbFrag, $bbPiCheck);
 
         $context->builder->positionAtEnd($bbFrag);
         // xmlNodeDump(XML_DOCUMENT_FRAG_NODE) emits children only (#32334).
@@ -215,6 +221,66 @@ final class JitDomSaveXMLUserScript
         );
         $innerStr = $context->helper->loadValue($innerVar);
         $context->builder->store(self::boxStringValue($context, $innerStr), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbPiCheck);
+        $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            'tagName',
+            $elementClassId
+        );
+        $tagStr = $context->helper->loadValue($tagVar);
+        $piKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateProcessingInstruction::TAG_KIND)
+        );
+        $isPi = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $piKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isPi, $bbPi, $bbElement);
+
+        $context->builder->positionAtEnd($bbPi);
+        // libxml xmlNodeDump PI: lt-query + target + optional space+data + query-gt (#32331).
+        $emptyLit = $context->builder->load($context->constantStringFromString(''));
+        $dataEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $textStr, $emptyLit),
+            $zero
+        );
+        $context->builder->branchIf($dataEmpty, $bbPiEmpty, $bbPiData);
+
+        $context->builder->positionAtEnd($bbPiEmpty);
+        $piOpen = $context->builder->load($context->constantStringFromString('<?'));
+        $piClose = $context->builder->load($context->constantStringFromString('?>'));
+        $piEmptyXml = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $piOpen, $nameStr),
+            $piClose
+        );
+        $context->builder->store(self::boxStringValue($context, $piEmptyXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbPiData);
+        $piOpenData = $context->builder->load($context->constantStringFromString('<?'));
+        $piSpace = $context->builder->load($context->constantStringFromString(' '));
+        $piCloseData = $context->builder->load($context->constantStringFromString('?>'));
+        $piDataXml = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat(
+                    $context,
+                    JitStringConcat::concat($context, $piOpenData, $nameStr),
+                    $piSpace
+                ),
+                $textStr
+            ),
+            $piCloseData
+        );
+        $context->builder->store(self::boxStringValue($context, $piDataXml), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElement);
