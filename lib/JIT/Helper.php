@@ -726,7 +726,10 @@ restart:
                     $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
                     goto return_bool;
                 }
-                break;
+                // convert_scalar_to_number: IS_TRUE→1, IS_FALSE→0 (#32337).
+                $rightType = Variable::TYPE_NATIVE_LONG;
+                $rightValue = $this->context->builder->zExt($rightValue, $leftValue->typeOf());
+                goto restart;
             case TYPE_PAIR_NATIVE_BOOL_NATIVE_LONG:
                 if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                     $result = $this->context->getTypeFromString('int1')->constInt(0, false);
@@ -750,7 +753,10 @@ restart:
                     $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $__left, $rightValue);
                     goto return_bool;
                 }
-                break;
+                // convert_scalar_to_number: IS_TRUE→1, IS_FALSE→0 (#32337).
+                $leftType = Variable::TYPE_NATIVE_LONG;
+                $leftValue = $this->context->builder->zExt($leftValue, $rightValue->typeOf());
+                goto restart;
             case TYPE_PAIR_NATIVE_DOUBLE_NATIVE_BOOL:
                 if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                     $result = $this->context->getTypeFromString('int1')->constInt(0, false);
@@ -776,7 +782,12 @@ restart:
                     );
                     goto return_bool;
                 }
-                break;
+                // IS_TRUE/IS_FALSE → double 1.0/0.0 then native-double arith (#32337).
+                $i64 = $this->context->getTypeFromString('int64');
+                $rightLong = $this->context->builder->zExt($rightValue, $i64);
+                $rightType = Variable::TYPE_NATIVE_DOUBLE;
+                $rightValue = $this->context->builder->siToFp($rightLong, $leftValue->typeOf());
+                goto restart;
             case TYPE_PAIR_NATIVE_BOOL_NATIVE_DOUBLE:
                 if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                     $result = $this->context->getTypeFromString('int1')->constInt(0, false);
@@ -802,7 +813,12 @@ restart:
                     );
                     goto return_bool;
                 }
-                break;
+                // IS_TRUE/IS_FALSE → double 1.0/0.0 then native-double arith (#32337).
+                $i64 = $this->context->getTypeFromString('int64');
+                $leftLong = $this->context->builder->zExt($leftValue, $i64);
+                $leftType = Variable::TYPE_NATIVE_DOUBLE;
+                $leftValue = $this->context->builder->siToFp($leftLong, $rightValue->typeOf());
+                goto restart;
             case TYPE_PAIR_NATIVE_BOOL_NATIVE_BOOL:
                 switch ($opcode->type) {
                     case OpCode::TYPE_IDENTICAL:
@@ -814,7 +830,13 @@ restart:
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $rightValue);
                         goto return_bool;
                 }
-                break;
+                // true+true → 2; convert_scalar_to_number then native-long (#32337).
+                $i64 = $this->context->getTypeFromString('int64');
+                $leftType = Variable::TYPE_NATIVE_LONG;
+                $rightType = Variable::TYPE_NATIVE_LONG;
+                $leftValue = $this->context->builder->zExt($leftValue, $i64);
+                $rightValue = $this->context->builder->zExt($rightValue, $i64);
+                goto restart;
             case TYPE_PAIR_STRING_STRING:
                 if (OpCode::TYPE_MODULO === $opcode->type) {
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);

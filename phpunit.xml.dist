@@ -332,6 +332,9 @@
             <file>./test/compliance/UnaryMinusNegInf32317VMTest.php</file>
             <file>./test/compliance/UnaryMinusNegInf32317JITTest.php</file>
             <file>./test/unit/UnaryMinusNegInf32317AotTest.php</file>
+            <file>./test/compliance/BoolNativeArith32337VMTest.php</file>
+            <file>./test/compliance/BoolNativeArith32337JITTest.php</file>
+            <file>./test/unit/BoolNativeArith32337AotTest.php</file>
             <file>./test/compliance/IntMinModNegOne32285JITTest.php</file>
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
             <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
