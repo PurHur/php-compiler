@@ -14621,6 +14621,7 @@ class Compiler {
                 )];
             case Op\Expr\ArrayDimFetch::class:
                 $this->rejectArrayEmptyOffsetRead($expr, $block);
+                $this->rejectGlobalsAppend($expr, $block);
                 $mergeEcho = $this->mergeEchoSlotForBranch($block);
                 $dimForWrite = $this->isArrayDimFetchForWrite($expr, $block);
                 // By-ref call args also use FETCH_DIM_W — reject temporary bases (#29522 / #29247).
@@ -16611,6 +16612,7 @@ class Compiler {
      */
     private function compileArrayDimFetchWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): void
     {
+        $this->rejectGlobalsAppend($fetch, $block);
         $this->rejectTemporaryExpressionInWriteContext($fetch->result, $block, $fetch);
         $op = new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH_WRITE,
@@ -60275,6 +60277,32 @@ class Compiler {
             $this->throwCompileError($detail, $sourceFile, $source->getLine());
         }
         $this->throwCompileError($detail);
+    }
+
+    /**
+     * Zend zend_compile.c zend_compile_assign_dim(): `$GLOBALS[]` is never a legal write (#32253).
+     * Indexed `$GLOBALS[$name]` remains legal; empty-dim append uses a distinct diagnostic from #32229.
+     *
+     * @return never
+     */
+    protected function rejectGlobalsAppend(Op\Expr\ArrayDimFetch $fetch, ?Block $block = null): void
+    {
+        if (!$this->isArrayAppendDim($fetch->dim)) {
+            return;
+        }
+        $container = $fetch->var;
+        if (!$container instanceof Operand) {
+            return;
+        }
+        if (!$this->isBareGlobalsVariable($container, $block)) {
+            return;
+        }
+        $detail = 'Cannot append to $GLOBALS';
+        $sourceFile = $fetch->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $fetch->getLine());
     }
 
     /**
