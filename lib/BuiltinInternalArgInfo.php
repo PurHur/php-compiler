@@ -568,6 +568,8 @@ final class BuiltinInternalArgInfo
             'gmp_invert' => 'GMP|false',
             'gmp_random_seed' => 'void',
             'gmp_setbit', 'gmp_clrbit' => 'void',
+            // ext/random/random.stub.php — InternalArgInfo omits void (#23596)
+            'mt_srand', 'srand' => 'void',
             default => null,
         };
     }
@@ -788,6 +790,8 @@ final class BuiltinInternalArgInfo
                 : null,
             // php-src ext/posix/posix.stub.php — posix_isatty($file_descriptor): bool (untyped; accepts int|resource) (#28899)
             'posix_isatty' => 0 === $index ? '' : null,
+            // ext/random/random.stub.php — int $seed = 0, int $mode = MT_RAND_MT19937 (#23596)
+            'mt_srand', 'srand' => (0 === $index || 1 === $index) ? 'int' : null,
             // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)
             'number_format' => match ($index) {
                 0 => 'float',

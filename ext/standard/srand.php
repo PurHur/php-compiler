@@ -10,11 +10,14 @@ use PHPCompiler\JIT\Builtin\Rand as RandBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * srand() — legacy alias seeding Mersenne Twister (php-src ext/random/random.c, #3295).
+ * srand() — legacy alias seeding Mersenne Twister (php-src ext/random/random.c, #3295, #23596).
+ *
+ * php-src: function srand(int $seed = 0, int $mode = MT_RAND_MT19937): void
  */
 final class srand extends Internal
 {
@@ -26,34 +29,55 @@ final class srand extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 0 || $argc > 1) {
+        if ($argc > 2) {
             throw new \ArgumentCountError(
-                \sprintf('srand() expects at most 1 argument, %d given', $argc)
+                \sprintf('srand() expects at most 2 arguments, %d given', $argc)
             );
         }
-        if (0 === $argc) {
+        $hasSeed = isset($frame->calledArgs[0]);
+        $hasMode = isset($frame->calledArgs[1]);
+        $mode = VmMt19937::MT_RAND_MT19937;
+        if ($hasMode) {
+            $modeArg = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'srand', 2, 'mode');
+            $mode = VmMt19937::MT_RAND_PHP === $modeArg
+                ? VmMt19937::MT_RAND_PHP
+                : VmMt19937::MT_RAND_MT19937;
+        }
+        if (!$hasSeed && !$hasMode) {
             VmMt19937::resetForTests();
             VmMt19937::ensureSeeded();
 
             return;
         }
-        $seed = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'srand', 1, 'seed');
-        VmMt19937::seed($seed);
+        $seed = $hasSeed
+            ? VmMath::parseIntBuiltinArgForFrame($frame, 0, 'srand', 1, 'seed')
+            : 0;
+        VmMt19937::seed($seed, $mode);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 0 || $argc > 1) {
-            throw new \LogicException('srand() expects at most 1 argument');
+        if ($argc > 2) {
+            throw new \ArgumentCountError(
+                \sprintf('srand() expects at most 2 arguments, %d given', $argc)
+            );
         }
         RandBuiltin::ensureLinked($context);
-        if (0 === $argc) {
+        $hasSeed = isset($args[0]) && !NamedOptionalCallArgs::isOmittedOptional($args[0]);
+        $hasMode = isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
+        if (!$hasSeed && !$hasMode) {
             VmMt19937::resetForTests();
             VmMt19937::ensureSeeded();
         } else {
-            $seed = JitLongArg::lower($context, $args[0], 'srand() seed');
-            $context->builder->call(RandBuiltin::seed($context), $seed);
+            $i64 = $context->getTypeFromString('int64');
+            $seed = $hasSeed
+                ? JitLongArg::lower($context, $args[0], 'srand() seed')
+                : $i64->constInt(0, false);
+            $mode = $hasMode
+                ? JitLongArg::lower($context, $args[1], 'srand() mode')
+                : $i64->constInt(VmMt19937::MT_RAND_MT19937, false);
+            $context->builder->call(RandBuiltin::seedWithMode($context), $seed, $mode);
         }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

@@ -30,4 +30,17 @@ final class RandJitHelper
     {
         VmMt19937::seed($seed);
     }
+
+    /**
+     * mt_srand()/srand() two-arg seed (php-src random.stub.php $mode; #23596).
+     *
+     * Unknown modes collapse to MT_RAND_MT19937, matching VM {@see VmMt19937::seed}.
+     */
+    public static function seedWithMode(int $seed, int $mode): void
+    {
+        VmMt19937::seed(
+            $seed,
+            VmMt19937::MT_RAND_PHP === $mode ? VmMt19937::MT_RAND_PHP : VmMt19937::MT_RAND_MT19937
+        );
+    }
 }

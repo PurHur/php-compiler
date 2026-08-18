@@ -1334,6 +1334,10 @@ final class BuiltinParamNames
             // php-src ext/standard/php_mt_rand.c / random.stub.php — both params optional (0 or 2 args) (#24641)
             case 'mt_rand':
                 return ['min=', 'max='];
+            // php-src ext/random/random.stub.php — seed=0, mode=MT_RAND_MT19937 (#23596)
+            case 'mt_srand':
+            case 'srand':
+                return ['seed=', 'mode='];
             case 'hex2bin':
                 // php-src arity 1 — no $strict (#27763; ext/standard/string.c / string.stub.php)
                 return ['string'];
