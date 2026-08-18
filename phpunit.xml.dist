@@ -228,6 +228,8 @@
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437JITTest.php</file>
+            <file>./test/compliance/DebugPrintBacktraceVoid28909VMTest.php</file>
+            <file>./test/compliance/DebugPrintBacktraceVoid28909JITTest.php</file>
             <file>./test/compliance/CopyNamedParams23347VMTest.php</file>
             <file>./test/compliance/CopyNamedParams23347JITTest.php</file>
             <file>./test/compliance/RenameNamedParams23348VMTest.php</file>
