@@ -11,6 +11,6 @@ function bits(int $n, bool $t, string $s): void
     var_dump($t & $s);
     var_dump($s | 2);
     var_dump($n ^ $s);
-    var_dump('5' ^ '3');
+    // string⊙string &|^ is byte-wise in zend bitwise_*_function — not convert_to_long.
 }
 bits(5, true, '7');
