@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::createElementNS() (#14314, #18938, #24923).
+ * LLVM lowering for DOMDocument::createElementNS() (#14314, #18938, #24923, #32302).
  *
  * php-src: ext/dom/php_dom.stub.php — createElementNS(?string $namespace, …)
  * null namespace ≠ "" (no xmlns vs xmlns="") — preserve on AOT materialization.
@@ -261,18 +261,15 @@ final class JitDomCreateElementNS
             );
         }
         self::storeNullProperty($context, $obj, $className, VmDom::PROP_ATTRIBUTES);
-        if ('' !== $value) {
-            if (!$objectType->hasProperty($classId, VmDom::PROP_TEXT_CONTENT)) {
-                $objectType->defineProperty($classId, VmDom::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
-            }
-            self::storeStringProperty(
-                $context,
-                $obj,
-                $className,
-                VmDom::PROP_TEXT_CONTENT,
-                $context->builder->load($context->constantStringFromString($value))
-            );
-        }
+        // Always seed textContent/nodeValue/INNER_XML — textContent-only store
+        // leaves nodeValue as a null __string__* and the fetch SIGSEGVs (#32302 / #32292).
+        JitDomCreateElement::storeTextContentSlots($context, $obj, $value, $className);
+        JitDomCreateElement::storeUserScriptXmlnsAttr(
+            $context,
+            $obj,
+            self::xmlnsAttrForSaveXml($namespace, $qualifiedName),
+            $className
+        );
 
         return $obj;
     }
@@ -288,6 +285,25 @@ final class JitDomCreateElementNS
         return [substr($qualifiedName, 0, $pos), substr($qualifiedName, $pos + 1)];
     }
 
+    /**
+     * libxml xmlNodeDump nsDef on the dump root (php-src document.c createElementNS).
+     *
+     * null namespace → no xmlns; "" → xmlns="" / xmlns:prefix="".
+     */
+    private static function xmlnsAttrForSaveXml(?string $namespace, string $qualifiedName): string
+    {
+        if (null === $namespace) {
+            return '';
+        }
+        [$prefix] = self::splitQualifiedName($qualifiedName);
+        $uri = htmlspecialchars($namespace, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        if ('' !== $prefix) {
+            return ' xmlns:'.$prefix.'="'.$uri.'"';
+        }
+
+        return ' xmlns="'.$uri.'"';
+    }
+
     private static function ensureElementNSPropertyLayout(
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
@@ -301,6 +317,7 @@ final class JitDomCreateElementNS
             VmDom::PROP_ATTRIBUTES => JITVariable::TYPE_VALUE,
             VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
             VmDom::PROP_OWNER_DOCUMENT => JITVariable::TYPE_VALUE,
+            VmDom::PROP_USER_SCRIPT_XMLNS_ATTR => JITVariable::TYPE_STRING,
         ] as $prop => $type) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, $type);

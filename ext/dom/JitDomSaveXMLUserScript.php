@@ -75,6 +75,9 @@ final class JitDomSaveXMLUserScript
         if (!$objectType->hasProperty($elementClassId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
             $objectType->defineProperty($elementClassId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
         }
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR, JITVariable::TYPE_STRING);
+        }
         if (!$objectType->hasProperty($elementClassId, 'tagName')) {
             $objectType->defineProperty($elementClassId, 'tagName', JITVariable::TYPE_STRING);
         }
@@ -84,6 +87,7 @@ final class JitDomSaveXMLUserScript
             $tagStr = $context->builder->load(
                 $context->constantStringFromString(DomParseSimpleXmlJitHelper::rootTagArgv((string) $xmlLit))
             );
+            $openTagStr = $tagStr;
         } else {
             $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
                 $objectType,
@@ -93,6 +97,16 @@ final class JitDomSaveXMLUserScript
                 $elementClassId
             );
             $tagStr = $context->helper->loadValue($tagVar);
+            // createElementNS nsDef: ` xmlns:prefix="uri"` on the dump root (#32302).
+            $xmlnsVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $node,
+                'DOMElement',
+                VmDom::PROP_USER_SCRIPT_XMLNS_ATTR,
+                $elementClassId
+            );
+            $xmlnsStr = $context->helper->loadValue($xmlnsVar);
+            $openTagStr = JitStringConcat::concat($context, $tagStr, $xmlnsStr);
         }
         // Prefer ParentNode append/prepend markup when present (#26765); else textContent
         // (textContent-only mutations / loadXML root text).
@@ -155,7 +169,7 @@ final class JitDomSaveXMLUserScript
         $context->builder->positionAtEnd($bbSelfClose);
         $selfClose = JitStringConcat::concat(
             $context,
-            JitStringConcat::concat($context, $lt, $tagStr),
+            JitStringConcat::concat($context, $lt, $openTagStr),
             $slashGt
         );
         $context->builder->store($selfClose, $xmlSlot);
@@ -163,7 +177,7 @@ final class JitDomSaveXMLUserScript
         $context->builder->positionAtEnd($bbPaired);
         $open = JitStringConcat::concat(
             $context,
-            JitStringConcat::concat($context, $lt, $tagStr),
+            JitStringConcat::concat($context, $lt, $openTagStr),
             $gt
         );
         $close = JitStringConcat::concat(
