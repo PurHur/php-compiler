@@ -619,8 +619,6 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'ext/hash/JitHashCryptoKernel.php',
             'lib/JIT/Call/ReflectionMethodInvoke.php',
             'lib/JIT/Builtin/ReflectionEnumJitHelper.php',
-            'lib/JIT/Builtin/DirectoryIteratorSnapshotRuntime.php',
-            'lib/JIT/Builtin/GlobIteratorSnapshotRuntime.php',
             'lib/JIT/Builtin/ReflectionFunctionVariadicLookupRuntime.php',
             'lib/JIT/Builtin/ParamSensitiveLookupRuntime.php',
             'lib/JIT/Builtin/CliArgvRuntime.php',

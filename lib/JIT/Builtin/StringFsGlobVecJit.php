@@ -14,8 +14,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
  * Thin standalone AOT no longer forks always-on {@see JitFsGlobKernel} for user-facing
  * glob()/scandir() (tempnam #29940 / sys_get_temp_dir #29433 shape). NestedJIT of
  * {@see \PHPCompiler\ext\standard\FsGlobJitHelper} `@\glob`/`@\scandir` uses the libc
- * vec leaf only. GlobIterator/DirectoryIterator thin bridges call
- * {@see JitFsGlobKernel::implement} directly.
+ * vec leaf only. Iterator construct snapshots use PHP helpers (#32006).
  *
  * php-src: ext/standard/dir.c — glob(), scandir()
  */

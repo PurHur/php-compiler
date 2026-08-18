@@ -114,11 +114,22 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#29986', $source);
     }
 
-    public function testIteratorThinBridgesCallKernelDirectly(): void
+    public function testIteratorSnapshotsUseHelperBridgeNotLibcKernel(): void
     {
         $gi = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GlobIteratorSnapshotRuntime.php');
         $di = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DirectoryIteratorSnapshotRuntime.php');
-        $this->assertStringContainsString('JitFsGlobKernel::implement', $gi);
-        $this->assertStringContainsString('JitFsGlobKernel::implement', $di);
+        foreach ([$gi, $di] as $source) {
+            $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+            $this->assertStringNotContainsString('JitFsGlobKernel::implement', $source);
+            $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+            $this->assertStringNotContainsString('emitThinAotBridge', $source);
+            $this->assertStringNotContainsString('__phpc_glob_vec', $source);
+            $this->assertStringNotContainsString('__phpc_scandir_vec', $source);
+            $this->assertStringContainsString('#32006', $source);
+        }
+        $this->assertStringContainsString('GlobIteratorSnapshotJitHelper', $gi);
+        $this->assertStringContainsString('DirectoryIteratorSnapshotJitHelper', $di);
+        $this->assertLessThan(85, \substr_count($gi, "\n") + 1);
+        $this->assertLessThan(85, \substr_count($di, "\n") + 1);
     }
 }

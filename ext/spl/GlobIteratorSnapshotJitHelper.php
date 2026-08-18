@@ -10,8 +10,8 @@ use PHPCompiler\ext\standard\VmFsGlob;
 /**
  * Thin glob snapshot for AOT GlobIterator (#27422).
  *
- * Uses {@see VmFsGlob::glob()} (NestedJIT embed path). Thin standalone AOT links
- * libc {@see __phpc_glob_vec} via {@see \PHPCompiler\JIT\Builtin\GlobIteratorSnapshotRuntime}.
+ * Uses {@see VmFsGlob::glob()} (NestedJIT embed + thin standalone AOT via
+ * {@see \PHPCompiler\JIT\Builtin\GlobIteratorSnapshotRuntime} + {@see JitVmHelperLink} #32006).
  *
  * Return type is `array` (not HashTable): NestedJIT maps class HashTable to object ABI
  * (peer DirectoryIteratorSnapshotJitHelper #27289).
