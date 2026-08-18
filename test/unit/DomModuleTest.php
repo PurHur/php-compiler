@@ -812,6 +812,52 @@ PHP;
         }
     }
 
+    /**
+     * CSS child/sibling combinators on Dom\ ParentNode (#32061, php-src parentnode.c / lexbor).
+     */
+    public function test_dom_parent_node_css_combinators(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32061)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_32061_dom_qsa_combinators.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_combinators.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                "child=p\n"
+                ."compact=p\n"
+                ."nested=e\n"
+                ."qsa_child=1\n"
+                ."adj=s\n"
+                ."gen=p2\n"
+                ."body_p=p2\n"
+                ."desc=p\n"
+                ."matches_child=yes\n"
+                ."matches_nested=no\n"
+                ."matches_adj=yes\n"
+                ."closest=s\n"
+                ."first=p\n"
+                ."bad[div >]=SyntaxError\n"
+                ."bad[> p]=SyntaxError\n"
+                ."bad[div > > p]=SyntaxError\n"
+                ."bad[p++span]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
