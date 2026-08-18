@@ -39,7 +39,7 @@ final class JitOperandTypeLabel
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_HASHTABLE => 'array',
             Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
+            default => (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) ? 'array' : 'mixed',
         };
     }
 
