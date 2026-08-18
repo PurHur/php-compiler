@@ -8,12 +8,13 @@ use PHPCompiler\VM\ObjectEntry;
 
 /**
  * ldap_bind() / ldap_sasl_bind() / ldap_unbind() / ldap_close() / ldap_set_option() /
- * ldap_get_option() / ldap_start_tls() for compiled JIT/AOT modules
- * (#32001, #32002, #32107, #32109, #32147).
+ * ldap_get_option() / ldap_start_tls() / ldap_set_rebind_proc() for compiled JIT/AOT modules
+ * (#32001, #32002, #32107, #32109, #32147, #32148).
  *
  * SSOT: {@see VmLdapCore::bind} / {@see VmLdapCore::saslBind} / {@see VmLdapConnection::close}
- * / {@see VmLdapNative::startTlsSync}
- * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_sasl_bind / ldap_set_option / ldap_start_tls
+ * / {@see VmLdapNative::startTlsSync} / {@see VmLdapConnection::setRebindProc}
+ * php-src: ext/ldap/ldap.c — PHP_FUNCTION(ldap_bind) / ldap_sasl_bind / ldap_set_option /
+ * ldap_start_tls / ldap_set_rebind_proc
  */
 final class LdapLinkJitHelper
 {
@@ -167,6 +168,19 @@ final class LdapLinkJitHelper
 
             return false;
         }
+
+        return true;
+    }
+
+    /**
+     * ldap_set_rebind_proc() null-clear (php-src HAVE_3ARG_SETREBINDPROC; #32148).
+     *
+     * NestedJIT cannot take FCC; non-null callbacks TypeError in {@see JitLdapLink}.
+     */
+    public static function setRebindProcClearArgv(int $handle): bool
+    {
+        $conn = self::requireConnection($handle, 'ldap_set_rebind_proc');
+        VmLdapConnection::setRebindProc($conn, null, null);
 
         return true;
     }

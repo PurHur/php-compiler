@@ -18,7 +18,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ldap_bind() / ldap_sasl_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() (#32001, #32002, #32107, #32109, #32147). */
+/** LLVM lowering for ldap_bind() / ldap_sasl_bind() / ldap_unbind() / ldap_close() / ldap_set/get_option() / ldap_start_tls() / ldap_set_rebind_proc() (#32001, #32002, #32107, #32109, #32147, #32148). */
 final class JitLdapLink
 {
     /** @param list<JITVariable> $args */
@@ -186,6 +186,41 @@ final class JitLdapLink
 
         $ok = $context->builder->call(
             $context->lookupFunction('__compiler_ldap_start_tls'),
+            $handle
+        );
+
+        return self::boolFromI1($context, $ok);
+    }
+
+    /**
+     * ldap_set_rebind_proc() null-clear path (#32148).
+     *
+     * NestedJIT cannot take FCC yet — non-null callback is TypeError here;
+     * callable follow-up if a helper ABI for FCC lands.
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeSetRebindProc(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_set_rebind_proc() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+
+        $handle = self::lowerConnectionHandle($context, $args[0], 'ldap_set_rebind_proc');
+        self::rejectNonNullCallback($context, $args[1]);
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        LdapRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $ok = $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_set_rebind_proc'),
             $handle
         );
 
@@ -539,6 +574,73 @@ final class JitLdapLink
         );
 
         return $ptr;
+    }
+
+    private static function rejectNonNullCallback(Context $context, JITVariable $arg): void
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return;
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            self::rejectNonNullValueBoxCallback($context, $arg);
+
+            return;
+        }
+
+        self::emitTypeErrorAndAbort($context, self::callbackTypeErrorMessage(self::scalarGivenLabel($arg->type)));
+    }
+
+    private static function rejectNonNullValueBoxCallback(Context $context, JITVariable $arg): void
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $okBb = BasicBlockHelper::append($context, 'ldap_rebind_cb_null');
+        $badBb = BasicBlockHelper::append($context, 'ldap_rebind_cb_bad');
+        $context->builder->branchIf($isNull, $okBb, $badBb);
+
+        $context->builder->positionAtEnd($badBb);
+        self::emitTypeErrorAndAbort($context, self::callbackTypeErrorMessage('mixed'));
+        $context->builder->branch($okBb);
+
+        $context->builder->positionAtEnd($okBb);
+    }
+
+    private static function scalarGivenLabel(int $type): string
+    {
+        switch ($type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            case JITVariable::TYPE_OBJECT:
+                return 'object';
+            case JITVariable::TYPE_NULL:
+                return 'null';
+            default:
+                return 'mixed';
+        }
+    }
+
+    private static function callbackTypeErrorMessage(string $given): string
+    {
+        return \sprintf(
+            'ldap_set_rebind_proc(): Argument #2 ($callback) must be of type ?callable, %s given',
+            $given
+        );
     }
 
     private static function emitTypeErrorAndAbort(Context $context, string $message): void
