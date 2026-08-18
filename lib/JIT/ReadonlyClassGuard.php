@@ -495,10 +495,16 @@ final class ReadonlyClassGuard
         ReadonlyBridge::ensureLinked($context);
         ReadonlyBridge::registerDeclarations($context);
 
-        // NestedJIT / ReadonlyRaise body emission can clear the insert block; store
-        // unconditionally rather than fatal via Builder::getInsertBlock (#26756, #26826).
+        // NestedJIT / ReadonlyRaise body emission can clear the insert block.
+        // Resume in an open BB before the store — emitting malloc/GEP with no
+        // insert BB yields parentless IR (untyped ctor promotion, #32349).
         $entry = BasicBlockHelper::tryGetInsertBlock($context);
         if (null === $entry) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'readonly_store_resume');
+            $entry = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null === $entry) {
+                return;
+            }
             $emitStore();
 
             return;

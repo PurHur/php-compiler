@@ -30,6 +30,27 @@ PHP;
         $this->assertSame("a\nb\n", $out);
     }
 
+    /** Untyped / mixed promotion matches Zend on VM (#32349). */
+    public function testUntypedAndMixedPromotedProperty(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public function __construct(public $x = 1) {}
+}
+echo (new A())->x, "\n";
+class B {
+    public function __construct(public mixed $y = 2) {}
+}
+echo (new B())->y, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'ctor_promotion_untyped.php'));
+        $out = ob_get_clean();
+        $this->assertSame("1\n2\n", $out);
+    }
+
     public function testProtectedPromotedProperty(): void
     {
         $runtime = new Runtime();
