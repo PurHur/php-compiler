@@ -146,6 +146,8 @@
             <file>./test/compliance/TraitInsteadofParentJITTest.php</file>
             <file>./test/compliance/ClosureUseThis32152VMTest.php</file>
             <file>./test/compliance/ClosureUseThis32152JITTest.php</file>
+            <file>./test/compliance/StaticThis32181VMTest.php</file>
+            <file>./test/compliance/StaticThis32181JITTest.php</file>
             <file>./test/compliance/ContinueZero32155VMTest.php</file>
             <file>./test/compliance/ContinueZero32155JITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
