@@ -895,6 +895,7 @@
             <file>./test/compliance/SessionExcessArgc30684JITTest.php</file>
             <file>./test/compliance/SessionNameReflectionVMTest.php</file>
             <file>./test/compliance/PosixSysconfReflectionVMTest.php</file>
+            <file>./test/compliance/PosixRlimitReflectionVMTest.php</file>
             <file>./test/compliance/CurlStrerrorReflectionVMTest.php</file>
             <file>./test/compliance/CurlUpkeepReflectionVMTest.php</file>
             <file>./test/compliance/CurlEscapeUnescapeReflectionVMTest.php</file>
