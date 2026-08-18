@@ -54,6 +54,7 @@ final class DomInstanceMethodJit
         'dom\\xmldocument::createelementns' => true,
         'domdocument::createcomment' => true,
         'domdocument::createtextnode' => true,
+        'domdocument::createcdatasection' => true,
         'domdocument::createattributens' => true,
         'domdocument::createattribute' => true,
         'domdocument::load' => true,
@@ -254,6 +255,11 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::createtextnode' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateTextNode();
+
+                return;
+            }
+            if ('domdocument::createcdatasection' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateCDATASection();
 
                 return;
             }
@@ -740,6 +746,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\xmldocument::createelementns');
             self::ensureProxy($context, 'domdocument::createcomment');
             self::ensureProxy($context, 'domdocument::createtextnode');
+            self::ensureProxy($context, 'domdocument::createcdatasection');
             self::ensureProxy($context, 'domdocument::load');
             self::ensureProxy($context, 'domdocument::loadhtml');
             self::ensureProxy($context, 'domdocument::loadhtmlfile');
