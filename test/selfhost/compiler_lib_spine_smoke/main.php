@@ -5106,6 +5106,7 @@ require_once __DIR__.'/../../../lib/Ast/SealedClassAnnotator.php';
 require_once __DIR__.'/../../../lib/Ast/SealedClassPreprocessor.php';
 require_once __DIR__.'/../../../lib/Ast/StaticClassAnnotator.php';
 require_once __DIR__.'/../../../lib/Ast/StaticClassPreprocessor.php';
+require_once __DIR__.'/../../../lib/Ast/StrictTypesDeclareCompileCheck.php';
 require_once __DIR__.'/../../../lib/Ast/TryCatchElseAttacher.php';
 require_once __DIR__.'/../../../lib/Ast/TryCatchElseSupport.php';
 require_once __DIR__.'/../../../lib/Ast/TypedFunctionStaticRewriter.php';

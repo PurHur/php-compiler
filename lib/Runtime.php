@@ -84,6 +84,7 @@ class Runtime {
     public Traverser $postprocessor;
     private Ast\AbstractEnumMarker $abstractEnumMarker;
     private ?Ast\BreakContinueOperandCompileCheck $breakContinueOperandCompileCheck = null;
+    private ?Ast\StrictTypesDeclareCompileCheck $strictTypesDeclareCompileCheck = null;
     private Ast\ConfusableBuiltinTypeHintCheck $confusableBuiltinTypeHintCheck;
     public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
@@ -158,6 +159,8 @@ class Runtime {
         $astTraverser->addVisitor($this->abstractEnumMarker);
         $this->breakContinueOperandCompileCheck = new Ast\BreakContinueOperandCompileCheck();
         $astTraverser->addVisitor($this->breakContinueOperandCompileCheck);
+        $this->strictTypesDeclareCompileCheck = new Ast\StrictTypesDeclareCompileCheck();
+        $astTraverser->addVisitor($this->strictTypesDeclareCompileCheck);
         $this->sealedClassAnnotator = new SealedClassAnnotator();
         $astTraverser->addVisitor($this->sealedClassAnnotator);
         $this->staticClassAnnotator = new StaticClassAnnotator();
@@ -510,6 +513,9 @@ class Runtime {
         if (null !== $this->breakContinueOperandCompileCheck) {
             $this->breakContinueOperandCompileCheck->setSourceFile($filename);
         }
+        if (null !== $this->strictTypesDeclareCompileCheck) {
+            $this->strictTypesDeclareCompileCheck->setSourceFile($filename);
+        }
         try {
             $script = $this->parser->parse($code, $filename);
         } catch (\LogicException $e) {
@@ -572,6 +578,9 @@ class Runtime {
         $this->resetParserNameResolverState();
         if (null !== $this->breakContinueOperandCompileCheck) {
             $this->breakContinueOperandCompileCheck->setSourceFile($filename);
+        }
+        if (null !== $this->strictTypesDeclareCompileCheck) {
+            $this->strictTypesDeclareCompileCheck->setSourceFile($filename);
         }
         try {
             $script = $this->parser->parse($code, $filename);
