@@ -9970,7 +9970,36 @@ restart:
                     }
                     $this->context->recordIncludedFile($resolved);
                     $this->context->scriptStack->push($resolved);
-                    $parsed = $this->context->runtime->parseAndCompileFile($resolved, true);
+                    try {
+                        $parsed = $this->context->runtime->parseAndCompileFile($resolved, true);
+                    } catch (\Throwable $e) {
+                        $this->context->scriptStack->pop();
+                        if (VM\VmInclude::isCatchableSyntaxParseThrowable($e)) {
+                            $catchFrame = $this->dispatchIncludeParseError($e, $resolved, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        throw $e;
+                    }
+                    if (null === $parsed) {
+                        $this->context->scriptStack->pop();
+                        $detail = $this->context->runtime->formatParseAndCompileNullDetail(null)
+                            ?? Runtime::getLastParseFailure()
+                            ?? 'syntax error';
+                        $catchFrame = $this->dispatchIncludeParseError(
+                            new \ParseError(VM\VmInclude::normalizeSyntaxParseMessage($detail)),
+                            $resolved,
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
                     // ZEND_INCLUDE_OR_EVAL copies EX(This) into the included op_array (#31903).
@@ -13485,6 +13514,31 @@ restart:
             $this->context,
             $error->getMessage(),
             $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /**
+     * include/require syntax failure — catchable ParseError in the included file (#32154).
+     *
+     * php-src: Zend/zend_execute.c ZEND_INCLUDE_OR_EVAL; zend_compile_file parse failures.
+     */
+    private function dispatchIncludeParseError(\Throwable $error, string $includedFile, Frame $frame): ?Frame
+    {
+        $message = VM\VmInclude::syntaxParseMessage($error);
+        $line = VM\VmInclude::syntaxParseLine($error);
+        $this->context->errors->recordLastError(
+            VM\ErrorReporter::E_PARSE,
+            $message,
+            $includedFile,
+            $line
+        );
+        $thrown = VM\BuiltinExceptionSupport::materializeParseError(
+            $this->context,
+            $message,
+            $includedFile,
             $line
         );
 
