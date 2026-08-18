@@ -314,7 +314,7 @@ final class ldap_errno extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_errno() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapLink::invokeErrno($context, $args);
     }
 }
 
@@ -342,7 +342,7 @@ final class ldap_error extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_error() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapLink::invokeError($context, $args);
     }
 }
 
@@ -373,7 +373,7 @@ final class ldap_err2str extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_err2str() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapLink::invokeErr2str($context, $args);
     }
 }
 

@@ -37,6 +37,25 @@ final class LdapLinkJitHelper
         return VmLdapConnection::close($conn);
     }
 
+    public static function errnoArgv(int $handle): int
+    {
+        $conn = self::requireConnection($handle, 'ldap_errno');
+
+        return VmLdapConnection::errno($conn);
+    }
+
+    public static function errorArgv(int $handle): string
+    {
+        $conn = self::requireConnection($handle, 'ldap_error');
+
+        return VmLdapNative::err2string(VmLdapConnection::errno($conn));
+    }
+
+    public static function err2strArgv(int $errno): string
+    {
+        return VmLdapNative::err2string($errno);
+    }
+
     private static function requireConnection(int $handle, string $function): ObjectEntry
     {
         if (VmLdapConnection::isClosedLookupKey($handle)) {

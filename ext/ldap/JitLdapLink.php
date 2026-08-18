@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ldap;
 
 use PHPCompiler\ext\standard\JitGetObjectId;
+use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\LdapRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -105,6 +106,84 @@ final class JitLdapLink
         return self::boolFromI1($context, $ok);
     }
 
+    /** @param list<JITVariable> $args */
+    public static function invokeErrno(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_errno() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+
+        $handle = self::lowerConnectionHandle($context, $args[0], 'ldap_errno');
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        LdapRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $errno = $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_errno'),
+            $handle
+        );
+
+        return self::longFromI64($context, $errno);
+    }
+
+    /** @param list<JITVariable> $args */
+    public static function invokeError(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_error() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+
+        $handle = self::lowerConnectionHandle($context, $args[0], 'ldap_error');
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        LdapRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $error = $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_error'),
+            $handle
+        );
+
+        return self::stringFromPtr($context, $error);
+    }
+
+    /** @param list<JITVariable> $args */
+    public static function invokeErr2str(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_err2str() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+
+        $errno = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'ldap_err2str', 1, 'errno');
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        LdapRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $error = $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_err2str'),
+            $errno
+        );
+
+        return self::stringFromPtr($context, $error);
+    }
+
     private static function lowerConnectionHandle(Context $context, JITVariable $arg, string $function): Value
     {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
@@ -135,6 +214,28 @@ final class JitLdapLink
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         JitValueBox::writeBool($context, $slot, $ok);
+
+        return $ptr;
+    }
+
+    private static function longFromI64(Context $context, Value $value): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeLong($context, $slot, $value);
+
+        return $ptr;
+    }
+
+    private static function stringFromPtr(Context $context, Value $value): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $value
+        );
 
         return $ptr;
     }

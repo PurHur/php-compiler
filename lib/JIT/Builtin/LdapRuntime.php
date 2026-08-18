@@ -9,8 +9,8 @@ use PHPCompiler\JIT\JitVmHelperLink;
 
 /**
  * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect /
- * ldap_connect_wallet / ldap_bind / ldap_unbind (#6352, #18173, #22212, #22276,
- * #31984, #32000, #32001, #32002).
+ * ldap_connect_wallet / ldap_bind / ldap_unbind / ldap_errno / ldap_error / ldap_err2str
+ * (#6352, #18173, #22212, #22276, #31984, #32000, #32001, #32002, #32106).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -39,6 +39,12 @@ final class LdapRuntime
 
     private const LDAP_UNBIND_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::unbindArgv';
 
+    private const LDAP_ERRNO_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::errnoArgv';
+
+    private const LDAP_ERROR_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::errorArgv';
+
+    private const LDAP_ERR2STR_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::err2strArgv';
+
     /** @var list<string> */
     private const ESCAPE_HELPERS = [
         self::LDAP_ESCAPE_HELPER,
@@ -57,6 +63,9 @@ final class LdapRuntime
         self::LDAP_LINK_REGISTER_HELPER,
         self::LDAP_BIND_HELPER,
         self::LDAP_UNBIND_HELPER,
+        self::LDAP_ERRNO_HELPER,
+        self::LDAP_ERROR_HELPER,
+        self::LDAP_ERR2STR_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -168,6 +177,39 @@ final class LdapRuntime
             self::LINK_HELPER_PATH,
             self::LINK_HELPERS,
             '#32002'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_errno',
+            'ldap_errno_bridge_entry',
+            [$i64],
+            $i64,
+            self::LDAP_ERRNO_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32106'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_error',
+            'ldap_error_bridge_entry',
+            [$i64],
+            $strPtr,
+            self::LDAP_ERROR_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32106'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_err2str',
+            'ldap_err2str_bridge_entry',
+            [$i64],
+            $strPtr,
+            self::LDAP_ERR2STR_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32106'
         );
 
         if (null !== $savedBlock) {
