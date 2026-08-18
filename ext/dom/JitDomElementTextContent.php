@@ -40,9 +40,10 @@ final class JitDomElementTextContent
         $context = $objectType->jitContext();
         $propLc = strtolower($propName);
 
-        if (JitDomDocumentMethodKernel::shouldUse($context)
-            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-        ) {
+        // User-script AOT: always read the seeded STRING slot. NestedJIT of
+        // textContentArgv SIGSEGVs after c:main_before_php when there was no
+        // loadXML (createElement($name, $value) — #32292 / php-src document.c).
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $classId = $objectType->lookup(self::CLASS_ELEMENT);
             $slotProp = 'nodevalue' === $propLc ? self::PROP_NODE_VALUE : self::PROP_TEXT_CONTENT;
             if (!$objectType->hasProperty($classId, $slotProp)) {

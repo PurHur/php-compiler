@@ -53,8 +53,12 @@ final class JitDomCreateElement
                 return self::invokeViaHelper($context, ...$args);
             }
             if (null !== $nameLit) {
-                $obj = self::materializeElementFromLiteral($context, $nameLit);
-                self::initTextContentSlot($context, $obj, $args[2] ?? null);
+                $valueLit = self::compileTimeValueArg($args[2] ?? null);
+                if (null === $valueLit) {
+                    // Runtime $value — helper applies xmlEncode + text child (document.c).
+                    return self::invokeViaHelper($context, ...$args);
+                }
+                $obj = self::materializeElementWithTextContent($context, $nameLit, $valueLit);
                 self::storeOwnerAndNullParent($context, $obj, $args[0]);
 
                 // Box like invokeViaHelper so nested appendChild(createElement()) ARG_SEND
@@ -102,8 +106,11 @@ final class JitDomCreateElement
             $tag = $htmlUppercase ? strtoupper($nameLit) : $nameLit;
             // Local name for living saveHtml($node) compile-time fold (#31324).
             JitDomHtmlDocumentSaveHtml::rememberCreateElementTag($nameLit);
-            $obj = self::materializeElementFromLiteral($context, $tag, $elementClass);
-            self::initTextContentSlot($context, $obj, $args[2] ?? null, $elementClass);
+            $valueLit = self::compileTimeValueArg($args[2] ?? null);
+            if (null === $valueLit) {
+                return self::invokeViaHelper($context, ...$args);
+            }
+            $obj = self::materializeElementWithTextContent($context, $tag, $valueLit, $elementClass);
             self::storeOwnerAndNullParent($context, $obj, $args[0], $elementClass);
 
             return self::boxObjectResult($context, $obj);
@@ -144,32 +151,24 @@ final class JitDomCreateElement
         return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
-    private static function initTextContentSlot(
-        Context $context,
-        Value $element,
-        ?JITVariable $valueArg,
-        string $className = self::CLASS_ELEMENT
-    ): void {
-        $objectType = $context->type->object;
-        $classId = $objectType->lookup($className);
-        if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
-            $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
+    /**
+     * Optional createElement $value: omitted/null → ''; compile-time string → that
+     * string; runtime → null (caller NestedJIT helper). php-src document.c.
+     */
+    private static function compileTimeValueArg(?JITVariable $valueArg): ?string
+    {
+        if (null === $valueArg) {
+            return '';
         }
-        $lit = '';
-        if (null !== $valueArg) {
-            $lit = $valueArg->compileTimeString ?? JitStringBuiltinArg::compileTimeLiteral($valueArg) ?? '';
+        if (JITVariable::TYPE_NULL === $valueArg->type || ($valueArg->isNullConstant ?? false)) {
+            return '';
         }
-        $textStr = $context->builder->load($context->constantStringFromString($lit));
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $textStr
-        );
-        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($element, $className, self::PROP_TEXT_CONTENT),
-            $propVar,
-            JITVariable::TYPE_STRING
-        );
+        $lit = self::compileTimeStringArg($valueArg);
+        if (null !== $lit) {
+            return $lit;
+        }
+
+        return null;
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
@@ -280,8 +279,12 @@ final class JitDomCreateElement
                 JITVariable::TYPE_STRING
             );
         }
-        // Default empty; loadXML seeds real child markup via storeUserScriptInnerXml (#26757).
-        self::storeUserScriptInnerXml($context, $element, '', $className);
+        // Text child markup for saveXML($node) when there was no loadXML (#32292).
+        // loadXML overwrites INNER_XML with real child markup afterwards (#26757).
+        $inner = '' === $textContent
+            ? ''
+            : htmlspecialchars($textContent, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        self::storeUserScriptInnerXml($context, $element, $inner, $className);
     }
 
     /** Seed/replace {@see VmDom::PROP_USER_SCRIPT_INNER_XML} for AOT saveXML (#26757 / #26765). */

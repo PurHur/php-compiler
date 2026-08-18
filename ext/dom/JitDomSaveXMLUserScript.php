@@ -64,13 +64,8 @@ final class JitDomSaveXMLUserScript
         if (!\in_array($nodeVar->type, [JITVariable::TYPE_OBJECT, JITVariable::TYPE_VALUE], true)) {
             return null;
         }
-        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-            return null;
-        }
         $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xmlLit) {
-            return null;
-        }
+        $useXmlLitTag = JitDomLoadXMLUserScript::lastLoadWasPureUserScript() && null !== $xmlLit;
         $node = self::loadObjectArg($context, $nodeVar);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
@@ -80,11 +75,25 @@ final class JitDomSaveXMLUserScript
         if (!$objectType->hasProperty($elementClassId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
             $objectType->defineProperty($elementClassId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
         }
-        // Prefer compile-time root tag — documentElement temps often lose DOMElement type
-        // so runtime tagName reads can see an empty dynamic slot (#23251).
-        $tagStr = $context->builder->load(
-            $context->constantStringFromString(DomParseSimpleXmlJitHelper::rootTagArgv($xmlLit))
-        );
+        if (!$objectType->hasProperty($elementClassId, 'tagName')) {
+            $objectType->defineProperty($elementClassId, 'tagName', JITVariable::TYPE_STRING);
+        }
+        // loadXML documentElement temps often lose DOMElement type (#23251). createElement
+        // without loadXML seeds tagName (#32292 / php-src document.c xmlNodeDump).
+        if ($useXmlLitTag) {
+            $tagStr = $context->builder->load(
+                $context->constantStringFromString(DomParseSimpleXmlJitHelper::rootTagArgv((string) $xmlLit))
+            );
+        } else {
+            $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $node,
+                'DOMElement',
+                'tagName',
+                $elementClassId
+            );
+            $tagStr = $context->helper->loadValue($tagVar);
+        }
         // Prefer ParentNode append/prepend markup when present (#26765); else textContent
         // (textContent-only mutations / loadXML root text).
         $innerVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
