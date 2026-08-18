@@ -1595,6 +1595,38 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMCharacterData::deleteData() — php-src characterdata.c xmlUTF8Strsub (#32389).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function deleteData(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMCharacterData::deleteData', $extra, 2);
+        if (!VmDom::isCharacterData($node)) {
+            throw new \TypeError('DOMCharacterData::deleteData() must be called on a character data node');
+        }
+        $offsetVar = ($extra[0] ?? self::missingArg('deleteData', 0))->resolveIndirect();
+        $countVar = ($extra[1] ?? self::missingArg('deleteData', 1))->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $offsetVar->type && Variable::TYPE_FLOAT !== $offsetVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMCharacterData::deleteData(): Argument #1 ($offset) must be of type int, %s given',
+                VmDom::typeLabel($offsetVar)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $countVar->type && Variable::TYPE_FLOAT !== $countVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMCharacterData::deleteData(): Argument #2 ($count) must be of type int, %s given',
+                VmDom::typeLabel($countVar)
+            ));
+        }
+        VmDom::characterDataDeleteData($node, $offsetVar->toInt(), $countVar->toInt());
+        $result = new Variable();
+        $result->bool(true);
+
+        return $result;
+    }
+
+    /**
      * DOMNode::C14N() — inclusive/exclusive canonical XML (#19467).
      *
      * @param list<Variable> $extra
