@@ -8,7 +8,8 @@ namespace PHPCompiler\ext\standard;
  * Lowered into JIT/AOT modules for htmlspecialchars() runtime (#9445, #20487, #27290, php-in-PHP).
  *
  * Escape subset mirrors {@see VmString::htmlspecialchars()} / php-src ext/standard/html.c
- * for & < > " ' plus double_encode=false entity preservation and ENT_IGNORE (#32063).
+ * for & < > " ' plus double_encode=false entity preservation, ENT_IGNORE (#32063)
+ * and ENT_DISALLOWED → U+FFFD (#32084).
  * Self-contained for NestedJIT (#16075).
  *
  * NestedJIT / AOT cannot lower a loop-carried string accumulator when branches
@@ -36,15 +37,18 @@ final class HtmlspecialcharsJitHelper
         }
         // ENT_IGNORE: skip illegal UTF-8 bytes; copy valid multi-byte sequences whole
         // so continuation bytes are not mistaken for illegal leads (php-src html.c / #32063).
-        if (0 !== ($flags & ENT_IGNORE)) {
-            $validWidth = self::utf8ValidWidthAt($string, $i);
-            if ($validWidth < 1) {
-                return self::escapeFrom($string, $flags, $i + 1, $doubleEncode);
+        $validWidth = self::utf8ValidWidthAt($string, $i);
+        if (0 !== ($flags & ENT_IGNORE) && $validWidth < 1) {
+            return self::escapeFrom($string, $flags, $i + 1, $doubleEncode);
+        }
+        if ($validWidth > 1) {
+            if (0 !== ($flags & ENT_DISALLOWED)
+                && !self::unicodeCpIsAllowed(self::utf8CodePointAt($string, $i), $flags)) {
+                return "\xEF\xBF\xBD".self::escapeFrom($string, $flags, $i + $validWidth, $doubleEncode);
             }
-            if ($validWidth > 1) {
-                return self::copyBytes($string, $i, $validWidth)
-                    .self::escapeFrom($string, $flags, $i + $validWidth, $doubleEncode);
-            }
+
+            return self::copyBytes($string, $i, $validWidth)
+                .self::escapeFrom($string, $flags, $i + $validWidth, $doubleEncode);
         }
         $ch = $string[$i];
         if ('&' === $ch && !$doubleEncode) {
@@ -73,8 +77,63 @@ final class HtmlspecialcharsJitHelper
         if ("'" === $ch) {
             return ($quoteBoth ? ($entHtml5 ? '&apos;' : '&#039;') : "'").$rest;
         }
+        if (0 !== ($flags & ENT_DISALLOWED) && !self::unicodeCpIsAllowed(\ord($ch), $flags)) {
+            return "\xEF\xBF\xBD".$rest;
+        }
 
         return $ch.$rest;
+    }
+
+    /**
+     * php-src html.c unicode_cp_is_allowed(). ENT_HTML5 == DOC_TYPE_MASK (48).
+     * NestedJIT-safe: integer compares only.
+     */
+    public static function unicodeCpIsAllowed(int $uniCp, int $flags): bool
+    {
+        $documentType = $flags & ENT_HTML5;
+        if (ENT_XML1 === $documentType || ENT_XHTML === $documentType) {
+            return ($uniCp >= 0x20 && $uniCp <= 0xD7FF)
+                || (0x0A === $uniCp || 0x09 === $uniCp || 0x0D === $uniCp)
+                || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF && 0xFFFE !== $uniCp && 0xFFFF !== $uniCp);
+        }
+        if (ENT_HTML5 === $documentType) {
+            return ($uniCp >= 0x20 && $uniCp <= 0x7E)
+                || ($uniCp >= 0x09 && $uniCp <= 0x0D && 0x0B !== $uniCp)
+                || ($uniCp >= 0xA0 && $uniCp <= 0xD7FF)
+                || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF
+                    && (($uniCp & 0xFFFF) < 0xFFFE)
+                    && ($uniCp < 0xFDD0 || $uniCp > 0xFDEF));
+        }
+
+        return ($uniCp >= 0x20 && $uniCp <= 0x7E)
+            || (0x0A === $uniCp || 0x09 === $uniCp || 0x0D === $uniCp)
+            || ($uniCp >= 0xA0 && $uniCp <= 0xD7FF)
+            || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF);
+    }
+
+    /** UTF-8 scalar at $i (php-src get_next_char). NestedJIT-safe: no strlen/substr. */
+    public static function utf8CodePointAt(string $string, int $i): int
+    {
+        $byte = \ord($string[$i]);
+        if ($byte < 0x80) {
+            return $byte;
+        }
+        if (($byte & 0xE0) === 0xC0 && isset($string[$i + 1])) {
+            return (($byte & 0x1F) << 6) | (\ord($string[$i + 1]) & 0x3F);
+        }
+        if (($byte & 0xF0) === 0xE0 && isset($string[$i + 1]) && isset($string[$i + 2])) {
+            return (($byte & 0x0F) << 12)
+                | ((\ord($string[$i + 1]) & 0x3F) << 6)
+                | (\ord($string[$i + 2]) & 0x3F);
+        }
+        if (($byte & 0xF8) === 0xF0 && isset($string[$i + 1]) && isset($string[$i + 2]) && isset($string[$i + 3])) {
+            return (($byte & 0x07) << 18)
+                | ((\ord($string[$i + 1]) & 0x3F) << 12)
+                | ((\ord($string[$i + 2]) & 0x3F) << 6)
+                | (\ord($string[$i + 3]) & 0x3F);
+        }
+
+        return $byte;
     }
 
     /**

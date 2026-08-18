@@ -460,6 +460,8 @@
             <file>./test/compliance/HtmlspecialcharsNullFlagsStrictJITTest.php</file>
             <file>./test/compliance/HtmlspecialcharsEntIgnoreVMTest.php</file>
             <file>./test/compliance/HtmlspecialcharsEntIgnoreJITTest.php</file>
+            <file>./test/compliance/HtmlspecialcharsEntDisallowedVMTest.php</file>
+            <file>./test/compliance/HtmlspecialcharsEntDisallowedJITTest.php</file>
             <file>./test/compliance/ForwardStaticCallNamedVMTest.php</file>
             <file>./test/compliance/ForwardStaticCallNamedJITTest.php</file>
             <file>./test/compliance/ClearstatcacheNullStrict31245VMTest.php</file>

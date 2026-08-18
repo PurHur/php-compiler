@@ -1143,6 +1143,62 @@ final class VmString
     }
 
     /**
+     * UTF-8 scalar at $i (php-src html.c get_next_char). Invalid lead → that byte.
+     */
+    public static function utf8CodePointAt(string $string, int $i, int $len): int
+    {
+        if ($i >= $len) {
+            return 0;
+        }
+        $byte = \ord($string[$i]);
+        if ($byte < 0x80) {
+            return $byte;
+        }
+        if (($byte & 0xE0) === 0xC0 && $i + 1 < $len) {
+            return (($byte & 0x1F) << 6) | (\ord($string[$i + 1]) & 0x3F);
+        }
+        if (($byte & 0xF0) === 0xE0 && $i + 2 < $len) {
+            return (($byte & 0x0F) << 12)
+                | ((\ord($string[$i + 1]) & 0x3F) << 6)
+                | (\ord($string[$i + 2]) & 0x3F);
+        }
+        if (($byte & 0xF8) === 0xF0 && $i + 3 < $len) {
+            return (($byte & 0x07) << 18)
+                | ((\ord($string[$i + 1]) & 0x3F) << 12)
+                | ((\ord($string[$i + 2]) & 0x3F) << 6)
+                | (\ord($string[$i + 3]) & 0x3F);
+        }
+
+        return $byte;
+    }
+
+    /**
+     * php-src html.c unicode_cp_is_allowed(). $flags & ENT_HTML5 is DOC_TYPE_MASK (48).
+     */
+    public static function unicodeCpIsAllowed(int $uniCp, int $flags): bool
+    {
+        $documentType = $flags & ENT_HTML5;
+        if (ENT_XML1 === $documentType || ENT_XHTML === $documentType) {
+            return ($uniCp >= 0x20 && $uniCp <= 0xD7FF)
+                || (0x0A === $uniCp || 0x09 === $uniCp || 0x0D === $uniCp)
+                || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF && 0xFFFE !== $uniCp && 0xFFFF !== $uniCp);
+        }
+        if (ENT_HTML5 === $documentType) {
+            return ($uniCp >= 0x20 && $uniCp <= 0x7E)
+                || ($uniCp >= 0x09 && $uniCp <= 0x0D && 0x0B !== $uniCp)
+                || ($uniCp >= 0xA0 && $uniCp <= 0xD7FF)
+                || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF
+                    && (($uniCp & 0xFFFF) < 0xFFFE)
+                    && ($uniCp < 0xFDD0 || $uniCp > 0xFDEF));
+        }
+
+        return ($uniCp >= 0x20 && $uniCp <= 0x7E)
+            || (0x0A === $uniCp || 0x09 === $uniCp || 0x0D === $uniCp)
+            || ($uniCp >= 0xA0 && $uniCp <= 0xD7FF)
+            || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF);
+    }
+
+    /**
      * UTF-8 substring measured in codepoints (php-src ext/mbstring mb_get_substr; #7044).
      */
     public static function utf8CharSubstr(string $string, int $charOffset, int $charCount): string
@@ -2881,6 +2937,7 @@ final class VmString
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
+        $disallowed = 0 !== ($flags & ENT_DISALLOWED);
         $out = '';
         $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
@@ -2910,6 +2967,17 @@ final class VmString
                     $out .= $quoteBoth ? ($entHtml5 ? '&apos;' : '&#039;') : "'";
                     break;
                 default:
+                    if ($disallowed) {
+                        $width = self::utf8CharByteWidth($string, $i);
+                        $cp = self::utf8CodePointAt($string, $i, $len);
+                        if (!self::unicodeCpIsAllowed($cp, $flags)) {
+                            $out .= "\xEF\xBF\xBD";
+                        } else {
+                            $out .= \substr($string, $i, $width);
+                        }
+                        $i += $width - 1;
+                        break;
+                    }
                     $out .= $ch;
             }
         }
@@ -3017,6 +3085,7 @@ final class VmString
         }
         $string = $sanitized;
         $entries = self::htmlEntitiesMapForFlags($flags);
+        $disallowed = 0 !== ($flags & ENT_DISALLOWED);
         $out = '';
         $len = self::byteLength($string);
         for ($i = 0; $i < $len;) {
@@ -3030,7 +3099,13 @@ final class VmString
                     continue;
                 }
             }
-            $out .= $entries[$char] ?? $char;
+            if (isset($entries[$char])) {
+                $out .= $entries[$char];
+            } elseif ($disallowed && !self::unicodeCpIsAllowed(self::utf8CodePointAt($string, $i, $len), $flags)) {
+                $out .= "\xEF\xBF\xBD";
+            } else {
+                $out .= $char;
+            }
             $i += $width;
         }
 
