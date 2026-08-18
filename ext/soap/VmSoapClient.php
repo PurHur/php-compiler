@@ -2955,6 +2955,10 @@ final class VmSoapClient
         if (null !== $objectTemporal) {
             return $objectTemporal;
         }
+        // php-src to_xml_list1 — XSD_NMTOKENS / IDREFS / ENTITIES (#32272).
+        if (self::isSoapXsdListType($encType)) {
+            return self::encodeSoapXsdList($value);
+        }
         if (SoapConstants::XSD_BOOLEAN === $encType) {
             return self::soapVarIsTrue($value) ? 'true' : 'false';
         }
@@ -3044,6 +3048,34 @@ final class VmSoapClient
         } catch (\Exception) {
             return null;
         }
+    }
+
+    /** php-src defaultEncodings — XSD_NMTOKENS / IDREFS / ENTITIES use to_xml_list1 (#32272). */
+    private static function isSoapXsdListType(int $encType): bool
+    {
+        return \in_array($encType, [
+            SoapConstants::XSD_NMTOKENS,
+            SoapConstants::XSD_IDREFS,
+            SoapConstants::XSD_ENTITIES,
+        ], true);
+    }
+
+    /**
+     * php-src to_xml_list() — array items joined with space; strings whiteSpace_collapse (#32272).
+     */
+    private static function encodeSoapXsdList(mixed $value): string
+    {
+        if (\is_array($value)) {
+            $parts = [];
+            foreach ($value as $item) {
+                $parts[] = self::soapVarRawString($item);
+            }
+
+            return \htmlspecialchars(\implode(' ', $parts), \ENT_XML1);
+        }
+        $collapsed = \preg_replace('/\s+/u', ' ', \trim(self::soapVarRawString($value))) ?? '';
+
+        return \htmlspecialchars($collapsed, \ENT_XML1);
     }
 
     /**
