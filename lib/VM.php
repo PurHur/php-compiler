@@ -17914,8 +17914,23 @@ restart:
         if (!isset($frame->scope[$slot])) {
             return;
         }
-        $frame->iterators[$slot] = $frame->scope[$slot];
-        $this->context->foreachIterators[$slot] = $frame->scope[$slot];
+        $live = $frame->scope[$slot];
+        // ITER_RESET always addRef's a snapshot wrapper (by-value COW). Switching to the
+        // live CV must drop that extra HT ref — otherwise `$a[]` during foreach-by-ref
+        // zend_array_dup's and leaves IS_REFERENCE aliases on the iterated slot (#32128).
+        $old = $this->context->foreachIterators[$slot] ?? ($frame->iterators[$slot] ?? null);
+        if (null !== $old && $old !== $live) {
+            $resolved = $old->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $resolved->type) {
+                $resolved->toArray()->delRef();
+            }
+        }
+        // Zend FE_RESET_RW SEPARATE_ARRAY: property defaults / other shared tables must
+        // become unique before ZVAL_MAKE_REF, or `$o->items[]` dups and shares IS_REFERENCE
+        // with the class default (#32128).
+        $live->separateArrayForWrite();
+        $frame->iterators[$slot] = $live;
+        $this->context->foreachIterators[$slot] = $live;
     }
 
     private function resolveForeachContainer(Frame $frame, int $slot): Variable

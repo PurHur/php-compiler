@@ -254,6 +254,8 @@
             <file>./test/compliance/ForeachByrefUninitTyped31836JITTest.php</file>
             <file>./test/compliance/ForeachByrefUnsetRefcount31936VMTest.php</file>
             <file>./test/compliance/ForeachByrefUnsetRefcount31936JITTest.php</file>
+            <file>./test/compliance/ForeachByrefAppend32128VMTest.php</file>
+            <file>./test/compliance/ForeachByrefAppend32128JITTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947VMTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947JITTest.php</file>
             <file>./test/compliance/ArrayAccessIncByValue32015VMTest.php</file>
