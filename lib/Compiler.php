@@ -11369,6 +11369,11 @@ class Compiler {
         if ($this->defineValueRequiresRuntimeEvaluation($valueArg, $block)) {
             return;
         }
+        // define() inside a function/method registers when that function runs (zend_constants.c).
+        // Seeding compileTimeGlobalConsts here would fold the name in {main} before the call (#32039).
+        if (!$this->compileBlockIsFileScopeMain($block)) {
+            return;
+        }
         $vm = $this->tryFoldDefineValueOperand($valueArg, $block);
         if (null === $vm) {
             return;
@@ -11441,6 +11446,22 @@ class Compiler {
         $stored = new Variable();
         $stored->copyFrom($value);
         $this->compileTimeGlobalConsts[$lc] = $stored;
+    }
+
+    /**
+     * File-level {main} (not function/method/closure bodies).
+     *
+     * Literal define() may fold ConstFetch only in this scope (#6542). Nested define()
+     * still executes at run time (#32039, zend_builtin_functions.c).
+     */
+    private function compileBlockIsFileScopeMain(Block $block): bool
+    {
+        $func = $block->func;
+        if (null === $func) {
+            return true;
+        }
+
+        return '{main}' === $func->name && null === $func->class;
     }
 
     protected function tryFoldClassConstFetchDefault(
@@ -40747,13 +40768,37 @@ class Compiler {
         if ('' === $name) {
             return false;
         }
+        $defineName = null;
+        if ('define' === $name) {
+            $arg0 = $call->args[0] ?? null;
+            if ($arg0 instanceof Operand) {
+                $lit = $this->staticNameFromOperand($arg0);
+                if (null !== $lit) {
+                    $defineName = strtolower($lit);
+                }
+            }
+        }
         foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_FUNCCALL_INIT !== $op->type) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $initName = strtolower($this->resolveCompileTimeStringSlot((int) $op->arg1, $block) ?? '');
+                if ($name === $initName) {
+                    return true;
+                }
                 continue;
             }
-            $initName = strtolower($this->resolveCompileTimeStringSlot((int) $op->arg1, $block) ?? '');
-            if ($name === $initName) {
-                return true;
+            // define('LIT', …) lowers to TYPE_DECLARE_GLOBAL_CONST with no FUNCCALL_INIT (#204).
+            // Side-effect replay before hoisted var_export/defined() must not re-emit it (#32039).
+            if (
+                'define' === $name
+                && OpCode::TYPE_DECLARE_GLOBAL_CONST === $op->type
+            ) {
+                if (null === $defineName) {
+                    return true;
+                }
+                $declared = strtolower($this->resolveCompileTimeStringSlot((int) $op->arg1, $block) ?? '');
+                if ($declared === $defineName) {
+                    return true;
+                }
             }
         }
 
@@ -59434,7 +59479,7 @@ class Compiler {
         ?Op $cfgCallOp = null
     ): array
     {
-        $folded = $this->tryCompileDefineAsGlobalConst($name, $args, $result, $block);
+        $folded = $this->tryCompileDefineAsGlobalConst($name, $args, $result, $block, $startLine);
         if (null !== $folded) {
             return $folded;
         }
@@ -59677,7 +59722,8 @@ class Compiler {
         ?int $name,
         array $args,
         Operand $result,
-        Block $block
+        Block $block,
+        int $startLine = 0
     ): ?array {
         if (null === $name) {
             return null;
@@ -59720,13 +59766,22 @@ class Compiler {
         if ('' === $constName || str_contains($constName, '::')) {
             return null;
         }
-        $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
-        $ops = [new OpCode(
+        // File-scope define() may fold later ConstFetch (#204 / #6542). define() inside a
+        // function/method still runs when the function does — do not seed compile-time
+        // consts or {main} would see the name before the call (#32039).
+        if ($this->compileBlockIsFileScopeMain($block)) {
+            $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
+        }
+        $declare = new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
             $constNameSlot,
             $valueSlot,
             $caseInsensitiveSlot
-        )];
+        );
+        if ($startLine > 0) {
+            $declare->globalConstStartLine = $startLine;
+        }
+        $ops = [$declare];
         if (!empty($result->usages)) {
             $trueVar = new Variable(Variable::TYPE_BOOLEAN);
             $trueVar->bool(true);
