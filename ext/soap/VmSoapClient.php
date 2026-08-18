@@ -2934,6 +2934,7 @@ final class VmSoapClient
             $faultEl = $fault->item(0);
             $code = 'Client';
             $string = 'SOAP Fault';
+            $detail = null;
             if ($faultEl instanceof \DOMElement) {
                 foreach ($faultEl->childNodes as $child) {
                     if (!$child instanceof \DOMElement) {
@@ -2958,9 +2959,13 @@ final class VmSoapClient
                     } elseif ('faultstring' === $ln) {
                         $string = \trim($child->textContent);
                     }
+                    if ('Detail' === $ln) {
+                        // php-src php_packet_soap.c SOAP 1.2: master_to_zval(Detail) (#32047).
+                        $detail = self::soapFaultDetailValue($child);
+                    }
                 }
             }
-            throw new \SoapFault($code, $string);
+            throw new \SoapFault($code, $string, null, $detail);
         }
 
         $body = $xpath->query('//SOAP-ENV:Body/*|//env:Body/*');
@@ -3024,6 +3029,34 @@ final class VmSoapClient
         }
 
         return null;
+    }
+
+    /**
+     * php-src master_to_zval on SOAP 1.2 Fault Detail (php_packet_soap.c; #32047).
+     *
+     * Named children become stdClass properties — do not apply the SOAP `item` list
+     * heuristic used for encoded arrays.
+     */
+    private static function soapFaultDetailValue(\DOMElement $detailEl): mixed
+    {
+        $childElements = [];
+        foreach ($detailEl->childNodes as $child) {
+            if ($child instanceof \DOMElement) {
+                $childElements[] = $child;
+            }
+        }
+        if (0 === \count($childElements)) {
+            $text = \trim($detailEl->textContent);
+
+            return '' === $text ? null : $text;
+        }
+        $map = [];
+        foreach ($childElements as $child) {
+            $key = $child->localName ?? $child->nodeName;
+            $map[$key] = self::domElementToValue($child);
+        }
+
+        return (object) $map;
     }
 
     /**
