@@ -21,7 +21,13 @@ final class SoapSdlPayload
 
     public int $use = SoapConstants::SOAP_ENCODED;
 
-    /** @var list<string> */
+    /**
+     * Operation names (php-src php_sdl.c function table keys, not function_to_string; #31983).
+     *
+     * {@see SoapClientState::$functions} keeps __getFunctions display strings (`void ping()`).
+     *
+     * @var list<string>
+     */
     public array $functions = [];
 
     /** @var array<string, string> */
@@ -50,7 +56,8 @@ final class SoapSdlPayload
         $payload->uri = $state->uri;
         $payload->style = $state->style;
         $payload->use = $state->use;
-        $payload->functions = $state->functions;
+        // php-src php_sdl.c — parsed SDL functions keyed by operation name (#31983).
+        $payload->functions = \array_values($state->functionIndex);
         $payload->functionIndex = $state->functionIndex;
         $payload->types = $state->types;
         $payload->elementTypes = $state->elementTypes;

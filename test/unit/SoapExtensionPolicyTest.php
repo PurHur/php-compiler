@@ -225,6 +225,8 @@ final class SoapExtensionPolicyTest extends TestCase
             self::assertNotNull($payload);
             self::assertSame($wsdl, $payload->wsdl);
             self::assertContains('ping', $payload->functions);
+            self::assertNotContains('void ping()', $payload->functions);
+            self::assertSame(['void ping()'], \PHPCompiler\ext\soap\VmSoapClient::getFunctions($object));
             self::assertSame('http://127.0.0.1/', $payload->location);
 
             @\unlink($wsdl);
