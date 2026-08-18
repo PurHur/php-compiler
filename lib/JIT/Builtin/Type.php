@@ -710,6 +710,18 @@ class Type extends Builtin {
         );
         $fnOpensslDigest = $this->context->module->addFunction('__compiler_openssl_digest', $fntypeOpensslDigest);
         $this->context->registerFunction('__compiler_openssl_digest', $fnOpensslDigest);
+        // openssl_pbkdf2 — HMAC over __compiler_hash (hex) + LLVM hex-decode (#32410)
+        $fntypeOpensslPbkdf2 = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $strPtr,
+            $strPtr,
+            $i64,
+            $i64,
+            $strPtr
+        );
+        $fnOpensslPbkdf2 = $this->context->module->addFunction('__compiler_openssl_pbkdf2', $fntypeOpensslPbkdf2);
+        $this->context->registerFunction('__compiler_openssl_pbkdf2', $fnOpensslPbkdf2);
         // openssl_get_cipher_methods / openssl_get_md_methods — OpensslMethodsJitHelper (#21103 / #30148)
         $fntypeOpensslMethods = $this->context->context->functionType($htPtr, false, $i64);
         $fnOpensslCipherMethods = $this->context->module->addFunction(

@@ -1481,6 +1481,9 @@ final class BuiltinParamNames
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says opendata/ekey/privkey/method (#28754)
             case 'openssl_open':
                 return ['data', 'output', 'encrypted_key', 'private_key', 'cipher_algo', 'iv='];
+            // php-src ext/openssl/openssl.stub.php
+            case 'openssl_pbkdf2':
+                return ['password', 'salt', 'key_length', 'iterations', 'digest_algo='];
             case 'openssl_cms_verify':
                 // php-src ext/openssl/openssl.stub.php (#22368, re-#6592)
                 return [
