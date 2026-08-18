@@ -149,20 +149,34 @@ final class JitLongArithOverflow
 
     /**
      * @see php-src Zend/zend_operators.h ZEND_LONG_MUL_OVERFLOW
+     *
+     * `sdiv` is eager: `(a*b)/a` SIGFPEs when `a==0` (false* int after #32337 zext).
+     * php-src skips the quotient when `op1==0`.
      */
     private static function signedMulOverflow(Context $context, LlvmValue $a, LlvmValue $b): LlvmValue
     {
         $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
         $zero = $i64->constInt(0, true);
-        $product = $context->builder->mul($a, $b);
+        $falseVal = $i1->constInt(0, false);
         $aZero = $context->builder->icmp(Builder::INT_EQ, $a, $zero);
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $checkBb = BasicBlockHelper::append($context, 'mul_ov_sdiv');
+        $doneBb = BasicBlockHelper::append($context, 'mul_ov_done');
+        $context->builder->store($falseVal, $resultSlot);
+        $context->builder->branchIf($aZero, $doneBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $product = $context->builder->mul($a, $b);
         $quot = $context->builder->signedDiv($product, $a);
         $neq = $context->builder->icmp(Builder::INT_NE, $quot, $b);
+        $context->builder->store($neq, $resultSlot);
+        $context->builder->branch($doneBb);
 
-        return $context->builder->and(
-            $context->builder->xor($aZero, $context->getTypeFromString('int1')->constInt(1, false)),
-            $neq
-        );
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function extractConstantLong(Context $context, Variable $var): ?int

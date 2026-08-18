@@ -85,8 +85,10 @@ final class JitDomSaveXMLUserScript
         if (!$objectType->hasProperty($elementClassId, 'nodeName')) {
             $objectType->defineProperty($elementClassId, 'nodeName', JITVariable::TYPE_STRING);
         }
-        // createComment/createTextNode seed nodeName but not tagName — fetching tagName
-        // SIGSEGVs (#32315). libxml xmlNodeDump: comment `<!--data-->`, text = data.
+        // createComment/createTextNode/createDocumentFragment seed nodeName but not
+        // tagName — fetching tagName SIGSEGVs (#32315 / #32334). Check fragment
+        // nodeName before the PI `#pi` tagName discriminator (#32331). libxml xmlNodeDump:
+        // comment `<!--data-->`, text = data, fragment = children only (empty → "").
         // Skip when loadXML supplies the root tag from the compile-time literal (#23251).
         if (!$useXmlLitTag) {
             return self::serializeUserScriptNode($context, $objectType, $node, $elementClassId);
@@ -103,10 +105,10 @@ final class JitDomSaveXMLUserScript
     }
 
     /**
-     * Dump createComment/createTextNode/createProcessingInstruction (and createElement)
-     * without a loadXML tag literal.
+     * Dump createComment/createTextNode/createCDATASection/createDocumentFragment/
+     * createProcessingInstruction (and createElement) without a loadXML tag literal.
      *
-     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331)
+     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331 / #32334)
      */
     private static function serializeUserScriptNode(
         Context $context,
@@ -144,6 +146,8 @@ final class JitDomSaveXMLUserScript
         $bbText = BasicBlockHelper::append($context, 'dom_savexml_text');
         $bbCdataCheck = BasicBlockHelper::append($context, 'dom_savexml_check_cdata');
         $bbCdata = BasicBlockHelper::append($context, 'dom_savexml_cdata');
+        $bbFragCheck = BasicBlockHelper::append($context, 'dom_savexml_check_frag');
+        $bbFrag = BasicBlockHelper::append($context, 'dom_savexml_frag');
         $bbPiCheck = BasicBlockHelper::append($context, 'dom_savexml_check_pi');
         $bbPi = BasicBlockHelper::append($context, 'dom_savexml_pi');
         $bbPiEmpty = BasicBlockHelper::append($context, 'dom_savexml_pi_empty');
@@ -183,7 +187,7 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $nameStr, $cdataLit),
             $zero
         );
-        $context->builder->branchIf($isCdata, $bbCdata, $bbPiCheck);
+        $context->builder->branchIf($isCdata, $bbCdata, $bbFragCheck);
 
         $context->builder->positionAtEnd($bbCdata);
         $cdataOpen = $context->builder->load($context->constantStringFromString('<![CDATA['));
@@ -194,6 +198,29 @@ final class JitDomSaveXMLUserScript
             $cdataClose
         );
         $context->builder->store(self::boxStringValue($context, $cdataXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbFragCheck);
+        $fragLit = $context->builder->load($context->constantStringFromString('#document-fragment'));
+        $isFrag = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $fragLit),
+            $zero
+        );
+        // Fragment stand-ins never set tagName — check nodeName before the PI tagName fetch (#32334).
+        $context->builder->branchIf($isFrag, $bbFrag, $bbPiCheck);
+
+        $context->builder->positionAtEnd($bbFrag);
+        // xmlNodeDump(XML_DOCUMENT_FRAG_NODE) emits children only (#32334).
+        $innerVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            VmDom::PROP_USER_SCRIPT_INNER_XML,
+            $elementClassId
+        );
+        $innerStr = $context->helper->loadValue($innerVar);
+        $context->builder->store(self::boxStringValue($context, $innerStr), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbPiCheck);

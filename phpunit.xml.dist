@@ -332,6 +332,9 @@
             <file>./test/compliance/UnaryMinusNegInf32317VMTest.php</file>
             <file>./test/compliance/UnaryMinusNegInf32317JITTest.php</file>
             <file>./test/unit/UnaryMinusNegInf32317AotTest.php</file>
+            <file>./test/compliance/BoolNativeArith32337VMTest.php</file>
+            <file>./test/compliance/BoolNativeArith32337JITTest.php</file>
+            <file>./test/unit/BoolNativeArith32337AotTest.php</file>
             <file>./test/compliance/IntMinModNegOne32285JITTest.php</file>
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
             <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
@@ -355,6 +358,9 @@
             <file>./test/compliance/StaticPropMethodInc32313JITTest.php</file>
             <file>./test/unit/StaticPropMethodInc32313AotTest.php</file>
             <file>./test/unit/JsonEncodeInfNan32326AotTest.php</file>
+            <file>./test/unit/OpensslErrorString32336AotTest.php</file>
+            <file>./test/compliance/DomCreateDocumentFragment32334JITTest.php</file>
+            <file>./test/unit/DomCreateDocumentFragment32334AotTest.php</file>
             <file>./test/compliance/VarDumpInfNan32321VMTest.php</file>
             <file>./test/compliance/VarDumpInfNan32321JITTest.php</file>
             <file>./test/unit/VarDumpInfNan32321AotTest.php</file>

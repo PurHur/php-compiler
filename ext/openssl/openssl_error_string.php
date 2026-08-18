@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_error_string() — drain OpenSSL error queue (php-src ext/openssl/openssl.c; issue #6559).
+ * openssl_error_string() — drain OpenSSL error queue (php-src ext/openssl/openssl.c; VM #6559, JIT/AOT #32336).
  */
 final class openssl_error_string extends Internal
 {
@@ -43,8 +43,13 @@ final class openssl_error_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_error_string() is not implemented for JIT in this compiler build (issue #6559)'
-        );
+        $argc = \count($args);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(
+                'openssl_error_string() expects exactly 0 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslError::invoke($context);
     }
 }
