@@ -10,6 +10,8 @@ namespace PHPCompiler\JIT;
  * Always-on table is the small MCJIT alias set (syscall / __phpc_host_*).
  * libc malloc/realloc/free are module-local via {@see ensureMallocFamily} (#32273)
  * with int8* / size_t so NestedJIT leaves cannot mint malloc.1.
+ * {@see ensureResolveStreamDecl} owns __phpc_resolve_stream after the always-on
+ * drop (#32287) — StreamGlobalsJit / JitStreamLibcHandleKernel still implement the body.
  */
 final class LibcExtern
 {
@@ -143,7 +145,12 @@ final class LibcExtern
             // popen/pclose/fileno dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel
             // declare module-locally (peer fflush/ferror/fgets above); user-script popen/pclose
             // stay on PHP helpers (`ext/standard` + `__compiler_*`).
-            '__phpc_resolve_stream' => [$i8p, false, [$i64]],
+            // __phpc_resolve_stream dropped (#32287): NestedJIT JitStreamIoKernel /
+            // JitStreamSyncKernel call ensureResolveStreamDecl before lookup; standalone
+            // StreamGlobalsJit and embed JitStreamLibcHandleKernel still implement the body
+            // (phpc_stream.c already deleted — #5343). Canonical i8*(i64) ABI so the
+            // ensureExternal addFunction-without-getNamedFunction catch cannot mint
+            // __phpc_resolve_stream.1 (#31894 / #32122 class). Peer malloc drop (#32273).
             // Math libc decls removed (#28808): userland Math* + NestedJIT helpers are
             // PHP SSOT (MathSqrt #27888 … MathNextafter #28716); stats_standard_deviation
             // routes through MathSqrt::invoke.
@@ -353,6 +360,33 @@ final class LibcExtern
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /**
+     * Module-local __phpc_resolve_stream after LibcExtern always-on drop (#32287).
+     *
+     * Canonical i8*(int64) ABI. NestedJIT stream leaves call this before
+     * lookupFunction('__phpc_resolve_stream'); StreamGlobalsJit / JitStreamLibcHandleKernel
+     * implement the body. Peer: ensureMallocFamily (#32273) / ensureMemcpyDecl (#31885).
+     */
+    public static function ensureResolveStreamDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('__phpc_resolve_stream');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->module->getNamedFunction('__phpc_resolve_stream');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                '__phpc_resolve_stream',
+                $context->context->functionType($i8p, false, $i64)
+            );
+        }
+        $context->registerFunction('__phpc_resolve_stream', $fn);
     }
 
     /**
