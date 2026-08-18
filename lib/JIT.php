@@ -10872,7 +10872,14 @@ class JIT {
                     $builder->branch($targetEntry);
                     return $origBasicBlock;
                 case OpCode::TYPE_COALESCE:
-                    $branchBlock = $builder->getInsertBlock();
+                    // Match TYPE_NULLSAFE: NestedJIT CoalesceJitHelper / script-global
+                    // init can clear insert; a parentless load of phpc_script_global_*
+                    // fails module verify for `echo $undef ?? 'd'` (#32445).
+                    $branchBlock = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
+                    if (null === $branchBlock) {
+                        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'coalesce_branch');
+                        $branchBlock = JIT\BasicBlockHelper::tryGetInsertBlock($this->context) ?? $origBasicBlock;
+                    }
                     $builder->positionAtEnd($branchBlock);
                     $coalesceResult = $block->getOperand($op->arg1);
                     $this->context->coalesceAssignTargets[$coalesceResult] = true;
@@ -10880,6 +10887,7 @@ class JIT {
                     // the same alloca — otherwise AOT ?? + === / == on the merge reads a bad
                     // temp and MiniWebApp AOT exits with empty stdout (#31101 / #26818).
                     $this->ensureCoalesceMergeStackSlot($coalesceResult);
+                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'coalesce_after_slot');
                     $mergeSlot = $block->slotForOperand($coalesceResult);
                     if (null !== $mergeSlot) {
                         $this->context->coalesceMergeSlotOperands[$mergeSlot] = $coalesceResult;

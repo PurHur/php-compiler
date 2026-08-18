@@ -666,7 +666,7 @@ class Context {
 
     private function initScriptGlobalHeapBox(PHPLLVM\Value $global): void
     {
-        $restore = $this->builder->getInsertBlock();
+        $restore = BasicBlockHelper::tryGetInsertBlock($this);
         $this->positionBuilderAtInitEmission();
         $valueType = $this->getTypeFromString('__value__');
         $heapVal = $this->memory->malloc($valueType);
@@ -681,6 +681,10 @@ class Context {
         $this->builder->store($heapPtr, $global);
         if (null !== $restore) {
             BasicBlockHelper::restoreInsertBlock($this, $restore);
+        } else {
+            // NestedJIT helper compile can leave insert cleared; reopen so the
+            // subsequent load of this global is parented (#32445).
+            BasicBlockHelper::ensureOpenInsertBlock($this, 'script_global_after_init');
         }
     }
 

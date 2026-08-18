@@ -47,11 +47,14 @@ final class CoalesceHelper
     public static function isTakeLeftBranch(JIT $jit, Variable $check): Value
     {
         $context = $jit->context;
+        // Helper link / script-global init can clear insert (#32445).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'coalesce_take_left');
         if (Variable::TYPE_NATIVE_BOOL === $check->type) {
             return $context->helper->loadValue($check);
         }
         if (Variable::TYPE_VALUE === $check->type) {
             self::ensureLinked($context);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'coalesce_take_left_after_link');
             $valuePtr = JitValueBox::valuePtrFromVariable($context, $check);
             $typeByte = $context->builder->load(
                 $context->builder->structGep(
