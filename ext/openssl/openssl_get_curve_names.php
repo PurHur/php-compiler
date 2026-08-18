@@ -11,7 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_get_curve_names() — built-in EC curve names (#6560, ext/openssl/openssl.c).
+ * openssl_get_curve_names() — built-in EC curve names (#6560 VM, JIT/AOT #32364 via HashTable bake).
+ *
+ * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_get_curve_names) / EC_get_builtin_curves.
  */
 final class openssl_get_curve_names extends Internal
 {
@@ -35,8 +37,13 @@ final class openssl_get_curve_names extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_get_curve_names() is not implemented for JIT in this compiler build (issue #6560)'
-        );
+        $argc = \count($args);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(
+                'openssl_get_curve_names() expects exactly 0 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslMethods::curveNames($context);
     }
 }
