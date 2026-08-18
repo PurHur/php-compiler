@@ -61,6 +61,15 @@ final class IconvNativeTest extends TestCase
         $this->assertSame('caf', CharsetEngine::convert('UTF-8', 'ASCII//IGNORE', "caf\xC3\xA9"));
     }
 
+    /** U+20AC and other non-Latin-1 codepoints — glibc //TRANSLIT (#32103). */
+    public function testTranslitSuffixMapsUnicodeSymbolsToAscii(): void
+    {
+        $this->assertSame('aEURb', CharsetEngine::convert('UTF-8', 'ASCII//TRANSLIT', 'a€b'));
+        $this->assertSame('aEURb', VmIconv::iconv('UTF-8', 'ASCII//TRANSLIT', 'a€b'));
+        $this->assertSame('ab', CharsetEngine::convert('UTF-8', 'ASCII//IGNORE', 'a€b'));
+        $this->assertSame('JPY100', CharsetEngine::convert('UTF-8', 'ASCII//TRANSLIT', '¥100'));
+    }
+
     public function testUtf16leRoundTrip(): void
     {
         $le = CharsetEngine::convert('UTF-8', 'UTF-16LE', 'a');
