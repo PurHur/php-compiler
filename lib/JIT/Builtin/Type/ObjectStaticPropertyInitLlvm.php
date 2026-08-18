@@ -98,6 +98,37 @@ final class ObjectStaticPropertyInitLlvm
     }
 
     /**
+     * Initialize a typed static array property from a folded VM hashtable (#31967).
+     *
+     * php-src: Zend/zend_compile.c — ZEND_DECLARE_STATIC_PROP copies the default zval.
+     */
+    public static function initHashtableFromVmArray(Object_ $object, Value $global, VMVariable $value): void
+    {
+        if (VMVariable::TYPE_ARRAY !== $value->type) {
+            throw new \LogicException('Static array property default must be an array');
+        }
+        $table = $value->toArray();
+        if (!$table instanceof \PHPCompiler\VM\HashTable) {
+            throw new \LogicException('Static array property default must be a HashTable');
+        }
+        if (0 === $table->getNumElements()) {
+            self::initHashtableEmpty($object, $global);
+
+            return;
+        }
+        $context = $object->jitContext();
+        $restore = $context->builder->getInsertBlock();
+        $context->positionBuilderAtInitEmission();
+        $htVar = HashTableHelper::variableFromVmHashTable($context, $table);
+        $htPtr = $context->helper->loadValue($htVar);
+        $context->refcount->addref($htPtr);
+        $context->builder->store($htPtr, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
+        }
+    }
+
+    /**
      * WeakRef registry slot tables allocate on first write — eager __init__ hashtable alloc
      * runs before runtime tables are ready and segfaults HelloWorld AOT (#11437).
      */
@@ -129,6 +160,48 @@ final class ObjectStaticPropertyInitLlvm
             $context->lookupFunction('__value__writeHashtable'),
             $heapPtr,
             $ht
+        );
+        $context->builder->store($heapPtr, $global);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
+        }
+    }
+
+    /**
+     * Box a folded array default (including non-empty) into a static {@see __value__} property (#31967).
+     *
+     * php-src: Zend/zend_compile.c — ZEND_DECLARE_STATIC_PROP copies the default zval.
+     */
+    public static function initValueArrayDefault(Object_ $object, Value $global, VMVariable $value): void
+    {
+        if (VMVariable::TYPE_ARRAY !== $value->type) {
+            throw new \LogicException('Static boxed array property default must be an array');
+        }
+        $table = $value->toArray();
+        if (!$table instanceof \PHPCompiler\VM\HashTable) {
+            throw new \LogicException('Static boxed array property default must be a HashTable');
+        }
+        if (0 === $table->getNumElements()) {
+            self::initValueEmptyArray($object, $global);
+
+            return;
+        }
+        $context = $object->jitContext();
+        $restore = $context->builder->getInsertBlock();
+        $context->positionBuilderAtInitEmission();
+        $valueType = $context->getTypeFromString('__value__');
+        $heapVal = $context->memory->malloc($valueType);
+        $heapPtr = $context->builder->pointerCast(
+            $heapVal,
+            $context->getTypeFromString('__value__*')
+        );
+        $htVar = HashTableHelper::variableFromVmHashTable($context, $table);
+        $htPtr = $context->helper->loadValue($htVar);
+        $context->refcount->addref($htPtr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $heapPtr,
+            $htPtr
         );
         $context->builder->store($heapPtr, $global);
         if (null !== $restore) {

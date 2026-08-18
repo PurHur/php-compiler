@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCfg\Operand;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
@@ -33,12 +34,15 @@ final class RuntimeIndirectStaticMethodCall implements Call
      * @param array<int, Call> $candidatesByClassId class id => lowered static method proxy
      * @param bool             $bindCallerThis      Prepend enclosing $this for non-static
      *                                              candidates (static:: from instance, #28050)
+     * @param Variable|null    $runtimeClassVar     `$obj::method()` / `$class::method()` operand (#31967)
      */
     public function __construct(
         public readonly string $methodLc,
         public readonly array $candidatesByClassId,
         public readonly Block $enclosingBlock,
         public readonly bool $bindCallerThis = false,
+        public readonly ?Variable $runtimeClassVar = null,
+        public readonly ?Operand $runtimeClassOp = null,
     ) {
     }
 
@@ -48,12 +52,21 @@ final class RuntimeIndirectStaticMethodCall implements Call
             throw new \LogicException('RuntimeIndirectStaticMethodCall requires at least one candidate');
         }
 
-        // Same LSB class-id path as static::CONST / static::class — must not call
-        // emitEffectiveLateStaticClassId here: ensureLinked clears the insert block (#19614).
-        $classId = ClassConstFetchHelper::emitStaticKeywordClassIdForPseudoConst(
-            $context->type->object,
-            $this->enclosingBlock
-        );
+        if (null !== $this->runtimeClassVar && null !== $this->runtimeClassOp) {
+            $classId = ClassConstFetchHelper::emitResolveClassId(
+                $context->type->object,
+                $this->enclosingBlock,
+                $this->runtimeClassVar,
+                $this->runtimeClassOp
+            );
+        } else {
+            // Same LSB class-id path as static::CONST / static::class — must not call
+            // emitEffectiveLateStaticClassId here: ensureLinked clears the insert block (#19614).
+            $classId = ClassConstFetchHelper::emitStaticKeywordClassIdForPseudoConst(
+                $context->type->object,
+                $this->enclosingBlock
+            );
+        }
 
         return $this->dispatchByClassId($context, $classId, ...$args);
     }

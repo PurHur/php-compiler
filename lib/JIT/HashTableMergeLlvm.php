@@ -197,9 +197,9 @@ final class HashTableMergeLlvm
         );
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'ht_merge_sk_end_'.$tag);
         $context->builder->store($i8p->constNull(), $endPtrSlot);
-        $parsed = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $parsed = $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,

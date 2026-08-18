@@ -53,6 +53,8 @@ final class VmConstantJit
                 return $nullVar;
             case VmVariable::TYPE_ARRAY:
                 return self::arrayVariable($context, $vm);
+            case VmVariable::TYPE_ENUM_CASE:
+                return self::enumCaseVariable($context, $vm);
             default:
                 throw new \LogicException('Unsupported compile-time constant for JIT (vm type '.$vm->type.')');
         }
@@ -81,5 +83,20 @@ final class VmConstantJit
         }
 
         return $var;
+    }
+
+    /**
+     * Enum case objects in class-const / folded slots (vm type 9, #31967).
+     *
+     * php-src: Zend/zend_enum.c — cases are immortal singletons, not scalars.
+     */
+    private static function enumCaseVariable(Context $context, VmVariable $vm): Variable
+    {
+        $case = $vm->toEnumCase();
+        $classLc = strtolower(ltrim($case->enumClass->name, '\\'));
+        $classId = $context->type->object->lookup($classLc);
+        $caseKey = \PHPCompiler\ClassConstName::key($case->caseName);
+
+        return $context->type->object->jitEnumCaseFromBacking($classId, $caseKey);
     }
 }

@@ -1433,10 +1433,10 @@ final class HashTableWriteLlvm
         $builder->positionAtEnd($tryInt);
         $endPtrSlot = $builder->alloca($i8p, 1, 'arr_key_strtol_end');
         $builder->store($i8p->constNull(), $endPtrSlot);
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        LibcExtern::ensureStrtolDecl($context);
         $parsed = $builder->call(
-                        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
-            LibcExtern::ensureStrtolDecl($context);
-        $context->lookupFunction('strtol'),
+            $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,
             $context->getTypeFromString('int32')->constInt(10, false)
@@ -1520,9 +1520,9 @@ final class HashTableWriteLlvm
         $context->builder->positionAtEnd($tryInt);
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'ht_spread_add_end');
         $context->builder->store($i8p->constNull(), $endPtrSlot);
-        $parsed = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $parsed = $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,

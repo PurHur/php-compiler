@@ -2994,6 +2994,29 @@ class Context {
      */
     private function slotConstantAgreesWithOperandType(\PHPCompiler\VM\Variable $constVm, Operand $op): bool
     {
+        // Enum/object compile-time slots must not be rematerialized during hoisted
+        // makeVariableFromOp: that runs before DECLARE_ENUM/DECLARE_CLASS (#31967).
+        // After the enum is registered, folded `C::K` / `E::X` slots (the script-level
+        // CLASS_CONST_FETCH is often eliminated) must rematerialize the singleton.
+        if (\PHPCompiler\VM\Variable::TYPE_ENUM_CASE === $constVm->type) {
+            try {
+                $case = $constVm->toEnumCase();
+            } catch (\Throwable) {
+                return false;
+            }
+            $enumLc = strtolower(ltrim($case->enumClass->name, '\\'));
+            if (
+                !$this->type->object->hasDeclaredClass($enumLc)
+                || !$this->type->object->isRegisteredEnumLc($enumLc)
+            ) {
+                return false;
+            }
+
+            return true;
+        }
+        if (\PHPCompiler\VM\Variable::TYPE_OBJECT === $constVm->type) {
+            return false;
+        }
         $declared = Variable::getTypeFromType($op->type ?? null);
         if (
             Variable::TYPE_VALUE === $declared
