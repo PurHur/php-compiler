@@ -28,9 +28,10 @@ final class JitDomSaveXML
 
         DomSaveXMLRuntime::ensureLinked($context);
 
+        [$nodeArg] = JitDomSaveSerializationArgs::parse($args);
         $bridgeArgs = [self::loadObjectArg($context, $args[0])];
-        if (\count($args) >= 2) {
-            $bridgeArgs[] = JitValueBox::valuePtrFromVariable($context, $args[1]);
+        if (JitDomSaveSerializationArgs::isNodeScoped($nodeArg)) {
+            $bridgeArgs[] = JitValueBox::valuePtrFromVariable($context, $nodeArg);
         } else {
             $nullSlot = JitValueBox::alloc($context);
             $context->builder->call(

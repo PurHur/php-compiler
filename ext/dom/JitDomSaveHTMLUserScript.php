@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -32,7 +31,9 @@ final class JitDomSaveHTMLUserScript
      */
     public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
     {
-        $nodeScoped = \count($args) >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
+        $nodeScoped = JitDomSaveSerializationArgs::isNodeScoped(
+            JitDomSaveSerializationArgs::parse($args)[0]
+        );
         $options = JitDomLoadHTMLUserScript::lastCompileTimeOptions() ?? 0;
 
         // Prefer the original HTML literal so NCRs re-parse through host htmlDocDump (#25547).
