@@ -213,6 +213,12 @@ return_string:
         // Prefer void-ret rewrite so compare after value-box assign is not orphaned (#31101).
         BasicBlockHelper::ensureOpenInsertBlockReplacingVoidReturn($this->context, 'binary_op_load_cont');
         JitEnumNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right);
+        // array ⊙ scalar arithmetic: zend_type_error, not compiler abort (#32346).
+        if (JitArrayNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right)) {
+            return $this->nativeLongResultVariable(
+                $this->context->getTypeFromString('int64')->constInt(0, false)
+            );
+        }
         if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
             JitShiftOperandGuard::guardOperands($this->context, $opcode->type, $left, $right);
         }

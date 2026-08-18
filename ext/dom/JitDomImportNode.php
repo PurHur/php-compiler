@@ -15,18 +15,17 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::importNode() (#19212).
+ * LLVM lowering for DOMDocument::importNode() (#19212, #32350).
  *
- * User-script AOT materializes a clone and registers its id on the target document's
- * element id map (DomRegistry helpers segfault in standalone user-script builds).
+ * php-src ext/dom/document.c PHP_METHOD(DOMDocument, importNode) → xmlDocCopyNode.
+ * Thin-standalone AOT cannot return NestedJIT object pointers (property fetch
+ * aborts; contrast adoptNode #29853 which reuses the caller-side node). Materialize
+ * a user-script DOMElement instead — tag/inner XML from compile-time loadXML
+ * (#32350) or loadHTML getElementById (#19212).
  */
 final class JitDomImportNode
 {
     private const CLASS_DOCUMENT = 'DOMDocument';
-
-    private const CLASS_ELEMENT = 'DOMElement';
-
-    private const PROP_TEXT_CONTENT = 'textContent';
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
@@ -37,7 +36,7 @@ final class JitDomImportNode
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_import_node_cont');
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            return self::invokeUserScriptMaterialize($context, $args[0], $args[1]);
+            return self::invokeUserScriptMaterialize($context, $args[0]);
         }
 
         DomImportNodeRuntime::ensureLinked($context);
@@ -104,50 +103,83 @@ final class JitDomImportNode
         return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
+    /**
+     * Thin AOT: clone via user-script materialize (nodeName/tagName/INNER_XML slots).
+     * NestedJIT object returns abort on property fetch (#29853 / #32350).
+     */
     private static function invokeUserScriptMaterialize(
         Context $context,
-        JITVariable $documentVar,
-        JITVariable $sourceVar
+        JITVariable $documentVar
     ): Value {
-        $parsed = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-        $tag = $parsed['tag'] ?? 'div';
-        $id = $parsed['id'] ?? 'target';
-        $text = $parsed['text'] ?? '';
+        $tag = 'div';
+        $text = '';
+        $inner = '';
+        $id = 'target';
+        $fromXml = false;
+        if (null !== $xml) {
+            $root = self::parseCompileTimeXmlRoot($xml);
+            if (null !== $root) {
+                $tag = $root['tag'];
+                $inner = $root['inner'];
+                $fromXml = true;
+            }
+        }
+        if (!$fromXml && null !== $html) {
+            $tag = $html['tag'] ?? $tag;
+            $text = $html['text'] ?? '';
+            $id = $html['id'] ?? $id;
+        }
 
-        $element = JitDomCreateElement::materializeElementFromLiteral($context, $tag);
-        self::storeTextContent($context, $element, $text);
-        $document = self::loadObjectArg($context, $documentVar);
-        self::storeElementInIdMap($context, $document, $id, $element);
+        $element = JitDomCreateElement::materializeForUserScriptDocument(
+            $context,
+            $documentVar,
+            $tag,
+            $text
+        );
+        if ('' !== $inner) {
+            JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
+        }
+        if (!$fromXml) {
+            self::storeElementInIdMap($context, $documentVar, $id, $element);
+        }
 
         return self::boxObjectResult($context, $element);
     }
 
-    private static function storeTextContent(Context $context, Value $element, string $text): void
+    /**
+     * Root tag + child markup from a compile-time loadXML literal (#32350).
+     *
+     * @return array{tag: string, inner: string}|null
+     */
+    private static function parseCompileTimeXmlRoot(string $xml): ?array
     {
-        $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
-        if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
-            $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
+        $xml = ltrim($xml);
+        if (str_starts_with($xml, '<?xml')) {
+            $end = strpos($xml, '?>');
+            if (false !== $end) {
+                $xml = ltrim(substr($xml, $end + 2));
+            }
         }
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $context->builder->load($context->constantStringFromString($text))
-        );
-        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, self::PROP_TEXT_CONTENT),
-            $propVar,
-            JITVariable::TYPE_STRING
-        );
+        if (1 === preg_match('/^<([A-Za-z_][\w:.-]*)\b[^>]*\/>/', $xml, $m)) {
+            return ['tag' => $m[1], 'inner' => ''];
+        }
+        if (1 === preg_match('/^<([A-Za-z_][\w:.-]*)\b[^>]*>(.*)<\/\1\s*>/s', $xml, $m)) {
+            return ['tag' => $m[1], 'inner' => $m[2]];
+        }
+
+        return null;
     }
 
     private static function storeElementInIdMap(
         Context $context,
-        Value $document,
+        JITVariable $documentVar,
         string $idLit,
         Value $element
     ): void {
+        $document = self::loadObjectArg($context, $documentVar);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_DOCUMENT);
         if (!$objectType->hasProperty($classId, VmDom::PROP_ELEMENT_ID_MAP)) {

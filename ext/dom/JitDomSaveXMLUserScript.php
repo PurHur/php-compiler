@@ -122,10 +122,10 @@ final class JitDomSaveXMLUserScript
 
     /**
      * Dump createComment/createTextNode/createCDATASection/createDocumentFragment/
-     * createProcessingInstruction/createEntityReference (and createElement) without a
-     * loadXML tag literal.
+     * createProcessingInstruction/createEntityReference/createAttribute (and createElement)
+     * without a loadXML tag literal.
      *
-     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331 / #32334 / #32343)
+     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331 / #32334 / #32343 / #32351)
      */
     private static function serializeUserScriptNode(
         Context $context,
@@ -133,6 +133,18 @@ final class JitDomSaveXMLUserScript
         Value $node,
         int $elementClassId
     ): Value {
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $bbAttr = BasicBlockHelper::append($context, 'dom_savexml_attr');
+        $bbLeaf = BasicBlockHelper::append($context, 'dom_savexml_leaf');
+        $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
+        $isAttr = self::icmpObjectClassIsAttr($context, $objectType, $node);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbLeaf);
+
+        $context->builder->positionAtEnd($bbAttr);
+        $context->builder->store(self::serializeAttrNode($context, $objectType, $node), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbLeaf);
         $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $node,
@@ -157,7 +169,6 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $nameStr, $commentLit),
             $zero
         );
-        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
         $bbComment = BasicBlockHelper::append($context, 'dom_savexml_comment');
         $bbCheckText = BasicBlockHelper::append($context, 'dom_savexml_check_text');
         $bbText = BasicBlockHelper::append($context, 'dom_savexml_text');
@@ -172,7 +183,6 @@ final class JitDomSaveXMLUserScript
         $bbEntityCheck = BasicBlockHelper::append($context, 'dom_savexml_check_entity');
         $bbEntity = BasicBlockHelper::append($context, 'dom_savexml_entity');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
-        $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
 
         $context->builder->positionAtEnd($bbComment);
@@ -481,6 +491,130 @@ final class JitDomSaveXMLUserScript
         }
 
         throw new \LogicException('DOMDocument::saveXML() node must be an object');
+    }
+
+    /**
+     * DOMAttr / Dom\Attr — xmlNodeDump XML_ATTRIBUTE_NODE is ` name="value"` (#32351).
+     * Must run before DOMElement slot fetches (those SIGSEGV on Attr objects, #32315).
+     */
+    private static function icmpObjectClassIsAttr(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $node
+    ): Value {
+        $classicId = $objectType->lookup('DOMAttr');
+        $livingId = $objectType->lookup('Dom\\Attr');
+        self::ensureAttrStringProps($objectType, $classicId);
+        self::ensureAttrStringProps($objectType, $livingId);
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($node, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isClassic = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($classicId, false)
+        );
+        $isLiving = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($livingId, false)
+        );
+
+        return $context->builder->or($isClassic, $isLiving);
+    }
+
+    private static function ensureAttrStringProps(
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        int $classId
+    ): void {
+        foreach (['nodeName', 'name', 'value'] as $prop) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
+    }
+
+    private static function serializeAttrNode(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $node
+    ): Value {
+        $classicId = $objectType->lookup('DOMAttr');
+        $livingId = $objectType->lookup('Dom\\Attr');
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($node, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isClassic = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($classicId, false)
+        );
+        $strPtr = $context->getTypeFromString('__string__*');
+        $xmlSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $bbClassic = BasicBlockHelper::append($context, 'dom_savexml_attr_classic');
+        $bbLiving = BasicBlockHelper::append($context, 'dom_savexml_attr_living');
+        $bbJoin = BasicBlockHelper::append($context, 'dom_savexml_attr_join');
+        $context->builder->branchIf($isClassic, $bbClassic, $bbLiving);
+
+        $context->builder->positionAtEnd($bbClassic);
+        $context->builder->store(
+            self::dumpAttrNameValue($context, $objectType, $node, 'DOMAttr', $classicId),
+            $xmlSlot
+        );
+        $context->builder->branch($bbJoin);
+
+        $context->builder->positionAtEnd($bbLiving);
+        $context->builder->store(
+            self::dumpAttrNameValue($context, $objectType, $node, 'Dom\\Attr', $livingId),
+            $xmlSlot
+        );
+        $context->builder->branch($bbJoin);
+
+        $context->builder->positionAtEnd($bbJoin);
+
+        return self::boxStringValue($context, $context->builder->load($xmlSlot));
+    }
+
+    private static function dumpAttrNameValue(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $node,
+        string $class,
+        int $classId
+    ): Value {
+        $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            $class,
+            'nodeName',
+            $classId
+        );
+        $valueVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            $class,
+            'value',
+            $classId
+        );
+        $nameStr = $context->helper->loadValue($nameVar);
+        $valueStr = $context->helper->loadValue($valueVar);
+        $space = $context->builder->load($context->constantStringFromString(' '));
+        $eqq = $context->builder->load($context->constantStringFromString('="'));
+        $q = $context->builder->load($context->constantStringFromString('"'));
+
+        return JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat($context, $space, $nameStr),
+                $eqq
+            ),
+            JitStringConcat::concat($context, $valueStr, $q)
+        );
     }
 
     private static function boxConstantString(Context $context, string $lit): Value
