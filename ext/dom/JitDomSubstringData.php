@@ -86,6 +86,10 @@ final class JitDomSubstringData
                 0,
                 DomExceptionConstants::INDEX_SIZE_ERR
             );
+            // emitCatchableClassError terminates the BB when a catch handler exists
+            // (peer DomNodeLiveMutationRuntime). Boxing into the sealed block is
+            // "Terminator found in the middle of a basic block" (#32372 leftover).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_substringdata_index_cont');
 
             return self::boxConstantString($context, '');
         }
