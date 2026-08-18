@@ -19293,6 +19293,40 @@ class JIT {
                 return;
             }
         }
+        if (
+            null === $current
+            && null !== $read->objectPropertyReceiver
+            && null !== $read->objectPropertyClassName
+            && null !== $read->objectPropertyName
+            && '' !== $read->objectPropertyName
+        ) {
+            $magicClassId = $this->context->type->object->lookup($read->objectPropertyClassName);
+            if (
+                JIT\MagicMethodDispatch::propertyReadUsesMagicGetAtCompileTime(
+                    $this->context,
+                    $magicClassId,
+                    $read->objectPropertyClassName,
+                    $read->objectPropertyName,
+                    $this->context->jitEnclosingBlock
+                )
+            ) {
+                $magicFetched = JIT\MagicMethodDispatch::tryEmitMagicGet(
+                    $this->context,
+                    $read->objectPropertyReceiver,
+                    $read->objectPropertyClassName,
+                    $read->objectPropertyName,
+                    $this->context->jitEnclosingBlock
+                );
+                if (null !== $magicFetched) {
+                    $current = new Variable(
+                        $this->context,
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VALUE,
+                        $magicFetched
+                    );
+                }
+            }
+        }
         if (null === $current) {
             $current = $read;
         }

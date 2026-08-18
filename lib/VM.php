@@ -3577,8 +3577,11 @@ class VM {
         }
         $meta = $this->classPropertyMeta($object, $name, $frame);
         if (null === $meta) {
-            // Live dynamic slots are read from storage (zend_std_read_property, #31949).
-            return !$object->hasProperty($name);
+            if (!$object->hasProperty($name)) {
+                return true;
+            }
+            // get_property_ptr_ptr may allocate a fresh dynamic slot before ++/-- (#32016).
+            return $object->getProperty($name)->objectPropertyRwFresh;
         }
         if ($this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, $meta->getVisibility)) {
             return true;

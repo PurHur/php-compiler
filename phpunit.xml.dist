@@ -541,6 +541,8 @@
             <file>./test/compliance/MagicPropIncNoUndefWarnJITTest.php</file>
             <file>./test/compliance/MagicPropDecNoUndefWarnVMTest.php</file>
             <file>./test/compliance/MagicPropDecNoUndefWarnJITTest.php</file>
+            <file>./test/compliance/MagicPropGetOnlyIncNoUndefWarnVMTest.php</file>
+            <file>./test/compliance/MagicPropGetOnlyIncNoUndefWarnJITTest.php</file>
             <file>./test/compliance/XmlGetCurrentReflectionVMTest.php</file>
             <file>./test/compliance/XmlParserGetOptionReflectionVMTest.php</file>
             <file>./test/compliance/XmlParserFreeReflectionVMTest.php</file>
