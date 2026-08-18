@@ -412,6 +412,13 @@ final class BuiltinParamNames
             // php-src ext/posix/posix.stub.php — InternalArgInfo still says fd (#28899)
             case 'posix_isatty':
                 return ['file_descriptor'];
+            // php-src ext/posix/posix.stub.php — PHP 8.3+; absent from InternalArgInfo (#27918)
+            case 'posix_sysconf':
+                return ['conf_id'];
+            case 'posix_pathconf':
+                return ['path', 'name'];
+            case 'posix_fpathconf':
+                return ['file_descriptor', 'name'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/salt=
             // ($salt required; optionality override in BuiltinInternalArgInfo, #23264 / #28920)
             case 'crypt':
