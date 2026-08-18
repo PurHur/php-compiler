@@ -6199,4 +6199,53 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dcngettext, 'n', 'dcngettext'));
     }
 
+    /** @covers issue #24666 */
+    public function testZipProceduralZendStubNamedParams(): void
+    {
+        $open = BuiltinParamNames::forFunction('zip_open');
+        self::assertSame(['filename'], $open);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($open, 'filename', 'zip_open'));
+        self::assertSame(['filename'], BuiltinParamNames::paramNamesForInternalFunction('zip_open'));
+
+        $close = BuiltinParamNames::forFunction('zip_close');
+        self::assertSame(['zip'], $close);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($close, 'zip', 'zip_close'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($close, 'filename', 'zip_close'));
+
+        $read = BuiltinParamNames::forFunction('zip_read');
+        self::assertSame(['zip'], $read);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($read, 'zip', 'zip_read'));
+
+        $entryOpen = BuiltinParamNames::forFunction('zip_entry_open');
+        self::assertSame(['zip_dp', 'zip_entry', 'mode='], $entryOpen);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($entryOpen, 'zip_dp', 'zip_entry_open'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($entryOpen, 'zip_entry', 'zip_entry_open'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($entryOpen, 'mode', 'zip_entry_open'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('zip_entry_open'));
+
+        $entryClose = BuiltinParamNames::forFunction('zip_entry_close');
+        self::assertSame(['zip_entry'], $entryClose);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($entryClose, 'zip_entry', 'zip_entry_close'));
+        // Legacy InternalArgInfo name must not resolve (Zend stub is zip_entry)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($entryClose, 'zip_ent', 'zip_entry_close'));
+        self::assertSame(['zip_entry'], BuiltinParamNames::paramNamesForInternalFunction('zip_entry_close'));
+
+        $entryRead = BuiltinParamNames::forFunction('zip_entry_read');
+        self::assertSame(['zip_entry', 'len='], $entryRead);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($entryRead, 'zip_entry', 'zip_entry_read'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($entryRead, 'len', 'zip_entry_read'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('zip_entry_read'));
+
+        foreach ([
+            'zip_entry_name',
+            'zip_entry_filesize',
+            'zip_entry_compressedsize',
+            'zip_entry_compressionmethod',
+        ] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['zip_entry'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'zip_entry', $fn), $fn);
+        }
+    }
+
 }

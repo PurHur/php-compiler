@@ -20,7 +20,7 @@ final class zip_read extends ZipProceduralFunction
         if (null === $frame->returnVar) {
             return;
         }
-        $archive = VmZipProcedural::requireArchiveHandle($frame->calledArgs[0], 'zip_read', 1);
+        $archive = VmZipProcedural::requireArchiveHandle($frame->calledArgs[0], 'zip_read', 1, 'zip');
         $entry = VmZipProcedural::zipRead($archive);
         if (false === $entry) {
             $frame->returnVar->bool(false);

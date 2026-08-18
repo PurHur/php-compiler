@@ -218,8 +218,12 @@ final class VmZipProcedural
         return isset(self::$entries[$handle]) && VmFs::isZipEntryPlaceholder($handle);
     }
 
-    public static function requireArchiveHandle(Variable $var, string $function, int $argNum = 1): int
-    {
+    public static function requireArchiveHandle(
+        Variable $var,
+        string $function,
+        int $argNum = 1,
+        string $paramName = 'zip'
+    ): int {
         $var = $var->resolveIndirect();
         $handle = VmZipResourceArg::resolveHandle($var);
         if (null === $handle || !self::isArchiveHandle($handle)) {
@@ -227,7 +231,7 @@ final class VmZipProcedural
                 '%s(): Argument #%d ($%s) must be of type resource, %s given',
                 $function,
                 $argNum,
-                1 === $argNum ? 'filename' : 'zip',
+                $paramName,
                 VmZipResourceArg::debugTypeName($var)
             ));
         }
