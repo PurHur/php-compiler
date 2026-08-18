@@ -432,13 +432,14 @@ final class VmDomLiving
      * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580, #20689, #20866).
      *
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
-     * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:empty`, `:only-child`,
-     * `:only-of-type`, `:root`, `:not()` / `:is()` / `:where()` (selector-list
-     * args), `:has()` (relative selector-list args), CSS attribute selectors
-     * (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`, `*=`, optional `i` flag),
-     * descendant / child (`>`) / adjacent-sibling (`+`) / general-sibling (`~`)
-     * combinators, and comma selector lists (CSS Selectors Level 3–4 /
-     * php-src Dom\* lexbor; #32061, #32089, #32108, #32132, #32150, #32165).
+     * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:nth-child(An+B of S)` /
+     * `:nth-last-child(An+B of S)`, `:empty`, `:only-child`, `:only-of-type`,
+     * `:root`, `:not()` / `:is()` / `:where()` (selector-list args), `:has()`
+     * (relative selector-list args), CSS attribute selectors (`[attr]`, `=`,
+     * `~=`, `|=`, `^=`, `$=`, `*=`, optional `i` flag), descendant / child
+     * (`>`) / adjacent-sibling (`+`) / general-sibling (`~`) combinators, and
+     * comma selector lists (CSS Selectors Level 3–4 / php-src Dom\* lexbor;
+     * #32061, #32089, #32108, #32132, #32150, #32165, #32185).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -1276,7 +1277,8 @@ final class VmDomLiving
                     if ('' === $arg) {
                         return null;
                     }
-                    if (null === self::parseNthExpression($arg)) {
+                    $allowOf = 'nth-child' === $name || 'nth-last-child' === $name;
+                    if (null === self::parseNthChildArgument($arg, $allowOf)) {
                         return null;
                     }
                     $i = $end;
@@ -1603,6 +1605,12 @@ final class VmDomLiving
         if ('has' === $name) {
             return self::matchesHasPseudo($element, $arg);
         }
+        if ('nth-child' === $name) {
+            return self::nthChildMatches($element, $arg, false);
+        }
+        if ('nth-last-child' === $name) {
+            return self::nthChildMatches($element, $arg, true);
+        }
         $pos = self::elementSiblingPositions($element);
         if (null === $pos) {
             return false;
@@ -1615,14 +1623,81 @@ final class VmDomLiving
             'last-of-type' => $pos['typeCount'] === $pos['typeIndex'],
             'only-child' => 1 === $pos['elementCount'],
             'only-of-type' => 1 === $pos['typeCount'],
-            'nth-child' => null !== $arg && self::nthExpressionMatches($arg, $pos['elementIndex']),
-            'nth-last-child' => null !== $arg
-                && self::nthExpressionMatches($arg, $pos['elementCount'] - $pos['elementIndex'] + 1),
             'nth-of-type' => null !== $arg && self::nthExpressionMatches($arg, $pos['typeIndex']),
             'nth-last-of-type' => null !== $arg
                 && self::nthExpressionMatches($arg, $pos['typeCount'] - $pos['typeIndex'] + 1),
             default => false,
         };
+    }
+
+    /**
+     * `:nth-child(An+B [of S]?)` / `:nth-last-child(An+B [of S]?)`.
+     *
+     * When `of S` is present, An+B counts among sibling elements matching
+     * selector-list S (CSS Selectors 4 / php-src lexbor; #32185).
+     */
+    private static function nthChildMatches(ObjectEntry $element, ?string $arg, bool $fromEnd): bool
+    {
+        if (null === $arg) {
+            return false;
+        }
+        $parsed = self::parseNthChildArgument($arg, true);
+        if (null === $parsed) {
+            return false;
+        }
+        $index = self::nthChildFilteredIndex($element, $parsed['of'], $fromEnd);
+        if (null === $index) {
+            return false;
+        }
+
+        return self::nthAnBMatches($parsed['a'], $parsed['b'], $index);
+    }
+
+    /**
+     * 1-based index of $element among parent element children, optionally
+     * restricted to those matching selector-list $of. Null when disconnected
+     * or when $of is set and this element is not in that filtered list.
+     */
+    private static function nthChildFilteredIndex(ObjectEntry $element, ?string $of, bool $fromEnd): ?int
+    {
+        if (!DomRegistry::has($element)) {
+            return null;
+        }
+        $parentId = DomRegistry::state($element)->parentId;
+        if (null === $parentId) {
+            return null;
+        }
+        $parent = DomRegistry::entry($parentId);
+        if (null === $parent || !DomRegistry::has($parent)) {
+            return null;
+        }
+        $filtered = [];
+        foreach (DomRegistry::state($parent)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || !VmDom::isElement($child)) {
+                continue;
+            }
+            if (null !== $of && !self::matchesLogicalPseudo($child, 'is', $of)) {
+                continue;
+            }
+            $filtered[] = $child;
+        }
+        $count = \count($filtered);
+        $index = 0;
+        foreach ($filtered as $i => $child) {
+            if ($child->id === $element->id) {
+                $index = $i + 1;
+                break;
+            }
+        }
+        if (0 === $index || 0 === $count) {
+            return null;
+        }
+        if ($fromEnd) {
+            return $count - $index + 1;
+        }
+
+        return $index;
     }
 
     /**
@@ -2028,8 +2103,12 @@ final class VmDomLiving
         if (null === $parsed) {
             return false;
         }
-        $a = $parsed['a'];
-        $b = $parsed['b'];
+
+        return self::nthAnBMatches($parsed['a'], $parsed['b'], $index);
+    }
+
+    private static function nthAnBMatches(int $a, int $b, int $index): bool
+    {
         if (0 === $a) {
             return $index === $b;
         }
@@ -2045,6 +2124,41 @@ final class VmDomLiving
         }
 
         return 0 === (($b - $index) % (-$a));
+    }
+
+    /**
+     * Parse `:nth-child()` / `:nth-last-child()` argument `An+B [of S]?`.
+     * `:nth-of-type()` passes `$allowOf=false` so `of S` is SyntaxError (#32185).
+     *
+     * @return array{a: int, b: int, of: ?string}|null
+     */
+    private static function parseNthChildArgument(string $expression, bool $allowOf): ?array
+    {
+        $expression = trim($expression);
+        if ('' === $expression) {
+            return null;
+        }
+        $of = null;
+        $nth = $expression;
+        if (1 === preg_match('/^(.*?)\s+of\s+(.+)$/is', $expression, $m)) {
+            if (!$allowOf) {
+                return null;
+            }
+            $nth = trim($m[1]);
+            $of = trim($m[2]);
+            if ('' === $nth || '' === $of) {
+                return null;
+            }
+            if (null === self::parseLogicalPseudoArgument('is', $of)) {
+                return null;
+            }
+        }
+        $parsed = self::parseNthExpression($nth);
+        if (null === $parsed) {
+            return null;
+        }
+
+        return ['a' => $parsed['a'], 'b' => $parsed['b'], 'of' => $of];
     }
 
     /**

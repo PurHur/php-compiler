@@ -1087,6 +1087,56 @@ PHP;
         }
     }
 
+    /**
+     * CSS :nth-child(An+B of S) on Dom\ ParentNode (#32185, php-src parentnode.c / lexbor).
+     */
+    public function test_dom_parent_node_css_nth_child_of(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32185)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_dom_qsa_nth_child_of.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_nth_child_of.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                "h2:nth-child(even of .hi)=h3 [h3,h6]\n"
+                ."h2.hi:nth-child(even)=h4 [h4,h6]\n"
+                ."h2:nth-child(odd of .hi)=h1 [h1,h4]\n"
+                ."h2.hi:nth-child(odd)=h1 [h1,h3]\n"
+                ."h2:nth-last-child(even of .hi)=h1 [h1,h4]\n"
+                ."h2.hi:nth-last-child(even)=h1 [h1,h3]\n"
+                ."h2:nth-last-child(odd of .hi)=h3 [h3,h6]\n"
+                ."h2.hi:nth-last-child(odd)=h4 [h4,h6]\n"
+                ."h2:nth-child(2n of .hi)=h3 [h3,h6]\n"
+                ."h2:nth-child(2n+1 of .hi)=h1 [h1,h4]\n"
+                ."h2:nth-child(n of .hi)=h1 [h1,h3,h4,h6]\n"
+                ."h2:nth-child(even of h2.hi)=h3 [h3,h6]\n"
+                .":nth-child(even of .hi)=h3 [h3,h6]\n"
+                ."matches_h3_even_of=yes\n"
+                ."matches_h4_even_of=no\n"
+                ."matches_h3_even=no\n"
+                ."closest=h3\n"
+                ."bad[:nth-child(even of)]=SyntaxError\n"
+                ."bad[:nth-child(of .hi)]=SyntaxError\n"
+                ."bad[:nth-child(even of ())]=SyntaxError\n"
+                ."bad[:nth-of-type(even of .hi)]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
