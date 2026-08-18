@@ -237,6 +237,7 @@
             <file>./test/compliance/TryCatchElsePhpSrcStrict31159JITTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146VMTest.php</file>
             <file>./test/compliance/TypedPropCoalesceUninit31146JITTest.php</file>
+            <file>./test/compliance/StaticPropertyCoalesceAssign32035VMTest.php</file>
             <file>./test/compliance/TypedPropIssetDimUninit31783VMTest.php</file>
             <file>./test/compliance/TypedPropIssetDimUninit31783JITTest.php</file>
             <file>./test/compliance/TypedPropNestedCoalesce31769VMTest.php</file>

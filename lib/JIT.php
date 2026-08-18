@@ -8259,6 +8259,7 @@ class JIT {
                         if (!$this->context->hasVariableOp($coalesceTarget)) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $coalesceTarget);
                         }
+                        $this->persistStaticPropertyBeforeCoalesceMergePromote($coalesceTarget, $value);
                         $mergeDest = $this->context->getVariableFromOp($coalesceTarget);
                         if (Variable::KIND_VALUE === $mergeDest->kind) {
                             $slot = JIT\JitValueBox::alloc($this->context);
@@ -8289,6 +8290,7 @@ class JIT {
                         if (!$this->context->hasVariableOp($coalesceTarget)) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $coalesceTarget);
                         }
+                        $this->persistStaticPropertyBeforeCoalesceMergePromote($coalesceTarget, $value);
                         $mergeDest = $this->context->getVariableFromOp($coalesceTarget);
                         if (
                             Variable::TYPE_VALUE !== $mergeDest->type
@@ -23348,6 +23350,23 @@ class JIT {
         }
 
         return $dest;
+    }
+
+    /**
+     * ??= merge temps are stack slots. Class::$prop fetch binds KIND_VALUE plus
+     * staticPropertyGlobal; promoting first drops that lvalue so the store never
+     * reaches the module global and AOT readback stays NULL (#32035, #20877).
+     */
+    private function persistStaticPropertyBeforeCoalesceMergePromote(Operand $coalesceTarget, Variable $value): void
+    {
+        if (!$this->context->hasVariableOp($coalesceTarget)) {
+            return;
+        }
+        $dest = $this->context->getVariableFromOp($coalesceTarget);
+        if (null === $dest->staticPropertyGlobal || null === $dest->staticPropertyType) {
+            return;
+        }
+        $this->assignOperand($coalesceTarget, $value, false);
     }
 
     private function ensureCoalesceMergeStackSlot(Operand $mergeOp): void
