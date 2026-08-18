@@ -819,6 +819,8 @@
             <file>./test/compliance/DatefmtFormatObjectReflectionVMTest.php</file>
             <file>./test/compliance/IntlDateFormatterFormatNamed23667VMTest.php</file>
             <file>./test/compliance/IntlDateFormatterFormatNamed23667JITTest.php</file>
+            <file>./test/compliance/MsgfmtFormatMessageValues24504VMTest.php</file>
+            <file>./test/compliance/MsgfmtFormatMessageValues24504JITTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681VMTest.php</file>
             <file>./test/compliance/TimezoneAbbreviationsListExcessArgc30681JITTest.php</file>
             <file>./test/compliance/GetdateStrtotimeArgc30714VMTest.php</file>

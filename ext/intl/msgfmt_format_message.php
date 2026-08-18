@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  * msgfmt_format_message() — one-shot MessageFormat (php-src msgformat.c; #6366).
  *
  * Z_PARAM_STR $locale / $pattern — null TypeError under caller strict_types (#29921).
+ * php-src msgformat.stub.php names the array argument $values (#24504).
  */
 final class msgfmt_format_message extends Internal
 {

@@ -127,7 +127,8 @@ final class BuiltinParamNames
             'intldateformatter::format' => ['datetime'],
             'messageformatter::setpattern' => ['pattern'],
             'messageformatter::getpattern' => [],
-            'messageformatter::formatmessage' => ['locale', 'pattern', 'args'],
+            // php-src ext/intl/msgformat/msgformat.stub.php — InternalArgInfo still args (#24504)
+            'messageformatter::formatmessage' => ['locale', 'pattern', 'values'],
             // php-src ext/intl/formatter/formatter.stub.php — InternalArgInfo still has num/str/position (#23409)
             'numberformatter::formatcurrency' => ['amount', 'currency'],
             'numberformatter::parsecurrency' => ['string', 'currency', 'offset'],
@@ -2189,8 +2190,9 @@ final class BuiltinParamNames
                 return ['locale', 'pattern'];
             case 'msgfmt_format':
                 return ['formatter', 'args'];
+            // php-src ext/intl/msgformat/msgformat.stub.php — InternalArgInfo still args (#24504)
             case 'msgfmt_format_message':
-                return ['locale', 'pattern', 'args'];
+                return ['locale', 'pattern', 'values'];
             // php-src ext/intl/formatter/formatter.stub.php — InternalArgInfo still has value/fmt/position (#23409)
             case 'numfmt_format_currency':
                 return ['formatter', 'amount', 'currency'];
