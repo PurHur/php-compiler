@@ -6113,6 +6113,7 @@ class Compiler {
                 : null;
             $op = new OpCode(OpCode::TYPE_ARRAY_DIM_FETCH, $resultSlot, $containerSlot, $dimSlot);
             $op->arrayDimFetchIs = true;
+            $this->assignSourceMetadata($op, $fetch);
             $opcodes[] = $op;
             $containerSlot = $resultSlot;
         }
@@ -14323,12 +14324,16 @@ class Compiler {
                     ? OpCode::TYPE_ARRAY_DIM_FETCH_WRITE
                     : OpCode::TYPE_ARRAY_DIM_FETCH;
 
-                return array_merge($prefix, [new OpCode(
+                $fetchOp = new OpCode(
                     $fetchType,
                     $resultSlot,
                     $this->compileArrayDimFetchContainerSlot($expr, $block),
                     $dimSlot
-                )]);
+                );
+                // Zend attributes Undefined array key to the dim-fetch opline (#31994, zend_vm_def.h).
+                $this->assignSourceMetadata($fetchOp, $expr);
+
+                return array_merge($prefix, [$fetchOp]);
             case Op\Expr\ConstFetch::class:
                 $nsName = null;
                 if (!is_null($expr->nsName)) {
@@ -16243,6 +16248,7 @@ class Compiler {
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
         );
         $op->arrayDimFetchSkipFloatKeyDeprecation = $skipFloatKeyDeprecation;
+        $this->assignSourceMetadata($op, $fetch);
         $block->addOpCode($op);
     }
 
@@ -16252,12 +16258,14 @@ class Compiler {
     private function compileArrayDimFetchWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): void
     {
         $this->rejectTemporaryExpressionInWriteContext($fetch->result, $block, $fetch);
-        $block->addOpCode(new OpCode(
+        $op = new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH_WRITE,
             $this->compileOperand($fetch->result, $block, false),
             $this->compileArrayDimFetchContainerSlot($fetch, $block),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
-        ));
+        );
+        $this->assignSourceMetadata($op, $fetch);
+        $block->addOpCode($op);
     }
 
     /**
