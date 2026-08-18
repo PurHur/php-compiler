@@ -10092,7 +10092,22 @@ restart:
                             $frame->generatorYield = true;
                             break;
                         }
-                        if ($this->advanceGeneratorIteration($inner)) {
+                        try {
+                            $innerAdvanced = $this->advanceGeneratorIteration($inner);
+                        } catch (VM\GeneratorUncaughtThrow $e) {
+                            // Zend: inner throw at yield-from is catchable in the outer generator (#32102).
+                            $gen->yieldFromActive = false;
+                            $gen->yieldFromIteratorAdvance = false;
+                            $catchFrame = $this->dispatchEngineThrow($frame, $e->thrown);
+                            if (null !== $catchFrame) {
+                                $catchFrame->generatorState = $gen;
+                                $gen->frame = $catchFrame;
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        if ($innerAdvanced) {
                             $gen->currentKey->copyFrom($inner->currentKey);
                             $gen->publishCurrentValue($inner->currentSnapshot);
                             $inner->foreachNeedsAdvance = true;

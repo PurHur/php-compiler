@@ -22,6 +22,7 @@ final class GeneratorVMTest extends BaseTest
                 'generator_yield_auto_key.phpt',
                 'generator_yield_from_generator.phpt',
                 'generator_yield_from_generator_first_value.phpt',
+                'generator_yield_from_inner_throw_catch.phpt',
                 'generator_yield_from_iterator.phpt',
                 'generator_yield_from_non_traversable.phpt',
                 'generator_yield_from_string.phpt',
