@@ -61,25 +61,22 @@ final class ReadonlyClassGuard
             return;
         }
 
+        // NestedJIT / method entry can clear the insert block. Resume on the
+        // function's last open BB before the class_id GEP so ZEND_ASSIGN_OBJ
+        // guards stay parented (#32367, same pattern as #32363).
+        BasicBlockHelper::positionAfterPrematureVoidReturn($context, 'readonly_guard_resume');
+        $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $entry) {
+            return;
+        }
+        $fn = $entry->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+
         $obj = $lvalue->objectPropertyReceiver;
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
-
-        $fn = BasicBlockHelper::parentFunction($context);
-        $entry = BasicBlockHelper::tryGetInsertBlock($context);
-        if (null === $entry) {
-            // NestedJIT / pending-Error body emission can clear the insert block; resume
-            // in an open block rather than Factory::basicBlock(null) (#26826).
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'readonly_guard_resume');
-            $entry = BasicBlockHelper::tryGetInsertBlock($context);
-            if (null === $entry) {
-                return;
-            }
-            $fn = $entry->getParent();
-            assert($fn instanceof \PHPLLVM\Value\Function_);
-        }
         $storeBlock = $fn->appendBasicBlock('readonly_allow_store');
         $exitBlock = $fn->appendBasicBlock('readonly_guard_exit');
 
