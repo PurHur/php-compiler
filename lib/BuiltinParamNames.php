@@ -846,6 +846,9 @@ final class BuiltinParamNames
             // php-src ext/standard/file.stub.php — InternalArgInfo still says old_name/new_name (#23348)
             case 'rename':
                 return ['from', 'to', 'context'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says path (#28853)
+            case 'is_uploaded_file':
+                return ['filename'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says path/new_path (#28854)
             case 'move_uploaded_file':
                 return ['from', 'to'];

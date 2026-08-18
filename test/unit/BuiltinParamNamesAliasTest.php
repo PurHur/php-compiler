@@ -2917,6 +2917,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'stripcslashes'));
     }
 
+    /** @covers issue #28853 */
+    public function testIsUploadedFileZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('is_uploaded_file');
+        self::assertSame(['filename'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'is_uploaded_file'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'path', 'is_uploaded_file'));
+    }
+
     /** @covers issue #28854 */
     public function testMoveUploadedFileZendStubNamedParams(): void
     {
