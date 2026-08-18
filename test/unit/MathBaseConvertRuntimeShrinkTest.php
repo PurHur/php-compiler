@@ -38,6 +38,13 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitDigitValue', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);
         $this->assertLessThan(400, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('getNamedFunction', $source);
+        $this->assertStringContainsString('#32420', $source);
+
+        $module = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringContainsString('#32420', $module);
+        $this->assertStringNotContainsString("lookupFunction('phpc_basetozval_result')", $module);
+        $this->assertStringNotContainsString("addFunction('phpc_basetozval_result'", $module);
     }
 
 
