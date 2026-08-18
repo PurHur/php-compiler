@@ -33,9 +33,9 @@ final class DynamicObjectReadonlyGuard
         }
 
         ErrorRaise::ensureLinked($context);
-        // NestedJIT / ctor entry can clear the insert block. Resume on the
-        // function's last open BB so the dynamic_readonly GEP stays reachable
-        // (ZEND_ASSIGN_OBJ, #32363).
+        // NestedJIT / ctor / method entry can clear the insert block. Resume on
+        // the function's last open BB so the dynamic_readonly GEP stays reachable
+        // (ZEND_ASSIGN_OBJ, #32363 / #32367).
         BasicBlockHelper::positionAfterPrematureVoidReturn($context, 'dyn_readonly_resume');
         $entry = BasicBlockHelper::tryGetInsertBlock($context);
         if (null === $entry) {

@@ -89,6 +89,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'dom_clonenode_savexml.phpt',
         'ctor_promo_untyped_string_32349.phpt',
         'ctor_untyped_prop_assign_32363.phpt',
+        'method_prop_assign_32367.phpt',
     ];
 
     /**
