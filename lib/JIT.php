@@ -18888,6 +18888,28 @@ class JIT {
 
             return;
         }
+        if (Variable::TYPE_STRING === $read->type) {
+            // Runtime string (not a folded literal): increment_string / numeric convert (#32435).
+            $str = $this->context->helper->loadValue($read);
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $writePtr = JIT\JitValueBox::pointer($this->context, $slot);
+            if (!$prefix) {
+                $this->assignOperand($resultOp, $read, true);
+            }
+            JIT\JitIncDec::writeStringIncDecToValuePtr($this->context, $str, $writePtr, $increment);
+            $newVar = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VALUE,
+                $slot
+            );
+            $this->assignOperand($writeOp, $newVar, true);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
+        }
         if (null !== $read->staticPropertyGlobal) {
             $write = $this->context->getVariableFromOpInScopes($writeOp);
             $this->compileStaticPropertyIncDecOp($read, $write, $resultOp, $increment, $prefix);
