@@ -8,8 +8,8 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
 /**
- * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect_wallet
- * (#6352, #18173, #22212, #22276, #31984).
+ * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect / ldap_connect_wallet
+ * (#6352, #18173, #22212, #22276, #31984, #32000).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -28,6 +28,8 @@ final class LdapRuntime
 
     private const LDAP_CONNECT_WALLET_HELPER = 'PHPCompiler\\ext\\ldap\\LdapDnJitHelper::connectWallet';
 
+    private const LDAP_CONNECT_HELPER = 'PHPCompiler\\ext\\ldap\\LdapDnJitHelper::connectUri';
+
     /** @var list<string> */
     private const ESCAPE_HELPERS = [
         self::LDAP_ESCAPE_HELPER,
@@ -38,6 +40,7 @@ final class LdapRuntime
         self::LDAP_DN2UFN_HELPER,
         self::LDAP_EXPLODE_DN_HELPER,
         self::LDAP_CONNECT_WALLET_HELPER,
+        self::LDAP_CONNECT_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -105,6 +108,17 @@ final class LdapRuntime
             self::DN_HELPER_PATH,
             self::DN_HELPERS,
             '#31984'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_connect',
+            'ldap_connect_bridge_entry',
+            [$strPtr, $i64, $i64],
+            $valuePtr,
+            self::LDAP_CONNECT_HELPER,
+            self::DN_HELPER_PATH,
+            self::DN_HELPERS,
+            '#32000'
         );
 
         if (null !== $savedBlock) {

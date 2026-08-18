@@ -19,10 +19,12 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LdapDnJitHelper::dn2ufn', $source);
         $this->assertStringContainsString('LdapDnJitHelper::explodeDn', $source);
         $this->assertStringContainsString('LdapDnJitHelper::connectWallet', $source);
+        $this->assertStringContainsString('LdapDnJitHelper::connectUri', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('__compiler_ldap_escape', $source);
         $this->assertStringContainsString('__compiler_ldap_connect_wallet', $source);
-        $this->assertSame(4, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
+        $this->assertStringContainsString('ldap_connect_bridge_entry', $source);
+        $this->assertSame(5, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
