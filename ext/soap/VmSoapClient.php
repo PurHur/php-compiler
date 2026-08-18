@@ -2919,7 +2919,7 @@ final class VmSoapClient
     /** php-src to_xml_string / to_xml_bool / to_xml_base64 / to_xml_hexbin (#32190). */
     private static function soapVarEncodedText(int $encType, mixed $value): string
     {
-        // php-src to_xml_datetime_ex IS_LONG — localtime + strftime + tzbuf (#32237 / #32239).
+        // php-src to_xml_datetime_ex IS_LONG — localtime + strftime + tzbuf (#32237 / #32239 / #32240).
         if (\is_int($value)) {
             $temporal = self::formatSoapXsdTemporalTimestamp($encType, $value);
             if (null !== $temporal) {
@@ -2965,7 +2965,7 @@ final class VmSoapClient
     /**
      * php-src to_xml_datetime_ex() for IS_LONG (#32237 / #32239).
      *
-     * dateTime: "%Y-%m-%dT%H:%M:%S"; date: "%Y-%m-%d"; time: "%H:%M:%S"; plus tzbuf (`Z` for UTC).
+     * dateTime/date/time/gYear* via to_xml_datetime_ex (#32237 / #32239 / #32240).
      */
     private static function formatSoapXsdTemporalTimestamp(int $encType, int $timestamp): ?string
     {
@@ -2973,6 +2973,11 @@ final class VmSoapClient
             SoapConstants::XSD_DATETIME => 'datetime',
             SoapConstants::XSD_DATE => 'date',
             SoapConstants::XSD_TIME => 'time',
+            SoapConstants::XSD_GYEAR => 'gyear',
+            SoapConstants::XSD_GYEARMONTH => 'gyearmonth',
+            SoapConstants::XSD_GMONTHDAY => 'gmonthday',
+            SoapConstants::XSD_GDAY => 'gday',
+            SoapConstants::XSD_GMONTH => 'gmonth',
             default => null,
         };
         if (null === $kind) {
@@ -2994,6 +2999,11 @@ final class VmSoapClient
             'datetime' => \sprintf('%04d-%02d-%02dT%02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second),
             'date' => \sprintf('%04d-%02d-%02d', $year, $month, $day),
             'time' => \sprintf('%02d:%02d:%02d', $hour, $minute, $second),
+            'gyear' => \sprintf('%04d', $year),
+            'gyearmonth' => \sprintf('%04d-%02d', $year, $month),
+            'gmonthday' => \sprintf('--%02d-%02d', $month, $day),
+            'gday' => \sprintf('---%02d', $day),
+            'gmonth' => \sprintf('--%02d--', $month),
         };
 
         return \htmlspecialchars($text.self::soapXsdTimezoneSuffix($offset), \ENT_XML1);
