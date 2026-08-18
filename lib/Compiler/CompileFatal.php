@@ -42,4 +42,47 @@ final class CompileFatal extends \CompileError
     {
         return self::formatZendStderrLine($this->getMessage(), $this->sourceFile, $this->sourceLine);
     }
+
+    /**
+     * Zend text for php-parser {@code checkUseUse()} when the alias is {@code self} or {@code parent}.
+     *
+     * {@code use Foo as static} is a Zend parse error (unexpected token), not this compile fatal —
+     * do not remap {@code 'static'} (#32254, Zend/zend_compile.c zend_compile_use()).
+     */
+    public static function useAsSpecialClassNameMessage(string $parserMessage): ?string
+    {
+        $message = trim($parserMessage);
+        if (1 === preg_match('/^(.*) on (?:unknown line|line \\d+)$/', $message, $m)) {
+            $message = trim($m[1]);
+        }
+        if (1 !== preg_match(
+            "/^Cannot use .+ as .+ because '(self|parent)' is a special class name$/i",
+            $message
+        )) {
+            return null;
+        }
+
+        return $message;
+    }
+
+    /**
+     * Map php-parser checkUseUse() Error to Zend compile fatal (#32254).
+     *
+     * @return never
+     */
+    public static function rethrowUseAsSpecialClassName(\Throwable $e, string $filename): never
+    {
+        $raw = $e instanceof \PhpParser\Error ? $e->getRawMessage() : $e->getMessage();
+        $mapped = self::useAsSpecialClassNameMessage($raw);
+        if (null === $mapped) {
+            throw $e;
+        }
+        $line = 1;
+        if ($e instanceof \PhpParser\Error && $e->getStartLine() > 0) {
+            $line = $e->getStartLine();
+        } elseif (preg_match('/\\bon line (\\d+)\\b/', $e->getMessage(), $m)) {
+            $line = max(1, (int) $m[1]);
+        }
+        throw new self('' !== $filename ? $filename : 'unknown', $line, $mapped);
+    }
 }
