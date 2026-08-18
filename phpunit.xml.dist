@@ -337,6 +337,9 @@
             <file>./test/compliance/BoolNativeArith32337VMTest.php</file>
             <file>./test/compliance/BoolNativeArith32337JITTest.php</file>
             <file>./test/unit/BoolNativeArith32337AotTest.php</file>
+            <file>./test/compliance/LongStringBitwise32407VMTest.php</file>
+            <file>./test/compliance/LongStringBitwise32407JITTest.php</file>
+            <file>./test/unit/LongStringBitwise32407AotTest.php</file>
             <file>./test/compliance/IntMinModNegOne32285JITTest.php</file>
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
             <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
