@@ -885,14 +885,13 @@ restart:
                         $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
                         goto return_double;
                     }
-                    if (OpCode::TYPE_PLUS === $opcode->type) {
-                        $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
-                    } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                        $result = $this->context->builder->subNoSignedWrap($leftLong, $rightLong);
-                    } else {
-                        $result = $this->context->builder->mulNoSignedWrap($leftLong, $rightLong);
-                    }
-                    goto return_long;
+                    // convert_to_long then ZEND_SIGNED_*_OVERFLOW (#32426 leftover of #31964).
+                    return JitLongArithOverflow::binaryNativeLong(
+                        $this->context,
+                        $opcode->type,
+                        $leftLong,
+                        $rightLong
+                    );
                 }
                 if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                     $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
@@ -1872,14 +1871,13 @@ restart:
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
-                if (OpCode::TYPE_PLUS === $opcode->type) {
-                    $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
-                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                    $result = $this->context->builder->subNoSignedWrap($leftLong, $__right);
-                } else {
-                    $result = $this->context->builder->mulNoSignedWrap($leftLong, $__right);
-                }
-                goto return_long;
+
+                return JitLongArithOverflow::binaryNativeLong(
+                    $this->context,
+                    $opcode->type,
+                    $leftLong,
+                    $__right
+                );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
                 $f64 = $this->context->getTypeFromString('double');
@@ -1966,14 +1964,13 @@ restart:
             if (OpCode::TYPE_PLUS === $opcode->type || OpCode::TYPE_MINUS === $opcode->type || OpCode::TYPE_MUL === $opcode->type) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
-                if (OpCode::TYPE_PLUS === $opcode->type) {
-                    $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
-                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                    $result = $this->context->builder->subNoSignedWrap($__left, $rightLong);
-                } else {
-                    $result = $this->context->builder->mulNoSignedWrap($__left, $rightLong);
-                }
-                goto return_long;
+
+                return JitLongArithOverflow::binaryNativeLong(
+                    $this->context,
+                    $opcode->type,
+                    $__left,
+                    $rightLong
+                );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
                 $f64 = $this->context->getTypeFromString('double');

@@ -9,7 +9,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
- * JIT long + / * / − with PHP_INT overflow → double promotion (#31964 / #32422).
+ * JIT long + / * / − with PHP_INT overflow → double promotion (#31964 / #32422 / #32426).
  *
  * @see php-src Zend/zend_operators.h ZEND_SIGNED_ADD_OVERFLOW /
  *      ZEND_LONG_MUL_OVERFLOW / fast_long_sub_function /
