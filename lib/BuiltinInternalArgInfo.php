@@ -789,6 +789,8 @@ final class BuiltinInternalArgInfo
                 2, 3 => '?string',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — ?string $type = null (InternalArgInfo string) (#23381)
+            'get_resources' => 0 === $index ? '?string' : null,
             // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096, #28566)
             'bcceil', 'bcfloor' => 0 === $index ? 'string' : null,
             'bcround' => match ($index) {

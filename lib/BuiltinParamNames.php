@@ -1182,7 +1182,9 @@ final class BuiltinParamNames
                 // php-src ext/standard/file.stub.php — ?bool &$would_block = null (#23352)
                 return ['stream', 'operation', '&would_block='];
             case 'get_resources':
-                return ['resource_type'];
+                // php-src ext/standard/basic_functions.stub.php — ?string $type = null (#23381)
+                // InternalArgInfo still says resouce_type (typo) / resource_type.
+                return ['type='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says res (#23342)
             case 'get_resource_type':
                 return ['resource'];
