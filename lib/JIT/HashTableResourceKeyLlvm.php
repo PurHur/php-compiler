@@ -41,6 +41,8 @@ final class HashTableResourceKeyLlvm
             $context->constantFromString(ResourceArrayOffsetSupport::WARNING_FORMAT_LL),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

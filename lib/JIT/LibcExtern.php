@@ -132,7 +132,12 @@ final class LibcExtern
             // printf dropped (#31706): NestedJIT JitHeader / JitSetcookie / JitSessionStorageKernel /
             // ScriptExit declare printf(3) module-locally via ensurePrintf(); user-script printf()
             // stays on JitPrintf / __compiler_printf / printf_ (#3681) — not libc.
-            'snprintf' => [$i32, true, [$i8p, $sizeT, $i8p]],
+            // snprintf dropped (#32092): NestedJIT leaves call ensureSnprintf before lookup
+            // (warnings/number_format/session/OB/Reflection + dec* / sprintf kernel); kernels that
+            // already declare snprintf module-locally stay as-is. EMBED MCJIT still gets
+            // __phpc_host_snprintf always-on alias (#98 / #21109 / #21124). Peer printf drop
+            // (#31706) / strlen (#32068). User-script sprintf()/printf() stay on JitPrintf /
+            // SprintfSnprintfRuntime (#31963) — not libc.
             // popen/pclose/fileno dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel
             // declare module-locally (peer fflush/ferror/fgets above); user-script popen/pclose
             // stay on PHP helpers (`ext/standard` + `__compiler_*`).
@@ -281,6 +286,34 @@ final class LibcExtern
             );
         }
         $context->registerFunction('printf', $fn);
+    }
+
+    /**
+     * Module-local snprintf(3) after LibcExtern always-on drop (#32092).
+     *
+     * User-script sprintf()/printf() stay on JitPrintf / SprintfSnprintfRuntime (#31963);
+     * NestedJIT C-string format leaves call this before lookupFunction('snprintf').
+     * Peer: ensurePrintf (#31706) / ensureStrlenDecl (#32068).
+     */
+    public static function ensureSnprintf(Context $context): void
+    {
+        try {
+            $context->lookupFunction('snprintf');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->getNamedFunction('snprintf');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'snprintf',
+                $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
+            );
+        }
+        $context->registerFunction('snprintf', $fn);
     }
 
     /**

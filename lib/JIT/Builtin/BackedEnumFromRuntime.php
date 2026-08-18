@@ -344,6 +344,8 @@ final class BackedEnumFromRuntime
             $context->constantFromString('"%.*s" is not a valid backing value for enum %s'),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,
@@ -376,6 +378,8 @@ final class BackedEnumFromRuntime
             $context->constantFromString('%lld is not a valid backing value for enum %s'),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,
@@ -500,6 +504,8 @@ final class BackedEnumFromRuntime
         $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
         $fmt = $context->builder->pointerCast($context->constantFromString('%G'), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call($context->lookupFunction('snprintf'), $bufChar, $bufSize, $fmt, $doubleVal);
         $len = $context->builder->zExt($written, $i64);
         $str = $context->builder->call($context->lookupFunction('__string__init'), $len, $bufChar);

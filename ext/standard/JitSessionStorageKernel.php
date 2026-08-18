@@ -556,6 +556,8 @@ final class JitSessionStorageKernel
             $context->constantFromString('%s/sess_%.*s'),
             $i8p
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $pathPtr,
@@ -651,6 +653,8 @@ final class JitSessionStorageKernel
             $context->constantFromString('%.*s|s:%lld:"%.*s";'),
             $i8p
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $wrote = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $dst,

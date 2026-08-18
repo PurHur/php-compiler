@@ -247,6 +247,8 @@ final class UnsetHelperLlvm
         );
         $buf = $context->builder->alloca($i8->arrayType(512), 1, 'unset_dim_obj_msg');
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufPtr,

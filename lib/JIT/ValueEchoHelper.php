@@ -79,6 +79,8 @@ final class ValueEchoHelper
             $context->constantFromString(ValueEchoSupport::RESOURCE_FORMAT),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

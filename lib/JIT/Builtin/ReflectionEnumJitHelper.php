@@ -605,6 +605,8 @@ final class ReflectionEnumJitHelper
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
         $fmtCstr = $context->builder->pointerCast($context->constantFromString($fmt), $charPtr);
         $args = [$bufChar, $sizeT->constInt(self::SNPRINTF_BUF, false), $fmtCstr, ...$extraArgs];
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call($context->lookupFunction('snprintf'), ...$args);
 
         return [$context->builder->pointerCast($buf, $charPtr), $written];

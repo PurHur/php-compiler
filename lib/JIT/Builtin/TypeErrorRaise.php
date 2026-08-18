@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM;
 use PHPLLVM\Value;
 
@@ -390,6 +391,8 @@ final class TypeErrorRaise
         $context->builder->positionAtEnd($bbCheckValue);
         $context->builder->branchIf($valueKind, $bbValue, $bbType);
         $context->builder->positionAtEnd($bbArgCount);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $linePtr,

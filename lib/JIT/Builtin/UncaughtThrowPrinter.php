@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ExceptionSupport;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
@@ -67,6 +68,8 @@ final class UncaughtThrowPrinter
 
         $lineBuf = $builder->alloca($i8->arrayType(1024), 1, 'uncaught_line');
         $linePtr = $builder->pointerCast($lineBuf, $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $builder->call(
             $context->lookupFunction('snprintf'),
             $linePtr,

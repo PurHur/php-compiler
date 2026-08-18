@@ -139,6 +139,8 @@ final class ObOutputEchoJitEmit
         $i32 = $context->getTypeFromString('int32');
         $buf = $context->builder->alloca($i8->arrayType($bufSize), 1, 'fmtbuf');
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $n = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufPtr,
@@ -168,6 +170,8 @@ final class ObOutputEchoJitEmit
         $i32 = $context->getTypeFromString('int32');
         $buf = $context->builder->alloca($i8->arrayType($bufSize), 1, 'dblbuf');
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $n = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufPtr,

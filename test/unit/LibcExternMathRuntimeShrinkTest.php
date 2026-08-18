@@ -60,6 +60,10 @@ final class LibcExternMathRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("'strlen' =>", $source);
         $this->assertStringContainsString('ensureStrlenDecl', $source);
         $this->assertStringContainsString('#32068', $source);
+        // snprintf dropped from always-on (#32092) — module-local ensureSnprintf
+        $this->assertStringNotContainsString("'snprintf' =>", $source);
+        $this->assertStringContainsString('ensureSnprintf', $source);
+        $this->assertStringContainsString('#32092', $source);
     }
 
     public function testJitStatsStandardDeviationUsesMathSqrtNotLibc(): void

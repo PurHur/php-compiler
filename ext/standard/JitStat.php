@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -355,6 +356,8 @@ final class JitStat
         $fmt = $context->builder->pointerCast($context->constantFromString('%s(): %s failed for %s'), $charPtr);
         $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
         $opPtr = $context->builder->pointerCast($context->constantFromString($op), $charPtr);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

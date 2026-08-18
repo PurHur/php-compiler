@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\IncDecResourceProvenance;
 use PHPCfg\Operand;
 use PHPCompiler\VM\ValueEchoSupport;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Value;
 
 /**
@@ -85,6 +86,8 @@ final class VmResourceIdString
             $context->constantFromString($format),
             $charPtr
         );
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $written = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $bufChar,

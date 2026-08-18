@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -312,6 +313,8 @@ final class ReadonlyRaise
         $lineBuf = $context->builder->alloca($i8->arrayType(512), 1, 'fatal_line');
         $linePtr = $context->builder->pointerCast($lineBuf, $i8p);
         $stderrPtr = StringTriggerErrorJit::stderrFilePtr($context);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
             $linePtr,

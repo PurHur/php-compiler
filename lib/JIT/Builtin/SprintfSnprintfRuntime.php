@@ -94,6 +94,8 @@ final class SprintfSnprintfRuntime
 
         $context->builder->positionAtEnd($doubleBb);
         $dbl = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
+        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+        LibcExtern::ensureSnprintf($context);
         $writtenD = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $outChar,

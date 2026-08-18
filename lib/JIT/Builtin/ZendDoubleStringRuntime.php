@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -246,6 +247,8 @@ final class ZendDoubleStringRuntime
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
         $fmtPtr = $context->builder->pointerCast($context->constantFromString($fmt), $charPtr);
         if (null === $precisionArg) {
+            // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
+            LibcExtern::ensureSnprintf($context);
             $written = $context->builder->call(
                 $context->lookupFunction('snprintf'),
                 $bufChar,
