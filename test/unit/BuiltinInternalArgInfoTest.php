@@ -498,6 +498,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_debug_type'));
     }
 
+    /** ext/ctype/ctype.stub.php — mixed $text; InternalArgInfo untyped (#26183, re-#23192). */
+    public function testCtypeFamilyTextParamIsMixed(): void
+    {
+        foreach ([
+            'ctype_alnum', 'ctype_alpha', 'ctype_cntrl', 'ctype_digit', 'ctype_graph',
+            'ctype_lower', 'ctype_print', 'ctype_punct', 'ctype_space', 'ctype_upper',
+            'ctype_xdigit',
+        ] as $fn) {
+            $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($info, $fn);
+            $this->assertSame('mixed', $info['type'], $fn);
+            $this->assertFalse($info['isOptional'], $fn);
+            $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            $this->assertSame(['text'], BuiltinParamNames::forFunction($fn), $fn);
+        }
+    }
+
     /** php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#28223). */
     public function testRestoreExceptionHandlerReturnTypeIsTrue(): void
     {
