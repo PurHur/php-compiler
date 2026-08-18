@@ -6,13 +6,15 @@ namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\JIT\Builtin\OpensslMethodsCrypto;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for openssl_get_cipher_methods()/openssl_get_md_methods() (#21103).
+ * LLVM lowering for openssl_get_cipher_methods()/openssl_get_md_methods() (#21103)
+ * and openssl_get_curve_names() (#6560 VM, JIT/AOT #32364).
  */
 final class JitOpensslMethods
 {
@@ -24,6 +26,18 @@ final class JitOpensslMethods
     public static function mdMethods(Context $context, ?JITVariable $aliases = null): Value
     {
         return self::invoke($context, '__compiler_openssl_get_md_methods', 'openssl_get_md_methods', $aliases);
+    }
+
+    /**
+     * openssl_get_curve_names() — bake {@see VmOpenssl::curveNames()} like curl_version (#24463).
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_get_curve_names) / EC_get_builtin_curves
+     */
+    public static function curveNames(Context $context): Value
+    {
+        $htVar = HashTableHelper::variableFromVmHashTable($context, VmOpenssl::curveNames());
+
+        return $htVar->value;
     }
 
     private static function invoke(
