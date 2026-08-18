@@ -60,4 +60,9 @@ final class ArrayAccessDimension
     {
         return $this->object->class->name;
     }
+
+    public function getObject(): ObjectEntry
+    {
+        return $this->object;
+    }
 }

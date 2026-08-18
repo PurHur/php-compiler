@@ -82,4 +82,19 @@ final class ArrayAccessHelper
     {
         VmArrayAccess::assignWritableOffset($context, $lvalue, $value);
     }
+
+    public static function offsetGetReturnsByRefAtCompileTime(
+        Context $context,
+        Variable $receiver,
+        ?Operand $receiverOp
+    ): bool {
+        return VmArrayAccess::offsetGetReturnsByRefAtCompileTime($context, $receiver, $receiverOp);
+    }
+
+    public static function resolveContainerClassName(
+        Variable $container,
+        ?Operand $containerOp
+    ): ?string {
+        return VmArrayAccess::resolveContainerClassLc($container, $containerOp);
+    }
 }

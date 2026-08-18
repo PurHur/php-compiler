@@ -1283,6 +1283,15 @@ final class Variable {
         return $this->arrayAccessDimension->declaringClassName();
     }
 
+    public function getArrayAccessDimension(): ArrayAccessDimension
+    {
+        if (self::TYPE_ARRAYACCESS_OFFSET !== $this->type) {
+            throw new \LogicException('Not an ArrayAccess offset');
+        }
+
+        return $this->arrayAccessDimension;
+    }
+
     public function propertyHookRef(PropertyHookRef $ref): void
     {
         $this->reset();
