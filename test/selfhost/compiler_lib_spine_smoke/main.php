@@ -5568,6 +5568,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/OpensslEncryptCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/OpensslEncryptRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/OpensslMethodsCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/OpensslMethodsRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/OpensslPbkdf2Runtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/OpensslSignCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/OpensslSignRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Output.php';

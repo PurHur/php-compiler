@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7627 |
-| Phase A inventory files (M2 ratio SSOT) | 7627 |
+| PHP files on vm.php path | 7628 |
+| Phase A inventory files (M2 ratio SSOT) | 7628 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24353 |
+| Source constructs flagged (warnings) | 24354 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5774,6 +5774,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/OpensslEncryptRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/OpensslMethodsCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslMethodsRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/OpensslPbkdf2Runtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
@@ -21885,9 +21886,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_pbkdf2.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
-- new ArgumentCountError (line 66)
-- 2 class method(s)
+- new ArgumentCountError (line 44)
+- new ArgumentCountError (line 79)
+- 5 class method(s)
 
 ### `ext/openssl/openssl_pkcs12_export.php`
 
@@ -46819,7 +46820,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 2365)
+- new InternalArgInfo (line 2367)
 - 24 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -46835,8 +46836,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2773)
-- new ArgumentCountError (line 2784)
+- new ArgumentCountError (line 2776)
+- new ArgumentCountError (line 2787)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -50069,6 +50070,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `lib/JIT/Builtin/OpensslPbkdf2Runtime.php`
+
+**Warnings** (review for bootstrap subset):
+- 21 class method(s)
 
 ### `lib/JIT/Builtin/OpensslSignCrypto.php`
 

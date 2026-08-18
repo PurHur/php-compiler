@@ -1,11 +1,17 @@
 --TEST--
-AOT: openssl_pbkdf2() sha256 raw key + ValueError + false (#32410)
+AOT: openssl_pbkdf2() SHA-256 key derivation including runtime args (#32410 leftover of #6488, ext/openssl/openssl.c)
 --FILE--
 <?php
-declare(strict_types=1);
-
-$expect = "\x63\x2c\x28\x12\xe4\x6d\x46\x04\x10\x2b\xa7\x61\x8e\x9d\x6d\x7d\x2f\x81\x28\xf6";
-echo openssl_pbkdf2('password', 'salt', 20, 1000, 'sha256') === $expect ? "632c2812e46d4604102ba7618e9d6d7d2f8128f6\n" : "mismatch\n";
+$derived = openssl_pbkdf2('password', 'salt', 20, 1000, 'sha256');
+echo ($derived === hex2bin('632c2812e46d4604102ba7618e9d6d7d2f8128f6')) ? "ok\n" : "bad\n";
+echo strlen($derived), "\n";
+$pw = 'password';
+$salt = 'salt';
+$len = 20;
+$iter = 1000;
+$algo = 'sha256';
+$runtime = openssl_pbkdf2($pw, $salt, $len, $iter, $algo);
+echo ($runtime === hex2bin('632c2812e46d4604102ba7618e9d6d7d2f8128f6')) ? "runtimeok\n" : "runtimebad\n";
 var_dump(openssl_pbkdf2('password', 'salt', 20, 0, 'sha256'));
 var_dump(@openssl_pbkdf2('password', 'salt', 20, 1000, 'nope'));
 try {
@@ -15,7 +21,9 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-632c2812e46d4604102ba7618e9d6d7d2f8128f6
+ok
+20
+runtimeok
 bool(false)
 bool(false)
 openssl_pbkdf2(): Argument #3 ($key_length) must be greater than 0
