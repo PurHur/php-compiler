@@ -15,7 +15,8 @@ use PHPLLVM\Value;
  *
  * Uses a DOMElement stand-in (peer {@see JitDomCreateComment}) because allocating an
  * unregistered DOMCdataSection class aborts LLVM codegen in standalone AOT. Slot layout
- * exposes nodeName / nodeValue / textContent / data for property reads and saveXML.
+ * exposes nodeName / nodeValue / textContent / data / wholeText for property reads and saveXML
+ * (#32395).
  *
  * php-src: ext/dom/document.c PHP_METHOD(DOMDocument, createCDATASection) → xmlNewCDataBlock
  * php-src: ext/dom/cdatasection.c — nodeName #cdata-section; data / nodeValue / textContent share the body
@@ -31,6 +32,8 @@ final class JitDomCreateCDATASection
     private const PROP_TEXT_CONTENT = 'textContent';
 
     private const PROP_DATA = 'data';
+
+    private const PROP_WHOLE_TEXT = 'wholeText';
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
@@ -71,6 +74,7 @@ final class JitDomCreateCDATASection
         self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
+        self::storeStringLiteral($context, $obj, self::PROP_WHOLE_TEXT, $data);
 
         return $obj;
     }
@@ -90,6 +94,7 @@ final class JitDomCreateCDATASection
         self::storeStringValue($context, $obj, self::PROP_NODE_VALUE, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
+        self::storeStringValue($context, $obj, self::PROP_WHOLE_TEXT, $dataStr);
 
         return $obj;
     }
@@ -103,6 +108,7 @@ final class JitDomCreateCDATASection
             self::PROP_NODE_VALUE,
             self::PROP_TEXT_CONTENT,
             self::PROP_DATA,
+            self::PROP_WHOLE_TEXT,
         ] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);

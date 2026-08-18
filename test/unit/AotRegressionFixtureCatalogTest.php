@@ -91,6 +91,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'dom_appenddata.phpt',
         'dom_insertdata.phpt',
         'dom_deletedata.phpt',
+        'dom_wholetext.phpt',
         'ctor_promo_untyped_string_32349.phpt',
         'ctor_untyped_prop_assign_32363.phpt',
         'method_prop_assign_32367.phpt',
