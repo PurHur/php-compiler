@@ -8658,7 +8658,11 @@ class JIT {
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
                     $fetchIs = !$forWrite && $op->arrayDimFetchIs;
-                    $warnUndefKeyIncDec = $forWrite && $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1);
+                    $warnUndefKeyIncDec = $forWrite && (
+                        $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
+                        || $this->varFetchDestUsedAsCompoundAssign($block, $i, (int) $op->arg1)
+                        || $this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)
+                    );
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     // Zend: E_NOTICE + continue on non-object __get temp (#29231, re-#4673).
                     if (
@@ -23588,6 +23592,18 @@ class JIT {
         }
 
         return OpCode::destSlotUsedAsAssignLvalue($next, $destSlot);
+    }
+
+    /** True when fetch dest is lhs of a following compound assign ($a[$k] += …, #31991). */
+    private function varFetchDestUsedAsCompoundAssign(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot)
+            || OpCode::destSlotUsedAsInPlaceCompoundAssign($next, $destSlot);
     }
 
     /** True when fetch dest is lhs of a following compound read ($prop += …, #30077). */

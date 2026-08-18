@@ -5503,10 +5503,14 @@ restart:
                         }
                         $table = $container->toArray();
                         try {
-                            // ++/-- FETCH_DIM_W: warn on missing key then treat as null (#30078, zend_vm_def.h).
-                            $forIncDec = $forWrite && $this->propertyFetchDestUsedAsIncDec($frame, $op);
+                            // ++/-- / += FETCH_DIM_W: warn on missing key then treat as null (#30078, #31991).
+                            $forRwOp = $forWrite && (
+                                $this->propertyFetchDestUsedAsIncDec($frame, $op)
+                                || $this->propertyFetchDestUsedAsCompoundAssign($frame, $op)
+                                || $this->propertyFetchDestUsedAsDimRwContainer($frame, $op)
+                            );
                             if (
-                                (!$forWrite && !$fetchIs || $forIncDec)
+                                (!$forWrite && !$fetchIs || $forRwOp)
                                 && !$table->keyExists($arg3, false, $frame, false)
                             ) {
                                 $this->context->errors->undefinedArrayKey(
@@ -11908,6 +11912,19 @@ restart:
     {
         return $this->propertyFetchDestUsedAsAssignRefSource($frame, $op)
             || $this->propertyFetchDestUsedAsReturnByRef($frame, $op);
+    }
+
+    /** True when fetch dest is lhs of a following compound assign ($a[$k] += …, #31991). */
+    private function propertyFetchDestUsedAsCompoundAssign(Frame $frame, OpCode $op): bool
+    {
+        $next = $frame->block->opCodes[$frame->pos] ?? null;
+        if (null === $next) {
+            return false;
+        }
+        $destSlot = (int) $op->arg1;
+
+        return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot)
+            || OpCode::destSlotUsedAsInPlaceCompoundAssign($next, $destSlot);
     }
 
     /** True when fetch dest is read by a compound op before a later assign (#6438, zend_property_hooks.c). */
