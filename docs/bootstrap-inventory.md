@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7590 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24260 |
+| Source constructs flagged (warnings) | 24261 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1419,7 +1419,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/JitLdapDn.php` | 0 | 3 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
 | `ext/ldap/JitLdapLink.php` | 0 | 12 |
-| `ext/ldap/JitLdapResult.php` | 0 | 2 |
+| `ext/ldap/JitLdapResult.php` | 0 | 3 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
 | `ext/ldap/LdapDnJitHelper.php` | 0 | 3 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
@@ -18618,21 +18618,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 29)
 - new ArgumentCountError (line 92)
 - new ArgumentCountError (line 146)
-- new ArgumentCountError (line 204)
-- new ArgumentCountError (line 232)
-- new ArgumentCountError (line 265)
-- new ArgumentCountError (line 293)
-- new ArgumentCountError (line 319)
-- new ArgumentCountError (line 345)
-- new ArgumentCountError (line 371)
-- new ArgumentCountError (line 404)
+- new ArgumentCountError (line 207)
+- new ArgumentCountError (line 235)
+- new ArgumentCountError (line 268)
+- new ArgumentCountError (line 296)
+- new ArgumentCountError (line 322)
+- new ArgumentCountError (line 348)
+- new ArgumentCountError (line 374)
+- new ArgumentCountError (line 407)
 - 25 class method(s)
 
 ### `ext/ldap/JitLdapResult.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
-- 5 class method(s)
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 58)
+- 11 class method(s)
 
 ### `ext/ldap/LdapConstants.php`
 
@@ -18665,8 +18666,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/LdapResultJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 22)
-- 2 class method(s)
+- new Variable (line 27)
+- 5 class method(s)
 
 ### `ext/ldap/LdapSerializeDeny.php`
 
@@ -18789,13 +18790,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapResult.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 34)
-- new ClassEntry (line 39)
-- new ObjectEntry (line 48)
-- new Variable (line 55)
-- new ObjectEntry (line 64)
-- new Variable (line 72)
-- 11 class method(s)
+- new ClassEntry (line 40)
+- new ClassEntry (line 45)
+- new ObjectEntry (line 54)
+- new Variable (line 62)
+- new ObjectEntry (line 116)
+- new Variable (line 124)
+- 15 class method(s)
 
 ### `ext/ldap/ldap_connect.php`
 
