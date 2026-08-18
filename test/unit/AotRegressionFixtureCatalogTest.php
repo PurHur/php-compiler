@@ -82,6 +82,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'unary_minus_neg_inf_32317.phpt',
         'str_shuffle_named_params.phpt',
         'metaphone_soundex_count_chars_named_23437.phpt',
+        'named_args_23507_base_convert_addcslashes_hash_file.phpt',
         'debug_print_backtrace_void_28909.phpt',
         'array_callable_static_invoke.phpt',
         'dom_createdocumentfragment_savexml.phpt',

@@ -338,8 +338,12 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'int', 'value' => -1],
             3 => ['kind' => 'int', 'value' => 0],
         ],
-        // php-src ext/hash/hash.stub.php — binary=false, options=[] (#25068)
+        // php-src ext/hash/hash.stub.php — binary=false, options=[] (#25068, #23507)
         'hash' => [
+            2 => ['kind' => 'bool', 'value' => false],
+            3 => ['kind' => 'array'],
+        ],
+        'hash_file' => [
             2 => ['kind' => 'bool', 'value' => false],
             3 => ['kind' => 'array'],
         ],
