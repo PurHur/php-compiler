@@ -87,8 +87,20 @@ final class JitValueBox
      */
     public static function valuePtrFromVariable(Context $context, Variable $var): Value
     {
-        if (null !== $var->valueBoxAliasPtr) {
+        if (null !== $var->valueBoxAliasPtr && null === $var->staticPropertyGlobal) {
             return self::normalizeValuePtr($context, $var->valueBoxAliasPtr);
+        }
+        // `$r = &Class::$prop` must read the live module global, not the fetch snapshot (#32036).
+        if (
+            null !== $var->staticPropertyGlobal
+            && Variable::TYPE_VALUE === ($var->staticPropertyType ?? $var->type)
+        ) {
+            $heapPtr = $context->builder->pointerCast(
+                $context->builder->load($var->staticPropertyGlobal),
+                $context->getTypeFromString('__value__*')
+            );
+
+            return self::normalizeValuePtr($context, $heapPtr);
         }
         // Return-by-ref from `$this->prop` must alias the heap property slot, not the
         // stack copy materialized by propertyFetch (issue #4054, Zend ZEND_RETURN_BY_REF).

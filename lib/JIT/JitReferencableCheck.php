@@ -21,6 +21,10 @@ final class JitReferencableCheck
         if (null !== $arg->objectPropertySlot) {
             return true;
         }
+        // Class static properties are lvalues (Zend ZEND_FETCH_STATIC_PROP_W / MAKE_REF, #32036).
+        if (null !== $arg->staticPropertyGlobal) {
+            return true;
+        }
         if (null !== $arg->valueBoxAliasPtr) {
             return true;
         }

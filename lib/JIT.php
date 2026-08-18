@@ -8497,6 +8497,7 @@ class JIT {
                         throw new \LogicException('Reference assignment requires named destination variable');
                     }
                     // Zend: `$a =& f()` / non-variable RHS → Notice + value assign (#30015).
+                    // Class static properties are lvalues (FETCH_STATIC_PROP_W, #32036).
                     if (
                         $this->context->hasVariableOp($srcOp)
                         && !JIT\JitReferencableCheck::isOperandReferenceable(
@@ -16016,7 +16017,7 @@ class JIT {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $bound = $this->context->namedVariableBindings[$resolved];
-                if ($bound->functionStaticGlobal) {
+                if ($bound->functionStaticGlobal || null !== $bound->staticPropertyGlobal) {
                     $this->context->scope->variables[$resultOp] = $bound;
 
                     return $bound;
@@ -16032,7 +16033,10 @@ class JIT {
                 $resolvedBinding = $this->context->resolveRefAliasName($name);
                 if (
                     isset($this->context->namedVariableBindings[$resolvedBinding])
-                    && $this->context->namedVariableBindings[$resolvedBinding]->functionStaticGlobal
+                    && (
+                        $this->context->namedVariableBindings[$resolvedBinding]->functionStaticGlobal
+                        || null !== $this->context->namedVariableBindings[$resolvedBinding]->staticPropertyGlobal
+                    )
                 ) {
                     $global = $this->context->namedVariableBindings[$resolvedBinding];
                     $this->context->scope->variables[$resultOp] = $global;
@@ -16474,6 +16478,20 @@ class JIT {
             $this->markScopeVariableAssignedIfTracked($resultOp, $value);
 
             return;
+        }
+        if (!$this->context->hasVariableOp($resultOp) && null !== $resolvedName && '' !== $resolvedName) {
+            $boundName = $this->context->resolveRefAliasName($resolvedName);
+            if (isset($this->context->namedVariableBindings[$boundName])) {
+                $boundLv = $this->context->namedVariableBindings[$boundName];
+                if (
+                    null !== $boundLv->staticPropertyGlobal
+                    || $boundLv->functionStaticGlobal
+                    || null !== $boundLv->objectPropertySlot
+                    || null !== $boundLv->valueBoxAliasPtr
+                ) {
+                    $this->context->setVariableOp($resultOp, $boundLv);
+                }
+            }
         }
         if (!$this->context->hasVariableOp($resultOp)) {
             if (
