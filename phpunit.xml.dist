@@ -163,6 +163,8 @@
             <file>./test/compliance/ContinueZero32155JITTest.php</file>
             <file>./test/compliance/ContinueOverdeep32207VMTest.php</file>
             <file>./test/compliance/ContinueOverdeep32207JITTest.php</file>
+            <file>./test/compliance/UseAsSpecialClassName32254VMTest.php</file>
+            <file>./test/compliance/UseAsSpecialClassName32254JITTest.php</file>
             <file>./test/compliance/PseudoClassCallNoScope32227VMTest.php</file>
             <file>./test/compliance/PseudoClassCallNoScope32227JITTest.php</file>
             <file>./test/compliance/PseudoClassNewNoScope32252VMTest.php</file>
