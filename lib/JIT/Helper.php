@@ -1813,6 +1813,12 @@ restart:
                 $result = $this->emitGuardedIntShift($opcode->type, $leftLong, $__right);
                 goto return_long;
             }
+            if ($this->isBitwiseLogicOpcode($opcode->type)) {
+                // bitwise_*_function: convert_to_long on the string (#32407).
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $result = $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightValue);
+                goto return_long;
+            }
             if (OpCode::TYPE_MODULO === $opcode->type) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
@@ -1899,6 +1905,12 @@ restart:
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
                 $result = $this->emitGuardedIntShift($opcode->type, $__left, $rightLong);
+                goto return_long;
+            }
+            if ($this->isBitwiseLogicOpcode($opcode->type)) {
+                // bitwise_*_function: convert_to_long on the string (#32407).
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $result = $this->emitBitwiseLongOp($opcode->type, $leftValue, $rightLong);
                 goto return_long;
             }
             if (OpCode::TYPE_MODULO === $opcode->type) {
@@ -2274,6 +2286,28 @@ return_bool:
             OpCode::TYPE_SHIFT_RIGHT => $leftInt >> $rightInt,
             default => null,
         };
+    }
+
+    /** Zend bitwise_and/or/xor_function after convert_to_long (#32407). */
+    private function isBitwiseLogicOpcode(int $type): bool
+    {
+        return OpCode::TYPE_BITWISE_AND === $type
+            || OpCode::TYPE_BITWISE_OR === $type
+            || OpCode::TYPE_BITWISE_XOR === $type;
+    }
+
+    /** LLVM and/or/xor on i64 operands (php-src bitwise_*_function). */
+    private function emitBitwiseLongOp(int $opType, $leftLong, $rightLong)
+    {
+        $__right = $this->context->builder->intCast($rightLong, $leftLong->typeOf());
+        if (OpCode::TYPE_BITWISE_AND === $opType) {
+            return $this->context->builder->bitwiseAnd($leftLong, $__right);
+        }
+        if (OpCode::TYPE_BITWISE_OR === $opType) {
+            return $this->context->builder->bitwiseOr($leftLong, $__right);
+        }
+
+        return $this->context->builder->bitwiseXor($leftLong, $__right);
     }
 
     /** Zend shift_left/right_function: negative count → catchable ArithmeticError (#21912). */

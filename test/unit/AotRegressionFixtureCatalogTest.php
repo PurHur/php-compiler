@@ -95,6 +95,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'dom_wholetext.phpt',
         'dom_iswhitespace.phpt',
         'dom_setattrns.phpt',
+        'long_string_bitwise_32407.phpt',
         'ctor_promo_untyped_string_32349.phpt',
         'ctor_untyped_prop_assign_32363.phpt',
         'method_prop_assign_32367.phpt',
