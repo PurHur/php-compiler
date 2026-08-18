@@ -2826,6 +2826,37 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mult', 'str_repeat'));
     }
 
+    /** @covers issue #23437 */
+    public function testMetaphoneSoundexCountCharsZendStubNamedParams(): void
+    {
+        $soundex = BuiltinParamNames::forFunction('soundex');
+        self::assertSame(['string'], $soundex);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($soundex, 'string', 'soundex'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($soundex, 'str', 'soundex'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('soundex'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('soundex'));
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('soundex'));
+
+        $metaphone = BuiltinParamNames::forFunction('metaphone');
+        self::assertSame(['string', 'max_phonemes='], $metaphone);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($metaphone, 'string', 'metaphone'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($metaphone, 'max_phonemes', 'metaphone'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($metaphone, 'text', 'metaphone'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($metaphone, 'phones', 'metaphone'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('metaphone'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('metaphone'));
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('metaphone'));
+
+        $countChars = BuiltinParamNames::forFunction('count_chars');
+        self::assertSame(['string', 'mode='], $countChars);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($countChars, 'string', 'count_chars'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($countChars, 'mode', 'count_chars'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($countChars, 'input', 'count_chars'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('count_chars'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('count_chars'));
+        self::assertSame('array|string', BuiltinInternalArgInfo::returnTypeLabelForFunction('count_chars'));
+    }
+
     /** @covers issue #23919 */
     public function testStrShuffleZendStubNamedParams(): void
     {

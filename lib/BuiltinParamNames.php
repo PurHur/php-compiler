@@ -409,6 +409,13 @@ final class BuiltinParamNames
             case 'strrev':
             case 'str_rot13':
                 return ['string'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still text/phones, str, input (#23437)
+            case 'soundex':
+                return ['string'];
+            case 'metaphone':
+                return ['string', 'max_phonemes='];
+            case 'count_chars':
+                return ['string', 'mode='];
             // php-src ext/posix/posix.stub.php — InternalArgInfo still says fd (#28899)
             case 'posix_isatty':
                 return ['file_descriptor'];
