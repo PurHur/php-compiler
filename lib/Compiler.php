@@ -7129,12 +7129,62 @@ class Compiler {
         $this->throwCompileLogic('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
+    /**
+     * php-src Zend/zend_compile.c {@code reserved_class_names} / {@code zend_is_reserved_class_name()} (#32206).
+     * Match is case-insensitive on the unqualified name; {@code parent}/{@code self}/{@code static}
+     * and {@code array}/{@code callable} are in the C table (usually parse errors as identifiers).
+     *
+     * @var array<string, true>
+     */
+    private const RESERVED_CLASS_NAMES = [
+        'bool' => true,
+        'false' => true,
+        'float' => true,
+        'int' => true,
+        'null' => true,
+        'parent' => true,
+        'self' => true,
+        'static' => true,
+        'string' => true,
+        'true' => true,
+        'void' => true,
+        'never' => true,
+        'iterable' => true,
+        'object' => true,
+        'mixed' => true,
+        'array' => true,
+        'callable' => true,
+    ];
+
+    /**
+     * php-src zend_assert_valid_class_name() — compile fatal before TYPE_DECLARE_* (#32206).
+     * Message shape is PHP 8.2/8.3: Cannot use '%s' as class name as it is reserved.
+     */
+    protected function assertNotReservedClassName(string $name, Op $op): void
+    {
+        $unqualified = $name;
+        if (str_contains($name, '\\')) {
+            $parts = explode('\\', $name);
+            $unqualified = $parts[count($parts) - 1];
+        }
+        if (!isset(self::RESERVED_CLASS_NAMES[strtolower($unqualified)])) {
+            return;
+        }
+        $detail = sprintf("Cannot use '%s' as class name as it is reserved", $unqualified);
+        $sourceFile = $op->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError($detail, $sourceFile, $op->getLine());
+    }
+
     protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
     {
         $name = $this->staticNameFromOperand($iface->name);
         if (null === $name) {
             $this->throwCompileError('Interface name must be a compile-time class reference');
         }
+        $this->assertNotReservedClassName($name, $iface);
         $extends = $this->interfaceNamesFromOperands($iface->extends);
         $this->classCompileRegistry->registerInterface($name, $extends, $iface->stmts);
 
@@ -7180,6 +7230,7 @@ class Compiler {
         if (null === $name) {
             $this->throwCompileError('Trait name must be a compile-time class reference');
         }
+        $this->assertNotReservedClassName($name, $trait);
         $this->classCompileRegistry->registerTrait($name, $trait->stmts);
 
         $return = new OpCode(
@@ -7223,6 +7274,10 @@ class Compiler {
 
     protected function compileEnum(Op\Stmt\Enum_ $enum, Block $block): OpCode
     {
+        $enumName = $this->staticNameFromOperand($enum->name);
+        if (null !== $enumName) {
+            $this->assertNotReservedClassName($enumName, $enum);
+        }
         $backedTypeSlot = null;
         if (null !== $enum->backedType && $enum->backedType instanceof Op\Type\Literal) {
             $backedVar = new Variable(Variable::TYPE_STRING);
@@ -7244,7 +7299,6 @@ class Compiler {
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class', $return->attributeEntries);
         AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($return->attributeNames, 'class', $return->attributeEntries);
         AttributeNames::assertDeprecatedTargetAllowed($return->attributeNames, 'class', $return->attributeEntries);
-        $enumName = $this->staticNameFromOperand($enum->name);
         if (null !== $enumName) {
             AttributeNames::assertDeprecatedAllowedOnClassLike(
                 $return->attributeNames,
@@ -7694,6 +7748,7 @@ class Compiler {
         if (null === $className) {
             $this->throwCompileError('Class name must be a compile-time class reference');
         }
+        $this->assertNotReservedClassName($className, $class);
         $parentLc = null;
         $parentName = null;
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {

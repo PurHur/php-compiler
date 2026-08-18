@@ -954,6 +954,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getrusage'));
     }
 
+    /** php-src ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783). */
+    public function testPosixTimesReflectionReturnUnion(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_times'));
+    }
+
     /** php-src ext/hash/hash.stub.php — HashContext on hash_copy (#27745). */
     public function testHashCopyReflectionStubTypes(): void
     {

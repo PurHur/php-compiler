@@ -29,7 +29,14 @@ final class posix_times extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->array(VmPosix::timesToHashTable(VmPosix::times()));
+        $raw = VmPosix::times();
+        if (null === $raw) {
+            // php-src posix.c PHP_FUNCTION(posix_times) — RETURN_FALSE when times() fails (#28783)
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array(VmPosix::timesToHashTable($raw));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

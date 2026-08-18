@@ -16,10 +16,11 @@ final class PosixTimesJitHelper
 {
     public static function resolve(): ?HashTable
     {
-        try {
-            return VmPosix::timesToHashTable(VmPosix::times());
-        } catch (\Throwable) {
+        $raw = VmPosix::times();
+        if (null === $raw) {
             return null;
         }
+
+        return VmPosix::timesToHashTable($raw);
     }
 }
