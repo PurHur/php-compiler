@@ -301,6 +301,28 @@ final class VmArrayAccess
         );
     }
 
+    /** True when offsetGet is `&offsetGet` for a statically known ArrayAccess class (#32015). */
+    public static function offsetGetReturnsByRefAtCompileTime(
+        Context $context,
+        JitVariable $receiver,
+        ?Operand $receiverOp
+    ): bool {
+        $classLc = self::resolveContainerClassLc($receiver, $receiverOp);
+        if (null !== $classLc && 'object' !== $classLc) {
+            return isset($context->functionReturnsRef[strtolower($classLc.'::offsetget')]);
+        }
+        foreach (self::arrayAccessMethodCandidates($context, 'offsetget') as $candidate) {
+            if (
+                $candidate instanceof Call\Native
+                && isset($context->functionReturnsRef[strtolower($candidate->name)])
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function discardAssignTarget(Context $context): JitVariable
     {
         $slot = JitValueBox::alloc($context);
@@ -404,7 +426,7 @@ final class VmArrayAccess
         return $candidates;
     }
 
-    private static function resolveContainerClassLc(
+    public static function resolveContainerClassLc(
         JitVariable $container,
         ?Operand $containerOp
     ): ?string {

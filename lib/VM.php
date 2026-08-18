@@ -11024,6 +11024,53 @@ restart:
     }
 
     /**
+     * ++/-- on ArrayAccess when offsetGet returns by value — Notice, no offsetSet (#32015, zend_vm_def.h).
+     */
+    private function executeArrayAccessByValueOffsetIncDec(
+        Frame $frame,
+        Variable $read,
+        Variable $result,
+        string $className,
+        bool $increment,
+        bool $prefix
+    ): ?Frame {
+        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $this->context->errors->indirectModificationOfOverloadedElement(
+            $className,
+            $this->context,
+            $frame,
+            $scriptFile
+        );
+        $working = new Variable();
+        $working->copyFrom($read->resolveIndirect());
+        try {
+            if ($prefix) {
+                if ($increment) {
+                    $working->applyIncrement($this, $frame);
+                } else {
+                    $working->applyDecrement($this, $frame);
+                }
+                $result->copyFrom($working);
+            } else {
+                $old = new Variable();
+                $old->copyFrom($working);
+                if ($increment) {
+                    $working->applyIncrement($this, $frame);
+                } else {
+                    $working->applyDecrement($this, $frame);
+                }
+                $result->copyFrom($old);
+            }
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
+        } catch (\Error $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
+    /**
      * Pre/post increment/decrement with Zend bool→int coercion (#4727, #3552).
      * Rejects ++/-- on readonly properties after construction (#3149).
      * Inaccessible / overloaded props RMW via __get then __set (#25687, zend_object_handlers.c).
@@ -11063,6 +11110,22 @@ restart:
         );
         if (false !== $magicCatch) {
             return $magicCatch;
+        }
+        $resolvedWrite = $write->resolveIndirect();
+        if (
+            $resolvedWrite->isArrayAccessOffset()
+            && !$this->arrayAccessOffsetGetReturnsByRef(
+                $resolvedWrite->getArrayAccessDimension()->getObject()
+            )
+        ) {
+            return $this->executeArrayAccessByValueOffsetIncDec(
+                $frame,
+                $read,
+                $result,
+                $resolvedWrite->arrayAccessOffsetClassName(),
+                $increment,
+                $prefix
+            );
         }
         $this->warnUndefinedVariableForIncDecRead($frame, $op, $read, $write);
         $resolvedRead = $read->resolveIndirect();
@@ -22743,6 +22806,12 @@ restart:
 
         return null !== $decl
             && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
+    /** True when ArrayAccess::offsetGet is declared `&offsetGet` (zend_vm_def.h ZEND_PRE/POST_INC). */
+    public function arrayAccessOffsetGetReturnsByRef(ObjectEntry $object): bool
+    {
+        return $this->instanceMethodReturnsByRef($object, 'offsetGet');
     }
 
     private function resolveVmReturnValue(Frame $frame, OpCode $op): Variable

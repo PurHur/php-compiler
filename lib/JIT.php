@@ -18585,6 +18585,37 @@ class JIT {
         $read = $this->context->getVariableFromOpInScopes($readOp);
         $write = $this->context->getVariableFromOpInScopes($writeOp);
         if (
+            $write->isArrayAccessWritableOffset
+            && null !== $write->writableArrayAccessReceiver
+            && !JIT\ArrayAccessHelper::offsetGetReturnsByRefAtCompileTime(
+                $this->context,
+                $write->writableArrayAccessReceiver,
+                null
+            )
+        ) {
+            $className = JIT\ArrayAccessHelper::resolveContainerClassName(
+                $write->writableArrayAccessReceiver,
+                null
+            ) ?? 'ArrayAccess';
+            JIT\ArrayAccessHelper::emitIndirectModifyNotice($this->context, $className);
+            if (!$prefix) {
+                $this->assignOperand($resultOp, $read, true);
+            }
+            $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+            $oneVar = new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $this->context->constantFromInteger(1)
+            );
+            $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVal, true);
+            }
+
+            return;
+        }
+        if (
             JIT\StringOffsetHelper::isWritableCharOffsetLvalue($write, $this->context)
             || JIT\StringOffsetHelper::isWritableCharOffsetLvalue($read, $this->context)
         ) {
