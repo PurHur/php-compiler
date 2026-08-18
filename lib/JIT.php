@@ -10043,10 +10043,14 @@ class JIT {
                     $className = $this->context->type->object->classNameForId($classId);
                     if ($nameOp instanceof Operand\Literal) {
                         $destSlot = (int) $op->arg1;
-                        // FETCH_STATIC_PROP_W: assign / dim-write / dim-RW must alias the module
-                        // slot. FETCH_R by-value copies (zend_array_dup) so `$b = A::$a` does not
-                        // share storage (#32307).
+                        // FETCH_STATIC_PROP_W / RW: assign / ++/-- / += / dim-write must alias
+                        // the module slot (zend_execute.c ZEND_FETCH_STATIC_PROP_RW). FETCH_R
+                        // by-value copies (zend_array_dup) so `$b = A::$a` does not share
+                        // storage (#32307). Untyped `self::$x++` was FETCH_R and lost the store
+                        // (#32313, #31968 group 3).
                         $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsIncDec($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsCompoundAssign($block, $i, $destSlot)
                             || $this->varFetchDestUsedAsDimWriteContainer($block, $i, $destSlot)
                             || $this->varFetchDestUsedAsDimRwContainer($block, $i, $destSlot);
                         if (!$forWrite) {
