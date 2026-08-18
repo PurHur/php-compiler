@@ -25,6 +25,17 @@ final class JitStripWhitespace
         }
 
         $pathLit = $args[0]->compileTimeString ?? null;
+        $blockedEarly = JitStreamIncludeOpen::rejectCompileTimeBlockedScriptOpen(
+            $context,
+            $pathLit,
+            'php_strip_whitespace',
+            false,
+            false
+        );
+        if (null !== $blockedEarly) {
+            return $blockedEarly;
+        }
+
         if (null !== $pathLit) {
             if ('' === $pathLit) {
                 throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
@@ -41,8 +52,20 @@ final class JitStripWhitespace
 
         StripWhitespace::ensureLinked($context);
         StringFileGetContents::implement($context);
-
         $pathStr = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'php_strip_whitespace', 0, 'filename');
+
+        return JitStreamIncludeOpen::wrapWithRuntimeBlockedGuard(
+            $context,
+            $pathStr,
+            'php_strip_whitespace',
+            false,
+            static fn (Context $ctx): Value => JitStreamIncludeOpen::materializeEmptyString($ctx),
+            static fn (Context $ctx): Value => self::lowerReadAndStrip($ctx, $pathStr)
+        );
+    }
+
+    private static function lowerReadAndStrip(Context $context, Value $pathStr): Value
+    {
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr
@@ -72,19 +95,6 @@ final class JitStripWhitespace
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-
-        return $ptr;
-    }
-
-    private static function emptyString(Context $context): Value
-    {
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            self::emptyOwnedString($context)
-        );
 
         return $ptr;
     }

@@ -82,11 +82,44 @@ final class JitHighlight
         // Arity guarded by highlight_file/show_source::call via requireArgCountRangeJit (#30689).
         $argc = \count($args);
 
+        $pathLit = $args[0]->compileTimeString ?? null;
+        $blockedEarly = JitStreamIncludeOpen::rejectCompileTimeBlockedScriptOpen(
+            $context,
+            $pathLit,
+            $functionName,
+            true,
+            true
+        );
+        if (null !== $blockedEarly) {
+            return $blockedEarly;
+        }
+
         // Z_PARAM_PATH then empty-path: Zend E_WARNING then ValueError (#30514).
         $pathStr = JitStringBuiltinArg::lowerPath($context, $args[0], $functionName, 0, 'filename');
         self::rejectEmptyPathWithHighlightWarning($context, $args[0], $pathStr, $functionName);
         StringFileGetContents::implement($context);
         JitNativeString::ensureInsertBlock($context);
+
+        return JitStreamIncludeOpen::wrapWithRuntimeBlockedGuard(
+            $context,
+            $pathStr,
+            $functionName,
+            true,
+            static fn (Context $ctx): Value => self::emitMissingFileResult($ctx, $args, $argc, $functionName),
+            static fn (Context $ctx): Value => self::lowerReadAndHighlight($ctx, $pathStr, $args, $argc, $functionName)
+        );
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function lowerReadAndHighlight(
+        Context $context,
+        Value $pathStr,
+        array $args,
+        int $argc,
+        string $functionName
+    ): Value {
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr

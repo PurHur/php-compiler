@@ -53,6 +53,15 @@ final class highlight_file extends Internal
             VmStreamOpenFailure::warnHighlightFailedOpening($frame, $functionName, $path);
             throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
         }
+        if (VmStreamIncludeOpenPolicy::blockedForScriptOpen($path, $frame->vmContext)) {
+            VmStreamIncludeOpenPolicy::warnScriptOpenBlocked($frame, $functionName, $path, true);
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $contents = VmFs::readPathContentsViaOpen($path, $frame->vmContext);
         if (false === $contents) {
             VmStreamOpenFailure::warnFailedToOpen($frame, $functionName, $path);
