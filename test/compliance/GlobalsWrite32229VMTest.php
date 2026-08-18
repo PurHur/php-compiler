@@ -29,6 +29,10 @@ final class GlobalsWrite32229VMTest extends BaseTest
             __DIR__.'/cases/language/unset_globals_compile_fatal.phpt',
             'unset_globals_compile_fatal.phpt'
         );
+        yield 'globals_append_compile_fatal.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/globals_append_compile_fatal.phpt',
+            'globals_append_compile_fatal.phpt'
+        );
         yield 'globals_dim_assign_ok.phpt' => self::parsePHPT(
             __DIR__.'/cases/language/globals_dim_assign_ok.phpt',
             'globals_dim_assign_ok.phpt'

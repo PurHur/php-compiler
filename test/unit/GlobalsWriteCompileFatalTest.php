@@ -7,10 +7,11 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #32229 — bare $GLOBALS writes are a Zend compile-time fatal */
+/** @covers issue #32229 / #32253 — bare $GLOBALS writes and $GLOBALS[] append are Zend compile-time fatals */
 final class GlobalsWriteCompileFatalTest extends TestCase
 {
     private const MESSAGE = '$GLOBALS can only be modified using the $GLOBALS[$name] = $value syntax';
+    private const APPEND_MESSAGE = 'Cannot append to $GLOBALS';
 
     /**
      * @dataProvider illegalGlobalsWriteProvider
@@ -31,6 +32,39 @@ final class GlobalsWriteCompileFatalTest extends TestCase
         yield 'unset' => ['<?php unset($GLOBALS); echo "accepted\n";'];
         yield 'assign-ref target' => ['<?php $a = []; $GLOBALS =& $a; echo "accepted\n";'];
         yield 'pre-inc' => ['<?php ++$GLOBALS; echo "accepted\n";'];
+    }
+
+    /**
+     * @dataProvider illegalGlobalsAppendProvider
+     */
+    public function testGlobalsAppendFailsAtCompileTime(string $code): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(self::APPEND_MESSAGE);
+        $runtime->parseAndCompile($code, 'globals_append.php');
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function illegalGlobalsAppendProvider(): iterable
+    {
+        yield 'assign' => ['<?php $GLOBALS[] = 1; echo "accepted\n";'];
+        yield 'plus-assign' => ['<?php $GLOBALS[] += 1; echo "accepted\n";'];
+        yield 'assign-ref' => ['<?php $a = 1; $GLOBALS[] =& $a; echo "accepted\n";'];
+        yield 'pre-inc' => ['<?php ++$GLOBALS[]; echo "accepted\n";'];
+    }
+
+    public function testGlobalsNestedAppendStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            '<?php $GLOBALS[\'xs\'] = []; $GLOBALS[\'xs\'][] = 7; echo $GLOBALS[\'xs\'][0];',
+            'globals_nested_append_ok.php'
+        );
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('7', ob_get_clean());
     }
 
     public function testGlobalsDimAssignStillCompiles(): void
