@@ -46,4 +46,53 @@ PHP;
             }
         }
     }
+
+    public function test_zip_open_named_filename_matches_positional(): void
+    {
+        $prev = getenv('PHP_COMPILER_ENABLE_ZIP');
+        putenv('PHP_COMPILER_ENABLE_ZIP=1');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+$n = [];
+foreach ((new ReflectionFunction('zip_open'))->getParameters() as $p) {
+    $n[] = $p->getName();
+}
+echo implode(',', $n), "\n";
+echo var_export(@zip_open('/no/such.zip'), true), "\n";
+echo var_export(@zip_open(filename: '/no/such.zip'), true), "\n";
+$c = [];
+foreach ((new ReflectionFunction('zip_entry_close'))->getParameters() as $p) {
+    $c[] = $p->getName();
+}
+echo implode(',', $c), "\n";
+try {
+    zip_entry_close(zip_entry: false);
+} catch (Throwable $e) {
+    echo 'zip_entry:', $e->getMessage(), "\n";
+}
+try {
+    zip_entry_close(zip_ent: false);
+} catch (Throwable $e) {
+    echo 'zip_ent:', $e->getMessage(), "\n";
+}
+PHP;
+            $block = $runtime->parseAndCompile($code, 'zip_named.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+            self::assertStringContainsString("filename\n", $out);
+            self::assertStringContainsString("false\nfalse\n", $out);
+            self::assertStringContainsString("zip_entry\n", $out);
+            self::assertStringContainsString('zip_entry:zip_entry_close(): Argument #1 ($zip_entry) must be of type resource, bool given', $out);
+            self::assertStringContainsString('zip_ent:Unknown named parameter $zip_ent', $out);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_ENABLE_ZIP');
+            } else {
+                putenv('PHP_COMPILER_ENABLE_ZIP='.$prev);
+            }
+        }
+    }
 }
