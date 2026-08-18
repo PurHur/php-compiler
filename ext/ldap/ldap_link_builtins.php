@@ -423,7 +423,7 @@ final class ldap_set_option extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_set_option() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapLink::invokeSetOption($context, $args);
     }
 }
 
@@ -477,7 +477,7 @@ final class ldap_get_option extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_get_option() is not implemented for JIT in this compiler build (issue #21851)');
+        return JitLdapLink::invokeGetOption($context, $args);
     }
 }
 
