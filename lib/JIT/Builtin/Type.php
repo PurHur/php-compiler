@@ -1044,31 +1044,14 @@ class Type extends Builtin {
             $fntypeAssertOptions
         );
         $this->context->registerFunction('__compiler_assert_options', $fnAssertOptions);
-        $i8p = $this->context->getTypeFromString('int8*');
-        // Dead always-on libc decls removed (#32173 / peer getrandom #32139):
-        // getloadavg(3) — user-script sys_getloadavg() is SysGetloadavgJitHelper / VmSys
-        //   / `__compiler_sys_getloadavg` (#12106); no NestedJIT lookup remains.
-        // sleep(3)/usleep(3) — SleepJitHelper / VmSleepPure / MathSleep (#9378).
-        // localtime/gmtime/strftime/strptime/timegm/mktime — MktimeJitHelper /
-        //   GmmktimeJitHelper / StrftimeJitHelper / StrptimeJitHelper /
-        //   FormatDatetimeJitHelper / VmDate (#9132). Live NestedJIT kernels keep
-        //   time/gettimeofday/getpid/getppid/strerror/getgid/getuid/geteuid/getpwuid.
-        $libcFns = [
-            'time' => [$i64, false, [$i8p]],
-            'gettimeofday' => [$i32, false, [$i8p, $i8p]],
-            'getpid' => [$i32, false, []],
-            'getppid' => [$i32, false, []],
-            'strerror' => [$i8p, false, [$i32]],
-            'getgid' => [$i32, false, []],
-            'getuid' => [$i32, false, []],
-            'geteuid' => [$i32, false, []],
-            'getpwuid' => [$i8p, false, [$i32]],
-        ];
-        foreach ($libcFns as $libcName => $spec) {
-            [$ret, $vararg, $params] = $spec;
-            $ft = $this->context->context->functionType($ret, $vararg, ...$params);
-            $this->ensureExternalFunction($libcName, $ft);
-        }
+        // Leftover always-on $libcFns removed (#32217 / peer Type I/O #32202 / calendar #32173):
+        // time(2) — JitTimeKernel::ensureLibcTime (#30332). User-script time() stays TimeJitHelper.
+        // gettimeofday(2) — JitMicrotimeKernel::ensureLibcGettimeofday (#29405).
+        // getpid(2) — JitGetmypidKernel::ensureLibcGetpid (#30623).
+        // getppid/getgid/getuid/geteuid — JitPosixGet*Kernel::ensureLibc* (#30728–#30803).
+        // strerror(3) — SocketErrorRuntime::ensureStrerrorLibc / JitFtok::ensureWarningLibc.
+        // getpwuid(3)+geteuid(2) — JitGetCurrentUser::ensureLibcGeteuid/Getpwuid (#32217).
+        // Dead calendar/sleep/getloadavg already dropped (#32173). Keep exit/abort.
         $void = $this->context->getTypeFromString('void');
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i32 = $this->context->getTypeFromString('int32');

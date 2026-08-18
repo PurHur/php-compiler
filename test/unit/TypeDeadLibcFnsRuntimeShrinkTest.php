@@ -30,22 +30,6 @@ final class TypeDeadLibcFnsRuntimeShrinkTest extends TestCase
         ];
     }
 
-    /** @return list<string> */
-    private function keptLibcFns(): array
-    {
-        return [
-            'time',
-            'gettimeofday',
-            'getpid',
-            'getppid',
-            'strerror',
-            'getgid',
-            'getuid',
-            'geteuid',
-            'getpwuid',
-        ];
-    }
-
     public function testTypeBuiltinDropsDeadAlwaysOnLibcFns(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
@@ -56,13 +40,6 @@ final class TypeDeadLibcFnsRuntimeShrinkTest extends TestCase
                 "'{$sym}' =>",
                 $type,
                 "Builtin\\Type must not always-declare libc {$sym} (#32173)"
-            );
-        }
-        foreach ($this->keptLibcFns() as $sym) {
-            $this->assertStringContainsString(
-                "'{$sym}' =>",
-                $type,
-                "Builtin\\Type must keep live NestedJIT libc {$sym} (#32173)"
             );
         }
         $this->assertStringContainsString("addFunction('exit'", $type);

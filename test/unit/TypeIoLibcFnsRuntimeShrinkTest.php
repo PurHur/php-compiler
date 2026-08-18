@@ -53,13 +53,6 @@ final class TypeIoLibcFnsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("'__compiler_env_register_putenv' =>", $type);
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        foreach (['time', 'gettimeofday', 'getpid', 'getppid', 'strerror', 'getgid', 'getuid', 'geteuid', 'getpwuid'] as $sym) {
-            $this->assertStringContainsString(
-                "'{$sym}' =>",
-                $type,
-                "Builtin\\Type must keep live NestedJIT libc {$sym} (#32173 / #32202)"
-            );
-        }
     }
 
     public function testNoNestedJitLookupFunctionRemainsForLseek(): void
