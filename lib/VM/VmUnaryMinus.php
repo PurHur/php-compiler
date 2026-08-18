@@ -6,13 +6,16 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitValueNumeric;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
- * SSOT for JIT unary - lowering (#5083, zend_operators.c, #9976, #28761, #32317).
+ * SSOT for JIT unary - lowering (#5083, zend_operators.c, #9976, #28761, #32317, #32442).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitUnaryMinus}
  */
@@ -24,10 +27,19 @@ final class VmUnaryMinus
             throw new \InvalidArgumentException('Expected TYPE_UNARY_MINUS opcode');
         }
 
-        // Boxed INF/float must not go through unary + — JitLongArg::lower fptosi(INF)
-        // is PHP_INT_MIN, then INT_MIN negate becomes +2^63 (#32317).
-        if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_NATIVE_DOUBLE === $var->type) {
+        $constName = strtolower($var->compileTimeConstantName ?? '');
+        if ('inf' === $constName || 'nan' === $constName) {
             return $context->helper->unaryOp($opcode, $var);
+        }
+
+        // Native float: fneg. Boxed values type-switch (IS_DOUBLE vs convert_to_long).
+        // Do not sitofp every non-double box — that made -$string float(-0) (#32442)
+        // and skipped integer negate for boxed longs.
+        if (Variable::TYPE_NATIVE_DOUBLE === $var->type) {
+            return $context->helper->unaryOp($opcode, $var);
+        }
+        if (Variable::TYPE_VALUE === $var->type && JitValueBox::isValueOperand($var)) {
+            return self::negateValueBox($context, $var);
         }
 
         try {
@@ -72,6 +84,73 @@ final class VmUnaryMinus
         }
 
         return self::negateLongWithIntMinPromote($context, $value);
+    }
+
+    /**
+     * Boxed unary minus: zendi_convert_scalar_to_number then zendi_negate_function (#32442).
+     *
+     * IS_DOUBLE stays double (fneg). Everything else convert_to_long then integer
+     * negate with ZEND_LONG_MIN → double. php-src Zend/zend_operators.c.
+     */
+    private static function negateValueBox(Context $context, Variable $var): Variable
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'unary_minus_vbox_typed_cont');
+        $resultPtr = JitValueBox::alloc($context);
+        $isDouble = JitValueNumeric::valueIsDouble($context, $var);
+        $doubleBlock = BasicBlockHelper::append($context, 'unary_minus_vbox_double');
+        $longBlock = BasicBlockHelper::append($context, 'unary_minus_vbox_as_long');
+        $doneBlock = BasicBlockHelper::append($context, 'unary_minus_vbox_typed_done');
+        $context->builder->branchIf($isDouble, $doubleBlock, $longBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
+        $dval = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $dneg = $context->builder->fNegate($dval);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $resultPtr,
+            $dneg
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $long = JitLongArg::lower($context, $var, 'unary minus boxed operand');
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $isMin = $context->builder->icmp(
+            Builder::INT_EQ,
+            $long,
+            $i64->constInt(\PHP_INT_MIN, true)
+        );
+        $minBlock = BasicBlockHelper::append($context, 'unary_minus_vbox_int_min');
+        $negBlock = BasicBlockHelper::append($context, 'unary_minus_vbox_neg_long');
+        $context->builder->branchIf($isMin, $minBlock, $negBlock);
+
+        $context->builder->positionAtEnd($minBlock);
+        $minNeg = $context->builder->fNegate($context->builder->sitofp($long, $f64));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $resultPtr,
+            $minNeg
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($negBlock);
+        $negLong = $context->builder->negate($long);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $resultPtr,
+            $negLong
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        JitValueBox::publishAfterWrite($context, $resultPtr);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $resultPtr);
     }
 
     /**
