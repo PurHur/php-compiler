@@ -2187,6 +2187,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('error_clear_last'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — void (#28909). */
+    public function testDebugPrintBacktraceReflectionReturnVoid(): void
+    {
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('debug_print_backtrace'));
+        $this->assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('debug_print_backtrace'));
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — void + filename="" (#27998). */
     public function testClearstatcacheReflectionStubTypes(): void
     {

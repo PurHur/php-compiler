@@ -155,6 +155,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits / empty (#25623)
             'preg_last_error_msg' => 'string',
             'error_clear_last' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#28909)
+            'debug_print_backtrace' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return empty; Zend void (#27998)
             'clearstatcache' => 'void',
             // ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324, #25580)
