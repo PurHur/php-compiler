@@ -13112,6 +13112,39 @@ class JIT {
                             $declaringClass,
                             $name->value
                         );
+                        if (
+                            $forWrite
+                            && $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
+                            && JIT\MagicMethodDispatch::propertyReadUsesMagicGetAtCompileTime(
+                                $this->context,
+                                $classId,
+                                $declaringClass,
+                                $name->value,
+                                $block
+                            )
+                            && !JIT\MagicMethodDispatch::hasInstanceMethod(
+                                $this->context->type->object,
+                                $classId,
+                                '__set'
+                            )
+                            && null !== $fetched->objectPropertySlot
+                            && null !== $fetched->objectPropertyType
+                        ) {
+                            $magicSeed = JIT\MagicMethodDispatch::tryEmitMagicGet(
+                                $this->context,
+                                $receiver,
+                                $declaringClass,
+                                $name->value,
+                                $block
+                            );
+                            if (null !== $magicSeed) {
+                                $this->context->type->object->propertyStore(
+                                    $fetched->objectPropertySlot,
+                                    $magicSeed,
+                                    $fetched->objectPropertyType
+                                );
+                            }
+                        }
                         if ($forDimWrite) {
                             // BP_VAR_W auto-init (#31770); BP_VAR_RW ++/+= must Error (#31784).
                             if ($this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)) {

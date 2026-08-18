@@ -3891,7 +3891,19 @@ class VM {
             }
         }
 
-        return $object->allocateProperty($name);
+        $prop = $object->allocateProperty($name);
+        // get_property_ptr_ptr (++/--, +=): seed from __get when no __set (#32016, zend_object_handlers.c).
+        if (
+            null !== $op
+            && !$this->propertyFetchDestUsedAsPlainAssign($frame, $op)
+            && $this->hasInstanceMethod($object->class, '__get')
+            && !$this->propertyWriteUsesMagicSet($object, $name, $frame)
+            && !$this->instanceMethodReturnsByRef($object, '__get')
+        ) {
+            $prop->copyFrom($this->invokeMagicGet($object, $name));
+        }
+
+        return $prop;
     }
 
     /**
