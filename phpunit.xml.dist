@@ -904,6 +904,8 @@
             <file>./test/compliance/PcgOneseq128XslRr64Generate31054JITTest.php</file>
             <file>./test/compliance/RandomizerExcessArgc31092VMTest.php</file>
             <file>./test/compliance/RandomizerExcessArgc31092JITTest.php</file>
+            <file>./test/compliance/RandomizerNamedArgs26257VMTest.php</file>
+            <file>./test/compliance/RandomizerNamedArgs26257JITTest.php</file>
             <file>./test/compliance/RandomEngineGenerateExcessArgc31096VMTest.php</file>
             <file>./test/compliance/RandomEngineGenerateExcessArgc31096JITTest.php</file>
             <file>./test/compliance/RandomEngineJumpExcessArgc31097VMTest.php</file>
