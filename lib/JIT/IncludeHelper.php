@@ -9,11 +9,14 @@ use PHPCfg\Operand\Temporary;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM\VmInclude;
 use PHPCompiler\ext\standard\IncludeBindingJitHelper;
 use PHPCompiler\ext\standard\IncludeJitHelper;
 use PHPCompiler\Web\DeployRoot;
@@ -95,9 +98,33 @@ final class IncludeHelper
 
         $context->recordJitIncludedFile($path);
 
-        $included = $context->runtime->parseAndCompileFile($path, true);
+        try {
+            $included = $context->runtime->parseAndCompileFile($path, true);
+        } catch (\Throwable $e) {
+            if (VmInclude::isCatchableSyntaxParseThrowable($e)) {
+                self::emitIncludeParseError($jit, $path, $e);
+
+                return;
+            }
+            throw $e;
+        }
         if (null === $included) {
-            $diag = $context->runtime->compiler->getCompileAbortDetail();
+            $diag = $context->runtime->compiler->getCompileAbortDetail()
+                ?? Runtime::getLastParseFailure();
+            $normalized = VmInclude::normalizeSyntaxParseMessage((string) $diag);
+            if (
+                null !== $diag && '' !== $diag
+                && (CompileFatal::isSyntaxParseErrorMessage($normalized)
+                    || (bool) preg_match('/syntax error\\b/i', $normalized))
+            ) {
+                self::emitIncludeParseError(
+                    $jit,
+                    $path,
+                    new \ParseError($normalized)
+                );
+
+                return;
+            }
             $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : ' — (no compiler abort detail; parser/CFG returned null)';
             throw new \LogicException('failed to compile include: '.$path.$suffix);
         }
@@ -105,6 +132,31 @@ final class IncludeHelper
         $context->markJitIncludedFileCompiled($path);
 
         self::compileInlinedBlock($jit, $func, $callerBlock, $included, $resultOperand, false, 'c:include:'.$path);
+    }
+
+    /**
+     * Emit catchable ParseError at the include site (php-src ZEND_INCLUDE_OR_EVAL, #32154).
+     *
+     * Literal includes are inlined at JIT compile time; a syntax-error target must not abort
+     * compilation of the caller — seed Error→CompileError→ParseError then throw into user catch.
+     */
+    private static function emitIncludeParseError(JIT $jit, string $path, \Throwable $error): void
+    {
+        $message = VmInclude::syntaxParseMessage($error);
+        $line = VmInclude::syntaxParseLine($error);
+        $object = $jit->context->type->object;
+        $object->lookup('Error');
+        $object->lookup('CompileError');
+        $object->lookup('ParseError');
+        TryCatchHelper::emitCatchableClassError(
+            $jit->context,
+            'ParseError',
+            $message,
+            $jit,
+            $path,
+            $line
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($jit->context, 'include_parse_error_cont');
     }
 
     /**
