@@ -297,7 +297,7 @@ final class JitDomDocumentElement
             ] as [$prop, $jit]
         ) {
             $objectType->propertyStore(
-                $objectType->propertySlotFor($element, 'DOMNode', $prop),
+                $objectType->propertySlotFor($element, 'DOMElement', $prop),
                 $jit,
                 JITVariable::TYPE_VALUE
             );

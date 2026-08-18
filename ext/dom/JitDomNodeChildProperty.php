@@ -34,18 +34,34 @@ final class JitDomNodeChildProperty
             && \in_array($classLc, ['object', 'stdclass', ''], true);
     }
 
-    public static function fetch(Object_ $objectType, Value $obj, string $propName): JITVariable
+    public static function fetch(Object_ $objectType, Value $obj, string $propName, string $classLc = 'domnode'): JITVariable
     {
+        $slotClass = self::childEdgeClass($classLc);
         $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $obj,
-            self::CLASS_NODE,
+            $slotClass,
             $propName,
-            $objectType->lookup(self::CLASS_NODE)
+            $objectType->lookup($slotClass)
         );
         self::annotateCompileTimeChild($result, $propName);
 
         return $result;
+    }
+
+    /**
+     * Element allocations store first/last on DOMElement. Using DOMNode indices
+     * on those objects aliases tagName/nodeName (#32361). Documents keep DOMNode.
+     * appendChild() return temps are typed DOMNode but allocate as DOMElement.
+     */
+    private static function childEdgeClass(string $classLc): string
+    {
+        $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
+        if (str_contains($classLc, 'document') && !str_contains($classLc, 'element')) {
+            return self::CLASS_NODE;
+        }
+
+        return 'DOMElement';
     }
 
     /**

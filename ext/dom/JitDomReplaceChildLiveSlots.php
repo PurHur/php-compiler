@@ -127,12 +127,11 @@ final class JitDomReplaceChildLiveSlots
     private static function ensureLayout(Context $context): void
     {
         $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
         $elementClassId = $objectType->lookup('DOMElement');
         $listClassId = $objectType->lookup('DOMNodeList');
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            if (!$objectType->hasProperty($nodeClassId, $prop)) {
-                $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
         foreach ([
@@ -164,7 +163,7 @@ final class JitDomReplaceChildLiveSlots
         JITVariable $value
     ): void {
         $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($parent, 'DOMNode', $prop),
+            $context->type->object->propertySlotFor($parent, 'DOMElement', $prop),
             $value,
             JITVariable::TYPE_VALUE
         );
@@ -176,7 +175,7 @@ final class JitDomReplaceChildLiveSlots
         string $prop,
         string $label
     ): Value {
-        return self::loadLink($context, $obj, 'DOMNode', $prop, $label);
+        return self::loadLink($context, $obj, 'DOMElement', $prop, $label);
     }
 
     private static function storeSibling(

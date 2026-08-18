@@ -65,9 +65,9 @@ final class JitDomNodeListItemUserScript
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_us_first');
         $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
-        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_FIRST_CHILD)) {
-            $objectType->defineProperty($nodeClassId, VmDom::PROP_FIRST_CHILD, JITVariable::TYPE_VALUE);
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_FIRST_CHILD)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_FIRST_CHILD, JITVariable::TYPE_VALUE);
         }
         $firstObj = self::loadChildObjectFromSlot(
             $context,
@@ -124,7 +124,7 @@ final class JitDomNodeListItemUserScript
         Value $receiver,
         string $prop
     ): Value {
-        $childSlot = $objectType->propertySlotFor($receiver, 'DOMNode', $prop);
+        $childSlot = $objectType->propertySlotFor($receiver, 'DOMElement', $prop);
         $slotPtr = $context->builder->load($childSlot);
         $voidPtr = $context->getTypeFromString('void*');
         $objPtrTy = $context->getTypeFromString('__object__*');

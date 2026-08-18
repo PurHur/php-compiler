@@ -377,23 +377,24 @@ final class DomNodeLiveMutationRuntime
         Value $lastChildObj
     ): void {
         $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
+        $elementClassId = $objectType->lookup('DOMElement');
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            if (!$objectType->hasProperty($nodeClassId, $prop)) {
-                $objectType->defineProperty($nodeClassId, $prop, Variable::TYPE_VALUE);
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, Variable::TYPE_VALUE);
             }
         }
 
         $receiverObj = self::receiverObject($context, $receiver);
         $firstJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $firstChildObj);
         $lastJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $lastChildObj);
+        // DOMElement layout — DOMNode first/last aliases tagName on Element (#32361).
         $objectType->propertyStore(
-            $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_FIRST_CHILD),
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_FIRST_CHILD),
             $firstJit,
             Variable::TYPE_VALUE
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_LAST_CHILD),
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_LAST_CHILD),
             $lastJit,
             Variable::TYPE_VALUE
         );
@@ -417,10 +418,10 @@ final class DomNodeLiveMutationRuntime
     private static function clearChildLinkSlots(Context $context, Variable $receiver): void
     {
         $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
+        $elementClassId = $objectType->lookup('DOMElement');
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            if (!$objectType->hasProperty($nodeClassId, $prop)) {
-                $objectType->defineProperty($nodeClassId, $prop, Variable::TYPE_VALUE);
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, Variable::TYPE_VALUE);
             }
         }
         $receiverObj = self::receiverObject($context, $receiver);
@@ -435,7 +436,7 @@ final class DomNodeLiveMutationRuntime
         );
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
             $objectType->propertyStore(
-                $objectType->propertySlotFor($receiverObj, 'DOMNode', $prop),
+                $objectType->propertySlotFor($receiverObj, 'DOMElement', $prop),
                 $nullVar,
                 Variable::TYPE_VALUE
             );
@@ -475,11 +476,11 @@ final class DomNodeLiveMutationRuntime
             if (!\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
                 return;
             }
-            $tag = $arg->compileTimeDomTagName ?? null;
-            if (null === $tag || '' === $tag) {
+            $markup = self::compileTimeChildElementMarkup($arg);
+            if (null === $markup) {
                 return;
             }
-            $pieces[] = '<'.$tag.'/>';
+            $pieces[] = $markup;
         }
         JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, implode('', $pieces));
     }
@@ -813,6 +814,24 @@ final class DomNodeLiveMutationRuntime
     }
 
     /**
+     * xmlNodeDump of a createElement child: empty → {@code <tag/>}, else paired
+     * with escaped text / inner markup (#32361 / php-src document.c).
+     */
+    private static function compileTimeChildElementMarkup(Variable $arg): ?string
+    {
+        $tag = $arg->compileTimeDomTagName ?? null;
+        if (null === $tag || '' === $tag) {
+            return null;
+        }
+        $inner = $arg->compileTimeDomInnerXml ?? '';
+        if ('' === $inner) {
+            return '<'.$tag.'/>';
+        }
+
+        return '<'.$tag.'>'.$inner.'</'.$tag.'>';
+    }
+
+    /**
      * Write ParentNode append/prepend args into __phpcUserScriptInnerXml for AOT saveXML (#26765).
      *
      * Compile-time pieces (string literals + createElement tags) are concatenated onto the
@@ -843,11 +862,11 @@ final class DomNodeLiveMutationRuntime
             if (!\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
                 return;
             }
-            $tag = $arg->compileTimeDomTagName ?? null;
-            if (null === $tag || '' === $tag) {
+            $markup = self::compileTimeChildElementMarkup($arg);
+            if (null === $markup) {
                 return;
             }
-            $pieces[] = '<'.$tag.'/>';
+            $pieces[] = $markup;
         }
         $objectType = $context->type->object;
         $classId = $objectType->lookup('DOMElement');

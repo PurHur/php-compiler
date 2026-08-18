@@ -121,6 +121,8 @@ final class JitDomAppendChildUserScript
             $docJit,
             JITVariable::TYPE_VALUE
         );
+        // Pin for document-wide saveXML() without loadXML (#32361).
+        DomUserScriptPinnedRootLlvm::pin($context, $child);
 
         return self::boxObjectResult($context, $child);
     }
