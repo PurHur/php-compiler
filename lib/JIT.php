@@ -19068,6 +19068,31 @@ class JIT {
             return;
         }
 
+        if (Variable::TYPE_STRING === $read->type) {
+            // Runtime string ++/--: zend increment_string / numeric convert (#32435).
+            // Fallback binaryOp (string+1) SIGSEGVs compile or prints 1.
+            $this->guardIncDecResourceOperand($read, $increment, $readOp);
+            $str = $this->context->helper->loadValue($read);
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $writePtr = JIT\JitValueBox::pointer($this->context, $slot);
+            JIT\JitIncDec::writeStringPtrIncDec($this->context, $str, $writePtr, $increment);
+            $newVar = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VALUE,
+                $writePtr
+            );
+            if (!$prefix) {
+                $this->assignOperand($resultOp, $read, true);
+            }
+            $this->assignOperand($writeOp, $newVar, true);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
+        }
+
         // Top-level fopen() handles and other shapes that miss the buckets above (#23777 / #6396).
         $this->guardIncDecResourceOperand($read, $increment, $readOp);
         if (!$prefix) {

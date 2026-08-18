@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * str_increment()/str_decrement() for compiled JIT/AOT modules (#14850, #27345).
+ * str_increment()/str_decrement() and zend increment_string() for JIT/AOT
+ * (#14850, #27345, #32435).
  *
  * Semantics match {@see VmString::strIncrement()} / {@see VmString::strDecrement()}
- * (php-src ext/standard/string.c). Inlined for NestedJIT — no VmString::* calls
+ * and {@see VmString::incrementStringOperator()} (php-src ext/standard/string.c /
+ * Zend/zend_operators.c). Inlined for NestedJIT — no VmString::* calls
  * (#27345 / peer #23204 StrRepeat).
  *
  * NestedJIT notes (peer StrReplace #27079):
@@ -98,6 +100,147 @@ final class StrIncdecJitHelper
         }
 
         return self::bumpThenWrapDec($string, $len, $wrapFrom);
+    }
+
+    /**
+     * zend_operators.c increment_string() — empty → '1'; non-alnum stops the carry
+     * without ValueError (unlike {@see incrementArgv}). (#32435)
+     */
+    public static function operatorIncrement(string $string): string
+    {
+        if ('' === $string) {
+            return '1';
+        }
+        if (self::onlyAsciiAlphanumeric($string)) {
+            return self::incrementArgv($string);
+        }
+
+        return self::incrementStringMixed($string);
+    }
+
+    /**
+     * Classify a string for ++/-- (zend is_numeric then increment_string).
+     * 0 = non-numeric, 1 = integral numeric, 2 = float numeric. (#32435)
+     */
+    public static function numericIncDecKind(string $s): int
+    {
+        $i = 0;
+        $len = self::byteLen($s);
+        if (0 === $len) {
+            return 0;
+        }
+        while ($i < $len && (' ' === $s[$i] || "\t" === $s[$i])) {
+            $i = $i + 1;
+        }
+        if ($i >= $len) {
+            return 0;
+        }
+        if ('+' === $s[$i] || '-' === $s[$i]) {
+            $i = $i + 1;
+        }
+        if ($i >= $len) {
+            return 0;
+        }
+        $sawDigit = 0;
+        $sawDot = 0;
+        $sawExp = 0;
+        while ($i < $len) {
+            $c = $s[$i];
+            $o = \ord($c);
+            if ($o >= 48 && $o <= 57) {
+                $sawDigit = 1;
+                $i = $i + 1;
+            } elseif ('.' === $c && 0 === $sawDot && 0 === $sawExp) {
+                $sawDot = 1;
+                $i = $i + 1;
+            } elseif (('e' === $c || 'E' === $c) && 0 === $sawExp && 1 === $sawDigit) {
+                $sawExp = 1;
+                $i = $i + 1;
+                if ($i < $len && ('+' === $s[$i] || '-' === $s[$i])) {
+                    $i = $i + 1;
+                }
+            } elseif (' ' === $c || "\t" === $s[$i]) {
+                break;
+            } else {
+                return 0;
+            }
+        }
+        while ($i < $len) {
+            if (' ' !== $s[$i] && "\t" !== $s[$i]) {
+                return 0;
+            }
+            $i = $i + 1;
+        }
+        if (0 === $sawDigit) {
+            return 0;
+        }
+        if (1 === $sawDot || 1 === $sawExp) {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    private static function incrementStringMixed(string $string): string
+    {
+        $len = self::byteLen($string);
+        $last = $len - 1;
+        $lastChar = $string[$last];
+        if (!self::isAsciiAlnumChar($lastChar)) {
+            return $string;
+        }
+        if ('9' !== $lastChar && 'Z' !== $lastChar && 'z' !== $lastChar) {
+            return self::bumpAt($string, $len, $last, true);
+        }
+        $wrapFrom = $last;
+        $i = $last - 1;
+        while ($i >= 0) {
+            $c = $string[$i];
+            if ('9' === $c || 'Z' === $c || 'z' === $c) {
+                $wrapFrom = $i;
+                $i = $i - 1;
+            } else {
+                break;
+            }
+        }
+        if ($i < 0) {
+            return self::lengthenInc($string, $len);
+        }
+        if (self::isAsciiAlnumChar($string[$i])) {
+            return self::bumpThenWrapInc($string, $len, $wrapFrom);
+        }
+
+        return self::wrapSuffixOnly($string, $len, $wrapFrom);
+    }
+
+    private static function wrapSuffixOnly(string $string, int $len, int $wrapFrom): string
+    {
+        $out = '';
+        $j = 0;
+        while ($j < $len) {
+            if ($j >= $wrapFrom) {
+                $c = $string[$j];
+                if ('9' === $c) {
+                    $out = self::concat($out, '0');
+                } elseif ('Z' === $c) {
+                    $out = self::concat($out, 'A');
+                } else {
+                    $out = self::concat($out, 'a');
+                }
+            } else {
+                $out = self::concat($out, $string[$j]);
+            }
+            $j = $j + 1;
+        }
+
+        return $out;
+    }
+
+    private static function isAsciiAlnumChar(string $c): bool
+    {
+        $o = \ord($c);
+
+        return ($o >= 48 && $o <= 57) || ($o >= 65 && $o <= 90) || ($o >= 97 && $o <= 122);
     }
 
     private static function bumpAt(string $string, int $len, int $at, bool $increment): string

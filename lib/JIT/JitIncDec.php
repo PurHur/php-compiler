@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\StringStrIncdec;
 use PHPCompiler\VM\VmIncDec;
 use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
@@ -157,7 +158,8 @@ final class JitIncDec
     }
 
     /**
-     * Boxed ++/--: IS_DOUBLE += 1.0, else long with PHP_INT overflow (#32281).
+     * Boxed ++/--: IS_STRING via increment_string / numeric convert (#32435),
+     * IS_DOUBLE += 1.0, else long with PHP_INT overflow (#32281).
      *
      * @see php-src Zend/zend_operators.c increment_function / decrement_function
      */
@@ -169,10 +171,25 @@ final class JitIncDec
         bool $increment
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'incdec_vbox_typed_cont');
+        $isString = JitValueNumeric::valueIsString($context, $read);
+        $strBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_string' : 'dec_vbox_string');
+        $numBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_numeric' : 'dec_vbox_numeric');
+        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_typed_done');
+        $context->builder->branchIf($isString, $strBlock, $numBlock);
+
+        $context->builder->positionAtEnd($strBlock);
+        $readPtr = JitValueBox::valuePtrFromVariable($context, $read);
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $readPtr
+        );
+        self::writeStringPtrIncDec($context, $strPtr, $writePtr, $increment);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($numBlock);
         $isDouble = JitValueNumeric::valueIsDouble($context, $read);
         $floatBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_float' : 'dec_vbox_float');
         $longBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_as_long' : 'dec_vbox_as_long');
-        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_typed_done');
         $context->builder->branchIf($isDouble, $floatBlock, $longBlock);
 
         $context->builder->positionAtEnd($floatBlock);
@@ -195,6 +212,107 @@ final class JitIncDec
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($longBlock);
+        self::writeLongIncDecToValuePtr($context, $curLong, $writePtr, $increment);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * Runtime string ++/-- into a value box (zend increment_function IS_STRING). (#32435)
+     *
+     * Numeric strings promote like VM {@see \PHPCompiler\VM\Variable} storeNumericStringIncDec;
+     * non-numeric ++ uses increment_string(); non-numeric -- is a no-op; empty -- is int(-1).
+     */
+    public static function writeStringPtrIncDec(
+        Context $context,
+        LlvmValue $strPtr,
+        LlvmValue $writePtr,
+        bool $increment
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'incdec_str_cont');
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $len,
+            $len->typeOf()->constInt(0, false)
+        );
+        $emptyBlock = BasicBlockHelper::append($context, $increment ? 'inc_str_empty' : 'dec_str_empty');
+        $kindBlock = BasicBlockHelper::append($context, 'incdec_str_kind');
+        $doneBlock = BasicBlockHelper::append($context, 'incdec_str_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $kindBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        if ($increment) {
+            $oneStr = StringStrIncdec::invokeOperatorIncrement($context, $strPtr);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $writePtr,
+                $oneStr
+            );
+        } else {
+            $i64 = $context->getTypeFromString('int64');
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $writePtr,
+                $i64->constInt(-1, true)
+            );
+        }
+        JitValueBox::publishAfterWrite($context, $writePtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($kindBlock);
+        $kind = StringStrIncdec::invokeNumericKind($context, $strPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $isNonNum = $context->builder->icmp(Builder::INT_EQ, $kind, $i64->constInt(0, false));
+        $nonNumBlock = BasicBlockHelper::append($context, 'incdec_str_nonnum');
+        $numBlock = BasicBlockHelper::append($context, 'incdec_str_num');
+        $context->builder->branchIf($isNonNum, $nonNumBlock, $numBlock);
+
+        $context->builder->positionAtEnd($nonNumBlock);
+        if ($increment) {
+            $newStr = StringStrIncdec::invokeOperatorIncrement($context, $strPtr);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $writePtr,
+                $newStr
+            );
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $writePtr,
+                $strPtr
+            );
+        }
+        JitValueBox::publishAfterWrite($context, $writePtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($numBlock);
+        $isFloat = $context->builder->icmp(Builder::INT_EQ, $kind, $i64->constInt(2, false));
+        $floatBlock = BasicBlockHelper::append($context, 'incdec_str_float');
+        $intBlock = BasicBlockHelper::append($context, 'incdec_str_int');
+        $context->builder->branchIf($isFloat, $floatBlock, $intBlock);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $f64 = $context->getTypeFromString('double');
+        $cur = JitLongArg::lowerStringToDouble($context, $strPtr);
+        $one = $f64->constReal(1.0);
+        $new = $increment
+            ? $context->builder->fadd($cur, $one)
+            : $context->builder->fsub($cur, $one);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $writePtr,
+            $new
+        );
+        JitValueBox::publishAfterWrite($context, $writePtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $curLong = JitLongArg::lowerStringValue($context, $strPtr);
         self::writeLongIncDecToValuePtr($context, $curLong, $writePtr, $increment);
         $context->builder->branch($doneBlock);
 
