@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\ext\standard\DirHandleJitHelper;
 
 /**
- * dir() entry list for embed NestedJIT (#30757).
+ * dir() entry list for JIT/AOT NestedJIT (#30757, #32027).
  *
  * Uses only {@see DirHandleJitHelper} — do not call {@see VmDir} (peer DirectoryIteratorSnapshot).
  *
