@@ -960,6 +960,28 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_times'));
     }
 
+    /** php-src ext/posix/posix.stub.php — PHP 8.3+ sysconf family absent from InternalArgInfo (#27918). */
+    public function testPosixSysconfFamilyReflectionStubTypes(): void
+    {
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_sysconf'));
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_pathconf'));
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_fpathconf'));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('posix_sysconf', 0));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('posix_pathconf', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('posix_pathconf', 1));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('posix_fpathconf', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('posix_fpathconf', 1));
+        $sys = BuiltinInternalArgInfo::paramInfoForFunction('posix_sysconf', 0);
+        $this->assertNotNull($sys);
+        $this->assertSame('conf_id', $sys['name']);
+        $this->assertSame('int', $sys['type']);
+        $this->assertFalse($sys['isOptional']);
+        $fd = BuiltinInternalArgInfo::paramInfoForFunction('posix_fpathconf', 0);
+        $this->assertNotNull($fd);
+        $this->assertSame('file_descriptor', $fd['name']);
+        $this->assertSame('', $fd['type']);
+    }
+
     /** php-src ext/hash/hash.stub.php — HashContext on hash_copy (#27745). */
     public function testHashCopyReflectionStubTypes(): void
     {

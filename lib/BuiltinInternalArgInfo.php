@@ -194,6 +194,9 @@ final class BuiltinInternalArgInfo
             'getrusage' => 'array|false',
             // ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783)
             'posix_times' => 'array|false',
+            // ext/posix/posix.stub.php — PHP 8.3+; absent from InternalArgInfo (#27918)
+            'posix_sysconf' => 'int',
+            'posix_pathconf', 'posix_fpathconf' => 'int|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|false (#27776)
             'net_get_interfaces' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28916)
@@ -792,6 +795,18 @@ final class BuiltinInternalArgInfo
                 : null,
             // php-src ext/posix/posix.stub.php — posix_isatty($file_descriptor): bool (untyped; accepts int|resource) (#28899)
             'posix_isatty' => 0 === $index ? '' : null,
+            // php-src ext/posix/posix.stub.php — PHP 8.3+; absent from InternalArgInfo (#27918)
+            'posix_sysconf' => 0 === $index ? 'int' : null,
+            'posix_pathconf' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                default => null,
+            },
+            'posix_fpathconf' => match ($index) {
+                0 => '',
+                1 => 'int',
+                default => null,
+            },
             // ext/random/random.stub.php — int $seed = 0, int $mode = MT_RAND_MT19937 (#23596)
             'mt_srand', 'srand' => (0 === $index || 1 === $index) ? 'int' : null,
             // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)

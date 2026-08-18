@@ -11,7 +11,12 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
-/** posix_pathconf() — pathconf(3) (php-src ext/posix/posix.c; #20509). */
+/**
+ * posix_pathconf() — pathconf(3) (php-src ext/posix/posix.c; #20509).
+ *
+ * Reflection stub: string $path, int $name → int|false (#27918; posix.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
+ */
 final class posix_pathconf extends Internal
 {
     public function __construct()

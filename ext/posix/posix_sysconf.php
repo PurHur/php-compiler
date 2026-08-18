@@ -10,7 +10,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** posix_sysconf() — sysconf(3) (php-src ext/posix/posix.c; #20509). */
+/**
+ * posix_sysconf() — sysconf(3) (php-src ext/posix/posix.c; #20509).
+ *
+ * Reflection stub: int $conf_id → int (#27918; posix.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
+ */
 final class posix_sysconf extends Internal
 {
     public function __construct()
