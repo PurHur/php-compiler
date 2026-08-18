@@ -87,6 +87,10 @@ final class JitDomXPathEvaluate
         if (preg_match('~^(true|false|boolean\(|not\()~i', $expr)) {
             return true;
         }
+        // XPath 1.0 `or` / `and` (#32050) — not NCName fragments (`ancestor-or-self`).
+        if (self::hasTopLevelOrAnd($expr)) {
+            return true;
+        }
         // Top-level comparison only — skip [=<>] inside () / [] (#21148).
         $depth = 0;
         $quote = null;
@@ -113,6 +117,54 @@ final class JitDomXPathEvaluate
             }
             if (0 === $depth && ('=' === $ch || '<' === $ch || '>' === $ch)) {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function hasTopLevelOrAnd(string $expr): bool
+    {
+        foreach (['or', 'and'] as $word) {
+            $depth = 0;
+            $quote = null;
+            $len = \strlen($expr);
+            $wordLen = \strlen($word);
+            for ($i = 0; $i < $len; ++$i) {
+                $ch = $expr[$i];
+                if (null !== $quote) {
+                    if ($ch === $quote) {
+                        $quote = null;
+                    }
+                    continue;
+                }
+                if ('"' === $ch || "'" === $ch) {
+                    $quote = $ch;
+                    continue;
+                }
+                if ('(' === $ch || '[' === $ch) {
+                    ++$depth;
+                    continue;
+                }
+                if (')' === $ch || ']' === $ch) {
+                    --$depth;
+                    continue;
+                }
+                if (0 !== $depth) {
+                    continue;
+                }
+                if ($i + $wordLen > $len || 0 !== substr_compare($expr, $word, $i, $wordLen)) {
+                    continue;
+                }
+                $beforeOk = 0 === $i || !preg_match('/[\w.-]/', $expr[$i - 1]);
+                $afterOk = $i + $wordLen >= $len || !preg_match('/[\w.-]/', $expr[$i + $wordLen]);
+                if ($beforeOk && $afterOk) {
+                    $left = trim(substr($expr, 0, $i));
+                    $right = trim(substr($expr, $i + $wordLen));
+                    if ('' !== $left && '' !== $right) {
+                        return true;
+                    }
+                }
             }
         }
 

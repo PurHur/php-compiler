@@ -449,7 +449,7 @@ final class VmDomXPath
             return DomRegistry::has($context) ? [$context->id] : [];
         }
         if ('..' === $expression) {
-            return self::collectMatchingAlongAxis($context, '..', $state->xpathNamespaces);
+            return self::collectMatchingAlongAxis($context, '..', $state->xpathNamespaces, $ctx, $xpath);
         }
         if (str_starts_with($expression, './/')) {
             return self::evaluateRelativeDescendantPath(
@@ -510,23 +510,25 @@ final class VmDomXPath
             return self::evaluateDescendantPath(
                 $document,
                 substr($expression, 2),
-                $state->xpathNamespaces
+                $state->xpathNamespaces,
+                $ctx,
+                $xpath
             );
         }
 
         // Absolute /… from the document root (#19709).
         if (str_starts_with($expression, '/')) {
-            return self::evaluateAbsolutePath($context, substr($expression, 1), $state->xpathNamespaces);
+            return self::evaluateAbsolutePath($context, substr($expression, 1), $state->xpathNamespaces, $ctx, $xpath);
         }
 
         // Relative multi-segment child path: wrap/a, a/text() (#20456).
         if (str_contains($expression, '/')) {
-            return self::evaluateChildAxisPath($context, $expression, $state->xpathNamespaces);
+            return self::evaluateChildAxisPath($context, $expression, $state->xpathNamespaces, $ctx, $xpath);
         }
 
         // Child / named-axis step: tag / * / text() / child::* / following-sibling::* (#20456, #31773).
         if (self::looksLikePathSegment($expression)) {
-            return self::collectMatchingAlongAxis($context, $expression, $state->xpathNamespaces);
+            return self::collectMatchingAlongAxis($context, $expression, $state->xpathNamespaces, $ctx, $xpath);
         }
 
         throw new \DOMException('Invalid expression');
@@ -745,9 +747,7 @@ final class VmDomXPath
         if (null !== $attrIds) {
             return $attrIds;
         }
-        unset($xpath);
-
-        return self::evaluateDescendantPath($context, $inner, $namespaces);
+        return self::evaluateDescendantPath($context, $inner, $namespaces, $ctx, $xpath);
     }
 
     /**
@@ -1185,7 +1185,9 @@ final class VmDomXPath
     private static function evaluateAbsolutePath(
         ObjectEntry $context,
         string $path,
-        array $namespaces
+        array $namespaces,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
         $document = VmDom::isDocument($context)
             ? $context
@@ -1198,7 +1200,7 @@ final class VmDomXPath
             return [];
         }
 
-        return self::evaluateChildAxisPath($document, $path, $namespaces);
+        return self::evaluateChildAxisPath($document, $path, $namespaces, $ctx, $xpath);
     }
 
     /**
@@ -1211,7 +1213,9 @@ final class VmDomXPath
     private static function evaluateDescendantPath(
         ObjectEntry $context,
         string $path,
-        array $namespaces
+        array $namespaces,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
         $segments = self::splitLocationPath($path);
         if ([] === $segments) {
@@ -1229,13 +1233,15 @@ final class VmDomXPath
                 self::walkAxisSegments(
                     self::descendantOrSelfNodeIds($context),
                     $segments,
-                    $namespaces
+                    $namespaces,
+                    $ctx,
+                    $xpath
                 )
             );
         }
-        $currentIds = self::collectMatchingDescendants($context, $segments[0], $namespaces);
+        $currentIds = self::collectMatchingDescendants($context, $segments[0], $namespaces, $ctx, $xpath);
 
-        return self::walkAxisSegments($currentIds, array_slice($segments, 1), $namespaces);
+        return self::walkAxisSegments($currentIds, array_slice($segments, 1), $namespaces, $ctx, $xpath);
     }
 
     /**
@@ -1248,14 +1254,16 @@ final class VmDomXPath
     private static function evaluateChildAxisPath(
         ObjectEntry $start,
         string $path,
-        array $namespaces
+        array $namespaces,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
         $segments = self::splitLocationPath($path);
         if ([] === $segments) {
             return [];
         }
 
-        return self::walkAxisSegments([$start->id], $segments, $namespaces);
+        return self::walkAxisSegments([$start->id], $segments, $namespaces, $ctx, $xpath);
     }
 
     /**
@@ -1297,7 +1305,9 @@ final class VmDomXPath
     private static function walkAxisSegments(
         array $currentIds,
         array $segments,
-        array $namespaces
+        array $namespaces,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
         foreach ($segments as $segment) {
             $nextIds = [];
@@ -1307,7 +1317,7 @@ final class VmDomXPath
                 if (null === $node) {
                     continue;
                 }
-                foreach (self::collectMatchingAlongAxis($node, $segment, $namespaces) as $nextId) {
+                foreach (self::collectMatchingAlongAxis($node, $segment, $namespaces, $ctx, $xpath) as $nextId) {
                     if (isset($seen[$nextId])) {
                         continue;
                     }
@@ -1345,7 +1355,11 @@ final class VmDomXPath
             return true;
         }
         $candidate = self::splitAxisAndTest($expression)['testSegment'];
-        if (self::isNodeTypeTestName(self::parsePathSegment($candidate)['test'])) {
+        $parsed = self::parsePathSegment($candidate);
+        if (self::isNodeTypeTestName($parsed['test'])) {
+            return true;
+        }
+        if (null !== ($parsed['generalPred'] ?? null)) {
             return true;
         }
 
@@ -1523,15 +1537,48 @@ final class VmDomXPath
             if (isset($matches[4]) && '' !== $matches[4]) {
                 $positionPred = ['op' => '=', 'rhs' => (int) $matches[4]];
             }
+            $attr = isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null;
+            $test = $matches[1];
+            // Catch-all is optional-predicate, so `a[@id or @class]` is eaten as a tag name.
+            // Split a trailing `[pred]` into a general boolean predicate (#32050).
+            if (null === $attr && null === $positionPred && str_contains($test, '[')) {
+                $split = self::splitTrailingPredicate($test);
+                if (null !== $split) {
+                    return [
+                        'test' => $split['test'],
+                        'attr' => null,
+                        'attrValue' => '',
+                        'attrNumeric' => false,
+                        'positionPred' => null,
+                        'fnPred' => null,
+                        'fnPredValue' => '',
+                        'generalPred' => $split['pred'],
+                    ];
+                }
+            }
 
             return [
-                'test' => $matches[1],
-                'attr' => isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null,
+                'test' => $test,
+                'attr' => $attr,
                 'attrValue' => $matches[3] ?? '',
                 'attrNumeric' => false,
                 'positionPred' => $positionPred,
                 'fnPred' => null,
                 'fnPredValue' => '',
+            ];
+        }
+
+        $split = self::splitTrailingPredicate($segment);
+        if (null !== $split) {
+            return [
+                'test' => $split['test'],
+                'attr' => null,
+                'attrValue' => '',
+                'attrNumeric' => false,
+                'positionPred' => null,
+                'fnPred' => null,
+                'fnPredValue' => '',
+                'generalPred' => $split['pred'],
             ];
         }
 
@@ -1544,6 +1591,54 @@ final class VmDomXPath
             'fnPred' => null,
             'fnPredValue' => '',
         ];
+    }
+
+    /**
+     * Split `test[pred]` from the last balanced `[…]` (#32050).
+     *
+     * @return array{test: string, pred: string}|null
+     */
+    private static function splitTrailingPredicate(string $segment): ?array
+    {
+        $len = \strlen($segment);
+        if ($len < 3 || ']' !== $segment[$len - 1]) {
+            return null;
+        }
+        $depth = 0;
+        $quote = null;
+        for ($i = $len - 1; $i >= 0; --$i) {
+            $ch = $segment[$i];
+            if (null !== $quote) {
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if (']' === $ch) {
+                ++$depth;
+                continue;
+            }
+            if ('[' !== $ch) {
+                continue;
+            }
+            --$depth;
+            if (0 !== $depth) {
+                continue;
+            }
+            $test = substr($segment, 0, $i);
+            $pred = trim(substr($segment, $i + 1, $len - $i - 2));
+            if ('' === $test || '' === $pred) {
+                return null;
+            }
+
+            return ['test' => $test, 'pred' => $pred];
+        }
+
+        return null;
     }
 
     private static function isNodeTypeTestName(string $test): bool
@@ -1633,8 +1728,26 @@ final class VmDomXPath
         string $fnPredValue = '',
         bool $attrNumeric = false,
         bool $attrExists = false,
-        ?string $attrOp = null
+        ?string $attrOp = null,
+        ?string $generalPred = null,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
+        if (null !== $generalPred && null !== $ctx && null !== $xpath) {
+            $nodeIds = array_values(array_filter(
+                $nodeIds,
+                static function (int $id) use ($ctx, $xpath, $generalPred): bool {
+                    $node = DomRegistry::entry($id);
+                    if (null === $node) {
+                        return false;
+                    }
+
+                    return self::booleanize(
+                        self::evaluateToMixed($ctx, $xpath, $generalPred, $node, false)
+                    );
+                }
+            ));
+        }
         if (null !== $attr) {
             if ($attrExists) {
                 $nodeIds = array_values(array_filter(
@@ -1843,7 +1956,9 @@ final class VmDomXPath
     private static function collectMatchingAlongAxis(
         ObjectEntry $context,
         string $segment,
-        array $namespaces
+        array $namespaces,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
         $split = self::splitAxisAndTest($segment);
         $axis = $split['axis'];
@@ -1869,7 +1984,10 @@ final class VmDomXPath
             $parsed['fnPredValue'],
             $parsed['attrNumeric'],
             $parsed['attrExists'] ?? false,
-            $parsed['attrOp'] ?? null
+            $parsed['attrOp'] ?? null,
+            $parsed['generalPred'] ?? null,
+            $ctx,
+            $xpath
         );
     }
 
@@ -2158,7 +2276,9 @@ final class VmDomXPath
     private static function collectMatchingChildren(
         ObjectEntry $parent,
         string $segment,
-        array $namespaces
+        array $namespaces,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
         $parsed = self::parsePathSegment($segment);
         $ids = [];
@@ -2185,7 +2305,10 @@ final class VmDomXPath
             $parsed['fnPredValue'],
             $parsed['attrNumeric'],
             $parsed['attrExists'] ?? false,
-            $parsed['attrOp'] ?? null
+            $parsed['attrOp'] ?? null,
+            $parsed['generalPred'] ?? null,
+            $ctx,
+            $xpath
         );
     }
 
@@ -2200,7 +2323,9 @@ final class VmDomXPath
     private static function collectMatchingDescendants(
         ObjectEntry $context,
         string $segment,
-        array $namespaces
+        array $namespaces,
+        ?Context $ctx = null,
+        ?ObjectEntry $xpath = null
     ): array {
         $parsed = self::parsePathSegment($segment);
         $test = $parsed['test'];
@@ -2218,7 +2343,10 @@ final class VmDomXPath
                 $parsed['fnPredValue'],
                 $parsed['attrNumeric'],
                 $parsed['attrExists'] ?? false,
-                $parsed['attrOp'] ?? null
+                $parsed['attrOp'] ?? null,
+                $parsed['generalPred'] ?? null,
+                $ctx,
+                $xpath
             );
         }
         $ids = [];
@@ -2234,7 +2362,10 @@ final class VmDomXPath
             $parsed['fnPredValue'],
             $parsed['attrNumeric'],
             $parsed['attrExists'] ?? false,
-            $parsed['attrOp'] ?? null
+            $parsed['attrOp'] ?? null,
+            $parsed['generalPred'] ?? null,
+            $ctx,
+            $xpath
         );
     }
 
@@ -2466,6 +2597,12 @@ final class VmDomXPath
         if (preg_match('~^(true|false|boolean\(|not\(|starts-with\(|contains\(|lang\()~i', $expression)) {
             return true;
         }
+        // XPath 1.0 `or` / `and` — boolean result, not a node-set union (`|`) (#32050).
+        if (null !== self::findTopLevelWordOperator($expression, 'or')
+            || null !== self::findTopLevelWordOperator($expression, 'and')
+        ) {
+            return true;
+        }
 
         // XPath 1.0 comparisons (= != < <= > >=) at top level (#20280).
         return null !== self::findTopLevelComparison($expression);
@@ -2518,6 +2655,18 @@ final class VmDomXPath
         }
         if (0 === strcasecmp($expression, 'false()')) {
             return false;
+        }
+        // `or` then `and` (XPath 1.0 §3.4 precedence; #32050). Word tokens only —
+        // `ancestor-or-self` / `standard` must not split.
+        $or = self::findTopLevelWordOperator($expression, 'or');
+        if (null !== $or) {
+            return self::booleanize(self::evaluateToMixed($ctx, $xpath, $or['left'], $contextNode, $registerNodeNS))
+                || self::booleanize(self::evaluateToMixed($ctx, $xpath, $or['right'], $contextNode, $registerNodeNS));
+        }
+        $and = self::findTopLevelWordOperator($expression, 'and');
+        if (null !== $and) {
+            return self::booleanize(self::evaluateToMixed($ctx, $xpath, $and['left'], $contextNode, $registerNodeNS))
+                && self::booleanize(self::evaluateToMixed($ctx, $xpath, $and['right'], $contextNode, $registerNodeNS));
         }
         if (preg_match('~^not\(~i', $expression)) {
             $inner = self::wrappedFunctionInner($expression, 'not');
@@ -3493,6 +3642,59 @@ final class VmDomXPath
                 if ('' !== $left && '' !== $right) {
                     return ['op' => strtolower($word), 'left' => $left, 'right' => $right];
                 }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Leftmost top-level XPath 1.0 word operator (`or` / `and`; also reused shape of `div`/`mod`).
+     * Skips quotes, parens, predicates, and NCName fragments (`ancestor-or-self`) (#32050).
+     *
+     * @return array{op: string, left: string, right: string}|null
+     */
+    private static function findTopLevelWordOperator(string $expression, string $word): ?array
+    {
+        $depth = 0;
+        $quote = null;
+        $len = \strlen($expression);
+        $wordLen = \strlen($word);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $expression[$i];
+            if (null !== $quote) {
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if ('(' === $ch || '[' === $ch) {
+                ++$depth;
+                continue;
+            }
+            if (')' === $ch || ']' === $ch) {
+                --$depth;
+                continue;
+            }
+            if (0 !== $depth) {
+                continue;
+            }
+            if ($i + $wordLen > $len || 0 !== substr_compare($expression, $word, $i, $wordLen)) {
+                continue;
+            }
+            $beforeOk = 0 === $i || !preg_match('/[\w.-]/', $expression[$i - 1]);
+            $afterOk = $i + $wordLen >= $len || !preg_match('/[\w.-]/', $expression[$i + $wordLen]);
+            if (!$beforeOk || !$afterOk) {
+                continue;
+            }
+            $left = trim(substr($expression, 0, $i));
+            $right = trim(substr($expression, $i + $wordLen));
+            if ('' !== $left && '' !== $right) {
+                return ['op' => $word, 'left' => $left, 'right' => $right];
             }
         }
 
