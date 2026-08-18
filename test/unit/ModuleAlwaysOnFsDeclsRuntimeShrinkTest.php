@@ -35,6 +35,7 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
             'strncmp', // #32382 — leftover Module always-on after LibcExtern #31839
             'strlen', // #32068 — leftover Module always-on already dropped
             'substr_compare', // #32402 — leftover Module always-on after StringSubstrCompare PHP
+            'phpc_basetozval_result', // #32420 — leftover Module always-on after MathBaseConvertRuntime PHP
         ];
     }
 
@@ -57,16 +58,17 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('#32382', $source);
         $this->assertStringContainsString('#32402', $source);
+        $this->assertStringContainsString('#32420', $source);
         foreach ($this->deletedDecls() as $sym) {
             $this->assertStringNotContainsString(
                 "lookupFunction('{$sym}')",
                 $source,
-                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32068/#32382/#32402)"
+                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32068/#32382/#32402/#32420)"
             );
             $this->assertStringNotContainsString(
                 "addFunction('{$sym}'",
                 $source,
-                "Module.php must not always-add libc {$sym} (#30530/#31374/#31403/#31458/#31498)"
+                "Module.php must not always-add libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32420)"
             );
         }
     }

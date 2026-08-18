@@ -23,6 +23,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Replaces {@see MathBaseConvertJit} LLVM (~950 LOC). SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  * Call-site {@see ensureLinked} restores the caller insert block after bridge emit (peer #26869).
  * NestedJIT of other helpers may only declare ABIs (#27012); bodies emit outside NestedJIT.
+ * Module always-on leftover dropped (#32420): declareFunction uses getNamedFunction first
+ * so NestedJIT i32 vs i64 cannot mint phpc_basetozval_result.1 (#31894 / #32122).
  * php-src: ext/standard/math.c
  */
 final class MathBaseConvertRuntime
@@ -132,6 +134,12 @@ final class MathBaseConvertRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
@@ -144,6 +152,8 @@ final class MathBaseConvertRuntime
         $i32 = $context->getTypeFromString('int32');
         $strPtr = $context->getTypeFromString('__string__*');
 
+        // getNamedFunction first — leftover Module always-on addFunction without it
+        // minted phpc_basetozval_result.1 on i32 vs NestedJIT i64 (#32420 / #32122).
         return match ($name) {
             'phpc_base_convert' => $context->module->addFunction(
                 $name,
