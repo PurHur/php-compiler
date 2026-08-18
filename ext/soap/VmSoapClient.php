@@ -3599,12 +3599,16 @@ final class VmSoapClient
             }
         }
         if (0 === \count($childElements)) {
-            $text = \trim($el->textContent);
-            if ('' === $text && $el->hasAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'nil')) {
+            $text = $el->textContent;
+            if ('' === \trim($text) && $el->hasAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'nil')) {
                 return null;
             }
+            $typeName = self::resolveTypeLocalName($el, $elementTypes, $hintType);
+            if (null !== $typeName) {
+                return self::decodeXsdScalarText($typeName, $text, $el);
+            }
 
-            return $text;
+            return \trim($text);
         }
         $map = [];
         $list = true;
@@ -3777,6 +3781,125 @@ final class VmSoapClient
         [$local] = self::xsiTypeNameAndNs($el);
 
         return $local;
+    }
+
+    /**
+     * php-src to_zval_long / to_zval_bool / to_zval_double / to_zval_base64 / to_zval_hexbin
+     * (ext/soap/php_encoding.c). Leaf xsi:type (or SDL hint) selects the converter; strings stay
+     * strings (to_zval_stringc), including xsd:decimal / dateTime / duration.
+     */
+    private static function decodeXsdScalarText(string $typeName, string $text, \DOMElement $el): mixed
+    {
+        $kind = self::xsdScalarDecodeKind($typeName);
+        if (null === $kind) {
+            return \trim($text);
+        }
+        $collapsed = \preg_replace('/[ \t\r\n]+/', ' ', $text) ?? $text;
+        if ('' === $collapsed) {
+            // php-src: no children → NULL; empty after whiteSpace_collapse still errors for numbers.
+            if (!$el->hasChildNodes()) {
+                return 'base64' === $kind || 'hex' === $kind ? '' : null;
+            }
+            if ('bool' === $kind) {
+                return false;
+            }
+            if ('base64' === $kind || 'hex' === $kind) {
+                return '';
+            }
+            throw new \SoapFault('Client', 'SOAP-ERROR: Encoding: Violation of encoding rules');
+        }
+
+        return match ($kind) {
+            'long' => self::decodeXsdLongText($collapsed),
+            'double' => self::decodeXsdDoubleText($collapsed),
+            'bool' => self::decodeXsdBoolText($collapsed),
+            'base64' => self::decodeXsdBase64Text($collapsed),
+            'hex' => self::decodeXsdHexText($collapsed),
+            default => $text,
+        };
+    }
+
+    /** @return 'long'|'double'|'bool'|'base64'|'hex'|null */
+    private static function xsdScalarDecodeKind(string $typeName): ?string
+    {
+        return match ($typeName) {
+            'int', 'integer', 'long', 'short', 'byte',
+            'nonPositiveInteger', 'negativeInteger', 'nonNegativeInteger',
+            'unsignedLong', 'unsignedInt', 'unsignedShort', 'unsignedByte',
+            'positiveInteger' => 'long',
+            'float', 'double' => 'double',
+            'boolean' => 'bool',
+            'base64Binary' => 'base64',
+            'hexBinary' => 'hex',
+            default => null,
+        };
+    }
+
+    /** php-src to_zval_long — is_numeric_string: IS_LONG else IS_DOUBLE else soap_error0. */
+    private static function decodeXsdLongText(string $text): int|float
+    {
+        $int = \filter_var($text, \FILTER_VALIDATE_INT);
+        if (false !== $int) {
+            return $int;
+        }
+        if (\is_numeric($text)) {
+            return (float) $text;
+        }
+        throw new \SoapFault('Client', 'SOAP-ERROR: Encoding: Violation of encoding rules');
+    }
+
+    /** php-src to_zval_double — is_numeric_string plus NaN / INF / -INF. */
+    private static function decodeXsdDoubleText(string $text): float
+    {
+        if (0 === \strcasecmp($text, 'NaN')) {
+            return \NAN;
+        }
+        if (0 === \strcasecmp($text, '-INF')) {
+            return -\INF;
+        }
+        if (0 === \strcasecmp($text, 'INF')) {
+            return \INF;
+        }
+        if (\is_numeric($text)) {
+            return (float) $text;
+        }
+        throw new \SoapFault('Client', 'SOAP-ERROR: Encoding: Violation of encoding rules');
+    }
+
+    /** php-src to_zval_bool — empty / 0 / f / false → false; else true. */
+    private static function decodeXsdBoolText(string $text): bool
+    {
+        if ('' === $text) {
+            return false;
+        }
+        $lc = \strtolower($text);
+
+        return !('0' === $text || 'f' === $lc || 'false' === $lc);
+    }
+
+    /** php-src to_zval_base64 — php_base64_decode after whiteSpace_collapse. */
+    private static function decodeXsdBase64Text(string $text): string
+    {
+        $decoded = \base64_decode($text, true);
+        if (false === $decoded) {
+            throw new \SoapFault('Client', 'SOAP-ERROR: Encoding: Violation of encoding rules');
+        }
+
+        return $decoded;
+    }
+
+    /** php-src to_zval_hexbin — nibble pair walk after whiteSpace_collapse. */
+    private static function decodeXsdHexText(string $text): string
+    {
+        if (1 === \strlen($text) % 2) {
+            throw new \SoapFault('Client', 'SOAP-ERROR: Encoding: Violation of encoding rules');
+        }
+        $decoded = @\hex2bin($text);
+        if (false === $decoded) {
+            throw new \SoapFault('Client', 'SOAP-ERROR: Encoding: Violation of encoding rules');
+        }
+
+        return $decoded;
     }
 
     private static function importValue(mixed $value, Context $ctx): Variable
