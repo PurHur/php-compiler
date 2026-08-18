@@ -426,4 +426,128 @@ final class VmBoundMethodCallable
 
         return null;
     }
+
+    /**
+     * Compile-time `['Class','method']()` array callable — class and method operand slots (#32299).
+     *
+     * Bound `[object, method]` stays on {@see resolveBoundMethodReceiverOperand}; this path is
+     * only the two-string static form. php-src: Zend/zend_execute.c ZEND_INIT_DYNAMIC_CALL.
+     *
+     * @return array{0:int,1:int}|null
+     */
+    public static function resolveStaticArrayCallableSlots(Block $block, int $calleeSlot): ?array
+    {
+        $arraySlot = self::resolveBoundMethodArrayRootSlot($block, $calleeSlot);
+        if (null === $arraySlot) {
+            return null;
+        }
+        $classValueSlot = self::arrayElementValueSlot($block, $arraySlot, 0);
+        $methodValueSlot = self::arrayElementValueSlot($block, $arraySlot, 1);
+        if (null === $classValueSlot || null === $methodValueSlot) {
+            return null;
+        }
+        $classConstSlot = self::constantStringSlot($block, $classValueSlot);
+        $methodConstSlot = self::constantStringSlot($block, $methodValueSlot);
+        if (null === $classConstSlot || null === $methodConstSlot) {
+            return null;
+        }
+
+        return [$classConstSlot, $methodConstSlot];
+    }
+
+    private static function arrayElementValueSlot(
+        Block $block,
+        int $arraySlot,
+        int $key,
+        array &$visited = []
+    ): ?int {
+        $id = spl_object_id($block).':'.$arraySlot.':'.$key;
+        if (isset($visited[$id])) {
+            return null;
+        }
+        $visited[$id] = true;
+        $packedIndex = 0;
+        foreach ($block->opCodes as $op) {
+            if (
+                (OpCode::TYPE_INIT_ARRAY !== $op->type && OpCode::TYPE_ADD_ARRAY_ELEMENT !== $op->type)
+                || $op->arg1 !== $arraySlot
+                || null === $op->arg2
+            ) {
+                continue;
+            }
+            $explicit = self::opcodeExplicitIntKey($block, $op);
+            $thisKey = $explicit ?? $packedIndex;
+            if (null === $explicit) {
+                ++$packedIndex;
+            } else {
+                $packedIndex = $explicit + 1;
+            }
+            if ($thisKey === $key) {
+                return (int) $op->arg2;
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $found = self::arrayElementValueSlot($parent, $arraySlot, $key, $visited);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    private static function opcodeExplicitIntKey(Block $block, OpCode $op): ?int
+    {
+        if (null === $op->arg3 || !isset($block->constants[$op->arg3])) {
+            return null;
+        }
+        $c = $block->constants[$op->arg3];
+        if (Variable::TYPE_INTEGER !== $c->type) {
+            return null;
+        }
+
+        return $c->toInt();
+    }
+
+    private static function constantStringSlot(Block $block, int $slot, array &$visited = []): ?int
+    {
+        $id = spl_object_id($block).':'.$slot;
+        if (isset($visited[$id])) {
+            return null;
+        }
+        $visited[$id] = true;
+        if (isset($block->constants[$slot]) && Variable::TYPE_STRING === $block->constants[$slot]->type) {
+            return $slot;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($op->arg2 !== $slot && $op->arg1 !== $slot) {
+                continue;
+            }
+            $src = (int) $op->arg3;
+            if (isset($block->constants[$src]) && Variable::TYPE_STRING === $block->constants[$src]->type) {
+                return $src;
+            }
+            $nested = self::constantStringSlot($block, $src, $visited);
+            if (null !== $nested) {
+                return $nested;
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $found = self::constantStringSlot($parent, $slot, $visited);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
 }

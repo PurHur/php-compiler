@@ -6311,33 +6311,27 @@ class Object_ extends Type {
             return;
         }
         foreach ($this->staticPropertyGlobals[$parentId] as $name => $entry) {
-            if (!isset($this->staticPropertyGlobals[$childId][$name])) {
-                $this->defineStaticProperty(
-                    $childId,
-                    $entry['displayName'] ?? $name,
-                    $entry['type'],
-                    $entry['default'] ?? null,
-                    null,
-                    !empty($entry['typedWithoutDefault'])
-                );
-                if (isset($this->staticPropertyVisibility[$parentId][$name])) {
-                    $this->staticPropertyVisibility[$childId][$name] = $this->staticPropertyVisibility[$parentId][$name];
-                }
-                if (isset($this->staticPropertySetVisibility[$parentId][$name])) {
-                    $this->staticPropertySetVisibility[$childId][$name] = $this->staticPropertySetVisibility[$parentId][$name];
-                }
-                if (isset($this->staticPropertyGetVisibility[$parentId][$name])) {
-                    $this->staticPropertyGetVisibility[$childId][$name] = $this->staticPropertyGetVisibility[$parentId][$name];
-                }
-                if (isset($this->staticPropertyAsymmetricExplicitRead[$parentId][$name])) {
-                    $this->staticPropertyAsymmetricExplicitRead[$childId][$name]
-                        = $this->staticPropertyAsymmetricExplicitRead[$parentId][$name];
-                }
-                if (isset($this->staticPropertyDeclaringClassId[$parentId][$name])) {
-                    $this->staticPropertyDeclaringClassId[$childId][$name]
-                        = $this->staticPropertyDeclaringClassId[$parentId][$name];
-                }
+            if (isset($this->staticPropertyGlobals[$childId][$name])) {
+                continue;
             }
+            // zend_inheritance.c: inherited static properties share the declaring
+            // class's storage — do not allocate sp_{childId}_* (#32301).
+            $this->staticPropertyGlobals[$childId][$name] = $entry;
+            if (isset($this->staticPropertyVisibility[$parentId][$name])) {
+                $this->staticPropertyVisibility[$childId][$name] = $this->staticPropertyVisibility[$parentId][$name];
+            }
+            if (isset($this->staticPropertySetVisibility[$parentId][$name])) {
+                $this->staticPropertySetVisibility[$childId][$name] = $this->staticPropertySetVisibility[$parentId][$name];
+            }
+            if (isset($this->staticPropertyGetVisibility[$parentId][$name])) {
+                $this->staticPropertyGetVisibility[$childId][$name] = $this->staticPropertyGetVisibility[$parentId][$name];
+            }
+            if (isset($this->staticPropertyAsymmetricExplicitRead[$parentId][$name])) {
+                $this->staticPropertyAsymmetricExplicitRead[$childId][$name]
+                    = $this->staticPropertyAsymmetricExplicitRead[$parentId][$name];
+            }
+            $this->staticPropertyDeclaringClassId[$childId][$name]
+                = $this->staticPropertyDeclaringClassId[$parentId][$name] ?? $parentId;
         }
     }
 

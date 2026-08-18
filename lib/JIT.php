@@ -11616,12 +11616,14 @@ class JIT {
                             break;
                         }
                         $nameSlot = $block->slotForOperand($nameOp);
-                        if (
-                            JIT\BoundMethodCallableHelper::isBoundMethodArrayCallee($nameOp, $nameVar)
-                            && $this->tryInitBoundMethodFccDirect($block, $nameSlot)
-                        ) {
-                            $this->context->scope->argOperands = [];
-                            break;
+                        if (JIT\BoundMethodCallableHelper::isBoundMethodArrayCallee($nameOp, $nameVar)) {
+                            if (
+                                $this->tryInitBoundMethodFccDirect($block, $nameSlot)
+                                || $this->tryInitStaticArrayCallableDirect($block, $nameSlot)
+                            ) {
+                                $this->context->scope->argOperands = [];
+                                break;
+                            }
                         }
                         if (null !== $nameSlot) {
                             $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);
@@ -18876,8 +18878,34 @@ class JIT {
             }
             $write = $this->context->getVariableFromOpInScopes($writeOp);
             $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
-            // zend_operators.c IS_DOUBLE ± 1.0; else zend_operators.h long overflow (#32281 / #29144).
-            JIT\JitIncDec::writeValueBoxIncDec($this->context, $read, $cur, $writePtr, $increment);
+            // zend_operators.c decrement_function IS_NULL is a no-op (#32297 / #7435).
+            // Compile-time TYPE_NULL already returns above; untyped `$n = null` is a value box
+            // and previously readLong(null)→0 then stored int(-1).
+            if (!$increment) {
+                JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dec_vbox_null_cont');
+                $isNull = JIT\JitValueCompare::valueBoxIsNull($this->context, $read);
+                $nullBlock = JIT\BasicBlockHelper::append($this->context, 'dec_vbox_null_noop');
+                $decBlock = JIT\BasicBlockHelper::append($this->context, 'dec_vbox_numeric');
+                $doneBlock = JIT\BasicBlockHelper::append($this->context, 'dec_vbox_null_done');
+                $this->context->builder->branchIf($isNull, $nullBlock, $decBlock);
+
+                $this->context->builder->positionAtEnd($nullBlock);
+                $this->emitIncDecNoEffectWarning(false, 'null');
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    $writePtr
+                );
+                $this->context->builder->branch($doneBlock);
+
+                $this->context->builder->positionAtEnd($decBlock);
+                JIT\JitIncDec::writeValueBoxIncDec($this->context, $read, $cur, $writePtr, $increment);
+                $this->context->builder->branch($doneBlock);
+
+                $this->context->builder->positionAtEnd($doneBlock);
+            } else {
+                // zend_operators.c IS_DOUBLE ± 1.0; else zend_operators.h long overflow (#32281 / #29144).
+                JIT\JitIncDec::writeValueBoxIncDec($this->context, $read, $cur, $writePtr, $increment);
+            }
             $this->invalidateScriptGlobalCompileTimeMetadata($write);
             if ($prefix) {
                 $newVar = new Variable(
@@ -20112,6 +20140,26 @@ class JIT {
             return false;
         }
         $this->initJitMethodCall($block, $receiverOp, $methodLc);
+
+        return true;
+    }
+
+    /**
+     * Fold `['Class','method']()` array callables to INIT_STATIC_METHOD_CALL (#32299).
+     *
+     * RuntimeVariableFunction only dispatches string function names; an array callee
+     * previously emitted abort() (rc=134). php-src: Zend/zend_execute.c ZEND_INIT_DYNAMIC_CALL.
+     */
+    private function tryInitStaticArrayCallableDirect(Block $block, ?int $calleeSlot): bool
+    {
+        if (null === $calleeSlot) {
+            return false;
+        }
+        $slots = VM\VmBoundMethodCallable::resolveStaticArrayCallableSlots($block, $calleeSlot);
+        if (null === $slots) {
+            return false;
+        }
+        $this->initJitStaticCall($block, $slots[0], $slots[1]);
 
         return true;
     }

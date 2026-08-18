@@ -9,8 +9,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
- * JIT ++/-- with PHP_INT_MAX/MIN → double promotion (#29144)
- * and boxed/native float ± 1.0 (#32281).
+ * JIT ++/-- with PHP_INT_MAX/MIN → double promotion (#29144),
+ * boxed/native float ± 1.0 (#32281), and IS_NULL decrement no-op (#32297).
  *
  * @see php-src Zend/zend_operators.h fast_long_increment_function /
  *      fast_long_decrement_function
