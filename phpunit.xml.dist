@@ -158,6 +158,8 @@
             <file>./test/compliance/GlobalThis32180JITTest.php</file>
             <file>./test/compliance/ParamThis32179VMTest.php</file>
             <file>./test/compliance/ParamThis32179JITTest.php</file>
+            <file>./test/compliance/ReservedClassName32206VMTest.php</file>
+            <file>./test/compliance/ReservedClassName32206JITTest.php</file>
             <file>./test/compliance/DeclareStrictTypesMidfile32182VMTest.php</file>
             <file>./test/compliance/DeclareStrictTypesMidfile32182JITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
