@@ -106,9 +106,10 @@ final class JitDomSaveXMLUserScript
 
     /**
      * Dump createComment/createTextNode/createCDATASection/createDocumentFragment/
-     * createProcessingInstruction (and createElement) without a loadXML tag literal.
+     * createProcessingInstruction/createEntityReference (and createElement) without a
+     * loadXML tag literal.
      *
-     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331 / #32334)
+     * php-src: ext/dom/document.c saveXML → xmlNodeDump (#32315 / #32331 / #32334 / #32343)
      */
     private static function serializeUserScriptNode(
         Context $context,
@@ -152,6 +153,8 @@ final class JitDomSaveXMLUserScript
         $bbPi = BasicBlockHelper::append($context, 'dom_savexml_pi');
         $bbPiEmpty = BasicBlockHelper::append($context, 'dom_savexml_pi_empty');
         $bbPiData = BasicBlockHelper::append($context, 'dom_savexml_pi_data');
+        $bbEntityCheck = BasicBlockHelper::append($context, 'dom_savexml_check_entity');
+        $bbEntity = BasicBlockHelper::append($context, 'dom_savexml_entity');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
         $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
@@ -240,7 +243,7 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $tagStr, $piKindLit),
             $zero
         );
-        $context->builder->branchIf($isPi, $bbPi, $bbElement);
+        $context->builder->branchIf($isPi, $bbPi, $bbEntityCheck);
 
         $context->builder->positionAtEnd($bbPi);
         // libxml xmlNodeDump PI: lt-query + target + optional space+data + query-gt (#32331).
@@ -281,6 +284,29 @@ final class JitDomSaveXMLUserScript
             $piCloseData
         );
         $context->builder->store(self::boxStringValue($context, $piDataXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbEntityCheck);
+        $entityKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateEntityReference::TAG_KIND)
+        );
+        $isEntity = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $entityKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isEntity, $bbEntity, $bbElement);
+
+        $context->builder->positionAtEnd($bbEntity);
+        // libxml xmlNodeDump XML_ENTITY_REF_NODE: `&` + name + `;` (#32343).
+        $erefOpen = $context->builder->load($context->constantStringFromString('&'));
+        $erefClose = $context->builder->load($context->constantStringFromString(';'));
+        $erefXml = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $erefOpen, $nameStr),
+            $erefClose
+        );
+        $context->builder->store(self::boxStringValue($context, $erefXml), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElement);

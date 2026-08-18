@@ -85,6 +85,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'debug_print_backtrace_void_28909.phpt',
         'array_callable_static_invoke.phpt',
         'dom_createdocumentfragment_savexml.phpt',
+        'dom_createentityreference_savexml.phpt',
     ];
 
     /**
