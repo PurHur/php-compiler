@@ -39,6 +39,12 @@ final class php_strip_whitespace extends Internal
             'php_strip_whitespace',
             'filename'
         );
+        if (VmStreamIncludeOpenPolicy::blockedForScriptOpen($path, $frame->vmContext)) {
+            VmStreamIncludeOpenPolicy::warnScriptOpenBlocked($frame, 'php_strip_whitespace', $path);
+            $frame->returnVar->string('');
+
+            return;
+        }
         $contents = VmFs::fileGetContents($path);
         if (false === $contents) {
             VmStreamOpenFailure::warnFailedToOpen($frame, 'php_strip_whitespace', $path);
