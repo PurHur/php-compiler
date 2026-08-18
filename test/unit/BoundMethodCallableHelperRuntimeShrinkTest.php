@@ -26,6 +26,7 @@ final class BoundMethodCallableHelperRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('resolveBoundMethodReceiverOperand', $source);
         $this->assertStringContainsString('resolveInvokableObjectReceiverOperand', $source);
         $this->assertStringContainsString('classNameFromObjectSlot', $source);
+        $this->assertStringContainsString('resolveStaticArrayCallableSlots', $source);
         $this->assertGreaterThan(300, substr_count($source, "\n") + 1);
     }
 
