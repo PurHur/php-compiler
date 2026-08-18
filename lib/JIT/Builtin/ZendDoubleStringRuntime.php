@@ -47,11 +47,77 @@ final class ZendDoubleStringRuntime
 
     /**
      * convert_to_string / echo / var_dump float display (zend_gcvt).
-     * json_encode keeps {@see format()} — JSON uses lowercase `e`.
+     * json_encode keeps {@see format()} then {@see jsonEncodeNumberOrNull()} (#32326).
      */
     public static function formatGcvt(Context $context, Value $doubleVal): Value
     {
         return self::zendifyGcvt($context, self::format($context, $doubleVal));
+    }
+
+    /**
+     * php_json_encode_double: INF/NAN is not a JSON number (#32326).
+     *
+     * Sets {@see JSON_ERROR_INF_OR_NAN} (7). Soft-fail returns a null {@see __string__*}
+     * (json_encode → false). {@see JSON_PARTIAL_OUTPUT_ON_ERROR} (512) emits `0`.
+     * {@param $fn} must be the json_encode value bridge (not {@see BasicBlockHelper::parentFunction}).
+     *
+     * @see php-src ext/json/json_encoder.c php_json_encode_double
+     */
+    public static function jsonEncodeNumberOrNull(Context $context, LlvmFunction $fn, Value $dbl, Value $flags): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $s = ++self::$seq;
+
+        $isNan = $context->builder->fcmp(Builder::REAL_UNO, $dbl, $dbl);
+        $posInf = $dbl->typeOf()->constReal(\INF);
+        $negInf = $dbl->typeOf()->constReal(-\INF);
+        $isInf = $context->builder->fcmp(Builder::REAL_OEQ, $dbl, $posInf);
+        $isNinf = $context->builder->fcmp(Builder::REAL_OEQ, $dbl, $negInf);
+        $isNf = $context->builder->or($isNan, $context->builder->or($isInf, $isNinf));
+
+        $nfBb = $fn->appendBasicBlock('json_dbl_nf_'.$s);
+        $okBb = $fn->appendBasicBlock('json_dbl_ok_'.$s);
+        $doneBb = $fn->appendBasicBlock('json_dbl_done_'.$s);
+        $context->builder->branchIf($isNf, $nfBb, $okBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $formatted = self::format($context, $dbl);
+        $okEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($nfBb);
+        StringJsonDecode::ensureLinked($context);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_json_set_last_error'),
+            $i64->constInt(7, false)
+        );
+        $isPartial = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $i64->constInt(512, false)),
+            $i64->constInt(0, false)
+        );
+        $partBb = $fn->appendBasicBlock('json_dbl_partial_'.$s);
+        $failBb = $fn->appendBasicBlock('json_dbl_fail_'.$s);
+        $context->builder->branchIf($isPartial, $partBb, $failBb);
+
+        $context->builder->positionAtEnd($partBb);
+        $zeroStr = $context->builder->load($context->constantStringFromString('0'));
+        $partEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $nullStr = $strPtr->constNull();
+        $failEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($strPtr, 'json_dbl_phi_'.$s);
+        $phi->addIncoming($formatted, $okEnd);
+        $phi->addIncoming($zeroStr, $partEnd);
+        $phi->addIncoming($nullStr, $failEnd);
+
+        return $phi;
     }
 
     public static function format(Context $context, Value $doubleVal): Value

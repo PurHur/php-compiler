@@ -351,6 +351,7 @@
             <file>./test/compliance/StaticPropMethodInc32313VMTest.php</file>
             <file>./test/compliance/StaticPropMethodInc32313JITTest.php</file>
             <file>./test/unit/StaticPropMethodInc32313AotTest.php</file>
+            <file>./test/unit/JsonEncodeInfNan32326AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938VMTest.php</file>
             <file>./test/compliance/VarExportArrayElementProperty31938JITTest.php</file>
