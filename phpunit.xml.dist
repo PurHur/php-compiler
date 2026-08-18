@@ -363,6 +363,8 @@
             <file>./test/unit/DomCreateDocumentFragment32334AotTest.php</file>
             <file>./test/compliance/DomCreateEntityReference32343JITTest.php</file>
             <file>./test/unit/DomCreateEntityReference32343AotTest.php</file>
+            <file>./test/compliance/DomCloneNodeJITTest.php</file>
+            <file>./test/unit/DomCloneNodeAotTest.php</file>
             <file>./test/compliance/VarDumpInfNan32321VMTest.php</file>
             <file>./test/compliance/VarDumpInfNan32321JITTest.php</file>
             <file>./test/unit/VarDumpInfNan32321AotTest.php</file>

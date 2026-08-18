@@ -142,6 +142,12 @@ final class DomInstanceMethodJit
         'domattr::isid' => true,
         'dom\\attr::isid' => true,
         'domelement::toggleattribute' => true,
+        'domnode::clonenode' => true,
+        'domelement::clonenode' => true,
+        'domtext::clonenode' => true,
+        'domcomment::clonenode' => true,
+        'domdocumentfragment::clonenode' => true,
+        'domattr::clonenode' => true,
         'domnode::contains' => true,
         'domnode::comparedocumentposition' => true,
         'domnode::getrootnode' => true,
@@ -526,6 +532,17 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::clonenode' === $lc
+                || 'domelement::clonenode' === $lc
+                || 'domtext::clonenode' === $lc
+                || 'domcomment::clonenode' === $lc
+                || 'domdocumentfragment::clonenode' === $lc
+                || 'domattr::clonenode' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeCloneNode();
+
+                return;
+            }
             if ('domnode::contains' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeContains();
 
@@ -789,6 +806,12 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::replacechildren');
             self::ensureProxy($context, 'domdocumentfragment::replacechildren');
             self::ensureProxy($context, 'domelement::toggleattribute');
+            self::ensureProxy($context, 'domnode::clonenode');
+            self::ensureProxy($context, 'domelement::clonenode');
+            self::ensureProxy($context, 'domtext::clonenode');
+            self::ensureProxy($context, 'domcomment::clonenode');
+            self::ensureProxy($context, 'domdocumentfragment::clonenode');
+            self::ensureProxy($context, 'domattr::clonenode');
             self::ensureProxy($context, 'domnode::contains');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
             self::ensureProxy($context, 'domnode::getrootnode');
@@ -916,7 +939,7 @@ final class DomInstanceMethodJit
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
-        'domnode' => ['appendchild'],
+        'domnode' => ['appendchild', 'clonenode'],
         'domelement' => ['setattribute', 'removeattribute', 'setidattribute', 'setidattributens', 'setidattributenode'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],

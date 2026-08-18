@@ -12178,6 +12178,9 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomCloneNodeCompileTimeTag(
+                        $block->getOperand($op->arg1)
+                    );
                     $this->propagateBcMathNumberMethodCompileTime(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -14320,6 +14323,24 @@ class JIT {
             return;
         }
         $tag = $nameArg->compileTimeString;
+        if (null === $tag || '' === $tag) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->context->getVariableFromOp($result)->compileTimeDomTagName = $tag;
+    }
+
+    /**
+     * Remember cloneNode() tag on the result Variable for saveXML of non-root clones.
+     */
+    private function propagateDomCloneNodeCompileTimeTag(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomNodeCloneNode)) {
+            return;
+        }
+        $tag = \PHPCompiler\ext\dom\JitDomCloneNode::$lastResultTagName;
         if (null === $tag || '' === $tag) {
             return;
         }
@@ -21093,6 +21114,11 @@ class JIT {
                 ) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::'.$methodLc);
                 }
+                // cloneNode on firstChild temps (:object) — php-src xmlDocCopyNode.
+                if ('clonenode' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::clonenode');
+                }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
@@ -21118,6 +21144,12 @@ class JIT {
                 // User-script AOT may omit DOMNodeList from allClassNamesById — still bind item().
                 if ('item' === $methodLc && $this->context->functionIsRegistered('domnodelist::item')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnodelist::item');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('clonenode' === $methodLc && $this->context->functionIsRegistered('domnode::clonenode')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21345,6 +21377,15 @@ class JIT {
             $this->context->scope->args = [$receiverVar];
 
             return;
+        }
+        if ('clonenode' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
+            if ($this->context->functionIsRegistered('domnode::clonenode')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
         }
         $needsRuntimeDispatch = null === $normalizedReceiverUserType
             || '' === $normalizedReceiverUserType

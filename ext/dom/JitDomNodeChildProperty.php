@@ -14,6 +14,11 @@ final class JitDomNodeChildProperty
 {
     private const CLASS_NODE = 'DOMNode';
 
+    /** Last firstChild/lastChild compile-time tag — cloneNode receivers often lose Variable metadata. */
+    public static ?string $lastFetchedTagName = null;
+
+    public static ?int $lastFetchedChildIndex = null;
+
     public static function isDomNodeChildProperty(string $classLc, string $propLc): bool
     {
         if (!\in_array(strtolower($propLc), ['firstchild', 'lastchild'], true)) {
@@ -60,8 +65,10 @@ final class JitDomNodeChildProperty
         $propLc = strtolower($propName);
         if ('firstchild' === $propLc) {
             $result->compileTimeDomChildIndex = 0;
+            self::$lastFetchedChildIndex = 0;
             if ('element' === $nodes[0]['kind']) {
                 $result->compileTimeDomTagName = $nodes[0]['data'];
+                self::$lastFetchedTagName = $nodes[0]['data'];
             }
 
             return;
@@ -69,8 +76,10 @@ final class JitDomNodeChildProperty
         if ('lastchild' === $propLc) {
             $last = \count($nodes) - 1;
             $result->compileTimeDomChildIndex = $last;
+            self::$lastFetchedChildIndex = $last;
             if ('element' === $nodes[$last]['kind']) {
                 $result->compileTimeDomTagName = $nodes[$last]['data'];
+                self::$lastFetchedTagName = $nodes[$last]['data'];
             }
         }
     }
