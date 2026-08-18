@@ -3127,6 +3127,9 @@ class Compiler {
                         $iter = $ops[$i];
                         /** @var Op\Expr\AssignRef $assign */
                         $assign = $ops[$i + 1];
+                        // Fusion skips AssignRef, which is where rejectThisReassignment normally fires.
+                        // Zend zend_compile_foreach: foreach (... as &$this) is Cannot re-assign $this (#32205).
+                        $this->rejectThisReassignment($assign->var);
                         $destSlot = $this->compileOperand($assign->var, $block, false);
                         $this->registerForeachByRefLoopVarBindings($block, $assign, $iter, $destSlot);
                         $block->addOpCode(new OpCode(
