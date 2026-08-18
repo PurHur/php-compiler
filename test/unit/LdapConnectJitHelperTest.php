@@ -20,6 +20,7 @@ final class LdapConnectJitHelperTest extends TestCase
         $this->assertStringContainsString('JitLdapConnect::invoke', $source);
         $this->assertStringNotContainsString('is not implemented for JIT', $source);
         $this->assertStringContainsString('__compiler_ldap_connect', $source);
+        $this->assertStringContainsString('__compiler_ldap_link_register', $source);
         $this->assertStringContainsString('LdapRuntime::ensureLinked', $source);
         $helper = (string) file_get_contents(__DIR__.'/../../ext/ldap/LdapDnJitHelper.php');
         $this->assertStringContainsString('function connectUri', $helper);
