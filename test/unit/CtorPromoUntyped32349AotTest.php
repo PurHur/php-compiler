@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class CtorPromoUntyped32349AotTest extends TestCase
 {
-    private const EXPECTED = "1\n3\na\n1\n1\n2\n";
+    private const EXPECTED = "1|7\n3\nab\n14\n1\n2|9\n";
 
     public function testVmCtorPromoUntypedStringMixed(): void
     {
@@ -53,5 +53,18 @@ final class CtorPromoUntyped32349AotTest extends TestCase
         } finally {
             @unlink($bin);
         }
+    }
+
+    public function testWriteFetchSkipsValueSlotLoad(): void
+    {
+        $slot = (string) file_get_contents(
+            __DIR__.'/../../lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php'
+        );
+        $this->assertStringContainsString('#32349', $slot);
+        $this->assertStringContainsString('bool $forWrite = false', $slot);
+        $this->assertStringContainsString('if ($forWrite)', $slot);
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/BasicBlockHelper.php');
+        $this->assertStringContainsString('unsealAndContinue', $helper);
+        $this->assertStringContainsString('continueAfterDefiningValue', $helper);
     }
 }

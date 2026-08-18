@@ -498,7 +498,13 @@ final class ReadonlyClassGuard
         // NestedJIT / ReadonlyRaise body emission can clear the insert block.
         // Resume in an open BB before the store — emitting malloc/GEP with no
         // insert BB yields parentless IR (untyped ctor promotion, #32349).
+        // A premature `ret void` after the VALUE-slot GEP must be unsealed on the
+        // *same* BB (values like the slot pointer must dominate the store).
         $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null !== $entry && null !== $entry->getTerminator()) {
+            BasicBlockHelper::unsealAndContinue($context);
+            $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        }
         if (null === $entry) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'readonly_store_resume');
             $entry = BasicBlockHelper::tryGetInsertBlock($context);

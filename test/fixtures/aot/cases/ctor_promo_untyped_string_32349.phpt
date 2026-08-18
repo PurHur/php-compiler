@@ -8,7 +8,7 @@ class A
     {
     }
 }
-echo (new A())->x, "\n";
+echo (new A())->x, '|', (new A(7))->x, "\n";
 
 class B
 {
@@ -24,7 +24,7 @@ class C
     {
     }
 }
-echo (new C())->x, "\n";
+echo (new C())->x, (new C('b'))->x, "\n";
 
 class D
 {
@@ -32,7 +32,7 @@ class D
     {
     }
 }
-echo (new D())->x, "\n";
+echo (new D())->x, (new D(4))->x, "\n";
 
 class E
 {
@@ -46,13 +46,13 @@ class F
     {
     }
 }
-echo (new F())->x, "\n";
+echo (new F())->x, '|', (new F(9))->x, "\n";
 --EXPECT--
-1
+1|7
 3
-a
+ab
+14
 1
-1
-2
+2|9
 --EXPECT_EXIT--
 0

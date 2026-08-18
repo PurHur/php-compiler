@@ -8208,6 +8208,7 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_ASSIGN:
+                    JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                     // Stamp assign opline so mid-method private(set) Errors match Zend (#29665).
                     if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
                         $this->context->callSiteLine = $op->sourceLocation->startLine;
@@ -13179,8 +13180,10 @@ class JIT {
                         $fetched = $this->context->type->object->propertyFetch(
                             $receiver,
                             $declaringClass,
-                            $name->value
+                            $name->value,
+                            $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1)
                         );
+                        JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                         if ($forDimWrite) {
                             // BP_VAR_W auto-init (#31770); BP_VAR_RW ++/+= must Error (#31784).
                             if ($this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)) {
@@ -13296,12 +13299,21 @@ class JIT {
             }
         }
 
+        $hasExplicitReturn = false;
+        foreach ($block->opCodes as $scanOp) {
+            if (OpCode::TYPE_RETURN === $scanOp->type || OpCode::TYPE_RETURN_VOID === $scanOp->type) {
+                $hasExplicitReturn = true;
+                break;
+            }
+        }
         $tail = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
         if (
             0 === $this->context->inlineIncludeDepth
             && $this->isVoidLlvmFunction($func)
             && !$block->syntheticCfgBranch
             && null !== $block->func
+            && [] !== $block->opCodes
+            && !$hasExplicitReturn
             && null !== $tail
             && null === $tail->getTerminator()
         ) {
@@ -16869,6 +16881,12 @@ class JIT {
                     $this->context,
                     $value,
                     $result->objectPropertyDnfArms
+                );
+            }
+            if (null !== $result->objectPropertySlot) {
+                JIT\BasicBlockHelper::continueAfterDefiningValue(
+                    $this->context,
+                    $result->objectPropertySlot
                 );
             }
             JIT\ReadonlyClassGuard::emitStoreUnlessPending(
@@ -24280,6 +24298,20 @@ class JIT {
         // Immediate next only — later ASSIGN is often dead-temp reuse, not a write (#23986).
         $next = $block->opCodes[$opIndex + 1] ?? null;
         if (null === $next) {
+            return false;
+        }
+
+        return OpCode::destSlotUsedAsAssignLvalue($next, $destSlot);
+    }
+
+    /**
+     * True when the fetch dest is the LHS of the immediately following TYPE_ASSIGN
+     * (`$this->x = $rhs`). Skip the VALUE-slot load for those writes (#32349).
+     */
+    private function varFetchDestUsedAsPlainAssignStore(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (null === $next || OpCode::TYPE_ASSIGN !== $next->type) {
             return false;
         }
 

@@ -196,6 +196,101 @@ final class BasicBlockHelper
         return $open;
     }
 
+    /**
+     * Keep emitting on the current (or last) BB of the active function after a premature
+     * terminator. php-llvm cannot classify ReturnInst (LLVMIsAReturnInst is a ValueRef);
+     * erase any terminator so `$this->x = $rhs` stays reachable (#32349).
+     */
+    public static function unsealAndContinue(Context $context): bool
+    {
+        $insert = self::tryGetInsertBlock($context);
+        if (null !== $insert) {
+            $term = $insert->getTerminator();
+            if (null === $term) {
+                return true;
+            }
+            try {
+                $term->eraseFromParent();
+            } catch (\Throwable) {
+                return false;
+            }
+            $context->builder->positionAtEnd($insert);
+
+            return true;
+        }
+        $fn = self::parentFunction($context);
+        if (!$fn instanceof Function_) {
+            return false;
+        }
+        // Do not jump to an unrelated open BB (often still-open entry mid-ARG_RECV).
+        // That made the store dominate-fail / run in entry (#32349).
+        return false;
+    }
+
+    /**
+     * Resume lowering on the basic block that defined $def, unsealing a premature
+     * terminator so later stores dominate (#32349 ctor promotion VALUE slot).
+     */
+    public static function continueAfterDefiningValue(Context $context, Value $def): bool
+    {
+        try {
+            $raw = $def->value ?? null;
+            if (null === $raw) {
+                return false;
+            }
+            $bbRef = $context->llvm->lib->LLVMGetInstructionParent($raw);
+            if (null === $bbRef) {
+                return false;
+            }
+            $bb = $context->llvm->factory->basicBlock($context->context, $bbRef);
+        } catch (\Throwable) {
+            return false;
+        }
+        if (null === $bb) {
+            return false;
+        }
+        $term = $bb->getTerminator();
+        if (null !== $term) {
+            try {
+                $term->eraseFromParent();
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+        $context->builder->positionAtEnd($bb);
+
+        return true;
+    }
+
+    public static function repositionToLastOpenIfInsertLost(Context $context): void
+    {
+        $insert = self::tryGetInsertBlock($context);
+        if (null !== $insert && null === $insert->getTerminator()) {
+            return;
+        }
+        if (null !== $insert) {
+            self::unsealAndContinue($context);
+
+            return;
+        }
+        $fn = $context->loweringLlvmFunction;
+        if (!$fn instanceof Function_) {
+            $fn = self::parentFunction($context);
+        }
+        if (!$fn instanceof Function_) {
+            return;
+        }
+        $open = self::lastOpenBasicBlock($fn);
+        if (null === $open) {
+            return;
+        }
+        $entry = $fn->countBasicBlocks() > 0 ? $fn->getEntryBasicBlock() : null;
+        if ($open === $entry) {
+            return;
+        }
+        $context->builder->positionAtEnd($open);
+    }
+
     public static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
     {
         if (null === $block) {

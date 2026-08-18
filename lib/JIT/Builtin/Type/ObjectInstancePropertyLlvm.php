@@ -21,7 +21,8 @@ final class ObjectInstancePropertyLlvm
         Value $obj,
         string $class,
         string $name,
-        int $classId
+        int $classId,
+        bool $forWrite = false
     ): Variable {
         $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
         if (\PHPCompiler\ext\dom\JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
@@ -49,7 +50,7 @@ final class ObjectInstancePropertyLlvm
             return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);
         }
 
-        return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId);
+        return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId, $forWrite);
     }
 
     /** Slot read without ext/dom live-bridge re-dispatch (#18951). */
@@ -58,7 +59,8 @@ final class ObjectInstancePropertyLlvm
         Value $obj,
         string $class,
         string $name,
-        int $classId
+        int $classId,
+        bool $forWrite = false
     ): Variable {
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
@@ -83,20 +85,26 @@ final class ObjectInstancePropertyLlvm
         foreach ($object->propertySetsForClass($classId) as $propset) {
             if ($propset[0] === $nameId) {
                 $slot = $object->propertySlotPtr($obj, $propset[3]);
-                $loaded = $context->builder->load($slot);
                 if (Variable::TYPE_VALUE === $propset[2]) {
                     $valueType = $context->getTypeFromString('__value__');
-                    $storage = BasicBlockHelper::entryAlloca($context, $valueType);
-                    $valueMap = $context->structFieldMap['__value__'];
-                    $context->builder->store(
-                        $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-                        $context->builder->structGep($storage, $valueMap['type'])
-                    );
-                    $context->builder->call(
-                        $context->lookupFunction('__object__load_value_slot'),
-                        $slot,
-                        $storage
-                    );
+                    // Write-only FETCH (ZEND_ASSIGN_OBJ) must not entryAlloca: that parks the
+                    // builder at function entry while ARG_RECV's value-copy is still open,
+                    // so the store is emitted in entry and the ctor body never runs (#32349).
+                    if ($forWrite) {
+                        $storage = $context->builder->alloca($valueType);
+                    } else {
+                        $storage = BasicBlockHelper::entryAlloca($context, $valueType);
+                        $valueMap = $context->structFieldMap['__value__'];
+                        $context->builder->store(
+                            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                            $context->builder->structGep($storage, $valueMap['type'])
+                        );
+                        $context->builder->call(
+                            $context->lookupFunction('__object__load_value_slot'),
+                            $slot,
+                            $storage
+                        );
+                    }
                     $var = new Variable(
                         $context,
                         $propset[2],
@@ -113,6 +121,7 @@ final class ObjectInstancePropertyLlvm
 
                     return $var;
                 }
+                $loaded = $context->builder->load($slot);
                 if (Variable::TYPE_HASHTABLE === $propset[2]) {
                     $htPtr = $context->builder->pointerCast(
                         $loaded,
