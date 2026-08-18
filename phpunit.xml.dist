@@ -672,6 +672,8 @@
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorVMTest.php</file>
             <file>./test/compliance/LocaleAcceptFromHttpNullTypeErrorJITTest.php</file>
             <file>./test/compliance/LocaleLookupFilterMatchesReflection25198VMTest.php</file>
+            <file>./test/compliance/LocaleLookupJit32118VMTest.php</file>
+            <file>./test/compliance/LocaleLookupJit32118JITTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictVMTest.php</file>
             <file>./test/compliance/IsASubclassNullClassStrictJITTest.php</file>
             <file>./test/compliance/IsASubclassNullAllowStringStrictVMTest.php</file>

@@ -6,11 +6,14 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ReflectionSupport;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
 /** Locale::lookup() — php-src locale_methods.c (#20036). */
 final class LocaleLookup extends VmClassMethod
@@ -56,6 +59,11 @@ final class LocaleLookup extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(VmLocale::lookup($tags, $locale, $canonicalize, $default));
         }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        return JitLocaleLookup::lookup($context, ...$args);
     }
 
     /** @return list<string> */
