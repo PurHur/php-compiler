@@ -2795,6 +2795,10 @@ final class VmSoapClient
     ): string {
         $encType = $soapVar['type'] ?? 0;
         $inner = $soapVar['value'];
+        // php-src to_xml_any — xmlStringTextNoenc child of parent, no wrapper / xsi:type (#32241).
+        if (SoapConstants::XSD_ANYXML === (int) $encType) {
+            return self::encodeSoapAnyXml($inner);
+        }
         $literal = null !== $state && SoapConstants::SOAP_LITERAL === $state->use;
         // php-src xmlNodeSetName(enc_name) (#32191).
         if (null !== $soapVar['name']) {
@@ -2862,6 +2866,26 @@ final class VmSoapClient
         $xsi = $qname[0].':'.$qname[1];
 
         return '<'.$qtag.$xmlnsAttr.' xsi:type="'.\htmlspecialchars($xsi, \ENT_XML1).'">'.$text.'</'.$qtag.'>';
+    }
+
+    /**
+     * php-src ext/soap/php_encoding.c to_xml_any — xmlNewTextLen + xmlStringTextNoenc (#32241).
+     *
+     * Scalar payloads are inserted as unescaped XML text under the parent (operation)
+     * element. Arrays recurse with get_conversion(XSD_ANYXML).
+     */
+    private static function encodeSoapAnyXml(mixed $inner): string
+    {
+        if (\is_array($inner)) {
+            $out = '';
+            foreach ($inner as $el) {
+                $out .= self::encodeSoapAnyXml($el);
+            }
+
+            return $out;
+        }
+
+        return self::soapVarRawString($inner);
     }
 
     /**
