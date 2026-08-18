@@ -2949,7 +2949,13 @@ final class VmSoapClient
                     } elseif ('faultcode' === $ln) {
                         $code = \trim($child->textContent);
                     }
-                    if ('faultstring' === $ln || 'Reason' === $ln) {
+                    if ('Reason' === $ln) {
+                        // php-src php_packet_soap.c SOAP 1.2: first Reason/Text only (#32046).
+                        $text = self::firstChildElementText($child, 'Text');
+                        if (null !== $text) {
+                            $string = $text;
+                        }
+                    } elseif ('faultstring' === $ln) {
                         $string = \trim($child->textContent);
                     }
                 }
