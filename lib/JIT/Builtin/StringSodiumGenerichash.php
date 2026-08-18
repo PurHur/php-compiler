@@ -40,6 +40,8 @@ final class StringSodiumGenerichash
 
         $restore = self::captureInsertBlock($context);
         LibcExtern::register($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         self::ensureLibsodium($context);
         self::ensureStringAlloc($context);
         self::implement($context);

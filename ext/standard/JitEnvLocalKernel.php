@@ -303,12 +303,12 @@ final class JitEnvLocalKernel
     {
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
-        $voidPtr = $context->getTypeFromString('void*');
-        $sizeT = $context->getTypeFromString('size_t');
 
+        // malloc after LibcExtern always-on drop (#32273) — canonical i8*/size_t,
+        // not void* (malloc.1 class, #31894 / #32122).
+        LibcExtern::ensureMallocFamily($context);
         foreach ([
             ['strlen', $i64, [$i8p]],
-            ['malloc', $voidPtr, [$sizeT]],
             ['__string__init', $context->getTypeFromString('__string__*'), [$i64, $i8p]],
             ['__value__readString', $context->getTypeFromString('__string__*'), [$context->getTypeFromString('__value__*')]],
         ] as [$name, $ret, $params]) {

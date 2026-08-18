@@ -317,17 +317,9 @@ final class PackArgvSerialize
 
     private static function ensureLibc(Context $context): void
     {
-        $voidPtr = $context->getTypeFromString('void*');
-        $sizeT = $context->getTypeFromString('size_t');
-        try {
-            $context->lookupFunction('malloc');
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction(
-                'malloc',
-                $context->context->functionType($voidPtr, false, $sizeT)
-            );
-            $context->registerFunction('malloc', $fn);
-        }
+        // malloc(3) after LibcExtern always-on drop (#32273) — canonical i8*/size_t,
+        // not void* (malloc.1 class, #31894 / #32122).
+        LibcExtern::ensureMallocFamily($context);
         // Module-local memcpy(3) body — decl-only SIGSEGVs argv pack (#31963 / #31885).
         LibcExtern::ensureMemcpyImplemented($context);
     }

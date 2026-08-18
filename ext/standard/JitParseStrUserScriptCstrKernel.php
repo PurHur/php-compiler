@@ -138,16 +138,13 @@ final class JitParseStrUserScriptCstrKernel
 
     private static function ensureLibc(Context $context): void
     {
-        $voidPtr = $context->getTypeFromString('void*');
-        $voidTy = $context->getTypeFromString('void');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
 
-        self::ensureExternal($context, 'malloc', $context->context->functionType($voidPtr, false, $sizeT));
-        self::ensureExternal($context, 'free', $context->context->functionType($voidTy, false, $i8p));
+        // malloc/free after LibcExtern always-on drop (#32273) — canonical i8*/size_t,
+        // not void* (malloc.1 class, #31894 / #32122).
+        LibcExtern::ensureMallocFamily($context);
         // memcpy(3) via LibcExtern::ensureMemcpyDecl after always-on drop (#31885);
         // canonical i8* ABI avoids void* NestedJIT mistyped calls (#27663).
         LibcExtern::ensureMemcpyDecl($context);

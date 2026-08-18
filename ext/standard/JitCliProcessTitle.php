@@ -151,19 +151,10 @@ final class JitCliProcessTitle
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
 
-        $i64 = $context->getTypeFromString('int64');
-
-        foreach (['malloc', 'strlen'] as $name) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $ft = 'malloc' === $name
-                    ? $context->context->functionType($i8p, false, $i64)
-                    : $context->context->functionType($i64, false, $i8p);
-                $fn = $context->module->addFunction($name, $ft);
-                $context->registerFunction($name, $fn);
-            }
-        }
+        // malloc after LibcExtern always-on drop (#32273) — canonical i8*/size_t,
+        // not i64 size (malloc.1 class, #31894 / #32122).
+        LibcExtern::ensureMallocFamily($context);
+        LibcExtern::ensureStrlenDecl($context);
 
         try {
             $context->lookupFunction('prctl');

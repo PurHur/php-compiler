@@ -234,6 +234,8 @@ final class SocketPairIoRuntime
         \PHPCompiler\JIT\LibcExtern::ensurePosixFd($context);
         // Module-local memcpy(3) after LibcExtern always-on drop (#31885).
         \PHPCompiler\JIT\LibcExtern::ensureMemcpyDecl($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        \PHPCompiler\JIT\LibcExtern::ensureMallocFamily($context);
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');

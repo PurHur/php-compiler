@@ -84,6 +84,9 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'strtod',
             'strlen',
             'snprintf',
+            'malloc',
+            'realloc',
+            'free',
         ];
     }
 
@@ -94,7 +97,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988/#31997/#32068/#32092)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988/#31997/#32068/#32092/#32273)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -126,6 +129,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31997', $source);
         $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('#32092', $source);
+        $this->assertStringContainsString('#32273', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
         $this->assertStringContainsString('ensureMemcpyDecl', $source);
@@ -135,6 +139,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStrtodDecl', $source);
         $this->assertStringContainsString('ensureStrlenDecl', $source);
         $this->assertStringContainsString('ensureSnprintf', $source);
+        $this->assertStringContainsString('ensureMallocFamily', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
     }
@@ -386,6 +391,21 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc snprintf (#32092)'
         );
+        $this->assertStringNotContainsString(
+            "'malloc' =>",
+            $source,
+            'LibcExtern must not declare libc malloc (#32273)'
+        );
+        $this->assertStringNotContainsString(
+            "'realloc' =>",
+            $source,
+            'LibcExtern must not declare libc realloc (#32273)'
+        );
+        $this->assertStringNotContainsString(
+            "'free' =>",
+            $source,
+            'LibcExtern must not declare libc free (#32273)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
@@ -401,6 +421,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31997', $source);
         $this->assertStringContainsString('#32068', $source);
         $this->assertStringContainsString('#32092', $source);
+        $this->assertStringContainsString('#32273', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
@@ -410,6 +431,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStrtodDecl', $source);
         $this->assertStringContainsString('ensureStrlenDecl', $source);
         $this->assertStringContainsString('ensureSnprintf', $source);
+        $this->assertStringContainsString('ensureMallocFamily', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
         $this->assertStringContainsString('ensureStrncmp', $source);
@@ -850,6 +872,75 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             }
         }
         $this->assertSame([], $missing, 'NestedJIT snprintf lookups must call ensureSnprintf (#32092)');
+    }
+
+    public function testNestedJitConsumersEnsureMallocFamilyAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'lib/JIT/Builtin/MemoryManager/Native.php',
+            'lib/JIT/Builtin/PackArgvSerialize.php',
+            'lib/JIT/Builtin/PregExpandRuntime.php',
+            'lib/JIT/Builtin/ObStorageLlvm.php',
+            'lib/JIT/Builtin/OutputRewriteVarsStorage.php',
+            'lib/JIT/Builtin/SocketPairIoRuntime.php',
+            'lib/JIT/Builtin/SscanfAssignApply.php',
+            'lib/JIT/Builtin/StringGetenv.php',
+            'lib/JIT/Builtin/StringSodiumAead.php',
+            'lib/JIT/Builtin/StringSodiumGenerichash.php',
+            'lib/JIT/Builtin/StringZlibJit.php',
+            'ext/standard/JitFsGlobKernel.php',
+            'ext/standard/JitMultipartKernel.php',
+            'ext/standard/JitParseStrUserScriptCstrKernel.php',
+            'ext/standard/JitStreamIoKernel.php',
+            'ext/standard/JitGzStreamKernel.php',
+            'ext/standard/JitEnvLocalKernel.php',
+            'ext/standard/JitCliProcessTitle.php',
+            'ext/standard/JitRequestParseBodyKernel.php',
+            'ext/standard/JitArgon2Kernel.php',
+            'ext/hash/JitHashCryptoKernel.php',
+            'ext/openssl/JitOpensslCipherKernel.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensureMallocFamily',
+                $source,
+                "{$rel} must call LibcExtern::ensureMallocFamily after #32273"
+            );
+            $this->assertStringContainsString('#32273', $source);
+        }
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringContainsString('ensureMallocFamily', $libc);
+        $this->assertStringContainsString('#32273', $libc);
+        $this->assertStringNotContainsString("'malloc' =>", $libc);
+        $this->assertStringNotContainsString("'realloc' =>", $libc);
+        $this->assertStringNotContainsString("'free' =>", $libc);
+
+        $root = dirname(__DIR__, 2);
+        $missing = [];
+        foreach (['lib', 'ext'] as $dir) {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root.'/'.$dir, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if ('php' !== $file->getExtension()) {
+                    continue;
+                }
+                $path = $file->getPathname();
+                if (str_ends_with($path, '/lib/JIT/LibcExtern.php')) {
+                    continue;
+                }
+                $source = (string) file_get_contents($path);
+                if (!str_contains($source, "lookupFunction('malloc')")
+                    && !str_contains($source, "lookupFunction('realloc')")
+                    && !str_contains($source, "lookupFunction('free')")) {
+                    continue;
+                }
+                if (!str_contains($source, 'LibcExtern::ensureMallocFamily')) {
+                    $missing[] = substr($path, strlen($root) + 1);
+                }
+            }
+        }
+        $this->assertSame([], $missing, 'NestedJIT malloc/realloc/free lookups must call ensureMallocFamily (#32273)');
     }
 
     public function testNestedJitConsumersLookupCompilerStrcasecmpAfterLibcExternDrop(): void

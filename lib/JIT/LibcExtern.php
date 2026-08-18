@@ -7,15 +7,15 @@ namespace PHPCompiler\JIT;
 /**
  * Canonical C library extern declarations for AOT/MCJIT modules.
  *
- * Registers malloc/free and string/memory helpers with int8* pointer types so
- * per-builtin ensureLibc() helpers cannot introduce conflicting void* signatures.
+ * Always-on table is the small MCJIT alias set (syscall / __phpc_host_*).
+ * libc malloc/realloc/free are module-local via {@see ensureMallocFamily} (#32273)
+ * with int8* / size_t so NestedJIT leaves cannot mint malloc.1.
  */
 final class LibcExtern
 {
     public static function register(Context $context): void
     {
         $ctx = $context->context;
-        $void = $context->getTypeFromString('void');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
@@ -23,9 +23,11 @@ final class LibcExtern
 
         /** @var array<string, array{0: mixed, 1: bool, 2: list<mixed>}> $specs */
         $specs = [
-            'malloc' => [$i8p, false, [$sizeT]],
-            'realloc' => [$i8p, false, [$i8p, $sizeT]],
-            'free' => [$void, false, [$i8p]],
+            // malloc/realloc/free dropped (#32273): NestedJIT leaves call ensureMallocFamily
+            // before lookup; MemoryManager\Native::register() does the same. Canonical i8*
+            // / size_t ABI — leaves that declared void* or i64 size used to mint malloc.1
+            // (#31894 / #32122 class). Peer memcpy drop (#31885). User-script alloc stays
+            // on MemoryManager __mm__malloc / __mm__realloc / __mm__free — not libc.
             // memcpy dropped (#31885): NestedJIT leaves that lookup without a local decl
             // call ensureMemcpyDecl before lookup; kernels that already declare i8* memcpy
             // module-locally stay as-is. EMBED MCJIT still gets implementMemcpyBody after
@@ -314,6 +316,43 @@ final class LibcExtern
             );
         }
         $context->registerFunction('snprintf', $fn);
+    }
+
+    /**
+     * Module-local malloc(3)/realloc(3)/free(3) after LibcExtern always-on drop (#32273).
+     *
+     * Canonical i8* / size_t ABI. NestedJIT leaves used to declare void* or i64 size,
+     * which LLVM silently renamed to malloc.1 (#31894 / #32122 class). MemoryManager\Native
+     * and NestedJIT C-buffer leaves call this before lookupFunction('malloc'|'realloc'|'free').
+     * Peer: ensureMemcpyDecl (#31885) / ensurePosixFd (#31817).
+     */
+    public static function ensureMallocFamily(Context $context): void
+    {
+        $void = $context->getTypeFromString('void');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        // Tuple list (not always-on table rows) so LibcExternDeadDeclsRuntimeShrinkTest can
+        // assert malloc/realloc/free rows are gone without matching this helper.
+        foreach ([
+            ['malloc', $i8p, [$sizeT]],
+            ['realloc', $i8p, [$i8p, $sizeT]],
+            ['free', $void, [$i8p]],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+
+                continue;
+            } catch (\LogicException $e) {
+            }
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
+        }
     }
 
     /**

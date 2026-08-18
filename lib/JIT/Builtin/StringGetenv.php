@@ -190,6 +190,8 @@ final class StringGetenv
     public static function invokePutenvNestedLeaf(Context $context, Value $assignmentStr): void
     {
         LibcExtern::register($context);
+        // malloc/free after LibcExtern always-on drop (#32273).
+        LibcExtern::ensureMallocFamily($context);
         self::ensureLibcStrchr($context);
         self::ensureLibcSetenvUnsetenv($context);
         $map = $context->structFieldMap['__string__'];

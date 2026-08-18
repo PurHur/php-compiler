@@ -288,9 +288,10 @@ final class SscanfAssignApply
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
 
+        // malloc after LibcExtern always-on drop (#32273).
+        \PHPCompiler\JIT\LibcExtern::ensureMallocFamily($context);
         foreach (
             [
-                ['malloc', $i8p, [$sizeT]],
                 ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {

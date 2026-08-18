@@ -243,12 +243,13 @@ final class JitStreamIoKernel
         // Module-local stdio after LibcExtern always-on drop (#31606 / fopen family #31764).
         // Module-local close(2) after open/close/read/write always-on drop (#31817).
         // strcmp(3) after always-on LibcExtern drop (#31971).
+        // malloc/free after always-on LibcExtern drop (#32273).
         LibcExtern::ensureStrcmpDecl($context);
+        LibcExtern::ensureMallocFamily($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $void = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
 
         foreach ([
@@ -262,8 +263,6 @@ final class JitStreamIoKernel
             ['fclose', $i32, [$i8p]],
             ['tmpfile', $i8p, []],
             ['strdup', $i8p, [$i8p]],
-            ['free', $void, [$i8p]],
-            ['malloc', $i8p, [$sizeT]],
             ['fread', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
             ['fgets', $i8p, [$i8p, $i32, $i8p]],
             ['fseek', $i32, [$i8p, $i64, $i32]],
