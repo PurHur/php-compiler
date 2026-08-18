@@ -2950,6 +2950,11 @@ final class VmSoapClient
                 return $temporal;
             }
         }
+        // php-src to_xml_datetime_ex IS_OBJECT DateTimeInterface — php_format_date_obj (#32269).
+        $objectTemporal = self::formatSoapXsdTemporalDateTimeObject($encType, $value);
+        if (null !== $objectTemporal) {
+            return $objectTemporal;
+        }
         if (SoapConstants::XSD_BOOLEAN === $encType) {
             return self::soapVarIsTrue($value) ? 'true' : 'false';
         }
@@ -2984,6 +2989,51 @@ final class VmSoapClient
         }
 
         return \htmlspecialchars(self::soapVarRawString($value), \ENT_XML1);
+    }
+
+    /**
+     * php-src to_xml_datetime_ex() IS_OBJECT DateTimeInterface (#32269).
+     *
+     * DateTime / DateTimeImmutable, or the json-wire bag exportArgTree emits
+     * ({@see \PHPCompiler\VM\DateTimeSupport::exportZendJsonWireDateTimeLike}).
+     * XSD_DATE / XSD_TIME / gYear* object formats are siblings #32270 / #32271.
+     */
+    private static function formatSoapXsdTemporalDateTimeObject(int $encType, mixed $value): ?string
+    {
+        if (SoapConstants::XSD_DATETIME !== $encType) {
+            return null;
+        }
+        $dt = self::soapVarDateTimeInterface($value);
+        if (null === $dt) {
+            return null;
+        }
+        // php-src to_xml_datetime() ext_date_format "Y-m-d\\TH:i:s.up"
+        return \htmlspecialchars($dt->format('Y-m-d\TH:i:s.up'), \ENT_XML1);
+    }
+
+    /**
+     * Host DateTimeInterface, or Zend json-wire {date, timezone_type, timezone}.
+     */
+    private static function soapVarDateTimeInterface(mixed $value): ?\DateTimeInterface
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value;
+        }
+        if (
+            !\is_array($value)
+            || !isset($value['date'], $value['timezone_type'], $value['timezone'])
+            || !\is_string($value['date'])
+            || !\is_int($value['timezone_type'])
+            || !\is_string($value['timezone'])
+            || '' === $value['timezone']
+        ) {
+            return null;
+        }
+        try {
+            return new \DateTime($value['date'], new \DateTimeZone($value['timezone']));
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**
