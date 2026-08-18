@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -16,6 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT float→string honoring PG(precision) (#21963).
  *
  * LLVM snprintf over {@see IniRuntime::loadPrecision()}.
+ * Echo / `(string)` / var_dump then rewrite libc `%g` to zend_gcvt E-form (#32316).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmZendDoubleString}.
  * php-src: Zend/zend_operators.c — _convert_to_string float branch
  */
@@ -24,6 +26,11 @@ final class ZendDoubleStringRuntime
     private const ABI = '__compiler_zend_double_string';
 
     private const ENTRY = 'zend_double_string_entry';
+
+    /** Fresh ABI — not inside cached `__compiler_zend_double_string` helper-runtime (#32316). */
+    private const ZENDIFY_ABI = '__compiler_zendify_snprintf_g';
+
+    private const ZENDIFY_ENTRY = 'zendify_snprintf_g_entry';
 
     private static int $seq = 0;
 
@@ -35,6 +42,16 @@ final class ZendDoubleStringRuntime
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::implement($context);
+        self::ensureZendifyLinked($context);
+    }
+
+    /**
+     * convert_to_string / echo / var_dump float display (zend_gcvt).
+     * json_encode keeps {@see format()} — JSON uses lowercase `e`.
+     */
+    public static function formatGcvt(Context $context, Value $doubleVal): Value
+    {
+        return self::zendifyGcvt($context, self::format($context, $doubleVal));
     }
 
     public static function format(Context $context, Value $doubleVal): Value
@@ -231,6 +248,268 @@ final class ZendDoubleStringRuntime
         $phi->addIncoming($okPhi, $okEnd);
 
         return $phi;
+    }
+
+    public static function zendifyGcvt(Context $context, Value $str): Value
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return $str;
+        }
+        self::ensureZendifyLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ZENDIFY_ABI),
+            $str
+        );
+    }
+
+    private static function ensureZendifyLinked(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ZENDIFY_ABI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ZENDIFY_ABI, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
+
+        self::ensureDecls($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ZENDIFY_ABI,
+                $context->context->functionType($strPtr, false, $strPtr)
+            );
+        $entry = $fn->appendBasicBlock(self::ZENDIFY_ENTRY);
+        $context->registerFunction(self::ZENDIFY_ABI, $fn);
+        $context->activeFunction = self::ZENDIFY_ABI;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        $context->builder->positionAtEnd($entry);
+        try {
+            self::emitZendifyBody($context, $fn, $fn->getParam(0));
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
+    }
+
+    /**
+     * LLVM peer of {@see \PHPCompiler\ext\standard\VmZendDoubleString::zendifySnprintfG()}.
+     *
+     * php-src Zend/zend_strtod.c zend_gcvt E branch (#32316).
+     */
+    private static function emitZendifyBody(Context $context, LlvmFunction $fn, Value $str): void
+    {
+        $b = $context->builder;
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $map = $context->structFieldMap['__string__'];
+
+        $len = $b->load($b->structGep($str, $map['length']));
+        $data = $b->structGep($str, $map['value']);
+
+        $ePosPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $hasDotPtr = BasicBlockHelper::entryAlloca($context, $i8);
+        $iPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $b->store($len, $ePosPtr);
+        $b->store($i8->constInt(0, false), $hasDotPtr);
+        $b->store($i64->constInt(0, false), $iPtr);
+
+        $scanHead = $fn->appendBasicBlock('zgcvt_scan_head');
+        $scanBody = $fn->appendBasicBlock('zgcvt_scan_body');
+        $foundE = $fn->appendBasicBlock('zgcvt_found_e');
+        $scanNext = $fn->appendBasicBlock('zgcvt_scan_next');
+        $scanDone = $fn->appendBasicBlock('zgcvt_scan_done');
+        $rewrite = $fn->appendBasicBlock('zgcvt_rewrite');
+        $done = $fn->appendBasicBlock('zgcvt_done');
+
+        $b->branch($scanHead);
+        $b->positionAtEnd($scanHead);
+        $i = $b->load($iPtr);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $i, $len), $scanBody, $scanDone);
+
+        $b->positionAtEnd($scanBody);
+        $c = $b->load($b->gep($data, $i));
+        $isDot = $b->icmp(Builder::INT_EQ, $c, $i8->constInt(\ord('.'), false));
+        $b->store(
+            $b->select($isDot, $i8->constInt(1, false), $b->load($hasDotPtr)),
+            $hasDotPtr
+        );
+        $isE = $b->or(
+            $b->icmp(Builder::INT_EQ, $c, $i8->constInt(\ord('e'), false)),
+            $b->icmp(Builder::INT_EQ, $c, $i8->constInt(\ord('E'), false))
+        );
+        $b->branchIf($isE, $foundE, $scanNext);
+
+        $b->positionAtEnd($foundE);
+        $b->store($i, $ePosPtr);
+        $b->branch($scanDone);
+
+        $b->positionAtEnd($scanNext);
+        $b->store($b->add($i, $i64->constInt(1, false)), $iPtr);
+        $b->branch($scanHead);
+
+        $b->positionAtEnd($scanDone);
+        $ePos = $b->load($ePosPtr);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $ePos, $len), $rewrite, $done);
+        $noEEnd = $scanDone;
+
+        $b->positionAtEnd($rewrite);
+        $outBuf = $b->call(
+            $context->lookupFunction('__mm__malloc'),
+            $sizeT->constInt(80, false)
+        );
+        $out = $b->pointerCast($outBuf, $i8p);
+        $diPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $siPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $b->store($i64->constInt(0, false), $diPtr);
+        $b->store($i64->constInt(0, false), $siPtr);
+
+        $copyMantHead = $fn->appendBasicBlock('zgcvt_mant_head');
+        $copyMantBody = $fn->appendBasicBlock('zgcvt_mant_body');
+        $afterMant = $fn->appendBasicBlock('zgcvt_after_mant');
+        $b->branch($copyMantHead);
+        $b->positionAtEnd($copyMantHead);
+        $si = $b->load($siPtr);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $si, $ePos), $copyMantBody, $afterMant);
+        $b->positionAtEnd($copyMantBody);
+        $di = $b->load($diPtr);
+        $b->store($b->load($b->gep($data, $si)), $b->gep($out, $di));
+        $b->store($b->add($si, $i64->constInt(1, false)), $siPtr);
+        $b->store($b->add($di, $i64->constInt(1, false)), $diPtr);
+        $b->branch($copyMantHead);
+
+        $b->positionAtEnd($afterMant);
+        $needDot = $fn->appendBasicBlock('zgcvt_need_dot');
+        $afterDot = $fn->appendBasicBlock('zgcvt_after_dot');
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $b->load($hasDotPtr), $i8->constInt(0, false)),
+            $needDot,
+            $afterDot
+        );
+        $b->positionAtEnd($needDot);
+        $di = $b->load($diPtr);
+        $b->store($i8->constInt(\ord('.'), false), $b->gep($out, $di));
+        $di1 = $b->add($di, $i64->constInt(1, false));
+        $b->store($i8->constInt(\ord('0'), false), $b->gep($out, $di1));
+        $b->store($b->add($di1, $i64->constInt(1, false)), $diPtr);
+        $b->branch($afterDot);
+
+        $b->positionAtEnd($afterDot);
+        $di = $b->load($diPtr);
+        $b->store($i8->constInt(\ord('E'), false), $b->gep($out, $di));
+        $b->store($b->add($di, $i64->constInt(1, false)), $diPtr);
+
+        $expIdx = $b->add($ePos, $i64->constInt(1, false));
+        $b->store($expIdx, $siPtr);
+        $haveSign = $fn->appendBasicBlock('zgcvt_have_sign');
+        $signBody = $fn->appendBasicBlock('zgcvt_sign_body');
+        $plusSign = $fn->appendBasicBlock('zgcvt_plus_sign');
+        $afterSign = $fn->appendBasicBlock('zgcvt_after_sign');
+        $b->branchIf($b->icmp(Builder::INT_ULT, $expIdx, $len), $haveSign, $plusSign);
+
+        $b->positionAtEnd($haveSign);
+        $sc = $b->load($b->gep($data, $expIdx));
+        $isSign = $b->or(
+            $b->icmp(Builder::INT_EQ, $sc, $i8->constInt(\ord('+'), false)),
+            $b->icmp(Builder::INT_EQ, $sc, $i8->constInt(\ord('-'), false))
+        );
+        $b->branchIf($isSign, $signBody, $plusSign);
+
+        $b->positionAtEnd($signBody);
+        $di = $b->load($diPtr);
+        $b->store($sc, $b->gep($out, $di));
+        $b->store($b->add($di, $i64->constInt(1, false)), $diPtr);
+        $b->store($b->add($expIdx, $i64->constInt(1, false)), $siPtr);
+        $b->branch($afterSign);
+
+        $b->positionAtEnd($plusSign);
+        $di = $b->load($diPtr);
+        $b->store($i8->constInt(\ord('+'), false), $b->gep($out, $di));
+        $b->store($b->add($di, $i64->constInt(1, false)), $diPtr);
+        $b->branch($afterSign);
+
+        $b->positionAtEnd($afterSign);
+        $skipHead = $fn->appendBasicBlock('zgcvt_skip_head');
+        $skipBody = $fn->appendBasicBlock('zgcvt_skip_body');
+        $skipDone = $fn->appendBasicBlock('zgcvt_skip_done');
+        $b->branch($skipHead);
+        $b->positionAtEnd($skipHead);
+        $si = $b->load($siPtr);
+        $inRange = $b->icmp(Builder::INT_ULT, $si, $len);
+        $isZero = $fn->appendBasicBlock('zgcvt_is_zero');
+        $b->branchIf($inRange, $isZero, $skipDone);
+        $b->positionAtEnd($isZero);
+        $zc = $b->load($b->gep($data, $si));
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $zc, $i8->constInt(\ord('0'), false)),
+            $skipBody,
+            $skipDone
+        );
+        $b->positionAtEnd($skipBody);
+        $b->store($b->add($si, $i64->constInt(1, false)), $siPtr);
+        $b->branch($skipHead);
+
+        $b->positionAtEnd($skipDone);
+        $emptyExp = $fn->appendBasicBlock('zgcvt_empty_exp');
+        $copyExp = $fn->appendBasicBlock('zgcvt_copy_exp');
+        $afterExp = $fn->appendBasicBlock('zgcvt_after_exp');
+        $si = $b->load($siPtr);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $si, $len), $copyExp, $emptyExp);
+
+        $b->positionAtEnd($emptyExp);
+        $di = $b->load($diPtr);
+        $b->store($i8->constInt(\ord('0'), false), $b->gep($out, $di));
+        $b->store($b->add($di, $i64->constInt(1, false)), $diPtr);
+        $b->branch($afterExp);
+
+        $copyExpHead = $fn->appendBasicBlock('zgcvt_cexp_head');
+        $copyExpBody = $fn->appendBasicBlock('zgcvt_cexp_body');
+        $b->positionAtEnd($copyExp);
+        $b->branch($copyExpHead);
+        $b->positionAtEnd($copyExpHead);
+        $si = $b->load($siPtr);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $si, $len), $copyExpBody, $afterExp);
+        $b->positionAtEnd($copyExpBody);
+        $di = $b->load($diPtr);
+        $b->store($b->load($b->gep($data, $si)), $b->gep($out, $di));
+        $b->store($b->add($si, $i64->constInt(1, false)), $siPtr);
+        $b->store($b->add($di, $i64->constInt(1, false)), $diPtr);
+        $b->branch($copyExpHead);
+
+        $b->positionAtEnd($afterExp);
+        $outLen = $b->load($diPtr);
+        $newStr = $b->call(
+            $context->lookupFunction('__string__init'),
+            $outLen,
+            $out
+        );
+        $b->call($context->lookupFunction('__mm__free'), $outBuf);
+        $rewriteEnd = $b->getInsertBlock();
+        $b->branch($done);
+
+        $b->positionAtEnd($done);
+        $phi = $b->phi($strPtr);
+        $phi->addIncoming($str, $noEEnd);
+        $phi->addIncoming($newStr, $rewriteEnd);
+        $b->returnValue($phi);
     }
 
     private static function snprintfCall(

@@ -234,7 +234,7 @@ final class StringPrintR
             $context->lookupFunction('__value__readDouble'),
             $arg
         );
-        $doubleStr = ZendDoubleStringRuntime::format($context, $doubleVal);
+        $doubleStr = ZendDoubleStringRuntime::formatGcvt($context, $doubleVal);
         $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 

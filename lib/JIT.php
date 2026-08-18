@@ -10531,8 +10531,9 @@ class JIT {
                             break;
                         case Variable::TYPE_NATIVE_DOUBLE:
                             $argValue = $this->context->helper->loadValue($arg);
-                            // PG(precision) via ZendDoubleStringRuntime (#21963).
-                            $formatted = JIT\Builtin\ZendDoubleStringRuntime::format(
+                            // PG(precision) via ZendDoubleStringRuntime (#21963);
+                            // libc %g → zend_gcvt E-form (#32316).
+                            $formatted = JIT\Builtin\ZendDoubleStringRuntime::formatGcvt(
                                 $this->context,
                                 $argValue
                             );

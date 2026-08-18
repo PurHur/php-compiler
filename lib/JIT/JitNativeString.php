@@ -273,12 +273,13 @@ final class JitNativeString
                     JitResourceIdString::formatNativeLong($context, $value, $sourceOperand)
                 );
             case Variable::TYPE_NATIVE_DOUBLE:
-                // PG(precision) via VmZendDoubleString (#21963, Zend/zend_operators.c).
+                // PG(precision) via VmZendDoubleString (#21963, Zend/zend_operators.c);
+                // libc %g → zend_gcvt E-form (#32316).
                 return new Variable(
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
-                    Builtin\ZendDoubleStringRuntime::format($context, $value)
+                    Builtin\ZendDoubleStringRuntime::formatGcvt($context, $value)
                 );
             case Variable::TYPE_NATIVE_BOOL:
                 self::ensureInsertBlock($context);

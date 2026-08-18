@@ -215,7 +215,8 @@ final class ValueEchoRuntime
         );
         // Boxed AOT temps (echo INF / fdiv result) must match Zend casing — not libc
         // snprintf "inf" via __phpc_ob_echo_double (#27412; peer native path #21963).
-        $formatted = ZendDoubleStringRuntime::format($context, $doubleVal);
+        // libc %g → zend_gcvt (`1e+100` → `1.0E+100`) (#32316).
+        $formatted = ZendDoubleStringRuntime::formatGcvt($context, $doubleVal);
         ValueEchoHelper::echoStringVariable(
             $context,
             new Variable(

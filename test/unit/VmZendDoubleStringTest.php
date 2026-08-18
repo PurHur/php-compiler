@@ -44,4 +44,16 @@ final class VmZendDoubleStringTest extends TestCase
         $this->assertSame('1.0E-5', VmZendDoubleString::format(1e-5));
         $this->assertSame('1.5E+20', VmZendDoubleString::format(1.5e20));
     }
+
+    /** libc snprintf %g → zend_gcvt (#32316). */
+    public function testZendifySnprintfGMatchesZendGcvt(): void
+    {
+        $this->assertSame('1.0E+100', VmZendDoubleString::zendifySnprintfG('1e+100'));
+        $this->assertSame('1.0E-5', VmZendDoubleString::zendifySnprintfG('1e-05'));
+        $this->assertSame('1.5E+20', VmZendDoubleString::zendifySnprintfG('1.5e+20'));
+        $this->assertSame('-1.0E+20', VmZendDoubleString::zendifySnprintfG('-1e+20'));
+        $this->assertSame('3.5', VmZendDoubleString::zendifySnprintfG('3.5'));
+        $this->assertSame('INF', VmZendDoubleString::zendifySnprintfG('INF'));
+        $this->assertSame('1.0E+0', VmZendDoubleString::zendifySnprintfG('1e+00'));
+    }
 }
