@@ -32,6 +32,8 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
             'lstat', // #31403
             'strrchr', // #31458 — StrrchrJitHelper + NestedJIT module-local
             'strcoll', // #31498 — StringStrcoll module-local trampoline
+            'strncmp', // #32382 — leftover Module always-on after LibcExtern #31839
+            'strlen', // #32068 — leftover Module always-on already dropped
         ];
     }
 
@@ -39,7 +41,6 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
     private function keptDecls(): array
     {
         return [
-            'strlen',
             '__errno_location',
         ];
     }
@@ -52,11 +53,13 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31403', $source);
         $this->assertStringContainsString('#31458', $source);
         $this->assertStringContainsString('#31498', $source);
+        $this->assertStringContainsString('#32068', $source);
+        $this->assertStringContainsString('#32382', $source);
         foreach ($this->deletedDecls() as $sym) {
             $this->assertStringNotContainsString(
                 "lookupFunction('{$sym}')",
                 $source,
-                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498)"
+                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32068/#32382)"
             );
             $this->assertStringNotContainsString(
                 "addFunction('{$sym}'",

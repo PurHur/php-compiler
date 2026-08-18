@@ -968,16 +968,10 @@ class Module extends ModuleAbstract
         // memcmp(3) dropped from always-on Module decls (#31954 / #31885 peer):
         // NestedJIT leaves call LibcExtern::ensureMemcmpDecl before lookup;
         // user-script memcmp() is not a php-src builtin (#25359).
-        try {
-            $context->lookupFunction('strncmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('strncmp', $ft);
-            $context->registerFunction('strncmp', $fn);
-        }
+        // strncmp(3) dropped from always-on Module decls (#32382 / #31839 peer):
+        // NestedJIT leaves call LibcExtern::ensureStrncmp before lookup;
+        // user-script strncmp() stays on NCompareJitHelper / VmString (#15225).
+        // Leftover always-on vs NestedJIT size_t vs i64 minted strncmp.1 (#31894 / #32122).
         StringCaseCompare::ensureStrcasecmpLinked($context);
         StringCaseCompare::ensureStrncasecmpLinked($context);
         // strcoll(3) not always-on in Module/LibcExtern (#31498 / #31458 peer):

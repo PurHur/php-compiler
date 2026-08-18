@@ -469,15 +469,52 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'ext/standard/JitRequestParseBodyKernel.php',
             'ext/standard/JitSessionStorageKernel.php',
             'lib/JIT/M5TrivialEchoNative.php',
+            'ext/standard/JitStreamIoKernel.php',
+            'ext/standard/JitStreamMetaThinAot.php',
+            'ext/standard/JitPath.php',
         ] as $rel) {
             $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
             $this->assertStringContainsString(
                 'LibcExtern::ensureStrncmp',
                 $source,
-                "{$rel} must call LibcExtern::ensureStrncmp after #31839"
+                "{$rel} must call LibcExtern::ensureStrncmp after #31839/#32382"
             );
-            $this->assertStringContainsString('#31839', $source);
+            $this->assertTrue(
+                str_contains($source, '#31839') || str_contains($source, '#32382'),
+                "{$rel} must cite #31839 or #32382"
+            );
         }
+        $module = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringNotContainsString("lookupFunction('strncmp')", $module);
+        $this->assertStringNotContainsString("addFunction('strncmp'", $module);
+        $this->assertStringContainsString('#32382', $module);
+        $this->assertStringContainsString('#31839', $module);
+
+        $root = dirname(__DIR__, 2);
+        $missing = [];
+        foreach (['lib', 'ext'] as $dir) {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root.'/'.$dir, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if ('php' !== $file->getExtension()) {
+                    continue;
+                }
+                $path = $file->getPathname();
+                if (str_ends_with($path, '/lib/JIT/LibcExtern.php')) {
+                    continue;
+                }
+                $source = (string) file_get_contents($path);
+                if (!str_contains($source, "lookupFunction('strncmp')")) {
+                    continue;
+                }
+                if (!str_contains($source, 'LibcExtern::ensureStrncmp')
+                    && !str_contains($source, 'self::ensureStrncmp')) {
+                    $missing[] = substr($path, strlen($root) + 1);
+                }
+            }
+        }
+        $this->assertSame([], $missing, 'NestedJIT strncmp lookups must call ensureStrncmp (#32382)');
     }
 
     public function testNestedJitConsumersEnsurePrintfAfterLibcExternDrop(): void

@@ -62,8 +62,10 @@ final class LibcExtern
             // (#31839). User-script strcmp() stays on VmString / JitStringCompare (#30702)
             // — not libc.
             // strncmp dropped (#31839): NestedJIT leaves call ensureStrncmp() before lookup
-            // (M5TrivialEchoNative + multipart/CGI/stream kernels); user-script strncmp()
-            // stays on NCompareJitHelper / VmString (#15225 / MemcmpRuntimeShrinkTest) — not libc.
+            // (M5TrivialEchoNative + multipart/CGI/stream kernels); leftover Module.php
+            // always-on also dropped (#32382) so NestedJIT size_t vs i64 cannot mint
+            // strncmp.1 (#31894 / #32122). User-script strncmp() stays on NCompareJitHelper
+            // / VmString (#15225 / MemcmpRuntimeShrinkTest) — not libc.
             // Peer strncasecmp (#31682) / strcasecmp (#31787) / open-fd (#31817) drops.
             // strcasecmp dropped (#31787): NestedJIT class/name compares look up
             // __compiler_strcasecmp (StringCaseCompare::ensureStrcasecmpLinked);

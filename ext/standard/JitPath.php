@@ -16,6 +16,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -264,6 +265,8 @@ final class JitPath
         $zero = JitStringIndex::zero($context);
         $i32 = $context->getTypeFromString('int32');
         $sizeT = $context->getTypeFromString('size_t');
+        // Module-local strncmp after leftover Module always-on drop (#32382 / #31839).
+        LibcExtern::ensureStrncmp($context);
 
         $done = self::block($context, 'basename_suffix_done_'.$id);
         $noStrip = self::block($context, 'basename_suffix_no_strip_'.$id);
