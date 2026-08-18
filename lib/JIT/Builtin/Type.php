@@ -235,25 +235,25 @@ class Type extends Builtin {
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
         $voidTy = $this->context->getTypeFromString('void');
+        // Leftover always-on libc decls removed (#32202 / peer Type $libcFns #32173):
+        // getenv(3)/putenv(3) — StringGetenv::ensureLibcGetenv / BootstrapCompileSmokeM3Emit::
+        //   ensureLibcPutenv after LibcExtern drops (#31637 / #31582). User-script getenv()/
+        //   putenv() stay GetenvLookupJitHelper / PutenvJitHelper.
+        // strlen(3) — LibcExtern::ensureStrlenDecl (#32068). User-script strlen() stays
+        //   ext/types JitStrlen / VmString.
+        // open/read/write/close — LibcExtern::ensurePosixFd (#31817). User-script file I/O
+        //   stays on PHP helpers (`__compiler_*`).
+        // fopen/fwrite/fclose — LibcExtern::ensureStdioFile (#31764). User-script fopen()
+        //   stays on JitStreamIoKernel / StreamIoJitHelper.
+        // lseek(2) — zero NestedJIT lookupFunction consumers.
         foreach (
             [
-                'getenv' => [$i8p, false, $i8p],
-                'putenv' => [$i32, false, $i8p],
-                'strlen' => [$sizeT, false, $i8p],
                 '__compiler_env_local_lookup' => [$i8p, false, $i8p],
                 '__compiler_env_register_putenv' => [$voidTy, false, $i8p],
-            ] as $libcName => [$ret, $vararg, $param]
+            ] as $abiName => [$ret, $vararg, $param]
         ) {
-            $this->ensureExternalFunction($libcName, $this->context->context->functionType($ret, $vararg, $param));
+            $this->ensureExternalFunction($abiName, $this->context->context->functionType($ret, $vararg, $param));
         }
-        $this->ensureExternalFunction('open', $this->context->context->functionType($i32, false, $i8p, $i32, $i32));
-        $this->ensureExternalFunction('fopen', $this->context->context->functionType($i8p, false, $i8p, $i8p));
-        $this->ensureExternalFunction('fwrite', $this->context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p));
-        $this->ensureExternalFunction('fclose', $this->context->context->functionType($i32, false, $i8p));
-        $this->ensureExternalFunction('read', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
-        $this->ensureExternalFunction('lseek', $this->context->context->functionType($i64, false, $i32, $i64, $i32));
-        $this->ensureExternalFunction('write', $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT));
-        $this->ensureExternalFunction('close', $this->context->context->functionType($i32, false, $i32));
         $fntypeReadfile = $this->context->context->functionType(
             $i64,
             false,
