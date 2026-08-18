@@ -21202,6 +21202,12 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::substringdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::substringdata');
                 }
+                if ('appenddata' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::appenddata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::appenddata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::appenddata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::appenddata');
+                }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
@@ -21239,6 +21245,12 @@ class JIT {
                 }
                 if ('substringdata' === $methodLc && $this->context->functionIsRegistered('domtext::substringdata')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::substringdata');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('appenddata' === $methodLc && $this->context->functionIsRegistered('domtext::appenddata')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::appenddata');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21480,6 +21492,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::substringdata');
             if ($this->context->functionIsRegistered('domtext::substringdata')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::substringdata');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('appenddata' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::appenddata');
+            if ($this->context->functionIsRegistered('domtext::appenddata')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::appenddata');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
