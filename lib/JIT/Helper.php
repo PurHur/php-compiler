@@ -1769,6 +1769,13 @@ restart:
                 $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                 goto return_bool;
             }
+            // convert_scalar_to_number: IS_TRUE→1, IS_FALSE→0 then numeric-string ⊙ long (#32401).
+            $rightType = Variable::TYPE_NATIVE_LONG;
+            $rightValue = $this->context->builder->zExt(
+                $rightValue,
+                $this->context->getTypeFromString('int64')
+            );
+            goto restart;
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_LONG === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -1838,6 +1845,24 @@ restart:
                 );
                 $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
                 goto return_double;
+            }
+            if (OpCode::TYPE_SPACESHIP === $opcode->type || self::isOrderedCompareOpcode($opcode->type)) {
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                $lt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $leftLong, $__right);
+                $gt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $leftLong, $__right);
+                $ty = $leftLong->typeOf();
+                $cmp = $this->context->builder->select(
+                    $gt,
+                    $ty->constInt(1, true),
+                    $this->context->builder->select($lt, $ty->constInt(-1, true), $ty->constInt(0, false))
+                );
+                if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                    $result = $cmp;
+                    goto return_long;
+                }
+                $result = JitValueCompare::boolFromSpaceshipCmp($this->context, $opcode->type, $cmp);
+                goto return_bool;
             }
         }
         if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_STRING === $rightType) {
@@ -1909,6 +1934,24 @@ restart:
                 $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
                 goto return_double;
             }
+            if (OpCode::TYPE_SPACESHIP === $opcode->type || self::isOrderedCompareOpcode($opcode->type)) {
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                $lt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $__left, $rightLong);
+                $gt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $__left, $rightLong);
+                $ty = $__left->typeOf();
+                $cmp = $this->context->builder->select(
+                    $gt,
+                    $ty->constInt(1, true),
+                    $this->context->builder->select($lt, $ty->constInt(-1, true), $ty->constInt(0, false))
+                );
+                if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                    $result = $cmp;
+                    goto return_long;
+                }
+                $result = JitValueCompare::boolFromSpaceshipCmp($this->context, $opcode->type, $cmp);
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_DOUBLE === $rightType) {
             if (OpCode::TYPE_MODULO === $opcode->type) {
@@ -1964,6 +2007,13 @@ restart:
                 $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                 goto return_bool;
             }
+            // convert_scalar_to_number: IS_TRUE→1, IS_FALSE→0 then numeric-string ⊙ long (#32401).
+            $leftType = Variable::TYPE_NATIVE_LONG;
+            $leftValue = $this->context->builder->zExt(
+                $leftValue,
+                $this->context->getTypeFromString('int64')
+            );
+            goto restart;
         }
         if (Variable::TYPE_NULL === $leftType && JitValueBox::isValueOperand($right)) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
