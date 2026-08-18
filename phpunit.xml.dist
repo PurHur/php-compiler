@@ -77,6 +77,8 @@
             <file>./test/compliance/IncludeInheritsThisJITTest.php</file>
             <file>./test/compliance/IncludeInheritsClassScopeVMTest.php</file>
             <file>./test/compliance/IncludeInheritsClassScopeJITTest.php</file>
+            <file>./test/compliance/IncludeParseError32154VMTest.php</file>
+            <file>./test/compliance/IncludeParseError32154JITTest.php</file>
             <file>./test/compliance/EvalInheritsThisVMTest.php</file>
             <file>./test/compliance/EvalInheritsThisJITTest.php</file>
             <file>./test/compliance/EvalEmptyReturnsFalse31914VMTest.php</file>
@@ -140,6 +142,8 @@
             <file>./test/compliance/TraitDiamondInsteadofRequiredNotAddedJITTest.php</file>
             <file>./test/compliance/TraitInsteadofParentVMTest.php</file>
             <file>./test/compliance/TraitInsteadofParentJITTest.php</file>
+            <file>./test/compliance/ClosureUseThis32152VMTest.php</file>
+            <file>./test/compliance/ClosureUseThis32152JITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignJITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimRwVMTest.php</file>
@@ -264,6 +268,10 @@
             <file>./test/compliance/LdapStartTls32109JITTest.php</file>
             <file>./test/compliance/LdapBindExt32146VMTest.php</file>
             <file>./test/compliance/LdapBindExt32146JITTest.php</file>
+            <file>./test/compliance/LdapSaslBind32147VMTest.php</file>
+            <file>./test/compliance/LdapSaslBind32147JITTest.php</file>
+            <file>./test/compliance/LdapSetRebindProc32148VMTest.php</file>
+            <file>./test/compliance/LdapSetRebindProc32148JITTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947VMTest.php</file>
             <file>./test/compliance/ArrayAccessAssignOp31947JITTest.php</file>
             <file>./test/compliance/ArrayAccessIncByValue32015VMTest.php</file>
@@ -906,6 +914,8 @@
             <file>./test/compliance/PcgOneseq128XslRr64Generate31054JITTest.php</file>
             <file>./test/compliance/RandomizerExcessArgc31092VMTest.php</file>
             <file>./test/compliance/RandomizerExcessArgc31092JITTest.php</file>
+            <file>./test/compliance/RandomizerNamedArgs26257VMTest.php</file>
+            <file>./test/compliance/RandomizerNamedArgs26257JITTest.php</file>
             <file>./test/compliance/RandomEngineGenerateExcessArgc31096VMTest.php</file>
             <file>./test/compliance/RandomEngineGenerateExcessArgc31096JITTest.php</file>
             <file>./test/compliance/RandomEngineJumpExcessArgc31097VMTest.php</file>

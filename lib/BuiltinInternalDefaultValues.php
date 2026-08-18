@@ -50,6 +50,10 @@ final class BuiltinInternalDefaultValues
         'resourcebundle_create' => [
             2 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/random/randomizer.stub.php — IntervalBoundary $boundary = ClosedOpen (#26257)
+        'random\\randomizer::getfloat' => [
+            2 => ['kind' => 'enum_case', 'class' => 'Random\\IntervalBoundary', 'case' => 'ClosedOpen'],
+        ],
         'datetime::__construct' => [
             0 => ['kind' => 'string', 'value' => 'now'],
             1 => ['kind' => 'null'],

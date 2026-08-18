@@ -2232,6 +2232,10 @@ final class ReflectionSupport
         if ('round' === $callableLc && 2 === $index) {
             return 'RoundingMode::HalfAwayFromZero';
         }
+        // php-src ext/random/randomizer.stub.php (#26257)
+        if ('random\\randomizer::getfloat' === $callableLc && 2 === $index) {
+            return 'Random\\IntervalBoundary::ClosedOpen';
+        }
 
         return null;
     }

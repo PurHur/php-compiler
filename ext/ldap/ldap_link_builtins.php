@@ -165,7 +165,7 @@ final class ldap_sasl_bind extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_sasl_bind() is not implemented for JIT in this compiler build (issue #22176)');
+        return JitLdapLink::invokeSaslBind($context, $args);
     }
 }
 
@@ -228,7 +228,7 @@ final class ldap_set_rebind_proc extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_set_rebind_proc() is not implemented for JIT in this compiler build (issue #22226)');
+        return JitLdapLink::invokeSetRebindProc($context, $args);
     }
 }
 
