@@ -11616,12 +11616,14 @@ class JIT {
                             break;
                         }
                         $nameSlot = $block->slotForOperand($nameOp);
-                        if (
-                            JIT\BoundMethodCallableHelper::isBoundMethodArrayCallee($nameOp, $nameVar)
-                            && $this->tryInitBoundMethodFccDirect($block, $nameSlot)
-                        ) {
-                            $this->context->scope->argOperands = [];
-                            break;
+                        if (JIT\BoundMethodCallableHelper::isBoundMethodArrayCallee($nameOp, $nameVar)) {
+                            if (
+                                $this->tryInitBoundMethodFccDirect($block, $nameSlot)
+                                || $this->tryInitStaticArrayCallableDirect($block, $nameSlot)
+                            ) {
+                                $this->context->scope->argOperands = [];
+                                break;
+                            }
                         }
                         if (null !== $nameSlot) {
                             $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);
@@ -20138,6 +20140,26 @@ class JIT {
             return false;
         }
         $this->initJitMethodCall($block, $receiverOp, $methodLc);
+
+        return true;
+    }
+
+    /**
+     * Fold `['Class','method']()` array callables to INIT_STATIC_METHOD_CALL (#32299).
+     *
+     * RuntimeVariableFunction only dispatches string function names; an array callee
+     * previously emitted abort() (rc=134). php-src: Zend/zend_execute.c ZEND_INIT_DYNAMIC_CALL.
+     */
+    private function tryInitStaticArrayCallableDirect(Block $block, ?int $calleeSlot): bool
+    {
+        if (null === $calleeSlot) {
+            return false;
+        }
+        $slots = VM\VmBoundMethodCallable::resolveStaticArrayCallableSlots($block, $calleeSlot);
+        if (null === $slots) {
+            return false;
+        }
+        $this->initJitStaticCall($block, $slots[0], $slots[1]);
 
         return true;
     }
