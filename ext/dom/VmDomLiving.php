@@ -434,8 +434,8 @@ final class VmDomLiving
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
      * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:nth-child(An+B of S)` /
      * `:nth-last-child(An+B of S)`, `:empty`, `:only-child`, `:only-of-type`,
-     * `:root`, `:checked`, `:disabled` / `:enabled`, `:not()` / `:is()` /
-     * `:where()` (selector-list args), `:has()` (relative selector-list args),
+     * `:root`, `:checked`, `:disabled` / `:enabled`, `:optional` / `:required`,
+     * `:not()` / `:is()` / `:where()` (selector-list args), `:has()` (relative selector-list args),
      * CSS attribute selectors (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`, `*=`,
      * optional `i` flag), descendant / child (`>`) / adjacent-sibling (`+`) /
      * general-sibling (`~`) combinators, and comma selector lists (CSS
@@ -1254,6 +1254,7 @@ final class VmDomLiving
                 if (1 !== preg_match(
                     '/\G(?:first-child|last-child|first-of-type|last-of-type|'
                     .'only-child|only-of-type|empty|root|checked|disabled|enabled|'
+                    .'optional|required|'
                     .'nth-child|nth-last-child|nth-of-type|nth-last-of-type|'
                     .'not|is|where|has)/A',
                     $selector,
@@ -1608,6 +1609,12 @@ final class VmDomLiving
         }
         if ('enabled' === $name) {
             return !self::elementIsCssDisabled($element);
+        }
+        if ('required' === $name) {
+            return self::elementIsCssRequired($element);
+        }
+        if ('optional' === $name) {
+            return self::elementIsCssOptional($element);
         }
         if ('not' === $name || 'is' === $name || 'where' === $name) {
             return self::matchesLogicalPseudo($element, $name, $arg);
@@ -2192,6 +2199,40 @@ final class VmDomLiving
         }
 
         return false;
+    }
+
+    /**
+     * CSS `:required` — HTML-namespace `input`/`select`/`textarea` with a
+     * `required` attribute (php-src adapted lexbor
+     * `LXB_CSS_SELECTOR_PSEUDO_CLASS_REQUIRED`; #32257). Empty `required=""`
+     * still counts. Other tags and non-HTML-namespace elements never match.
+     */
+    private static function elementIsCssRequired(ObjectEntry $element): bool
+    {
+        return self::elementIsHtmlFormValueControl($element)
+            && VmDom::hasAttribute($element, 'required');
+    }
+
+    /**
+     * CSS `:optional` — HTML-namespace `input`/`select`/`textarea` without a
+     * `required` attribute (php-src `LXB_CSS_SELECTOR_PSEUDO_CLASS_OPTIONAL`).
+     * Not the global negation of `:required`.
+     */
+    private static function elementIsCssOptional(ObjectEntry $element): bool
+    {
+        return self::elementIsHtmlFormValueControl($element)
+            && !VmDom::hasAttribute($element, 'required');
+    }
+
+    /** HTML-namespace form value controls that participate in optional/required. */
+    private static function elementIsHtmlFormValueControl(ObjectEntry $element): bool
+    {
+        if (!self::elementIsHtmlNamespace($element)) {
+            return false;
+        }
+        $local = self::elementCssLocalName($element);
+
+        return 'input' === $local || 'select' === $local || 'textarea' === $local;
     }
 
     private static function elementIsHtmlNamespace(ObjectEntry $element): bool

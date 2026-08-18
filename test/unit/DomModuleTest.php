@@ -1236,6 +1236,57 @@ PHP;
         }
     }
 
+    /**
+     * CSS :optional/:required on Dom\ ParentNode (#32257, php-src parentnode.c / adapted lexbor).
+     */
+    public function test_dom_parent_node_css_optional_required(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32257)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_dom_qsa_optional_required.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_optional_required.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                ":required=cbr [cbr,selr,tar]\n"
+                .":optional=cb [cb,sel,ta]\n"
+                ."input:required=cbr [cbr]\n"
+                ."input:optional=cb [cb]\n"
+                .":is(:required)=cbr [cbr,selr,tar]\n"
+                ."input:not(:required)=cb [cb,inn,innr]\n"
+                ."#inn:optional=null []\n"
+                ."#innr:required=null []\n"
+                ."#btn:required=null []\n"
+                ."#tar:required=tar [tar]\n"
+                ."matches_cbr=yes\n"
+                ."matches_cb=yes\n"
+                ."matches_inn=no\n"
+                ."matches_innr=no\n"
+                ."matches_btn=no\n"
+                ."matches_tar=yes\n"
+                ."optional_cbr=no\n"
+                ."closest_tar=tar\n"
+                ."html_required=[hinpr,hselr]\n"
+                ."html_optional=[hinp,hta]\n"
+                ."bad[:required()]=SyntaxError\n"
+                ."bad[:optional(1)]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
