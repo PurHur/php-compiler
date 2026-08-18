@@ -48,6 +48,13 @@ final class JitDomXPathEvaluateUserScript
         if (null !== $invalid) {
             return $invalid;
         }
+        // XPath 1.0 `or` / `and` evaluate() — host-fold when Zend DOM is available (#32050).
+        if (self::hasTopLevelOrAnd($expression)) {
+            $host = self::tryHostEvaluateScalar($xml, $expression);
+            if (null !== $host) {
+                return self::boxHostScalar($context, $host);
+            }
+        }
         if (preg_match('~^boolean\((.+)\)$~i', $expression, $boolWrap)) {
             $inner = trim($boolWrap[1]);
             if (preg_match('~^count\((.+)\)$~i', $inner, $countWrap)) {
@@ -355,6 +362,117 @@ final class JitDomXPathEvaluateUserScript
         return $sum;
     }
 
+    /**
+     * Host Zend DOMXPath::evaluate() for compile-time scalar folds (#32050).
+     *
+     * @return bool|int|float|string|null
+     */
+    private static function tryHostEvaluateScalar(string $xml, string $expression): mixed
+    {
+        if (!\extension_loaded('dom') || !\class_exists(\DOMDocument::class, false)) {
+            return null;
+        }
+        set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $doc = new \DOMDocument();
+            if (!@$doc->loadXML($xml)) {
+                restore_error_handler();
+
+                return null;
+            }
+            $xpath = new \DOMXPath($doc);
+            foreach (JitDomXPathRegisterUserScript::namespaces() as $prefix => $uri) {
+                if ('' === $prefix) {
+                    continue;
+                }
+                @$xpath->registerNamespace($prefix, $uri);
+            }
+            $result = $xpath->evaluate($expression);
+        } catch (\Throwable) {
+            restore_error_handler();
+
+            return null;
+        }
+        restore_error_handler();
+        if (\is_bool($result) || \is_int($result) || \is_float($result) || \is_string($result)) {
+            return $result;
+        }
+
+        return null;
+    }
+
+    private static function hasTopLevelOrAnd(string $expression): bool
+    {
+        foreach (['or', 'and'] as $word) {
+            $depth = 0;
+            $quote = null;
+            $len = \strlen($expression);
+            $wordLen = \strlen($word);
+            for ($i = 0; $i < $len; ++$i) {
+                $ch = $expression[$i];
+                if (null !== $quote) {
+                    if ($ch === $quote) {
+                        $quote = null;
+                    }
+                    continue;
+                }
+                if ('"' === $ch || "'" === $ch) {
+                    $quote = $ch;
+                    continue;
+                }
+                if ('(' === $ch || '[' === $ch) {
+                    ++$depth;
+                    continue;
+                }
+                if (')' === $ch || ']' === $ch) {
+                    --$depth;
+                    continue;
+                }
+                if (0 !== $depth) {
+                    continue;
+                }
+                if ($i + $wordLen > $len || 0 !== substr_compare($expression, $word, $i, $wordLen)) {
+                    continue;
+                }
+                $beforeOk = 0 === $i || !preg_match('/[\w.-]/', $expression[$i - 1]);
+                $afterOk = $i + $wordLen >= $len || !preg_match('/[\w.-]/', $expression[$i + $wordLen]);
+                if ($beforeOk && $afterOk) {
+                    $left = trim(substr($expression, 0, $i));
+                    $right = trim(substr($expression, $i + $wordLen));
+                    if ('' !== $left && '' !== $right) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function boxHostScalar(Context $context, bool|int|float|string $value): Value
+    {
+        if (\is_bool($value)) {
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool(
+                $context,
+                $slot,
+                $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false)
+            );
+
+            return JitValueBox::normalizeValuePtr($context, $slot);
+        }
+        if (\is_int($value)) {
+            return self::boxLong($context, $value);
+        }
+        if (\is_float($value)) {
+            return self::boxDouble($context, $value);
+        }
+
+        return self::boxString($context, $value);
+    }
+
     private static function countForXPath(string $xml, string $inner): ?int
     {
         // //tag[n] — at most one node (#19456).
@@ -362,6 +480,12 @@ final class JitDomXPathEvaluateUserScript
             $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $posMatches[1], (int) $posMatches[2]);
 
             return null === $text ? 0 : 1;
+        }
+        if (preg_match('~\s+(?:or|and)\s+|\[not\(~i', $inner)) {
+            $host = self::tryHostEvaluateScalar($xml, 'count('.$inner.')');
+            if (\is_int($host) || \is_float($host)) {
+                return (int) $host;
+            }
         }
         if (!preg_match(
             '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\])?$~',

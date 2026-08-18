@@ -259,11 +259,16 @@ final class JitDomXPathQueryUserScript
     {
         $trimmed = trim($exprLit);
         // Host-fold named axes / `..` (#31773), `//*[last()]` / `[position()…]` (#31923),
-        // and abbreviated attribute axis `@*` / `@name` (#32003, #32032). Flattened
-        // descendant `[last()]` is wrong; user-script AOT ABI aborts on these paths.
+        // abbreviated attribute axis `@*` / `@name` (#32003, #32032), and `or`/`and`/`not(`
+        // boolean predicates (#32050). Flattened descendant `[last()]` is wrong; user-script
+        // AOT ABI aborts on these paths.
         $positional = (bool) preg_match('~\[(?:last\(\)|position\(\))~i', $trimmed);
         $attrAxis = self::isHostFoldAttributeAxis($trimmed);
-        if (!str_contains($trimmed, '::') && !str_contains($trimmed, '..') && !$positional && !$attrAxis) {
+        // Boolean `or`/`and`/`not(` — user-script regex only handles [@attr=v] (#32050).
+        $boolExpr = str_contains($trimmed, ' or ')
+            || str_contains($trimmed, ' and ')
+            || str_contains($trimmed, '[not(');
+        if (!str_contains($trimmed, '::') && !str_contains($trimmed, '..') && !$positional && !$attrAxis && !$boolExpr) {
             return null;
         }
         if (!\extension_loaded('dom') || !\class_exists(\DOMDocument::class, false)) {
