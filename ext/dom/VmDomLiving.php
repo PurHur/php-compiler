@@ -432,10 +432,12 @@ final class VmDomLiving
      * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580, #20689, #20866).
      *
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
-     * CSS attribute selectors (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`, `*=`,
-     * optional `i` flag), descendant / child (`>`) / adjacent-sibling (`+`) /
-     * general-sibling (`~`) combinators, and comma selector lists (CSS
-     * Selectors Level 3 / php-src Dom\* lexbor; #32061, #32089).
+     * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:empty`, `:only-child`,
+     * `:only-of-type`, `:root`, CSS attribute selectors (`[attr]`, `=`, `~=`,
+     * `|=`, `^=`, `$=`, `*=`, optional `i` flag), descendant / child (`>`) /
+     * adjacent-sibling (`+`) / general-sibling (`~`) combinators, and comma
+     * selector lists (CSS Selectors Level 3 / php-src Dom\* lexbor; #32061,
+     * #32089, #32108, #32132).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -552,7 +554,11 @@ final class VmDomLiving
     }
 
     /**
-     * Element.matches() — php-src ext/dom/php_dom.c / ParentNode (#20418).
+     * Element.matches() — php-src ext/dom/php_dom.c / ParentNode (#20418, #32132).
+     *
+     * Document-scoped querySelectorAll misses disconnected and fragment-hosted
+     * nodes; those still have to match against themselves (php-src `:empty` /
+     * `:root` on createElement / fragment children).
      */
     public static function matches(ObjectEntry $element, string $selectors): bool
     {
@@ -561,6 +567,13 @@ final class VmDomLiving
         }
         $root = VmDom::ownerDocumentEntry($element) ?? $element;
         $ids = self::querySelectorAllIds($root, $selectors);
+        if (\in_array($element->id, $ids, true)) {
+            return true;
+        }
+        if ($root->id === $element->id) {
+            return false;
+        }
+        $ids = self::querySelectorAllIds($element, $selectors);
 
         return \in_array($element->id, $ids, true);
     }
@@ -1228,6 +1241,7 @@ final class VmDomLiving
                 ++$i;
                 if (1 !== preg_match(
                     '/\G(?:first-child|last-child|first-of-type|last-of-type|'
+                    .'only-child|only-of-type|empty|root|'
                     .'nth-child|nth-last-child|nth-of-type|nth-last-of-type)/A',
                     $selector,
                     $m,
@@ -1550,6 +1564,12 @@ final class VmDomLiving
 
     private static function matchesStructuralPseudo(ObjectEntry $element, string $name, ?string $arg): bool
     {
+        if ('empty' === $name) {
+            return self::elementIsEmpty($element);
+        }
+        if ('root' === $name) {
+            return self::elementIsCssRoot($element);
+        }
         $pos = self::elementSiblingPositions($element);
         if (null === $pos) {
             return false;
@@ -1560,6 +1580,8 @@ final class VmDomLiving
             'last-child' => $pos['elementCount'] === $pos['elementIndex'],
             'first-of-type' => 1 === $pos['typeIndex'],
             'last-of-type' => $pos['typeCount'] === $pos['typeIndex'],
+            'only-child' => 1 === $pos['elementCount'],
+            'only-of-type' => 1 === $pos['typeCount'],
             'nth-child' => null !== $arg && self::nthExpressionMatches($arg, $pos['elementIndex']),
             'nth-last-child' => null !== $arg
                 && self::nthExpressionMatches($arg, $pos['elementCount'] - $pos['elementIndex'] + 1),
@@ -1568,6 +1590,53 @@ final class VmDomLiving
                 && self::nthExpressionMatches($arg, $pos['typeCount'] - $pos['typeIndex'] + 1),
             default => false,
         };
+    }
+
+    /**
+     * CSS3 `:empty` — no children except comments and processing instructions
+     * (php-src lexbor / Selectors Level 3; #32132). Text, CDATA, elements, and
+     * entity references count; a whitespace-only text node is not empty.
+     */
+    private static function elementIsEmpty(ObjectEntry $element): bool
+    {
+        if (!DomRegistry::has($element)) {
+            return true;
+        }
+        foreach (DomRegistry::state($element)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || !DomRegistry::has($child)) {
+                continue;
+            }
+            if (VmDom::isCommentNode($child) || VmDom::isProcessingInstruction($child)) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * CSS3 `:root` — element whose parent is a Document or DocumentFragment
+     * (php-src `pseudo_classes_root.phpt` / lexbor; #32132). Disconnected
+     * elements and nested element children do not match.
+     */
+    private static function elementIsCssRoot(ObjectEntry $element): bool
+    {
+        if (!DomRegistry::has($element)) {
+            return false;
+        }
+        $parentId = DomRegistry::state($element)->parentId;
+        if (null === $parentId) {
+            return false;
+        }
+        $parent = DomRegistry::entry($parentId);
+        if (null === $parent) {
+            return false;
+        }
+
+        return VmDom::isDocument($parent) || VmDom::isDocumentFragment($parent);
     }
 
     private static function nthExpressionMatches(string $expression, int $index): bool

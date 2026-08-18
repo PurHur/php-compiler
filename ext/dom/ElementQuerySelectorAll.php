@@ -45,6 +45,10 @@ final class ElementQuerySelectorAll extends DomClassMethod
             ));
         }
         $object = $var->toObject();
+        // ParentNode: Element + DocumentFragment (php-src php_dom.stub.php; #32132 :root).
+        if (VmDom::isDocumentFragment($object)) {
+            return $object;
+        }
         if (!VmDomLiving::isLivingElement($object) || !VmDom::isElement($object)) {
             throw new \TypeError($label.' must be called on a Dom\\Element instance');
         }

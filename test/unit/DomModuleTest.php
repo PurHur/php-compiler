@@ -912,6 +912,66 @@ PHP;
         }
     }
 
+    /**
+     * CSS :empty / :only-child / :only-of-type / :root on Dom\ ParentNode
+     * (#32132, php-src parentnode.c / lexbor).
+     */
+    public function test_dom_parent_node_css_empty_only_root(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#32132)');
+            }
+            $runtime = new Runtime();
+            $code = file_get_contents(__DIR__.'/../repro/issue_dom_qsa_empty_only_root.php');
+            self::assertNotFalse($code);
+            $block = $runtime->parseAndCompile($code, 'dom_qsa_empty_only_root.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                ":root=container [container]\n"
+                ."container:root=container [container]\n"
+                ."p:root=null []\n"
+                ."p:only-child=lonely [lonely,textsib]\n"
+                ."p:only-of-type=lonely [lonely,textsib,mixp]\n"
+                ."span:only-of-type=mixs [mixs]\n"
+                ."e:empty=e0 [e0,e1,e3,e4]\n"
+                ."g3 p:only-child=textsib [textsib]\n"
+                ."g3 p:first-child=textsib [textsib]\n"
+                ."matches_lonely_only=yes\n"
+                ."matches_a_only=no\n"
+                ."matches_textsib_only=yes\n"
+                ."matches_mixp_only_type=yes\n"
+                ."matches_e0_empty=yes\n"
+                ."matches_e2_empty=no\n"
+                ."matches_e3_empty=yes\n"
+                ."matches_e5_empty=no\n"
+                ."matches_e6_empty=no\n"
+                ."matches_container_root=yes\n"
+                ."matches_g1_root=no\n"
+                ."closest=container\n"
+                ."frag_root=froot\n"
+                ."frag_p_root=no\n"
+                ."loose_qsa=null\n"
+                ."loose_matches=no\n"
+                ."loose_empty=yes\n"
+                ."bad[:empty()]=SyntaxError\n"
+                ."bad[:only-child()]=SyntaxError\n"
+                ."bad[:root()]=SyntaxError\n"
+                ."bad[p:blank]=SyntaxError\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
