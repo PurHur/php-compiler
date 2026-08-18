@@ -41,6 +41,13 @@ final class HtmlEntitiesJitRuntimeShrinkTest extends TestCase
             ENT_QUOTES | ENT_SUBSTITUTE
         );
         $this->assertSame('&lt;&euro;&gt;', $euro);
+        $this->assertSame(
+            '(',
+            \PHPCompiler\ext\standard\HtmlEntitiesJitHelper::encode(
+                "\xC3\x28",
+                ENT_QUOTES | ENT_IGNORE
+            )
+        );
     }
 
     public function testJitHtmlentitiesRoutesThroughHtmlEntitiesJit(): void

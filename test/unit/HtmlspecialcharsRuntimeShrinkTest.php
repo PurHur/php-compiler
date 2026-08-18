@@ -38,6 +38,20 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         }
     }
 
+    public function testHtmlspecialcharsJitHelperEntIgnoreMatchesVmString(): void
+    {
+        $flags = ENT_QUOTES | ENT_IGNORE;
+        foreach (["\xC3\x28", "a\xC3\x28b", "\xC3\xA9", 'ok'] as $s) {
+            $this->assertSame(
+                VmString::htmlspecialchars($s, $flags, 'UTF-8', true),
+                HtmlspecialcharsJitHelper::htmlspecialchars($s, $flags),
+                'ENT_IGNORE mismatch for '.bin2hex($s)
+            );
+        }
+        $this->assertSame('(', HtmlspecialcharsJitHelper::htmlspecialchars("\xC3\x28", $flags));
+        $this->assertSame('a(b', HtmlspecialcharsJitHelper::htmlspecialchars("a\xC3\x28b", $flags));
+    }
+
     public function testHtmlspecialcharsExDoubleEncodeFalseMatchesVmString(): void
     {
         $flags = ENT_QUOTES;

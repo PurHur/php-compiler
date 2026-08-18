@@ -28,6 +28,10 @@ final class HtmlEntitiesJitHelper
         if ($width < 1) {
             return '';
         }
+        // ENT_IGNORE: skip illegal UTF-8 bytes (php-src html.c / #32063).
+        if (0 !== ($flags & ENT_IGNORE) && self::utf8ValidWidthAt($string, $i) < 1) {
+            return self::escapeFrom($string, $flags, $i + 1, $doubleEncode);
+        }
         $char = self::copyBytes($string, $i, $width);
         if ('&' === $char && !$doubleEncode) {
             $entityLen = self::existingEntityLen($string, $i);
@@ -345,6 +349,71 @@ final class HtmlEntitiesJitHelper
         }
 
         return (isset($string[$i + 1]) && isset($string[$i + 2]) && isset($string[$i + 3])) ? 4 : 1;
+    }
+
+    /**
+     * Width of a well-formed UTF-8 sequence at $i, or 0 if illegal (php-src html.c
+     * get_next_char). NestedJIT-safe: no strlen/substr/VmString (#32063).
+     */
+    public static function utf8ValidWidthAt(string $string, int $i): int
+    {
+        if (!isset($string[$i])) {
+            return 0;
+        }
+        $byte = \ord($string[$i]);
+        if ($byte < 0x80) {
+            return 1;
+        }
+        if (($byte & 0xE0) === 0xC0) {
+            if (!isset($string[$i + 1])) {
+                return 0;
+            }
+            $next = \ord($string[$i + 1]);
+            if (($next & 0xC0) !== 0x80) {
+                return 0;
+            }
+            $cp = (($byte & 0x1F) << 6) | ($next & 0x3F);
+            if ($cp < 0x80) {
+                return 0;
+            }
+
+            return 2;
+        }
+        if (($byte & 0xF0) === 0xE0) {
+            if (!isset($string[$i + 1]) || !isset($string[$i + 2])) {
+                return 0;
+            }
+            $n1 = \ord($string[$i + 1]);
+            $n2 = \ord($string[$i + 2]);
+            if (($n1 & 0xC0) !== 0x80 || ($n2 & 0xC0) !== 0x80) {
+                return 0;
+            }
+            $cp = (($byte & 0x0F) << 12) | (($n1 & 0x3F) << 6) | ($n2 & 0x3F);
+            if ($cp < 0x800 || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+                return 0;
+            }
+
+            return 3;
+        }
+        if (($byte & 0xF8) === 0xF0) {
+            if (!isset($string[$i + 1]) || !isset($string[$i + 2]) || !isset($string[$i + 3])) {
+                return 0;
+            }
+            $n1 = \ord($string[$i + 1]);
+            $n2 = \ord($string[$i + 2]);
+            $n3 = \ord($string[$i + 3]);
+            if (($n1 & 0xC0) !== 0x80 || ($n2 & 0xC0) !== 0x80 || ($n3 & 0xC0) !== 0x80) {
+                return 0;
+            }
+            $cp = (($byte & 0x07) << 18) | (($n1 & 0x3F) << 12) | (($n2 & 0x3F) << 6) | ($n3 & 0x3F);
+            if ($cp < 0x10000) {
+                return 0;
+            }
+
+            return 4;
+        }
+
+        return 0;
     }
 
     public static function existingEntityLen(string $string, int $i): int
