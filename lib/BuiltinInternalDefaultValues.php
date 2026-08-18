@@ -482,6 +482,10 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             3 => ['kind' => 'array'],
         ],
+        // php-src ext/standard/array.stub.php — int $flags = SORT_STRING (#27949)
+        'array_unique' => [
+            1 => ['kind' => 'int', 'value' => 2],
+        ],
         // php-src ext/standard/file.stub.php — permissions=0777, context=null (#24885)
         // InternalArgInfo int → 0; untyped context= has no inferrable default.
         'mkdir' => [
