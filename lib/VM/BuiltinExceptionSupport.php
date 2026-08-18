@@ -284,21 +284,73 @@ final class BuiltinExceptionSupport
             $obj->getProperty('faultactor')->string($faultactor);
         }
         if (null !== $detail) {
-            if (\is_string($detail)) {
-                $obj->getProperty('detail')->string($detail);
-            } elseif (\is_int($detail)) {
-                $obj->getProperty('detail')->int($detail);
-            } elseif (\is_bool($detail)) {
-                $obj->getProperty('detail')->bool($detail);
-            } elseif (\is_float($detail)) {
-                $obj->getProperty('detail')->float($detail);
-            } else {
-                $obj->getProperty('detail')->string((string) $detail);
+            if ($obj->hasProperty('detail')) {
+                $obj->getProperty('detail')->copyFrom(self::phpValueToVariable($ctx, $detail));
             }
         }
         if ('' !== $name) {
             $obj->getProperty('_name')->string($name);
         }
+
+        return $var;
+    }
+
+    /** Import native PHP values onto a VM Variable (SoapFault::$detail objects; #32047). */
+    private static function phpValueToVariable(Context $ctx, mixed $value): Variable
+    {
+        $var = new Variable();
+        if (\is_string($value)) {
+            $var->string($value);
+
+            return $var;
+        }
+        if (\is_int($value)) {
+            $var->int($value);
+
+            return $var;
+        }
+        if (\is_bool($value)) {
+            $var->bool($value);
+
+            return $var;
+        }
+        if (\is_float($value)) {
+            $var->float($value);
+
+            return $var;
+        }
+        if ($value instanceof \stdClass) {
+            if (!isset($ctx->classes['stdclass'])) {
+                $var->string((string) $value);
+
+                return $var;
+            }
+            $object = new ObjectEntry($ctx->classes['stdclass']);
+            $object->constructed = true;
+            foreach ((array) $value as $key => $item) {
+                $object->allocateProperty((string) $key)
+                    ->copyFrom(self::phpValueToVariable($ctx, $item));
+            }
+            $var->object($object);
+
+            return $var;
+        }
+        if (\is_array($value)) {
+            $ht = new HashTable();
+            $isList = \array_is_list($value);
+            foreach ($value as $key => $item) {
+                $slot = self::phpValueToVariable($ctx, $item);
+                if ($isList) {
+                    $ht->addIndex((int) $key, $slot);
+                } else {
+                    $ht->add((string) $key, $slot);
+                }
+            }
+            $var->array($ht);
+
+            return $var;
+        }
+        $var->string((string) $value);
 
         return $var;
     }
