@@ -1089,6 +1089,17 @@ restart:
                         );
                         $result = $this->context->builder->fdiv($leftDouble, $rightValue);
                         goto return_double;
+                    case OpCode::TYPE_MODULO:
+                        // zend_operators.c mod_function — zval_get_long both sides.
+                        $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+                        $i64 = $this->context->getTypeFromString('int64');
+                        $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
+                        $result = JitNumericDivisionGuard::signedModulo(
+                            $this->context,
+                            $leftLong,
+                            $rightLong
+                        );
+                        goto return_long;
                     case OpCode::TYPE_EQUAL:
                         $result = JitValueCompare::looseEqualValueToNativeDouble(
                             $this->context,
@@ -1236,6 +1247,16 @@ restart:
                         );
                         $result = $this->context->builder->fdiv($leftValue, $rightDouble);
                         goto return_double;
+                    case OpCode::TYPE_MODULO:
+                        $i64 = $this->context->getTypeFromString('int64');
+                        $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
+                        $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
+                        $result = JitNumericDivisionGuard::signedModulo(
+                            $this->context,
+                            $leftLong,
+                            $rightLong
+                        );
+                        goto return_long;
                     case OpCode::TYPE_EQUAL:
                         $result = JitValueCompare::looseEqualNativeDoubleToValue(
                             $this->context,

@@ -331,6 +331,12 @@
             <file>./test/unit/FloatIncDecStaysFloat32281AotTest.php</file>
             <file>./test/compliance/IntMinModNegOne32285JITTest.php</file>
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
+            <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
+            <file>./test/unit/IntMinModuloNegOne31968AotTest.php</file>
+            <file>./test/compliance/DomCreateElementValue32292JITTest.php</file>
+            <file>./test/unit/DomCreateElementValue32292AotTest.php</file>
+            <file>./test/compliance/CastIntFloatCallArg32293JITTest.php</file>
+            <file>./test/unit/CastIntFloatCallArg32293AotTest.php</file>
             <file>./test/compliance/AsortNatural32295JITTest.php</file>
             <file>./test/unit/AsortNatural32295AotTest.php</file>
             <file>./test/compliance/ParentPrivateStaticArrayObjectProperty31937VMTest.php</file>
