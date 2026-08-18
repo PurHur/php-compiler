@@ -12920,7 +12920,17 @@ class JIT {
                                 break;
                             }
                             // BP_VAR_RW (++/--): Undefined property after create (zend_object_handlers.c, #29241).
-                            if ($this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)) {
+                            // Magic __get supplies the value — no Undefined property (#31992).
+                            if (
+                                $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
+                                && !JIT\MagicMethodDispatch::propertyReadUsesMagicGetAtCompileTime(
+                                    $this->context,
+                                    $classId,
+                                    $declaringClass,
+                                    $name->value,
+                                    $block
+                                )
+                            ) {
                                 JIT\Builtin\UndefinedPropertyFetchRuntime::emitWarning(
                                     $this->context,
                                     $declaringClass,
