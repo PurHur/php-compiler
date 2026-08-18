@@ -19409,6 +19409,20 @@ class JIT {
         if (null === $current) {
             $current = $read;
         }
+        // Untyped statics are boxed `__value__*`. binaryOp+storeValueBox stored an alloca
+        // pointer into the module global, so ++/-- vanished when the method returned (#32314).
+        // php-src increment_function mutates the class static zval in place.
+        if (Variable::TYPE_VALUE === $read->staticPropertyType && $current === $read) {
+            $this->compileStaticPropertyValueBoxIncDecInPlace(
+                $read,
+                $write,
+                $resultOp,
+                $increment,
+                $prefix
+            );
+
+            return;
+        }
         if (!$prefix) {
             $this->assignOperand($resultOp, $current, true);
         }
@@ -19444,6 +19458,79 @@ class JIT {
         }
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
+        }
+    }
+
+    /**
+     * Boxed static ++/-- writes the heap box the module global already points at (#32314).
+     *
+     * @see php-src Zend/zend_operators.c increment_function / decrement_function
+     */
+    private function compileStaticPropertyValueBoxIncDecInPlace(
+        Variable $read,
+        Variable $write,
+        \PHPCfg\Operand $resultOp,
+        bool $increment,
+        bool $prefix
+    ): void {
+        if (JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
+            $this->context,
+            $this,
+            $read,
+            $this->context->jitEnclosingBlock
+        )) {
+            return;
+        }
+        $heapPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
+        if (!$prefix) {
+            $oldSlot = JIT\JitValueBox::alloc($this->context);
+            $oldPtr = JIT\JitValueBox::pointer($this->context, $oldSlot);
+            JIT\JitValueBox::copyIntoPointer($this->context, $oldPtr, $heapPtr);
+            $oldVar = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $oldSlot
+            );
+            $this->assignOperand($resultOp, $oldVar, true);
+        }
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+        if (JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
+            $this->context,
+            $write,
+            $newVal,
+            $this->context->jitEnclosingBlock,
+            $this
+        )) {
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVal, true);
+            }
+
+            return;
+        }
+        $cur = $this->readIncDecValueBoxLong($read, $heapPtr, $increment);
+        JIT\JitIncDec::writeValueBoxIncDec($this->context, $read, $cur, $heapPtr, $increment);
+        if (null !== $read->staticPropertyInitGlobal) {
+            $this->context->builder->store(
+                $this->context->getTypeFromString('int1')->constInt(1, false),
+                $read->staticPropertyInitGlobal
+            );
+        }
+        if ($prefix) {
+            $newVar = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VALUE,
+                $heapPtr
+            );
+            $this->assignOperand($resultOp, $newVar, true);
         }
     }
 
