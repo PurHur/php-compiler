@@ -192,6 +192,8 @@ final class BuiltinInternalArgInfo
             'sys_getloadavg' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28841)
             'getrusage' => 'array|false',
+            // ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783)
+            'posix_times' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|false (#27776)
             'net_get_interfaces' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28916)

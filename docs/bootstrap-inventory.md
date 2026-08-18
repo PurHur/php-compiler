@@ -1970,7 +1970,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/PosixStrerrorJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTerminalJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTimesJitHelper.php` | 0 | 1 |
-| `ext/posix/VmPosix.php` | 0 | 32 |
+| `ext/posix/VmPosix.php` | 0 | 31 |
 | `ext/posix/VmPosixCtermidPure.php` | 0 | 1 |
 | `ext/posix/VmPosixIdentityWritePure.php` | 0 | 1 |
 | `ext/posix/VmPosixMknodPure.php` | 0 | 1 |
@@ -23500,19 +23500,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 411)
 - new Variable (line 415)
 - new Variable (line 418)
-- new Error (line 478)
-- new HashTable (line 486)
-- new Variable (line 488)
-- new Error (line 512)
-- new Error (line 520)
-- new Error (line 534)
-- new Error (line 577)
-- new Error (line 588)
-- new Error (line 625)
-- new Error (line 640)
-- new Error (line 661)
-- new Error (line 680)
-- new Error (line 776)
+- new HashTable (line 484)
+- new Variable (line 486)
+- new Error (line 510)
+- new Error (line 518)
+- new Error (line 532)
+- new Error (line 575)
+- new Error (line 586)
+- new Error (line 623)
+- new Error (line 638)
+- new Error (line 659)
+- new Error (line 678)
+- new Error (line 774)
 - 52 class method(s)
 
 ### `ext/posix/VmPosixCtermidPure.php`
@@ -46674,7 +46673,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 2334)
+- new InternalArgInfo (line 2336)
 - 24 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
