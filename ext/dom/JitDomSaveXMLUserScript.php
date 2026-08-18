@@ -85,8 +85,9 @@ final class JitDomSaveXMLUserScript
         if (!$objectType->hasProperty($elementClassId, 'nodeName')) {
             $objectType->defineProperty($elementClassId, 'nodeName', JITVariable::TYPE_STRING);
         }
-        // createComment/createTextNode seed nodeName but not tagName — fetching tagName
-        // SIGSEGVs (#32315). libxml xmlNodeDump: comment `<!--data-->`, text = data.
+        // createComment/createTextNode/createDocumentFragment seed nodeName but not
+        // tagName — fetching tagName SIGSEGVs (#32315 / #32334). libxml xmlNodeDump:
+        // comment `<!--data-->`, text = data, fragment = children only (empty → "").
         // Skip when loadXML supplies the root tag from the compile-time literal (#23251).
         if (!$useXmlLitTag) {
             return self::serializeUserScriptNode($context, $objectType, $node, $elementClassId);
@@ -103,7 +104,8 @@ final class JitDomSaveXMLUserScript
     }
 
     /**
-     * Dump createComment/createTextNode (and createElement) without a loadXML tag literal.
+     * Dump createComment/createTextNode/createCDATASection/createDocumentFragment
+     * (and createElement) without a loadXML tag literal.
      *
      * php-src: ext/dom/document.c saveXML → xmlNodeDump
      */
@@ -143,6 +145,8 @@ final class JitDomSaveXMLUserScript
         $bbText = BasicBlockHelper::append($context, 'dom_savexml_text');
         $bbCdataCheck = BasicBlockHelper::append($context, 'dom_savexml_check_cdata');
         $bbCdata = BasicBlockHelper::append($context, 'dom_savexml_cdata');
+        $bbFragCheck = BasicBlockHelper::append($context, 'dom_savexml_check_frag');
+        $bbFrag = BasicBlockHelper::append($context, 'dom_savexml_frag');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
         $bbDone = BasicBlockHelper::append($context, 'dom_savexml_leaf_done');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
@@ -178,7 +182,7 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $nameStr, $cdataLit),
             $zero
         );
-        $context->builder->branchIf($isCdata, $bbCdata, $bbElement);
+        $context->builder->branchIf($isCdata, $bbCdata, $bbFragCheck);
 
         $context->builder->positionAtEnd($bbCdata);
         $cdataOpen = $context->builder->load($context->constantStringFromString('<![CDATA['));
@@ -189,6 +193,28 @@ final class JitDomSaveXMLUserScript
             $cdataClose
         );
         $context->builder->store(self::boxStringValue($context, $cdataXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbFragCheck);
+        $fragLit = $context->builder->load($context->constantStringFromString('#document-fragment'));
+        $isFrag = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $fragLit),
+            $zero
+        );
+        $context->builder->branchIf($isFrag, $bbFrag, $bbElement);
+
+        $context->builder->positionAtEnd($bbFrag);
+        // xmlNodeDump(XML_DOCUMENT_FRAG_NODE) emits children only (#32334).
+        $innerVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            VmDom::PROP_USER_SCRIPT_INNER_XML,
+            $elementClassId
+        );
+        $innerStr = $context->helper->loadValue($innerVar);
+        $context->builder->store(self::boxStringValue($context, $innerStr), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElement);
