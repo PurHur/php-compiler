@@ -167,6 +167,10 @@ final class DomInstanceMethodJit
         'domtext::clonenode' => true,
         'domtext::splittext' => true,
         'domcdatasection::splittext' => true,
+        'domtext::iswhitespaceinelementcontent' => true,
+        'domcdatasection::iswhitespaceinelementcontent' => true,
+        'domtext::iselementcontentwhitespace' => true,
+        'domcdatasection::iselementcontentwhitespace' => true,
         'domcomment::clonenode' => true,
         'domdocumentfragment::clonenode' => true,
         'domattr::clonenode' => true,
@@ -615,6 +619,15 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domtext::iswhitespaceinelementcontent' === $lc
+                || 'domcdatasection::iswhitespaceinelementcontent' === $lc
+                || 'domtext::iselementcontentwhitespace' === $lc
+                || 'domcdatasection::iselementcontentwhitespace' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomTextIsWhitespaceInElementContent();
+
+                return;
+            }
             if ('domnode::contains' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeContains();
 
@@ -903,6 +916,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domtext::clonenode');
             self::ensureProxy($context, 'domtext::splittext');
             self::ensureProxy($context, 'domcdatasection::splittext');
+            self::ensureProxy($context, 'domtext::iswhitespaceinelementcontent');
+            self::ensureProxy($context, 'domcdatasection::iswhitespaceinelementcontent');
+            self::ensureProxy($context, 'domtext::iselementcontentwhitespace');
+            self::ensureProxy($context, 'domcdatasection::iselementcontentwhitespace');
             self::ensureProxy($context, 'domcomment::clonenode');
             self::ensureProxy($context, 'domdocumentfragment::clonenode');
             self::ensureProxy($context, 'domattr::clonenode');
@@ -1034,9 +1051,9 @@ final class DomInstanceMethodJit
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild', 'clonenode'],
-        'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
+        'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
+        'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domelement' => ['setattribute', 'removeattribute', 'setidattribute', 'setidattributens', 'setidattributenode'],
         'domattr' => ['isid'],

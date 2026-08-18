@@ -62,6 +62,8 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domcharacterdata::deletedata'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domtext::replacedata'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domcharacterdata::replacedata'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domtext::iswhitespaceinelementcontent'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domtext::iselementcontentwhitespace'));
         } finally {
             putenv('PHP_COMPILER_AOT_USER_SCRIPT');
         }
