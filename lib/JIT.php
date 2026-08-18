@@ -18839,23 +18839,42 @@ class JIT {
             return;
         }
 
+        if (Variable::TYPE_NATIVE_DOUBLE === $read->type) {
+            // zend_operators.c increment_function IS_DOUBLE: Z_DVAL_P += 1.0 (#32281).
+            $cur = $this->context->helper->loadValue($read);
+            $newVar = JIT\JitIncDec::nativeDoubleIncDec($this->context, $cur, $increment);
+            if (!$prefix) {
+                $this->assignOperand($resultOp, $read, true);
+            }
+            $this->assignOperand($writeOp, $newVar, true);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
+        }
+
         if ($this->isIncDecValueBoxLvalue($read, $readOp)) {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
             if (!$prefix) {
+                // Snapshot before mutate so post-inc of float keeps float(1.5) not int(1) (#32281).
+                $oldSlot = JIT\JitValueBox::alloc($this->context);
+                $oldPtr = JIT\JitValueBox::pointer($this->context, $oldSlot);
+                JIT\JitValueBox::copyIntoPointer($this->context, $oldPtr, $readPtr);
                 $oldVar = new Variable(
                     $this->context,
-                    Variable::TYPE_NATIVE_LONG,
-                    Variable::KIND_VALUE,
-                    $cur
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $oldSlot
                 );
                 $this->assignOperand($resultOp, $oldVar, true);
             }
             $write = $this->context->getVariableFromOpInScopes($writeOp);
             $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
-            // zend_operators.h — PHP_INT_MAX/MIN overflow → double (#29144).
-            JIT\JitIncDec::writeLongIncDecToValuePtr($this->context, $cur, $writePtr, $increment);
+            // zend_operators.c IS_DOUBLE ± 1.0; else zend_operators.h long overflow (#32281 / #29144).
+            JIT\JitIncDec::writeValueBoxIncDec($this->context, $read, $cur, $writePtr, $increment);
             $this->invalidateScriptGlobalCompileTimeMetadata($write);
             if ($prefix) {
                 $newVar = new Variable(

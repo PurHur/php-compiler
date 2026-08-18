@@ -9,10 +9,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
- * JIT ++/-- with PHP_INT_MAX/MIN → double promotion (#29144).
+ * JIT ++/-- with PHP_INT_MAX/MIN → double promotion (#29144)
+ * and boxed/native float ± 1.0 (#32281).
  *
  * @see php-src Zend/zend_operators.h fast_long_increment_function /
  *      fast_long_decrement_function
+ * @see php-src Zend/zend_operators.c increment_function / decrement_function IS_DOUBLE
  */
 final class JitIncDec
 {
@@ -152,6 +154,73 @@ final class JitIncDec
 
         $context->builder->positionAtEnd($doneBlock);
         JitValueBox::publishAfterWrite($context, $writePtr);
+    }
+
+    /**
+     * Boxed ++/--: IS_DOUBLE += 1.0, else long with PHP_INT overflow (#32281).
+     *
+     * @see php-src Zend/zend_operators.c increment_function / decrement_function
+     */
+    public static function writeValueBoxIncDec(
+        Context $context,
+        Variable $read,
+        LlvmValue $curLong,
+        LlvmValue $writePtr,
+        bool $increment
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'incdec_vbox_typed_cont');
+        $isDouble = JitValueNumeric::valueIsDouble($context, $read);
+        $floatBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_float' : 'dec_vbox_float');
+        $longBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_as_long' : 'dec_vbox_as_long');
+        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_typed_done');
+        $context->builder->branchIf($isDouble, $floatBlock, $longBlock);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $readPtr = JitValueBox::valuePtrFromVariable($context, $read);
+        $f64 = $context->getTypeFromString('double');
+        $cur = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $readPtr
+        );
+        $one = $f64->constReal(1.0);
+        $new = $increment
+            ? $context->builder->fadd($cur, $one)
+            : $context->builder->fsub($cur, $one);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $writePtr,
+            $new
+        );
+        JitValueBox::publishAfterWrite($context, $writePtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        self::writeLongIncDecToValuePtr($context, $curLong, $writePtr, $increment);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * Native double ++/-- : dval ± 1.0 (#32281).
+     */
+    public static function nativeDoubleIncDec(
+        Context $context,
+        LlvmValue $cur,
+        bool $increment
+    ): Variable {
+        $f64 = $context->getTypeFromString('double');
+        $one = $f64->constReal(1.0);
+        $new = $increment
+            ? $context->builder->fadd($cur, $one)
+            : $context->builder->fsub($cur, $one);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::KIND_VALUE,
+            $new
+        );
     }
 
     private static function doubleConst(Context $context, float $f): Variable
