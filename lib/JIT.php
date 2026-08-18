@@ -8217,6 +8217,15 @@ class JIT {
                         );
                     } else {
                         $value = $this->context->getVariableFromOp($rhsOperand);
+                        // `@$undef` / `$a = $undef` TYPE_ASSIGN RHS: ZEND_CHECK_UNDEFINED_VAR
+                        // even when the CV is already in namedVariableBindings (#32041).
+                        if ($rhsOperand instanceof Operand) {
+                            JIT\UndefinedVariableHelper::guardBeforeNamedLocalRead(
+                                $this->context,
+                                $rhsOperand,
+                                $value
+                            );
+                        }
                     }
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
@@ -8350,6 +8359,7 @@ class JIT {
                             if ([] !== $destOp->usages || $forceAssign) {
                                 $this->assignOperand($destOp, $value, $forceAssign);
                             }
+                            $this->maybeBindNamedVariable($aliasOp);
                             $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
                             break;
                         }
@@ -23906,7 +23916,10 @@ class JIT {
         if (null === $name || '' === $name) {
             return;
         }
-        $this->context->bindVariableByName($name, $this->context->getVariableFromOp($op));
+        $var = $this->context->getVariableFromOp($op);
+        $this->context->bindVariableByName($name, $var);
+        // TYPE_ASSIGN dest is a defined CV for later ZEND_CHECK_UNDEFINED_VAR (#32041).
+        JIT\UndefinedVariableHelper::markAssigned($this->context, $op, $var);
     }
 
     /**

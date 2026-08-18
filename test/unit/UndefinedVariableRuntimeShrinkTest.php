@@ -29,6 +29,8 @@ final class UndefinedVariableRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/UndefinedVariableHelper.php');
         $this->assertStringContainsString('guardBeforeRuntimeRead', $source);
+        $this->assertStringContainsString('guardBeforeNamedLocalRead', $source);
+        $this->assertStringContainsString('#32041', $source);
         $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
         $this->assertStringContainsString('markAssigned', $source);
         $this->assertStringContainsString('ScopeVariableAssignedFlags', $source);
