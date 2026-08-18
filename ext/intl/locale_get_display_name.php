@@ -61,6 +61,6 @@ final class locale_get_display_name extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \RuntimeException('locale_get_display_name() JIT lowering not implemented; use VM');
+        return JitLocaleGetDisplayName::getDisplayName($context, ...$args);
     }
 }
