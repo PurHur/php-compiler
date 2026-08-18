@@ -1481,6 +1481,38 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMCharacterData::substringData() — php-src characterdata.c (#32372).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function substringData(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMCharacterData::substringData', $extra, 2);
+        $offsetVar = ($extra[0] ?? self::missingArg('substringData', 0))->resolveIndirect();
+        $countVar = ($extra[1] ?? self::missingArg('substringData', 1))->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $offsetVar->type && Variable::TYPE_FLOAT !== $offsetVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMCharacterData::substringData(): Argument #1 ($offset) must be of type int, %s given',
+                VmDom::typeLabel($offsetVar)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $countVar->type && Variable::TYPE_FLOAT !== $countVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMCharacterData::substringData(): Argument #2 ($count) must be of type int, %s given',
+                VmDom::typeLabel($countVar)
+            ));
+        }
+        $result = new Variable();
+        $result->string(VmDom::characterDataSubstringData(
+            $node,
+            $offsetVar->toInt(),
+            $countVar->toInt()
+        ));
+
+        return $result;
+    }
+
+    /**
      * DOMNode::C14N() — inclusive/exclusive canonical XML (#19467).
      *
      * @param list<Variable> $extra

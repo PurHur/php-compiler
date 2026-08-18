@@ -21147,6 +21147,12 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::clonenode');
                 }
+                if ('substringdata' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::substringdata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::substringdata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::substringdata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::substringdata');
+                }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
@@ -21178,6 +21184,12 @@ class JIT {
                 }
                 if ('clonenode' === $methodLc && $this->context->functionIsRegistered('domnode::clonenode')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('substringdata' === $methodLc && $this->context->functionIsRegistered('domtext::substringdata')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::substringdata');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21410,6 +21422,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
             if ($this->context->functionIsRegistered('domnode::clonenode')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('substringdata' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::substringdata');
+            if ($this->context->functionIsRegistered('domtext::substringdata')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::substringdata');
                 $this->context->scope->args = [$receiverVar];
 
                 return;

@@ -59,6 +59,7 @@ final class JitDomCreateCDATASection
 
     public static function materialize(Context $context, string $data): Value
     {
+        JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -76,6 +77,7 @@ final class JitDomCreateCDATASection
 
     private static function materializeFromRuntimeData(Context $context, JITVariable $dataArg): Value
     {
+        JitDomSubstringData::remember(null);
         $dataStr = self::loadStringArg($context, $dataArg);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);

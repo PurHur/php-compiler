@@ -46,6 +46,19 @@ final class DomInstanceMethodJitTest extends TestCase
         }
     }
 
+    public function testRecognizesDomSubstringDataProxyUnderUserScriptAot(): void
+    {
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        try {
+            $this->assertTrue(DomInstanceMethodJit::shouldDeferToVmClassMethodLowering());
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domtext::substringdata'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domcharacterdata::substringdata'));
+            $this->assertFalse(DomInstanceMethodJit::isDomInstanceMethodProxy('object::substringdata'));
+        } finally {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        }
+    }
+
     public function testEnsureProxyRegistersCallableLowering(): void
     {
         $this->markTestSkipped('loadJitContext() is too heavy for default unit gate (#17130)');
