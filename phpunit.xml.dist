@@ -930,6 +930,8 @@
             <file>./test/compliance/RandomizerExcessArgc31092JITTest.php</file>
             <file>./test/compliance/RandomizerNamedArgs26257VMTest.php</file>
             <file>./test/compliance/RandomizerNamedArgs26257JITTest.php</file>
+            <file>./test/compliance/RandomizerNamedArgs27626VMTest.php</file>
+            <file>./test/compliance/RandomizerNamedArgs27626JITTest.php</file>
             <file>./test/compliance/RandomEngineGenerateExcessArgc31096VMTest.php</file>
             <file>./test/compliance/RandomEngineGenerateExcessArgc31096JITTest.php</file>
             <file>./test/compliance/RandomEngineJumpExcessArgc31097VMTest.php</file>

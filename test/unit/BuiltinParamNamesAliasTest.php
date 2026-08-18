@@ -6199,6 +6199,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dcngettext, 'n', 'dcngettext'));
     }
 
+    /** @covers issue #27626 */
+    public function testRandomizerGetBytesZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('Random\\Randomizer::getBytes');
+        self::assertSame(['length'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'Random\\Randomizer::getBytes'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('Random\\Randomizer', 'getBytes'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('Random\\Randomizer', 'getBytes'));
+        self::assertSame(
+            'int',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('random\\randomizer', 'getbytes', 0)
+        );
+    }
+
     /** @covers issue #24666 */
     public function testZipProceduralZendStubNamedParams(): void
     {

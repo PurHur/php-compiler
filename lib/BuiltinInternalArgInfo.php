@@ -2160,7 +2160,8 @@ final class BuiltinInternalArgInfo
             // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25056)
             'resourcebundle::__construct' => ($index === 0 || $index === 1) ? '?string' : null,
             'resourcebundle::create' => ($index === 0 || $index === 1) ? '?string' : null,
-            // php-src ext/random/randomizer.stub.php — missing from InternalArgInfo (#26257)
+            // php-src ext/random/randomizer.stub.php — missing from InternalArgInfo (#26257, #27626)
+            'random\\randomizer::getbytes' => 0 === $index ? 'int' : null,
             'random\\randomizer::getfloat' => match ($index) {
                 0, 1 => 'float',
                 2 => 'Random\\IntervalBoundary',
