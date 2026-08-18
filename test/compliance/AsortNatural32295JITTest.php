@@ -7,21 +7,20 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
+ * JIT: asort(SORT_NATURAL) matches php_natsort (#32295).
+ *
  * @group llvm
  */
-/** JIT compliance for asort(). */
-final class AsortJITTest extends BaseTest
+final class AsortNatural32295JITTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['asort_jit.phpt', 'asort_jit_int.phpt', 'asort_natural_jit.phpt'] as $file) {
-            yield $file => self::parsePHPT(
-                __DIR__.'/cases/stdlib/'.$file,
-                $file
-            );
-        }
+        yield 'asort_natural_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/asort_natural_jit.phpt',
+            'asort_natural_jit.phpt'
+        );
     }
 
     public function setUp(): void
