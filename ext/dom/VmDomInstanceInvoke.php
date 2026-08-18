@@ -129,6 +129,7 @@ final class VmDomInstanceInvoke
             'savehtml' => VmDomJitDispatch::saveHtml($self, $extra),
             'rename' => VmDomJitDispatch::rename($ctx, $self, $extra),
             'substringdata' => VmDomJitDispatch::substringData($self, $extra),
+            'appenddata' => VmDomJitDispatch::appendData($self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
     }
