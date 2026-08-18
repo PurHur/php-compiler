@@ -19,9 +19,7 @@ final class LibcExtern
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $dbl = $context->getTypeFromString('double');
         $i8p = $context->getTypeFromString('int8*');
-        $i8pp = $i8p->pointerType(0);
 
         /** @var array<string, array{0: mixed, 1: bool, 2: list<mixed>}> $specs */
         $specs = [
@@ -78,7 +76,9 @@ final class LibcExtern
             // NestedJIT JitTempnamKernel + ReflectionSetup declare strrchr(3) module-locally.
             // strtol dropped (#31988): NestedJIT leaves call ensureStrtolDecl before lookup;
             // user-script strtol()/intval() stay on ext/standard PHP (not libc on char*).
-            'strtod' => [$dbl, false, [$i8p, $i8pp]],
+            // strtod dropped (#31997): NestedJIT leaves call ensureStrtodDecl before lookup;
+            // user-script floatval()/is_numeric() stay on ext/standard PHP (not libc on char*).
+            // Peer strtol drop (#31988).
             // strdup dropped from always-on (#31534): JitFsGlobKernel / JitStreamIoKernel declare
             // strdup(3) module-locally (#31721 GlobIterator/FilesystemIterator AOT).
             // strtok_r dropped (#29091): parse_str AOT kernel uses __compiler_strtok_r.
@@ -689,6 +689,33 @@ final class LibcExtern
             );
         }
         $context->registerFunction('strtol', $fn);
+    }
+
+    /**
+     * Module-local strtod(3) after LibcExtern always-on drop (#31997).
+     *
+     * User-script floatval()/is_numeric() stay on ext/standard PHP; NestedJIT numeric-parse
+     * leaves call this before lookupFunction('strtod'). Peer: ensureStrtolDecl (#31988).
+     */
+    public static function ensureStrtodDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('strtod');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $context->getTypeFromString('int8**');
+        $dbl = $context->getTypeFromString('double');
+        $fn = $context->module->getNamedFunction('strtod');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'strtod',
+                $context->context->functionType($dbl, false, $i8p, $i8pp)
+            );
+        }
+        $context->registerFunction('strtod', $fn);
     }
 
     private static function implementStrlenBody(Context $context): void

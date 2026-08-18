@@ -324,6 +324,8 @@ final class JitMinMax
         $charPtr = $context->builder->structGep($strPtr, $strMap['value']);
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'jit_min_max_'.$tag.'_end');
         $context->builder->store($i8p->constNull(), $endPtrSlot);
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $stringAsDouble = $context->builder->call(
             $context->lookupFunction('strtod'),
             $charPtr,

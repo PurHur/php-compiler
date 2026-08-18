@@ -345,6 +345,8 @@ final class JitScalarEnumCoerce
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $ptr = self::stringDataPtr($context, $stringVal);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $stringFloat = $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

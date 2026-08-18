@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\StreamLifecycleJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
@@ -125,6 +126,8 @@ final class is_numeric extends Internal
         );
         $nullEnd = $context->getTypeFromString('int8*')->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
         $endPtr = $context->builder->load($endPtrSlot);
         $notConsumed = $context->builder->icmp(Builder::INT_EQ, $endPtr, $charPtr);

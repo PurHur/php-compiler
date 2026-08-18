@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\Web\Params;
 use PHPLLVM\Builder;
@@ -255,6 +256,8 @@ final class JitWebParams
         );
         $nullEnd = $context->getTypeFromString('int8*')->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $dbl = $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
         $i64 = JitStringIndex::i64($context);
 

@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
@@ -105,6 +106,8 @@ final class floatval extends Internal
             case JITVariable::TYPE_STRING:
                 $ptr = $this->stringDataPtr($context, $this->jitString($context, $args[0], $this->name.'() argument #1'));
                 $endPtr = $context->getTypeFromString('int8**')->constNull();
+                // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+                LibcExtern::ensureStrtodDecl($context);
 
                 return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
             case JITVariable::TYPE_NULL:
@@ -254,6 +257,8 @@ final class floatval extends Internal
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $ptr = $this->stringDataPtr($context, $stringVal);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $stringFloat = $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
         $stringEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

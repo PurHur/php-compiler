@@ -81,6 +81,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             'memcmp',
             'strcmp',
             'strtol',
+            'strtod',
         ];
     }
 
@@ -91,7 +92,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988)"
+                "LibcExtern must not declare libc {$sym} (#28850/#29050/#30332/#31374/#31403/#31458/#31498/#31519/#31534/#31558/#31582/#31606/#31637/#31655/#31682/#31706/#31743/#31764/#31787/#31817/#31839/#31863/#31885/#31954/#31971/#31988/#31997)"
             );
         }
         $this->assertStringContainsString('#28850', $source);
@@ -120,12 +121,14 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31954', $source);
         $this->assertStringContainsString('#31971', $source);
         $this->assertStringContainsString('#31988', $source);
+        $this->assertStringContainsString('#31997', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
         $this->assertStringContainsString('ensureMemcpyDecl', $source);
         $this->assertStringContainsString('ensureMemcmpDecl', $source);
         $this->assertStringContainsString('ensureStrcmpDecl', $source);
         $this->assertStringContainsString('ensureStrtolDecl', $source);
+        $this->assertStringContainsString('ensureStrtodDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
     }
@@ -362,6 +365,11 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
             $source,
             'LibcExtern must not declare libc strtol (#31988)'
         );
+        $this->assertStringNotContainsString(
+            "'strtod' =>",
+            $source,
+            'LibcExtern must not declare libc strtod (#31997)'
+        );
         $this->assertStringContainsString('#31655', $source);
         $this->assertStringContainsString('#31682', $source);
         $this->assertStringContainsString('#31706', $source);
@@ -374,12 +382,14 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31885', $source);
         $this->assertStringContainsString('#31954', $source);
         $this->assertStringContainsString('#31971', $source);
+        $this->assertStringContainsString('#31997', $source);
         $this->assertStringContainsString('ensurePrintf', $source);
         $this->assertStringContainsString('ensureMemmoveDecl', $source);
         $this->assertStringContainsString('ensureMemsetDecl', $source);
         $this->assertStringContainsString('ensureMemcpyDecl', $source);
         $this->assertStringContainsString('ensureMemcmpDecl', $source);
         $this->assertStringContainsString('ensureStrcmpDecl', $source);
+        $this->assertStringContainsString('ensureStrtodDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
         $this->assertStringContainsString('ensureStrncmp', $source);
@@ -672,6 +682,38 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $module = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
         $this->assertStringNotContainsString("addFunction('strtol'", $module);
         $this->assertStringContainsString('#31988', $module);
+    }
+
+    public function testNestedJitConsumersEnsureStrtodDeclAfterLibcExternDrop(): void
+    {
+        foreach ([
+            'lib/VM/VmValueCompare.php',
+            'ext/standard/JitFdiv.php',
+            'ext/filter/JitFilter.php',
+            'ext/standard/JitZendScalarCast.php',
+            'ext/standard/JitScalarEnumCoerce.php',
+            'ext/standard/JitMinMax.php',
+            'ext/standard/floatval.php',
+            'ext/standard/is_numeric.php',
+            'lib/JIT/TypedParamCoerce.php',
+            'lib/JIT/ArrayUniqueLlvm.php',
+            'ext/standard/JitWebParams.php',
+        ] as $rel) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
+            $this->assertStringContainsString(
+                'LibcExtern::ensureStrtodDecl',
+                $source,
+                "{$rel} must call LibcExtern::ensureStrtodDecl after #31997"
+            );
+            $this->assertStringContainsString('#31997', $source);
+        }
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringContainsString('ensureStrtodDecl', $libc);
+        $this->assertStringContainsString('#31997', $libc);
+        $this->assertStringNotContainsString("'strtod' =>", $libc);
+        $module = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringNotContainsString("addFunction('strtod'", $module);
+        $this->assertStringContainsString('#31997', $module);
     }
 
     public function testNestedJitConsumersLookupCompilerStrcasecmpAfterLibcExternDrop(): void

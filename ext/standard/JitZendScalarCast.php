@@ -64,6 +64,8 @@ final class JitZendScalarCast
                     JitStringArg::lower($context, $arg, '(float) cast')
                 );
                 $endPtr = $context->getTypeFromString('int8**')->constNull();
+                // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+                LibcExtern::ensureStrtodDecl($context);
 
                 return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
             case JITVariable::TYPE_NULL:
@@ -335,6 +337,8 @@ final class JitZendScalarCast
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $ptr = self::stringDataPtr($context, $stringVal);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $stringFloat = $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
         $stringEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -395,6 +399,8 @@ final class JitZendScalarCast
     {
         $ptr = self::stringDataPtr($context, $strPtr);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
 
         return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
     }

@@ -1008,16 +1008,9 @@ class Module extends ModuleAbstract
         // strtol(3) dropped from always-on Module decls (#31988 / #31971 peer):
         // NestedJIT leaves call LibcExtern::ensureStrtolDecl before lookup;
         // user-script strtol()/intval() stay on ext/standard PHP.
-        try {
-            $context->lookupFunction('strtod');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i8pp = $context->getTypeFromString('int8**');
-            $double = $context->getTypeFromString('double');
-            $ft = $context->context->functionType($double, false, $i8p, $i8pp);
-            $fn = $context->module->addFunction('strtod', $ft);
-            $context->registerFunction('strtod', $fn);
-        }
+        // strtod(3) dropped from always-on Module decls (#31997 / #31988 peer):
+        // NestedJIT leaves call LibcExtern::ensureStrtodDecl before lookup;
+        // user-script floatval()/is_numeric() stay on ext/standard PHP.
         try {
             $context->lookupFunction('phpc_basetozval_result');
         } catch (\Throwable $e) {

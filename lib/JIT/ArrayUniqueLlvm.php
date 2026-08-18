@@ -383,6 +383,8 @@ final class ArrayUniqueLlvm
         $strMap = $context->structFieldMap['__string__'];
         $charPtr = $context->builder->structGep($str, $strMap['value']);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $stringFp = $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
