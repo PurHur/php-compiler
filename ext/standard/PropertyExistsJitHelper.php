@@ -15,7 +15,8 @@ use PHPCompiler\Web\Superglobals;
  */
 final class PropertyExistsJitHelper
 {
-    public static function existsArgv(Variable $objectOrClass, string $property): bool
+    /** 1/0 — NestedJIT `: bool` was i1 ABI with `ret i64 0` (#31966). */
+    public static function existsArgv(Variable $objectOrClass, string $property): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -24,6 +25,6 @@ final class PropertyExistsJitHelper
             );
         }
 
-        return VmReflection::propertyExists($ctx, $objectOrClass, $property);
+        return VmReflection::propertyExists($ctx, $objectOrClass, $property) ? 1 : 0;
     }
 }

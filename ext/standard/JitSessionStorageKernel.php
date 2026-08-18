@@ -380,9 +380,9 @@ final class JitSessionStorageKernel
         $context->builder->positionAtEnd($bbSNum);
         $numStart = $context->builder->inBoundsGEP($afterPipe, $i64->constInt(2, false));
         $endPtr = $context->builder->alloca($i8p);
-        $valLen = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $valLen = $context->builder->call(
             $context->lookupFunction('strtol'),
             $numStart,
             $endPtr,
@@ -431,9 +431,9 @@ final class JitSessionStorageKernel
         $context->builder->positionAtEnd($bbINum);
         $iStart = $context->builder->inBoundsGEP($afterPipe, $i64->constInt(2, false));
         $iEndPtr = $context->builder->alloca($i8p);
-        $iVal = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $iVal = $context->builder->call(
             $context->lookupFunction('strtol'),
             $iStart,
             $iEndPtr,

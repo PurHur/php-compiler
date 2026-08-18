@@ -116,5 +116,7 @@ final class PowIntRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitPow.php');
         $this->assertStringContainsString('PowIntRuntime', $source);
         $this->assertStringContainsString('__phpc_pow_int', $source);
+        $this->assertStringContainsString('tryFoldCompileTimeIntegerPow', $source);
+        $this->assertStringContainsString('#31966', $source);
     }
 }

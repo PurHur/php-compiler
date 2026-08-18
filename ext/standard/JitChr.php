@@ -258,9 +258,9 @@ final class JitChr
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca($context->getTypeFromString('int8*'), 1, 'chr_strtol_end');
         $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endPtrSlot);
-        $raw = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $raw = $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,

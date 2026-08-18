@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -50,10 +52,25 @@ final class PowIntRuntime
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
-        self::implementPowIntBridge($context);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        // Preserve caller insert block — clearInsertionPosition orphans the **
+        // call after JitValueBox::alloc (`Instruction referencing instruction not
+        // embedded in a basic block`, #31966 / peer #26884).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
+        try {
+            self::ensureJitHelperCompiled($context);
+            self::implementPowIntBridge($context);
+            self::registerLinkedRuntime($context);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
     }
 
     private static function implementPowIntBridge(Context $context): void
@@ -69,7 +86,6 @@ final class PowIntRuntime
         $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
-        $doubleTy = $context->getTypeFromString('double');
         $voidTy = $context->getTypeFromString('void');
         $ft = $context->context->functionType($voidTy, false, $valuePtr, $i64, $i64);
         $fn = null !== $probe
@@ -83,6 +99,8 @@ final class PowIntRuntime
         $floatPath = $fn->appendBasicBlock('pow_int_bridge_float');
         $done = $fn->appendBasicBlock('pow_int_bridge_done');
 
+        $context->activeFunction = $abiName;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
         $context->builder->positionAtEnd($entry);
         $out = $fn->getParam(0);
         $base = $fn->getParam(1);
@@ -94,22 +112,25 @@ final class PowIntRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        $tag = $context->builder->call(
+        $tag = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::COMPUTE_HELPER),
-            $base,
-            $exp
+            [$base, $exp]
         );
-        $tagI32 = $tag->typeOf() === $i32
-            ? $tag
-            : $context->builder->truncOrBitCast($tag, $i32);
+        $tagI64 = JitNestedHelperCoerce::extractLongFromHelperResult($context, $tag, $i64);
+        $tagI32 = $tagI64->typeOf() === $i32
+            ? $tagI64
+            : $context->builder->truncOrBitCast($tagI64, $i32);
         $isFloat = $context->builder->icmp(Builder::INT_NE, $tagI32, $i32->constInt(0, false));
         $context->builder->branchIf($isFloat, $floatPath, $intPath);
 
         $context->builder->positionAtEnd($intPath);
-        $intResult = $context->builder->call(self::helperFunction($context, self::RESULT_INT_HELPER));
-        $intI64 = $intResult->typeOf() === $i64
-            ? $intResult
-            : $context->builder->sext($intResult, $i64);
+        $intResult = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::RESULT_INT_HELPER),
+            []
+        );
+        $intI64 = JitNestedHelperCoerce::extractLongFromHelperResult($context, $intResult, $i64);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $out,
@@ -118,10 +139,12 @@ final class PowIntRuntime
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($floatPath);
-        $floatResult = $context->builder->call(self::helperFunction($context, self::RESULT_FLOAT_HELPER));
-        $floatD = $floatResult->typeOf() === $doubleTy
-            ? $floatResult
-            : $context->builder->sitofp($floatResult, $doubleTy);
+        $floatResult = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::RESULT_FLOAT_HELPER),
+            []
+        );
+        $floatD = JitNestedHelperCoerce::extractDoubleFromHelperResult($context, $floatResult);
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $out,

@@ -12,10 +12,12 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for property_exists() via PropertyExistsJitHelper PHP.
  *
- * Replaces inline strcasecmp LLVM in ext/standard/JitPropertyExists.php.
- * SSOT: {@see \PHPCompiler\ext\standard\PropertyExistsJitHelper}.
- * php-src: ext/standard/class.c — PHP_FUNCTION(property_exists)
- */
+     * Replaces inline strcasecmp LLVM in ext/standard/JitPropertyExists.php.
+     * SSOT: {@see \PHPCompiler\ext\standard\PropertyExistsJitHelper}.
+     * NestedJIT of `: bool` emitted `ret i64 0` into an i1 helper (#31966);
+     * existsArgv returns int (0/1) and this bridge truncs to i1.
+     * php-src: ext/standard/class.c — PHP_FUNCTION(property_exists)
+     */
 final class StringPropertyExists
 {
     private const ABI = '__phpc_jit_property_exists';
@@ -77,24 +79,34 @@ final class StringPropertyExists
                 $context->context->functionType($i1, false, $valuePtr, $strPtr)
             );
 
-        $entry = $fn->appendBasicBlock('property_exists_bridge_entry');
-        $context->builder->positionAtEnd($entry);
+        $savedLowering = $context->loweringLlvmFunction;
+        $savedActive = $context->activeFunction;
+        $context->activeFunction = self::ABI;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
+        try {
+            $entry = $fn->appendBasicBlock('property_exists_bridge_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, '#16442');
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            $helperFn,
-            [$fn->getParam(0), $fn->getParam(1)]
-        );
-        $exists = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($exists);
+            $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, '#16442');
+            $raw = JitNestedHelperCoerce::callHelper(
+                $context,
+                $helperFn,
+                [$fn->getParam(0), $fn->getParam(1)]
+            );
+            $i64 = $context->getTypeFromString('int64');
+            $existsI64 = JitNestedHelperCoerce::extractLongFromHelperResult($context, $raw, $i64);
+            $exists = JitNestedHelperCoerce::coerceHelperScalarResult($context, $existsI64, $i1);
+            $context->builder->returnValue($exists);
 
-        $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+            $context->registerFunction(self::ABI, $fn);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 }

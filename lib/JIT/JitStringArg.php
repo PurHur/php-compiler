@@ -94,6 +94,9 @@ final class JitStringArg
                     JitValueBox::pointer($context, $arg->value)
                 );
             }
+            if (self::isStringPtrPtrType($llvmType)) {
+                return $context->builder->load($arg->value);
+            }
 
             return $arg->value;
         }
@@ -110,6 +113,9 @@ final class JitStringArg
                     $context->lookupFunction('__value__readString'),
                     $context->builder->load($arg->value)
                 );
+            }
+            if (self::isStringPtrPtrType($llvmType)) {
+                return $context->builder->load($arg->value);
             }
         }
 
@@ -338,5 +344,11 @@ final class JitStringArg
         $classId = (int) $classIdVal->getConstantValue();
 
         return $context->type->object->classNameForId($classId);
+    }
+
+    /** LLVM may suffix struct names (`__string__.12**`) when parsing helper bitcode. */
+    public static function isStringPtrPtrType(string $llvmType): bool
+    {
+        return '__string__**' === $llvmType || str_ends_with($llvmType, '__string__**');
     }
 }

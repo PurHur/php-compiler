@@ -106,10 +106,12 @@ final class FunctionStaticHelper
                 );
                 break;
             case Variable::TYPE_STRING:
+                // fromLiteral string slots are `__string__**` (alloca); writeString wants `*`.
+                $strPtr = JitStringArg::lower($context, $default, 'function-static string');
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
                     $destPtr,
-                    $default->value
+                    $strPtr
                 );
                 break;
             case Variable::TYPE_OBJECT:

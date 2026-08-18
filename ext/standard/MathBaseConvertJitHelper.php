@@ -144,6 +144,10 @@ final class MathBaseConvertJitHelper
         if ($pos >= $end) {
             return $num;
         }
+        // NestedJIT may drop the radix to 0 on recursive calls; sdiv 0 is SIGFPE (#31966).
+        if ($base < 2 || $base > 36) {
+            return $num;
+        }
         $digit = self::radixDigitChar(\substr($str, $pos, 1), $base);
         if ($digit < 0) {
             self::$lastInvalidChars = true;

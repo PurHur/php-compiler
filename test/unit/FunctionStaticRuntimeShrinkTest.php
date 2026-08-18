@@ -20,6 +20,8 @@ final class FunctionStaticRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_fn_static_init_', $source);
         $this->assertStringNotContainsString('addGlobal($i8', $source);
         $this->assertStringNotContainsString('$initFlags', $source);
+        // fromLiteral string slots are `__string__**`; writeString wants `*` (#31966).
+        $this->assertStringContainsString('JitStringArg::lower', $source);
     }
 
     public function testFunctionStaticRuntimeUsesModuleInitTable(): void

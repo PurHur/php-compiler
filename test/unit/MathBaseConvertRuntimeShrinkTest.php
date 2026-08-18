@@ -55,6 +55,7 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\ord(', $source);
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathBaseConvertRuntime.php');
         $this->assertStringNotContainsString('stringFromCstr', $runtime);
+        $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $runtime);
     }
 
     public function testMathBaseConvertJitHelperMatchesVmMath(): void

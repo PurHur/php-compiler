@@ -165,9 +165,9 @@ final class JitLongArg {
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'jit_long_arg_strtol_end');
         $context->builder->store($i8p->constNull(), $endPtrSlot);
-        $parsed = // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
+        // strtol(3) via LibcExtern::ensureStrtolDecl after always-on drop (#31988).
         LibcExtern::ensureStrtolDecl($context);
-        $context->builder->call(
+        $parsed = $context->builder->call(
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,
