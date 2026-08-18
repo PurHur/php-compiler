@@ -73,9 +73,6 @@ final class ScopeBuiltinHelper
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $flags = self::resolveFlags($context, $flagsArg);
         $named = self::namedVariablesInScope($context);
-        if ([] === $named) {
-            return $context->getTypeFromString('int64')->constInt(0, false);
-        }
 
         $i64 = $context->getTypeFromString('int64');
         $countSlot = $context->builder->alloca($i64, 1, 'extract_count');
@@ -91,6 +88,7 @@ final class ScopeBuiltinHelper
             || Variable::TYPE_NULL === $flagsArg->type
             || ($flagsArg->isNullConstant ?? false);
 
+        // Walk even when $named is empty: extract(['this'=>1]) must still throw (#32226).
         ScopeBuiltinEmitHelper::walkStringKeyNodes(
             $context,
             $ht,
@@ -98,7 +96,8 @@ final class ScopeBuiltinHelper
             $flags,
             $countSlot,
             $prefixStr,
-            $defaultOverwrite
+            $defaultOverwrite,
+            true
         );
 
         return $context->builder->load($countSlot);
@@ -114,7 +113,7 @@ final class ScopeBuiltinHelper
         $i64 = $context->getTypeFromString('int64');
         $flags = $i64->constInt(0, false);
         $emptyPrefix = $context->builder->load($context->constantStringFromString(''));
-        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, null, $emptyPrefix, true);
+        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, null, $emptyPrefix, true, false);
     }
 
     public static function compact(Context $context, Variable ...$nameArgs): Value
