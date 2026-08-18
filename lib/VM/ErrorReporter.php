@@ -787,7 +787,21 @@ final class ErrorReporter
                 $walk = $walk->parent;
             }
             if ($line <= 0) {
-                $walk = $frame;
+                // Match FatalSite: this frame's pending FUNCCALL line, else the current
+                // opcode. Walking parent callSiteLine first cites the caller of a user
+                // function/method/closure instead of the inner opline (#32040).
+                if ($frame->callSiteLine > 0) {
+                    $line = $frame->callSiteLine;
+                }
+            }
+            if ($line <= 0) {
+                $opcodeLine = FatalSite::lineFromOpcodes($frame);
+                if ($opcodeLine > 0) {
+                    $line = $opcodeLine;
+                }
+            }
+            if ($line <= 0) {
+                $walk = $frame->parent;
                 while (null !== $walk) {
                     if ($walk->callSiteLine > 0) {
                         $line = $walk->callSiteLine;
@@ -797,7 +811,7 @@ final class ErrorReporter
                 }
             }
             if ($line <= 0) {
-                $walk = $frame;
+                $walk = $frame->parent;
                 while (null !== $walk) {
                     if ('' !== $walk->scriptPath) {
                         $opcodeLine = FatalSite::lineFromOpcodes($walk);

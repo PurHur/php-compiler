@@ -45,6 +45,50 @@ PHP
         $this->assertStringNotContainsString('on line 6', $stderr);
     }
 
+    public function testFunctionUndefinedVariableWarningCitesInnerEchoLine(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_undef_var_function_line.php';
+        [, $stderr] = $this->runVmScript($script, 0);
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_function_line\.php on line 6\s*$/m',
+            $stderr
+        );
+        $this->assertStringNotContainsString('on line 9', $stderr);
+    }
+
+    public function testMethodUndefinedVariableWarningCitesInnerEchoLine(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_undef_var_method_line.php';
+        [, $stderr] = $this->runVmScript($script, 0);
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+maintainer_gap_undef_var_method_line\.php on line 8\s*$/m',
+            $stderr
+        );
+        $this->assertStringNotContainsString('on line 12', $stderr);
+    }
+
+    public function testClosureUndefinedVariableErrorGetLastCitesInnerLine(): void
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_undef_closure_line_');
+        $this->assertNotFalse($tmp);
+        file_put_contents($tmp, <<<'PHP'
+<?php
+error_reporting(E_ALL);
+$fn = function () {
+    echo $missing, "\n";
+};
+$fn();
+$e = error_get_last();
+echo 'last:', $e['line'] ?? 0, "\n";
+PHP
+        );
+        [$stdout, $stderr] = $this->runVmScript($tmp, 0);
+        @unlink($tmp);
+        $this->assertMatchesRegularExpression('/ on line 4\s*$/m', $stderr);
+        $this->assertStringNotContainsString('on line 6', $stderr);
+        $this->assertSame("\nlast:4\n", $stdout);
+    }
+
     public function testBinaryExprUndefinedVariableWarningIncludesLineSuffix(): void
     {
         $script = $this->repoRoot.'/test/repro/maintainer-probe/batch3_undefined_var_arith.php';
