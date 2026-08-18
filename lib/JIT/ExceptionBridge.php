@@ -154,6 +154,34 @@ final class ExceptionBridge
     }
 
     /**
+     * Builtin Error — catchable in active try/catch, fatal when uncaught (#32226).
+     *
+     * Same shape as {@see emitDateRangeErrorAndAbort} with class `Error`.
+     */
+    public static function emitErrorAndAbort(Context $context, string $message): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            ErrorRaise::ensureStandaloneBodies($context);
+        }
+
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'Error', $message);
+
+            return;
+        }
+
+        ErrorRaise::emitRaise($context, $message);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+    }
+
+    /**
      * Builtin DateRangeError — catchable in active try/catch, fatal when uncaught (#31118).
      *
      * php-src: ext/date/php_date.c — zend_argument_error(date_ce_date_range_error, …)

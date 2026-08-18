@@ -19,6 +19,9 @@ use PHPCompiler\Web\Superglobals;
  */
 final class ScopeBuiltinJitHelper
 {
+    /** php-src: php_extract() — zend_throw_error(NULL, "Cannot re-assign $this") (#32226). */
+    public const EXTRACT_THIS_REASSIGN_ERROR = 'Cannot re-assign $this';
+
     /**
      * @param string $namesTable NUL-delimited scope variable names (compile-time)
      *
@@ -81,6 +84,18 @@ final class ScopeBuiltinJitHelper
     public static function prefixVarName(string $prefix, string $key): string
     {
         return $prefix.'_'.$key;
+    }
+
+    /**
+     * php_extract_overwrite / if_exists / prefix that resolves to `this`.
+     *
+     * EXTR_SKIP never imports `this` (bug #77135); other types throw.
+     */
+    public static function rejectExtractThis(string $finalName): void
+    {
+        if ('this' === $finalName) {
+            throw new \Error(self::EXTRACT_THIS_REASSIGN_ERROR);
+        }
     }
 
     public static function isValidVarName(string $name): bool
@@ -149,7 +164,8 @@ final class ScopeBuiltinJitHelper
                 return $finalName;
 
             case VmScope::EXTR_PREFIX_INVALID:
-                if (!self::isValidVarName($key)) {
+                // php_extract_prefix_invalid: "this" is treated as an invalid name and prefixed.
+                if (!self::isValidVarName($key) || 'this' === $key) {
                     return self::prefixVarName($prefixArg, $key);
                 }
 
@@ -157,6 +173,10 @@ final class ScopeBuiltinJitHelper
 
             case VmScope::EXTR_SKIP:
             default:
+                // php_extract_skip: never import `this` even when the CV is unset (#77135).
+                if ('this' === $key) {
+                    return null;
+                }
                 if (!$varExists) {
                     return $key;
                 }

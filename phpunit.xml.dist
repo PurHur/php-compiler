@@ -169,6 +169,8 @@
             <file>./test/compliance/ReservedClassName32206JITTest.php</file>
             <file>./test/compliance/ForeachByRefThis32205VMTest.php</file>
             <file>./test/compliance/ForeachByRefThis32205JITTest.php</file>
+            <file>./test/compliance/ExtractThis32226VMTest.php</file>
+            <file>./test/compliance/ExtractThis32226JITTest.php</file>
             <file>./test/compliance/DeclareStrictTypesMidfile32182VMTest.php</file>
             <file>./test/compliance/DeclareStrictTypesMidfile32182JITTest.php</file>
             <file>./test/compliance/UninitTypedArrayDimAssignVMTest.php</file>

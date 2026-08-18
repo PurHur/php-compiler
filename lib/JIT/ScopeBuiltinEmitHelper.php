@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\ScopeBuiltinJitHelper;
 use PHPCompiler\ext\standard\VmScope;
 use PHPCompiler\JIT\Builtin\ScopeBuiltinRuntime;
 use PHPCompiler\JIT\JitValueBox;
@@ -31,6 +32,7 @@ final class ScopeBuiltinEmitHelper
         ?Value $countSlot,
         Value $prefixStr,
         bool $defaultOverwrite = false,
+        bool $protectThis = false,
     ): void {
         HashTableReadLlvm::forEachStringKeyNode(
             $context,
@@ -40,7 +42,7 @@ final class ScopeBuiltinEmitHelper
                 Context $context,
                 Value $keyStr,
                 Value $valEntry
-            ) use ($named, $flags, $countSlot, $prefixStr, $defaultOverwrite): void {
+            ) use ($named, $flags, $countSlot, $prefixStr, $defaultOverwrite, $protectThis): void {
                 self::importExtractKey(
                     $context,
                     $keyStr,
@@ -49,7 +51,8 @@ final class ScopeBuiltinEmitHelper
                     $flags,
                     $prefixStr,
                     $countSlot,
-                    $defaultOverwrite
+                    $defaultOverwrite,
+                    $protectThis
                 );
             }
         );
@@ -66,17 +69,27 @@ final class ScopeBuiltinEmitHelper
         Value $flags,
         Value $prefixStr,
         ?Value $countSlot,
-        bool $defaultOverwrite
+        bool $defaultOverwrite,
+        bool $protectThis
     ): void {
-        if ([] === $named) {
-            return;
-        }
-
         // Default EXTR_OVERWRITE: match keys in LLVM (no NestedJIT string-return /
         // matchNamedVariableIndex under thin AOT) (#27520).
         if ($defaultOverwrite) {
-            self::importExtractKeyOverwriteLlvm($context, $keyStr, $valEntry, $named, $flags, $countSlot);
+            self::importExtractKeyOverwriteLlvm(
+                $context,
+                $keyStr,
+                $valEntry,
+                $named,
+                $flags,
+                $countSlot,
+                $protectThis
+            );
 
+            return;
+        }
+
+        // Empty named still walks extract(['this'=>1]) so OVERWRITE can throw (#32226).
+        if ([] === $named && !$protectThis) {
             return;
         }
 
@@ -103,6 +116,16 @@ final class ScopeBuiltinEmitHelper
 
         $merge = BasicBlockHelper::append($context, 'extract_import_done_'.$tag);
         $context->builder->positionAtEnd($nonEmpty);
+        if ($protectThis) {
+            $thisLit = $context->builder->load($context->constantStringFromString('this'));
+            $isThis = JitStringCompare::identical($context, $targetStr, $thisLit);
+            $throwThis = BasicBlockHelper::append($context, 'extract_target_this_'.$tag);
+            $importBb = BasicBlockHelper::append($context, 'extract_target_import_'.$tag);
+            $context->builder->branchIf($isThis, $throwThis, $importBb);
+            $context->builder->positionAtEnd($throwThis);
+            ExceptionBridge::emitErrorAndAbort($context, ScopeBuiltinJitHelper::EXTRACT_THIS_REASSIGN_ERROR);
+            $context->builder->positionAtEnd($importBb);
+        }
         ScopeBuiltinIndexLlvm::branchOnNamedVariableIndex(
             $context,
             ScopeBuiltinRuntime::matchNamedVariableIndex(
@@ -113,10 +136,15 @@ final class ScopeBuiltinEmitHelper
             $named,
             'extract_target_'.$tag,
             $emptyDone,
-            static function (Context $context, Variable $dest, string $name) use ($valEntry, $flags, $countSlot, $merge): void {
+            static function (Context $context, Variable $dest, string $name) use ($valEntry, $flags, $countSlot, $merge, $protectThis): void {
+                if ($protectThis && 'this' === $name) {
+                    ExceptionBridge::emitErrorAndAbort($context, ScopeBuiltinJitHelper::EXTRACT_THIS_REASSIGN_ERROR);
+
+                    return;
+                }
                 self::maybeAssignExtract($context, $dest, $valEntry, $flags, $countSlot, $merge);
             },
-            $nonEmpty
+            $context->builder->getInsertBlock() ?? $nonEmpty
         );
 
         // Assign/skip → $merge must continue the walk; else sealFunction emits `ret void` (#27520).
@@ -138,12 +166,29 @@ final class ScopeBuiltinEmitHelper
         Value $valEntry,
         array $named,
         Value $flags,
-        ?Value $countSlot
+        ?Value $countSlot,
+        bool $protectThis
     ): void {
         $tag = 'eo'.(string) ++self::$blockSeq;
         $done = BasicBlockHelper::append($context, 'extract_ow_done_'.$tag);
+        if ($protectThis) {
+            $thisLit = $context->builder->load($context->constantStringFromString('this'));
+            $isThis = JitStringCompare::identical($context, $keyStr, $thisLit);
+            $throwThis = BasicBlockHelper::append($context, 'extract_ow_this_'.$tag);
+            $afterThis = BasicBlockHelper::append($context, 'extract_ow_after_this_'.$tag);
+            $context->builder->branchIf($isThis, $throwThis, $afterThis);
+            $context->builder->positionAtEnd($throwThis);
+            ExceptionBridge::emitErrorAndAbort($context, ScopeBuiltinJitHelper::EXTRACT_THIS_REASSIGN_ERROR);
+            $context->builder->positionAtEnd($afterThis);
+        }
         $names = \array_keys($named);
         $n = \count($names);
+        if (0 === $n) {
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
+
+            return;
+        }
         $checkBlocks = [];
         for ($i = 0; $i < $n; ++$i) {
             $checkBlocks[$i] = BasicBlockHelper::append($context, 'extract_ow_chk_'.$tag.'_'.$i);

@@ -166,6 +166,9 @@ final class VmScope
                 }
             }
 
+            // php-src php_extract: importing `this` throws Error (ext/standard/array.c, #32226).
+            ScopeBuiltinJitHelper::rejectExtractThis($finalName);
+
             $target = self::ensureCallerVariable($caller, $finalName);
             if ($refs) {
                 $target->indirect($valueVar);
