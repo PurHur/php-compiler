@@ -1,0 +1,21 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php
+@@ -97,10 +97,14 @@
+         if (! $node->num) {
+             return new Goto_(end($stack), $node->getAttributes());
+         }
+         if ($node->num instanceof LNumber) {
+             $num = $node->num->value;
+-            if ($num < 1 || $num > \count($stack)) {
+-                throw new \LogicException('Too high of a count for '.$node->getType());
++            $keyword = 'Stmt_Break' === $node->getType() ? 'break' : 'continue';
++            if ($num < 1) {
++                throw new \LogicException(sprintf("'%s' operator accepts only positive integers", $keyword));
++            }
++            if ($num > \count($stack)) {
++                throw new \LogicException(sprintf("Cannot '%s' %d levels", $keyword, $num));
+             }
+             $loc = array_slice($stack, -$num, 1);
+ 
+             return new Goto_($loc[0], $node->getAttributes());

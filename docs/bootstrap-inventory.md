@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7579 |
-| Phase A inventory files (M2 ratio SSOT) | 7579 |
+| PHP files on vm.php path | 7580 |
+| Phase A inventory files (M2 ratio SSOT) | 7580 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24238 |
+| Source constructs flagged (warnings) | 24242 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5262,6 +5262,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/AbstractEnumMarker.php` | 0 | 1 |
 | `lib/Ast/AssertExprMessageRewriter.php` | 0 | 7 |
 | `lib/Ast/AsymmetricVisibilityRewriter.php` | 0 | 11 |
+| `lib/Ast/BreakContinueOperandCompileCheck.php` | 0 | 3 |
 | `lib/Ast/CatchIntersectionAttacher.php` | 0 | 1 |
 | `lib/Ast/CatchIntersectionSupport.php` | 0 | 1 |
 | `lib/Ast/CloneWithDesugar.php` | 0 | 1 |
@@ -6760,7 +6761,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 42 |
+| `lib/Runtime.php` | 0 | 43 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 19 |
@@ -46352,6 +46353,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 48 class method(s)
 - 8 closure(s)
 
+### `lib/Ast/BreakContinueOperandCompileCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 61)
+- new CompileFatal (line 83)
+- 6 class method(s)
+
 ### `lib/Ast/CatchIntersectionAttacher.php`
 
 **Warnings** (review for bootstrap subset):
@@ -55910,47 +55918,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Runtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new NodeTraverser (line 148)
-- new Ast\ConfusableBuiltinTypeHintCheck (line 150)
-- new MultiBlockNameResolver (line 152)
-- new Ast\EnumCaseImportRewriter (line 153)
-- new GroupUseStripper (line 155)
-- new Ast\AbstractEnumMarker (line 156)
-- new SealedClassAnnotator (line 158)
-- new StaticClassAnnotator (line 160)
-- new Ast\EnumPropertyCompileCheck (line 162)
-- new Ast\ReadonlyClassTraitPropertyCompileCheck (line 163)
-- new Ast\GeneratorYieldSourceMarker (line 164)
-- new Ast\AssertExprMessageRewriter (line 166)
-- new ReadonlyFunctionAnnotator (line 167)
-- new TryCatchElseAttacher (line 168)
-- new CatchIntersectionAttacher (line 169)
-- new Parser (line 170)
-- new ParserFactory (line 171)
-- new Traverser (line 175)
-- new InOperatorResolver (line 176)
-- new ExitFunctionResolver (line 177)
-- new VoidCastResolver (line 178)
-- new Visitor\Simplifier (line 179)
-- new Visitor\DeadBlockEliminator (line 180)
-- new Traverser (line 181)
-- new Visitor\PhiResolver (line 182)
-- new NullSafeLivenessDetector (line 183)
-- new Optimizer\AssignOp (line 184)
-- new CompilerTypeReconstructor (line 186)
-- new Compiler (line 204)
-- new VMContext (line 209)
-- new VM (line 215)
-- new JIT (line 325)
-- new JITContext (line 339)
-- new SealedClassPreprocessor (line 412)
-- new StaticClassPreprocessor (line 415)
-- new SourcePreprocessor\PropertyHooks (line 418)
-- new State (line 575)
-- new ReflectionProperty (line 609)
-- new ReflectionProperty (line 612)
-- new LintCompiler (line 1044)
-- new Variable (line 1175)
+- new NodeTraverser (line 149)
+- new Ast\ConfusableBuiltinTypeHintCheck (line 151)
+- new MultiBlockNameResolver (line 153)
+- new Ast\EnumCaseImportRewriter (line 154)
+- new GroupUseStripper (line 156)
+- new Ast\AbstractEnumMarker (line 157)
+- new Ast\BreakContinueOperandCompileCheck (line 159)
+- new SealedClassAnnotator (line 161)
+- new StaticClassAnnotator (line 163)
+- new Ast\EnumPropertyCompileCheck (line 165)
+- new Ast\ReadonlyClassTraitPropertyCompileCheck (line 166)
+- new Ast\GeneratorYieldSourceMarker (line 167)
+- new Ast\AssertExprMessageRewriter (line 169)
+- new ReadonlyFunctionAnnotator (line 170)
+- new TryCatchElseAttacher (line 171)
+- new CatchIntersectionAttacher (line 172)
+- new Parser (line 173)
+- new ParserFactory (line 174)
+- new Traverser (line 178)
+- new InOperatorResolver (line 179)
+- new ExitFunctionResolver (line 180)
+- new VoidCastResolver (line 181)
+- new Visitor\Simplifier (line 182)
+- new Visitor\DeadBlockEliminator (line 183)
+- new Traverser (line 184)
+- new Visitor\PhiResolver (line 185)
+- new NullSafeLivenessDetector (line 186)
+- new Optimizer\AssignOp (line 187)
+- new CompilerTypeReconstructor (line 189)
+- new Compiler (line 207)
+- new VMContext (line 212)
+- new VM (line 218)
+- new JIT (line 328)
+- new JITContext (line 342)
+- new SealedClassPreprocessor (line 415)
+- new StaticClassPreprocessor (line 418)
+- new SourcePreprocessor\PropertyHooks (line 421)
+- new State (line 588)
+- new ReflectionProperty (line 622)
+- new ReflectionProperty (line 625)
+- new LintCompiler (line 1057)
+- new Variable (line 1188)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
