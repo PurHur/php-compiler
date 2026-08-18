@@ -12160,6 +12160,16 @@ class Compiler {
     }
 
     /**
+     * Zend zend_compile_new() → zend_ensure_valid_class_fetch_type() — `new self/parent/static`
+     * in a named free function is a compile-time fatal even when unused (#32252, re-#32227).
+     */
+    protected function rejectPseudoClassNewOutsideClassScope(Op\Expr\New_ $expr, Block $block): void
+    {
+        $keyword = $this->firstClassCallableScopeKeyword($expr->class);
+        $this->rejectPseudoClassFetchOutsideKnownClassScope($keyword, $block, $expr);
+    }
+
+    /**
      * @param null|'parent'|'self'|'static' $keyword
      */
     protected function rejectPseudoClassFetchOutsideKnownClassScope(?string $keyword, Block $block, Op $source): void
@@ -14794,6 +14804,7 @@ class Compiler {
                     $calleeName
                 );
             case Op\Expr\New_::class:
+                $this->rejectPseudoClassNewOutsideClassScope($expr, $block);
                 // Abstract/enum `new` is a runtime Error when NEW executes (Zend zend_execute.c),
                 // not a unit-wide compile fatal — dead `if (false) { new Abstract; }` must load (#25787 / re-#3385).
                 $className = $this->literalScopeClassName($expr->class);
@@ -15789,6 +15800,7 @@ class Compiler {
      */
     private function compileNewExprForThrow(Op\Expr\New_ $expr, Block $block): array
     {
+        $this->rejectPseudoClassNewOutsideClassScope($expr, $block);
         // Same as Op\Expr\New_:: class path — defer abstract/enum instantiate to runtime (#25787).
         $className = $this->literalScopeClassName($expr->class);
         $resultSlot = $block->forceFreshVarSlot($expr->result);
