@@ -49,7 +49,7 @@ final class ldap_bind extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_bind() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapLink::invokeBind($context, $args);
     }
 }
 
@@ -257,7 +257,7 @@ final class ldap_unbind extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_unbind() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapLink::invokeUnbind($context, $args, 'ldap_unbind');
     }
 }
 
@@ -286,7 +286,7 @@ final class ldap_close extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ldap_close() is not implemented for JIT in this compiler build (issue #3369)');
+        return JitLdapLink::invokeUnbind($context, $args, 'ldap_close');
     }
 }
 

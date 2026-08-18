@@ -8,8 +8,9 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
 /**
- * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect / ldap_connect_wallet
- * (#6352, #18173, #22212, #22276, #31984, #32000).
+ * JIT/AOT link for ldap_escape / ldap_dn2ufn / ldap_explode_dn / ldap_connect /
+ * ldap_connect_wallet / ldap_bind / ldap_unbind (#6352, #18173, #22212, #22276,
+ * #31984, #32000, #32001, #32002).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringStrcoll #22256).
  * php-src: ext/ldap/ldap.c
@@ -20,6 +21,8 @@ final class LdapRuntime
 
     private const DN_HELPER_PATH = '/ext/ldap/LdapDnJitHelper.php';
 
+    private const LINK_HELPER_PATH = '/ext/ldap/LdapLinkJitHelper.php';
+
     private const LDAP_ESCAPE_HELPER = 'PHPCompiler\\ext\\ldap\\LdapEscapeJitHelper::ldapEscape';
 
     private const LDAP_DN2UFN_HELPER = 'PHPCompiler\\ext\\ldap\\LdapDnJitHelper::dn2ufn';
@@ -29,6 +32,12 @@ final class LdapRuntime
     private const LDAP_CONNECT_WALLET_HELPER = 'PHPCompiler\\ext\\ldap\\LdapDnJitHelper::connectWallet';
 
     private const LDAP_CONNECT_HELPER = 'PHPCompiler\\ext\\ldap\\LdapDnJitHelper::connectUri';
+
+    private const LDAP_LINK_REGISTER_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::registerHandleArgv';
+
+    private const LDAP_BIND_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::bindArgv';
+
+    private const LDAP_UNBIND_HELPER = 'PHPCompiler\\ext\\ldap\\LdapLinkJitHelper::unbindArgv';
 
     /** @var list<string> */
     private const ESCAPE_HELPERS = [
@@ -41,6 +50,13 @@ final class LdapRuntime
         self::LDAP_EXPLODE_DN_HELPER,
         self::LDAP_CONNECT_WALLET_HELPER,
         self::LDAP_CONNECT_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const LINK_HELPERS = [
+        self::LDAP_LINK_REGISTER_HELPER,
+        self::LDAP_BIND_HELPER,
+        self::LDAP_UNBIND_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -119,6 +135,39 @@ final class LdapRuntime
             self::DN_HELPER_PATH,
             self::DN_HELPERS,
             '#32000'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_link_register',
+            'ldap_link_register_bridge_entry',
+            [$i64],
+            $context->getTypeFromString('void'),
+            self::LDAP_LINK_REGISTER_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32001'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_bind',
+            'ldap_bind_bridge_entry',
+            [$i64, $strPtr, $strPtr, $i64, $i64],
+            $context->getTypeFromString('int1'),
+            self::LDAP_BIND_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32001'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_ldap_unbind',
+            'ldap_unbind_bridge_entry',
+            [$i64],
+            $context->getTypeFromString('int1'),
+            self::LDAP_UNBIND_HELPER,
+            self::LINK_HELPER_PATH,
+            self::LINK_HELPERS,
+            '#32002'
         );
 
         if (null !== $savedBlock) {

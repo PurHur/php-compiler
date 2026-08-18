@@ -21,6 +21,12 @@ final class VmLdapConnection
     /** @var array<int, array{native: \FFI\CData, closed: bool, errno: int, object: ObjectEntry, rebind_callback: ?Variable, rebind_ctx: ?Context, rebind_params: ?\FFI\CData}> */
     private static array $state = [];
 
+    /** @var list<int> object ids from connectUri awaiting JIT handle registration (#32001) */
+    private static array $pendingJitHandleIds = [];
+
+    /** @var array<int, int> JIT object address (ptrToInt) => object id */
+    private static array $jitHandleToId = [];
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])) {
@@ -54,6 +60,51 @@ final class VmLdapConnection
     public static function isLive(ObjectEntry $object): bool
     {
         return isset(self::$state[$object->id]) && !self::$state[$object->id]['closed'];
+    }
+
+    /** Enqueue object id after ldap_connect() NestedJIT helper wrap (#32001). */
+    public static function enqueuePendingJitHandle(int $objectId): void
+    {
+        self::$pendingJitHandleIds[] = $objectId;
+    }
+
+    /** Map compiled __object__* address to VM link state after ldap_connect() JIT (#32001). */
+    public static function claimPendingJitHandle(int $handle): void
+    {
+        if ($handle <= 0 || [] === self::$pendingJitHandleIds) {
+            return;
+        }
+        self::$jitHandleToId[$handle] = (int) \array_shift(self::$pendingJitHandleIds);
+    }
+
+    public static function connectionForLookupKey(int $handle): ?ObjectEntry
+    {
+        if ($handle <= 0) {
+            return null;
+        }
+        $id = self::$jitHandleToId[$handle] ?? null;
+        if (null === $id || !isset(self::$state[$id])) {
+            return null;
+        }
+        $object = self::$state[$id]['object'];
+        if (!self::isLive($object)) {
+            return null;
+        }
+
+        return $object;
+    }
+
+    public static function isClosedLookupKey(int $handle): bool
+    {
+        if ($handle <= 0) {
+            return false;
+        }
+        $id = self::$jitHandleToId[$handle] ?? null;
+        if (null === $id || !isset(self::$state[$id])) {
+            return false;
+        }
+
+        return self::$state[$id]['closed'];
     }
 
     public static function native(ObjectEntry $object): \FFI\CData

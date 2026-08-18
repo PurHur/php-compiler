@@ -20,11 +20,16 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LdapDnJitHelper::explodeDn', $source);
         $this->assertStringContainsString('LdapDnJitHelper::connectWallet', $source);
         $this->assertStringContainsString('LdapDnJitHelper::connectUri', $source);
+        $this->assertStringContainsString('LdapLinkJitHelper::bindArgv', $source);
+        $this->assertStringContainsString('LdapLinkJitHelper::unbindArgv', $source);
+        $this->assertStringContainsString('LdapLinkJitHelper::registerHandleArgv', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('__compiler_ldap_escape', $source);
         $this->assertStringContainsString('__compiler_ldap_connect_wallet', $source);
+        $this->assertStringContainsString('__compiler_ldap_bind', $source);
+        $this->assertStringContainsString('__compiler_ldap_unbind', $source);
         $this->assertStringContainsString('ldap_connect_bridge_entry', $source);
-        $this->assertSame(5, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
+        $this->assertSame(8, \preg_match_all('/JitVmHelperLink::ensureBridge\(/', $source));
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -32,6 +37,6 @@ final class LdapRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('ensureEscapeHelperCompiled', $source);
         $this->assertStringNotContainsString('implementEscapeBridge', $source);
-        $this->assertLessThan(150, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
     }
 }

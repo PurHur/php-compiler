@@ -8,11 +8,13 @@ use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\LdapRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -114,11 +116,46 @@ final class JitLdapConnect
 
         LdapRuntime::ensureLinked($context);
 
-        return $context->builder->call(
+        $result = $context->builder->call(
             $context->lookupFunction('__compiler_ldap_connect'),
             $uri,
             $hasPort,
             $port
         );
+
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($result, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $regBb = BasicBlockHelper::append($context, 'ldap_connect_register');
+        $doneBb = BasicBlockHelper::append($context, 'ldap_connect_done');
+        $context->builder->branchIf($isObject, $regBb, $doneBb);
+
+        $context->builder->positionAtEnd($regBb);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $result
+        );
+        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $objAddr = $context->builder->ptrToInt(
+            $context->builder->pointerCast($obj, $voidp),
+            $i64
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_ldap_link_register'),
+            $objAddr
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $result;
     }
 }
