@@ -12084,6 +12084,70 @@ class Compiler {
     }
 
     /**
+     * Zend zend_is_scope_known() when !CG(active_class_entry) (#32227, Zend/zend_compile.c).
+     *
+     * Scope is known-empty in a named free function. File/eval ({main}) inherit the
+     * including/eval'ing class; closures can be rebound — both stay runtime.
+     */
+    protected function compileScopeKnowsNoClassEntry(Block $block): bool
+    {
+        $func = $block->func;
+        if (null === $func) {
+            return false;
+        }
+        if (((int) ($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0) {
+            return false;
+        }
+        $name = $func->name;
+        if ($name instanceof Operand\Literal) {
+            $name = $name->value;
+        }
+        if (!is_string($name) || '' === $name || '{main}' === $name) {
+            return false;
+        }
+        if (ClosureRichDisplayName::isClosureCfgName($name)) {
+            return false;
+        }
+
+        return null === $func->class;
+    }
+
+    /**
+     * Zend zend_ensure_valid_class_fetch_type() — self/parent/static::method in a free function
+     * is a compile-time fatal even when the function is never called (#32227).
+     */
+    protected function rejectPseudoClassStaticCallOutsideClassScope(Op\Expr\StaticCall $expr, Block $block): void
+    {
+        $keyword = $this->firstClassCallableScopeKeyword($expr->class);
+        $this->rejectPseudoClassFetchOutsideKnownClassScope($keyword, $block, $expr);
+    }
+
+    /**
+     * @param null|'parent'|'self'|'static' $keyword
+     */
+    protected function rejectPseudoClassFetchOutsideKnownClassScope(?string $keyword, Block $block, Op $source): void
+    {
+        if (null === $keyword) {
+            return;
+        }
+        if ($this->pseudoClassInCompileScope($keyword, $block)) {
+            return;
+        }
+        if (!$this->compileScopeKnowsNoClassEntry($block)) {
+            return;
+        }
+        $sourceFile = $source->getFile();
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $this->throwCompileError(
+            PseudoClassTypeHintCompileCheck::messageFor($keyword),
+            $sourceFile,
+            $source->getLine()
+        );
+    }
+
+    /**
      * Zend zend_compile.c — self/parent/static return & parameter types require class scope (#17480).
      *
      * @return never
@@ -14658,6 +14722,7 @@ class Compiler {
                     $expr
                 );
             case Op\Expr\StaticCall::class:
+                $this->rejectPseudoClassStaticCallOutsideClassScope($expr, $block);
                 $fromCallableFcc = $this->tryCompileClosureFromCallableAsFcc($expr, $block);
                 if (null !== $fromCallableFcc) {
                     return $fromCallableFcc;
@@ -44345,8 +44410,23 @@ class Compiler {
             && 'class' === strtolower($constName)
             && null !== $className
             && !$this->pseudoClassInCompileScope($className, $block)) {
+            $keyword = strtolower($className);
+            // Free-function ::class uses zend_ensure_valid_class_fetch_type wording (#32227).
+            // File-level still uses the historical global-scope diagnostic (#5024).
+            if (in_array($keyword, ['self', 'parent', 'static'], true)
+                && $this->compileScopeKnowsNoClassEntry($block)) {
+                $sourceFile = $expr->getFile();
+                if ('' === $sourceFile) {
+                    $sourceFile = 'unknown';
+                }
+                $this->throwCompileError(
+                    PseudoClassTypeHintCompileCheck::messageFor($keyword),
+                    $sourceFile,
+                    $expr->getLine()
+                );
+            }
             $this->throwCompileError(
-                'Cannot use "'.strtolower($className).'" in the global scope'
+                'Cannot use "'.$keyword.'" in the global scope'
             );
         }
         if (null !== $constName && 'class' === strtolower($constName)) {
@@ -44996,6 +45076,13 @@ class Compiler {
         // `parent::` / `self::` / `static::` instanceMethod(...) — bound `$this` closures (#17655, #26630).
         // Static methods / static context: fall through to `"Class::m"` string FCC (#26252).
         // Binding `$this` from a static method yields a null receiver and fromCallable fails.
+        if (Op\Expr\FirstClassCallable::KIND_STATIC === $expr->kind && null !== $expr->class) {
+            $this->rejectPseudoClassFetchOutsideKnownClassScope(
+                $this->firstClassCallableScopeKeyword($expr->class),
+                $block,
+                $expr
+            );
+        }
         if (
             Op\Expr\FirstClassCallable::KIND_STATIC === $expr->kind
             && null !== $expr->class
