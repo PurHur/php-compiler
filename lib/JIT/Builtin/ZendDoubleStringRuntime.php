@@ -251,16 +251,24 @@ final class ZendDoubleStringRuntime
                 $context->context->functionType($strPtr, false, $double)
             );
 
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         $entry = $fn->appendBasicBlock(self::ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $result = self::emitBody($context, $fn, $fn->getParam(0), false);
-        $context->builder->returnValue($result);
         $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        $context->activeFunction = self::ABI;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        $context->builder->positionAtEnd($entry);
+        try {
+            $result = self::emitBody($context, $fn, $fn->getParam(0), false);
+            $context->builder->returnValue($result);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
@@ -295,16 +303,24 @@ final class ZendDoubleStringRuntime
                 $context->context->functionType($strPtr, false, $double)
             );
 
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         $entry = $fn->appendBasicBlock(self::H_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $result = self::emitBody($context, $fn, $fn->getParam(0), true);
-        $context->builder->returnValue($result);
         $context->registerFunction(self::H_ABI, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+        $context->activeFunction = self::H_ABI;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        $context->builder->positionAtEnd($entry);
+        try {
+            $result = self::emitBody($context, $fn, $fn->getParam(0), true);
+            $context->builder->returnValue($result);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
