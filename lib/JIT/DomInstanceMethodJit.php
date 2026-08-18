@@ -116,6 +116,8 @@ final class DomInstanceMethodJit
         'domdocument::normalizedocument' => true,
         'domdocument::createdocumentfragment' => true,
         'domdocument::importnode' => true,
+        'domnode::clonenode' => true,
+        'domelement::clonenode' => true,
         'domdocument::adoptnode' => true,
         'dom\\document::importlegacynode' => true,
         'dom\\xmldocument::importlegacynode' => true,
@@ -299,6 +301,12 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::importnode' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentImportNode();
+
+                return;
+            }
+            if ('domnode::clonenode' === $lc || 'domelement::clonenode' === $lc) {
+                // firstChild temps lose DOMElement userType → object::clonenode (#32355).
+                $context->functionProxies[$lc] = new Call\DomNodeCloneNode();
 
                 return;
             }
@@ -847,6 +855,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domtokenlist::getiterator');
             self::ensureProxy($context, 'dom\\tokenlist::getiterator');
             self::ensureProxy($context, 'domdocument::importnode');
+            self::ensureProxy($context, 'domnode::clonenode');
+            self::ensureProxy($context, 'domelement::clonenode');
             self::ensureProxy($context, 'domdocument::adoptnode');
             self::ensureProxy($context, 'dom\\document::importlegacynode');
             self::ensureProxy($context, 'dom\\xmldocument::importlegacynode');

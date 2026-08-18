@@ -67,6 +67,11 @@ final class JitDomSaveXMLUserScript
         }
         $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
         $useXmlLitTag = JitDomLoadXMLUserScript::lastLoadWasPureUserScript() && null !== $xmlLit;
+        // cloneNode materializes non-root copies; xmlNodeDump must use the clone's
+        // tag/attrs/inner slots, not the loadXML documentElement literal (#32355).
+        if (JitDomCloneNode::hasMaterializedClone()) {
+            $useXmlLitTag = false;
+        }
         $node = self::loadObjectArg($context, $nodeVar);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');

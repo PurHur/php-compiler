@@ -32,6 +32,19 @@ final class DomInstanceMethodJitTest extends TestCase
         }
     }
 
+    public function testRecognizesDomNodeCloneNodeProxyUnderUserScriptAot(): void
+    {
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        try {
+            $this->assertTrue(DomInstanceMethodJit::shouldDeferToVmClassMethodLowering());
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::clonenode'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::clonenode'));
+            $this->assertFalse(DomInstanceMethodJit::isDomInstanceMethodProxy('object::clonenode'));
+        } finally {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        }
+    }
+
     public function testRecognizesDomAttrIsIdProxyUnderUserScriptAot(): void
     {
         // USER_SCRIPT_DIRECT_METHODS — AOT isId must not ExternalMethod-null (#29884).

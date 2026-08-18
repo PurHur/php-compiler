@@ -20520,6 +20520,20 @@ class JIT {
                     return;
                 }
             }
+            // firstChild temps lose TYPE_OBJECT; cloneNode must not NestedJIT (#32355).
+            if (
+                'clonenode' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
+                if ($this->context->functionIsRegistered('domnode::clonenode')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
@@ -21017,6 +21031,21 @@ class JIT {
                 }
             }
             if ('object' === $declaringClassLc || '' === $declaringClassLc) {
+                // firstChild temps lower as :object; NestedJIT clone SIGSEGVs (#32355 / #19212).
+                if (
+                    'clonenode' === $methodLc
+                    && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+                ) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
+                    if ($this->context->functionIsRegistered('domnode::clonenode')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                            'domnode::clonenode'
+                        );
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                }
                 // childNodes/attributes temps often lower as :object; ensure DOM list item() /
                 // NamedNodeMap getNamedItem* proxies before building class-id candidates
                 // (#21171 AOT, #18493, #24332).
