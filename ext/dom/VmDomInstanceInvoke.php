@@ -132,6 +132,7 @@ final class VmDomInstanceInvoke
             'appenddata' => VmDomJitDispatch::appendData($self, $extra),
             'insertdata' => VmDomJitDispatch::insertData($self, $extra),
             'deletedata' => VmDomJitDispatch::deleteData($self, $extra),
+            'replacedata' => VmDomJitDispatch::replaceData($self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
     }
