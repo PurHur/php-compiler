@@ -2675,7 +2675,28 @@ class Context {
     }
 
     public function constantFromFloat(float $value, ?string $type = null): PHPLLVM\Value {
-        return $this->getTypeFromString($type === null ? 'double' : $type)->constReal($value);
+        $llvmType = $this->getTypeFromString($type === null ? 'double' : $type);
+        // PHP FFI LLVMConstReal(double) drops IEEE specials: -INF becomes 2^63 (#32317).
+        // Positive inf/nan via LLVMConstRealOfString; -INF via LLVMConstFNeg(+inf)
+        // (llvm-c Core.h — zend_operators.c zendi_negate_function analog).
+        if (\is_nan($value) || \is_infinite($value)) {
+            $text = \is_nan($value) ? 'nan' : 'inf';
+            $raw = $this->llvm->lib->LLVMConstRealOfString($llvmType->type, $text);
+            if (null === $raw) {
+                throw new \LogicException('LLVMConstRealOfString failed for '.$text.' (#32317)');
+            }
+            if (\is_infinite($value) && $value < 0.0) {
+                $neg = $this->llvm->lib->LLVMConstFNeg($raw);
+                if (null === $neg) {
+                    throw new \LogicException('LLVMConstFNeg failed for -inf (#32317)');
+                }
+                $raw = $neg;
+            }
+
+            return $this->llvm->factory->value($this->context, $raw);
+        }
+
+        return $llvmType->constReal($value);
     }
 
     public function constantFromString(string $string): PHPLLVM\Value {
@@ -3644,7 +3665,7 @@ class Context {
                     $type = $this->getTypeFromString('double');
                     $global = $this->module->addGlobal($type, $name);
                     $floatVal = $phpVar->toFloat();
-                    $global->setInitializer($type->constReal($floatVal));
+                    $global->setInitializer($this->constantFromFloat($floatVal));
                     // Keep host float for compile-time fold (round(M_PI, 5), #27249).
                     $this->constants[$name] = [Variable::TYPE_NATIVE_DOUBLE, $global, $floatVal];
                     break;

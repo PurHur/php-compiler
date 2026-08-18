@@ -61,11 +61,11 @@ class Helper {
                     case OpCode::TYPE_UNARY_MINUS:
                         $constName = strtolower($var->compileTimeConstantName ?? '');
                         if ('inf' === $constName) {
-                            $result = $this->context->getTypeFromString('double')->constReal(-INF);
+                            $result = $this->context->constantFromFloat(-INF, 'double');
                             goto return_double;
                         }
                         if ('nan' === $constName) {
-                            $result = $this->context->getTypeFromString('double')->constReal(NAN);
+                            $result = $this->context->constantFromFloat(NAN, 'double');
                             goto return_double;
                         }
                         if (JitValueBox::isValueOperand($var)) {

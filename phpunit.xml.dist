@@ -329,6 +329,9 @@
             <file>./test/unit/IntDivAlwaysFloat31968AotTest.php</file>
             <file>./test/compliance/FloatIncDecStaysFloat32281JITTest.php</file>
             <file>./test/unit/FloatIncDecStaysFloat32281AotTest.php</file>
+            <file>./test/compliance/UnaryMinusNegInf32317VMTest.php</file>
+            <file>./test/compliance/UnaryMinusNegInf32317JITTest.php</file>
+            <file>./test/unit/UnaryMinusNegInf32317AotTest.php</file>
             <file>./test/compliance/IntMinModNegOne32285JITTest.php</file>
             <file>./test/unit/IntMinModNegOne32285AotTest.php</file>
             <file>./test/compliance/IntMinModuloNegOne31968JITTest.php</file>
