@@ -11536,10 +11536,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 716)
 - new Variable (line 722)
 - new Variable (line 756)
-- new ObjectEntry (line 2415)
-- new HashTable (line 2439)
-- new Variable (line 2441)
-- 89 class method(s)
+- new ObjectEntry (line 2529)
+- new HashTable (line 2553)
+- new Variable (line 2555)
+- 92 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`

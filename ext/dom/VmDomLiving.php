@@ -434,11 +434,11 @@ final class VmDomLiving
      * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
      * `:first-of-type`, `:last-of-type`, `:nth-*()`, `:empty`, `:only-child`,
      * `:only-of-type`, `:root`, `:not()` / `:is()` / `:where()` (selector-list
-     * args), CSS attribute selectors (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`,
-     * `*=`, optional `i` flag), descendant / child (`>`) / adjacent-sibling
-     * (`+`) / general-sibling (`~`) combinators, and comma selector lists
-     * (CSS Selectors Level 3–4 / php-src Dom\* lexbor; #32061, #32089,
-     * #32108, #32132, #32150).
+     * args), `:has()` (relative selector-list args), CSS attribute selectors
+     * (`[attr]`, `=`, `~=`, `|=`, `^=`, `$=`, `*=`, optional `i` flag),
+     * descendant / child (`>`) / adjacent-sibling (`+`) / general-sibling (`~`)
+     * combinators, and comma selector lists (CSS Selectors Level 3–4 /
+     * php-src Dom\* lexbor; #32061, #32089, #32108, #32132, #32150, #32165).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -459,8 +459,8 @@ final class VmDomLiving
         if ('' === $selectors) {
             throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
         }
-        // CSS selector lists: "a, b" unions groups. Commas inside :is()/:not()
-        // / [attr="a,b"] are not list separators (php-src Dom\* / lexbor; #20689, #32150).
+        // CSS selector lists: "a, b" unions groups. Commas inside :is()/:not()/:has()
+        // / [attr="a,b"] are not list separators (php-src Dom\* / lexbor; #20689, #32150, #32165).
         $groups = self::splitSelectorList($selectors);
         if (null === $groups || [] === $groups) {
             throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
@@ -896,13 +896,15 @@ final class VmDomLiving
     /**
      * Tokenize one selector group into combinator + simple-selector steps (#32061).
      *
-     * First step has combinator `""`. Subsequent steps use ` ` (descendant),
-     * `>` (child), `+` (adjacent sibling), or `~` (general sibling). Leading,
-     * trailing, or doubled combinators → null (SyntaxError).
+     * First step has combinator `""` unless `$relative` (CSS `:has()`): then a
+     * missing leading combinator is the descendant combinator ` `, and a single
+     * leading `>` / `+` / `~` is allowed. Subsequent steps use ` ` (descendant),
+     * `>` (child), `+` (adjacent sibling), or `~` (general sibling). Trailing
+     * or doubled combinators → null (SyntaxError).
      *
      * @return list<array{combinator: string, simple: array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>}}>|null
      */
-    private static function parseCompoundSelector(string $selector): ?array
+    private static function parseCompoundSelector(string $selector, bool $relative = false): ?array
     {
         $selector = trim($selector);
         $len = \strlen($selector);
@@ -913,6 +915,7 @@ final class VmDomLiving
         $i = 0;
         $expectSimple = true;
         $combinator = '';
+        $gotLeadingCombinator = false;
         while ($i < $len) {
             $skippedWs = false;
             while ($i < $len && ctype_space($selector[$i])) {
@@ -925,6 +928,13 @@ final class VmDomLiving
             $ch = $selector[$i];
             if ('>' === $ch || '+' === $ch || '~' === $ch) {
                 if ($expectSimple) {
+                    if ($relative && [] === $parts && !$gotLeadingCombinator) {
+                        $combinator = $ch;
+                        $gotLeadingCombinator = true;
+                        ++$i;
+                        continue;
+                    }
+
                     return null;
                 }
                 $combinator = $ch;
@@ -947,8 +957,11 @@ final class VmDomLiving
             if (null === $simple) {
                 return null;
             }
+            $firstCombinator = $relative
+                ? ('' === $combinator ? ' ' : $combinator)
+                : '';
             $parts[] = [
-                'combinator' => [] === $parts ? '' : $combinator,
+                'combinator' => [] === $parts ? $firstCombinator : $combinator,
                 'simple' => $simple,
             ];
             $combinator = '';
@@ -1240,7 +1253,7 @@ final class VmDomLiving
                     '/\G(?:first-child|last-child|first-of-type|last-of-type|'
                     .'only-child|only-of-type|empty|root|'
                     .'nth-child|nth-last-child|nth-of-type|nth-last-of-type|'
-                    .'not|is|where)/A',
+                    .'not|is|where|has)/A',
                     $selector,
                     $m,
                     0,
@@ -1267,7 +1280,7 @@ final class VmDomLiving
                         return null;
                     }
                     $i = $end;
-                } elseif ('not' === $name || 'is' === $name || 'where' === $name) {
+                } elseif ('not' === $name || 'is' === $name || 'where' === $name || 'has' === $name) {
                     if ($i >= $len || '(' !== $selector[$i]) {
                         return null;
                     }
@@ -1276,7 +1289,10 @@ final class VmDomLiving
                         return null;
                     }
                     $arg = trim(substr($selector, $i + 1, $end - $i - 2));
-                    if (null === self::parseLogicalPseudoArgument($name, $arg)) {
+                    $parsedArg = 'has' === $name
+                        ? self::parseHasPseudoArgument($arg)
+                        : self::parseLogicalPseudoArgument($name, $arg);
+                    if (null === $parsedArg) {
                         return null;
                     }
                     $i = $end;
@@ -1584,6 +1600,9 @@ final class VmDomLiving
         if ('not' === $name || 'is' === $name || 'where' === $name) {
             return self::matchesLogicalPseudo($element, $name, $arg);
         }
+        if ('has' === $name) {
+            return self::matchesHasPseudo($element, $arg);
+        }
         $pos = self::elementSiblingPositions($element);
         if (null === $pos) {
             return false;
@@ -1604,6 +1623,101 @@ final class VmDomLiving
                 && self::nthExpressionMatches($arg, $pos['typeCount'] - $pos['typeIndex'] + 1),
             default => false,
         };
+    }
+
+    /**
+     * Parse `:has()` argument. Empty `:has()` is invalid. Each group is a
+     * relative selector (implicit descendant, or leading `>` / `+` / `~`)
+     * (Selectors 4 / php-src lexbor; #32165).
+     *
+     * @return list<string>|null
+     */
+    private static function parseHasPseudoArgument(string $arg): ?array
+    {
+        if ('' === $arg) {
+            return null;
+        }
+        $groups = self::splitSelectorList($arg);
+        if (null === $groups || [] === $groups) {
+            return null;
+        }
+        foreach ($groups as $group) {
+            if (null === self::parseCompoundSelector($group, true)) {
+                return null;
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
+     * CSS4 `:has()` — true when any relative selector, anchored at `$element`,
+     * matches at least one element (php-src lexbor / Selectors Level 4; #32165).
+     */
+    private static function matchesHasPseudo(ObjectEntry $element, ?string $arg): bool
+    {
+        $groups = self::parseHasPseudoArgument(null === $arg ? '' : $arg);
+        if (null === $groups) {
+            return false;
+        }
+        foreach ($groups as $group) {
+            $compound = self::parseCompoundSelector($group, true);
+            if (null === $compound) {
+                continue;
+            }
+            if (self::elementMatchesRelativeFromAnchor($element, $compound)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Walk from `$anchor` along a relative selector's combinators.
+     *
+     * @param list<array{combinator: string, simple: array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<array{name: string, arg: ?string}>, attrs: list<array{name: string, op: ?string, value: ?string, i: bool}>}}> $compound
+     */
+    private static function elementMatchesRelativeFromAnchor(ObjectEntry $anchor, array $compound): bool
+    {
+        $n = \count($compound);
+        if ($n < 1) {
+            return false;
+        }
+        $filtered = [];
+        $seen = [];
+        foreach (self::elementsReachedByCombinator($anchor, $compound[0]['combinator']) as $cand) {
+            if (isset($seen[$cand->id])) {
+                continue;
+            }
+            if (self::elementMatchesSimple($cand, $compound[0]['simple'])) {
+                $seen[$cand->id] = true;
+                $filtered[] = $cand;
+            }
+        }
+        for ($i = 1; $i < $n; $i++) {
+            if ([] === $filtered) {
+                return false;
+            }
+            $comb = $compound[$i]['combinator'];
+            $simple = $compound[$i]['simple'];
+            $next = [];
+            $seen = [];
+            foreach ($filtered as $left) {
+                foreach (self::elementsReachedByCombinator($left, $comb) as $cand) {
+                    if (isset($seen[$cand->id])) {
+                        continue;
+                    }
+                    if (self::elementMatchesSimple($cand, $simple)) {
+                        $seen[$cand->id] = true;
+                        $next[] = $cand;
+                    }
+                }
+            }
+            $filtered = $next;
+        }
+
+        return [] !== $filtered;
     }
 
     /**
