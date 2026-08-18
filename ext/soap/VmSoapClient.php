@@ -2940,7 +2940,13 @@ final class VmSoapClient
                         continue;
                     }
                     $ln = $child->localName ?? $child->nodeName;
-                    if ('faultcode' === $ln || 'Code' === $ln) {
+                    if ('Code' === $ln) {
+                        // php-src php_packet_soap.c SOAP 1.2: Code/Value only (#32045).
+                        $valueText = self::firstChildElementText($child, 'Value');
+                        if (null !== $valueText) {
+                            $code = $valueText;
+                        }
+                    } elseif ('faultcode' === $ln) {
                         $code = \trim($child->textContent);
                     }
                     if ('faultstring' === $ln || 'Reason' === $ln) {
@@ -2994,6 +3000,24 @@ final class VmSoapClient
         }
 
         return self::maybeMappedObject($responseEl, $children, $classmap, $typemap, $scopedTypes, null);
+    }
+
+    /**
+     * php-src get_node(children, name) text (php_packet_soap.c; #32045).
+     */
+    private static function firstChildElementText(\DOMElement $parent, string $localName): ?string
+    {
+        foreach ($parent->childNodes as $child) {
+            if (!$child instanceof \DOMElement) {
+                continue;
+            }
+            $ln = $child->localName ?? $child->nodeName;
+            if ($localName === $ln) {
+                return \trim($child->textContent);
+            }
+        }
+
+        return null;
     }
 
     /**
