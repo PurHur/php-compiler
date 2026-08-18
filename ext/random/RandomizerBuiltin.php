@@ -16,6 +16,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
@@ -369,6 +370,19 @@ final class RandomizerBuiltin
             ] as $lc => $class) {
                 $entry->methods[$lc] = new $class();
                 $entry->methodVisibility[$lc] = $pub;
+            }
+            $entry->methodNames['nextfloat'] = 'nextFloat';
+            $entry->methodNames['getfloat'] = 'getFloat';
+            $entry->methodNames['getbytesfromstring'] = 'getBytesFromString';
+            // php-src randomizer.stub.php — Reflection return types (#26257)
+            $floatRet = ReflectionTypeSupport::cfgTypeFromLabel('float');
+            $stringRet = ReflectionTypeSupport::cfgTypeFromLabel('string');
+            if (null !== $floatRet) {
+                $entry->methodReturnDeclaredTypes['getfloat'] = $floatRet;
+                $entry->methodReturnDeclaredTypes['nextfloat'] = $floatRet;
+            }
+            if (null !== $stringRet) {
+                $entry->methodReturnDeclaredTypes['getbytesfromstring'] = $stringRet;
             }
         }
 
