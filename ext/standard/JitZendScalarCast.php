@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ArrayCountRuntime;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -15,7 +17,7 @@ use PHPLLVM\LLVMAbstract\Type as LlvmType;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, zend_operators.c).
+ * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, #32444, zend_operators.c).
  *
  * Zend php-src: (int)/(float) on enum cases warn and yield legacy 1 / 1.0 (#5714, #7120).
  * intval/floatval JIT must use the same legacy paths (not backing extract).
@@ -40,9 +42,14 @@ final class JitZendScalarCast
                 );
             case JITVariable::TYPE_NULL:
                 return $i64->constInt(0, false);
+            case JITVariable::TYPE_HASHTABLE:
+                return self::arrayToLong01($context, $arg);
             case JITVariable::TYPE_VALUE:
                 return self::valueBoxToInt($context, $arg);
             default:
+                if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+                    return self::arrayToLong01($context, $arg);
+                }
                 throw new \LogicException('(int) cast unsupported operand type in JIT');
         }
     }
@@ -70,11 +77,40 @@ final class JitZendScalarCast
                 return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
             case JITVariable::TYPE_NULL:
                 return $double->constReal(0.0);
+            case JITVariable::TYPE_HASHTABLE:
+                return $context->builder->siToFp(
+                    self::arrayToLong01($context, $arg),
+                    $double
+                );
             case JITVariable::TYPE_VALUE:
                 return self::valueBoxToFloat($context, $arg);
             default:
+                if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+                    return $context->builder->siToFp(
+                        self::arrayToLong01($context, $arg),
+                        $double
+                    );
+                }
                 throw new \LogicException('(float) cast unsupported operand type in JIT');
         }
+    }
+
+    /**
+     * Zend convert_scalar_to_number IS_ARRAY: zend_hash_num_elements ? 1 : 0 (#32444).
+     *
+     * php-src: Zend/zend_operators.c — _zval_get_long_func / zval_get_double_func
+     * VM SSOT: {@see \PHPCompiler\VM\Variable} toInt/toFloat TYPE_ARRAY arms.
+     */
+    private static function arrayToLong01(Context $context, JITVariable $arg): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $count = ArrayCountRuntime::numElements($context, $arg);
+
+        return $context->builder->select(
+            $context->builder->icmp(Builder::INT_NE, $count, $i64->constInt(0, false)),
+            $i64->constInt(1, false),
+            $i64->constInt(0, false)
+        );
     }
 
     private static function valueBoxToInt(Context $context, JITVariable $arg): Value
@@ -184,6 +220,26 @@ final class JitZendScalarCast
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterPlainObjectCheck);
+        $htBlock = BasicBlockHelper::append($context, 'int_cast_value_ht');
+        $afterHt = BasicBlockHelper::append($context, 'int_cast_value_after_ht');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_HASHTABLE, false)),
+            $htBlock,
+            $afterHt
+        );
+
+        $context->builder->positionAtEnd($htBlock);
+        $htPtr = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr);
+        $htCount = ArrayBuiltinHelper::getNumElements($context, $htPtr);
+        $htInt = $context->builder->select(
+            $context->builder->icmp(Builder::INT_NE, $htCount, $zero),
+            $i64->constInt(1, false),
+            $zero
+        );
+        $htEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterHt);
         $fallbackBlock = BasicBlockHelper::append($context, 'int_cast_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -207,6 +263,7 @@ final class JitZendScalarCast
         $phi->addIncoming($boolInt, $boolEndBlock);
         $phi->addIncoming($doubleInt, $doubleEndBlock);
         $phi->addIncoming($stringInt, $stringEndBlock);
+        $phi->addIncoming($htInt, $htEndBlock);
         if (null !== $enumLong && null !== $enumEndBlock) {
             $phi->addIncoming($enumLong, $enumEndBlock);
         }
@@ -326,6 +383,28 @@ final class JitZendScalarCast
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterPlainObjectCheck);
+        $htBlock = BasicBlockHelper::append($context, 'float_cast_value_ht');
+        $afterHt = BasicBlockHelper::append($context, 'float_cast_value_after_ht');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_HASHTABLE, false)),
+            $htBlock,
+            $afterHt
+        );
+
+        $context->builder->positionAtEnd($htBlock);
+        $htPtr = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr);
+        $htCount = ArrayBuiltinHelper::getNumElements($context, $htPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $htInt = $context->builder->select(
+            $context->builder->icmp(Builder::INT_NE, $htCount, $i64->constInt(0, false)),
+            $i64->constInt(1, false),
+            $i64->constInt(0, false)
+        );
+        $htFloat = $context->builder->siToFp($htInt, $double);
+        $htEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterHt);
         $fallbackBlock = BasicBlockHelper::append($context, 'float_cast_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -353,6 +432,7 @@ final class JitZendScalarCast
         $phi->addIncoming($boolFloat, $boolEndBlock);
         $phi->addIncoming($nativeDoubleVal, $nativeDoubleEndBlock);
         $phi->addIncoming($stringFloat, $stringEndBlock);
+        $phi->addIncoming($htFloat, $htEndBlock);
         if (null !== $enumDouble && null !== $enumEndBlock) {
             $phi->addIncoming($enumDouble, $enumEndBlock);
         }
