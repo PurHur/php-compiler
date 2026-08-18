@@ -366,6 +366,8 @@ final class JitFdiv
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'fdiv_strtod_end');
         $context->builder->store($i8p->constNull(), $endPtrSlot);
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
         $context->builder->call(
             $context->lookupFunction('strtod'),
             $charPtr,
@@ -385,6 +387,8 @@ final class JitFdiv
         $map = $context->structFieldMap['__string__'];
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
+        // strtod(3) via LibcExtern::ensureStrtodDecl after always-on drop (#31997).
+        LibcExtern::ensureStrtodDecl($context);
 
         return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
     }

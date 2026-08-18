@@ -52,8 +52,10 @@ final class LibcExternMathRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('#28808', $source);
-        // strtod still needs double — only math decls were removed
-        $this->assertStringContainsString("'strtod' =>", $source);
+        // strtod dropped from always-on (#31997) — module-local ensureStrtodDecl
+        $this->assertStringNotContainsString("'strtod' =>", $source);
+        $this->assertStringContainsString('ensureStrtodDecl', $source);
+        $this->assertStringContainsString('#31997', $source);
     }
 
     public function testJitStatsStandardDeviationUsesMathSqrtNotLibc(): void
