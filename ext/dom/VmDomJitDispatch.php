@@ -378,6 +378,20 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMNode::hasChildNodes() — exact user arity 0 (php-src node.c xmlNode->children; #32427).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function hasChildNodes(ObjectEntry $node, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMNode::hasChildNodes', $extra, 0);
+        $var = new Variable();
+        $var->bool(VmDom::hasChildNodes($node));
+
+        return $var;
+    }
+
+    /**
      * DOMNode::getNodePath() — exact user arity 0 (#31011; php-src node.c).
      *
      * @param list<Variable> $extra

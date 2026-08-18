@@ -165,6 +165,14 @@ final class DomInstanceMethodJit
         'domcharacterdata::replacedata' => true,
         'domnode::clonenode' => true,
         'domelement::clonenode' => true,
+        'domnode::haschildnodes' => true,
+        'domelement::haschildnodes' => true,
+        'domdocument::haschildnodes' => true,
+        'domdocumentfragment::haschildnodes' => true,
+        'dom\\node::haschildnodes' => true,
+        'dom\\element::haschildnodes' => true,
+        'dom\\htmlelement::haschildnodes' => true,
+        'dom\\document::haschildnodes' => true,
         'domtext::clonenode' => true,
         'domtext::splittext' => true,
         'domcdatasection::splittext' => true,
@@ -648,6 +656,19 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::haschildnodes' === $lc
+                || 'domelement::haschildnodes' === $lc
+                || 'domdocument::haschildnodes' === $lc
+                || 'domdocumentfragment::haschildnodes' === $lc
+                || 'dom\\node::haschildnodes' === $lc
+                || 'dom\\element::haschildnodes' === $lc
+                || 'dom\\htmlelement::haschildnodes' === $lc
+                || 'dom\\document::haschildnodes' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeHasChildNodes();
+
+                return;
+            }
             if ('domtext::splittext' === $lc || 'domcdatasection::splittext' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomTextSplitText();
 
@@ -948,6 +969,14 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domcharacterdata::replacedata');
             self::ensureProxy($context, 'domnode::clonenode');
             self::ensureProxy($context, 'domelement::clonenode');
+            self::ensureProxy($context, 'domnode::haschildnodes');
+            self::ensureProxy($context, 'domelement::haschildnodes');
+            self::ensureProxy($context, 'domdocument::haschildnodes');
+            self::ensureProxy($context, 'domdocumentfragment::haschildnodes');
+            self::ensureProxy($context, 'dom\\node::haschildnodes');
+            self::ensureProxy($context, 'dom\\element::haschildnodes');
+            self::ensureProxy($context, 'dom\\htmlelement::haschildnodes');
+            self::ensureProxy($context, 'dom\\document::haschildnodes');
             self::ensureProxy($context, 'domtext::clonenode');
             self::ensureProxy($context, 'domtext::splittext');
             self::ensureProxy($context, 'domcdatasection::splittext');
@@ -1092,7 +1121,7 @@ final class DomInstanceMethodJit
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
-        'domnode' => ['appendchild', 'clonenode'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],

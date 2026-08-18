@@ -21196,6 +21196,12 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::clonenode');
                 }
+                // hasChildNodes on documentElement/firstChild temps (:object) — php-src node.c.
+                if ('haschildnodes' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::haschildnodes');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::haschildnodes');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::haschildnodes');
+                }
                 if ('substringdata' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::substringdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::substringdata');
@@ -21239,6 +21245,12 @@ class JIT {
                 }
                 if ('clonenode' === $methodLc && $this->context->functionIsRegistered('domnode::clonenode')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('haschildnodes' === $methodLc && $this->context->functionIsRegistered('domnode::haschildnodes')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::haschildnodes');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21483,6 +21495,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
             if ($this->context->functionIsRegistered('domnode::clonenode')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('haschildnodes' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::haschildnodes');
+            if ($this->context->functionIsRegistered('domnode::haschildnodes')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::haschildnodes');
                 $this->context->scope->args = [$receiverVar];
 
                 return;

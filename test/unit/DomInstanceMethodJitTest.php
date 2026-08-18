@@ -68,6 +68,8 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::hasattributens'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::removeattributens'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domdocument::getelementsbytagnamens'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::haschildnodes'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::haschildnodes'));
         } finally {
             putenv('PHP_COMPILER_AOT_USER_SCRIPT');
         }
