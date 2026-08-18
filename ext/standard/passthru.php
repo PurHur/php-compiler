@@ -27,7 +27,6 @@ final class passthru extends Internal
     {
         // php-src ext/standard/exec.c / basic_functions.stub.php — ArgumentCountError (#30566)
         $this->requireArgCountRange($frame, 'passthru', 1, 2);
-        $argc = \count($frame->calledArgs);
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'passthru', 'command', false);
         // php-src exec.c — Zend "cannot be empty" (#30340)
         VmString::rejectEmptyBuiltinStringArg($command, 'passthru', 0, 'command', true);
@@ -35,7 +34,7 @@ final class passthru extends Internal
         if (false !== $result) {
             if (!VmExecNative::linesToStdout($result['lines'])) {
                 $result = false;
-            } elseif ($argc >= 2) {
+            } elseif (isset($frame->calledArgs[1])) {
                 $frame->calledArgs[1]->resolveIndirect()->int($result['status']);
             }
         }

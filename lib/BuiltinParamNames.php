@@ -1013,6 +1013,12 @@ final class BuiltinParamNames
                 return ['arg'];
             case 'escapeshellcmd':
                 return ['command'];
+            // php-src ext/standard/basic_functions.stub.php / exec.c — InternalArgInfo still return_value (#23625)
+            case 'exec':
+                return ['command', 'output=', 'result_code='];
+            case 'passthru':
+            case 'system':
+                return ['command', 'result_code='];
             // php-src ext/session/session.stub.php — ?string $name = null; InternalArgInfo still says newname (#23436, #31423)
             case 'session_name':
                 return ['name='];
