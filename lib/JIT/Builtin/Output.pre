@@ -14,10 +14,9 @@ use PHPCompiler\JIT\Builtin;
 class Output extends Builtin {
 
     public function register(): void {
-        declare {
-            // printf/snprintf: LibcExtern::register() (int8*); avoid char* duplicates → printf.1 / snprintf.2
-            function sprintf(char*, const char*, ...): int32;
-        }
+        // sprintf(3) always-on decl removed (#32110): user-script sprintf()/printf()
+        // remain PHP helpers (`__compiler_sprintf`/`__compiler_printf`) and
+        // NestedJIT leaves use LibcExtern::ensureSnprintf() at call sites.
     }
 
 }
