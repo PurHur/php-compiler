@@ -1065,12 +1065,8 @@ restart:
                     $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                     goto return_bool;
                 }
-                // Value-box doubles must use fadd/fsub/fmul/fdiv — integer add/sub/mul
-                // on double operands fails LLVM module verify (#22990 pack NestedJIT).
-                $leftDouble = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readDouble'),
-                    JitValueBox::valuePtrFromVariable($this->context, $left)
-                );
+                // Value-box numeric strings need strtod, not __value__readDouble (#32325).
+                $leftDouble = JitValueNumeric::valueBoxToDouble($this->context, $left);
                 switch ($opcode->type) {
                     case OpCode::TYPE_PLUS:
                         $result = $this->context->builder->fadd($leftDouble, $rightValue);
@@ -1224,11 +1220,8 @@ restart:
                     $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
                     goto return_bool;
                 }
-                // Peer VALUE⊙double above — float ops on boxed RHS (#22990).
-                $rightDouble = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readDouble'),
-                    JitValueBox::valuePtrFromVariable($this->context, $right)
-                );
+                // Peer VALUE⊙double above — numeric strings via strtod (#32325).
+                $rightDouble = JitValueNumeric::valueBoxToDouble($this->context, $right);
                 switch ($opcode->type) {
                     case OpCode::TYPE_PLUS:
                         $result = $this->context->builder->fadd($leftValue, $rightDouble);
@@ -1897,6 +1890,10 @@ restart:
                 $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
                 goto return_long;
             }
+            $stringDouble = $this->emitNumericStringNativeDoubleOp($opcode, $leftValue, $rightValue, true);
+            if (null !== $stringDouble) {
+                return $stringDouble;
+            }
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
                 $result = $falseVal;
@@ -1914,6 +1911,10 @@ restart:
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                 $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
                 goto return_long;
+            }
+            $stringDouble = $this->emitNumericStringNativeDoubleOp($opcode, $rightValue, $leftValue, false);
+            if (null !== $stringDouble) {
+                return $stringDouble;
             }
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
@@ -2294,6 +2295,65 @@ return_bool:
         }
 
         return null;
+    }
+
+    /**
+     * Numeric-string ⊙ native double: zend_operators.c promotes to double (#32325).
+     *
+     * `%` stays on the int path (fpToSi + signedModulo). php-src: add/mul/sub/div/compare_function.
+     *
+     * @param PHPLLVM\Value $stringStruct native `__string__*`
+     * @param PHPLLVM\Value $doubleVal    native double
+     */
+    private function emitNumericStringNativeDoubleOp(
+        OpCode $opcode,
+        $stringStruct,
+        $doubleVal,
+        bool $stringIsLeft
+    ): ?Variable {
+        $isArith = JitValueNumeric::isArithOpcode($opcode->type);
+        $isSpaceship = OpCode::TYPE_SPACESHIP === $opcode->type;
+        $isOrdered = self::isOrderedCompareOpcode($opcode->type);
+        if (!$isArith && !$isSpaceship && !$isOrdered) {
+            return null;
+        }
+        $stringDouble = JitLongArg::lowerStringToDouble($this->context, $stringStruct);
+        $left = $stringIsLeft ? $stringDouble : $doubleVal;
+        $right = $stringIsLeft ? $doubleVal : $stringDouble;
+        if ($isSpaceship) {
+            return $this->nativeLongResultVariable(
+                JitFloatCompare::spaceship($this->context, $left, $right)
+            );
+        }
+        if ($isOrdered) {
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                JitFloatCompare::relationalCompare($this->context, $opcode->type, $left, $right)
+            );
+        }
+        if (OpCode::TYPE_PLUS === $opcode->type) {
+            $result = $this->context->builder->fadd($left, $right);
+        } elseif (OpCode::TYPE_MINUS === $opcode->type) {
+            $result = $this->context->builder->fsub($left, $right);
+        } elseif (OpCode::TYPE_MUL === $opcode->type) {
+            $result = $this->context->builder->fmul($left, $right);
+        } else {
+            JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                $this->context,
+                $right,
+                'Division by zero'
+            );
+            $result = $this->context->builder->fdiv($left, $right);
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::KIND_VALUE,
+            $result
+        );
     }
 
     /** Preserve folded int literals for compile-time consumers (#19090). */

@@ -843,11 +843,7 @@ final class VmValueCompare
         if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
-        $leftDouble = $context->builder->call(
-            $context->lookupFunction('__value__readDouble'),
-            $valuePtr
-        );
+        $leftDouble = \PHPCompiler\JIT\JitValueNumeric::valueBoxToDouble($context, $boxed);
 
         return VmFloatCompare::relationalCompare(
             $context,
@@ -866,11 +862,7 @@ final class VmValueCompare
         if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
-        $rightDouble = $context->builder->call(
-            $context->lookupFunction('__value__readDouble'),
-            $valuePtr
-        );
+        $rightDouble = \PHPCompiler\JIT\JitValueNumeric::valueBoxToDouble($context, $boxed);
 
         return VmFloatCompare::relationalCompare(
             $context,
@@ -897,7 +889,6 @@ final class VmValueCompare
             : $context->helper->loadValue($right);
         $map = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
         $leftType = $context->builder->load($context->builder->structGep($leftPtr, $map['type']));
         $rightType = $context->builder->load($context->builder->structGep($rightPtr, $map['type']));
         $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
@@ -933,7 +924,9 @@ final class VmValueCompare
         $objCmp = SpaceshipRuntime::callObjectCompareSpaceship($context, $leftObj, $rightObj);
         $orderedObj = self::boolFromSpaceshipCmp($context, $opcodeType, $objCmp);
 
-        $notLong = $context->builder->select($bothObj, $orderedObj, $falseVal);
+        $genericCmp = SpaceshipRuntime::callValueSpaceship($context, $leftPtr, $rightPtr);
+        $orderedGeneric = self::boolFromSpaceshipCmp($context, $opcodeType, $genericCmp);
+        $notLong = $context->builder->select($bothObj, $orderedObj, $orderedGeneric);
 
         return $context->builder->select($bothLong, $orderedLong, $notLong);
     }

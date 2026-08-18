@@ -41,6 +41,28 @@ final class JitValueNumeric
         );
     }
 
+    public static function valueIsString(Context $context, Variable $boxed): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $jitStr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $vmStr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+        );
+
+        return $context->builder->or($jitStr, $vmStr);
+    }
+
     /**
      * VALUE ⊙ VALUE for + − * /.
      *
@@ -72,6 +94,88 @@ final class JitValueNumeric
         }
 
         return self::emitBoxedNumericResult($context, $opType, $left, $right);
+    }
+
+    /**
+     * convert_scalar_to_number → double (zend_operators.c, #32325).
+     *
+     * `__value__readDouble` returns 0.0 for TYPE_STRING boxes; numeric strings must go through strtod.
+     */
+    public static function valueBoxToDouble(Context $context, Variable $boxed): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $f64 = $context->getTypeFromString('double');
+        $done = BasicBlockHelper::append($context, 'vbox_to_d_done');
+
+        $strBlock = BasicBlockHelper::append($context, 'vbox_to_d_str');
+        $afterStr = BasicBlockHelper::append($context, 'vbox_to_d_after_str');
+        $isString = $context->builder->or(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_STRING, false)
+            ),
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+            )
+        );
+        $context->builder->branchIf($isString, $strBlock, $afterStr);
+        $context->builder->positionAtEnd($strBlock);
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $strDbl = JitLongArg::lowerStringToDouble($context, $strPtr);
+        $strEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterStr);
+        $dblBlock = BasicBlockHelper::append($context, 'vbox_to_d_dbl');
+        $numBlock = BasicBlockHelper::append($context, 'vbox_to_d_num');
+        $isNativeDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isVmFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
+        );
+        $isFloat = $context->builder->or($isNativeDouble, $isVmFloat);
+        $context->builder->branchIf($isFloat, $dblBlock, $numBlock);
+
+        $context->builder->positionAtEnd($dblBlock);
+        $dblVal = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $dblEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($numBlock);
+        $numLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $numDbl = $context->builder->siToFp($numLong, $f64);
+        $numEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($f64, 'vbox_to_d_phi');
+        $phi->addIncoming($strDbl, $strEnd);
+        $phi->addIncoming($dblVal, $dblEnd);
+        $phi->addIncoming($numDbl, $numEnd);
+
+        return $phi;
     }
 
     /** Public wrapper for Number/scalar dual-path (#24683). */
@@ -215,10 +319,10 @@ final class JitValueNumeric
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
-        // `/` is always float in PHP (zend_div).
+        // `/` is always float in PHP (zend_div). Numeric strings use strtod (#32325).
         if (OpCode::TYPE_DIV === $opType) {
-            $ld = $context->builder->call($context->lookupFunction('__value__readDouble'), $leftPtr);
-            $rd = $context->builder->call($context->lookupFunction('__value__readDouble'), $rightPtr);
+            $ld = self::valueBoxToDouble($context, $left);
+            $rd = self::valueBoxToDouble($context, $right);
             JitNumericDivisionGuard::emitZeroDoubleDivisorGuard($context, $rd, 'Division by zero');
             $fres = $context->builder->fdiv($ld, $rd);
             $context->builder->call(
@@ -230,18 +334,24 @@ final class JitValueNumeric
             return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         }
 
-        $eitherDouble = $context->builder->or(
-            self::valueIsDouble($context, $left),
-            self::valueIsDouble($context, $right)
+        $eitherPromote = $context->builder->or(
+            $context->builder->or(
+                self::valueIsDouble($context, $left),
+                self::valueIsDouble($context, $right)
+            ),
+            $context->builder->or(
+                self::valueIsString($context, $left),
+                self::valueIsString($context, $right)
+            )
         );
         $floatBlock = BasicBlockHelper::append($context, 'vbox_vbox_arith_float');
         $longBlock = BasicBlockHelper::append($context, 'vbox_vbox_arith_long');
         $doneBlock = BasicBlockHelper::append($context, 'vbox_vbox_arith_done');
-        $context->builder->branchIf($eitherDouble, $floatBlock, $longBlock);
+        $context->builder->branchIf($eitherPromote, $floatBlock, $longBlock);
 
         $context->builder->positionAtEnd($floatBlock);
-        $ld = $context->builder->call($context->lookupFunction('__value__readDouble'), $leftPtr);
-        $rd = $context->builder->call($context->lookupFunction('__value__readDouble'), $rightPtr);
+        $ld = self::valueBoxToDouble($context, $left);
+        $rd = self::valueBoxToDouble($context, $right);
         $fres = self::emitDoubleOp($context, $opType, $ld, $rd);
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),

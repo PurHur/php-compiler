@@ -177,4 +177,23 @@ final class JitLongArg {
 
         return $parsed->typeOf() === $i64 ? $parsed : $context->builder->zExt($parsed, $i64);
     }
+
+    /**
+     * Native `__string__*` → double via strtod(3) (zend convert_scalar_to_number, #32325).
+     */
+    public static function lowerStringToDouble(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'jit_str_strtod_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        LibcExtern::ensureStrtodDecl($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('strtod'),
+            $charPtr,
+            $endPtrSlot
+        );
+    }
 }
