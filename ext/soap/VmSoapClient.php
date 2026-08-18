@@ -2635,7 +2635,9 @@ final class VmSoapClient
     }
 
     /**
-     * php-src ext/soap/php_encoding.c to_xml_array — SOAP_ENCODED list arrays (#21715).
+     * php-src ext/soap/php_encoding.c to_xml_array — SOAP_ENCODED list arrays (#21715 / #32220).
+     *
+     * SOAP 1.1: SOAP-ENC:arrayType="xsd:T[n]". SOAP 1.2: enc:itemType + enc:arraySize + enc:Array.
      *
      * @param list<mixed> $value
      */
@@ -2651,10 +2653,17 @@ final class VmSoapClient
         }
         $count = \count($value);
         $itemXsd = self::guessSoapEncodedArrayItemType($value);
-        $arrayType = $itemXsd.'['.$count.']';
-        $attrs = ' SOAP-ENC:arrayType="'.\htmlspecialchars($arrayType, \ENT_XML1).'"';
-        if (0 !== ($state->features & SoapConstants::SOAP_USE_XSI_ARRAY_TYPE)) {
-            $attrs .= ' xsi:type="SOAP-ENC:Array"';
+        if (SoapConstants::SOAP_1_2 === $state->soapVersion) {
+            // php-src to_xml_array SOAP 1.2: set_ns_prop itemType/arraySize + xsi:type enc:Array (#32220).
+            $attrs = ' enc:itemType="'.\htmlspecialchars($itemXsd, \ENT_XML1).'"'
+                .' enc:arraySize="'.$count.'"'
+                .' xsi:type="enc:Array"';
+        } else {
+            $arrayType = $itemXsd.'['.$count.']';
+            $attrs = ' SOAP-ENC:arrayType="'.\htmlspecialchars($arrayType, \ENT_XML1).'"';
+            if (0 !== ($state->features & SoapConstants::SOAP_USE_XSI_ARRAY_TYPE)) {
+                $attrs .= ' xsi:type="SOAP-ENC:Array"';
+            }
         }
 
         return '<'.$tag.$attrs.'>'.$inner.'</'.$tag.'>';
