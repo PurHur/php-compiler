@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: assigned object vs string/int == / <=> must match Zend (#32540).
+ * AOT: assigned object vs string/int == / <=> must match Zend (#32540 leftover of #32515).
  *
  * @see php-src Zend/zend_operators.c compare_function / zend_compare
  *
@@ -18,7 +18,7 @@ require_once __DIR__.'/../LlvmToolchain.php';
  */
 final class RuntimeObjectScalarUnlikeCompare32540AotTest extends TestCase
 {
-    private const EXPECT = "nident\nneq\n1\n-1\n0\nnigt\n";
+    private const EXPECT = "nident\nneq\n1\n-1\n1\n0\nngt\n";
 
     public function testVmRuntimeObjectScalarUnlikeCompareMatchesZend(): void
     {
@@ -48,10 +48,12 @@ final class RuntimeObjectScalarUnlikeCompare32540AotTest extends TestCase
         $this->assertSame(0, $compileRc, implode("\n", $compileOut));
         $this->assertFileExists($bin);
         try {
-            $runOut = [];
-            exec(escapeshellarg($bin).' 2>/dev/null', $runOut, $runRc);
-            $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $this->assertSame(self::EXPECT, implode("\n", $runOut)."\n");
+            for ($run = 0; $run < 3; ++$run) {
+                $runOut = [];
+                exec(escapeshellarg($bin).' 2>/dev/null', $runOut, $runRc);
+                $this->assertSame(0, $runRc, 'run '.($run + 1).': '.implode("\n", $runOut));
+                $this->assertSame(self::EXPECT, implode("\n", $runOut)."\n", 'run '.($run + 1));
+            }
         } finally {
             @unlink($bin);
         }

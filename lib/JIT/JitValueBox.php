@@ -705,9 +705,18 @@ final class JitValueBox
         }
 
         $slot = self::alloc($context);
-        $native = Variable::KIND_VALUE === $var->kind
-            ? $var->value
-            : $context->builder->load($var->value);
+        if (Variable::KIND_VALUE === $var->kind) {
+            $native = $var->value;
+        } else {
+            $storageTy = $context->getStringFromType($var->value->typeOf());
+            $native = (
+                '__object__*' === $storageTy
+                || '__string__*' === $storageTy
+                || '__hashtable__*' === $storageTy
+            )
+                ? $var->value
+                : $context->builder->load($var->value);
+        }
         switch ($var->type) {
             case Variable::TYPE_NATIVE_LONG:
                 self::writeLong($context, $slot, $native);

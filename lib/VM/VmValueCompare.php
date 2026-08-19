@@ -670,14 +670,20 @@ final class VmValueCompare
         $rightPtr = self::runtimeValuePtr($context, $right);
         $map = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
-        $leftKind = $context->builder->load(
-            $context->builder->structGep($leftPtr, $map['type'])
+        $leftKind = $context->builder->and(
+            $context->builder->load(
+                $context->builder->structGep($leftPtr, $map['type'])
+            ),
+            $i8->constInt(0x7f, false)
         );
-        $rightKind = $context->builder->load(
-            $context->builder->structGep($rightPtr, $map['type'])
+        $rightKind = $context->builder->and(
+            $context->builder->load(
+                $context->builder->structGep($rightPtr, $map['type'])
+            ),
+            $i8->constInt(0x7f, false)
         );
-        $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
-        $strTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $objTag = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $strTag = $i8->constInt(Variable::TYPE_STRING & 0x7f, false);
         $leftObj = $context->builder->icmp(Builder::INT_EQ, $leftKind, $objTag);
         $rightObj = $context->builder->icmp(Builder::INT_EQ, $rightKind, $objTag);
         $leftStr = $context->builder->icmp(Builder::INT_EQ, $leftKind, $strTag);
