@@ -878,6 +878,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/filter/filter.stub.php — filter_id(string $name): int|false (#28756)
             'filter_id' => 0 === $index ? 'string' : null,
+            // ext/standard/basic_functions.stub.php — ?int $mask = null (InternalArgInfo int) (#28176)
+            'umask' => 0 === $index ? '?int' : null,
             // ext/standard/basic_functions.stub.php — ?string $type = null (InternalArgInfo string) (#23381)
             'get_resources' => 0 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?callable $callback = null (InternalArgInfo string|array) (#23359)
