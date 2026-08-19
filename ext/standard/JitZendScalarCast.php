@@ -17,7 +17,7 @@ use PHPLLVM\LLVMAbstract\Type as LlvmType;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, #32444, #32452, zend_operators.c).
+ * JIT lowering for Zend scalar (int)/(float)/(bool) casts (#5714, #5791, #32444, #32452, #32455, zend_operators.c).
  *
  * Zend php-src: (int)/(float) on enum cases warn and yield legacy 1 / 1.0 (#5714, #7120).
  * intval/floatval JIT must use the same legacy paths (not backing extract).
@@ -145,6 +145,116 @@ final class JitZendScalarCast
         $phi = $context->builder->phi($resultTy, $kind.'_cast_native_obj_phi');
         $phi->addIncoming($enumVal, $enumEnd);
         $phi->addIncoming($plain, $plainEnd);
+
+        return $phi;
+    }
+
+    /**
+     * Zend convert_to_boolean — arrays are zend_hash_num_elements ? true : false (#32455).
+     *
+     * php-src: Zend/zend_operators.c convert_to_boolean IS_ARRAY
+     */
+    public static function emitBoolCast(Context $context, JITVariable $arg): Value
+    {
+        $false = $context->constantFromBool(false);
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->helper->loadValue($arg);
+            case JITVariable::TYPE_NATIVE_LONG:
+                $v = $context->helper->loadValue($arg);
+
+                return $context->builder->icmp(
+                    Builder::INT_NE,
+                    $v,
+                    $v->typeOf()->constInt(0, false)
+                );
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                $v = $context->helper->loadValue($arg);
+
+                return $context->builder->fcmp(
+                    Builder::REAL_ONE,
+                    $v,
+                    $v->typeOf()->constReal(0.0)
+                );
+            case JITVariable::TYPE_STRING:
+                return boolval::stringTruthy(
+                    $context,
+                    JitStringArg::lower($context, $arg, '(bool) cast')
+                );
+            case JITVariable::TYPE_NULL:
+                return $false;
+            case JITVariable::TYPE_HASHTABLE:
+                return self::arrayToBool($context, $arg);
+            case JITVariable::TYPE_VALUE:
+                return self::valueBoxToBool($context, $arg);
+            default:
+                if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+                    return self::arrayToBool($context, $arg);
+                }
+                throw new \LogicException('(bool) cast unsupported operand type in JIT');
+        }
+    }
+
+    /** Zend convert_to_boolean(IS_ARRAY): zend_hash_num_elements ? 1 : 0 (#32455). */
+    private static function arrayToBool(Context $context, JITVariable $arg): Value
+    {
+        $n = self::arrayToLong01($context, $arg);
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $n,
+            $n->typeOf()->constInt(0, false)
+        );
+    }
+
+    private static function valueBoxToBool(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isArray = $context->builder->or(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_HASHTABLE, false)
+            ),
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
+            )
+        );
+        $arrayBlock = BasicBlockHelper::append($context, 'bool_cast_value_ht');
+        $scalarBlock = BasicBlockHelper::append($context, 'bool_cast_value_scalar');
+        $doneBlock = BasicBlockHelper::append($context, 'bool_cast_value_done');
+        $context->builder->branchIf($isArray, $arrayBlock, $scalarBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $htPtr = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $htCount = ArrayBuiltinHelper::getNumElements($context, $htPtr);
+        $arrayTruthy = $context->builder->icmp(
+            Builder::INT_NE,
+            $htCount,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $arrayEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($scalarBlock);
+        $scalarTruthy = (new boolval())->call($context, $arg);
+        $scalarEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($arrayTruthy->typeOf(), 'bool_cast_value_phi');
+        $phi->addIncoming($arrayTruthy, $arrayEnd);
+        $phi->addIncoming($scalarTruthy, $scalarEnd);
 
         return $phi;
     }
