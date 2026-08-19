@@ -514,6 +514,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         // php-src ext/standard/basic_functions.stub.php (#26104)
         self::assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('memory_reset_peak_usage'));
         self::assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('memory_reset_peak_usage'));
+        // php-src ext/pcre/php_pcre.stub.php + basic_functions.stub.php + file.stub.php (#25751)
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_split'));
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('fgetcsv'));
+        self::assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('parse_str'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('parse_str', 1));
         // php-src ext/libxml/libxml.stub.php (#25844)
         self::assertSame('array', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('libxml_get_errors'));
         self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_errors'));
