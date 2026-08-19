@@ -62,6 +62,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\MethodCall
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Empty_
+                || $usage instanceof Op\Expr\Isset_ // leftover of #32475 / #32556
                 || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\Include_
@@ -72,6 +73,7 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Value
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Echo_
+                || $usage instanceof Op\Expr\Print_
                 || $usage instanceof Op\Expr\Array_
                 || $usage instanceof Op\Expr\Cast\Array_
                 || $usage instanceof Op\Expr\Cast\Object_
@@ -85,6 +87,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\YieldFrom
                 || $usage instanceof FirstClassCallable
                 || $usage instanceof Op\Terminal\StaticVar) {
+                // isset() / print share Empty_ / Echo_ storage (#32556 leftover of #32475).
                 continue;
             } elseif ($usage instanceof Op\Stmt\JumpIf || $usage instanceof Op\Expr\BooleanNot) {
                 // if ($a) / !$a need zend_is_true; keep storage as hashtable (#32475 leftover of #32455).
@@ -141,6 +144,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\Empty_
+                || $usage instanceof Op\Expr\Isset_
                 || $usage instanceof Op\Expr\BooleanNot
                 || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Stmt\JumpIf
@@ -157,6 +161,7 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Terminal\Echo_
+                || $usage instanceof Op\Expr\Print_
                 || $usage instanceof Op\Expr\Array_
                 || $usage instanceof Op\Expr\Cast\Array_
                 || $usage instanceof Op\Expr\Cast\Object_
@@ -171,7 +176,7 @@ class Analyzer
                 || $usage instanceof Op\Terminal\StaticVar
                 || $usage instanceof FirstClassCallable
                 || $usage instanceof Op\Terminal\Const_) {
-                // not a dynamic packed-array append
+                // isset() / print are not packed-array appends (#32556 leftover of #32475).
             } else {
                 throw new \LogicException('Not implemented dynamic append operand '.get_class($usage));
             }
