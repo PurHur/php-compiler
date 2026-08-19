@@ -380,8 +380,8 @@ smoke_007_throwsweb() {
     [[ -n "$stderr" ]] && echo "$stderr" >&2
     return 1
   fi
-  if [[ ! "$out" =~ [Ii]nvalid ]]; then
-    echo "examples-aot-smoke: 007-ThrowsWeb: missing caught-error needle" >&2
+  if [[ ! "$out" =~ Invalid\ email\ address ]]; then
+    echo "examples-aot-smoke: 007-ThrowsWeb: missing caught-error needle (expected Invalid email address)" >&2
     [[ -n "$out" ]] && echo "--- stdout ---" >&2 && echo "$out" >&2 && echo "--- end ---" >&2
     return 1
   fi
