@@ -1406,15 +1406,10 @@ class Type extends Builtin {
             $fntypeHttpBuildQuery
         );
         $this->context->registerFunction('__compiler_http_build_query', $fnHttpBuildQuery);
-        $fntypeIconv = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $strPtr
-        );
-        $fnIconv = $this->context->module->addFunction('__compiler_iconv', $fntypeIconv);
-        $this->context->registerFunction('__compiler_iconv', $fnIconv);
+        // __compiler_iconv always-on shell removed (#32482): user-script iconv() stays
+        // IconvJitHelper / VmIconv. NestedJIT/AOT bridge is IconvRuntime
+        // (getNamedFunction first + JitVmHelperLink::ensureCompiled). Leftover Type
+        // addFunction vs Runtime ABI drift mints iconv.1 (#31894 / #32122).
         // $this->maskedarray->register();
         // $this->nativearray->register();
     }
