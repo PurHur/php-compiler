@@ -24321,7 +24321,10 @@ class JIT {
                     return $left.$right;
                 }
             }
-            if (OpCode::TYPE_ASSIGN !== $prior->type || $prior->arg2 !== $slot) {
+            if (OpCode::TYPE_ASSIGN !== $prior->type) {
+                continue;
+            }
+            if (!\in_array($prior->arg2, $this->jitNamedScopeSlotAliases($block, $slot), true)) {
                 continue;
             }
             $resolved = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $visited);
@@ -24339,7 +24342,10 @@ class JIT {
                 if (!$parent instanceof Block) {
                     return null;
                 }
-                $resolved = $this->resolveJitCompileTimeStringSlot($parent, $slot, $visited);
+                // Fresh visited per parent — shared $visited marks the slot seen on parent
+                // one and makes parent two return null before walking (#32496 openssl PEM).
+                $branchVisited = [];
+                $resolved = $this->resolveJitCompileTimeStringSlot($parent, $slot, $branchVisited);
                 if (null === $resolved) {
                     return null;
                 }
@@ -24363,7 +24369,144 @@ class JIT {
             }
         }
 
+        return $this->jitCompileTimeStringFromNamedBindingIfStable($block, $slot);
+    }
+
+    /**
+     * When {@see Block::$parents} is empty on forward-only CFG edges, slot back-edges
+     * cannot reach the ASSIGN — fall back to named bindings unless try/catch (or ?:)
+     * branches disagree (#32496 vs #32570).
+     */
+    private function jitCompileTimeStringFromNamedBindingIfStable(Block $block, int $slot): ?string
+    {
+        $name = null;
+        foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
+            if ($scopeSlot === $slot) {
+                $name = $scopeName;
+                break;
+            }
+        }
+        if (null === $name || '' === $name) {
+            return null;
+        }
+        if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $name)) {
+            return null;
+        }
+        $bound = $this->context->namedVariableBindings[
+            $this->context->resolveRefAliasName($name)
+        ] ?? null;
+        if (null === $bound || null === $bound->compileTimeString) {
+            return null;
+        }
+
+        return $bound->compileTimeString;
+    }
+
+    /**
+     * True when incoming CFG arms assign different compile-time strings to $name
+     * (try $error="" vs catch $error="msg" — #32570).
+     */
+    private function jitNamedLocalHasDivergentBranchCompileTimeStrings(Block $block, string $name): bool
+    {
+        if (\count($block->parents) <= 1) {
+            return false;
+        }
+        $agreed = null;
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                return true;
+            }
+            $resolved = $this->jitEffectiveNamedLocalCompileTimeString($parent, $name);
+            if (null === $resolved) {
+                continue;
+            }
+            if (null === $agreed) {
+                $agreed = $resolved;
+            } elseif ($agreed !== $resolved) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function jitEffectiveNamedLocalCompileTimeString(
+        Block $block,
+        string $name,
+        array &$visited = []
+    ): ?string {
+        $id = spl_object_id($block);
+        if (isset($visited[$id])) {
+            return null;
+        }
+        $visited[$id] = true;
+        $slot = null;
+        foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
+            if ($scopeName === $name) {
+                $slot = $scopeSlot;
+                break;
+            }
+        }
+        if (null !== $slot) {
+            foreach ($block->opCodes as $prior) {
+                if (OpCode::TYPE_ASSIGN !== $prior->type) {
+                    continue;
+                }
+                if (!\in_array($prior->arg2, $this->jitNamedScopeSlotAliases($block, $slot), true)) {
+                    continue;
+                }
+                $rhs = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, []);
+                if (null !== $rhs) {
+                    return $rhs;
+                }
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = $this->jitEffectiveNamedLocalCompileTimeString($parent, $name, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+        $bound = $this->context->namedVariableBindings[
+            $this->context->resolveRefAliasName($name)
+        ] ?? null;
+        if (null !== $bound && null !== $bound->compileTimeString) {
+            return $bound->compileTimeString;
+        }
+
         return null;
+    }
+
+    /**
+     * php-cfg may bind distinct {@see Operand} objects to different scope slots for one CV
+     * name (#72). Call sites can reference a different slot than the TYPE_ASSIGN dest
+     * (openssl_x509_parse($pem) after `$pem = <<<'PEM'…` — #32496).
+     *
+     * @return list<int>
+     */
+    private function jitNamedScopeSlotAliases(Block $block, int $slot): array
+    {
+        $name = null;
+        foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
+            if ($scopeSlot === $slot) {
+                $name = $scopeName;
+                break;
+            }
+        }
+        if (null === $name || '' === $name) {
+            return [$slot];
+        }
+        $aliases = [];
+        foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
+            if ($scopeName === $name) {
+                $aliases[] = $scopeSlot;
+            }
+        }
+
+        return [] !== $aliases ? $aliases : [$slot];
     }
 
     /** Release boxed locals before user function return (Zend end of scope; #4096). */
@@ -24748,11 +24891,13 @@ class JIT {
             return;
         }
         foreach ($block->opCodes as $prior) {
-            if (
-                OpCode::TYPE_ASSIGN !== $prior->type
-                || $prior->arg2 !== $nameSlot
-                || !isset($block->constants[$prior->arg3])
-            ) {
+            if (OpCode::TYPE_ASSIGN !== $prior->type) {
+                continue;
+            }
+            if (!\in_array($prior->arg2, $this->jitNamedScopeSlotAliases($block, $nameSlot), true)) {
+                continue;
+            }
+            if (!isset($block->constants[$prior->arg3])) {
                 continue;
             }
             $nameVar->compileTimeString = $block->constants[$prior->arg3]->toString();
