@@ -14,7 +14,8 @@ use PHPLLVM\Value;
  * JIT/AOT zend_compare for native object/array vs scalar (#32503 leftover of #32477/#32346).
  *
  * php-src: Zend/zend_operators.c compare_function / zend_compare —
- * plain object vs number is E_NOTICE + legacy 1; array vs non-array is ±1.
+ * plain object vs number is E_NOTICE + legacy 1; array vs number/string is ±1;
+ * array vs null/bool uses zend_is_true (#32520 leftover of #32503).
  * Object vs string without {@code __toString} is object-greater (#32514);
  * {@code null} literals are TYPE_VALUE + isNullConstant, not TYPE_NULL.
  * Object vs string == / != uses the same spaceship (#32515 leftover of #32503).
@@ -46,9 +47,9 @@ final class JitUnlikeCompare
         if ($leftObj || $rightObj) {
             return self::objectVsOther($context, $opType, $left, $right, $leftObj);
         }
-        // Array == bool uses zend_is_true; only ordered compare is ±1 (#32503).
+        // Array == bool uses zend_is_true later; ordered compare vs null/bool is #32520.
         if ($ordered && ($leftArr || $rightArr)) {
-            return self::arrayVsScalar($context, $opType, $leftArr);
+            return self::arrayVsScalar($context, $opType, $left, $right, $leftArr);
         }
 
         return null;
@@ -225,10 +226,51 @@ final class JitUnlikeCompare
         return self::fromSpaceshipValue($context, $opType, $phi);
     }
 
-    private static function arrayVsScalar(Context $context, int $opType, bool $arrayOnLeft): Variable
-    {
-        // zend_compare: IS_ARRAY vs non-array → array is greater (#32503).
+    private static function arrayVsScalar(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right,
+        bool $arrayOnLeft
+    ): Variable {
+        $array = $arrayOnLeft ? $left : $right;
+        $other = $arrayOnLeft ? $right : $left;
+        // zend_compare IS_ARRAY vs IS_NULL / IS_FALSE / IS_TRUE uses zend_is_true
+        // (empty array <=> null/false is 0; nonempty <=> true is 0). #32520 leftover of #32503.
+        if (self::isNullOperand($other) || Variable::TYPE_NATIVE_BOOL === $other->type) {
+            $arrayLong = self::arrayTruthyI64($context, $array);
+            $i64 = $arrayLong->typeOf();
+            if (self::isNullOperand($other)) {
+                $otherLong = $i64->constInt(0, false);
+            } else {
+                $otherLong = $context->builder->zExt(
+                    $context->helper->loadValue($other),
+                    $i64
+                );
+            }
+            $cmp = self::longSpaceshipI64($context, $arrayLong, $otherLong);
+
+            return self::fromSpaceshipValue(
+                $context,
+                $opType,
+                $arrayOnLeft ? $cmp : self::negateCmp($context, $cmp)
+            );
+        }
+
+        // zend_compare: IS_ARRAY vs number/string/resource → array is greater (#32503).
         return self::fromSpaceshipConst($context, $opType, $arrayOnLeft ? 1 : -1);
+    }
+
+    private static function isNullOperand(Variable $var): bool
+    {
+        return Variable::TYPE_NULL === $var->type || ($var->isNullConstant ?? false);
+    }
+
+    private static function arrayTruthyI64(Context $context, Variable $array): Value
+    {
+        $truth = $context->helper->loadValue($array->castTo(Variable::TYPE_NATIVE_BOOL));
+
+        return $context->builder->zExt($truth, $context->getTypeFromString('int64'));
     }
 
     private static function fromSpaceshipConst(Context $context, int $opType, int $cmp): Variable
