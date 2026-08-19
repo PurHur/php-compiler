@@ -25,6 +25,9 @@ patch_already_applied() {
     php-vendor-implicit-nullable-84.patch)
       grep -q '?Block \$prior = null' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php" 2>/dev/null
       ;;
+    php-cfg-class-optional-param-order.patch)
+      grep -q 'array \$implements, Block \$stmts, ?Operand \$extends = null' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php" 2>/dev/null
+      ;;
     php-llvm-structgep-assert.patch)
       grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
@@ -7095,6 +7098,7 @@ fi
 # Parser, …) — hunks are diffed against post-overlay vendor. Harmless on 8.2 (`?Type` since 7.1).
 # Matching lib/Visitor/* declarations were fixed directly (#24972).
 apply_patch "$PATCH_DIR/php-vendor-implicit-nullable-84.patch"
+apply_patch "$PATCH_DIR/php-cfg-class-optional-param-order.patch"
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_php_types_incdec_type_overlay
