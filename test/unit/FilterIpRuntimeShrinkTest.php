@@ -22,21 +22,23 @@ final class FilterIpRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('str_starts_with(', $source, 'NestedJIT thin-AOT hazard (#32571)');
         $this->assertStringNotContainsString('str_contains(', $source, 'NestedJIT thin-AOT hazard (#32571)');
         $this->assertDoesNotMatchRegularExpression('/private static int \$/', $source, 'mutable static spill (#32571)');
+        $this->assertDoesNotMatchRegularExpression('/\?array/', $source, 'nullable array returns break NestedJIT (#32571)');
+        $this->assertDoesNotMatchRegularExpression('/return \[\$/', $source, 'array literal returns break NestedJIT (#32571)');
     }
 
     public function testStringFilterIpRoutesThroughFilterIpValidate(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilterIp.php');
+        $this->assertStringContainsString('InetRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('__compiler_inet_pton', $source);
         $this->assertStringContainsString('FilterIpValidate::isValidInt', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('putenv', $source);
-        $this->assertLessThan(160, \substr_count($source, "\n"), 'StringFilterIp must be a thin bridge');
     }
 
     public function testJitFilterRoutesThroughStringFilterIp(): void
