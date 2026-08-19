@@ -13,24 +13,45 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT for DOMNode::isSupported() (php-src dom_has_feature).
+ * User-script AOT for DOMNode::isSupported() / DOMImplementation::hasFeature()
+ * (php-src dom_has_feature).
  *
  * Thin standalone AOT documentElement temps lose DOMElement userType and
  * NestedJIT DomRegistry is empty — instance-invoke aborts. php-src does not
  * read the node; fold compile-time feature/version via {@see VmDom::hasFeature}.
  *
+ * DOMImplementation::hasFeature is the same C helper; without a Call proxy
+ * user-script AOT binds an unbound method and prints false (#32491).
+ *
  * php-src: ext/dom/node.c PHP_METHOD(DOMNode, isSupported)
- *          ext/dom/php_dom.c dom_has_feature (#32480)
+ *          ext/dom/implementation.c PHP_METHOD(DOMImplementation, hasFeature)
+ *          ext/dom/php_dom.c dom_has_feature (#32480, #32491)
  */
 final class JitDomIsSupported
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_issupported_cont');
+        return self::invokeFeatureProbe($context, 'DOMNode::isSupported', ...$args);
+    }
+
+    public static function invokeHasFeature(Context $context, JITVariable ...$args): Value
+    {
+        return self::invokeFeatureProbe($context, 'DOMImplementation::hasFeature', ...$args);
+    }
+
+    private static function invokeFeatureProbe(
+        Context $context,
+        string $methodName,
+        JITVariable ...$args
+    ): Value {
+        $contTag = 'DOMImplementation::hasFeature' === $methodName
+            ? 'dom_hasfeature_cont'
+            : 'dom_issupported_cont';
+        BasicBlockHelper::ensureOpenInsertBlock($context, $contTag);
         if (!VmClassMethod::requireExactJitUserArgCount(
             $context,
             $args,
-            'DOMNode::isSupported',
+            $methodName,
             2
         )) {
             return VmClassMethod::jitArgcDummyReturn($context);
@@ -44,7 +65,7 @@ final class JitDomIsSupported
             ?? $versionArg->compileTimeString;
         if (null === $feature || null === $version) {
             throw new \LogicException(
-                'DOMNode::isSupported() user-script AOT requires compile-time feature/version'
+                $methodName.'() user-script AOT requires compile-time feature/version'
             );
         }
 

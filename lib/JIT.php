@@ -20880,6 +20880,12 @@ class JIT {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
+            } elseif ('hasfeature' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domimplementation::hasfeature');
+                if ($this->context->functionIsRegistered('domimplementation::hasfeature')) {
+                    $className = 'DOMImplementation';
+                    $declaringClassLc = 'domimplementation';
+                }
             } elseif ('contains' === $methodLc && $this->context->functionIsRegistered('domnode::contains')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
@@ -21275,6 +21281,10 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::lookupprefix');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::lookupprefix');
                 }
+                if ('hasfeature' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domimplementation::hasfeature');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\implementation::hasfeature');
+                }
                 // getElementsByTagName on documentElement temps (:object) — php-src element.c (#32454).
                 if ('getelementsbytagname' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
@@ -21359,6 +21369,12 @@ class JIT {
                 }
                 if ('lookupprefix' === $methodLc && $this->context->functionIsRegistered('domnode::lookupprefix')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('hasfeature' === $methodLc && $this->context->functionIsRegistered('domimplementation::hasfeature')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domimplementation::hasfeature');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21654,6 +21670,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupprefix');
             if ($this->context->functionIsRegistered('domnode::lookupprefix')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('hasfeature' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domimplementation::hasfeature');
+            if ($this->context->functionIsRegistered('domimplementation::hasfeature')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domimplementation::hasfeature');
                 $this->context->scope->args = [$receiverVar];
 
                 return;

@@ -79,6 +79,8 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::issupported'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::lookupprefix'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::lookupprefix'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domimplementation::hasfeature'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('dom\\implementation::hasfeature'));
         } finally {
             putenv('PHP_COMPILER_AOT_USER_SCRIPT');
         }

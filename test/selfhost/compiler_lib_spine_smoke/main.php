@@ -6086,6 +6086,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetIdAttributeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetIdAttributeNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementToggleAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomImplementationCreateDocumentType.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomImplementationHasFeature.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomInstanceMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeAfter.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeAppend.php';
