@@ -35,13 +35,17 @@ use PHPCompiler\JIT\Builtin\DomXPathQueryRuntime;
 use PHPCompiler\JIT\Builtin\DomHtmlDocumentCreateFromStringRuntime;
 use PHPCompiler\JIT\Builtin\DomXmlDocumentCreateFromStringRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
 /**
  * Thin standalone AOT: DOM document-method bridges in the main module (#17954, #19496, #20214, #23325).
@@ -1813,5 +1817,60 @@ final class JitDomDocumentMethodKernel
             return;
         }
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Compile-time null for Z_PARAM_OBJ_OF_CLASS(DOMNode) — Zend TypeError, not SIGSEGV (#32558).
+     *
+     * php-cfg types a `null` literal as TYPE_VALUE + isNullConstant (not TYPE_NULL).
+     * {@code __value__readObject} on that box segfaults in thin-AOT mutation lowering.
+     *
+     * @see php-src ext/dom/php_dom.stub.php DOMNode::appendChild(DOMNode $node)
+     */
+    public static function isCompileTimeNullDomNodeArg(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
+    }
+
+    /**
+     * @return true when a TypeError was emitted (caller must return {@see nullDomNodeArgReturn})
+     */
+    public static function emitTypeErrorIfCompileTimeNullDomNodeArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argumentNumber,
+        string $paramName
+    ): bool {
+        if (!self::isCompileTimeNullDomNodeArg($arg)) {
+            return false;
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_node_arg_typeerror');
+        JitNativeString::ensureInsertBlock($context);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type DOMNode, null given',
+                $function,
+                $argumentNumber,
+                $paramName
+            )
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_node_arg_after_type');
+
+        return true;
+    }
+
+    public static function nullDomNodeArgReturn(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $ptr
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 }

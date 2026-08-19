@@ -31,6 +31,18 @@ final class DomNodeAppendChild implements Call
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_invoke_cont');
         if (
+            isset($args[1])
+            && JitDomDocumentMethodKernel::emitTypeErrorIfCompileTimeNullDomNodeArg(
+                $context,
+                $args[1],
+                'DOMNode::appendChild',
+                1,
+                'node'
+            )
+        ) {
+            return JitDomDocumentMethodKernel::nullDomNodeArgReturn($context);
+        }
+        if (
             JitDomDocumentMethodKernel::shouldUse($context)
             && \count($args) >= 2
         ) {
