@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\GethostbynamelRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -64,6 +65,11 @@ final class gethostbyname extends Internal
             return self::boxedEmptyString($context);
         }
 
+        $literal = $hostnameArg->compileTimeString ?? JitStringArg::compileTimeLiteral($hostnameArg);
+        if (null !== $literal) {
+            return self::boxedResolvedString($context, VmDns::gethostbyname($literal));
+        }
+
         GethostbynamelRuntime::ensureLinked($context);
         $hostname = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
@@ -78,13 +84,18 @@ final class gethostbyname extends Internal
 
     private static function boxedEmptyString(Context $context): Value
     {
+        return self::boxedResolvedString($context, '');
+    }
+
+    private static function boxedResolvedString(Context $context, string $resolved): Value
+    {
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        $empty = $context->builder->load($context->constantStringFromString(''));
+        $str = $context->builder->load($context->constantStringFromString($resolved));
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $ptr,
-            $empty
+            $str
         );
 
         return $ptr;

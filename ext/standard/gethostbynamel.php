@@ -8,9 +8,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\GethostbynamelRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPLLVM\Value;
 
 /**
@@ -75,6 +78,16 @@ final class gethostbynamel extends Internal
             return self::boxedFalse($context);
         }
 
+        $literal = $hostnameArg->compileTimeString ?? JitStringArg::compileTimeLiteral($hostnameArg);
+        if (null !== $literal) {
+            $result = VmDns::gethostbynamel($literal);
+            if (false === $result) {
+                return self::boxedFalse($context);
+            }
+
+            return self::boxedMaterializedList($context, self::materializeIpList($context, $result));
+        }
+
         GethostbynamelRuntime::ensureLinked($context);
         $hostname = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
@@ -94,5 +107,38 @@ final class gethostbynamel extends Internal
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function materializeIpList(Context $context, HashTable $list): Value
+    {
+        $ht = HashTableHelper::alloc($context);
+        $i64 = $context->getTypeFromString('int64');
+        $setAt = $context->lookupFunction('__hashtable__setStringAt');
+        $index = 0;
+        foreach ($list->iterateKeyed(true) as $pair) {
+            [, $var] = $pair;
+            $var = $var->resolveIndirect();
+            if (\PHPCompiler\VM\Variable::TYPE_STRING !== $var->type) {
+                continue;
+            }
+            $ip = $context->builder->load($context->constantStringFromString($var->toString()));
+            $context->builder->call($setAt, $ht, $i64->constInt($index, false), $ip);
+            ++$index;
+        }
+
+        return $ht;
+    }
+
+    private static function boxedMaterializedList(Context $context, Value $listHt): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $listHt
+        );
+
+        return $ptr;
     }
 }
