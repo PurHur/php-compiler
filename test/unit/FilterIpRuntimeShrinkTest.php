@@ -42,6 +42,16 @@ final class FilterIpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmFilter::isValidIpAddress', $source);
     }
 
+    /** #32571 — dispatchConstFilter passes loadFilterFlags() → constInt(0), not null. */
+    public function testValidateIpFoldsConstFlagsLikeValidateFloat(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/JitFilter.php');
+        $this->assertStringContainsString('compileTimeFlagsInt($context, $flags)', $source);
+        $this->assertStringContainsString('null !== $lit && null !== $flagsInt', $source);
+        $this->assertStringNotContainsString('null !== $lit && null === $flags', $source);
+        $this->assertStringNotContainsString('null !== $lit && 0 === $flagsInt', $source);
+    }
+
     public function testFilterIpValidateSemanticsMatchVmFilter(): void
     {
         $cases = ['127.0.0.1', '999.0.0.1', '::1', 'not-an-ip', '192.168.0.1'];
