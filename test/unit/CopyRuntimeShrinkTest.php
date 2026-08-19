@@ -34,6 +34,8 @@ final class CopyRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString("lookupFunction('fread')", $source);
         $this->assertLessThan(180, \substr_count($source, "\n") + 1);
+        $jitCopy = (string) file_get_contents(__DIR__.'/../../ext/standard/JitCopy.php');
+        $this->assertStringContainsString('CopyRuntime::ensureLinked', $jitCopy);
     }
 
     public function testCopyJitHelperUsesTriggerErrorJitHelperForDirectoryWarning(): void

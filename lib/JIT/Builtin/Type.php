@@ -544,26 +544,11 @@ class Type extends Builtin {
         // MkdirJitHelper / StringMkdir / VmFsDirNative. NestedJIT/AOT bridge is
         // FsDirRuntime (getNamedFunction first). Leftover Type addFunction vs
         // Runtime ABI drift mints mkdir.1 (#31894 / #32122).
-        $fntypeCopy = $this->context->context->functionType(
-            $i32,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnCopy = $this->context->module->addFunction('__compiler_copy', $fntypeCopy);
-        $this->context->registerFunction('__compiler_copy', $fnCopy);
-        $valuePtr = $this->context->getTypeFromString('__value__*');
-        $fntypeChgrp = $this->context->context->functionType(
-            $i32,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $valuePtr,
-            $i32
-        );
-        $fnChgrp = $this->context->module->addFunction('__compiler_chgrp', $fntypeChgrp);
-        $this->context->registerFunction('__compiler_chgrp', $fnChgrp);
-        $fnChown = $this->context->module->addFunction('__compiler_chown', $fntypeChgrp);
-        $this->context->registerFunction('__compiler_chown', $fnChown);
+        // __compiler_copy / __compiler_chown / __compiler_chgrp always-on shells
+        // removed (#32466): user-script copy()/chown()/chgrp() stay CopyJitHelper /
+        // ChownJitHelper / VmFs. NestedJIT/AOT bridges are CopyRuntime / ChownRuntime
+        // (getNamedFunction first + JitVmHelperLink::ensureCompiled). Leftover Type
+        // addFunction vs Runtime ABI drift mints copy.1 / chown.1 (#31894 / #32122).
         $fntypeMoveUploaded = $this->context->context->functionType(
             $i32,
             false,

@@ -13,6 +13,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_chown/__compiler_chgrp via FsDirJitHelper PHP (#9585).
  *
+ * Type always-on leftover dropped (#32466): declareFunction uses getNamedFunction first
+ * so a drifted ABI cannot mint __compiler_chown.1 (#31894 / #32122).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer CopyRuntime #22231 / #24473).
  * Replaces {@see StringFsDirJit::emitChown}/{@see StringFsDirJit::emitChgrp} libc LLVM.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs}
@@ -90,6 +92,12 @@ final class ChownRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
@@ -100,6 +108,8 @@ final class ChownRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
 
+        // getNamedFunction first — leftover Type always-on addFunction without it
+        // minted __compiler_chown.1 on ABI drift (#32466 / #32122).
         return $context->module->addFunction(
             $name,
             $context->context->functionType($i32, false, $strPtr, $valuePtr, $i32)
