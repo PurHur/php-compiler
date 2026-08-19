@@ -16,7 +16,8 @@ use PHPLLVM\Value;
  * openssl_x509_fingerprint() (#32512 leftover of #6524),
  * openssl_x509_checkpurpose() (#32522 leftover of #20286),
  * openssl_x509_check_private_key() (#32527 leftover of #20285), and
- * openssl_x509_verify() (#32535 leftover of #6595).
+ * openssl_x509_verify() (#32535 leftover of #6595), and
+ * openssl_x509_export() (#32557 leftover of #20273).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -272,6 +273,52 @@ final class JitOpensslX509
         }
 
         return self::boxedLong($context, $verified);
+    }
+
+    /**
+     * openssl_x509_export() — bake {@see VmOpensslX509Native::exportCertificatePem}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_x509_export) / PEM_write_bio_X509
+     * Writes exported PEM to &$output via {@see JitOpensslSign::sign} peer pattern.
+     */
+    public static function export(
+        Context $context,
+        JITVariable $certificate,
+        JITVariable $output,
+        ?JITVariable $noText = null
+    ): Value {
+        $pem = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_x509_export() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32557)'
+            );
+        }
+        $noTextVal = self::compileTimeBool($noText, true);
+        if (null === $noTextVal) {
+            throw new \LogicException(
+                'openssl_x509_export() no_text must be a compile-time bool '
+                .'for JIT/AOT in this compiler build (issue #32557)'
+            );
+        }
+
+        if (!VmOpensslX509Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $exported = VmOpensslX509Native::exportCertificatePem($pem, $noTextVal);
+        if (false === $exported) {
+            return self::boxedFalse($context);
+        }
+
+        $str = $context->builder->load($context->constantStringFromString($exported));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::valuePtrFromVariable($context, $output),
+            $str
+        );
+
+        return self::boxedBool($context, true);
     }
 
     private static function compileTimeBool(?JITVariable $arg, bool $default): ?bool
