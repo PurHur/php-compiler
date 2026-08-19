@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StatArrayRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stat()/lstat() via {@see __phpc_stat} (issue #1197). */
+/** LLVM lowering for stat()/lstat() via {@see __phpc_stat} (issue #1197, #32651). */
 final class JitStatArray
 {
     private static int $seq = 0;
@@ -18,6 +19,8 @@ final class JitStatArray
     /** @return Value */
     public static function invoke(Context $context, Value $pathStr, bool $lstat): Value
     {
+        StatArrayRuntime::ensureLinked($context);
+
         $tag = ($lstat ? 'lstat' : 'stat').(string) ++self::$seq;
         $i32 = $context->getTypeFromString('int32');
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
