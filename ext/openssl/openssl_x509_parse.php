@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_x509_parse() — X.509 metadata array (php-src ext/openssl/xp.c; #6274).
+ * openssl_x509_parse() — X.509 metadata array (php-src ext/openssl/xp.c; #6274 VM, JIT/AOT #32496).
  */
 final class openssl_x509_parse extends Internal
 {
@@ -43,9 +43,14 @@ final class openssl_x509_parse extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_x509_parse() is not implemented for JIT in this compiler build (issue #6274)'
-        );
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                'openssl_x509_parse() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::parse($context, $args[0], $args[1] ?? null);
     }
 
     private static function boolArg(Variable $arg, int $position): bool
