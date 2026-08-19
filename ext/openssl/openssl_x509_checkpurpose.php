@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_x509_checkpurpose() — X509 purpose / trust check (php-src ext/openssl/openssl.c; #20286).
+ * openssl_x509_checkpurpose() — X509 purpose / trust check (php-src ext/openssl/openssl.c; #20286 VM, JIT/AOT #32522).
  */
 final class openssl_x509_checkpurpose extends Internal
 {
@@ -57,8 +57,19 @@ final class openssl_x509_checkpurpose extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_x509_checkpurpose() is not implemented for JIT in this compiler build (issue #20286)'
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'openssl_x509_checkpurpose() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::checkPurpose(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2] ?? null,
+            $args[3] ?? null
         );
     }
 
