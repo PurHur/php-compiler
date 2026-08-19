@@ -70,13 +70,13 @@ final class DomNodeChildNodeMutationRuntime
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_'.$kind);
             $parent = self::loadParentObject($context, $receiver);
             $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
-            // after → append onto parent InnerXml; before → prepend (#26752 only-child / trailing).
-            if ('before' === $kind) {
-                // before(firstChild, x) ≡ parent.prepend(x) for saveXML InnerXml (#26752).
+            // The parent from loadParentObject may be any node type (DOMDocument,
+            // DOMElement, …). invokeAppend's single-object shortcut assumes DOMElement
+            // property layout (JitDomAppendChildLiveSlots) and segfaults when the parent
+            // is a DOMDocument with a different slot count (#32611). Route both after and
+            // before through invokePrepend which takes the general loop path.
+            if ('before' === $kind || 'after' === $kind) {
                 DomNodeLiveMutationRuntime::invokePrepend($context, $extraArgCount, $parentVar, ...$extraArgs);
-            } elseif ('after' === $kind) {
-                // after(lastChild, x) ≡ parent.append(x) for saveXML InnerXml (#26752).
-                DomNodeLiveMutationRuntime::invokeAppend($context, $extraArgCount, $parentVar, ...$extraArgs);
             } else {
                 // replaceWith: replace parent InnerXml with the new node markup (#26752).
                 self::storeInnerXmlFromArgs($context, $parent, $extraArgs);
