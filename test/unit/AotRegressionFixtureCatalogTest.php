@@ -113,6 +113,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'object_int_float_cast_32452.phpt',
         'hash_update_stream.phpt',
         'hash_update_stream_length.phpt',
+        'dom_getlineno.phpt',
     ];
 
     /**

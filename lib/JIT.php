@@ -18322,6 +18322,9 @@ class JIT {
         if ($force || null !== $src->compileTimeDomNodePath) {
             $dest->compileTimeDomNodePath = $src->compileTimeDomNodePath;
         }
+        if ($force || null !== $src->compileTimeDomLineNo) {
+            $dest->compileTimeDomLineNo = $src->compileTimeDomLineNo;
+        }
         if ($force || null !== $src->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $src->compileTimeDomTextData;
         }
@@ -20874,6 +20877,12 @@ class JIT {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
+            } elseif ('getlineno' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
+                if ($this->context->functionIsRegistered('domnode::getlineno')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('contains' === $methodLc && $this->context->functionIsRegistered('domnode::contains')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
@@ -21264,6 +21273,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::issupported');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::issupported');
                 }
+                if ('getlineno' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getlineno');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::getlineno');
+                }
                 // getElementsByTagName on documentElement temps (:object) — php-src element.c (#32454).
                 if ('getelementsbytagname' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
@@ -21342,6 +21356,12 @@ class JIT {
                 }
                 if ('issupported' === $methodLc && $this->context->functionIsRegistered('domnode::issupported')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::issupported');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('getlineno' === $methodLc && $this->context->functionIsRegistered('domnode::getlineno')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getlineno');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21628,6 +21648,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::issupported');
             if ($this->context->functionIsRegistered('domnode::issupported')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::issupported');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('getlineno' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
+            if ($this->context->functionIsRegistered('domnode::getlineno')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getlineno');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
@@ -24055,6 +24084,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomNodePath && null === $dest->compileTimeDomNodePath) {
             $dest->compileTimeDomNodePath = $source->compileTimeDomNodePath;
+        }
+        if (null !== $source->compileTimeDomLineNo && null === $dest->compileTimeDomLineNo) {
+            $dest->compileTimeDomLineNo = $source->compileTimeDomLineNo;
         }
         if (null !== $source->compileTimeDomTextData && null === $dest->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $source->compileTimeDomTextData;
