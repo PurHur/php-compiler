@@ -11,7 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_x509_check_private_key() — match cert + private key (php-src ext/openssl/openssl.c; #20285).
+ * openssl_x509_check_private_key() — match cert + private key
+ * (php-src ext/openssl/openssl.c; #20285 VM, JIT/AOT #32527).
  */
 final class openssl_x509_check_private_key extends Internal
 {
@@ -44,8 +45,13 @@ final class openssl_x509_check_private_key extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_x509_check_private_key() is not implemented for JIT in this compiler build (issue #20285)'
-        );
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(
+                'openssl_x509_check_private_key() expects exactly 2 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::checkPrivateKey($context, $args[0], $args[1]);
     }
 }

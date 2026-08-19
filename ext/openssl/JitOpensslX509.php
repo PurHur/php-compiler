@@ -12,11 +12,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for openssl_x509_parse() (#32496 leftover of #6274) and
- * openssl_x509_fingerprint() (#32512 leftover of #6524).
+ * LLVM lowering for openssl_x509_parse() (#32496 leftover of #6274),
+ * openssl_x509_fingerprint() (#32512 leftover of #6524), and
+ * openssl_x509_check_private_key() (#32527 leftover of #20285).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_check_private_key) / X509_check_private_key
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -109,6 +111,41 @@ final class JitOpensslX509
         return self::boxedString($context, $fingerprint);
     }
 
+    /**
+     * openssl_x509_check_private_key() — bake {@see VmOpensslX509Native::checkPrivateKeyPem}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_x509_check_private_key) / X509_check_private_key
+     */
+    public static function checkPrivateKey(
+        Context $context,
+        JITVariable $certificate,
+        JITVariable $privateKey
+    ): Value {
+        $certPem = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $certPem) {
+            throw new \LogicException(
+                'openssl_x509_check_private_key() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32527)'
+            );
+        }
+        $keyPem = JitStringArg::compileTimeLiteral($privateKey);
+        if (null === $keyPem) {
+            throw new \LogicException(
+                'openssl_x509_check_private_key() private_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32527)'
+            );
+        }
+
+        if (!VmOpensslX509Native::available()) {
+            return self::boxedBool($context, false);
+        }
+
+        return self::boxedBool(
+            $context,
+            VmOpensslX509Native::checkPrivateKeyPem($certPem, $keyPem)
+        );
+    }
+
     private static function compileTimeBool(?JITVariable $arg, bool $default): ?bool
     {
         if (null === $arg) {
@@ -127,8 +164,13 @@ final class JitOpensslX509
 
     private static function boxedFalse(Context $context): Value
     {
+        return self::boxedBool($context, false);
+    }
+
+    private static function boxedBool(Context $context, bool $value): Value
+    {
         $slot = JitValueBox::alloc($context);
-        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool($value));
 
         return JitValueBox::pointer($context, $slot);
     }

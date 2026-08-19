@@ -7,8 +7,9 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * openssl_x509_parse / openssl_x509_fingerprint JIT/AOT bake libcrypto FFI in the compiler process
- * (#32496 leftover of #6274; #32512 leftover of #6524).
+ * openssl_x509_parse / openssl_x509_fingerprint / openssl_x509_check_private_key
+ * JIT/AOT bake libcrypto FFI in the compiler process
+ * (#32496 leftover of #6274; #32512 leftover of #6524; #32527 leftover of #20285).
  */
 final class OpensslX509RuntimeShrinkTest extends TestCase
 {
@@ -17,11 +18,13 @@ final class OpensslX509RuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/openssl/JitOpensslX509.php');
         $this->assertStringContainsString('VmOpensslX509Native::parseCertificatePem', $source);
         $this->assertStringContainsString('VmOpensslX509Native::fingerprintCertificatePem', $source);
+        $this->assertStringContainsString('VmOpensslX509Native::checkPrivateKeyPem', $source);
         $this->assertStringContainsString('HashTableHelper::variableFromVmHashTable', $source);
         $this->assertStringContainsString('compile-time string literal', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_x509_parse.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_x509_fingerprint.c');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_x509_check_private_key.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/OpensslX509Runtime.php');
     }
 

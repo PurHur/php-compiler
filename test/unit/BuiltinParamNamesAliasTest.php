@@ -5664,6 +5664,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
             BuiltinParamNames::paramNamesForInternalFunction('openssl_x509_parse')
         );
 
+        $checkKey = BuiltinParamNames::forFunction('openssl_x509_check_private_key');
+        self::assertSame(['certificate', 'private_key'], $checkKey);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($checkKey, 'certificate', 'openssl_x509_check_private_key'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($checkKey, 'private_key', 'openssl_x509_check_private_key'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($checkKey, 'cert', 'openssl_x509_check_private_key'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($checkKey, 'key', 'openssl_x509_check_private_key'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('openssl_x509_check_private_key'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_x509_check_private_key'));
+
         $csr = BuiltinParamNames::forFunction('openssl_csr_new');
         self::assertSame(['distinguished_names', 'private_key', 'options=', 'extra_attributes='], $csr);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($csr, 'distinguished_names', 'openssl_csr_new'));

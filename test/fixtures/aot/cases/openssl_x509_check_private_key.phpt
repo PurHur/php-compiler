@@ -1,0 +1,90 @@
+--TEST--
+AOT: openssl_x509_check_private_key() matching / mismatched / invalid PEM (#32527 leftover of #20285, ext/openssl/openssl.c)
+--SKIPIF--
+<?php
+require_once dirname(__DIR__, 4) . '/vendor/autoload.php';
+require_once dirname(__DIR__, 4) . '/ext/openssl/VmOpensslX509Native.php';
+if (!\PHPCompiler\ext\openssl\VmOpensslX509Native::available()) {
+    echo 'skip';
+}
+?>
+--FILE--
+<?php
+declare(strict_types=1);
+
+$cert = <<<'PEM'
+-----BEGIN CERTIFICATE-----
+MIIDJTCCAg2gAwIBAgIUGbNaijPWg7kdkIn8HVcDziYWBEowDQYJKoZIhvcNAQEL
+BQAwIjEgMB4GA1UEAwwXcGhwLWNvbXBpbGVyLXBrY3M3LXRlc3QwHhcNMjYwNzE1
+MTg0MjEyWhcNMzYwNzEyMTg0MjEyWjAiMSAwHgYDVQQDDBdwaHAtY29tcGlsZXIt
+cGtjczctdGVzdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANFZnm0D
+U4ZN8H4V5y0FQI5FQiWmiYi0jvnwnMj/gJvZZdMTlX+yXx6iVFc2uB3r6hldmf3z
+4aq2XjMTz9Ja7hO3N02Tif3a83y6z+SF9WCIQgWD4DQqqx26bROhrvzTp5fFGmO+
+OOrasipQTJBcYTGVUkj1s5eKUsR+AJp44NYZ61eWMi3vLcCqRCHF2y6+Gjl5svOz
+lJDR6QnrJsmFTaJdFGO3H+66XpBlKz2/cob6cXf3LuiD5YBMjz6DfN5F6CtH3mai
+nxwWaWxS0j4XB69kWp2Bp8d0VE6jI9II4aWNU96i8TCoy2ev2vZus/MDL9GB962Z
+klIcHkJNlNQy8DsCAwEAAaNTMFEwHQYDVR0OBBYEFF1AKJF6wHrX9xUimqn1Uztv
+9fucMB8GA1UdIwQYMBaAFF1AKJF6wHrX9xUimqn1Uztv9fucMA8GA1UdEwEB/wQF
+MAMBAf8wDQYJKoZIhvcNAQELBQADggEBAABhWADDcHqgYKyHAelTN8LaoNARjqzL
+SmUIVKc/+xyubbUk4MGGBppzGnYExnlVVYK7FhMNl0T6kFFkltFy8A0MonmMV52L
+lpD/Ixw08FOGohegF778usu1N9DwpOmbJIfTCwONeabuzEltSC+jgZBs40LEu2dF
+xM6Kb9Q1To8IXebo2WjG0KFv40T4owYmqrG9Xg8Rx5glzN0wWD0ss7BapcWMNS9i
+iZTtBvWfplHOqmGvhhMA009ZyZp2+YBn0GvbM/jS3+2aKddCdlt9ffE+9i/IvmPB
+1m35TgJ8v70S3D1TJlgnGekkg/JPmc/BPrsNT4LieL14S0E3mow4Wok=
+-----END CERTIFICATE-----
+PEM;
+
+$key = <<<'PEM'
+-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDRWZ5tA1OGTfB+
+FectBUCORUIlpomItI758JzI/4Cb2WXTE5V/sl8eolRXNrgd6+oZXZn98+Gqtl4z
+E8/SWu4TtzdNk4n92vN8us/khfVgiEIFg+A0Kqsdum0Toa7806eXxRpjvjjq2rIq
+UEyQXGExlVJI9bOXilLEfgCaeODWGetXljIt7y3AqkQhxdsuvho5ebLzs5SQ0ekJ
+6ybJhU2iXRRjtx/uul6QZSs9v3KG+nF39y7og+WATI8+g3zeRegrR95mop8cFmls
+UtI+FwevZFqdgafHdFROoyPSCOGljVPeovEwqMtnr9r2brPzAy/RgfetmZJSHB5C
+TZTUMvA7AgMBAAECggEAHa7o+/39FCLtlthrhyz3zUmxVP37AZYlsPdWflgJQo/I
+P0McmcGPI8cn0Zc28znQXzkFV5utLfOzrDxX5YnyYyXsQnnz6+Q6opR+W6Ge0XQg
+dasQLsq0qSoWGIgpSTyIG8iHswggBooXDvwvDvJPmaSEHpzaklcQ4JQZE837MIAK
+Aa5us2FpElBiFrvhD0OwjhCw7yOfvFnpW7tqKqesYUJ+iJFMjy7Vq2S830a4ElTO
+FjEhkoF+clgS0M6KTT0CKa3VQKa982L7b000hw66YlshjYXQ/WaMJHdqMPFM8qWp
+si5o4v4hoSRMJKy8+Ej876SRLEqe82cca8Pc0R4gyQKBgQDmeduIX3v5BYcW2j7O
+XegZGeoLH1/Cy6mtilULmrqz/hOGDbNlDa9xpqKuAOxM1iyhO3aN7NHZ1jMRrBJe
+zm5DjQFWXX4eUcy0HlbrsiBpC4iufS9uSzzoaTIfoetfdM9jXkQKVGbiXp6oyQy8
+n6FqpJTpo//xSP/S6q5fuZHTfwKBgQDoiNPcVA//IuLF8ApD6TcOsZE1Is0Ddgtg
+rC+rn5V3GK27ZXAR4sIdrcXl5erGc0eptoEhmD1Yx7zfoi5mBLHQyfNvPKa7VrXF
+lnoVGSqVnFUA13OXYvm2utDqr4AOdLxjIWLP3R7EddzOpDBgoPjPMgJBNc31GRG4
+Wal1TeaRRQKBgQCo5P/FrgNRd4WJb6G65QIi8uSaBgHM5CaRr9+mw1qycCyqffvK
+v/6jkHOCg9amcAUAmmzEkJkvw1JlTu2fYDNZeUlTmuvDGDqke99ClaQ+ll8xTzek
+4anevsgmeifcKeOYdAn0b+l9Vc167upQh8JoPfeKR85VaSNf0u6542lDzQKBgQCm
+Bkt93GcvevD+8kviAPlWfGF41sgZ2IZ3F3lRyDcnOW+RhPNnUcfW+ON7KZVe66AX
+BD9ehRwH71RjN6B5JpDuycINgfhpeZd+49l2hulouJ3YY/wb8oboeKoBZhzANYjs
+HkI2t2HoU168C26fD0+WX9ZMSOYsQSHtxda/8kbVIQKBgQDOZBVvbqyG30RTOHxC
+Itu4rR14WwzpQaTEJQTqqFH1NaH4sYJZWxMnDHOMjZs6ppyMjkDy5HX/x7E/TQ8x
+huKKXL+qGvI/KA1PdDBqmnFvIj9x1ECBaJLX6dsArsiNZ2ihW1oBx4si6bMKKzV1
+eVdlFT1IOmwYKpAIpJuPoxzczg==
+-----END PRIVATE KEY-----
+PEM;
+
+$other = <<<'PEM'
+-----BEGIN PRIVATE KEY-----
+MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAs/agkMDOJDS7Udfu
+b2zoYYZdjXjmjEGVAKQ0jcNsjzx8UizZZdezyq9Cb/a1Z8epPFm0KPXWO/DrfaO/
+pJdN0wIDAQABAkEAqAYbsisiDLHjNy35o7U2Xl/6lu0LrGZK/TdTDg0pHa2Tg2bU
+sRDsUL7mG+Sg7nXUkGQnMOc6PjHwRlF1v5i6EQIhAO6cRDOKu4OzmpsFpDz8RcAb
+fKcHtRGQoqNiHGkjOrd7AiEAwRQwNwDjClD+3IMkLHR/1d2MSRunQ/mYf+SHs51Y
+R4kCIA4uXWNO0HwwVXT3Ld6uA5s6RvtKWvmTRgc90oBxJpE3AiAXGnVSf5arS1nT
+xRV1BFOvoZ0Bun9fUOSAmTXrti40EQIgd7h1Ch05DM18TUSosFD/valTgZyBNqO5
+YQqYKeRM/Yk=
+-----END PRIVATE KEY-----
+PEM;
+
+var_export(openssl_x509_check_private_key($cert, $key));
+echo "\n";
+var_export(openssl_x509_check_private_key($cert, $other));
+echo "\n";
+var_export(openssl_x509_check_private_key('not-a-cert', $key));
+echo "\n";
+--EXPECT--
+true
+false
+false
