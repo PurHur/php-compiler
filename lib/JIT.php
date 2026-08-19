@@ -24280,9 +24280,18 @@ class JIT {
             if (null === $slot) {
                 continue;
             }
-            // Re-resolve at the call site — stale init literals ('' before try) must not
-            // win over catch reassignment when compileTimeString was already set (#32570).
-            $arg->compileTimeString = $this->resolveJitCompileTimeStringSlot($block, $slot);
+            if (null !== $arg->compileTimeString) {
+                // fromLiteral string temps carry TYPE_STRING — do not re-resolve (#32398).
+                if ($operand instanceof Operand\Literal || Variable::TYPE_STRING === $arg->type) {
+                    continue;
+                }
+                // Catch/branch reassignment: stale try-path '' on boxed locals (#32570).
+                $resolved = $this->resolveJitCompileTimeStringSlot($block, $slot);
+                $arg->compileTimeString = $resolved;
+
+                continue;
+            }
+            $this->foldCompileTimeStringFromSlot($block, $slot, $arg);
         }
     }
 
