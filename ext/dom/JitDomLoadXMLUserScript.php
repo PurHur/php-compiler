@@ -318,6 +318,11 @@ final class JitDomLoadXMLUserScript
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
+        JitDomCreateElement::storeAttributesPresence(
+            $context,
+            $element,
+            [] !== DomParseSimpleXmlJitHelper::rootAttributesArgv($xml)
+        );
         JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml);
 
         $objectType = $context->type->object;

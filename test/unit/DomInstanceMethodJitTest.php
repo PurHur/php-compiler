@@ -71,6 +71,8 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::getelementsbytagname'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::haschildnodes'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::haschildnodes'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::hasattributes'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::hasattributes'));
         } finally {
             putenv('PHP_COMPILER_AOT_USER_SCRIPT');
         }

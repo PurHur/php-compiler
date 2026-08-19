@@ -233,6 +233,38 @@ final class JitDomCreateElement
     }
 
     /**
+     * User-script AOT: non-null NamedNodeMap in attributes slot when the element
+     * has non-xmlns attributes (php-src xmlNode->properties != NULL) (#32458).
+     */
+    public static function storeAttributesPresence(
+        Context $context,
+        Value $element,
+        bool $present,
+        string $className = self::CLASS_ELEMENT
+    ): void {
+        if (!$present) {
+            return;
+        }
+        $objectType = $context->type->object;
+        $elemClassId = $objectType->lookup($className);
+        self::ensureElementPropertyLayout($objectType, $elemClassId);
+        $mapClassId = $objectType->lookup('DOMNamedNodeMap');
+        $map = $objectType->allocate($mapClassId);
+        $objectType->markObjectConstructed($map);
+        $mapJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $map
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, $className, self::PROP_ATTRIBUTES),
+            $mapJit,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    /**
      * Raw `%__object__*` for id-map / {@see DomUserScriptElementCacheLlvm} stores (#25119, #29736).
      *
      * {@see invoke()} boxes via {@see boxObjectResult()} for the call ABI (#29638); loadHTML /

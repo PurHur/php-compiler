@@ -21247,6 +21247,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::haschildnodes');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::haschildnodes');
                 }
+                if ('hasattributes' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::hasattributes');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::hasattributes');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::hasattributes');
+                }
                 // getElementsByTagName on documentElement temps (:object) — php-src element.c (#32454).
                 if ('getelementsbytagname' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
@@ -21307,6 +21312,12 @@ class JIT {
                 }
                 if ('haschildnodes' === $methodLc && $this->context->functionIsRegistered('domnode::haschildnodes')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::haschildnodes');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('hasattributes' === $methodLc && $this->context->functionIsRegistered('domnode::hasattributes')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::hasattributes');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21566,6 +21577,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::haschildnodes');
             if ($this->context->functionIsRegistered('domnode::haschildnodes')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::haschildnodes');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('hasattributes' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::hasattributes');
+            if ($this->context->functionIsRegistered('domnode::hasattributes')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::hasattributes');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
