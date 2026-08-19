@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\dom\JitDomAppendChild;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -34,6 +35,9 @@ final class DomNodeAppendChild implements Call
             JitDomDocumentMethodKernel::shouldUse($context)
             && \count($args) >= 2
         ) {
+            if (JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::appendChild', 1, 'node')) {
+                return JitDomRequireDomNodeArg::boxNullResult($context);
+            }
             // Pin object identity before ParentNode::append mutates slots (#27480).
             $childObj = self::loadChildObject($context, $args[1]);
             $append = new DomNodeAppend();

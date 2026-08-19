@@ -25,6 +25,10 @@ final class JitDomAppendChildUserScript
     ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_ac_store_cont');
 
+        if (JitDomRequireDomNodeArg::guardOrAbort($context, $childVar, 'DOMNode::appendChild', 1, 'node')) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+
         $document = self::loadObjectArg($context, $documentVar);
         $child = self::loadObjectArg($context, $childVar);
         $objectType = $context->type->object;
