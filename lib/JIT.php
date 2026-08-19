@@ -10215,7 +10215,8 @@ class JIT {
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
+                    $bool = ext\standard\JitZendScalarCast::emitBoolCast($this->context, $value);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $bool, true);
                     break;
                 case OpCode::TYPE_CAST_INT:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
