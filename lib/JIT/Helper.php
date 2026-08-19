@@ -238,6 +238,11 @@ return_string:
                 $this->context->getTypeFromString('int64')->constInt(0, false)
             );
         }
+        // object/array vs scalar < > <= >= <=> : zend_compare, not compiler abort (#32503).
+        $unlike = JitUnlikeCompare::tryLower($this->context, $opcode->type, $left, $right);
+        if (null !== $unlike) {
+            return $unlike;
+        }
         if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
             JitShiftOperandGuard::guardOperands($this->context, $opcode->type, $left, $right);
         }

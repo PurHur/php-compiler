@@ -390,8 +390,12 @@ final class JitScalarEnumCoerce
         return $context->builder->structGep($strPtr, $off);
     }
 
-    public static function emitObjectScalarWarning(Context $context, string $className, string $kind): void
-    {
+    public static function emitObjectScalarWarning(
+        Context $context,
+        string $className,
+        string $kind,
+        int $level = ErrorReporter::E_WARNING
+    ): void {
         $message = 'int' === $kind
             ? "Object of class {$className} could not be converted to int"
             : "Object of class {$className} could not be converted to float";
@@ -404,7 +408,7 @@ final class JitScalarEnumCoerce
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $sizeT->constInt(\strlen($message), false),
-            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $i32->constInt($level, false),
             $emptyFile,
             $i32->constInt(0, false)
         );

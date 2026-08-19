@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -57,8 +58,12 @@ final class JitScalarTypeCoerce
      *
      * @param 'int'|'float' $kind
      */
-    public static function emitPlainObjectToScalar(Context $context, Value $objPtr, string $kind): Value
-    {
+    public static function emitPlainObjectToScalar(
+        Context $context,
+        Value $objPtr,
+        string $kind,
+        int $errorLevel = ErrorReporter::E_WARNING
+    ): Value {
         /** @var ObjectBuiltin $objectBuiltin */
         $objectBuiltin = $context->type->object;
         $map = $context->structFieldMap['__object__'];
@@ -67,7 +72,7 @@ final class JitScalarTypeCoerce
         );
         $i64 = $context->getTypeFromString('int64');
         $double = $context->getTypeFromString('double');
-        $tag = 'scalar_coerce_obj_'.(string) spl_object_id($context);
+        $tag = 'scalar_coerce_obj_'.(string) spl_object_id($context).'_'.$errorLevel;
         $resultTy = 'int' === $kind ? $i64 : $double;
 
         $entries = [];
@@ -83,12 +88,12 @@ final class JitScalarTypeCoerce
             string $className,
             string $kind,
             Value $objPtr
-        ) use ($i64, $double, $objectBuiltin): Value {
+        ) use ($i64, $double, $objectBuiltin, $errorLevel): Value {
             $sxe = self::tryEmitSimpleXmlNumericCast($context, $objPtr, $className, $kind, $objectBuiltin);
             if (null !== $sxe) {
                 return $sxe;
             }
-            JitScalarEnumCoerce::emitObjectScalarWarning($context, $className, $kind);
+            JitScalarEnumCoerce::emitObjectScalarWarning($context, $className, $kind, $errorLevel);
 
             return 'int' === $kind ? $i64->constInt(1, false) : $double->constReal(1.0);
         };
