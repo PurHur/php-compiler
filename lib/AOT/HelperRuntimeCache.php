@@ -451,6 +451,22 @@ final class HelperRuntimeCache
             }
         }
 
+        // When the LLVM identity matches the committed manifest, accept the
+        // manifest's core_fingerprint as equivalent — the compiled objects are
+        // identical when only non-LLVM patches changed (#32599).
+        $archDir = $root.'/prelinked/helper-runtime/'.php_uname('m').'-'.strtolower(php_uname('s'));
+        $mfPath = $archDir.'/manifest.json';
+        if (is_file($mfPath)) {
+            $mf = json_decode((string) file_get_contents($mfPath), true);
+            if (\is_array($mf)) {
+                $mfTok = (string) ($mf['llvm_identity_token'] ?? '');
+                $mfCore = (string) ($mf['core_fingerprint'] ?? '');
+                if ('' !== $mfCore && '' !== $mfTok && $mfTok === self::llvmIdentityToken()) {
+                    $cores[] = $mfCore;
+                }
+            }
+        }
+
         return $list = array_values(array_unique($cores));
     }
 
