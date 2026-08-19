@@ -858,6 +858,14 @@ final class BuiltinParamNames
             // php-src ext/standard/filestat.stub.php — InternalArgInfo still says mode (#23346)
             case 'chmod':
                 return ['filename', 'permissions'];
+            // php-src ext/standard/basic_functions.stub.php — chown(string $filename, string|int $user): bool (#27812)
+            case 'chown':
+            case 'lchown':
+                return ['filename', 'user'];
+            // php-src ext/standard/basic_functions.stub.php — chgrp(string $filename, string|int $group): bool (#28001)
+            case 'chgrp':
+            case 'lchgrp':
+                return ['filename', 'group'];
             case 'mkdir':
                 // php-src ext/standard/file.stub.php — permissions=0777, recursive=false, context=null (#23453 / #24885)
                 return ['directory', 'permissions=', 'recursive=', 'context='];
