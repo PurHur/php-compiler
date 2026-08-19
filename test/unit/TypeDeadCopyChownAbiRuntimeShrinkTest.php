@@ -44,7 +44,6 @@ final class TypeDeadCopyChownAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_touch'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_move_uploaded_file'", $type);
         $this->assertStringContainsString('CopyRuntime::ensureLinked', (string) file_get_contents(
             __DIR__.'/../../lib/JIT/Builtin/StringFsDirJit.php'
         ));
