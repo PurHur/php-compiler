@@ -116,6 +116,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__offsetIsSetObjectKey', 'int1', ['__hashtable__*', '__object__*']);
         $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
         $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
+        $this->registerFn('__hashtable__ptrIsNonEmpty', 'int1', ['__hashtable__*']);
         // ksort()/krsort() string-key maps — NestedJIT KeySortJitHelper aborts under thin AOT (#27227 / peer #26975).
         $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysLocale', 'void', ['__hashtable__*']);
@@ -191,6 +192,7 @@ class HashTable extends Type
         $this->implementOffsetIsSetObjectKey();
         $this->implementValueReadHashtable();
         $this->implementValueWriteHashtable();
+        $this->implementHashtablePtrIsNonEmpty();
         $this->implementSortStringKeys();
         $this->implementSortStringKeysLocale();
         $this->implementSortStringKeysReverse();
@@ -670,6 +672,57 @@ class HashTable extends Type
         $map = $this->context->structFieldMap['__hashtable__'];
         $num = $this->context->builder->load($this->context->builder->structGep($ht, $map['numElements']));
         $this->context->builder->returnValue($num);
+    }
+
+    /**
+     * Null-safe zend_is_true(IS_ARRAY) for JUMPIF on boxed hashtables (#32475).
+     *
+     * php-src: Zend/zend_operators.c convert_to_boolean IS_ARRAY — zend_hash_num_elements.
+     */
+    private function implementHashtablePtrIsNonEmpty(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__ptrIsNonEmpty');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $saved = null;
+        try {
+            $saved = $this->context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        $i1 = $this->context->getTypeFromString('int1');
+        $entry = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($entry);
+        $ht = $fn->getParam(0);
+        $isNull = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $ht,
+            $ht->typeOf()->constNull()
+        );
+        $empty = $fn->appendBasicBlock('ht_empty');
+        $live = $fn->appendBasicBlock('ht_live');
+        $this->context->builder->branchIf($isNull, $empty, $live);
+
+        $this->context->builder->positionAtEnd($empty);
+        $this->context->builder->returnValue($i1->constInt(0, false));
+
+        $this->context->builder->positionAtEnd($live);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $num = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $map['numElements'])
+        );
+        $truthy = $this->context->builder->icmp(
+            Builder::INT_NE,
+            $num,
+            $num->typeOf()->constInt(0, false)
+        );
+        $this->context->builder->returnValue($truthy);
+
+        if (null !== $saved) {
+            $this->context->builder->positionAtEnd($saved);
+        } else {
+            $this->context->builder->clearInsertionPosition();
+        }
     }
 
     private function implementOffsetIsSet(): void

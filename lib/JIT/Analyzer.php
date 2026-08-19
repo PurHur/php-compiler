@@ -85,6 +85,9 @@ class Analyzer
                 || $usage instanceof FirstClassCallable
                 || $usage instanceof Op\Terminal\StaticVar) {
                 continue;
+            } elseif ($usage instanceof Op\Stmt\JumpIf || $usage instanceof Op\Expr\BooleanNot) {
+                // if ($a) / !$a need zend_is_true; keep storage as hashtable (#32475 leftover of #32455).
+                return true;
             } elseif ($usage instanceof Op\Terminal\Const_) {
                 // Immutable global const arrays use module globals in __init__ (#4904, #4941).
                 continue;
@@ -136,6 +139,9 @@ class Analyzer
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
+                || $usage instanceof Op\Expr\Empty_
+                || $usage instanceof Op\Expr\BooleanNot
+                || $usage instanceof Op\Stmt\JumpIf
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\New_
                 || $usage instanceof Op\Expr\MethodCall
