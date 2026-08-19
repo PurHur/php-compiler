@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomGetNodePath;
+use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
+use PHPCompiler\ext\dom\JitDomNodeChildProperty;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -70,13 +74,15 @@ final class DomNodeChildNodeMutationRuntime
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_'.$kind);
             $parent = self::loadParentObject($context, $receiver);
             $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
-            // The parent from loadParentObject may be any node type (DOMDocument,
-            // DOMElement, …). invokeAppend's single-object shortcut assumes DOMElement
-            // property layout (JitDomAppendChildLiveSlots) and segfaults when the parent
-            // is a DOMDocument with a different slot count (#32611). Route both after and
-            // before through invokePrepend which takes the general loop path.
             if ('before' === $kind || 'after' === $kind) {
-                DomNodeLiveMutationRuntime::invokePrepend($context, $extraArgCount, $parentVar, ...$extraArgs);
+                if (!self::trySyncSiblingInsertInnerXml($context, $kind, $receiver, $parent, $extraArgs)) {
+                    // Fallback: prepend/append when compile-time anchor/index is unknown.
+                    if ('before' === $kind) {
+                        DomNodeLiveMutationRuntime::invokePrepend($context, $extraArgCount, $parentVar, ...$extraArgs);
+                    } else {
+                        DomNodeLiveMutationRuntime::invokeAppend($context, $extraArgCount, $parentVar, ...$extraArgs);
+                    }
+                }
             } else {
                 // replaceWith: replace parent InnerXml with the new node markup (#26752).
                 self::storeInnerXmlFromArgs($context, $parent, $extraArgs);
@@ -111,6 +117,110 @@ final class DomNodeChildNodeMutationRuntime
             $pieces[] = '<'.$tag.'/>';
         }
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, implode('', $pieces));
+    }
+
+    /**
+     * Splice ChildNode::before/after args into parent PROP_USER_SCRIPT_INNER_XML (#26752).
+     *
+     * @param list<Variable> $extraArgs
+     */
+    private static function trySyncSiblingInsertInnerXml(
+        Context $context,
+        string $kind,
+        Variable $receiver,
+        Value $parent,
+        array $extraArgs
+    ): bool {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return false;
+        }
+        $markup = self::compileTimeMarkupFromArgs($extraArgs);
+        if (null === $markup || '' === $markup) {
+            return false;
+        }
+        $parentInner = self::compileTimeParentInnerXml();
+        if (null === $parentInner) {
+            return false;
+        }
+        $index = self::resolveReceiverChunkIndex($receiver, $parentInner);
+        if (null === $index) {
+            return false;
+        }
+        $after = 'after' === $kind;
+        $inner = DomParseSimpleXmlJitHelper::innerXmlInsertMarkupAt($parentInner, $index, $markup, $after);
+        if (null === $inner) {
+            return false;
+        }
+        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+
+        return true;
+    }
+
+    private static function compileTimeParentInnerXml(): ?string
+    {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return null;
+        }
+        if (null !== JitDomGetNodePath::$lastParentInner) {
+            return JitDomGetNodePath::$lastParentInner;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === trim($xml)) {
+            return null;
+        }
+
+        return DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+    }
+
+    private static function resolveReceiverChunkIndex(Variable $receiver, string $parentInner): ?int
+    {
+        if (null !== $receiver->compileTimeDomChildIndex) {
+            return $receiver->compileTimeDomChildIndex;
+        }
+        $tag = $receiver->compileTimeDomTagName ?? JitDomNodeChildProperty::$lastFetchedTagName;
+        if (null !== JitDomNodeChildProperty::$lastFetchedChildIndex && null !== $tag) {
+            return JitDomNodeChildProperty::$lastFetchedChildIndex;
+        }
+        if (null === $tag || '' === $tag) {
+            return null;
+        }
+        $tagLc = strtolower($tag);
+        foreach (DomParseSimpleXmlJitHelper::directChildMarkupChunks($parentInner) as $i => $chunk) {
+            $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunk);
+            if (null !== $parsed && strtolower($parsed['tag']) === $tagLc) {
+                return $i;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Variable> $extraArgs
+     */
+    private static function compileTimeMarkupFromArgs(array $extraArgs): ?string
+    {
+        $pieces = [];
+        foreach ($extraArgs as $arg) {
+            if (Variable::TYPE_STRING === $arg->type) {
+                $lit = $arg->compileTimeString ?? null;
+                if (null === $lit) {
+                    return null;
+                }
+                $pieces[] = $lit;
+                continue;
+            }
+            if (!\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
+                return null;
+            }
+            $tag = $arg->compileTimeDomTagName ?? null;
+            if (null === $tag || '' === $tag) {
+                return null;
+            }
+            $pieces[] = '<'.$tag.'/>';
+        }
+
+        return implode('', $pieces);
     }
 
     private static function loadParentObject(Context $context, Variable $receiver): Value

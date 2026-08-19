@@ -667,6 +667,26 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Insert markup before or after direct child {@code $index} under {@code $inner} (#26752).
+     *
+     * Peer {@see rootInnerXmlReplaceChildAt}: thin-AOT ChildNode::before/after must
+     * splice into PROP_USER_SCRIPT_INNER_XML, not prepend/append the whole parent.
+     *
+     * @return string|null New inner XML, or null when index is out of range
+     */
+    public static function innerXmlInsertMarkupAt(string $inner, int $index, string $markup, bool $after): ?string
+    {
+        $chunks = self::directChildMarkupChunks($inner);
+        if ($index < 0 || $index >= \count($chunks)) {
+            return null;
+        }
+        $insertAt = $after ? $index + 1 : $index;
+        array_splice($chunks, $insertAt, 0, [$markup]);
+
+        return implode('', $chunks);
+    }
+
+    /**
      * Outer-markup slices of each direct child under {@code $inner} (#28671).
      *
      * @return list<string>
