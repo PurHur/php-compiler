@@ -260,6 +260,7 @@ final class DomInstanceMethodJit
         'dom\\xmldocument::queryselectorall' => true,
         'dom\\htmldocument::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
+        'domimplementation::createdocument' => true,
         'domimplementation::createdocumenttype' => true,
         'domimplementation::hasfeature' => true,
         'dom\\implementation::hasfeature' => true,
@@ -916,6 +917,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domimplementation::createdocument' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomImplementationCreateDocument();
+
+                return;
+            }
             if ('domimplementation::createdocumenttype' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomImplementationCreateDocumentType();
 
@@ -1257,6 +1263,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domxpath::registernamespace');
             self::ensureProxy($context, 'domxpath::registerphpfunctions');
             self::ensureProxy($context, 'domxpath::registerphpfunctionns');
+            self::ensureProxy($context, 'domimplementation::createdocument');
             self::ensureProxy($context, 'domimplementation::createdocumenttype');
             self::ensureProxy($context, 'domimplementation::hasfeature');
             self::ensureProxy($context, 'dom\\implementation::hasfeature');
@@ -1302,7 +1309,7 @@ final class DomInstanceMethodJit
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath', 'getlineno'],
         'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'lookupprefix', 'lookupnamespaceuri', 'isdefaultnamespace', 'getlineno'],
-        'domimplementation' => ['createdocumenttype', 'hasfeature'],
+        'domimplementation' => ['createdocument', 'createdocumenttype', 'hasfeature'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
