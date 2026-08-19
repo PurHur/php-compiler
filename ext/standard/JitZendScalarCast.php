@@ -17,7 +17,7 @@ use PHPLLVM\LLVMAbstract\Type as LlvmType;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for Zend scalar (int)/(float)/(bool) casts (#5714, #5791, #32444, #32452, #32455, zend_operators.c).
+ * JIT lowering for Zend scalar (int)/(float)/(bool) casts (#5714, #5791, #32444, #32452, #32455, #32463, zend_operators.c).
  *
  * Zend php-src: (int)/(float) on enum cases warn and yield legacy 1 / 1.0 (#5714, #7120).
  * intval/floatval JIT must use the same legacy paths (not backing extract).
@@ -187,6 +187,10 @@ final class JitZendScalarCast
                 return self::arrayToBool($context, $arg);
             case JITVariable::TYPE_VALUE:
                 return self::valueBoxToBool($context, $arg);
+            case JITVariable::TYPE_OBJECT:
+                // zend_std_cast_object_to_type(_IS_BOOL) → 1; no E_WARNING (#32463 / #26409).
+                // php-src: Zend/zend_object_handlers.c — __toString is not consulted.
+                return $context->constantFromBool(true);
             default:
                 if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
                     return self::arrayToBool($context, $arg);

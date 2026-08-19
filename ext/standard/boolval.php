@@ -90,6 +90,9 @@ final class boolval extends Internal
                 $zero = $num->typeOf()->constInt(0, false);
 
                 return $context->builder->icmp(Builder::INT_NE, $num, $zero);
+            case JITVariable::TYPE_OBJECT:
+                // zend_is_true(IS_OBJECT) / zend_std_cast_object_to_type(_IS_BOOL) (#32463).
+                return $context->constantFromBool(true);
             default:
                 if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
                     $zero = $context->getTypeFromString('int64')->constInt(0, false);
