@@ -18,6 +18,10 @@ final class FilterIpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('function isValidInt', $source);
         $this->assertStringNotContainsString('preg_match(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\ext\\standard', $source);
+        $this->assertStringNotContainsString('explode(', $source, 'NestedJIT thin-AOT hazard (#32571)');
+        $this->assertStringNotContainsString('str_starts_with(', $source, 'NestedJIT thin-AOT hazard (#32571)');
+        $this->assertStringNotContainsString('str_contains(', $source, 'NestedJIT thin-AOT hazard (#32571)');
+        $this->assertDoesNotMatchRegularExpression('/private static int \$/', $source, 'mutable static spill (#32571)');
     }
 
     public function testStringFilterIpRoutesThroughFilterIpValidate(): void
@@ -88,5 +92,35 @@ final class FilterIpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('FilterIpValidate.php', $spine);
         $this->assertStringContainsString('FilterIpJitHelper.php', $spine);
         $this->assertStringContainsString('StringFilterIp.php', $spine);
+    }
+
+    /**
+     * Dynamic filter_var(..., FILTER_VALIDATE_IP) must not SIGSEGV under AOT (#32571).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testAotDynamicFilterValidateIpMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_filter_validate_ip_aot_dynamic.php';
+        $bin = sys_get_temp_dir().'/phpc_issue_32571_'.getmypid().'.bin';
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>/dev/null';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            $runOut = [];
+            exec(escapeshellarg($bin).' 2>/dev/null', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame("'127.0.0.1'\n'::1'\nfalse\n", implode("\n", $runOut)."\n");
+        } finally {
+            @unlink($bin);
+        }
     }
 }
