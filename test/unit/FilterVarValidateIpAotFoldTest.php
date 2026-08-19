@@ -14,7 +14,7 @@ final class FilterVarValidateIpAotFoldTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/JitFilter.php');
         $this->assertStringContainsString('compileTimeFlagsInt', $source);
         $this->assertMatchesRegularExpression(
-            '/validateIp[\s\S]*?0 === \$flagsInt/',
+            '/validateIp[\s\S]*?null !== \$flagsInt/',
             $source
         );
     }
