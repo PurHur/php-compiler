@@ -147,8 +147,12 @@ class Native implements Call {
             $skipVariadicPackedTypeCheck = null !== $this->variadicArgIndex
                 && $index === $this->variadicArgIndex
                 && $this->variadicSlotUsesElementTypeChecks($index);
+            // By-ref formals must pass the caller's promoted value box unmodified;
+            // type coercion creates a copy, breaking write-back (#24162, Zend ZEND_SEND_REF).
+            $skipByRefTypeCheck = isset($this->paramByRefByArg[$index]);
             if (
-                !$skipVariadicPackedTypeCheck
+                !$skipByRefTypeCheck
+                && !$skipVariadicPackedTypeCheck
                 && isset($this->paramTypeConstraintsByArg[$index])
                 && !$this->skipImplicitNullableTypeCheck($index, $arg)
             ) {
