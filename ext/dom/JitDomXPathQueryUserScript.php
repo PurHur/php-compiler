@@ -31,6 +31,13 @@ final class JitDomXPathQueryUserScript
         return self::$lastQueryTag;
     }
 
+    /** Clear stale query state when a non-XPath DOMNodeList is accessed (#32620). */
+    public static function clearQueryState(): void
+    {
+        self::$lastCacheKey = null;
+        self::$lastQueryTag = null;
+    }
+
     public static function shouldUse(Context $context): bool
     {
         return JitDomLoadHTMLUserScript::shouldUse($context);
