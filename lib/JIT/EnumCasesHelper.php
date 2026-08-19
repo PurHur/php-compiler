@@ -50,7 +50,12 @@ final class EnumCasesHelper
 
         $restore = $context->builder->getInsertBlock();
         $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         $context->activeFunction = $lc;
+        // ParentFunction prefers loweringLlvmFunction over the insert block (#31101).
+        // finishEnumClass runs while the script function is still the owner, so the
+        // cases() body would otherwise leak into {main} (#31101 / #31967).
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
 
@@ -68,8 +73,18 @@ final class EnumCasesHelper
                 $caseVars[] = $object->jitEnumCaseFromBacking($classId, $caseKey);
             }
             $htVar = HashTableHelper::packVariables($context, $caseVars);
-            $slot = JitValueBox::alloc($context);
-            $ptr = JitValueBox::pointer($context, $slot);
+            // Heap __value__* — separate native function; stack alloca is use-after-return (#26855).
+            $valueType = $context->getTypeFromString('__value__');
+            $heapVal = $context->memory->malloc($valueType);
+            $map = $context->structFieldMap['__value__'];
+            $context->builder->store(
+                $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $context->builder->structGep($heapVal, $map['type'])
+            );
+            $ptr = $context->builder->pointerCast(
+                $heapVal,
+                $context->getTypeFromString('__value__*')
+            );
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
                 $ptr,
@@ -78,6 +93,7 @@ final class EnumCasesHelper
             $context->builder->returnValue($ptr);
         } finally {
             $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
             if (null !== $restore) {
                 $context->builder->positionAtEnd($restore);
             } else {
