@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  * Object vs string without {@code __toString} is object-greater (#32514);
  * {@code null} literals are TYPE_VALUE + isNullConstant, not TYPE_NULL.
  * Object vs string == / != uses the same spaceship (#32515 leftover of #32503).
+ * Object vs non-object === / !== is never identical ({@code zend_is_identical}, #32523).
  * VM SSOT: {@see \PHPCompiler\VM\CompareUnlikeHelper::zendUnlikeValueSpaceship}
  */
 final class JitUnlikeCompare
@@ -31,7 +32,8 @@ final class JitUnlikeCompare
     ): ?Variable {
         $ordered = self::isCompareOp($opType);
         $equal = self::isLooseEqualOp($opType);
-        if (!$ordered && !$equal) {
+        $identical = self::isIdenticalOp($opType);
+        if (!$ordered && !$equal && !$identical) {
             return null;
         }
         $leftObj = Variable::TYPE_OBJECT === $left->type;
@@ -70,6 +72,12 @@ final class JitUnlikeCompare
             || OpCode::TYPE_NOT_EQUAL === $opType;
     }
 
+    private static function isIdenticalOp(int $opType): bool
+    {
+        return OpCode::TYPE_IDENTICAL === $opType
+            || OpCode::TYPE_NOT_IDENTICAL === $opType;
+    }
+
     private static function isArrayOperand(Variable $var): bool
     {
         return Variable::TYPE_HASHTABLE === $var->type
@@ -86,6 +94,16 @@ final class JitUnlikeCompare
         $obj = $objectOnLeft ? $left : $right;
         $other = $objectOnLeft ? $right : $left;
         $otherType = $other->type;
+        if (self::isIdenticalOp($opType)) {
+            // zend_is_identical: unlike types are never identical. Do not reuse
+            // zend_compare — object == true is true, object === true is false.
+            // Boxed TYPE_VALUE may hold the same object (#3622 identicalValueBoxToObject).
+            if (Variable::TYPE_VALUE === $otherType && !$other->isNullConstant) {
+                return null;
+            }
+
+            return self::fromIdenticalConst($context, $opType, false);
+        }
         // php-cfg types `null` as a __value__ box (TYPE_VALUE 134) with isNullConstant,
         // not TYPE_NULL 0 — leftover of #32503 (#32514).
         if (Variable::TYPE_NULL === $otherType || $other->isNullConstant) {
@@ -271,6 +289,19 @@ final class JitUnlikeCompare
         $truth = $context->helper->loadValue($array->castTo(Variable::TYPE_NATIVE_BOOL));
 
         return $context->builder->zExt($truth, $context->getTypeFromString('int64'));
+    }
+
+    private static function fromIdenticalConst(Context $context, int $opType, bool $areIdentical): Variable
+    {
+        $bit = OpCode::TYPE_IDENTICAL === $opType ? $areIdentical : !$areIdentical;
+        $i1 = $context->getTypeFromString('int1');
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $i1->constInt($bit ? 1 : 0, false)
+        );
     }
 
     private static function fromSpaceshipConst(Context $context, int $opType, int $cmp): Variable
