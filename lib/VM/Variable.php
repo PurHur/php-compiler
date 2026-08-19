@@ -1951,6 +1951,9 @@ restart:
                     'Unsupported operand types: %s',
                     self::operandZendTypeName($expr)
                 ));
+            case self::TYPE_ARRAY:
+                // zend_operators.c mul_function — unary +/- is array * int (#32553).
+                throw new \TypeError('Unsupported operand types: array * int');
         }
         throw new \TypeError(sprintf(
             'Unsupported operand types: %s',

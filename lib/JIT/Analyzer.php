@@ -63,6 +63,9 @@ class Analyzer
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Empty_
                 || $usage instanceof Op\Expr\BitwiseNot
+                // Unary +/- on packed arrays must not abort Analyzer (#32553 leftover of #32475).
+                || $usage instanceof Op\Expr\UnaryPlus
+                || $usage instanceof Op\Expr\UnaryMinus
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\Include_
                 || $usage instanceof Op\Terminal\Return_
@@ -143,6 +146,8 @@ class Analyzer
                 || $usage instanceof Op\Expr\Empty_
                 || $usage instanceof Op\Expr\BooleanNot
                 || $usage instanceof Op\Expr\BitwiseNot
+                || $usage instanceof Op\Expr\UnaryPlus
+                || $usage instanceof Op\Expr\UnaryMinus
                 || $usage instanceof Op\Stmt\JumpIf
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\New_
