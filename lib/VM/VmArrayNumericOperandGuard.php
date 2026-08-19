@@ -84,7 +84,12 @@ final class VmArrayNumericOperandGuard
             return true;
         }
         if (Variable::TYPE_VALUE === $var->type && JitValueBox::isValueOperand($var)) {
-            self::emitBoxedArrayUnaryTypeError($context, $var);
+            self::emitBoxedArrayTypeError(
+                $context,
+                $var,
+                'Unsupported operand types: array * int',
+                'arr_unary_vbox'
+            );
         }
 
         return false;
@@ -93,9 +98,13 @@ final class VmArrayNumericOperandGuard
     /**
      * Runtime: value-box IS_ARRAY / TYPE_HASHTABLE → TypeError; otherwise continue.
      */
-    private static function emitBoxedArrayUnaryTypeError(Context $context, Variable $var): void
-    {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'arr_unary_vbox_cont');
+    private static function emitBoxedArrayTypeError(
+        Context $context,
+        Variable $var,
+        string $message,
+        string $tag
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, $tag.'_cont');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -114,14 +123,11 @@ final class VmArrayNumericOperandGuard
             $i8->constInt(VmVariable::TYPE_ARRAY, false)
         );
         $isArray = $context->builder->or($isHt, $isArr);
-        $rejectBlock = BasicBlockHelper::append($context, 'arr_unary_vbox_reject');
-        $continueBlock = BasicBlockHelper::append($context, 'arr_unary_vbox_ok');
+        $rejectBlock = BasicBlockHelper::append($context, $tag.'_reject');
+        $continueBlock = BasicBlockHelper::append($context, $tag.'_ok');
         $context->builder->branchIf($isArray, $rejectBlock, $continueBlock);
         $context->builder->positionAtEnd($rejectBlock);
-        ExceptionBridge::emitTypeErrorAndAbort(
-            $context,
-            'Unsupported operand types: array * int'
-        );
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
         $context->builder->positionAtEnd($continueBlock);
     }
 
@@ -141,6 +147,29 @@ final class VmArrayNumericOperandGuard
         ExceptionBridge::emitTypeErrorAndAbort($context, 'Cannot perform bitwise not on array');
 
         return true;
+    }
+
+    /**
+     * Unary {@code ++}/-- on an array — zend_type_error, not compiler abort (#32554 leftover of #32486).
+     *
+     * php-src: Zend/zend_operators.c increment_function / decrement_function —
+     * {@code Cannot increment array} / {@code Cannot decrement array}.
+     *
+     * @return bool true when TypeError+abort was emitted
+     */
+    public static function guardIncDec(Context $context, Variable $var, bool $increment): bool
+    {
+        $message = $increment ? 'Cannot increment array' : 'Cannot decrement array';
+        if (self::isArrayOperand($var)) {
+            ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+
+            return true;
+        }
+        if (Variable::TYPE_VALUE === $var->type && JitValueBox::isValueOperand($var)) {
+            self::emitBoxedArrayTypeError($context, $var, $message, 'arr_incdec_vbox');
+        }
+
+        return false;
     }
 
     private static function isGuardedArithmeticOp(int $opCode): bool

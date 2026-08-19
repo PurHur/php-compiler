@@ -40,4 +40,12 @@ final class JitArrayNumericOperandGuard
     {
         return VmArrayNumericOperandGuard::guardUnaryBitwiseNot($context, $var);
     }
+
+    /**
+     * @return bool true when TypeError+abort was emitted
+     */
+    public static function guardIncDec(Context $context, Variable $var, bool $increment): bool
+    {
+        return VmArrayNumericOperandGuard::guardIncDec($context, $var, $increment);
+    }
 }

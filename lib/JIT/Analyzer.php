@@ -67,6 +67,10 @@ class Analyzer
                 // Unary +/- on packed arrays must not abort Analyzer (#32553 leftover of #32475).
                 || $usage instanceof Op\Expr\UnaryPlus
                 || $usage instanceof Op\Expr\UnaryMinus
+                || $usage instanceof Op\Expr\PreInc
+                || $usage instanceof Op\Expr\PostInc
+                || $usage instanceof Op\Expr\PreDec
+                || $usage instanceof Op\Expr\PostDec
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\Include_
                 || $usage instanceof Op\Terminal\Return_
@@ -152,6 +156,10 @@ class Analyzer
                 || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Expr\UnaryPlus
                 || $usage instanceof Op\Expr\UnaryMinus
+                || $usage instanceof Op\Expr\PreInc
+                || $usage instanceof Op\Expr\PostInc
+                || $usage instanceof Op\Expr\PreDec
+                || $usage instanceof Op\Expr\PostDec
                 || $usage instanceof Op\Stmt\JumpIf
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\New_
@@ -272,6 +280,10 @@ class Analyzer
                 || $op instanceof Op\Expr\Param
                 || $op instanceof Op\Expr\ConstFetch
                 || $op instanceof Op\Expr\AssignRef
+                || $op instanceof Op\Expr\PreInc
+                || $op instanceof Op\Expr\PostInc
+                || $op instanceof Op\Expr\PreDec
+                || $op instanceof Op\Expr\PostDec
                 || $op instanceof FirstClassCallable
                 || $op instanceof Op\Terminal\Const_
                 || $op instanceof Op\Iterator\Reset
