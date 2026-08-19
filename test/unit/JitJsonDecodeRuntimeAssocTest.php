@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * #24137: nested json_decode(..., true) must compile; assoc true from ConstFetch Load.
  *
- * Runtime AOT: literal JSON variable path green; json_encode→decode roundtrip blocked (#24137).
+ * Runtime AOT: literal JSON variable path green; json_encode→decode roundtrip (#24137).
  */
 final class JitJsonDecodeRuntimeAssocTest extends TestCase
 {
@@ -36,7 +36,7 @@ final class JitJsonDecodeRuntimeAssocTest extends TestCase
         $this->assertFileDoesNotExist($out.'.fail');
     }
 
-    public function testRuntimeAssocReproCompilesUnderAot(): void
+    public function testRuntimeAssocReproNoSegfaultUnderAot(): void
     {
         $root = dirname(__DIR__, 2);
         $source = $root.'/test/repro/issue_24137_json_decode_runtime_assoc.php';
@@ -45,9 +45,14 @@ final class JitJsonDecodeRuntimeAssocTest extends TestCase
         $this->runCommand(
             [PHP_BINARY, $root.'/bin/compile.php', '-o', $out, $source],
             $root,
-            expectExit: 0
+            expectExit: 0,
+            env: ['PHP_COMPILER_HELPER_RUNTIME_O' => '1']
         );
         $this->assertFileExists($out);
+        // Master SIGSEGV here; top-level $r['a'] must run under default helper cache (#24137).
+        $runOut = $this->runCommand([$out], $root, expectExit: 0);
+        $this->assertStringContainsString('{"a":1,"b":[2,3]}', $runOut);
+        $this->assertStringContainsString(' 1 ', $runOut);
     }
 
     public function testRuntimeLiteralJsonVariablePassesUnderAot(): void
@@ -68,10 +73,12 @@ final class JitJsonDecodeRuntimeAssocTest extends TestCase
 
     /**
      * @param list<string> $cmd
+     * @param array<string, string> $env
      */
-    private function runCommand(array $cmd, string $cwd, int $expectExit = 0): string
+    private function runCommand(array $cmd, string $cwd, int $expectExit = 0, array $env = []): string
     {
-        $proc = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd);
+        $procEnv = array_merge($_ENV, $env);
+        $proc = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd, $procEnv);
         $this->assertIsResource($proc);
         fclose($pipes[0]);
         $stdout = stream_get_contents($pipes[1]);

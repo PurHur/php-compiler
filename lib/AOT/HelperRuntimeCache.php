@@ -116,6 +116,14 @@ final class HelperRuntimeCache
         // and SIGSEGVd after c:main_before_php. Force NestedJIT of the self-contained
         // helper into the user AOT module.
         'phpcompiler\\ext\\standard\\strtrarrayjithelper::strtrarray' => true,
+        // #24137 — prelinked JsonDecodeJitHelper unit.o + heap __string__* bridge UAF;
+        // NestedJIT decodeInto into user AOT matches VM (peer #27019 StrWordCount).
+        'phpcompiler\\ext\\standard\\jsondecodejithelper::decodeinto' => true,
+        'phpcompiler\\ext\\standard\\jsondecodejithelper::decodeint' => true,
+        'phpcompiler\\ext\\standard\\jsondecodejithelper::decodebool' => true,
+        'phpcompiler\\ext\\standard\\jsondecodejithelper::decodefloat' => true,
+        'phpcompiler\\ext\\standard\\jsondecodejithelper::decodestring' => true,
+        'phpcompiler\\ext\\standard\\jsondecodejithelper::resulttag' => true,
         // #27019 — helper-runtime StrWordCountJitHelper unit.o returns 0 under thin AOT
         // (default cache hit); NestedJIT of countArgv/wordsArgv matches VM/JIT.
         'phpcompiler\\ext\\standard\\strwordcountjithelper::countargv' => true,
