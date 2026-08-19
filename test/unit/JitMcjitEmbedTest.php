@@ -424,6 +424,30 @@ PHP;
         $this->assertSame('        $this->x = $v;', $lines[7] ?? '');
     }
 
+    /** @covers issue #32583 — declare(strict_types=1) must stay first after bootstrap inject */
+    public function testPreservesLeadingDeclareStrictTypesBeforeBootstrap(): void
+    {
+        $in = "<?php\ndeclare(strict_types=1);\necho 1;\n";
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertMatchesRegularExpression(
+            '/^<\?php\s*declare\(strict_types=1\)\s*;\s*class __phpc_mcjit_embed_bootstrap/s',
+            $out
+        );
+    }
+
+    /** @covers issue #32583 — multiple leading declares preserved */
+    public function testPreservesMultipleLeadingDeclaresBeforeBootstrap(): void
+    {
+        $in = "<?php\ndeclare(strict_types=1);\ndeclare(encoding='UTF-8');\necho 1;\n";
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertMatchesRegularExpression(
+            '/declare\(strict_types=1\).*declare\(encoding=.*\).*class __phpc_mcjit_embed_bootstrap/s',
+            $out
+        );
+    }
+
     /** @covers issue #29665 — parenthesized asymmetric set form */
     public function testDoesNotPadClassWithParenthesizedPrivateSetProperty(): void
     {
