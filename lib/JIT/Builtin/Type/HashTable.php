@@ -276,6 +276,13 @@ class HashTable extends Type
             $typeinfo,
             $ref
         );
+        // __ref__init stores refcount 0; the allocator is the first owner (#32538).
+        // Without this, writeHashtable addref + delref of the INIT_ARRAY temp
+        // drops to 0 and frees the table before `$m['c']=3` / <=> run.
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__addref'),
+            $ref
+        );
         $this->context->builder->call(
             $this->context->lookupFunction('__hashtable__grow'),
             $ht,
