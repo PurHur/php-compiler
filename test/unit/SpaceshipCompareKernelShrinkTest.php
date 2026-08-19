@@ -29,6 +29,8 @@ final class SpaceshipCompareKernelShrinkTest extends TestCase
         $this->assertStringContainsString('__value__spaceship', $source);
         $this->assertStringContainsString('__object__compareSpaceship', $source);
         $this->assertStringContainsString('__hashtable__compareSpaceship', $source);
+        $this->assertStringContainsString('0 === $htFn->countBasicBlocks()', $source);
+        $this->assertStringContainsString('emitHashtableCompareSpaceship', $source);
     }
 
     public function testSpineBundleIncludesKernelNotBuiltinJit(): void

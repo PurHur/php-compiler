@@ -2474,13 +2474,18 @@ return_bool:
         }
         if (!ArrayBuiltinHelper::isNativeArray($leftType) && !ArrayBuiltinHelper::isNativeArray($rightType)) {
             // Hashtable⊙hashtable literals: zend_compare_arrays via compileTimeAssoc (#32524).
-            // Runtime tables still abort rather than call __hashtable__compareSpaceship
-            // (thin AOT SIGSEGV / miscompare, leftover of #32501).
+            // Runtime tables call __hashtable__compareSpaceship (kernel body is emitted even
+            // when __value__spaceship is already linked — #32536 leftover of #32501).
             $folded = self::foldCompileTimeAssocCompare($left, $right);
-            if (null === $folded) {
-                return null;
+            if (null !== $folded) {
+                $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
+            } else {
+                $cmp = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+                    $this->context,
+                    HashTableHelper::loadHashtablePointer($this->context, $left),
+                    HashTableHelper::loadHashtablePointer($this->context, $right)
+                );
             }
-            $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
             if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                 return $this->nativeLongResultVariable($cmp);
             }

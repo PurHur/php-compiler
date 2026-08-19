@@ -809,8 +809,8 @@ final class VmValueCompare
      * zend_compare_arrays / zend_hash_compare for packed native arrays and hashtables (#32501).
      *
      * php-src: Zend/zend_operators.c zend_compare_arrays; leftover of #5295 / #23988.
-     * Packed native arrays compare element-wise (same key bag 0..n-1) — do not
-     * materialize through __hashtable__compareSpaceship (thin AOT SIGSEGV).
+     * Packed native arrays compare element-wise (same key bag 0..n-1). Assoc
+     * hashtables use __hashtable__compareSpaceship (kernel body always emitted, #32536).
      */
     public static function spaceshipArrayPair(Context $context, Variable $left, Variable $right): Value
     {
@@ -916,13 +916,7 @@ final class VmValueCompare
      */
     public static function looseEqualHashtablePair(Context $context, Value $leftHt, Value $rightHt): Value
     {
-        SpaceshipRuntime::ensureLinked($context);
-        $fn = $context->lookupFunction('__hashtable__compareSpaceship');
-        $cmp = $context->builder->call(
-            $fn,
-            $context->builder->pointerCast($leftHt, $fn->getParam(0)->typeOf()),
-            $context->builder->pointerCast($rightHt, $fn->getParam(1)->typeOf())
-        );
+        $cmp = SpaceshipRuntime::callHashtableCompareSpaceship($context, $leftHt, $rightHt);
         $zero = $cmp->typeOf()->constInt(0, false);
 
         return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
