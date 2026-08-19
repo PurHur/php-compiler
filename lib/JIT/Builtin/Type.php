@@ -1217,6 +1217,16 @@ class Type extends Builtin {
             $fntypeJsonEncodeArray
         );
         $this->context->registerFunction('__compiler_json_encode_array', $fnJsonEncodeArray);
+        $fntypeJsonQuoteString = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $strPtr
+        );
+        $fnJsonQuoteString = $this->context->module->addFunction(
+            '__compiler_json_quote_string',
+            $fntypeJsonQuoteString
+        );
+        $this->context->registerFunction('__compiler_json_quote_string', $fnJsonQuoteString);
         // Returns __value__* (Unserialize #20785 / #20829) — not void+out-pointer.
         $fnJsonDecode = $this->context->module->addFunction(
             '__compiler_json_decode',

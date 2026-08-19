@@ -50,6 +50,7 @@ final class StringJsonEncode
     private const ABI_FUNCTIONS = [
         '__compiler_json_encode_value',
         '__compiler_json_encode_array',
+        JsonEncodeQuoteStringRuntime::ABI,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -92,14 +93,17 @@ final class StringJsonEncode
 
         $valueProbe = $context->module->getNamedFunction('__compiler_json_encode_value');
         $htProbe = $context->module->getNamedFunction('__compiler_json_encode_array');
+        $quoteProbe = $context->module->getNamedFunction(JsonEncodeQuoteStringRuntime::ABI);
         if (JitVmHelperLink::hasNamedBridgeEntry($valueProbe, self::VALUE_BRIDGE_ENTRY)
-            && JitVmHelperLink::hasNamedBridgeEntry($htProbe, self::HT_BRIDGE_ENTRY)) {
+            && JitVmHelperLink::hasNamedBridgeEntry($htProbe, self::HT_BRIDGE_ENTRY)
+            && null !== $quoteProbe && $quoteProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
         if (null !== $valueProbe && $valueProbe->countBasicBlocks() > 0
-            && null !== $htProbe && $htProbe->countBasicBlocks() > 0) {
+            && null !== $htProbe && $htProbe->countBasicBlocks() > 0
+            && null !== $quoteProbe && $quoteProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -109,6 +113,7 @@ final class StringJsonEncode
         $valuePtr = $context->getTypeFromString('__value__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
+        JsonEncodeQuoteStringRuntime::ensureLinked($context);
         self::implementJsonEncodeValueBridge($context);
         JitVmHelperLink::ensureBridge(
             $context,
@@ -154,6 +159,7 @@ final class StringJsonEncode
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::VALUE_BRIDGE_ENTRY);
         $floatBb = $fn->appendBasicBlock('json_enc_val_float');
+        $stringBb = $fn->appendBasicBlock('json_enc_val_string');
         $helperBb = $fn->appendBasicBlock('json_enc_val_helper');
 
         $context->builder->positionAtEnd($entry);
@@ -174,7 +180,16 @@ final class StringJsonEncode
             $i8->constInt(JitVariable::TYPE_NATIVE_DOUBLE, false)
         );
         $isFloat = $context->builder->or($isVmFloat, $isJitDouble);
-        $context->builder->branchIf($isFloat, $floatBb, $helperBb);
+        $notFloatBb = $fn->appendBasicBlock('json_enc_val_not_float');
+        $context->builder->branchIf($isFloat, $floatBb, $notFloatBb);
+
+        $context->builder->positionAtEnd($notFloatBb);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(VmVariable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBb, $helperBb);
 
         $context->builder->positionAtEnd($floatBb);
         try {
@@ -202,6 +217,11 @@ final class StringJsonEncode
         } finally {
             $context->loweringLlvmFunction = $savedLowering;
         }
+
+        $context->builder->positionAtEnd($stringBb);
+        $rawStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
+        $ownedStr = $context->builder->call($context->lookupFunction('__string__separate'), $rawStr);
+        $context->builder->returnValue(JsonEncodeQuoteStringRuntime::quote($context, $ownedStr));
 
         $context->builder->positionAtEnd($helperBb);
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::ENCODE_VALUE_HELPER, '#20816');

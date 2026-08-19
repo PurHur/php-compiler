@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\JsonEncodeQuoteStringRuntime;
 use PHPCompiler\JIT\Builtin\StringJsonEncode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -55,6 +57,24 @@ final class JitJsonEncode
             return self::stringOrFalse(
                 $context,
                 self::encodeBoxedValue($context, JitValueBox::valuePtrFromVariable($context, $arg), $flags)
+            );
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            $strPtr = JITVariable::KIND_VALUE === $arg->kind && null !== $arg->value
+                ? $arg->value
+                : JitStringArg::lowerDominating($context, $arg, 'json_encode string');
+            $strTy = $context->getStringFromType($strPtr->typeOf());
+            if (JitStringArg::isStringPtrPtrType($strTy)) {
+                $strPtr = $context->builder->load($strPtr);
+            }
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $strPtr
+            );
+
+            return self::stringOrFalse(
+                $context,
+                JsonEncodeQuoteStringRuntime::quote($context, $owned)
             );
         }
 
