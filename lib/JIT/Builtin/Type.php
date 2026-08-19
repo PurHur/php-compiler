@@ -717,18 +717,12 @@ class Type extends Builtin {
         );
         $fnOpensslPbkdf2 = $this->context->module->addFunction('__compiler_openssl_pbkdf2', $fntypeOpensslPbkdf2);
         $this->context->registerFunction('__compiler_openssl_pbkdf2', $fnOpensslPbkdf2);
-        // openssl_get_cipher_methods / openssl_get_md_methods — OpensslMethodsJitHelper (#21103 / #30148)
-        $fntypeOpensslMethods = $this->context->context->functionType($htPtr, false, $i64);
-        $fnOpensslCipherMethods = $this->context->module->addFunction(
-            '__compiler_openssl_get_cipher_methods',
-            $fntypeOpensslMethods
-        );
-        $this->context->registerFunction('__compiler_openssl_get_cipher_methods', $fnOpensslCipherMethods);
-        $fnOpensslMdMethods = $this->context->module->addFunction(
-            '__compiler_openssl_get_md_methods',
-            $fntypeOpensslMethods
-        );
-        $this->context->registerFunction('__compiler_openssl_get_md_methods', $fnOpensslMdMethods);
+        // __compiler_openssl_get_cipher_methods / __compiler_openssl_get_md_methods always-on
+        // shells removed (#32451): user-script openssl_get_*_methods() stays
+        // JitOpensslMethods / OpensslMethodsJitHelper / OpensslCipherRegistry.
+        // NestedJIT/AOT bridge is OpensslMethodsRuntime (getNamedFunction first +
+        // JitVmHelperLink::ensureBridge). Leftover Type addFunction vs Runtime ABI
+        // drift mints openssl_get_cipher_methods.1 (#31894 / #32122).
         $double = $this->context->getTypeFromString('double');
         $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
         $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);
