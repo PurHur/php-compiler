@@ -487,6 +487,8 @@ final class BuiltinInternalArgInfo
             'get_parent_class' => 'string|false',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return string (missing |false) (#28004)
             'phpversion' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return int; Zend int|bool (#27903)
+            'version_compare' => 'int|bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#27906)
             'php_sapi_name' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|float (#27906)
@@ -770,6 +772,8 @@ final class BuiltinInternalArgInfo
             'password_hash' => 2 === $index ? true : null,
             // ext/standard/string.stub.php — ?string $to = null (InternalArgInfo required string) (#23588)
             'strtr' => 2 === $index ? true : null,
+            // ext/standard/basic_functions.stub.php — ?string $operator = null (InternalArgInfo required) (#27903)
+            'version_compare' => 2 === $index ? true : null,
             default => null,
         };
     }
@@ -893,6 +897,8 @@ final class BuiltinInternalArgInfo
             'ini_get_all' => 0 === $index ? '?string' : null,
             // Zend/zend_builtin_functions.stub.php — ?string $extension = null (InternalArgInfo string) (#28004)
             'phpversion' => 0 === $index ? '?string' : null,
+            // ext/standard/basic_functions.stub.php — ?string $operator = null (InternalArgInfo string) (#27903)
+            'version_compare' => 2 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ini_alter absent; value union (#26465, #26187)
             'ini_set', 'ini_alter' => match ($index) {
                 0 => 'string',
