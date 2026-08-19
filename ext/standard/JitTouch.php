@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\FsDirRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -14,12 +15,13 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for touch() via __compiler_touch (libc utime). */
+/** LLVM lowering for touch() via __compiler_touch (php-in-PHP FsDirRuntime; #32510). */
 final class JitTouch
 {
     /** @return Value */
     public static function invoke(Context $context, Value $pathStr, Value $mtimeLong, Value $atimeLong): Value
     {
+        FsDirRuntime::ensureLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_touch'),

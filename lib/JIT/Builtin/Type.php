@@ -555,15 +555,10 @@ class Type extends Builtin {
         // JitUploadTempKernel (getNamedFunction first + JitVmHelperLink::ensureCompiled).
         // Leftover Type addFunction vs kernel ABI drift mints move_uploaded_file.1
         // (#31894 / #32122).
-        $fntypeTouch = $this->context->context->functionType(
-            $i32,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $i64,
-            $i64
-        );
-        $fnTouch = $this->context->module->addFunction('__compiler_touch', $fntypeTouch);
-        $this->context->registerFunction('__compiler_touch', $fnTouch);
+        // __compiler_touch always-on shell removed (#32510): user-script touch() stays
+        // JitTouch / VmFs. NestedJIT/AOT bridge is FsDirRuntime
+        // (getNamedFunction first; body TouchLibcRuntime utime). Leftover Type
+        // addFunction vs Runtime ABI drift mints touch.1 (#31894 / #32122).
         $void = $this->context->getTypeFromString('void');
         $fntypeRandomBytes = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),

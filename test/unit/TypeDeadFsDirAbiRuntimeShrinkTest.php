@@ -44,7 +44,7 @@ final class TypeDeadFsDirAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_touch'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_http_build_query'", $type);
         $this->assertStringContainsString('FtokRuntime::ensureLinked', $type);
     }
 
