@@ -837,6 +837,9 @@ final class BuiltinInternalArgInfo
                 2, 3 => '?string',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — mixed ...$values variadic type (#28177)
+            'sprintf', 'printf' => 1 === $index ? 'mixed' : null,
+            'fprintf' => 2 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — show_source(string $filename, bool $return=false) (#28756)
             'show_source' => match ($index) {
                 0 => 'string',
