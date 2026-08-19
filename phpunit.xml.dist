@@ -885,6 +885,8 @@
             <file>./test/compliance/DomCharacterDataExcessArgc31091JITTest.php</file>
             <file>./test/compliance/DomResidualExcessArgc31251VMTest.php</file>
             <file>./test/compliance/DomResidualExcessArgc31251JITTest.php</file>
+            <file>./test/compliance/DomChildNodeAfterAotSegfaultVMTest.php</file>
+            <file>./test/compliance/DomChildNodeAfterAotSegfaultJITTest.php</file>
             <file>./test/compliance/XsltHasExsltSupportExcessArgc30993VMTest.php</file>
             <file>./test/compliance/XsltHasExsltSupportExcessArgc30993JITTest.php</file>
             <file>./test/compliance/MiscExcessArgc30575VMTest.php</file>
