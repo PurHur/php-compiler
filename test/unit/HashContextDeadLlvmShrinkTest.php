@@ -39,6 +39,9 @@ final class HashContextDeadLlvmShrinkTest extends TestCase
         $this->assertStringContainsString('function finalLowering(', $source);
         $this->assertStringContainsString("'hash_update_file' => self::updateFile(", $source);
         $this->assertStringContainsString('function updateFile(', $source);
+        $this->assertStringContainsString("'hash_update_stream' => self::updateStream(", $source);
+        $this->assertStringContainsString('function updateStream(', $source);
+        $this->assertStringContainsString('implementStreamGetContentsForce', $source);
         $this->assertStringNotContainsString('HashContextCopyLlvm', $source);
         $this->assertStringNotContainsString('HashContextFinalLlvm', $source);
     }

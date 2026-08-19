@@ -11,16 +11,14 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /**
- * hash_update_stream() — incremental hash from stream resources (php-src ext/hash/hash.c; #6681).
+ * hash_update_stream() — incremental hash from stream resources (php-src ext/hash/hash.c; #6681, JIT/AOT #32483).
  */
 final class hash_update_stream extends HashFunction
 {
     public function execute(Frame $frame): void
     {
+        $this->requireArgCountRange($frame, 'hash_update_stream', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('hash_update_stream() requires two or three arguments in this compiler build');
-        }
         $ctx = VmHashContext::requireHashContext($frame->calledArgs[0], 'hash_update_stream', 1);
         $handle = VmStreamArg::requireStreamHandle(
             $frame->calledArgs[1]->resolveIndirect(),

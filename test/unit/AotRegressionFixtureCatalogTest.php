@@ -111,6 +111,8 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'method_prop_assign_32367.phpt',
         'coalesce_undef_echo_32445.phpt',
         'object_int_float_cast_32452.phpt',
+        'hash_update_stream.phpt',
+        'hash_update_stream_length.phpt',
     ];
 
     /**
