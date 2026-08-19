@@ -151,6 +151,7 @@ class Native implements Call {
                 !$skipVariadicPackedTypeCheck
                 && isset($this->paramTypeConstraintsByArg[$index])
                 && !$this->skipImplicitNullableTypeCheck($index, $arg)
+                && !isset($this->paramByRefByArg[$index])
             ) {
                 $constraint = $this->paramTypeConstraintsByArg[$index];
                 if ($context->callerStrictTypes) {
