@@ -16,6 +16,7 @@ use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -52,7 +53,7 @@ final class StringJsonDecode
 
     private const SET_LAST_ERROR_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::setLastError';
 
-    private const DECODE_BRIDGE_ENTRY = 'json_decode_bridge_entry';
+    private const DECODE_BRIDGE_ENTRY = 'json_decode_bridge_entry_v2';
 
     private const VALIDATE_BRIDGE_ENTRY = 'json_validate_bridge_entry';
 
@@ -136,6 +137,7 @@ final class StringJsonDecode
             return;
         }
         if (null !== $decodeProbe && $decodeProbe->countBasicBlocks() > 0
+            && JitVmHelperLink::hasNamedBridgeEntry($decodeProbe, self::DECODE_BRIDGE_ENTRY)
             && null !== $validateProbe && $validateProbe->countBasicBlocks() > 0
             && null !== $lastErrProbe && $lastErrProbe->countBasicBlocks() > 0
             && null !== $lastMsgProbe && $lastMsgProbe->countBasicBlocks() > 0
@@ -272,14 +274,10 @@ final class StringJsonDecode
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::DECODE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $payload = $fn->getParam(0);
-        // Own + pin: NestedJIT string-param addref/delref frees heap __string__* mid-call
-        // (length survives, content UAF). Constant strings already use disableRefcount (#24137).
-        // Combined with ARG_RECV skip of raw formal rebind in JIT.php (#24137).
-        $payloadOwned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $payload
-        );
-        $context->refcount->disableRefcount($payloadOwned);
+        // Copy heap __string__* into a fresh __string__ for NestedJIT PHP string params (#24137).
+        // disableRefcount on bridge-owned separate left strlen correct but payload empty under
+        // thin AOT (json_encode→decode roundtrip SIGSEGV / UAF).
+        $payloadOwned = self::nestedJitPayloadString($context, $payload);
         // Payload coerce is per-callee below: decodeInto may be `__string__*` while
         // decodeBool/Int/Float/String take by-value `__value__` (#24465).
 
@@ -469,6 +467,40 @@ final class StringJsonDecode
 
         $context->builder->returnValue($context->builder->pointerCast($phi, $valuePtr));
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Materialize {@see __string__*} for NestedJIT PHP `string` params (#24137).
+     *
+     * Peer {@see JIT::prepareNestedJitCalleeParamArgument} entry alloca + separate;
+     * then {@see __string__init} copies bytes so helper strlen/substr see content.
+     */
+    private static function nestedJitPayloadString(Context $context, Value $payload): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $separated = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $payload
+        );
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $context->builder->store($separated, $slot);
+        $loaded = $context->builder->load($slot);
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $loaded);
+        $src = $context->builder->pointerCast(
+            $context->builder->structGep($loaded, $map['value']),
+            $i8p
+        );
+        $copy = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $src
+        );
+        $context->refcount->disableRefcount($copy);
+
+        return $copy;
     }
 
     private static function registerLinkedRuntime(Context $context): void
