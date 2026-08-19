@@ -131,6 +131,8 @@ final class JitFtok
     private static function emitFtokFailedWarning(Context $context): void
     {
         self::ensureWarningLibc($context);
+        // __errno_location module-local after Module.php always-on drop (#32643).
+        \PHPCompiler\JIT\LibcExtern::ensureErrnoLocationDecl($context);
         StringTriggerError::ensureLinked($context);
 
         $i8 = $context->getTypeFromString('int8');
@@ -170,11 +172,9 @@ final class JitFtok
     {
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
-        $i32Ptr = $i32->pointerType(0);
         $sizeT = $context->getTypeFromString('size_t');
 
         foreach ([
-            ['__errno_location', $i32Ptr, []],
             ['strerror', $i8p, [$i32]],
             ['snprintf', $i32, [$i8p, $sizeT, $i8p]],
         ] as [$name, $ret, $params]) {

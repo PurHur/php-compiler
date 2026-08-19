@@ -36,6 +36,7 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
             'strlen', // #32068 — leftover Module always-on already dropped
             'substr_compare', // #32402 — leftover Module always-on after StringSubstrCompare PHP
             'phpc_basetozval_result', // #32420 — leftover Module always-on after MathBaseConvertRuntime PHP
+            '__errno_location', // #32643 — LibcExtern::ensureErrnoLocationDecl after Module drop
         ];
     }
 
@@ -43,7 +44,6 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
     private function keptDecls(): array
     {
         return [
-            '__errno_location',
         ];
     }
 
@@ -59,11 +59,12 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#32382', $source);
         $this->assertStringContainsString('#32402', $source);
         $this->assertStringContainsString('#32420', $source);
+        $this->assertStringContainsString('#32643', $source);
         foreach ($this->deletedDecls() as $sym) {
             $this->assertStringNotContainsString(
                 "lookupFunction('{$sym}')",
                 $source,
-                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32068/#32382/#32402/#32420)"
+                "Module.php must not always-declare libc {$sym} (#30530/#31374/#31403/#31458/#31498/#32068/#32382/#32402/#32420/#32643)"
             );
             $this->assertStringNotContainsString(
                 "addFunction('{$sym}'",
@@ -76,6 +77,8 @@ final class ModuleAlwaysOnFsDeclsRuntimeShrinkTest extends TestCase
     public function testModuleKeepsLiveAlwaysOnFsDecls(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringContainsString('#32643', $source);
+        $this->assertSame([], $this->keptDecls(), 'Module.php must not always-declare any libc symbol (#32643)');
         foreach ($this->keptDecls() as $sym) {
             $this->assertStringContainsString(
                 "lookupFunction('{$sym}')",

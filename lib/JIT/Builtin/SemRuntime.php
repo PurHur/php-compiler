@@ -352,17 +352,9 @@ final class SemRuntime
         );
 
         $context->builder->positionAtEnd($check);
-        // errno via __errno_location if available; otherwise treat any failure as terminal
-        $errnoFn = $context->module->getNamedFunction('__errno_location');
-        if (null === $errnoFn) {
-            $errnoFn = $context->module->addFunction(
-                '__errno_location',
-                $context->context->functionType($i32->pointerType(0), false)
-            );
-            $context->registerFunction('__errno_location', $errnoFn);
-        } else {
-            $context->registerFunction('__errno_location', $errnoFn);
-        }
+        // errno via __errno_location if available; otherwise treat any failure as terminal (#32643).
+        LibcExtern::ensureErrnoLocationDecl($context);
+        $errnoFn = $context->lookupFunction('__errno_location');
         $errno = $context->builder->load($context->builder->call($errnoFn));
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $errno, $i32->constInt(self::EINTR, false)),
