@@ -813,7 +813,7 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg + required 4-arg (#25067)
             case 'number_format':
                 return ['num', 'decimals=', 'decimal_separator=', 'thousands_separator='];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says number (#23259, #27795)
+            // php-src ext/standard/math.stub.php — InternalArgInfo still says number (#23259, #27795, #23506)
             case 'abs':
             case 'floor':
             case 'ceil':
@@ -824,7 +824,21 @@ final class BuiltinParamNames
             case 'asinh':
             case 'acosh':
             case 'atanh':
+            case 'sin':
+            case 'cos':
+            case 'tan':
+            case 'asin':
+            case 'acos':
+            case 'atan':
+            case 'sinh':
+            case 'cosh':
+            case 'tanh':
+            case 'exp':
+            case 'log10':
                 return ['num'];
+            // php-src ext/standard/math.stub.php — InternalArgInfo still number/base= (#23506)
+            case 'log':
+                return ['num', 'base='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still base/number/x (#23306)
             case 'pow':
                 return ['num', 'exponent'];
