@@ -160,6 +160,9 @@ final class StringJsonEncode
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::VALUE_BRIDGE_ENTRY);
         $floatBb = $fn->appendBasicBlock('json_enc_val_float');
         $stringBb = $fn->appendBasicBlock('json_enc_val_string');
+        $boolCheckBb = $fn->appendBasicBlock('json_enc_val_bool_check');
+        $boolTrueBb = $fn->appendBasicBlock('json_enc_val_bool_true');
+        $boolFalseBb = $fn->appendBasicBlock('json_enc_val_bool_false');
         $helperBb = $fn->appendBasicBlock('json_enc_val_helper');
 
         $context->builder->positionAtEnd($entry);
@@ -189,7 +192,35 @@ final class StringJsonEncode
             $typeKind,
             $i8->constInt(VmVariable::TYPE_STRING, false)
         );
-        $context->builder->branchIf($isString, $stringBb, $helperBb);
+        $notStringBb = $fn->appendBasicBlock('json_enc_val_not_string');
+        $context->builder->branchIf($isString, $stringBb, $notStringBb);
+
+        $context->builder->positionAtEnd($notStringBb);
+        // JIT TYPE_NATIVE_BOOL=2 collides with VM TYPE_FLOAT; __value__writeBool uses JIT tags (#26367).
+        $isJitBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(JitVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $isVmBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+        );
+        $isBool = $context->builder->or($isJitBool, $isVmBool);
+        $context->builder->branchIf($isBool, $boolCheckBb, $helperBb);
+
+        $context->builder->positionAtEnd($boolCheckBb);
+        $boolLong = $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr);
+        $zero = $i64->constInt(0, false);
+        $isTrue = $context->builder->icmp(Builder::INT_NE, $boolLong, $zero);
+        $context->builder->branchIf($isTrue, $boolTrueBb, $boolFalseBb);
+
+        $context->builder->positionAtEnd($boolTrueBb);
+        $context->builder->returnValue($context->builder->load($context->constantStringFromString('true')));
+
+        $context->builder->positionAtEnd($boolFalseBb);
+        $context->builder->returnValue($context->builder->load($context->constantStringFromString('false')));
 
         $context->builder->positionAtEnd($floatBb);
         try {

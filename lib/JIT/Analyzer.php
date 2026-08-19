@@ -50,16 +50,19 @@ class Analyzer
                 if ($this->canEscape($usage->var, $seen) || $this->canEscape($usage->result, $seen)) {
                     return true;
                 }
+            } elseif ($usage instanceof Op\Expr\FuncCall
+                || $usage instanceof Op\Expr\NsFuncCall
+                || $usage instanceof Op\Expr\StaticCall
+                || $usage instanceof Op\Expr\MethodCall) {
+                // Call operands must be refcounted hashtables / value boxes — native packed
+                // literals cannot survive ARG_SEND (string keys lost, #26367 AOT).
+                return true;
             } elseif ($usage instanceof Op\Expr\BinaryOp
                 || $usage instanceof Op\Expr\ArrayDimFetch
                 || $usage instanceof Op\Phi
-                || $usage instanceof Op\Expr\FuncCall
-                || $usage instanceof Op\Expr\NsFuncCall
-                || $usage instanceof Op\Expr\StaticCall
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\New_
-                || $usage instanceof Op\Expr\MethodCall
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Empty_
                 || $usage instanceof Op\Expr\Isset_ // leftover of #32475 / #32556

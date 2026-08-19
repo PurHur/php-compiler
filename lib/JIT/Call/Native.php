@@ -487,7 +487,12 @@ class Native implements Call {
                 break;
             case '__hashtable__*':
                 if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
-                    return HashTableHelper::materializeNativeArrayForCall($context, $arg);
+                    HashTableHelper::promoteNativeArrayVariableToHashtable($context, $arg);
+
+                    return $context->builder->call(
+                        $context->lookupFunction('__value__readHashtable'),
+                        \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
+                    );
                 }
                 switch ($arg->type) {
                     case Variable::TYPE_HASHTABLE:
@@ -518,6 +523,11 @@ class Native implements Call {
             case '__value__*':
                 if (null !== $arg->valueBoxAliasPtr) {
                     return \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($context, $arg->valueBoxAliasPtr);
+                }
+                if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+                    HashTableHelper::promoteNativeArrayVariableToHashtable($context, $arg);
+
+                    return \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg);
                 }
                 switch ($arg->type) {
                     case Variable::TYPE_VALUE:
