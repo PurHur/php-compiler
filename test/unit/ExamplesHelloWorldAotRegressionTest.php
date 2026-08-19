@@ -35,19 +35,21 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_AOT_USER_SCRIPT', $source);
     }
 
-    public function testStreamIoAlwaysNestedJitForUserScriptAot(): void
+    public function testStreamIoThinStandaloneUsesKernelEmbedUsesNestedJit(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/StreamIoRuntime.php');
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('isStandaloneInitPhase', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        // Thin user-script AOT: libc + handle-table kernel (#26929); embed: NestedJIT StreamIoJitHelper (#20943).
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('JitStreamIoKernel::implementForUserScriptLowering', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
-        $this->assertStringNotContainsString('JitStreamIoKernel', $source);
         $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/StreamIoJit.php');
         $this->assertStringContainsString('StreamIoRuntime::ensureLinked', $jit);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $jit);
+        $this->assertStringContainsString('JitStreamIoKernel::implementForUserScriptLowering', $jit);
         $this->assertStringNotContainsString('isStandaloneInitPhase', $jit);
-        $this->assertStringNotContainsString('JitStreamIoKernel', $jit);
         // User-script env SSOT (#20246) — not raw getenv in StreamIoRuntime after #20229 / #20553.
         $this->assertStringNotContainsString('PHP_COMPILER_AOT_USER_SCRIPT', $source);
         $env = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/UserScriptAotEnv.php');
