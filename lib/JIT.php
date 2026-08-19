@@ -17417,6 +17417,9 @@ class JIT {
                 return;
             }
             if (!$result->includeBinding) {
+                // copyBetweenPointers / foreach value fetch may branchToFreshContinue and
+                // seal the insert BB; delref here must not emit parentless IR (#26783 / #26784).
+                JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'assign_same_type_free_cont');
                 $result->free();
             }
             if ($value->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $value->type) {
