@@ -24330,6 +24330,16 @@ class JIT {
                 }
                 // Catch/branch reassignment: stale try-path '' on boxed locals (#32570).
                 $resolved = $this->resolveJitCompileTimeStringSlot($block, $slot);
+                if (null !== $resolved) {
+                    foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
+                        if ($scopeSlot === $slot
+                            && $this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)
+                        ) {
+                            $resolved = null;
+                            break;
+                        }
+                    }
+                }
                 $arg->compileTimeString = $resolved;
 
                 continue;
@@ -24459,23 +24469,44 @@ class JIT {
      * True when incoming CFG arms assign different compile-time strings to $name
      * (try $error="" vs catch $error="msg" — #32570).
      */
-    private function jitNamedLocalHasDivergentBranchCompileTimeStrings(Block $block, string $name): bool
-    {
-        if (\count($block->parents) <= 1) {
+    private function jitNamedLocalHasDivergentBranchCompileTimeStrings(
+        Block $block,
+        string $name,
+        array &$visited = []
+    ): bool {
+        $id = spl_object_id($block);
+        if (isset($visited[$id])) {
             return false;
         }
-        $agreed = null;
+        $visited[$id] = true;
+
+        if (\count($block->parents) > 1) {
+            $agreed = null;
+            foreach ($block->parents as $parent) {
+                if (!$parent instanceof Block) {
+                    return true;
+                }
+                $resolved = $this->jitEffectiveNamedLocalCompileTimeString($parent, $name);
+                if (null === $resolved) {
+                    continue;
+                }
+                if (null === $agreed) {
+                    $agreed = $resolved;
+                } elseif ($agreed !== $resolved) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // If/catch arms are single-parent blocks; divergence lives at an ancestor
+        // merge (try $error="" vs catch $error="msg") (#32570, ThrowsWeb #2076).
         foreach ($block->parents as $parent) {
             if (!$parent instanceof Block) {
-                return true;
-            }
-            $resolved = $this->jitEffectiveNamedLocalCompileTimeString($parent, $name);
-            if (null === $resolved) {
                 continue;
             }
-            if (null === $agreed) {
-                $agreed = $resolved;
-            } elseif ($agreed !== $resolved) {
+            if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($parent, $name, $visited)) {
                 return true;
             }
         }
@@ -24508,7 +24539,8 @@ class JIT {
                 if (!\in_array($prior->arg2, $this->jitNamedScopeSlotAliases($block, $slot), true)) {
                     continue;
                 }
-                $rhs = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, []);
+                $branchVisited = [];
+                $rhs = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $branchVisited);
                 if (null !== $rhs) {
                     return $rhs;
                 }
