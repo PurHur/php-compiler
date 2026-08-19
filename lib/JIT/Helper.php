@@ -2419,6 +2419,13 @@ return_bool:
         if (!\is_array($left->compileTimeAssoc) || !\is_array($right->compileTimeAssoc)) {
             return null;
         }
+        // INIT_ARRAY / assigned locals are KIND_VARIABLE alloca slots. Dim writes
+        // (`$m['c']=3`) do not refresh this snapshot, so folding would ignore
+        // mutations (#32538). Runtime __hashtable__compareSpaceship matches
+        // zend_hash_compare(..., ordered=0).
+        if (Variable::KIND_VARIABLE === $left->kind || Variable::KIND_VARIABLE === $right->kind) {
+            return null;
+        }
 
         return $left->compileTimeAssoc <=> $right->compileTimeAssoc;
     }
@@ -2540,7 +2547,7 @@ return_bool:
     private function tryValueBoxObjectStringLooseEqual(
         OpCode $opcode,
         Variable $boxed,
-        PHPLLVM\Value $nativeStr
+        \PHPLLVM\Value $nativeStr
     ): ?Variable {
         if (
             OpCode::TYPE_EQUAL !== $opcode->type

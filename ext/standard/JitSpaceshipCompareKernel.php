@@ -1104,32 +1104,22 @@ final class JitSpaceshipCompareKernel
 
     private static function longSpaceship(Context $context, Value $left, Value $right): Value
     {
-        $fn = SpaceshipRuntime::compareHelper(
-            $context,
-            'PHPCompiler\\VM\\CompareJitHelperScalars::longSpaceship'
-        );
-        $cmp = JitNestedHelperCoerce::callHelper($context, $fn, [$left, $right]);
+        // Native icmp — NestedJIT longSpaceship → spaceshipNumeric(int|float) boxes
+        // operands and calls __value__spaceship, which recurses until SIGSEGV (#32538).
+        $ty = $left->typeOf();
+        $lt = $context->builder->icmp(Builder::INT_SLT, $left, $right);
+        $gt = $context->builder->icmp(Builder::INT_SGT, $left, $right);
 
-        return JitNestedHelperCoerce::coerceBridgeResult(
-            $context,
-            $cmp,
-            $context->getTypeFromString('int64')
+        return $context->builder->select(
+            $gt,
+            $ty->constInt(1, true),
+            $context->builder->select($lt, $ty->constInt(-1, true), $ty->constInt(0, false))
         );
     }
 
     private static function kindSpaceship(Context $context, Value $left, Value $right): Value
     {
-        $fn = SpaceshipRuntime::compareHelper(
-            $context,
-            'PHPCompiler\\VM\\CompareJitHelperScalars::kindSpaceship'
-        );
-        $cmp = JitNestedHelperCoerce::callHelper($context, $fn, [$left, $right]);
-
-        return JitNestedHelperCoerce::coerceBridgeResult(
-            $context,
-            $cmp,
-            $context->getTypeFromString('int64')
-        );
+        return self::longSpaceship($context, $left, $right);
     }
 
     private static function doubleSpaceship(Context $context, Value $left, Value $right): Value

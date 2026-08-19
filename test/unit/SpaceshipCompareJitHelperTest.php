@@ -30,7 +30,9 @@ final class SpaceshipCompareJitHelperTest extends TestCase
     public function testSpaceshipCompareKernelRoutesScalarsThroughHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/JitSpaceshipCompareKernel.php');
-        $this->assertStringContainsString('CompareJitHelperScalars::longSpaceship', $source);
+        // Long <=> is native icmp — NestedJIT spaceshipNumeric(int|float) recurses via
+        // __value__spaceship in thin AOT (#32538). String/double still NestedJIT.
+        $this->assertStringNotContainsString('CompareJitHelperScalars::longSpaceship', $source);
         $this->assertStringContainsString('CompareJitHelperScalars::stringSpaceship', $source);
         $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $source);
         $this->assertStringContainsString('emitObjectCompareSpaceship(', $source);
