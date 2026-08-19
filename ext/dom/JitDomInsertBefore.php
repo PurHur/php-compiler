@@ -31,6 +31,10 @@ final class JitDomInsertBefore
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_insert_before_cont');
 
+        if (JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::insertBefore', 1, 'node')) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+
         // php-src: null refChild ≡ append (ext/dom/node.c). Reuse appendChild AOT path (#26458).
         if (
             \count($args) < 3
