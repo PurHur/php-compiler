@@ -75,6 +75,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'array_if_not_empty_32475.phpt',
         'object_array_logical_xor_32492.phpt',
         'array_ordered_compare_32501.phpt',
+        'hashtable_ordered_compare_32524.phpt',
         'object_string_null_unlike_compare.phpt',
         'array_null_bool_unlike_compare.phpt',
         'object_string_identical.phpt',

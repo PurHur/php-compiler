@@ -1746,17 +1746,40 @@ restart:
             $lhs = $this->loadValue($left);
             $rhs = $this->loadValue($right);
             $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            $folded = self::foldCompileTimeAssocCompare($left, $right);
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = $this->context->builder->icmp(Builder::INT_EQ, $lhs, $rhs);
             } elseif (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->builder->icmp(Builder::INT_NE, $lhs, $rhs);
             } elseif (OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = JitValueCompare::looseEqualHashtablePair($this->context, $lhs, $rhs);
+                if (null !== $folded) {
+                    $result = $this->context->constantFromBool(0 === $folded);
+                } else {
+                    $result = JitValueCompare::looseEqualHashtablePair($this->context, $lhs, $rhs);
+                }
             } elseif (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $same = JitValueCompare::looseEqualHashtablePair($this->context, $lhs, $rhs);
-                $result = $this->context->builder->xor($same, $trueVal);
+                if (null !== $folded) {
+                    $result = $this->context->constantFromBool(0 !== $folded);
+                } else {
+                    $same = JitValueCompare::looseEqualHashtablePair($this->context, $lhs, $rhs);
+                    $result = $this->context->builder->xor($same, $trueVal);
+                }
             } elseif (OpCode::TYPE_PLUS === $opcode->type) {
                 return ArrayBuiltinHelper::arrayUnion($this->context, $left, $right);
+            } elseif (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                if (null === $folded) {
+                    throw new \LogicException("Reached end of switch, can't handle binary operation yet: TYPE_SPACESHIP for hashtable pair");
+                }
+                $result = $this->context->getTypeFromString('int64')->constInt($folded, true);
+                goto return_long;
+            } elseif (self::isOrderedCompareOpcode($opcode->type)) {
+                if (null === $folded) {
+                    $type = opcode_type_name($opcode->type);
+                    throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for hashtable pair");
+                }
+                $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
+                $result = JitValueCompare::boolFromSpaceshipCmp($this->context, $opcode->type, $cmp);
+                goto return_bool;
             } else {
                 $type = opcode_type_name($opcode->type);
                 throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for hashtable pair");
@@ -2373,7 +2396,21 @@ return_bool:
     }
 
     /**
-     * Packed native array / hashtable < > <= >= <=> (#32501 leftover of #5295).
+     * zend_compare_arrays for string-keyed literals tracked on the JIT Variable (#32524).
+     *
+     * Host PHP `<=>` on arrays is the same zend_hash_compare(..., ordered=false).
+     */
+    private static function foldCompileTimeAssocCompare(Variable $left, Variable $right): ?int
+    {
+        if (!\is_array($left->compileTimeAssoc) || !\is_array($right->compileTimeAssoc)) {
+            return null;
+        }
+
+        return $left->compileTimeAssoc <=> $right->compileTimeAssoc;
+    }
+
+    /**
+     * Packed native array / hashtable < > <= >= <=> (#32501 leftover of #5295; hashtable #32524).
      *
      * php-src: Zend/zend_operators.c zend_compare_arrays / zend_hash_compare.
      */
@@ -2389,13 +2426,28 @@ return_bool:
         if (!$leftArr || !$rightArr) {
             return null;
         }
-        if (!ArrayBuiltinHelper::isNativeArray($leftType) && !ArrayBuiltinHelper::isNativeArray($rightType)) {
-            // Hashtable⊙hashtable ordered compare still uses __hashtable__compareSpaceship
-            // which SIGSEGVs on thin standalone AOT; leave as compile abort.
-            return null;
-        }
         if (OpCode::TYPE_SPACESHIP !== $opcode->type && !self::isOrderedCompareOpcode($opcode->type)) {
             return null;
+        }
+        if (!ArrayBuiltinHelper::isNativeArray($leftType) && !ArrayBuiltinHelper::isNativeArray($rightType)) {
+            // Hashtable⊙hashtable literals: zend_compare_arrays via compileTimeAssoc (#32524).
+            // Runtime tables still abort rather than call __hashtable__compareSpaceship
+            // (thin AOT SIGSEGV / miscompare, leftover of #32501).
+            $folded = self::foldCompileTimeAssocCompare($left, $right);
+            if (null === $folded) {
+                return null;
+            }
+            $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
+            if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                return $this->nativeLongResultVariable($cmp);
+            }
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                JitValueCompare::boolFromSpaceshipCmp($this->context, $opcode->type, $cmp)
+            );
         }
         $cmp = JitValueCompare::spaceshipArrayPair($this->context, $left, $right);
         if (OpCode::TYPE_SPACESHIP === $opcode->type) {
