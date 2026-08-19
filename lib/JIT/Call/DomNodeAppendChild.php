@@ -30,6 +30,14 @@ final class DomNodeAppendChild implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_invoke_cont');
+        if (\count($args) >= 2 && \PHPCompiler\ext\dom\JitDomRequireNodeArg::isNullConstant($args[1])) {
+            return \PHPCompiler\ext\dom\JitDomRequireNodeArg::emitTypeErrorAndReturnNull(
+                $context,
+                'DOMNode::appendChild',
+                1,
+                'node'
+            );
+        }
         if (
             JitDomDocumentMethodKernel::shouldUse($context)
             && \count($args) >= 2

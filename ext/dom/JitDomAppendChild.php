@@ -26,6 +26,15 @@ final class JitDomAppendChild
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_call_cont');
 
+        if (JitDomRequireNodeArg::isNullConstant($args[1])) {
+            return JitDomRequireNodeArg::emitTypeErrorAndReturnNull(
+                $context,
+                'DOMNode::appendChild',
+                1,
+                'node'
+            );
+        }
+
         $tagGlobal = $context->module->getNamedGlobal(DomUserScriptLiveTagListLlvm::GLOBAL_TAG);
         if (null !== $tagGlobal) {
             $tagStr = $context->builder->load($tagGlobal);

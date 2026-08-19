@@ -31,6 +31,23 @@ final class JitDomReplaceChild
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replace_child_cont');
 
+        if (JitDomRequireNodeArg::isNullConstant($args[1])) {
+            return JitDomRequireNodeArg::emitTypeErrorAndReturnNull(
+                $context,
+                'DOMNode::replaceChild',
+                1,
+                'node'
+            );
+        }
+        if (JitDomRequireNodeArg::isNullConstant($args[2])) {
+            return JitDomRequireNodeArg::emitTypeErrorAndReturnNull(
+                $context,
+                'DOMNode::replaceChild',
+                2,
+                'child'
+            );
+        }
+
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             self::syncUserScriptReplaceSlots($context, $args[0], $args[1], $args[2]);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replace_child_post');

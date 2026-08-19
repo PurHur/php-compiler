@@ -28,6 +28,16 @@ final class JitDomRemoveChild
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_cont');
+
+        if (JitDomRequireNodeArg::isNullConstant($args[1])) {
+            return JitDomRequireNodeArg::emitTypeErrorAndReturnNull(
+                $context,
+                'DOMNode::removeChild',
+                1,
+                'child'
+            );
+        }
+
         DomNodeTreeMutationRuntime::ensureRemoveChildLinked($context);
 
         $parent = self::loadObjectArg($context, $args[0]);

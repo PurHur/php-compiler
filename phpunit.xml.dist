@@ -715,6 +715,8 @@
             <file>./test/compliance/DomDocumentLoadReflectionVMTest.php</file>
             <file>./test/compliance/DomGetElementByIdNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementByIdNullStrictJITTest.php</file>
+            <file>./test/compliance/DomMutationNullTypeerrorVMTest.php</file>
+            <file>./test/compliance/DomMutationNullTypeerrorJITTest.php</file>
             <file>./test/compliance/DomGetElementByIdNonIdNullVMTest.php</file>
             <file>./test/compliance/DomPhpcEnginePropsInvisibleVMTest.php</file>
             <file>./test/compliance/DomPhpcEnginePropsInvisibleJITTest.php</file>

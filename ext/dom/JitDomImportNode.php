@@ -35,6 +35,15 @@ final class JitDomImportNode
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_import_node_cont');
 
+        if (JitDomRequireNodeArg::isNullConstant($args[1])) {
+            return JitDomRequireNodeArg::emitTypeErrorAndReturnNull(
+                $context,
+                'DOMDocument::importNode',
+                1,
+                'node'
+            );
+        }
+
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeUserScriptMaterialize($context, $args[0]);
         }
