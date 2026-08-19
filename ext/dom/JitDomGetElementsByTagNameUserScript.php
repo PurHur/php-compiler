@@ -19,6 +19,9 @@ final class JitDomGetElementsByTagNameUserScript
 
     private static ?string $lastNsLocal = null;
 
+    /** Last NS query was DOMElement::getElementsByTagNameNS (skip document element; #32511). */
+    private static bool $lastNsFromElement = false;
+
     public static function shouldUse(Context $context): bool
     {
         return JitDomLoadHTMLUserScript::shouldUse($context);
@@ -34,10 +37,16 @@ final class JitDomGetElementsByTagNameUserScript
         return [self::$lastNsUri, self::$lastNsLocal];
     }
 
+    public static function lastNsQueryFromElement(): bool
+    {
+        return self::$lastNsFromElement;
+    }
+
     public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
     {
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
+        self::$lastNsFromElement = false;
         if (\count($args) < 2) {
             return null;
         }
@@ -93,6 +102,7 @@ final class JitDomGetElementsByTagNameUserScript
         $count = DomParseSimpleXmlJitHelper::countElementsByTagNameNSArgv($xml, $nsLit, $localLit);
         self::$lastNsUri = $nsLit;
         self::$lastNsLocal = $localLit;
+        self::$lastNsFromElement = false;
         DomUserScriptLiveTagListLlvm::initCount($context, 'ns|'.$nsLit.'|'.$localLit, $count);
 
         return self::boxNodeList($context, $count);
@@ -107,6 +117,7 @@ final class JitDomGetElementsByTagNameUserScript
     {
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
+        self::$lastNsFromElement = false;
         if (\count($args) < 2) {
             return null;
         }
@@ -128,6 +139,44 @@ final class JitDomGetElementsByTagNameUserScript
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $count = DomParseSimpleXmlJitHelper::countDescendantTagArgv($inner, $tagLit);
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
+
+        return self::boxNodeList($context, $count);
+    }
+
+    /**
+     * DOMElement::getElementsByTagNameNS() — descendants of documentElement (#32511).
+     *
+     * php-src: ext/dom/element.c PHP_METHOD(DOMElement, getElementsByTagNameNS).
+     */
+    public static function tryInvokeFromElementNS(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 3) {
+            return null;
+        }
+        $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $nsLit && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+            $nsLit = '';
+        }
+        if ($context->callerStrictTypes && (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false))) {
+            return null;
+        }
+        $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $nsLit || null === $localLit) {
+            return null;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml) {
+            return null;
+        }
+        $count = DomParseSimpleXmlJitHelper::countElementsByTagNameNSFromDescendantsArgv(
+            $xml,
+            $nsLit,
+            $localLit
+        );
+        self::$lastNsUri = $nsLit;
+        self::$lastNsLocal = $localLit;
+        self::$lastNsFromElement = true;
+        DomUserScriptLiveTagListLlvm::initCount($context, 'elns|'.$nsLit.'|'.$localLit, $count);
 
         return self::boxNodeList($context, $count);
     }

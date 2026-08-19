@@ -70,6 +70,7 @@ final class DomInstanceMethodJit
         'domdocument::getelementsbytagname' => true,
         'domelement::getelementsbytagname' => true,
         'domdocument::getelementsbytagnamens' => true,
+        'domelement::getelementsbytagnamens' => true,
         'domdocument::appendchild' => true,
         'domnode::appendchild' => true,
         'domdocumentfragment::appendchild' => true,
@@ -596,6 +597,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domelement::getelementsbytagnamens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetElementsByTagNameNS();
+
+                return;
+            }
             if ('domdocument::appendchild' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentAppendChild();
 
@@ -1061,6 +1067,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
             self::ensureProxy($context, 'domelement::getelementsbytagname');
             self::ensureProxy($context, 'domdocument::getelementsbytagnamens');
+            self::ensureProxy($context, 'domelement::getelementsbytagnamens');
             self::ensureProxy($context, 'domdocument::appendchild');
             self::ensureProxy($context, 'domelement::appendchild');
             self::ensureProxy($context, 'domnode::appendchild');
@@ -1300,7 +1307,7 @@ final class DomInstanceMethodJit
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getnodepath', 'getlineno'],
+        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getelementsbytagnamens', 'getnodepath', 'getlineno'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],
