@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * plain object vs number is E_NOTICE + legacy 1; array vs non-array is ±1.
  * Object vs string without {@code __toString} is object-greater (#32514);
  * {@code null} literals are TYPE_VALUE + isNullConstant, not TYPE_NULL.
+ * Object vs string == / != uses the same spaceship (#32515 leftover of #32503).
  * VM SSOT: {@see \PHPCompiler\VM\CompareUnlikeHelper::zendUnlikeValueSpaceship}
  */
 final class JitUnlikeCompare
@@ -27,7 +28,9 @@ final class JitUnlikeCompare
         Variable $left,
         Variable $right
     ): ?Variable {
-        if (!self::isCompareOp($opType)) {
+        $ordered = self::isCompareOp($opType);
+        $equal = self::isLooseEqualOp($opType);
+        if (!$ordered && !$equal) {
             return null;
         }
         $leftObj = Variable::TYPE_OBJECT === $left->type;
@@ -43,7 +46,8 @@ final class JitUnlikeCompare
         if ($leftObj || $rightObj) {
             return self::objectVsOther($context, $opType, $left, $right, $leftObj);
         }
-        if ($leftArr || $rightArr) {
+        // Array == bool uses zend_is_true; only ordered compare is ±1 (#32503).
+        if ($ordered && ($leftArr || $rightArr)) {
             return self::arrayVsScalar($context, $opType, $leftArr);
         }
 
@@ -57,6 +61,12 @@ final class JitUnlikeCompare
             || OpCode::TYPE_GREATER_OR_EQUAL === $opType
             || OpCode::TYPE_SMALLER === $opType
             || OpCode::TYPE_SMALLER_OR_EQUAL === $opType;
+    }
+
+    private static function isLooseEqualOp(int $opType): bool
+    {
+        return OpCode::TYPE_EQUAL === $opType
+            || OpCode::TYPE_NOT_EQUAL === $opType;
     }
 
     private static function isArrayOperand(Variable $var): bool
@@ -233,6 +243,18 @@ final class JitUnlikeCompare
     {
         if (OpCode::TYPE_SPACESHIP === $opType) {
             return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $cmp);
+        }
+        if (OpCode::TYPE_EQUAL === $opType || OpCode::TYPE_NOT_EQUAL === $opType) {
+            $zero = $cmp->typeOf()->constInt(0, false);
+            $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+            if (OpCode::TYPE_NOT_EQUAL === $opType) {
+                $eq = $context->builder->xor(
+                    $eq,
+                    $context->getTypeFromString('int1')->constInt(1, false)
+                );
+            }
+
+            return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $eq);
         }
 
         return new Variable(
