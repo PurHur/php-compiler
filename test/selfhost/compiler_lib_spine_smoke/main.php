@@ -542,6 +542,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomParentNodeProperty.php';
 require_once __DIR__.'/../../../ext/dom/JitDomRemoveChild.php';
 require_once __DIR__.'/../../../ext/dom/JitDomReplaceChild.php';
 require_once __DIR__.'/../../../ext/dom/JitDomReplaceChildLiveSlots.php';
+require_once __DIR__.'/../../../ext/dom/JitDomRequireDomNodeArg.php';
 require_once __DIR__.'/../../../ext/dom/JitDomInsertBefore.php';
 require_once __DIR__.'/../../../ext/dom/JitDomSaveHTML.php';
 require_once __DIR__.'/../../../ext/dom/JitDomSaveHTMLFile.php';
