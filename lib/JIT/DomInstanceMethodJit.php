@@ -187,11 +187,33 @@ final class DomInstanceMethodJit
         'dom\\element::getnodepath' => true,
         'dom\\htmlelement::getnodepath' => true,
         'dom\\document::getnodepath' => true,
+        'domnode::getlineno' => true,
+        'domelement::getlineno' => true,
+        'domdocument::getlineno' => true,
+        'dom\\node::getlineno' => true,
+        'dom\\element::getlineno' => true,
+        'dom\\htmlelement::getlineno' => true,
+        'dom\\document::getlineno' => true,
         'domnode::issupported' => true,
         'domelement::issupported' => true,
         'domdocument::issupported' => true,
         'dom\\node::issupported' => true,
         'dom\\element::issupported' => true,
+        'domnode::lookupprefix' => true,
+        'domelement::lookupprefix' => true,
+        'domdocument::lookupprefix' => true,
+        'dom\\node::lookupprefix' => true,
+        'dom\\element::lookupprefix' => true,
+        'domnode::lookupnamespaceuri' => true,
+        'domelement::lookupnamespaceuri' => true,
+        'domdocument::lookupnamespaceuri' => true,
+        'dom\\node::lookupnamespaceuri' => true,
+        'dom\\element::lookupnamespaceuri' => true,
+        'domnode::isdefaultnamespace' => true,
+        'domelement::isdefaultnamespace' => true,
+        'domdocument::isdefaultnamespace' => true,
+        'dom\\node::isdefaultnamespace' => true,
+        'dom\\element::isdefaultnamespace' => true,
         'domtext::clonenode' => true,
         'domtext::splittext' => true,
         'domcdatasection::splittext' => true,
@@ -238,6 +260,8 @@ final class DomInstanceMethodJit
         'dom\\htmldocument::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
         'domimplementation::createdocumenttype' => true,
+        'domimplementation::hasfeature' => true,
+        'dom\\implementation::hasfeature' => true,
         // Dom\Attr::rename / Dom\Element::rename — php-src @implementation-alias (#21083, #27108).
         'dom\\attr::rename' => true,
         'dom\\element::rename' => true,
@@ -716,6 +740,18 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::getlineno' === $lc
+                || 'domelement::getlineno' === $lc
+                || 'domdocument::getlineno' === $lc
+                || 'dom\\node::getlineno' === $lc
+                || 'dom\\element::getlineno' === $lc
+                || 'dom\\htmlelement::getlineno' === $lc
+                || 'dom\\document::getlineno' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeGetLineNo();
+
+                return;
+            }
             if ('domnode::issupported' === $lc
                 || 'domelement::issupported' === $lc
                 || 'domdocument::issupported' === $lc
@@ -723,6 +759,36 @@ final class DomInstanceMethodJit
                 || 'dom\\element::issupported' === $lc
             ) {
                 $context->functionProxies[$lc] = new Call\DomNodeIsSupported();
+
+                return;
+            }
+            if ('domnode::lookupprefix' === $lc
+                || 'domelement::lookupprefix' === $lc
+                || 'domdocument::lookupprefix' === $lc
+                || 'dom\\node::lookupprefix' === $lc
+                || 'dom\\element::lookupprefix' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeLookupPrefix();
+
+                return;
+            }
+            if ('domnode::lookupnamespaceuri' === $lc
+                || 'domelement::lookupnamespaceuri' === $lc
+                || 'domdocument::lookupnamespaceuri' === $lc
+                || 'dom\\node::lookupnamespaceuri' === $lc
+                || 'dom\\element::lookupnamespaceuri' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeLookupNamespaceURI();
+
+                return;
+            }
+            if ('domnode::isdefaultnamespace' === $lc
+                || 'domelement::isdefaultnamespace' === $lc
+                || 'domdocument::isdefaultnamespace' === $lc
+                || 'dom\\node::isdefaultnamespace' === $lc
+                || 'dom\\element::isdefaultnamespace' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeIsDefaultNamespace();
 
                 return;
             }
@@ -846,6 +912,13 @@ final class DomInstanceMethodJit
             }
             if ('domimplementation::createdocumenttype' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomImplementationCreateDocumentType();
+
+                return;
+            }
+            if ('domimplementation::hasfeature' === $lc
+                || 'dom\\implementation::hasfeature' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomImplementationHasFeature();
 
                 return;
             }
@@ -1048,11 +1121,33 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\element::getnodepath');
             self::ensureProxy($context, 'dom\\htmlelement::getnodepath');
             self::ensureProxy($context, 'dom\\document::getnodepath');
+            self::ensureProxy($context, 'domnode::getlineno');
+            self::ensureProxy($context, 'domelement::getlineno');
+            self::ensureProxy($context, 'domdocument::getlineno');
+            self::ensureProxy($context, 'dom\\node::getlineno');
+            self::ensureProxy($context, 'dom\\element::getlineno');
+            self::ensureProxy($context, 'dom\\htmlelement::getlineno');
+            self::ensureProxy($context, 'dom\\document::getlineno');
             self::ensureProxy($context, 'domnode::issupported');
             self::ensureProxy($context, 'domelement::issupported');
             self::ensureProxy($context, 'domdocument::issupported');
             self::ensureProxy($context, 'dom\\node::issupported');
             self::ensureProxy($context, 'dom\\element::issupported');
+            self::ensureProxy($context, 'domnode::lookupprefix');
+            self::ensureProxy($context, 'domelement::lookupprefix');
+            self::ensureProxy($context, 'domdocument::lookupprefix');
+            self::ensureProxy($context, 'dom\\node::lookupprefix');
+            self::ensureProxy($context, 'dom\\element::lookupprefix');
+            self::ensureProxy($context, 'domnode::lookupnamespaceuri');
+            self::ensureProxy($context, 'domelement::lookupnamespaceuri');
+            self::ensureProxy($context, 'domdocument::lookupnamespaceuri');
+            self::ensureProxy($context, 'dom\\node::lookupnamespaceuri');
+            self::ensureProxy($context, 'dom\\element::lookupnamespaceuri');
+            self::ensureProxy($context, 'domnode::isdefaultnamespace');
+            self::ensureProxy($context, 'domelement::isdefaultnamespace');
+            self::ensureProxy($context, 'domdocument::isdefaultnamespace');
+            self::ensureProxy($context, 'dom\\node::isdefaultnamespace');
+            self::ensureProxy($context, 'dom\\element::isdefaultnamespace');
             self::ensureProxy($context, 'domtext::clonenode');
             self::ensureProxy($context, 'domtext::splittext');
             self::ensureProxy($context, 'domcdatasection::splittext');
@@ -1156,6 +1251,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domxpath::registerphpfunctions');
             self::ensureProxy($context, 'domxpath::registerphpfunctionns');
             self::ensureProxy($context, 'domimplementation::createdocumenttype');
+            self::ensureProxy($context, 'domimplementation::hasfeature');
+            self::ensureProxy($context, 'dom\\implementation::hasfeature');
             self::ensureProxy($context, 'dom\\htmldocument::queryselector');
             self::ensureProxy($context, 'dom\\htmldocument::queryselectorall');
             self::ensureProxy($context, 'dom\\document::queryselector');
@@ -1196,13 +1293,14 @@ final class DomInstanceMethodJit
 
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
-        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported'],
+        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath', 'getlineno'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'lookupprefix', 'lookupnamespaceuri', 'isdefaultnamespace', 'getlineno'],
+        'domimplementation' => ['createdocumenttype', 'hasfeature'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getnodepath'],
+        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getnodepath', 'getlineno'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],

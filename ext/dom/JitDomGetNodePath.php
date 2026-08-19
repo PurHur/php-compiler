@@ -56,6 +56,9 @@ final class JitDomGetNodePath
         $result->compileTimeDomNodePath = $path;
         $result->compileTimeDomInnerXml = $inner;
         $result->compileTimeDomTagName = $tag;
+        $result->compileTimeDomLineNo = JitDomGetLineNo::rootLineNo(
+            JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml
+        );
         self::$lastParentPath = $path;
         self::$lastParentInner = $inner;
         self::$lastChildFetchWasFirstChild = false;
@@ -100,6 +103,11 @@ final class JitDomGetNodePath
             $result->compileTimeDomTagName = $siblings[$index]['data'];
         }
         $result->compileTimeDomChildIndex = $index;
+        $result->compileTimeDomLineNo = JitDomGetLineNo::childLineNo(
+            JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml,
+            (string) $parentInner,
+            $index
+        );
         self::$lastChildFetchWasFirstChild = 'firstchild' === $propLc;
         self::rememberWalk($path, $inner);
     }

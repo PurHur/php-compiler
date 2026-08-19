@@ -136,6 +136,11 @@ final class Variable {
     public ?string $compileTimeDomNodePath = null;
 
     /**
+     * xmlGetLineNo for a loadXML documentElement / child walk (#32489).
+     */
+    public ?int $compileTimeDomLineNo = null;
+
+    /**
      * Character-data payload of a createTextNode / splitText stand-in (#32362).
      */
     public ?string $compileTimeDomTextData = null;

@@ -15,6 +15,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT ABI bridges for upload temp helpers via UploadTempJitHelper PHP (#5346, #9799, #19723, #23301).
  *
+ * Type always-on leftover dropped (#32499): each bridge uses getNamedFunction first
+ * so a drifted ABI cannot mint move_uploaded_file.1 (#31894 / #32122).
  * Quarantined from lib/JIT/Builtin/UploadTempJit — {@see \PHPCompiler\JIT\Builtin\UploadTempJit}
  * stays the thin orchestrator. Call-site lowering stays in {@see JitIsUploadedFile}/{@see JitMoveUploadedFile}.
  *
