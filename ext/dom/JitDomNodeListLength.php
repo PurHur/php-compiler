@@ -72,12 +72,18 @@ final class JitDomNodeListLength
             $phi = $context->builder->phi($i64);
             $phi->addIncoming($instanceVal, $bbInstance);
             $phi->addIncoming($globalVal, $bbGlobal);
+            // Keep native-long fetch shape aligned with propertyFetchDeclaredSlot(): callers
+            // expect TYPE_NATIVE_LONG KIND_VALUE to carry an int64* storage pointer.
+            // Returning the raw i64 phi here makes later generic loads treat it as a pointer
+            // (load i64), which fails module verification (#32622).
+            $nativeSlot = BasicBlockHelper::entryAlloca($context, $i64);
+            $context->builder->store($phi, $nativeSlot);
 
             return new JITVariable(
                 $context,
                 JITVariable::TYPE_NATIVE_LONG,
                 JITVariable::KIND_VALUE,
-                $phi
+                $nativeSlot
             );
         }
 
