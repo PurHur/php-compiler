@@ -19,6 +19,9 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 @@ -248,10 +248,10 @@
+         $name = $this->parseExprNode($node->namespacedName);
+         $old = $this->currentClass;
+         $this->currentClass = $name;
          $this->block->children[] = new Op\Stmt\Class_(
              $name,
              $node->flags,
