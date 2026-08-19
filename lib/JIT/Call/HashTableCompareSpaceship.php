@@ -19,11 +19,12 @@ final class HashTableCompareSpaceship implements Call
             throw new \LogicException('compareSpaceship() requires receiver and other hashtable');
         }
         JitSpaceshipCompareKernel::declareAbiFunctions($context);
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
         $left = HashTableNestedReceiver::hashtableFromReceiver($context, $args[0]);
         $right = HashTableNestedReceiver::hashtableFromReceiver($context, $args[1]);
 
-        return $context->builder->call(
-            $context->lookupFunction('__hashtable__compareSpaceship'),
+        return \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+            $context,
             $left,
             $right
         );

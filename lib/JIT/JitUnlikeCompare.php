@@ -676,7 +676,34 @@ final class JitUnlikeCompare
         $context->builder->branchIf($eitherHt, $htBlock, $preGenBlock);
 
         $context->builder->positionAtEnd($htBlock);
-        $htEnd = $context->builder->getInsertBlock();
+        // zend_compare_arrays when BOTH are hashtables (#32536). The #32528
+        // arrGreater shortcut is only for unlike kinds (array vs null/bool/other).
+        $bothHt = $context->builder->and($leftHt, $rightHt);
+        $htCmpBlock = BasicBlockHelper::append($context, $tag.'_ht_cmp');
+        $htUnlikeBlock = BasicBlockHelper::append($context, $tag.'_ht_unlike');
+        $context->builder->branchIf($bothHt, $htCmpBlock, $htUnlikeBlock);
+
+        $context->builder->positionAtEnd($htCmpBlock);
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
+        $readHt = $context->lookupFunction('__value__readHashtable');
+        $leftHtPtr = $context->builder->call(
+            $readHt,
+            $context->builder->pointerCast($leftPtr, $readHt->getParam(0)->typeOf())
+        );
+        $rightHtPtr = $context->builder->call(
+            $readHt,
+            $context->builder->pointerCast($rightPtr, $readHt->getParam(0)->typeOf())
+        );
+        $htCmp = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+            $context,
+            $leftHtPtr,
+            $rightHtPtr
+        );
+        $htCmpEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($htUnlikeBlock);
+        $htUnlikeEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($preGenBlock);
@@ -752,7 +779,8 @@ final class JitUnlikeCompare
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, $tag.'_phi');
-        $phi->addIncoming($arrPair, $htEnd);
+        $phi->addIncoming($htCmp, $htCmpEnd);
+        $phi->addIncoming($arrPair, $htUnlikeEnd);
         $phi->addIncoming($unlikeCmp, $unlikeEnd);
         $phi->addIncoming($objIntCmp, $objIntLeftEnd);
         $phi->addIncoming($objIntCmpRight, $objIntRightEnd);
