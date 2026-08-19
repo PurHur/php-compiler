@@ -89,17 +89,18 @@ final class ArrayFillRuntime
                 $context->context->functionType($htPtr, false, $i64, $i64, $valuePtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_fill_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $filled = HashTableFillLlvm::fill(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2)
-        );
-        $context->builder->returnValue($filled);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_FILL, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_fill_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $filled = HashTableFillLlvm::fill(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2)
+            );
+            $context->builder->returnValue($filled);
+        });
         $context->registerFunction(self::ABI_FILL, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

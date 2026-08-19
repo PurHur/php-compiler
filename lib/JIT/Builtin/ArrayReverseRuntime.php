@@ -94,14 +94,13 @@ final class ArrayReverseRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $i1)
             );
 
-        $entry = $fn->appendBasicBlock('array_reverse_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $preserve = $fn->getParam(1);
-        $reversed = HashTableReverseLlvm::reverse($context, $src, $preserve);
-        $context->builder->returnValue($reversed);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_REVERSE, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_reverse_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $reversed = HashTableReverseLlvm::reverse($context, $fn->getParam(0), $fn->getParam(1));
+            $context->builder->returnValue($reversed);
+        });
         $context->registerFunction(self::ABI_REVERSE, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

@@ -80,13 +80,13 @@ final class ArrayValuesRuntime
                 $context->context->functionType($htPtr, false, $htPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_values_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $values = HashTableValuesLlvm::values($context, $src);
-        $context->builder->returnValue($values);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_VALUES, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_values_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $values = HashTableValuesLlvm::values($context, $fn->getParam(0));
+            $context->builder->returnValue($values);
+        });
         $context->registerFunction(self::ABI_VALUES, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

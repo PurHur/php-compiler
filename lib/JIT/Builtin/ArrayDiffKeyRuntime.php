@@ -90,27 +90,29 @@ final class ArrayDiffKeyRuntime
     private static function emitSingleBridge(Context $context): void
     {
         $fn = self::declareFunction($context, self::ABI_SINGLE);
-        $entry = $fn->appendBasicBlock('array_diff_key_copy_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $copied = HashTableKeyFilterLlvm::copy($context, $fn->getParam(0));
-        $context->builder->returnValue($copied);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_SINGLE, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_diff_key_copy_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $copied = HashTableKeyFilterLlvm::copy($context, $fn->getParam(0));
+            $context->builder->returnValue($copied);
+        });
         $context->registerFunction(self::ABI_SINGLE, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function emitTwoBridge(Context $context): void
     {
         $fn = self::declareFunction($context, self::ABI_TWO);
-        $entry = $fn->appendBasicBlock('array_diff_key_filter_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $filtered = HashTableKeyFilterLlvm::diffKey(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1)
-        );
-        $context->builder->returnValue($filtered);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_TWO, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_diff_key_filter_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $filtered = HashTableKeyFilterLlvm::diffKey(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1)
+            );
+            $context->builder->returnValue($filtered);
+        });
         $context->registerFunction(self::ABI_TWO, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function declareFunction(Context $context, string $name): LlvmFunction

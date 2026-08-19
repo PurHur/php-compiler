@@ -222,14 +222,13 @@ final class ArrayColumnRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $strPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_column_with_key_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $key = $fn->getParam(1);
-        $out = ArrayColumnLlvm::columnWithStringKey($context, $src, $key);
-        $context->builder->returnValue($out);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_COLUMN, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_column_with_key_entry');
+            $context->builder->positionAtEnd($entry);
+            $out = ArrayColumnLlvm::columnWithStringKey($context, $fn->getParam(0), $fn->getParam(1));
+            $context->builder->returnValue($out);
+        });
         $context->registerFunction(self::ABI_COLUMN, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     /**
@@ -281,16 +280,16 @@ final class ArrayColumnRuntime
                 $abi,
                 $context->context->functionType($htPtr, false, ...$params)
             );
-        $entry = $fn->appendBasicBlock($abi.'_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $keyVal = $fn->getParam(1);
-        $keyStr = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $keyVal
-        );
-        $out = ArrayColumnLlvm::columnWithStringKey($context, $src, $keyStr);
-        $context->builder->returnValue($out);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abi, static function () use ($context, $fn, $abi): void {
+            $entry = $fn->appendBasicBlock($abi.'_entry');
+            $context->builder->positionAtEnd($entry);
+            $keyStr = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $fn->getParam(1)
+            );
+            $out = ArrayColumnLlvm::columnWithStringKey($context, $fn->getParam(0), $keyStr);
+            $context->builder->returnValue($out);
+        });
         $context->registerFunction($abi, $fn);
         $context->builder->clearInsertionPosition();
     }

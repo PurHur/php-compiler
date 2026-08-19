@@ -77,13 +77,13 @@ final class ArrayFlipRuntime
                 $context->context->functionType($htPtr, false, $htPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_flip_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $flipped = ArrayFlipLlvm::flipHashTable($context, $src);
-        $context->builder->returnValue($flipped);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_FLIP, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_flip_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $flipped = ArrayFlipLlvm::flipHashTable($context, $fn->getParam(0));
+            $context->builder->returnValue($flipped);
+        });
         $context->registerFunction(self::ABI_FLIP, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

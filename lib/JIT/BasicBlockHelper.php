@@ -88,6 +88,31 @@ final class BasicBlockHelper
         throw new \LogicException('Current basic block has no parent function');
     }
 
+    /**
+     * Emit LLVM into $fn while the in-flight app function is lowering elsewhere (#27211).
+     *
+     * Without this, {@see parentFunction()} prefers {@see Context::$loweringLlvmFunction}
+     * over the bridge insert block and HashTable*Llvm loops append to the wrong function
+     * (module verify: cross-function args / void fn returning hashtable).
+     */
+    public static function scopeLoweringToFunction(
+        Context $context,
+        Function_ $fn,
+        string $activeFunctionName,
+        callable $emit
+    ): void {
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
+        $context->activeFunction = $activeFunctionName;
+        $context->loweringLlvmFunction = $fn;
+        try {
+            $emit();
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+        }
+    }
+
     public static function append(Context $context, string $name): BasicBlock
     {
         return self::parentFunction($context)->appendBasicBlock($name);
