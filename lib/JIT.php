@@ -8128,6 +8128,15 @@ class JIT {
                         } else {
                             $this->assignOperand($captureOperand, $captureArg, true);
                         }
+                        $captureName = $block->closureCaptureSlotNames[$captureSlot] ?? null;
+                        if (null !== $captureName && '' !== $captureName) {
+                            $this->context->bindVariableByName($captureName, $captureVar);
+                            JIT\UndefinedVariableHelper::markAssigned(
+                                $this->context,
+                                $captureOperand,
+                                $captureVar
+                            );
+                        }
                     }
                 }
             }
