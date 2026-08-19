@@ -292,6 +292,7 @@ final class BuiltinParamNames
             'domimplementation::createdocument' => ['namespace=', 'qualifiedName=', 'doctype='],
             'domimplementation::createdocumenttype' => ['qualifiedName', 'publicId=', 'systemId='],
             'domimplementation::getfeature' => ['feature', 'version'],
+            'domimplementation::hasfeature' => ['feature', 'version'],
             'domnamednodemap::getnameditem' => ['qualifiedName'],
             'domnamednodemap::getnameditemns' => ['namespace', 'localName'],
             'domdocumentfragment::appendchild' => ['node'],
