@@ -27,6 +27,13 @@ final class StrrevRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_strrev', $builtin);
         $this->assertStringNotContainsString('strrev_head', $builtin);
         $this->assertStringNotContainsString('strrev_body', $builtin);
+
+        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            'strrevjithelper::strrevargv',
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT strrevArgv — prelinked unit.o SIGSEGVs (#27007)'
+        );
     }
 
     public function testStrrevJitHelperIsSelfContainedAndMatchesVmString(): void

@@ -170,6 +170,16 @@ final class HelperRuntimeCache
         // #31099 — NestedJIT UrlRewriterApply during emitAdd only (not Context init);
         // prelinked unit.o not used for user-script rewrite apply.
         'phpcompiler\\ext\\standard\\urlrewriterapplyjithelper::applyargv' => true,
+        // Differential AOT — prelinked StrRepeatJitHelper unit.o SIGSEGVs/OOM-kills under
+        // thin AOT (e10_method, str_repeat); NestedJIT StrRepeatJitHelper into user module
+        // (peer #30812 / #30859 / re-#27007).
+        'phpcompiler\\ext\\standard\\strrepeatjithelper::strrepeatargv' => true,
+        // Differential AOT — prelinked StrPadJitHelper unit.o SIGSEGVs (c11_strcmp, e15_str_fns);
+        // NestedJIT StrPadJitHelper into user module (peer #30812).
+        'phpcompiler\\ext\\standard\\strpadjithelper::padargv' => true,
+        // re-#27007 — prelinked StrrevJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
+        // StrrevJitHelper into user module (peer #30812).
+        'phpcompiler\\ext\\standard\\strrevjithelper::strrevargv' => true,
     ];
 
     private static bool $loggedHit = false;

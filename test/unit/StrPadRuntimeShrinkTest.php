@@ -24,6 +24,13 @@ final class StrPadRuntimeShrinkTest extends TestCase
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrPad.php');
         $this->assertStringContainsString('__compiler_str_pad', $bridge);
+
+        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            'strpadjithelper::padargv',
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT padArgv — prelinked unit.o SIGSEGVs'
+        );
     }
 
     public function testStrPadJitHelperInlinesWithoutVmStringCall(): void
