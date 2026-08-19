@@ -2533,6 +2533,9 @@ return_bool:
     /**
      * VALUE box tagged IS_OBJECT vs native string — {@code ==} must use zend_compare,
      * not {@see VmStringCompare::identicalStringToValue} (#32540 leftover of #32515).
+     *
+     * $nativeStr is a LLVM `__string__*` (PHPLLVM\Value), not PHPCompiler\JIT\Value
+     * — the bare type hint minted aot-smoke 0/8 (#32549 leftover of #32544).
      */
     private function tryValueBoxObjectStringLooseEqual(
         OpCode $opcode,
