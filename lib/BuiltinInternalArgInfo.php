@@ -170,13 +170,17 @@ final class BuiltinInternalArgInfo
             'usleep' => 'void',
             // ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324, #25580)
             'preg_grep' => 'array|false',
+            'preg_split' => 'array|false',
             'preg_match', 'preg_match_all' => 'int|false',
             // ext/pcre/php_pcre.stub.php — InternalArgInfo omits return (#27813, #28897; re-#23587)
             'preg_replace', 'preg_filter', 'preg_replace_callback' => 'array|string|null',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#26104)
             'memory_reset_peak_usage' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#25751)
+            'parse_str' => 'void',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
             'file_get_contents', 'fread', 'fgets' => 'string|false',
+            'fgetcsv' => 'array|false',
             'file_put_contents', 'fwrite', 'fputcsv' => 'int|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
             'stream_get_contents' => 'string|false',
@@ -1679,6 +1683,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/file.stub.php — ?int $length = null (#24826)
             'fgetcsv' => 1 === $index ? '?int' : null,
+            // ext/standard/basic_functions.stub.php — &$result untyped by-ref (#25751)
+            'parse_str' => 1 === $index ? '' : null,
             // ext/standard/file.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
             'fputcsv' => 5 === $index ? 'string' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24814)
