@@ -17,9 +17,10 @@ use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
-use PHPCompiler\JIT\Variable;
+use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\OpCode;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\Variable as VmVariable;
 
 /**
  * JIT/AOT eval() lowering via VmEval SSOT (#4652, #10248).
@@ -36,8 +37,7 @@ final class EvalRuntime
     ): void {
         $codeOp = $callerBlock->getOperand($op->arg2);
         $resultOp = $callerBlock->getOperand($op->arg1);
-        $codeVar = $jit->context->getVariableFromOp($codeOp);
-        $literal = JitStringArg::compileTimeLiteral($codeVar);
+        $literal = self::compileTimeEvalLiteral($jit, $callerBlock, $op);
 
         if (null !== $literal) {
             // zend_eval_stringl length 0 is FAILURE → zif_eval false, not inlined NULL (#31914).
@@ -53,14 +53,18 @@ final class EvalRuntime
                 : 0;
             $callLine = VmEval::evalCallSiteLine($callerPath, $callLine);
             $evalFile = VmEval::zendEvalFilename($callerPath, $callLine);
-            $evalClassScope = VmEval::declaringClassFromBlock($callerBlock);
+            $evalClassScope = VmEval::declaringClassForEvalLowering(
+                $callerBlock,
+                $jit->context->scope,
+                $jit->context->type->object
+            );
 
             // Type/function decls: bin/jit.php VM-lowers via Block::literalEvalSourceNeedsVm
             // (#25535). AOT still lowers TYPE_EVAL here — must not emitFalse without first
             // surfacing CompileFatal (final plain property on reference profile → parsed_ok, #26169)
             // or a catchable ParseError for syntax rejects (unclosed class body → ok, #27107).
             if (Block::literalEvalSourceNeedsVm($literal)) {
-                self::compileDeclLiteralEval($jit, $resultOp, $literal, $evalFile);
+                self::compileDeclLiteralEval($jit, $resultOp, $literal, $evalFile, $evalClassScope);
 
                 return;
             }
@@ -102,10 +106,16 @@ final class EvalRuntime
         JIT $jit,
         Operand $resultOp,
         string $literal,
-        string $evalFile
+        string $evalFile,
+        ?string $evalClassScope = null
     ): void {
         try {
-            $evalBlock = VmEval::tryCompileBlockOrThrowCompileFatal(new Runtime(), $literal, $evalFile);
+            $evalBlock = VmEval::tryCompileBlockOrThrowCompileFatal(
+                new Runtime(),
+                $literal,
+                $evalFile,
+                $evalClassScope
+            );
         } catch (CompileFatal $e) {
             if (CompileFatal::isSyntaxParseErrorMessage($e->getMessage())) {
                 self::emitEvalParseError($jit, $literal, $evalFile, $e->getMessage());
@@ -319,21 +329,46 @@ final class EvalRuntime
     public static function emitFalse(JIT $jit, Operand $resultOp): void
     {
         $context = $jit->context;
-        $falseVar = new Variable(
+        $falseVar = new JitVariable(
             $context,
-            Variable::TYPE_NATIVE_BOOL,
-            Variable::KIND_VALUE,
+            JitVariable::TYPE_NATIVE_BOOL,
+            JitVariable::KIND_VALUE,
             $context->getTypeFromString('int1')->constInt(0, false)
         );
         $falseVar->isNullConstant = false;
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeBool($context, $slot, $falseVar->value);
-        $boxed = new Variable(
+        $boxed = new JitVariable(
             $context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
+            JitVariable::TYPE_VALUE,
+            JitVariable::KIND_VARIABLE,
             $slot
         );
         $jit->assignOperandForced($resultOp, $boxed);
+    }
+
+    /**
+     * Resolve a compile-time eval() source string from the TYPE_EVAL operand (#31912 AOT).
+     *
+     * Slot-backed string constants may not carry {@see JitVariable::$compileTimeString} when
+     * php-cfg routes the eval expr through a temporary (#10661).
+     */
+    private static function compileTimeEvalLiteral(JIT $jit, Block $callerBlock, OpCode $op): ?string
+    {
+        $codeOp = $callerBlock->getOperand($op->arg2);
+        if ($codeOp instanceof Literal && is_string($codeOp->value)) {
+            return $codeOp->value;
+        }
+        if (null !== $op->arg2 && isset($callerBlock->constants[$op->arg2])) {
+            $const = $callerBlock->constants[$op->arg2];
+            if ($const instanceof VmVariable && VmVariable::TYPE_STRING === $const->type) {
+                return $const->toString();
+            }
+        }
+        if (null === $codeOp) {
+            return null;
+        }
+
+        return JitStringArg::compileTimeLiteral($jit->context->getVariableFromOp($codeOp));
     }
 }

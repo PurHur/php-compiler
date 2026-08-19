@@ -89,6 +89,35 @@ final class VmEval
     }
 
     /**
+     * Declaring class for JIT/AOT literal-eval inline (#31912).
+     *
+     * Method CFG blocks normally carry func->class; queued lowering can leave it unset while
+     * {@see \PHPCompiler\JIT\Scope::$className} still holds the declaring class.
+     */
+    public static function declaringClassForEvalLowering(
+        ?Block $callerBlock,
+        ?\PHPCompiler\JIT\Scope $jitScope,
+        ?\PHPCompiler\JIT\Builtin\Type\Object_ $objectType = null
+    ): ?string {
+        $fromBlock = self::declaringClassFromBlock($callerBlock);
+        if (null !== $fromBlock && '' !== $fromBlock) {
+            return $fromBlock;
+        }
+        if (null === $jitScope || '' === $jitScope->className) {
+            return null;
+        }
+        $scopeLc = $jitScope->className;
+        if (null !== $objectType && $objectType->hasDeclaredClass($scopeLc)) {
+            $display = $objectType->classNameForId($objectType->lookup($scopeLc));
+            if ('' !== $display) {
+                return $display;
+            }
+        }
+
+        return $scopeLc;
+    }
+
+    /**
      * Call-site line for nesting into zendEvalFilename (#25809).
      *
      * Inside an outer eval unit, CFG lines are still wrapEvalCode-shifted; unwrap so nested

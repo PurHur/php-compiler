@@ -337,6 +337,7 @@ class JIT {
             $this->context->scope->calledClassName = $calledClassName;
             $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
+            $this->context->inlineIncludeReturnHolders = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             $this->context->coalesceMergeSlotOperands = [];
             $this->context->ternaryEchoPhiByAliasSlot = [];
@@ -11350,8 +11351,6 @@ class JIT {
                         : $origBasicBlock;
                 case OpCode::TYPE_RETURN:
                     $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
-                    $returnBlock = $builder->getInsertBlock();
-                    $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
                     if (
                         0 === $this->context->inlineIncludeDepth
@@ -11360,17 +11359,34 @@ class JIT {
                         return $origBasicBlock;
                     }
                     if ($this->context->inlineIncludeDepth > 0) {
-                        if ([] !== $this->context->inlineIncludeReturnOperands) {
+                        JIT\BasicBlockHelper::unsealAndContinue($this->context);
+                        $returnBlock = $builder->getInsertBlock();
+                        $builder->positionAtEnd($returnBlock);
+                        if ([] !== $this->context->inlineIncludeReturnHolders) {
+                            $holder = $this->context->inlineIncludeReturnHolders[
+                                array_key_last($this->context->inlineIncludeReturnHolders)
+                            ];
+                            $holderOp = $this->context->inlineIncludeReturnOperands[
+                                array_key_last($this->context->inlineIncludeReturnOperands)
+                            ];
+                            $return->addref();
+                            $this->context->setVariableOp($holderOp, $holder);
+                            $this->assignOperand($holderOp, $return, true);
+                        } elseif ([] !== $this->context->inlineIncludeReturnOperands) {
                             $holderOp = $this->context->inlineIncludeReturnOperands[
                                 array_key_last($this->context->inlineIncludeReturnOperands)
                             ];
                             $return->addref();
                             $this->assignOperand($holderOp, $return, true);
                         }
+                        $returnBlock = $builder->getInsertBlock();
+                        $builder->positionAtEnd($returnBlock);
                         $this->context->inlineIncludeExitBlock = $returnBlock;
 
                         return $returnBlock;
                     }
+                    $returnBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($returnBlock);
                     if ($block->returnTypeNever) {
                         $neverFunc = null !== $block->func ? $block->func->name : null;
                         if (null !== $neverFunc && '' !== $neverFunc) {
@@ -13344,7 +13360,20 @@ class JIT {
             return;
         }
         if ($this->context->inlineIncludeDepth > 0) {
-            if ([] !== $this->context->inlineIncludeReturnOperands) {
+            JIT\BasicBlockHelper::unsealAndContinue($this->context);
+            $returnBlock = $builder->getInsertBlock();
+            $builder->positionAtEnd($returnBlock);
+            if ([] !== $this->context->inlineIncludeReturnHolders) {
+                $holder = $this->context->inlineIncludeReturnHolders[
+                    array_key_last($this->context->inlineIncludeReturnHolders)
+                ];
+                $holderOp = $this->context->inlineIncludeReturnOperands[
+                    array_key_last($this->context->inlineIncludeReturnOperands)
+                ];
+                $value->addref();
+                $this->context->setVariableOp($holderOp, $holder);
+                $this->assignOperand($holderOp, $value, true);
+            } elseif ([] !== $this->context->inlineIncludeReturnOperands) {
                 $holderOp = $this->context->inlineIncludeReturnOperands[
                     array_key_last($this->context->inlineIncludeReturnOperands)
                 ];
@@ -15985,6 +16014,14 @@ class JIT {
 
     public function assignIncludeResult(Operand $result): void
     {
+        if ([] !== $this->context->inlineIncludeReturnHolders) {
+            $holder = $this->context->inlineIncludeReturnHolders[
+                array_key_last($this->context->inlineIncludeReturnHolders)
+            ];
+            $this->assignOperand($result, $holder, true);
+
+            return;
+        }
         if ([] !== $this->context->inlineIncludeReturnOperands) {
             $holderOp = $this->context->inlineIncludeReturnOperands[
                 array_key_last($this->context->inlineIncludeReturnOperands)

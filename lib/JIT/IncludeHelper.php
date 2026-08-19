@@ -223,8 +223,6 @@ final class IncludeHelper
         } else {
             JitValueBox::writeLong($context, $returnHolder->value, $context->constantFromInteger(1));
         }
-        $context->setVariableOp($returnHolderOp, $returnHolder);
-        $context->inlineIncludeReturnOperands[] = $returnHolderOp;
         // Best-effort breadcrumb for self-host segfault triage: many bootstrap bundles are pure include
         // spines; record which include boundary we last entered before a fatal crash.
         Progress::emitNativeNote($context, $progressNote);
@@ -253,6 +251,10 @@ final class IncludeHelper
         if ($captureEvalReturn) {
             ++$context->evalInlineDepth;
         }
+        // Holder must live in the include scope so TYPE_RETURN assignOperand finds it (#31912).
+        $context->setVariableOp($returnHolderOp, $returnHolder);
+        $context->inlineIncludeReturnOperands[] = $returnHolderOp;
+        $context->inlineIncludeReturnHolders[] = $returnHolder;
         $context->builder->positionAtEnd($entryBb);
         self::bindIncludedThis($context, $included, $entryBb);
         foreach ($localBindings as $operand) {
@@ -323,7 +325,6 @@ final class IncludeHelper
             $context->inlineIncludeExitBlock = null;
             $exitBb = $jit->compileIncludedAtEntry($func, $included, $bodyBb);
         } finally {
-            --$context->inlineIncludeDepth;
             if ($captureEvalReturn) {
                 --$context->evalInlineDepth;
             }
@@ -336,19 +337,23 @@ final class IncludeHelper
 
         $resumeBb = self::appendIncludeResume($context, $func);
         $context->builder->positionAtEnd($exitBb);
-        if (null === $exitBb->getTerminator()) {
-            $context->builder->branch($resumeBb);
+        BasicBlockHelper::unsealAndContinue($context);
+        // Copy inline return on the exit→resume edge while depth is still > 0 so value-copy
+        // lowering does not emit a trailing main retVoid() (#31912).
+        if (null !== $resultOperand) {
+            $jit->assignIncludeResult($resultOperand);
         }
+        --$context->inlineIncludeDepth;
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'include_result_resume');
+        $context->builder->branch($resumeBb);
         $context->builder->positionAtEnd($resumeBb);
         // Caller opcodes after this include must lower into resumeBb, not preIncludeBb (#475).
         if ($context->scope->blockStorage->contains($callerBlock)) {
             $context->scope->blockStorage[$callerBlock] = $resumeBb;
         }
 
-        if (null !== $resultOperand) {
-            $jit->assignIncludeResult($resultOperand);
-        }
         array_pop($context->inlineIncludeReturnOperands);
+        array_pop($context->inlineIncludeReturnHolders);
     }
 
     /**

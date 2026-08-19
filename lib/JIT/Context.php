@@ -351,6 +351,9 @@ class Context {
     /** Require/include expression result slots while inlining (issue #783). */
     public array $inlineIncludeReturnOperands = [];
 
+    /** Value boxes holding inline eval/include return while inlining (#31912). */
+    public array $inlineIncludeReturnHolders = [];
+
     /** Last LLVM exit block from an inlined TU (if/elseif before nested include, #764). */
     public ?\PHPLLVM\BasicBlock $inlineIncludeExitBlock = null;
 

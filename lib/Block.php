@@ -3336,9 +3336,13 @@ class Block {
      */
     public static function literalEvalSourceNeedsVm(string $source): bool
     {
+        // `::class` is a pseudo-constant, not a type declaration — `return self::class` must
+        // stay on the expression inline path for AOT (#31912 eval_inherits_class_scope).
+        $stripped = preg_replace('/::class\b/i', '', $source) ?? $source;
+
         return 1 === preg_match(
             '/\b(?:class|interface|trait|enum|function)\b/i',
-            $source
+            $stripped
         );
     }
 
