@@ -1168,6 +1168,9 @@ final class JitUnlikeCompare
             $genVal = OpCode::TYPE_EQUAL === $opType
                 ? $eq
                 : $context->builder->xor($eq, $i1->constInt(1, false));
+        } elseif (self::isCompareOp($opType)) {
+            // < > <= >= must use zend_compare's -1/0/1, not === (#32539 leftover of #32536).
+            $genVal = JitValueCompare::boolFromSpaceshipCmp($context, $opType, $genericCmp);
         } else {
             $genVal = JitValueCompare::identicalValueToValue($context, $left, $right);
         }
