@@ -112,7 +112,8 @@ final class JitBoolArg
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
         // Compile-time 0/1 — avoid mid-function BB diamonds after `(string)$arr[$k]` (#23427).
-        if (null !== $arg->compileTimeLong) {
+        // Skip for value-box operands: compileTimeLong is stale in loops (#32605).
+        if (null !== $arg->compileTimeLong && !JitValueBox::isValueOperand($arg)) {
             return $context->constantFromBool(0 !== $arg->compileTimeLong);
         }
 
