@@ -27,6 +27,13 @@ final class VmUnaryMinus
             throw new \InvalidArgumentException('Expected TYPE_UNARY_MINUS opcode');
         }
 
+        // Unary - on array is mul_function (array * -1) — TypeError, not compile abort (#32553).
+        if (VmArrayNumericOperandGuard::guardUnary($context, $var)) {
+            $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+            return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $zero);
+        }
+
         // Do not coerce via unary + then negate: catchable TypeError must not
         // continue into integer negate (#32477 leftover of #32452).
         if (VmObjectNumericOperandGuard::guardUnary($context, $var)) {

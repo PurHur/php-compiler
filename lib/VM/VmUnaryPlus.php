@@ -32,6 +32,13 @@ final class VmUnaryPlus
             throw new \InvalidArgumentException('Expected TYPE_UNARY_PLUS opcode');
         }
 
+        // Unary + on array is mul_function (array * 1) — TypeError, not compile abort (#32553).
+        if (VmArrayNumericOperandGuard::guardUnary($context, $var)) {
+            $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+            return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $zero);
+        }
+
         if (null !== $var->objectPropertySlot && null !== $var->objectPropertyType) {
             $jitType = Variable::TYPE_VALUE === $var->objectPropertyType
                 ? Variable::TYPE_VALUE

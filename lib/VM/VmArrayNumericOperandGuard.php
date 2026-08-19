@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 
 /**
  * SSOT for JIT/AOT array ⊙ non-array arithmetic/bitwise TypeErrors (#32346, #32486).
@@ -17,6 +21,7 @@ use PHPCompiler\OpCode;
  * php-src: Zend/zend_operators.c add_function — IS_ARRAY+IS_ARRAY unions;
  * mixed array ⊙ scalar is zend_type_error. sub/mul/div/mod/pow likewise.
  * Bitwise {@code &|^~} and shifts are TypeError on arrays (leftover of #32346).
+ * Unary {@code +}/{@code -} is mul_function ({@code array * int}) (#32553 leftover of #32346/#32477).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitArrayNumericOperandGuard}
  */
@@ -54,6 +59,70 @@ final class VmArrayNumericOperandGuard
         );
 
         return true;
+    }
+
+    /**
+     * Unary {@code +}/{@code -} on an array — zend_type_error, not compiler abort (#32553).
+     *
+     * php-src: Zend/zend_operators.c mul_function — unary plus is {@code * 1},
+     * unary minus is {@code * -1}; IS_ARRAY mixed arithmetic is
+     * {@code Unsupported operand types: array * int}.
+     *
+     * Native packed / hashtable: handled fully (caller must not continue).
+     * Boxed {@see __value__}: runtime type-byte reject, then continue for non-arrays.
+     *
+     * @return bool true when native array was fully handled
+     */
+    public static function guardUnary(Context $context, Variable $var): bool
+    {
+        if (self::isArrayOperand($var)) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'Unsupported operand types: array * int'
+            );
+
+            return true;
+        }
+        if (Variable::TYPE_VALUE === $var->type && JitValueBox::isValueOperand($var)) {
+            self::emitBoxedArrayUnaryTypeError($context, $var);
+        }
+
+        return false;
+    }
+
+    /**
+     * Runtime: value-box IS_ARRAY / TYPE_HASHTABLE → TypeError; otherwise continue.
+     */
+    private static function emitBoxedArrayUnaryTypeError(Context $context, Variable $var): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'arr_unary_vbox_cont');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isArr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+        $isArray = $context->builder->or($isHt, $isArr);
+        $rejectBlock = BasicBlockHelper::append($context, 'arr_unary_vbox_reject');
+        $continueBlock = BasicBlockHelper::append($context, 'arr_unary_vbox_ok');
+        $context->builder->branchIf($isArray, $rejectBlock, $continueBlock);
+        $context->builder->positionAtEnd($rejectBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            'Unsupported operand types: array * int'
+        );
+        $context->builder->positionAtEnd($continueBlock);
     }
 
     /**
