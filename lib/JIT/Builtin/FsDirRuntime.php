@@ -16,6 +16,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_touch/__compiler_mkdir/__compiler_tempnam via FsDirJitHelper PHP (#8999, #25976).
  *
+ * Type always-on leftover dropped (#32510): declareFunction uses getNamedFunction first
+ * so a drifted ABI cannot mint __compiler_touch.1 (#31894 / #32122).
  * Replaces libc LLVM in {@see StringFsDirJit}. SSOT: {@see \PHPCompiler\ext\standard\VmFs}.
  * php-src: ext/standard/filestat.c, ext/standard/file.c
  *
@@ -99,6 +101,12 @@ final class FsDirRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
@@ -109,6 +117,8 @@ final class FsDirRuntime
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
 
+        // getNamedFunction first — leftover Type always-on addFunction without it
+        // minted __compiler_touch.1 on ABI drift (#32510 / #32122).
         return match ($name) {
             '__compiler_touch' => $context->module->addFunction(
                 $name,

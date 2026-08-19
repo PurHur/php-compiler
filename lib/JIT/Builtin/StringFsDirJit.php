@@ -28,14 +28,10 @@ final class StringFsDirJit
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_copy');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            StatArrayRuntime::ensureLinked($context);
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
+        // Do not early-return on __compiler_copy having a body: CopyRuntime alone
+        // does not implement touch/mkdir/tempnam. Type always-on empty shells used
+        // to paper that over; after those drops, skip-on-copy throws
+        // "missing after StringFsDirJit implement" (#32510 / peer #32466).
         CopyRuntime::ensureLinked($context);
         ResolveSidecarRuntime::ensureLinked($context);
         FsDirRuntime::ensureLinked($context);
@@ -43,6 +39,7 @@ final class StringFsDirJit
         StatArrayRuntime::ensureLinked($context);
         FtokRuntime::ensureLinked($context);
         ChownRuntime::ensureLinked($context);
+        self::registerLinkedRuntime($context);
     }
 
     private static function registerLinkedRuntime(Context $context): void
