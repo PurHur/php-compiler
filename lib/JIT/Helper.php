@@ -289,29 +289,10 @@ return_string:
             goto return_long;
         }
         if (OpCode::TYPE_LOGICAL_XOR === $opcode->type) {
-            $zeroI64 = $this->context->getTypeFromString('int64')->constInt(0, false);
-            if (Variable::TYPE_NATIVE_BOOL === $leftType) {
-                $leftTruth = $leftValue;
-            } elseif (Variable::TYPE_STRING === $leftType) {
-                $leftLen = $this->context->builder->call(
-                    $this->context->lookupFunction('__string__strlen'),
-                    $leftValue
-                );
-                $leftTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftLen, $zeroI64);
-            } else {
-                $leftTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $zeroI64);
-            }
-            if (Variable::TYPE_NATIVE_BOOL === $rightType) {
-                $rightTruth = $rightValue;
-            } elseif (Variable::TYPE_STRING === $rightType) {
-                $rightLen = $this->context->builder->call(
-                    $this->context->lookupFunction('__string__strlen'),
-                    $rightValue
-                );
-                $rightTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $rightLen, $zeroI64);
-            } else {
-                $rightTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $rightValue, $zeroI64);
-            }
+            // zend_is_true(op1) ^ zend_is_true(op2) — do not icmp object/array
+            // pointers against i64 0 (module verify fail, leftover of #32471/#32475 / #32492).
+            $leftTruth = $this->zendIsTrueI1($left);
+            $rightTruth = $this->zendIsTrueI1($right);
             $result = $this->context->builder->xor($leftTruth, $rightTruth);
             goto return_bool;
         }
@@ -2365,6 +2346,39 @@ return_bool:
             || OpCode::TYPE_GREATER_OR_EQUAL === $opcodeType
             || OpCode::TYPE_SMALLER === $opcodeType
             || OpCode::TYPE_SMALLER_OR_EQUAL === $opcodeType;
+    }
+
+    /**
+     * zend_is_true as i1 (#32492 leftover of #32471/#32475).
+     *
+     * php-src: Zend/zend_operators.c zend_is_true / convert_to_boolean —
+     * IS_OBJECT without a boolean cast handler is true; IS_ARRAY is
+     * zend_hash_num_elements != 0. icmp of __object__* / packed arrays
+     * against i64 0 fails LLVM module verification.
+     */
+    private function zendIsTrueI1(Variable $var): \PHPLLVM\Value
+    {
+        $type = $this->operandJitType($var);
+        if (Variable::TYPE_OBJECT === $type) {
+            return $this->context->constantFromBool(true);
+        }
+        if (Variable::TYPE_NULL === $type) {
+            return $this->context->constantFromBool(false);
+        }
+        if (Variable::TYPE_HASHTABLE === $type || ArrayBuiltinHelper::isNativeArray($type)) {
+            return $this->loadValue($var->castTo(Variable::TYPE_NATIVE_BOOL));
+        }
+        $loaded = $this->loadValue($var);
+        if (Variable::TYPE_NATIVE_DOUBLE === $type) {
+            // NaN is true (C `!= 0.0`); REAL_UNE matches zend_is_true IS_DOUBLE.
+            return $this->context->builder->fcmp(
+                Builder::REAL_UNE,
+                $loaded,
+                $this->context->getTypeFromString('double')->constReal(0.0)
+            );
+        }
+
+        return $this->context->castToBool($loaded);
     }
 
     private function operandJitType(Variable $var): int
