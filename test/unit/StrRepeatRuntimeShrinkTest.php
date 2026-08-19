@@ -28,6 +28,13 @@ final class StrRepeatRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_str_repeat', $builtin);
         $this->assertStringNotContainsString('JitStrRepeat', $builtin);
         $this->assertStringNotContainsString('strrepeat_head', $builtin);
+
+        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            'strrepeatjithelper::strrepeatargv',
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT strRepeatArgv — prelinked unit.o SIGSEGVs'
+        );
     }
 
     public function testStrRepeatJitHelperDelegatesToVmString(): void
