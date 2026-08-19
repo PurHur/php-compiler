@@ -502,6 +502,25 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertTrue($dest->toBool());
     }
 
+    /** @covers issue #25030 */
+    public function testExistsSiblingsAutoloadDefaultIsTrue(): void
+    {
+        $info = ['name' => 'autoload', 'type' => 'bool', 'isOptional' => true];
+        foreach (['interface_exists', 'trait_exists', 'enum_exists'] as $fn) {
+            self::assertTrue(
+                BuiltinInternalDefaultValues::isAvailable($fn, 1, $info, false),
+                $fn
+            );
+            $dest = new Variable();
+            self::assertTrue(
+                BuiltinInternalDefaultValues::materialize($dest, $fn, 1, $info),
+                $fn
+            );
+            self::assertSame(Variable::TYPE_BOOLEAN, $dest->type, $fn);
+            self::assertTrue($dest->toBool(), $fn);
+        }
+    }
+
     /** @covers issue #25388 */
     public function testClassAliasAutoloadDefaultIsTrue(): void
     {
