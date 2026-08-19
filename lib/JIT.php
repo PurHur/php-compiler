@@ -18322,6 +18322,9 @@ class JIT {
         if ($force || null !== $src->compileTimeDomNodePath) {
             $dest->compileTimeDomNodePath = $src->compileTimeDomNodePath;
         }
+        if ($force || null !== $src->compileTimeDomLineNo) {
+            $dest->compileTimeDomLineNo = $src->compileTimeDomLineNo;
+        }
         if ($force || null !== $src->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $src->compileTimeDomTextData;
         }
@@ -20880,6 +20883,12 @@ class JIT {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
+            } elseif ('getlineno' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
+                if ($this->context->functionIsRegistered('domnode::getlineno')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('hasfeature' === $methodLc) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domimplementation::hasfeature');
                 if ($this->context->functionIsRegistered('domimplementation::hasfeature')) {
@@ -21281,6 +21290,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::lookupprefix');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::lookupprefix');
                 }
+                if ('getlineno' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getlineno');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::getlineno');
+                }
                 if ('hasfeature' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domimplementation::hasfeature');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\implementation::hasfeature');
@@ -21369,6 +21383,12 @@ class JIT {
                 }
                 if ('lookupprefix' === $methodLc && $this->context->functionIsRegistered('domnode::lookupprefix')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('getlineno' === $methodLc && $this->context->functionIsRegistered('domnode::getlineno')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getlineno');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21670,6 +21690,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupprefix');
             if ($this->context->functionIsRegistered('domnode::lookupprefix')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('getlineno' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
+            if ($this->context->functionIsRegistered('domnode::getlineno')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getlineno');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
@@ -24106,6 +24135,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomNodePath && null === $dest->compileTimeDomNodePath) {
             $dest->compileTimeDomNodePath = $source->compileTimeDomNodePath;
+        }
+        if (null !== $source->compileTimeDomLineNo && null === $dest->compileTimeDomLineNo) {
+            $dest->compileTimeDomLineNo = $source->compileTimeDomLineNo;
         }
         if (null !== $source->compileTimeDomTextData && null === $dest->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $source->compileTimeDomTextData;

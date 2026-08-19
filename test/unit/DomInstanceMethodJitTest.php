@@ -75,6 +75,8 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::hasattributes'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::getnodepath'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::getnodepath'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::getlineno'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::getlineno'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::issupported'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::issupported'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::lookupprefix'));

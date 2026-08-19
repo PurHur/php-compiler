@@ -26,6 +26,12 @@ final class JitDomLoadXMLUserScript
 
     private static ?string $lastCompileTimeXml = null;
 
+    /**
+     * BOM-stripped loadXML source including leading whitespace.
+     * libxml xmlGetLineNo counts those newlines; $lastCompileTimeXml is ltrim'd for parse (#32489).
+     */
+    private static ?string $lastCompileTimeXmlSource = null;
+
     /** @var \SplObjectStorage<JITVariable, string>|null Per-document compile-time XML (#27392). */
     private static ?\SplObjectStorage $xmlByReceiver = null;
 
@@ -43,6 +49,12 @@ final class JitDomLoadXMLUserScript
     public static function lastCompileTimeXml(): ?string
     {
         return self::$lastCompileTimeXml;
+    }
+
+    /** Original loadXML bytes for xmlGetLineNo (php-src ext/dom/node.c) (#32489). */
+    public static function lastCompileTimeXmlSource(): ?string
+    {
+        return self::$lastCompileTimeXmlSource ?? self::$lastCompileTimeXml;
     }
 
     /**
@@ -121,18 +133,20 @@ final class JitDomLoadXMLUserScript
         self::$lastLoadWasPureUserScript = true;
     }
 
-    public static function rememberCompileTimeXml(string $xml, string $documentClass = self::CLASS_DOCUMENT): void
+    public static function rememberCompileTimeXml(string $xml, string $documentClass = self::CLASS_DOCUMENT, ?string $sourceXml = null): void
     {
         self::$lastCompileTimeXml = $xml;
+        self::$lastCompileTimeXmlSource = $sourceXml ?? $xml;
         self::$lastLoadWasPureUserScript = false;
         self::$lastDocumentClass = $documentClass;
         JitDomXPathRegisterUserScript::reset();
     }
 
     /** Bind compile-time XML to the loadXML() document receiver (#27392). */
-    public static function rememberCompileTimeXmlFor(JITVariable $document, string $xml): void
+    public static function rememberCompileTimeXmlFor(JITVariable $document, string $xml, ?string $sourceXml = null): void
     {
         self::$lastCompileTimeXml = $xml;
+        self::$lastCompileTimeXmlSource = $sourceXml ?? $xml;
         if (null === self::$xmlByReceiver) {
             self::$xmlByReceiver = new \SplObjectStorage();
         }
@@ -173,6 +187,8 @@ final class JitDomLoadXMLUserScript
         }
         // Match VmDom::loadXML / libxml: drop leading UTF-8 BOM before the thin parse (#26565).
         $lit = VmDom::stripLeadingUtf8Bom($lit);
+        // Keep original bytes for xmlGetLineNo; parse still uses ltrim (#32489).
+        $sourceXml = $lit;
         $forParse = ltrim($lit);
         // Whitespace-before-BOM (or other non-'<' junk) must not use the thin path — Zend rejects
         // it via libxml; fall through to DomLoadXMLRuntime → VmDom::loadXML (#26565).
@@ -219,7 +235,7 @@ final class JitDomLoadXMLUserScript
         // LIBXML_NOBLANKS / non-zero options already fall through above (#20476). NestedJIT
         // DomLoadXMLRuntime cannot run VmDom::loadXML (no preg_match in lean helpers).
 
-        self::rememberCompileTimeXmlFor($args[0], $lit);
+        self::rememberCompileTimeXmlFor($args[0], $lit, $sourceXml);
         self::$lastDocumentClass = self::CLASS_DOCUMENT;
         self::markLastLoadPureUserScript();
         // Declare textContent/nodeValue on DOMElement so forWrite hasProperty skips
