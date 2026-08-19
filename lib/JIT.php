@@ -20868,6 +20868,12 @@ class JIT {
             } elseif ('comparedocumentposition' === $methodLc && $this->context->functionIsRegistered('domnode::comparedocumentposition')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('issupported' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::issupported');
+                if ($this->context->functionIsRegistered('domnode::issupported')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('contains' === $methodLc && $this->context->functionIsRegistered('domnode::contains')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
@@ -21253,6 +21259,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getnodepath');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::getnodepath');
                 }
+                if ('issupported' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::issupported');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::issupported');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::issupported');
+                }
                 // getElementsByTagName on documentElement temps (:object) — php-src element.c (#32454).
                 if ('getelementsbytagname' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
@@ -21325,6 +21336,12 @@ class JIT {
                 }
                 if ('getnodepath' === $methodLc && $this->context->functionIsRegistered('domnode::getnodepath')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getnodepath');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('issupported' === $methodLc && $this->context->functionIsRegistered('domnode::issupported')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::issupported');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21602,6 +21619,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getnodepath');
             if ($this->context->functionIsRegistered('domnode::getnodepath')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getnodepath');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('issupported' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::issupported');
+            if ($this->context->functionIsRegistered('domnode::issupported')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::issupported');
                 $this->context->scope->args = [$receiverVar];
 
                 return;

@@ -187,6 +187,11 @@ final class DomInstanceMethodJit
         'dom\\element::getnodepath' => true,
         'dom\\htmlelement::getnodepath' => true,
         'dom\\document::getnodepath' => true,
+        'domnode::issupported' => true,
+        'domelement::issupported' => true,
+        'domdocument::issupported' => true,
+        'dom\\node::issupported' => true,
+        'dom\\element::issupported' => true,
         'domtext::clonenode' => true,
         'domtext::splittext' => true,
         'domcdatasection::splittext' => true,
@@ -711,6 +716,16 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::issupported' === $lc
+                || 'domelement::issupported' === $lc
+                || 'domdocument::issupported' === $lc
+                || 'dom\\node::issupported' === $lc
+                || 'dom\\element::issupported' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeIsSupported();
+
+                return;
+            }
             if ('domtext::splittext' === $lc || 'domcdatasection::splittext' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomTextSplitText();
 
@@ -1033,6 +1048,11 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\element::getnodepath');
             self::ensureProxy($context, 'dom\\htmlelement::getnodepath');
             self::ensureProxy($context, 'dom\\document::getnodepath');
+            self::ensureProxy($context, 'domnode::issupported');
+            self::ensureProxy($context, 'domelement::issupported');
+            self::ensureProxy($context, 'domdocument::issupported');
+            self::ensureProxy($context, 'dom\\node::issupported');
+            self::ensureProxy($context, 'dom\\element::issupported');
             self::ensureProxy($context, 'domtext::clonenode');
             self::ensureProxy($context, 'domtext::splittext');
             self::ensureProxy($context, 'domcdatasection::splittext');
@@ -1177,7 +1197,7 @@ final class DomInstanceMethodJit
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
