@@ -62,8 +62,11 @@ final class Base64JitHelper
     }
 
     /**
-     * Append-only bit accumulator (no `$str[$i] =` mutation; no negative bit cursor —
-     * NestedJIT treats negative `$valb` as 0 and emits a spurious NUL, #26890).
+     * RFC 4648 decode — append-only output (no in-place string mutation).
+     *
+     * Uses {@see intdiv} / `%` on the i%4 quartets instead of a variable-width bit
+     * accumulator (`$acc >> $nbits`) — NestedJIT mis-lowers the latter and appends
+     * spurious NUL bytes (#26890 / re-open on master Aug 2026).
      *
      * @return string|false
      */
@@ -77,10 +80,9 @@ final class Base64JitHelper
             return '';
         }
         $out = '';
-        $acc = 0;
-        $nbits = 0;
         $i = 0;
         $padding = 0;
+        $buf = 0;
         for ($pos = 0; $pos < $len; ++$pos) {
             $ch = $data[$pos];
             if ('=' === $ch) {
@@ -100,14 +102,24 @@ final class Base64JitHelper
                     return false;
                 }
             }
-            $acc = ($acc << 6) | $d;
-            $nbits += 6;
-            ++$i;
-            if ($nbits >= 8) {
-                $nbits -= 8;
-                $out .= self::byteAt(($acc >> $nbits) & 0xFF);
-                $acc = self::lowBits($acc, $nbits);
+            switch ($i % 4) {
+                case 0:
+                    $buf = $d * 4;
+                    break;
+                case 1:
+                    $out .= self::byteAt($buf + intdiv($d, 16));
+                    $buf = ($d % 16) * 16;
+                    break;
+                case 2:
+                    $out .= self::byteAt($buf + intdiv($d, 4));
+                    $buf = ($d % 4) * 64;
+                    break;
+                case 3:
+                    $out .= self::byteAt($buf + $d);
+                    $buf = 0;
+                    break;
             }
+            ++$i;
         }
         if ($strict && 1 === $i % 4) {
             return false;
@@ -119,7 +131,7 @@ final class Base64JitHelper
         return $out;
     }
 
-    /** Keep the low $n bits of $acc (NestedJIT-safe; $n is 0..7). */
+    /** @deprecated NestedJIT-safe bit peel — kept for unit grep only; decode uses i%4 switch above. */
     private static function lowBits(int $acc, int $n): int
     {
         return match ($n) {
