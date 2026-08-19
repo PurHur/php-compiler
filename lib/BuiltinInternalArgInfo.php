@@ -175,7 +175,7 @@ final class BuiltinInternalArgInfo
             'memory_reset_peak_usage' => 'void',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
             'file_get_contents', 'fread', 'fgets' => 'string|false',
-            'file_put_contents', 'fwrite' => 'int|false',
+            'file_put_contents', 'fwrite', 'fputcsv' => 'int|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
             'stream_get_contents' => 'string|false',
             // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |false) (#27739)

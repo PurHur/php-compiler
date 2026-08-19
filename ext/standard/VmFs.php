@@ -2281,7 +2281,7 @@ final class VmFs
         string $enclosure = '"',
         string $escape = '\\',
         string $eol = "\n",
-    ) {
+    ): int|false {
         if (self::isNativeCsvStreamHandle($handle)) {
             $line = VmCsv::formatLine($fields, $separator, $enclosure, $escape).$eol;
             $written = self::fwrite($handle, $line);
