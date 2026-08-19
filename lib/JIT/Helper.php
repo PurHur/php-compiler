@@ -30,6 +30,19 @@ class Helper {
     }
 
     public function unaryOp(OpCode $opcode, Variable $var): Variable {
+        // array/object unary ~: zend_type_error, not compiler abort (#32486 leftover of #32346/#32477).
+        if (OpCode::TYPE_BITWISE_NOT === $opcode->type) {
+            if (JitArrayNumericOperandGuard::guardUnaryBitwiseNot($this->context, $var)) {
+                return $this->nativeLongResultVariable(
+                    $this->context->getTypeFromString('int64')->constInt(0, false)
+                );
+            }
+            if (JitObjectNumericOperandGuard::guardUnaryBitwiseNot($this->context, $var)) {
+                return $this->nativeLongResultVariable(
+                    $this->context->getTypeFromString('int64')->constInt(0, false)
+                );
+            }
+        }
         $varValue = $this->loadValue($var);
         switch ($this->operandJitType($var)) {
             case Variable::TYPE_NATIVE_LONG:
@@ -213,13 +226,13 @@ return_string:
         // Prefer void-ret rewrite so compare after value-box assign is not orphaned (#31101).
         BasicBlockHelper::ensureOpenInsertBlockReplacingVoidReturn($this->context, 'binary_op_load_cont');
         JitEnumNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right);
-        // array ⊙ scalar arithmetic: zend_type_error, not compiler abort (#32346).
+        // array ⊙ scalar arithmetic/bitwise: zend_type_error, not compiler abort (#32346, #32486).
         if (JitArrayNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right)) {
             return $this->nativeLongResultVariable(
                 $this->context->getTypeFromString('int64')->constInt(0, false)
             );
         }
-        // object ⊙ scalar arithmetic: zend_type_error, not compiler abort (#32477).
+        // object ⊙ scalar arithmetic/bitwise: zend_type_error, not compiler abort (#32477, #32486).
         if (JitObjectNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right)) {
             return $this->nativeLongResultVariable(
                 $this->context->getTypeFromString('int64')->constInt(0, false)

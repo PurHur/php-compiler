@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\VM\VmArrayNumericOperandGuard;
 
 /**
- * JIT trampoline for array ⊙ non-array arithmetic TypeErrors (#32346).
+ * JIT trampoline for array ⊙ non-array arithmetic/bitwise TypeErrors (#32346, #32486).
  *
  * SSOT: {@see \PHPCompiler\VM\VmArrayNumericOperandGuard}
  */
@@ -23,5 +23,13 @@ final class JitArrayNumericOperandGuard
         Variable $right
     ): bool {
         return VmArrayNumericOperandGuard::guardArithmetic($context, $opCode, $left, $right);
+    }
+
+    /**
+     * @return bool true when TypeError+abort was emitted
+     */
+    public static function guardUnaryBitwiseNot(Context $context, Variable $var): bool
+    {
+        return VmArrayNumericOperandGuard::guardUnaryBitwiseNot($context, $var);
     }
 }
