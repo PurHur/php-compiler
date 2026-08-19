@@ -124,6 +124,8 @@ final class BuiltinInternalArgInfo
             'count_chars' => 'array|string',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472)
             'highlight_string', 'highlight_file', 'show_source' => 'string|bool',
+            // ext/filter/filter.stub.php — InternalArgInfo return int (missing |false) (#28756)
+            'filter_id' => 'int|false',
             // ext/standard/basic_functions.stub.php — PHP 8.4; InternalArgInfo bool → true (#25453, #28239)
             'stream_context_set_options', 'stream_context_set_params' => 'true',
             // ext/standard/file.stub.php — absent from InternalArgInfo (#23406)
@@ -830,6 +832,14 @@ final class BuiltinInternalArgInfo
                 2, 3 => '?string',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — show_source(string $filename, bool $return=false) (#28756)
+            'show_source' => match ($index) {
+                0 => 'string',
+                1 => 'bool',
+                default => null,
+            },
+            // ext/filter/filter.stub.php — filter_id(string $name): int|false (#28756)
+            'filter_id' => 0 === $index ? 'string' : null,
             // ext/standard/basic_functions.stub.php — ?string $type = null (InternalArgInfo string) (#23381)
             'get_resources' => 0 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?callable $callback = null (InternalArgInfo string|array) (#23359)
