@@ -13,6 +13,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_iconv via IconvJitHelper PHP (#9345, #25570).
  *
+ * Type always-on leftover dropped (#32482): declareFunction uses getNamedFunction first
+ * so a drifted ABI cannot mint __compiler_iconv.1 (#31894 / #32122).
  * Replaces ~750-line CharsetEngine LLVM monolith. SSOT: {@see \PHPCompiler\ext\iconv\VmIconv}.
  * php-src: ext/iconv/iconv.c — PHP_FUNCTION(iconv)
  *
@@ -80,6 +82,12 @@ final class IconvRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
@@ -88,6 +96,8 @@ final class IconvRuntime
 
         $strPtr = $context->getTypeFromString('__string__*');
 
+        // getNamedFunction first — leftover Type always-on addFunction without it
+        // minted __compiler_iconv.1 on ABI drift (#32482 / #32122).
         return $context->module->addFunction(
             $name,
             $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr)
