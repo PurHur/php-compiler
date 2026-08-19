@@ -818,12 +818,24 @@ final class Variable {
                             $this->context->builder->zExt($this->value, $this->context->getTypeFromString('long long'))
                         );
                     case self::TYPE_VALUE:
+                    case self::TYPE_HASHTABLE:
+                    case self::TYPE_STRING:
+                    case self::TYPE_NULL:
                         return new self(
                             $this->context,
                             $type,
                             self::KIND_VALUE,
                             (new \PHPCompiler\ext\standard\boolval())->call($this->context, $this)
                         );
+                }
+                // Native packed arrays: zend_hash_num_elements ? 1 : 0 (#32455).
+                if ($this->type & self::IS_NATIVE_ARRAY) {
+                    return new self(
+                        $this->context,
+                        $type,
+                        self::KIND_VALUE,
+                        (new \PHPCompiler\ext\standard\boolval())->call($this->context, $this)
+                    );
                 }
                 break;
             case self::TYPE_NATIVE_DOUBLE:

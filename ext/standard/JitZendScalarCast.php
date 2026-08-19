@@ -17,7 +17,7 @@ use PHPLLVM\LLVMAbstract\Type as LlvmType;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, #32444, #32452, zend_operators.c).
+ * JIT lowering for Zend scalar (int)/(float)/(bool) casts (#5714, #5791, #32444, #32452, #32455, zend_operators.c).
  *
  * Zend php-src: (int)/(float) on enum cases warn and yield legacy 1 / 1.0 (#5714, #7120).
  * intval/floatval JIT must use the same legacy paths (not backing extract).
@@ -99,6 +99,81 @@ final class JitZendScalarCast
                 }
                 throw new \LogicException('(float) cast unsupported operand type in JIT');
         }
+    }
+
+    /**
+     * (bool) — Zend convert_to_boolean (#32455).
+     *
+     * php-src: Zend/zend_operators.c convert_to_boolean IS_ARRAY arm
+     * (`zend_hash_num_elements ? 1 : 0`). Other types reuse {@see boolval::call}.
+     */
+    public static function emitBoolCast(Context $context, JITVariable $arg): Value
+    {
+        if (
+            JITVariable::TYPE_HASHTABLE === $arg->type
+            || ArrayBuiltinHelper::isNativeArray($arg->type)
+        ) {
+            $i64 = $context->getTypeFromString('int64');
+            $count = ArrayCountRuntime::numElements($context, $arg);
+
+            return $context->builder->icmp(
+                Builder::INT_NE,
+                $count,
+                $i64->constInt(0, false)
+            );
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return self::valueBoxToBool($context, $arg);
+        }
+
+        return (new boolval())->call($context, $arg);
+    }
+
+    /**
+     * Boxed (bool): hashtable uses zend_hash_num_elements; other tags reuse boolval (#32455).
+     */
+    private static function valueBoxToBool(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $htBlock = BasicBlockHelper::append($context, 'bool_cast_value_ht');
+        $otherBlock = BasicBlockHelper::append($context, 'bool_cast_value_other');
+        $done = BasicBlockHelper::append($context, 'bool_cast_value_done');
+        $context->builder->branchIf($isHt, $htBlock, $otherBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $htPtr = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr);
+        $htCount = ArrayBuiltinHelper::getNumElements($context, $htPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $htBool = $context->builder->icmp(
+            Builder::INT_NE,
+            $htCount,
+            $i64->constInt(0, false)
+        );
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($otherBlock);
+        $other = boolval::boxedTruthyScalar($context, $valuePtr);
+        $otherEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($htBool->typeOf(), 'bool_cast_value_phi');
+        $phi->addIncoming($htBool, $htEnd);
+        $phi->addIncoming($other, $otherEnd);
+
+        return $phi;
     }
 
     /**
