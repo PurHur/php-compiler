@@ -2547,7 +2547,7 @@ return_bool:
     private function tryValueBoxObjectStringLooseEqual(
         OpCode $opcode,
         Variable $boxed,
-        PHPLLVM\Value $nativeStr
+        \PHPLLVM\Value $nativeStr
     ): ?Variable {
         if (
             OpCode::TYPE_EQUAL !== $opcode->type

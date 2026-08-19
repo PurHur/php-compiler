@@ -492,14 +492,68 @@ final class JitUnlikeCompare
         $truthyCmp = self::longSpaceshipI64($context, $arrayLong, $otherLong);
         $oriented = $arrayOnLeft ? $truthyCmp : self::negateCmp($context, $truthyCmp);
         $greater = $i64->constInt($arrayOnLeft ? 1 : -1, true);
-        $liveCmp = $context->builder->select($useTruthy, $oriented, $greater);
-        $liveEnd = $context->builder->getInsertBlock();
+        // Native hashtable ⊙ boxed hashtable: zend_compare_arrays, not array-greater
+        // (#32538). Dim-write locals are TYPE_VALUE boxes; `$m <=> ['a'=>1]` hits this
+        // path with the literal on the native side (arrayOnLeft false → greater=-1).
+        if (Variable::TYPE_HASHTABLE !== $array->type) {
+            $liveCmp = $context->builder->select($useTruthy, $oriented, $greater);
+            $liveEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
+            $phi = $context->builder->phi($i64, $tag.'_phi');
+            $phi->addIncoming($nullPtrCmp, $nullPtrEnd);
+            $phi->addIncoming($liveCmp, $liveEnd);
+
+            return self::fromSpaceshipValue($context, $opType, $phi);
+        }
+
+        $isHt = self::valuePtrIsHashtable($context, $ptr);
+        $truthyBlock = BasicBlockHelper::append($context, $tag.'_truthy');
+        $htOrGreater = BasicBlockHelper::append($context, $tag.'_ht_or_gt');
+        $htCmpBlock = BasicBlockHelper::append($context, $tag.'_ht_cmp');
+        $greaterBlock = BasicBlockHelper::append($context, $tag.'_greater');
+        $context->builder->branchIf($useTruthy, $truthyBlock, $htOrGreater);
+
+        $context->builder->positionAtEnd($truthyBlock);
+        $truthyEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($htOrGreater);
+        $context->builder->branchIf($isHt, $htCmpBlock, $greaterBlock);
+
+        $context->builder->positionAtEnd($htCmpBlock);
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
+        $nativeHt = $context->helper->loadValue($array);
+        $readHt = $context->lookupFunction('__value__readHashtable');
+        $boxedHt = $context->builder->call(
+            $readHt,
+            $context->builder->pointerCast($ptr, $readHt->getParam(0)->typeOf())
+        );
+        $htCmp = $arrayOnLeft
+            ? \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+                $context,
+                $nativeHt,
+                $boxedHt
+            )
+            : \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+                $context,
+                $boxedHt,
+                $nativeHt
+            );
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($greaterBlock);
+        $greaterEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, $tag.'_phi');
         $phi->addIncoming($nullPtrCmp, $nullPtrEnd);
-        $phi->addIncoming($liveCmp, $liveEnd);
+        $phi->addIncoming($oriented, $truthyEnd);
+        $phi->addIncoming($htCmp, $htEnd);
+        $phi->addIncoming($greater, $greaterEnd);
 
         return self::fromSpaceshipValue($context, $opType, $phi);
     }
@@ -1169,8 +1223,12 @@ final class JitUnlikeCompare
                 ? $eq
                 : $context->builder->xor($eq, $i1->constInt(1, false));
         } elseif (self::isCompareOp($opType)) {
-            // < > <= >= must use zend_compare's -1/0/1, not === (#32539 leftover of #32536).
-            $genVal = JitValueCompare::boolFromSpaceshipCmp($context, $opType, $genericCmp);
+            // Boxed hashtable < > <= >= : zend_compare_arrays / zend_is_true vs
+            // null/bool (#32538 leftover of #32536). Do not use === (both
+            // directions false) or raw __value__spaceship (array always greater
+            // than null, so `[] > null` becomes true). Master #32543 used
+            // boolFromSpaceshipCmp(__value__spaceship) which regresses `$e > $n`.
+            $genVal = self::twoBoxedOrdered($context, $opType, $left, $right)->value;
         } else {
             $genVal = JitValueCompare::identicalValueToValue($context, $left, $right);
         }
