@@ -88,6 +88,17 @@ final class JitFsGlobKernel
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $existing = $context->module->getNamedFunction($name);
+        if (null !== $existing) {
+            try {
+                return $context->lookupFunction($name);
+            } catch (\Throwable) {
+                $context->registerFunction($name, $existing);
+
+                return $existing;
+            }
+        }
+
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {

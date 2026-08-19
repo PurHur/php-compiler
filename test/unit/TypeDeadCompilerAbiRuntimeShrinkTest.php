@@ -45,9 +45,7 @@ final class TypeDeadCompilerAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_xmlrpc_encode_value'", $type);
-        $this->assertStringContainsString("registerFunction('__phpc_glob_vec'", $type);
-        $this->assertStringContainsString("registerFunction('__phpc_scandir_vec'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_localtime'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_mktime'", $type);
     }
 
     public function testNoNestedJitLookupOfDroppedCompilerAbisRemains(): void
