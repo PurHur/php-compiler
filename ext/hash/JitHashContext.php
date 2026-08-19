@@ -6,25 +6,31 @@ namespace PHPCompiler\ext\hash;
 
 use PHPCompiler\ext\standard\JitFileGetContents;
 use PHPCompiler\ext\standard\JitHash;
+use PHPCompiler\ext\standard\JitIntdiv;
+use PHPCompiler\ext\standard\JitStreamIoKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\HashContextEmbedBridge;
 use PHPCompiler\JIT\Builtin\HashContextRuntime;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for hash_init/update/update_file/final/copy (#7174, #3357, #32464). */
+/** LLVM lowering for hash_init/update/update_file/update_stream/final/copy (#7174, #3357, #32464, #32483). */
 final class JitHashContext
 {
     private static int $updateFileSerial = 0;
+
+    private static int $updateStreamSerial = 0;
     private const INIT_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::init';
 
     private const UPDATE_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::update';
@@ -43,6 +49,7 @@ final class JitHashContext
             'hash_init' => self::init($context, ...$args),
             'hash_update' => self::update($context, ...$args),
             'hash_update_file' => self::updateFile($context, ...$args),
+            'hash_update_stream' => self::updateStream($context, ...$args),
             'hash_final' => self::final($context, ...$args),
             'hash_copy' => self::copy($context, ...$args),
             default => throw new \LogicException($name.'() JIT dispatch missing (#3357)'),
@@ -188,6 +195,98 @@ final class JitHashContext
         );
         self::applyUpdateChunk($context, $obj, $handle, $chunkStr);
         $okResult = self::returnTrue($context);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($failResult->typeOf());
+        $phi->addIncoming($failResult, $failTail);
+        $phi->addIncoming($okResult, $okTail);
+
+        return $phi;
+    }
+
+    /**
+     * hash_update_stream() — feed stream bytes into HashContext (php-src ext/hash/hash.c; #32483 leftover of #3357 / #6681).
+     *
+     * Reads via `__compiler_stream_get_contents` (current offset, optional `$length`,
+     * no seek) then {@see applyUpdateChunk()} like {@see updateFile()}. Thin AOT uses
+     * {@see JitStreamIoKernel::implementStreamGetContentsForce()} (peer #27437 / #20982).
+     */
+    public static function updateStream(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 2
+                    ? \sprintf('hash_update_stream() expects at least 2 arguments, %d given', $argc)
+                    : \sprintf('hash_update_stream() expects at most 3 arguments, %d given', $argc)
+            );
+
+            return $slot;
+        }
+        JitResourceArg::rejectEnumCaseOperand($context, $args[1], 'hash_update_stream', 1, 'stream');
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            JitResourceArg::emitResourceTypeErrorAndAbort($context, 'hash_update_stream', 1, 'stream', 'null');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        HashContextEmbedBridge::ensureLinked($context);
+        // Thin standalone AOT: libc FILE* stream_get_contents (peer #27437). NestedJIT
+        // StreamReadRuntime wants StreamIoJitHelper::ftellArgv and aborts (#20982).
+        if ($context->isThinStandaloneAotMain()) {
+            JitStreamIoKernel::implementStreamGetContentsForce($context);
+        } else {
+            StreamReadRuntime::ensureLinked($context);
+        }
+        $obj = self::readContextObject($context, $args[0]);
+        $hcHandle = self::loadHandle($context, $obj);
+        $i64 = $context->getTypeFromString('int64');
+        $streamHandle = $context->builder->truncOrBitCast(
+            JitLongArg::lower($context, $args[1], 'hash_update_stream() stream'),
+            $i64
+        );
+        $length = $i64->constInt(-1, true);
+        if (isset($args[2])) {
+            $length = JitIntdiv::lowerIntBuiltinArgForCaller(
+                $context,
+                $args[2],
+                'hash_update_stream',
+                3,
+                'length'
+            );
+        }
+        $contents = $context->builder->call(
+            $context->lookupFunction('__compiler_stream_get_contents'),
+            $streamHandle,
+            $length,
+            $i64->constInt(-1, true)
+        );
+        $strPtr = $context->getTypeFromString('__string__*');
+        $failed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtr->constNull());
+
+        $id = (string) (++self::$updateStreamSerial);
+        $failBlock = BasicBlockHelper::append($context, 'hus_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'hus_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'hus_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $failResult = self::boxedFalse($context);
+        $failTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $contents
+        );
+        self::applyUpdateChunk($context, $obj, $hcHandle, $owned);
+        $map = $context->structFieldMap['__string__'];
+        $nbytes = $context->builder->load($context->builder->structGep($owned, $map['length']));
+        $okResult = self::boxedLong($context, $nbytes);
         $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -432,6 +531,19 @@ final class JitHashContext
             $context,
             $slot,
             $context->getTypeFromString('int1')->constInt(0, false)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function boxedLong(Context $context, Value $long): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i64 = $context->getTypeFromString('int64');
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->builder->truncOrBitCast($long, $i64)
         );
 
         return JitValueBox::pointer($context, $slot);
