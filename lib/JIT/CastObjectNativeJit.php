@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 /**
  * Native-type (object) cast lowering — extracted from CastHelper (#10244).
  *
- * php-src: Zend/zend_operators.c — convert_to_object / cast_object (#30098, #30793, #32448).
+ * php-src: Zend/zend_operators.c — convert_to_object / cast_object (#30098, #30793, #32448, #32468).
  */
 final class CastObjectNativeJit
 {
@@ -29,6 +29,10 @@ final class CastObjectNativeJit
         }
         if (Variable::TYPE_HASHTABLE === $src->type) {
             return CastObjectFromHashtableJit::emit($context, $src, $block, $op);
+        }
+        if (ArrayBuiltinHelper::isNativeArray($src->type)) {
+            // convert_to_object(IS_ARRAY): packed int64[] was a compile abort (#32468).
+            return self::emitNativeArray($context, $src, $block, $op);
         }
         if (Variable::TYPE_VALUE === $src->type) {
             return CastObjectValueBoxJit::emit($context, $src, $block, $op);
@@ -51,6 +55,34 @@ final class CastObjectNativeJit
         throw new \LogicException(
             '(object) cast unsupported operand type in JIT: '.Variable::getStringType($src->type)
         );
+    }
+
+    /**
+     * Packed native list → hashtable → stdClass (zend_operators.c convert_to_object IS_ARRAY).
+     *
+     * Define "0".."n-1" on stdClass before the hashtable copy so numeric keys are
+     * addressable even when CFG literals were folded away (#32468).
+     */
+    private static function emitNativeArray(
+        Context $context,
+        Variable $src,
+        Block $block,
+        OpCode $op
+    ): Variable {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $classId = $object->lookup('stdClass');
+        $n = $src->nextFreeElement;
+        for ($i = 0; $i < $n; ++$i) {
+            $key = (string) $i;
+            if (!$object->hasProperty($classId, $key)) {
+                $object->defineProperty($classId, $key, Variable::TYPE_VALUE);
+            }
+        }
+        $ht = HashTableHelper::materializeNativeArrayForCall($context, $src);
+        $htVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht);
+
+        return CastObjectFromHashtableJit::emit($context, $htVar, $block, $op);
     }
 
     /**

@@ -70,6 +70,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'cast_object_resource.phpt',
         'cast_array_bool.phpt',
         'cast_object_bool.phpt',
+        'cast_object_native_array.phpt',
         'simplexml/load_string_child_property_cast.phpt',
         'static_property_closure_write_read_31965.phpt',
         'pow_operator_int_31966.phpt',
