@@ -10,43 +10,23 @@ use PHPCompiler\VM\ObjectEntry;
 /**
  * DOMElement::toggleAttribute() — user-script AOT (#19507).
  *
- * Nested VmDom bool/int presence is unreliable; keep a class-static mirror keyed by
- * element id + name so omit add/remove returns match php-src across calls in one process.
- * php-src: ext/dom/element.c — dom_element_toggle_attribute
+ * Returns int 0/1 for int1 bridge ABIs. Delegates to VmDom::toggleAttribute so
+ * DomRegistry attribute state drives omit/force semantics (php-src ext/dom/element.c).
  */
 final class DomToggleAttributeJitHelper
 {
-    /** @var array<string, bool> */
-    private static array $presentMirror = [];
-
-    public static function toggleOmitArgv(Context $ctx, ObjectEntry $element, string $name): bool
+    public static function toggleOmitArgv(Context $ctx, ObjectEntry $element, string $name): int
     {
-        $key = $element->id."\0".$name;
-        if (!isset(self::$presentMirror[$key])) {
-            VmDom::setAttributeNS($ctx, $element, null, $name, '');
-            self::$presentMirror[$key] = true;
-
-            return true;
-        }
-        VmDom::removeAttributeNS($ctx, $element, null, $name);
-        unset(self::$presentMirror[$key]);
-
-        return false;
+        return VmDom::toggleAttribute($ctx, $element, $name, null) ? 1 : 0;
     }
 
-    public static function toggleForceTrueArgv(Context $ctx, ObjectEntry $element, string $name): bool
+    public static function toggleForceTrueArgv(Context $ctx, ObjectEntry $element, string $name): int
     {
-        VmDom::setAttributeNS($ctx, $element, null, $name, '');
-        self::$presentMirror[$element->id."\0".$name] = true;
-
-        return true;
+        return VmDom::toggleAttribute($ctx, $element, $name, true) ? 1 : 0;
     }
 
-    public static function toggleForceFalseArgv(Context $ctx, ObjectEntry $element, string $name): bool
+    public static function toggleForceFalseArgv(Context $ctx, ObjectEntry $element, string $name): int
     {
-        VmDom::removeAttributeNS($ctx, $element, null, $name);
-        unset(self::$presentMirror[$element->id."\0".$name]);
-
-        return false;
+        return VmDom::toggleAttribute($ctx, $element, $name, false) ? 1 : 0;
     }
 }

@@ -192,26 +192,53 @@ final class DomNodeLiveMutationRuntime
                     foreach ($extraArgs as $arg) {
                         $llvmArgs[] = self::mutationArgObject($context, $arg);
                     }
-                } elseif (1 === $extraArgCount && Variable::TYPE_STRING === $extraArgs[0]->type) {
-                    JitDomDocumentMethodKernel::ensureReplaceChildrenStringBridge($context);
-                    $abi = self::replaceChildrenStringAbi();
-                    $llvmArgs = [
-                        self::receiverObject($context, $receiver),
-                        JitStringArg::lower($context, $extraArgs[0], 'DOMNode::replaceChildren() string argument'),
-                    ];
-                } else {
-                    self::ensureMutationBridge($context, $kind, $extraArgCount);
-                    $abi = self::abiFor($kind, $extraArgCount);
-                    $llvmArgs = [self::receiverObject($context, $receiver)];
-                    foreach ($extraArgs as $arg) {
-                        $llvmArgs[] = JitValueBox::valuePtrFromVariable($context, $arg);
+                    $context->builder->call($context->lookupFunction($abi), ...$llvmArgs);
+                    $firstArg = $extraArgs[0];
+                    $lastArg = $extraArgs[\count($extraArgs) - 1];
+                    $firstChildObj = self::childObjectForSlotSync($context, $firstArg);
+                    $lastChildObj = self::childObjectForSlotSync($context, $lastArg);
+                    if (null !== $firstChildObj && null !== $lastChildObj) {
+                        self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
                     }
+                    self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
+                    self::syncChildNodesLengthSlot($context, $receiver, $extraArgCount);
+                    self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, $extraArgs);
+
+                    return self::nullValuePtr($context);
                 }
-                $context->builder->call($context->lookupFunction($abi), ...$llvmArgs);
+                // String/mixed args: replaceChildrenString/Argv bridges abort in thin AOT;
+                // clear via object bridge then reuse working append string/object bridges (#29409).
+                JitDomDocumentMethodKernel::ensureReplaceChildrenObjectBridge($context, 0);
+                $context->builder->call(
+                    $context->lookupFunction(self::replaceChildrenObjectAbi(0)),
+                    self::receiverObject($context, $receiver)
+                );
+                self::clearChildLinkSlots($context, $receiver);
+                self::syncChildNodesLengthSlot($context, $receiver, 0);
+                self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, []);
+
                 $firstArg = $extraArgs[0];
                 $lastArg = $extraArgs[\count($extraArgs) - 1];
-                $firstChildObj = self::childObjectForSlotSync($context, $firstArg);
-                $lastChildObj = self::childObjectForSlotSync($context, $lastArg);
+                $firstChildObj = null;
+                $lastChildObj = null;
+                foreach ($extraArgs as $arg) {
+                    $appended = self::invokeUserScriptMutationArg($context, 'append', $receiver, $arg);
+                    if (Variable::TYPE_STRING === $arg->type) {
+                        if ($arg === $firstArg) {
+                            $firstChildObj = self::childObjectForSlotSync($context, $arg);
+                        }
+                        if ($arg === $lastArg) {
+                            $lastChildObj = self::childObjectForSlotSync($context, $arg);
+                        }
+                    } else {
+                        if ($arg === $firstArg) {
+                            $firstChildObj = $appended;
+                        }
+                        if ($arg === $lastArg) {
+                            $lastChildObj = $appended;
+                        }
+                    }
+                }
                 if (null !== $firstChildObj && null !== $lastChildObj) {
                     self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
                 }
@@ -1149,7 +1176,7 @@ final class DomNodeLiveMutationRuntime
     private static function childObjectForSlotSync(Context $context, Variable $arg): ?Value
     {
         if (Variable::TYPE_STRING === $arg->type) {
-            return JitDomCreateTextNode::materialize($context);
+            return JitDomCreateTextNode::materialize($context, $arg->compileTimeString ?? '');
         }
         if (\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
             return self::mutationArgObject($context, $arg);

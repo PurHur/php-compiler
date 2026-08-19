@@ -742,6 +742,29 @@ final class DomLivingApiRuntime
         Variable $name,
         ?Variable $force
     ): Value {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_toggle_attribute_user_script');
+            $nameLit = Variable::TYPE_STRING === $name->type ? ($name->compileTimeString ?? null) : null;
+            if (null === $nameLit) {
+                throw new \LogicException(
+                    'DOMElement::toggleAttribute() user-script AOT requires compile-time attribute name'
+                );
+            }
+            $mode = 'omit';
+            if (null !== $force && Variable::TYPE_NULL !== $force->type) {
+                if (Variable::TYPE_NATIVE_BOOL === $force->type) {
+                    $raw = $context->helper->loadValue($force);
+                    if (method_exists($raw, 'isConstant') && $raw->isConstant() && method_exists($raw, 'getConstantValue')) {
+                        $mode = ((int) $raw->getConstantValue() !== 0) ? 'force_true' : 'force_false';
+                    }
+                } elseif (Variable::TYPE_NATIVE_LONG === $force->type && null !== $force->compileTimeLong) {
+                    $mode = (0 !== $force->compileTimeLong) ? 'force_true' : 'force_false';
+                }
+            }
+
+            return \PHPCompiler\ext\dom\JitDomAttributeNodeNS::emitToggleAttributeInt1($context, $nameLit, $mode);
+        }
+
         $nameLlvm = JitStringArg::lower($context, $name, 'DOMElement::toggleAttribute() name');
         $receiverLlvm = self::loadObject($context, $receiver);
         $abi = self::ABI_TOGGLE_ATTRIBUTE_OMIT;
