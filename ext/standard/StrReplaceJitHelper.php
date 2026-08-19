@@ -101,12 +101,11 @@ final class StrReplaceJitHelper
     private static function byteLen(string $s): int
     {
         $n = 0;
-        while (true) {
-            if (!isset($s[$n])) {
-                return $n;
-            }
+        while (isset($s[$n])) {
             ++$n;
         }
+
+        return $n;
     }
 
     private static function concat(string $left, string $right): string

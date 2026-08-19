@@ -194,6 +194,14 @@ final class IssetHelperLlvm
                     $containerOp
                 );
             }
+            // Value box holding a string — extract __string__* and use string-offset isset.
+            // Without this, isset($s[$i]) on an inferred-string VALUE box falls through to
+            // hashtable lookup, which always returns false (#32621, peer str_replace #23912).
+            if (self::isInferredString($containerOp)) {
+                $strVar = self::stringFromValueBox($context, $container);
+
+                return self::compileStringOffsetIsSet($context, $strVar, $dim);
+            }
             $htVar = self::hashtableFromValueBox($context, $container);
 
             return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
@@ -324,6 +332,31 @@ final class IssetHelperLlvm
         $phi->addIncoming($propIsset, $objEnd);
 
         return $phi;
+    }
+
+    private static function isInferredString(?Operand $op): bool
+    {
+        if (null === $op || null === $op->type) {
+            return false;
+        }
+
+        return Type::TYPE_STRING === $op->type->type;
+    }
+
+    private static function stringFromValueBox(Context $context, Variable $container): Variable
+    {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $container);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $ptr
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $str
+        );
     }
 
     private static function hashtableFromValueBox(Context $context, Variable $container): Variable
