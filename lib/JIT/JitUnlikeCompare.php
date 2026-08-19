@@ -15,6 +15,8 @@ use PHPLLVM\Value;
  *
  * php-src: Zend/zend_operators.c compare_function / zend_compare —
  * plain object vs number is E_NOTICE + legacy 1; array vs non-array is ±1.
+ * Object vs string without {@code __toString} is object-greater (#32514);
+ * {@code null} literals are TYPE_VALUE + isNullConstant, not TYPE_NULL.
  * VM SSOT: {@see \PHPCompiler\VM\CompareUnlikeHelper::zendUnlikeValueSpaceship}
  */
 final class JitUnlikeCompare
@@ -73,10 +75,15 @@ final class JitUnlikeCompare
         $obj = $objectOnLeft ? $left : $right;
         $other = $objectOnLeft ? $right : $left;
         $otherType = $other->type;
-        if (Variable::TYPE_NULL === $otherType) {
+        // php-cfg types `null` as a __value__ box (TYPE_VALUE 134) with isNullConstant,
+        // not TYPE_NULL 0 — leftover of #32503 (#32514).
+        if (Variable::TYPE_NULL === $otherType || $other->isNullConstant) {
             $cmpConst = $objectOnLeft ? 1 : -1;
 
             return self::fromSpaceshipConst($context, $opType, $cmpConst);
+        }
+        if (Variable::TYPE_STRING === $otherType) {
+            return self::objectVsString($context, $opType, $obj, $other, $objectOnLeft);
         }
         if (Variable::TYPE_NATIVE_BOOL === $otherType) {
             $i64 = $context->getTypeFromString('int64');
@@ -126,6 +133,86 @@ final class JitUnlikeCompare
         }
 
         return null;
+    }
+
+    /**
+     * CompareStringableHelper: {@code __toString} then strcmp; else object is greater (#32514).
+     */
+    private static function objectVsString(
+        Context $context,
+        int $opType,
+        Variable $obj,
+        Variable $other,
+        bool $objectOnLeft
+    ): Variable {
+        $fallback = $objectOnLeft ? 1 : -1;
+        $objectBuiltin = $context->type->object;
+        $stringable = [];
+        foreach ($objectBuiltin->allClassNamesById() as $id => $name) {
+            $lc = strtolower(ltrim((string) $name, '\\'));
+            if ($objectBuiltin->classHasImplicitStringableLc($lc)) {
+                $stringable[(int) $id] = ltrim((string) $name, '\\');
+            }
+        }
+        if ([] === $stringable) {
+            return self::fromSpaceshipConst($context, $opType, $fallback);
+        }
+
+        $objPtr = $context->helper->loadValue($obj);
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $tag = 'unlike_obj_str_'.spl_object_id($context);
+        $done = BasicBlockHelper::append($context, $tag.'_done');
+        $incoming = [];
+        $ids = array_keys($stringable);
+        $lastIdx = \count($ids) - 1;
+        $fallbackBlock = BasicBlockHelper::append($context, $tag.'_fallback');
+
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $fallbackBlock
+                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            $coerced = MagicMethodDispatch::coerceObjectToString($context, $obj, $stringable[$id]);
+            if (null === $coerced) {
+                $cmp = $i64->constInt($fallback, true);
+            } else {
+                $objStr = $context->helper->loadValue($coerced);
+                $otherStr = $context->helper->loadValue($other);
+                $cmp = JitStringCompare::strcmp(
+                    $context,
+                    $objectOnLeft ? $objStr : $otherStr,
+                    $objectOnLeft ? $otherStr : $objStr
+                );
+            }
+            $incoming[] = [$cmp, $context->builder->getInsertBlock()];
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $incoming[] = [$i64->constInt($fallback, true), $context->builder->getInsertBlock()];
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i64, $tag.'_phi');
+        foreach ($incoming as [$val, $block]) {
+            $phi->addIncoming($val, $block);
+        }
+
+        return self::fromSpaceshipValue($context, $opType, $phi);
     }
 
     private static function arrayVsScalar(Context $context, int $opType, bool $arrayOnLeft): Variable
