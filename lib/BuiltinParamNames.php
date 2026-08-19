@@ -451,6 +451,8 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str1/str2/len (#23335)
             case 'strcmp':
             case 'strcasecmp':
+            // php-src stub string1/string2; InternalArgInfo still says str1/str2 (#23694)
+            case 'strcoll':
             // php-src stub string1/string2; InternalArgInfo still says s1/s2 (#24866)
             case 'strnatcmp':
             case 'strnatcasecmp':
