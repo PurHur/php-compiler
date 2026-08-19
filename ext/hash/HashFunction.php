@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Shared VM/JIT wiring for incremental hash builtins (php-src ext/hash/hash.c; #7174).
+ * Shared VM/JIT wiring for incremental hash builtins (php-src ext/hash/hash.c; #7174, #32464).
  */
 abstract class HashFunction extends Internal
 {

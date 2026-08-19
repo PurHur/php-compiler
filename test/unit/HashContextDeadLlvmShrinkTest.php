@@ -37,6 +37,8 @@ final class HashContextDeadLlvmShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/hash/JitHashContext.php');
         $this->assertStringContainsString('function copyLowering(', $source);
         $this->assertStringContainsString('function finalLowering(', $source);
+        $this->assertStringContainsString("'hash_update_file' => self::updateFile(", $source);
+        $this->assertStringContainsString('function updateFile(', $source);
         $this->assertStringNotContainsString('HashContextCopyLlvm', $source);
         $this->assertStringNotContainsString('HashContextFinalLlvm', $source);
     }
@@ -46,6 +48,7 @@ final class HashContextDeadLlvmShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/hash/JitHashContext.php');
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('finalLoweringStandaloneAot', $source);
+        $this->assertStringContainsString('JitHash::hash', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 
