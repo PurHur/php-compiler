@@ -24223,13 +24223,15 @@ class JIT {
         Variable $dest,
         Variable $source
     ): void {
-        if (null !== $dest->compileTimeString) {
-            return;
-        }
         if (null !== $source->compileTimeString) {
             $dest->compileTimeString = $source->compileTimeString;
 
             return;
+        }
+        if (null !== $dest->compileTimeString) {
+            // Catch/branch reassignment from a non-const RHS must drop stale init literals
+            // (e.g. $error = '' then catch $error = 'msg' — call args kept strlen=0) (#32570).
+            $dest->compileTimeString = null;
         }
         if (null !== $source->compileTimeDomTagName && null === $dest->compileTimeDomTagName) {
             $dest->compileTimeDomTagName = $source->compileTimeDomTagName;
@@ -24270,9 +24272,6 @@ class JIT {
     private function promoteCompileTimeStringOnCallArgs(Block $block, array $operands, array $args): void
     {
         foreach ($args as $i => $arg) {
-            if (null !== $arg->compileTimeString) {
-                continue;
-            }
             $operand = $operands[$i] ?? null;
             if (!$operand instanceof \PHPCfg\Operand) {
                 continue;
@@ -24281,7 +24280,9 @@ class JIT {
             if (null === $slot) {
                 continue;
             }
-            $this->foldCompileTimeStringFromSlot($block, $slot, $arg);
+            // Re-resolve at the call site — stale init literals ('' before try) must not
+            // win over catch reassignment when compileTimeString was already set (#32570).
+            $arg->compileTimeString = $this->resolveJitCompileTimeStringSlot($block, $slot);
         }
     }
 
@@ -24328,6 +24329,29 @@ class JIT {
             if (null !== $resolved) {
                 return $resolved;
             }
+        }
+
+        if (\count($block->parents) > 1) {
+            // Try/catch (and ?: / foreach) merge blocks: all incoming paths must agree.
+            // Picking the first parent folded catch assigns to the try-path literal (e.g.
+            // $error = "" before try, "msg" in catch → strlen($error) became 0) (#32570).
+            $agreed = null;
+            foreach ($block->parents as $parent) {
+                if (!$parent instanceof Block) {
+                    return null;
+                }
+                $resolved = $this->resolveJitCompileTimeStringSlot($parent, $slot, $visited);
+                if (null === $resolved) {
+                    return null;
+                }
+                if (null === $agreed) {
+                    $agreed = $resolved;
+                } elseif ($agreed !== $resolved) {
+                    return null;
+                }
+            }
+
+            return $agreed;
         }
 
         foreach ($block->parents as $parent) {
