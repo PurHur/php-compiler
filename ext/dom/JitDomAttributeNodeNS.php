@@ -802,6 +802,58 @@ final class JitDomAttributeNodeNS
         return $context->builder->load($resultSlot);
     }
 
+    /**
+     * DOMElement::toggleAttribute() — user-script AOT attribute cache (#19507).
+     * Returns int1: attribute present after call (php-src ext/dom/element.c dom_element_toggle_attribute).
+     *
+     * @param 'omit'|'force_true'|'force_false' $mode
+     */
+    public static function emitToggleAttributeInt1(Context $context, string $nameLit, string $mode): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_toggle_attr_emit');
+        $i1 = $context->getTypeFromString('int1');
+        if ('xmlns' === $nameLit || str_starts_with($nameLit, 'xmlns:')) {
+            return $i1->constInt(0, false);
+        }
+        if ('force_true' === $mode) {
+            self::setAttributeLiteralReuseOrCreate($context, $nameLit, '');
+
+            return $i1->constInt(1, false);
+        }
+        if ('force_false' === $mode) {
+            DomUserScriptAttributeCacheLlvm::clearLiteral($context, '', $nameLit);
+
+            return $i1->constInt(0, false);
+        }
+        $objPtr = $context->getTypeFromString('__object__*');
+        $existing = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
+        $isPresent = $context->builder->icmp(
+            Builder::INT_NE,
+            $existing,
+            $objPtr->constNull()
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $removeBlock = $fn->appendBasicBlock('dom_toggle_remove');
+        $addBlock = $fn->appendBasicBlock('dom_toggle_add');
+        $doneBlock = $fn->appendBasicBlock('dom_toggle_done');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->branchIf($isPresent, $removeBlock, $addBlock);
+
+        $context->builder->positionAtEnd($removeBlock);
+        DomUserScriptAttributeCacheLlvm::clearLiteral($context, '', $nameLit);
+        $context->builder->store($i1->constInt(0, false), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($addBlock);
+        self::setAttributeLiteralReuseOrCreate($context, $nameLit, '');
+        $context->builder->store($i1->constInt(1, false), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
     private static function compileTimeNullableStringArg(JITVariable $arg): ?string
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
