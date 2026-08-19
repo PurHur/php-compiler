@@ -13339,6 +13339,7 @@ class JIT {
     private function emitJitReturnFromValue(PHPLLVM\Value $func, Block $block, Variable $value): void
     {
         $builder = $this->context->builder;
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'jit_return_from_value_cont');
         $returnBlock = $builder->getInsertBlock();
         $builder->positionAtEnd($returnBlock);
         $this->markJitThisConstructedIfLeavingConstruct($block);
