@@ -887,6 +887,8 @@ final class BuiltinInternalArgInfo
             'ignore_user_abort' => 0 === $index ? '?bool' : null,
             // ext/standard/basic_functions.stub.php — ?int $mask = null (InternalArgInfo int) (#28176)
             'umask' => 0 === $index ? '?int' : null,
+            // ext/standard/basic_functions.stub.php — string|int $user/$group (InternalArgInfo untyped) (#27812, #28001)
+            'chown', 'lchown', 'chgrp', 'lchgrp' => 1 === $index ? 'string|int' : null,
             // ext/standard/basic_functions.stub.php — ?string $type = null (InternalArgInfo string) (#23381)
             'get_resources' => 0 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?callable $callback = null (InternalArgInfo string|array) (#23359)
