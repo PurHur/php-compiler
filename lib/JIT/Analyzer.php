@@ -62,6 +62,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\MethodCall
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Empty_
+                || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\Include_
                 || $usage instanceof Op\Terminal\Return_
@@ -141,6 +142,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\Empty_
                 || $usage instanceof Op\Expr\BooleanNot
+                || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Stmt\JumpIf
                 || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\New_

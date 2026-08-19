@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\VM\VmObjectNumericOperandGuard;
 
 /**
- * JIT trampoline for object ⊙ scalar arithmetic TypeErrors (#32477).
+ * JIT trampoline for object ⊙ scalar arithmetic/bitwise TypeErrors (#32477, #32486).
  *
  * SSOT: {@see \PHPCompiler\VM\VmObjectNumericOperandGuard}
  */
@@ -31,5 +31,13 @@ final class JitObjectNumericOperandGuard
     public static function guardUnary(Context $context, Variable $var): bool
     {
         return VmObjectNumericOperandGuard::guardUnary($context, $var);
+    }
+
+    /**
+     * @return bool true when TypeError was emitted
+     */
+    public static function guardUnaryBitwiseNot(Context $context, Variable $var): bool
+    {
+        return VmObjectNumericOperandGuard::guardUnaryBitwiseNot($context, $var);
     }
 }
