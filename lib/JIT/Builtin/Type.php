@@ -1014,8 +1014,6 @@ class Type extends Builtin {
         $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr, $i64, $i64);
         $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
         $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
-        $i8ppPtr = $this->context->getTypeFromString('int8**');
-        $i8pppPtr = $this->context->getTypeFromString('int8***');
         $fnPendingReset = $this->context->module->addFunction(
             '__phpc_pending_header_reset',
             $this->context->context->functionType($void, false)
@@ -1041,23 +1039,10 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false)
         );
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
-        $fnGlobVec = $this->context->module->addFunction(
-            '__phpc_glob_vec',
-            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
-        );
-        $this->context->registerFunction('__phpc_glob_vec', $fnGlobVec);
-        $fnScandirVec = $this->context->module->addFunction(
-            '__phpc_scandir_vec',
-            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
-        );
-        $this->context->registerFunction('__phpc_scandir_vec', $fnScandirVec);
-        // __phpc_file_vec always-on shell removed (#32250): leftover sibling of
-        // live __phpc_glob_vec / __phpc_scandir_vec; zero NestedJIT consumers.
-        $fnStrvecFree = $this->context->module->addFunction(
-            '__phpc_strvec_free',
-            $this->context->context->functionType($void, false, $i8ppPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_strvec_free', $fnStrvecFree);
+        // __phpc_glob_vec / __phpc_scandir_vec / __phpc_strvec_free always-on shells
+        // removed (#32650): JitFsGlobKernel declares module-locally (getNamedFunction first);
+        // user-script glob()/scandir() stay FsGlobJitHelper / VmFsGlob (#27235/#27236).
+        // __phpc_file_vec always-on shell removed (#32250): zero NestedJIT consumers.
         $fnStat = $this->context->module->addFunction(
             '__phpc_stat',
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
@@ -1094,21 +1079,9 @@ class Type extends Builtin {
         // __compiler_getdate always-on shell removed (#32250): user-script getdate()
         // stays JitGetdate IR / GetdateJitHelper (#26900). StringGetdate::implement()
         // is an intentional no-op.
-        $fnLocaltime = $this->context->module->addFunction(
-            '__compiler_localtime',
-            $this->context->context->functionType($void, false, $i64, $i1, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_localtime', $fnLocaltime);
-        $fnGmgetdate = $this->context->module->addFunction(
-            '__compiler_gmgetdate',
-            $this->context->context->functionType($void, false, $i64, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_gmgetdate', $fnGmgetdate);
-        $fnGmmktime = $this->context->module->addFunction(
-            '__compiler_gmmktime',
-            $this->context->context->functionType($void, false, $i64, $i64, $i64, $i64, $i64, $i64, $i1, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_gmmktime', $fnGmmktime);
+        // __compiler_localtime / __compiler_gmgetdate / __compiler_gmmktime always-on
+        // shells removed (#32650): StringLocaltime / StringGmgetdate / StringGmmktime
+        // own the ABI (getNamedFunction first); php-src ext/standard/datetime.c.
         $fnMktime = $this->context->module->addFunction(
             '__compiler_mktime',
             $this->context->context->functionType($void, false, $i64, $i64, $i64, $i64, $i64, $i64, $i1, $valuePtr)
