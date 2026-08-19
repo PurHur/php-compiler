@@ -171,6 +171,44 @@ class AnalyzerTest extends TestCase
         $this->assertFalse($analyzer->hasDynamicArrayAppend($init, 1));
     }
 
+    public function testCanEscapeIssetOnPackedArrayDoesNotThrow(): void
+    {
+        // isset($a) is Isset_ on the array operand (peer Empty_; leftover of #32475 / #32556).
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null]);
+        new Op\Expr\Isset_([$init]);
+
+        $this->assertFalse($analyzer->canEscape($init));
+    }
+
+    public function testCanEscapePrintOnPackedArrayDoesNotThrow(): void
+    {
+        // print $a is Print_ on the array operand (peer Echo_; leftover of #32475 / #32556).
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null]);
+        new Op\Expr\Print_($init);
+
+        $this->assertFalse($analyzer->canEscape($init));
+    }
+
+    public function testHasDynamicArrayAppendIssetDoesNotThrow(): void
+    {
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null]);
+        new Op\Expr\Isset_([$init]);
+
+        $this->assertFalse($analyzer->hasDynamicArrayAppend($init, 1));
+    }
+
+    public function testHasDynamicArrayAppendPrintDoesNotThrow(): void
+    {
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null]);
+        new Op\Expr\Print_($init);
+
+        $this->assertFalse($analyzer->hasDynamicArrayAppend($init, 1));
+    }
+
     private function makeOperand(array $keys): Operand
     {
         $values = [];

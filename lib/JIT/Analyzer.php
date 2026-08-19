@@ -62,6 +62,8 @@ class Analyzer
                 || $usage instanceof Op\Expr\MethodCall
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Empty_
+                // isset($packed) is a known usage (peer Empty_; leftover of #32475 / #32556).
+                || $usage instanceof Op\Expr\Isset_
                 || $usage instanceof Op\Expr\BitwiseNot
                 // Unary +/- on packed arrays must not abort Analyzer (#32553 leftover of #32475).
                 || $usage instanceof Op\Expr\UnaryPlus
@@ -75,6 +77,8 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Value
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Echo_
+                // print $packed is a known usage (peer Echo_; leftover of #32475 / #32556).
+                || $usage instanceof Op\Expr\Print_
                 || $usage instanceof Op\Expr\Array_
                 || $usage instanceof Op\Expr\Cast\Array_
                 || $usage instanceof Op\Expr\Cast\Object_
@@ -144,6 +148,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\Empty_
+                || $usage instanceof Op\Expr\Isset_
                 || $usage instanceof Op\Expr\BooleanNot
                 || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Expr\UnaryPlus
@@ -162,6 +167,7 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Terminal\Echo_
+                || $usage instanceof Op\Expr\Print_
                 || $usage instanceof Op\Expr\Array_
                 || $usage instanceof Op\Expr\Cast\Array_
                 || $usage instanceof Op\Expr\Cast\Object_
