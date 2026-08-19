@@ -964,14 +964,49 @@ final class VmValueCompare
         if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
+
+        // Zend compare_function: IS_DOUBLE < IS_LONG promotes the long to double.
+        // __value__readLong truncates floats, giving wrong results (#23471).
+        $isDouble = \PHPCompiler\JIT\JitValueNumeric::valueIsDouble($context, $boxed);
+        $floatBb = BasicBlockHelper::append($context, 'ord_vbox_long_float');
+        $longBb = BasicBlockHelper::append($context, 'ord_vbox_long_long');
+        $doneBb = BasicBlockHelper::append($context, 'ord_vbox_long_done');
+        $context->builder->branchIf($isDouble, $floatBb, $longBb);
+
+        $context->builder->positionAtEnd($floatBb);
+        $f64 = $context->getTypeFromString('double');
+        $boxedDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            JitValueBox::valuePtrFromVariable($context, $boxed)
+        );
+        $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
+        $floatResult = VmFloatCompare::relationalCompare(
+            $context,
+            $opcodeType,
+            $boxedDouble,
+            $nativeDouble
+        );
+        $floatEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($longBb);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $leftLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
         $__right = $context->builder->intCast($nativeLong, $leftLong->typeOf());
+        $longResult = self::orderedLongCompare($context, $opcodeType, $leftLong, $__right);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        return self::orderedLongCompare($context, $opcodeType, $leftLong, $__right);
+        $context->builder->positionAtEnd($doneBb);
+        $i1 = $context->getTypeFromString('int1');
+        $phi = $context->builder->phi($i1, 'ord_vbox_long_phi');
+        $phi->addIncoming($floatResult, $floatEnd);
+        $phi->addIncoming($longResult, $longEnd);
+
+        return $phi;
     }
 
     public static function orderedNativeLongToValue(
@@ -983,14 +1018,48 @@ final class VmValueCompare
         if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
+
+        // Zend compare_function: IS_LONG < IS_DOUBLE promotes the long to double (#23471).
+        $isDouble = \PHPCompiler\JIT\JitValueNumeric::valueIsDouble($context, $boxed);
+        $floatBb = BasicBlockHelper::append($context, 'ord_long_vbox_float');
+        $longBb = BasicBlockHelper::append($context, 'ord_long_vbox_long');
+        $doneBb = BasicBlockHelper::append($context, 'ord_long_vbox_done');
+        $context->builder->branchIf($isDouble, $floatBb, $longBb);
+
+        $context->builder->positionAtEnd($floatBb);
+        $f64 = $context->getTypeFromString('double');
+        $boxedDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            JitValueBox::valuePtrFromVariable($context, $boxed)
+        );
+        $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
+        $floatResult = VmFloatCompare::relationalCompare(
+            $context,
+            $opcodeType,
+            $nativeDouble,
+            $boxedDouble
+        );
+        $floatEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($longBb);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $rightLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
         $__left = $context->builder->intCast($nativeLong, $rightLong->typeOf());
+        $longResult = self::orderedLongCompare($context, $opcodeType, $__left, $rightLong);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        return self::orderedLongCompare($context, $opcodeType, $__left, $rightLong);
+        $context->builder->positionAtEnd($doneBb);
+        $i1 = $context->getTypeFromString('int1');
+        $phi = $context->builder->phi($i1, 'ord_long_vbox_phi');
+        $phi->addIncoming($floatResult, $floatEnd);
+        $phi->addIncoming($longResult, $longEnd);
+
+        return $phi;
     }
 
     public static function orderedValueToNativeDouble(
