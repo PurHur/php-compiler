@@ -1,0 +1,31 @@
+# PHP 8.0+ deprecates optional parameters declared before required parameters.
+# Class_::__construct has `$extends = null` before required `$implements` and `$stmts`.
+# This produces a Deprecated notice on every class compilation, leaking into VM output.
+#
+# Fix: reorder so $extends comes after $stmts (all required params first).
+# Idempotency: patch_already_applied greps Class_.php for the reordered signature.
+#
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php
+@@ -22,7 +22,7 @@
+ 
+     public $implements;
+ 
+-    public function __construct(Operand $name, int $flags, ?Operand $extends = null, array $implements, Block $stmts, array $attributes = [])
++    public function __construct(Operand $name, int $flags, array $implements, Block $stmts, ?Operand $extends = null, array $attributes = [])
+     {
+         parent::__construct($name, $stmts, $attributes);
+         $this->flags = $flags;
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -248,10 +248,10 @@
+         $this->block->children[] = new Op\Stmt\Class_(
+             $name,
+             $node->flags,
+-            $this->parseExprNode($node->extends),
+             $this->parseExprList($node->implements),
+             $this->parseNodes($node->stmts, new Block()),
++            $this->parseExprNode($node->extends),
+             $this->mapAttributes($node)
+         );
+         $this->currentClass = $old;
