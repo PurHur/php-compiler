@@ -970,9 +970,10 @@ final class Variable {
             if (null !== $this->objectPropertySlot) {
                 return;
             }
-            if ($this->ephemeralConcatTemp) {
-                return;
-            }
+            // ephemeralConcatTemp: each ConcatList link has its own entry alloca
+            // (never reused within one call), so free() emits the final delref
+            // at function exit. Without this, the last string in each temp leaks
+            // and heap-corrupts on repeated calls (#24024 re-fix).
             $ptr = self::KIND_VALUE === $this->kind
                 ? $this->value
                 : $this->context->helper->loadValue($this);

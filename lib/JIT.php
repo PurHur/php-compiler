@@ -9549,26 +9549,20 @@ class JIT {
                             JIT\StringOffsetHelper::emitAssignOpError($this->context);
                             break;
                         }
-                        if (
-                            $this->concatDeadOperandNeedsEntryAlloca($block, $destOp, $leftOp)
-                            || $left->ephemeralConcatTemp
-                        ) {
-                            // Fresh entry alloca per ConcatList link. KIND_VALUE-only continuation
-                            // stack-colors with dead fopen() __value__* slots under AOT and
-                            // heap-corrupts on 4-var encapsed echo (#24024 / re-#23842).
-                            $this->assignEphemeralConcatOperand(
-                                $block,
-                                $destOp,
-                                $left,
-                                $right,
-                                $func,
-                                $leftOp,
-                                $rightOp
-                            );
-                        } else {
-                            $newVal = $this->compileConcatIntoNewString($left, $right, $leftOp, $rightOp);
-                            $this->assignOperand($destOp, $newVal, true);
-                        }
+                        // Always use entry-alloca for dead-operand concat results.
+                        // assignOperand creates KIND_VALUE variables whose free() is a
+                        // no-op, leaking the allocated string and corrupting the heap on
+                        // repeated calls with multi-variable string interpolation
+                        // (#24024, #23842, e19_const segfault).
+                        $this->assignEphemeralConcatOperand(
+                            $block,
+                            $destOp,
+                            $left,
+                            $right,
+                            $func,
+                            $leftOp,
+                            $rightOp
+                        );
                         $this->maybeRefreshIncludeBindingsBeforeUse();
                         break;
                     }
