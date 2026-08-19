@@ -1553,6 +1553,9 @@ final class BuiltinParamNames
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says x509/out/notext (#32557)
             case 'openssl_x509_export':
                 return ['certificate', 'output', 'no_text='];
+            // php-src ext/openssl/openssl.stub.php
+            case 'openssl_x509_export_to_file':
+                return ['certificate', 'output_filename', 'no_text='];
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says dn/privkey/configargs (#24663)
             case 'openssl_csr_new':
                 return ['distinguished_names', 'private_key', 'options=', 'extra_attributes='];
