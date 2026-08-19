@@ -82,7 +82,7 @@ final class JitDomNodeListLength
             return new JITVariable(
                 $context,
                 JITVariable::TYPE_NATIVE_LONG,
-                JITVariable::KIND_VALUE,
+                JITVariable::KIND_VARIABLE,
                 $nativeSlot
             );
         }
