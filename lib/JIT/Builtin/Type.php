@@ -549,27 +549,12 @@ class Type extends Builtin {
         // ChownJitHelper / VmFs. NestedJIT/AOT bridges are CopyRuntime / ChownRuntime
         // (getNamedFunction first + JitVmHelperLink::ensureCompiled). Leftover Type
         // addFunction vs Runtime ABI drift mints copy.1 / chown.1 (#31894 / #32122).
-        $fntypeMoveUploaded = $this->context->context->functionType(
-            $i32,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnMoveUploaded = $this->context->module->addFunction(
-            '__compiler_move_uploaded_file',
-            $fntypeMoveUploaded
-        );
-        $this->context->registerFunction('__compiler_move_uploaded_file', $fnMoveUploaded);
-        $fntypeIsUploaded = $this->context->context->functionType(
-            $i32,
-            false,
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnIsUploaded = $this->context->module->addFunction(
-            '__compiler_is_uploaded_file',
-            $fntypeIsUploaded
-        );
-        $this->context->registerFunction('__compiler_is_uploaded_file', $fnIsUploaded);
+        // __compiler_move_uploaded_file / __compiler_is_uploaded_file always-on
+        // shells removed (#32499): user-script move_uploaded_file()/is_uploaded_file()
+        // stay UploadTempJitHelper / VmFs. NestedJIT/AOT bridge is
+        // JitUploadTempKernel (getNamedFunction first + JitVmHelperLink::ensureCompiled).
+        // Leftover Type addFunction vs kernel ABI drift mints move_uploaded_file.1
+        // (#31894 / #32122).
         $fntypeTouch = $this->context->context->functionType(
             $i32,
             false,
