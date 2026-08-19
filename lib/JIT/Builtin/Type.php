@@ -1040,7 +1040,7 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
         // __phpc_glob_vec / __phpc_scandir_vec / __phpc_strvec_free always-on shells
-        // removed (#32650): JitFsGlobKernel declares module-locally (getNamedFunction first);
+        // removed (#32636): JitFsGlobKernel declares module-locally (getNamedFunction first);
         // user-script glob()/scandir() stay FsGlobJitHelper / VmFsGlob (#27235/#27236).
         // __phpc_file_vec always-on shell removed (#32250): zero NestedJIT consumers.
         $fnStat = $this->context->module->addFunction(
@@ -1080,7 +1080,7 @@ class Type extends Builtin {
         // stays JitGetdate IR / GetdateJitHelper (#26900). StringGetdate::implement()
         // is an intentional no-op.
         // __compiler_localtime / __compiler_gmgetdate / __compiler_gmmktime always-on
-        // shells removed (#32650): StringLocaltime / StringGmgetdate / StringGmmktime
+        // shells removed (#32636): StringLocaltime / StringGmgetdate / StringGmmktime
         // own the ABI (getNamedFunction first); php-src ext/standard/datetime.c.
         $fnMktime = $this->context->module->addFunction(
             '__compiler_mktime',

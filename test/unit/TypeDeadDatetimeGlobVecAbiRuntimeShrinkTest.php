@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on datetime + fs-glob vec ABI shells from Builtin\Type (#32650).
+ * Drop leftover always-on datetime + fs-glob vec ABI shells from Builtin\Type (#32636).
  *
  * User-script localtime()/gmgetdate()/gmmktime()/glob()/scandir() stay PHP helpers.
  * Runtime owners declare module-locally (getNamedFunction first) so leftover Type
@@ -31,17 +31,17 @@ final class TypeDeadDatetimeGlobVecAbiRuntimeShrinkTest extends TestCase
     public function testTypeBuiltinDropsLeftoverAlwaysOnDatetimeGlobVecAbis(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#32650', $type);
+        $this->assertStringContainsString('#32636', $type);
         foreach ($this->droppedAbis() as $sym) {
             $this->assertStringNotContainsString(
                 "addFunction('{$sym}'",
                 $type,
-                "Builtin\\Type must not always-declare {$sym} (#32650)"
+                "Builtin\\Type must not always-declare {$sym} (#32636)"
             );
             $this->assertStringNotContainsString(
                 "registerFunction('{$sym}'",
                 $type,
-                "Builtin\\Type must not always-register {$sym} (#32650)"
+                "Builtin\\Type must not always-register {$sym} (#32636)"
             );
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
