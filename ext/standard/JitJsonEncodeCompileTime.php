@@ -46,6 +46,7 @@ final class JitJsonEncodeCompileTime
         ?Operand $operand,
         int $flags
     ): ?Value {
+        $context->jitJsonEncodeFoldedString = null;
         if (null === $block || null === $operand) {
             return null;
         }
@@ -150,6 +151,8 @@ final class JitJsonEncodeCompileTime
             self::emitSetLastError($context, $sticky);
         }
 
+        $context->jitJsonEncodeFoldedString = $encoded;
+
         return $context->builder->load($context->constantStringFromString($encoded));
     }
 
@@ -239,6 +242,8 @@ final class JitJsonEncodeCompileTime
         if (0 !== $sticky) {
             self::emitSetLastError($context, $sticky);
         }
+
+        $context->jitJsonEncodeFoldedString = $encoded;
 
         return $context->builder->load($context->constantStringFromString($encoded));
     }
