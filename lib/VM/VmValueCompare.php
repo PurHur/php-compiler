@@ -666,25 +666,78 @@ final class VmValueCompare
             throw new \LogicException('Expected two boxed __value__ operands');
         }
         SpaceshipRuntime::ensureLinked($context);
-        $readFn = $context->lookupFunction('__value__readObject');
-        $readTy = $readFn->getParam(0)->typeOf();
-        $leftObj = $context->builder->call(
-            $readFn,
-            $context->builder->pointerCast(self::runtimeValuePtr($context, $left), $readTy)
+        $leftPtr = self::runtimeValuePtr($context, $left);
+        $rightPtr = self::runtimeValuePtr($context, $right);
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $leftKind = $context->builder->load(
+            $context->builder->structGep($leftPtr, $map['type'])
         );
-        $rightObj = $context->builder->call(
-            $readFn,
-            $context->builder->pointerCast(self::runtimeValuePtr($context, $right), $readTy)
+        $rightKind = $context->builder->load(
+            $context->builder->structGep($rightPtr, $map['type'])
         );
-        $cmpFn = $context->lookupFunction('__object__compareSpaceship');
-        $cmp = $context->builder->call(
-            $cmpFn,
-            $context->builder->pointerCast($leftObj, $cmpFn->getParam(0)->typeOf()),
-            $context->builder->pointerCast($rightObj, $cmpFn->getParam(1)->typeOf())
-        );
-        $zero = $cmp->typeOf()->constInt(0, false);
+        $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+        $strTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $leftObj = $context->builder->icmp(Builder::INT_EQ, $leftKind, $objTag);
+        $rightObj = $context->builder->icmp(Builder::INT_EQ, $rightKind, $objTag);
+        $leftStr = $context->builder->icmp(Builder::INT_EQ, $leftKind, $strTag);
+        $rightStr = $context->builder->icmp(Builder::INT_EQ, $rightKind, $strTag);
+        $bothObj = $context->builder->and($leftObj, $rightObj);
+        $objStr = $context->builder->and($leftObj, $rightStr);
+        $strObj = $context->builder->and($leftStr, $rightObj);
+        $objStrUnlike = $context->builder->or($objStr, $strObj);
 
-        return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $entry = $context->builder->getInsertBlock();
+        $bothObjBb = BasicBlockHelper::append($context, 'loose_val_both_obj');
+        $mixedBb = BasicBlockHelper::append($context, 'loose_val_mixed');
+        $falseBb = BasicBlockHelper::append($context, 'loose_val_obj_str_false');
+        $genBb = BasicBlockHelper::append($context, 'loose_val_gen');
+        $doneBb = BasicBlockHelper::append($context, 'loose_val_done');
+        $context->builder->branchIf($bothObj, $bothObjBb, $mixedBb);
+
+        $context->builder->positionAtEnd($bothObjBb);
+        $leftObjPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $leftPtr
+        );
+        $rightObjPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $rightPtr
+        );
+        $objCmp = SpaceshipRuntime::callObjectCompareSpaceship($context, $leftObjPtr, $rightObjPtr);
+        $bothObjEq = $context->builder->icmp(
+            Builder::INT_EQ,
+            $objCmp,
+            $objCmp->typeOf()->constInt(0, false)
+        );
+        $bothObjEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($mixedBb);
+        $context->builder->branchIf($objStrUnlike, $falseBb, $genBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($genBb);
+        $genericCmp = SpaceshipRuntime::callValueSpaceship($context, $leftPtr, $rightPtr);
+        $genericEq = $context->builder->icmp(
+            Builder::INT_EQ,
+            $genericCmp,
+            $genericCmp->typeOf()->constInt(0, false)
+        );
+        $genEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i1, 'loose_val_done_phi');
+        $phi->addIncoming($bothObjEq, $bothObjEnd);
+        $phi->addIncoming($falseVal, $falseBb);
+        $phi->addIncoming($genericEq, $genEnd);
+
+        return $phi;
     }
 
     /**
@@ -987,12 +1040,8 @@ final class VmValueCompare
         if (Variable::TYPE_VALUE !== $left->type || Variable::TYPE_VALUE !== $right->type) {
             throw new \LogicException('Expected two boxed __value__ operands');
         }
-        $leftPtr = Variable::KIND_VARIABLE === $left->kind
-            ? $left->value
-            : $context->helper->loadValue($left);
-        $rightPtr = Variable::KIND_VARIABLE === $right->kind
-            ? $right->value
-            : $context->helper->loadValue($right);
+        $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
+        $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
         $map = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
         $leftType = $context->builder->load($context->builder->structGep($leftPtr, $map['type']));
@@ -1002,6 +1051,21 @@ final class VmValueCompare
             $context->builder->icmp(Builder::INT_EQ, $leftType, $longTag),
             $context->builder->icmp(Builder::INT_EQ, $rightType, $longTag)
         );
+        $objectTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+        $bothObj = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $objectTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $objectTag)
+        );
+        SpaceshipRuntime::ensureLinked($context);
+        $i1 = $context->getTypeFromString('int1');
+        $longBb = BasicBlockHelper::append($context, 'ord_val_val_long');
+        $objBb = BasicBlockHelper::append($context, 'ord_val_val_obj');
+        $objBodyBb = BasicBlockHelper::append($context, 'ord_val_val_obj_body');
+        $genBb = BasicBlockHelper::append($context, 'ord_val_val_gen');
+        $doneBb = BasicBlockHelper::append($context, 'ord_val_val_done');
+        $context->builder->branchIf($bothLong, $longBb, $objBb);
+
+        $context->builder->positionAtEnd($longBb);
         $leftLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $leftPtr
@@ -1011,14 +1075,13 @@ final class VmValueCompare
             $rightPtr
         );
         $orderedLong = self::orderedLongCompare($context, $opcodeType, $leftLong, $rightLong);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        // Zend compare_function object branch → zend_compare_objects (#25241).
-        $objectTag = $i8->constInt(Variable::TYPE_OBJECT, false);
-        $bothObj = $context->builder->and(
-            $context->builder->icmp(Builder::INT_EQ, $leftType, $objectTag),
-            $context->builder->icmp(Builder::INT_EQ, $rightType, $objectTag)
-        );
-        SpaceshipRuntime::ensureLinked($context);
+        $context->builder->positionAtEnd($objBb);
+        $context->builder->branchIf($bothObj, $objBodyBb, $genBb);
+
+        $context->builder->positionAtEnd($objBodyBb);
         $leftObj = $context->builder->call(
             $context->lookupFunction('__value__readObject'),
             $leftPtr
@@ -1029,12 +1092,22 @@ final class VmValueCompare
         );
         $objCmp = SpaceshipRuntime::callObjectCompareSpaceship($context, $leftObj, $rightObj);
         $orderedObj = self::boolFromSpaceshipCmp($context, $opcodeType, $objCmp);
+        $objEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($genBb);
         $genericCmp = SpaceshipRuntime::callValueSpaceship($context, $leftPtr, $rightPtr);
         $orderedGeneric = self::boolFromSpaceshipCmp($context, $opcodeType, $genericCmp);
-        $notLong = $context->builder->select($bothObj, $orderedObj, $orderedGeneric);
+        $genEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        return $context->builder->select($bothLong, $orderedLong, $notLong);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i1, 'ord_val_val_done_phi');
+        $phi->addIncoming($orderedLong, $longEnd);
+        $phi->addIncoming($orderedObj, $objEnd);
+        $phi->addIncoming($orderedGeneric, $genEnd);
+
+        return $phi;
     }
 
     /**
