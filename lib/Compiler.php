@@ -13326,9 +13326,13 @@ class Compiler {
                 for ($i = 1; $i < $total; $i++) {
                     $right = $this->compileConcatListPart($op->list[$i], $block);
                     $isLast = ($i === $total - 1);
-                    $dest = $isLast
-                        ? $return
-                        : $block->forceFreshVarSlot(new Temporary());
+                    if ($isLast) {
+                        $dest = $return;
+                    } else {
+                        $tmp = new Temporary();
+                        $dest = $block->forceFreshVarSlot($tmp);
+                        $block->orig->deadOperands[] = $tmp;
+                    }
                     $this->addConcatListOpCode($block, new OpCode(
                         OpCode::TYPE_CONCAT,
                         $dest,
