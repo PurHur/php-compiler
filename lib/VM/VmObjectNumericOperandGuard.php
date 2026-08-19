@@ -17,11 +17,12 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
 /**
- * SSOT for JIT/AOT object ⊙ scalar arithmetic TypeErrors (#32477).
+ * SSOT for JIT/AOT object ⊙ scalar arithmetic/bitwise TypeErrors (#32477, #32486).
  *
  * php-src: Zend/zend_operators.c — objects without numeric do_operation
  * (GMP / BcMath\Number) throw zend_type_error. Unary +/− messages are
  * {@code Unsupported operand types: stdClass} (operator_unsupported_types.phpt).
+ * Unary {@code ~} is {@code Cannot perform bitwise not on %s}.
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitObjectNumericOperandGuard}
  */
@@ -116,16 +117,18 @@ final class VmObjectNumericOperandGuard
     }
 
     /**
-     * Unary +/− on a native or boxed object without do_operation (#32477).
+     * Unary +/− (or {@code ~} with a custom message) on a native or boxed
+     * object without do_operation (#32477, #32486).
      *
+     * @param callable(string):string|null $messageForClass
      * @return bool true when native TYPE_OBJECT was fully handled (caller must not continue)
      */
-    public static function guardUnary(Context $context, Variable $var): bool
+    public static function guardUnary(Context $context, Variable $var, ?callable $messageForClass = null): bool
     {
         if (NestedJitCompileScope::isActive()) {
             return false;
         }
-        $msg = static fn (string $class): string => 'Unsupported operand types: '.$class;
+        $msg = $messageForClass ?? static fn (string $class): string => 'Unsupported operand types: '.$class;
         if (Variable::TYPE_OBJECT === $var->type) {
             self::emitNativeObjectTypeError($context, $var, $msg);
 
@@ -266,7 +269,12 @@ final class VmObjectNumericOperandGuard
             || OpCode::TYPE_MUL === $opCode
             || OpCode::TYPE_DIV === $opCode
             || OpCode::TYPE_MODULO === $opCode
-            || OpCode::TYPE_POW === $opCode;
+            || OpCode::TYPE_POW === $opCode
+            || OpCode::TYPE_BITWISE_AND === $opCode
+            || OpCode::TYPE_BITWISE_OR === $opCode
+            || OpCode::TYPE_BITWISE_XOR === $opCode
+            || OpCode::TYPE_SHIFT_LEFT === $opCode
+            || OpCode::TYPE_SHIFT_RIGHT === $opCode;
     }
 
     private static function operatorSymbol(int $opCode): string
@@ -278,6 +286,11 @@ final class VmObjectNumericOperandGuard
             OpCode::TYPE_DIV => '/',
             OpCode::TYPE_MODULO => '%',
             OpCode::TYPE_POW => '**',
+            OpCode::TYPE_BITWISE_AND => '&',
+            OpCode::TYPE_BITWISE_OR => '|',
+            OpCode::TYPE_BITWISE_XOR => '^',
+            OpCode::TYPE_SHIFT_LEFT => '<<',
+            OpCode::TYPE_SHIFT_RIGHT => '>>',
             default => '?',
         };
     }

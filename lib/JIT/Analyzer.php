@@ -51,6 +51,7 @@ class Analyzer
                     return true;
                 }
             } elseif ($usage instanceof Op\Expr\BinaryOp
+                || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Expr\ArrayDimFetch
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\FuncCall
@@ -136,6 +137,7 @@ class Analyzer
                     }
                 }
             } elseif ($usage instanceof Op\Expr\BinaryOp
+                || $usage instanceof Op\Expr\BitwiseNot
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion

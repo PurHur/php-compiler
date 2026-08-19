@@ -12,10 +12,12 @@ use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
 
 /**
- * SSOT for JIT/AOT array ⊙ non-array arithmetic TypeErrors (#32346).
+ * SSOT for JIT/AOT array ⊙ non-array arithmetic/bitwise TypeErrors (#32346, #32486).
  *
  * php-src: Zend/zend_operators.c add_function — IS_ARRAY+IS_ARRAY unions;
  * mixed array ⊙ scalar is zend_type_error. sub/mul/div/mod/pow likewise.
+ * Bitwise {@code &|^} / shifts / unary {@code ~} are always zend_type_error
+ * (no array union). Unary {@code ~}: {@code Cannot perform bitwise not on array}.
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitArrayNumericOperandGuard}
  */
@@ -55,6 +57,21 @@ final class VmArrayNumericOperandGuard
         return true;
     }
 
+    /**
+     * Unary {@code ~} on a native array (#32486).
+     *
+     * @return bool true when TypeError+abort was emitted
+     */
+    public static function guardUnaryBitwiseNot(Context $context, Variable $var): bool
+    {
+        if (!self::isArrayOperand($var)) {
+            return false;
+        }
+        ExceptionBridge::emitTypeErrorAndAbort($context, 'Cannot perform bitwise not on array');
+
+        return true;
+    }
+
     private static function isGuardedArithmeticOp(int $opCode): bool
     {
         return OpCode::TYPE_PLUS === $opCode
@@ -62,7 +79,12 @@ final class VmArrayNumericOperandGuard
             || OpCode::TYPE_MUL === $opCode
             || OpCode::TYPE_DIV === $opCode
             || OpCode::TYPE_MODULO === $opCode
-            || OpCode::TYPE_POW === $opCode;
+            || OpCode::TYPE_POW === $opCode
+            || OpCode::TYPE_BITWISE_AND === $opCode
+            || OpCode::TYPE_BITWISE_OR === $opCode
+            || OpCode::TYPE_BITWISE_XOR === $opCode
+            || OpCode::TYPE_SHIFT_LEFT === $opCode
+            || OpCode::TYPE_SHIFT_RIGHT === $opCode;
     }
 
     private static function isArrayOperand(Variable $var): bool
@@ -89,6 +111,11 @@ final class VmArrayNumericOperandGuard
             OpCode::TYPE_DIV => '/',
             OpCode::TYPE_MODULO => '%',
             OpCode::TYPE_POW => '**',
+            OpCode::TYPE_BITWISE_AND => '&',
+            OpCode::TYPE_BITWISE_OR => '|',
+            OpCode::TYPE_BITWISE_XOR => '^',
+            OpCode::TYPE_SHIFT_LEFT => '<<',
+            OpCode::TYPE_SHIFT_RIGHT => '>>',
             default => '?',
         };
     }

@@ -231,6 +231,8 @@
             <file>./test/compliance/MathTrigNumNamed23506JITTest.php</file>
             <file>./test/compliance/ObjectNumericTypeError32477VMTest.php</file>
             <file>./test/compliance/ObjectNumericTypeError32477JITTest.php</file>
+            <file>./test/compliance/ObjectArrayBitwiseTypeError32486VMTest.php</file>
+            <file>./test/compliance/ObjectArrayBitwiseTypeError32486JITTest.php</file>
             <file>./test/compliance/IntvalFloatvalStrvalBoolvalNamed23334VMTest.php</file>
             <file>./test/compliance/IntvalFloatvalStrvalBoolvalNamed23334JITTest.php</file>
             <file>./test/compliance/StrchrReflection25758VMTest.php</file>
