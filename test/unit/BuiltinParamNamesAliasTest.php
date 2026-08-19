@@ -1519,6 +1519,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23506 — sin/cos/tan/asin/acos/atan/sinh/cosh/tanh/exp/log/log10 Zend $num */
+    public function testSinCosTanZendStubNamedParams(): void
+    {
+        foreach ([
+            'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+            'sinh', 'cosh', 'tanh', 'exp', 'log10',
+        ] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['num'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'number', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+        }
+        $log = BuiltinParamNames::forFunction('log');
+        self::assertSame(['num', 'base='], $log);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($log, 'num', 'log'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($log, 'base', 'log'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($log, 'number', 'log'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('log'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('log'));
+    }
+
     /** @covers issue #11785 / #25166 */
     public function testDateTimeClassMethodNamedParameters(): void
     {

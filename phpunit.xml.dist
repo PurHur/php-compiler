@@ -227,6 +227,8 @@
             <file>./test/compliance/PowSqrtFmodNamed23306JITTest.php</file>
             <file>./test/compliance/MathNumNamed27795VMTest.php</file>
             <file>./test/compliance/MathNumNamed27795JITTest.php</file>
+            <file>./test/compliance/MathTrigNumNamed23506VMTest.php</file>
+            <file>./test/compliance/MathTrigNumNamed23506JITTest.php</file>
             <file>./test/compliance/IntvalFloatvalStrvalBoolvalNamed23334VMTest.php</file>
             <file>./test/compliance/IntvalFloatvalStrvalBoolvalNamed23334JITTest.php</file>
             <file>./test/compliance/StrchrReflection25758VMTest.php</file>
