@@ -30,8 +30,9 @@ final class OpensslMethodsRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('__hashtable__setStringAt', $runtime);
 
         $helper = (string) file_get_contents(__DIR__.'/../../../ext/openssl/OpensslMethodsJitHelper.php');
-        $this->assertStringContainsString('OpensslCipherRegistry::CIPHER_METHODS', $helper);
-        $this->assertStringContainsString('OpensslCipherRegistry::MD_METHODS', $helper);
+        $this->assertStringContainsString('must match OpensslCipherRegistry::CIPHER_METHODS', $helper);
+        $this->assertStringContainsString('must match OpensslCipherRegistry::MD_METHODS', $helper);
+        $this->assertStringNotContainsString('return OpensslCipherRegistry::', $helper);
         $this->assertStringNotContainsString('phpc_openssl_cipher_methods_kernel', $helper);
         $this->assertStringNotContainsString('phpc_openssl_md_methods_kernel', $helper);
         $this->assertFileDoesNotExist(__DIR__.'/../../../ext/openssl/phpc_openssl_cipher_methods_kernel.php');
