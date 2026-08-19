@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_x509_fingerprint() — X.509 DER digest fingerprint (php-src ext/openssl/x509.c; #6524).
+ * openssl_x509_fingerprint() — X.509 DER digest fingerprint (php-src ext/openssl/openssl.c; #6524 VM, JIT/AOT #32512).
  */
 final class openssl_x509_fingerprint extends Internal
 {
@@ -65,8 +65,13 @@ final class openssl_x509_fingerprint extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_x509_fingerprint() is not implemented for JIT in this compiler build (issue #6524)'
-        );
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'openssl_x509_fingerprint() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::fingerprint($context, $args[0], $args[1] ?? null, $args[2] ?? null);
     }
 }

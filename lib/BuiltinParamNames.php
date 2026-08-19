@@ -1536,6 +1536,9 @@ final class BuiltinParamNames
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says x509/shortnames (#24663)
             case 'openssl_x509_parse':
                 return ['certificate', 'short_names='];
+            // php-src ext/openssl/openssl.stub.php
+            case 'openssl_x509_fingerprint':
+                return ['certificate', 'digest_alg=', 'binary='];
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says dn/privkey/configargs (#24663)
             case 'openssl_csr_new':
                 return ['distinguished_names', 'private_key', 'options=', 'extra_attributes='];
