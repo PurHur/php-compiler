@@ -127,7 +127,7 @@ final class JitDomDocumentElement
                 JitDomCreateElement::storeAttributesPresence(
                     $context,
                     $child,
-                    [] !== DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open'])
+                    DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open'])
                 );
             }
             self::ensureLinkProps($context);

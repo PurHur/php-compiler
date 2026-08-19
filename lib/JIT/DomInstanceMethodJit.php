@@ -238,6 +238,9 @@ final class DomInstanceMethodJit
         'domxpath::registernamespace' => true,
         'domxpath::registerphpfunctions' => true,
         'domnodelist::item' => true,
+        'domnamednodemap::item' => true,
+        'dom\\namednodemap::item' => true,
+        'dom\\dtdnamednodemap::item' => true,
         'domnodelist::getiterator' => true,
         'domnamednodemap::getnameditem' => true,
         'domnamednodemap::getnameditemns' => true,
@@ -959,6 +962,14 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnamednodemap::item' === $lc
+                || 'dom\\namednodemap::item' === $lc
+                || 'dom\\dtdnamednodemap::item' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNamedNodeMapItem();
+
+                return;
+            }
             if ('domnodelist::getiterator' === $lc
                 || 'domnamednodemap::getnameditem' === $lc
                 || 'domnamednodemap::getnameditemns' === $lc
@@ -1215,6 +1226,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domxpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');
             self::ensureProxy($context, 'domnodelist::getiterator');
+            self::ensureProxy($context, 'domnamednodemap::item');
+            self::ensureProxy($context, 'dom\\namednodemap::item');
+            self::ensureProxy($context, 'dom\\dtdnamednodemap::item');
             self::ensureProxy($context, 'domnamednodemap::getnameditem');
             self::ensureProxy($context, 'domnamednodemap::getnameditemns');
             self::ensureProxy($context, 'domnamednodemap::getiterator');
@@ -1318,13 +1332,13 @@ final class DomInstanceMethodJit
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],
-        'domnamednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],
+        'domnamednodemap' => ['item', 'getnameditem', 'getnameditemns', 'getiterator'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove', 'getiterator'],
         'dom\\tokenlist' => ['add', 'contains', 'item', 'toggle', 'remove', 'getiterator'],
         'dom\\nodelist' => ['getiterator'],
         'dom\\htmlcollection' => ['getiterator'],
-        'dom\\namednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],
-        'dom\\dtdnamednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],
+        'dom\\namednodemap' => ['item', 'getnameditem', 'getnameditemns', 'getiterator'],
+        'dom\\dtdnamednodemap' => ['item', 'getnameditem', 'getnameditemns', 'getiterator'],
     ];
 
     private static function ensureDomElementPropertyLayout(Context $context): void

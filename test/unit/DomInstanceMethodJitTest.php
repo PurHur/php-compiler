@@ -86,6 +86,8 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::lookupnamespaceuri'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::isdefaultnamespace'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::isdefaultnamespace'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnamednodemap::item'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('dom\\namednodemap::item'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domimplementation::hasfeature'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('dom\\implementation::hasfeature'));
         } finally {

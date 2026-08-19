@@ -338,7 +338,7 @@ final class JitDomLoadXMLUserScript
         JitDomCreateElement::storeAttributesPresence(
             $context,
             $element,
-            [] !== DomParseSimpleXmlJitHelper::rootAttributesArgv($xml)
+            DomParseSimpleXmlJitHelper::rootAttributesArgv($xml)
         );
         JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml, '/'.$tag);
 
