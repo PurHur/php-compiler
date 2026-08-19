@@ -72,6 +72,12 @@ final class UndefinedVariableHelper
         if (isset($context->namedVariableBindings[$resolved])) {
             return;
         }
+        // Arrow-fn / closure use() captures are bound in the LLVM prologue before body
+        // code runs; emitting ZEND_CHECK_UNDEFINED_VAR for them is spurious (#10304, #24106).
+        $block = $context->jitCurrentBlock;
+        if (null !== $block && in_array($name, $block->closureCaptureSlotNames, true)) {
+            return;
+        }
         self::emitAssignedFlagGuard($context, $name);
     }
 
