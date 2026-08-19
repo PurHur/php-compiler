@@ -619,6 +619,8 @@ final class BuiltinInternalArgInfo
             'cli_set_process_title' => 'bool',
             // ext/standard/assert.stub.php — InternalArgInfo return int; Zend bool (#28335)
             'assert' => 'bool',
+            // ext/standard/array.stub.php — InternalArgInfo omits return; Zend string|int|false (#25582)
+            'array_search' => 'string|int|false',
             default => null,
         };
     }
@@ -1905,6 +1907,8 @@ final class BuiltinInternalArgInfo
                 1 => 'int',
                 default => null,
             },
+            // ext/standard/array.stub.php — $needle: mixed (InternalArgInfo untyped) (#25582)
+            'in_array', 'array_search' => 0 === $index ? 'mixed' : null,
             default => null,
         };
     }
