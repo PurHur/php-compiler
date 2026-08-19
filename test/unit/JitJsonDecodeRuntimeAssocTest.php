@@ -71,6 +71,19 @@ final class JitJsonDecodeRuntimeAssocTest extends TestCase
         $this->assertSame("1 1\n", $runOut);
     }
 
+    public function testJsonEncodeFoldedStringStampedOnContext(): void
+    {
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('jitJsonEncodeFoldedString', $context);
+        $this->assertStringContainsString('#24137', $context);
+
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        $this->assertStringContainsString('propagateJsonEncodeFoldedString', $jit);
+
+        $encode = (string) file_get_contents(__DIR__.'/../../ext/standard/JitJsonEncodeCompileTime.php');
+        $this->assertStringContainsString('jitJsonEncodeFoldedString = $encoded', $encode);
+    }
+
     /**
      * @param list<string> $cmd
      * @param array<string, string> $env

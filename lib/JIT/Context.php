@@ -117,6 +117,9 @@ class Context {
     /** Operand for json_encode() value arg during FUNCCALL lowering (#14040). */
     public ?Operand $jitJsonEncodeValueOperand = null;
 
+    /** Compile-time json_encode() result for assignCallResultOperand (#24137). */
+    public ?string $jitJsonEncodeFoldedString = null;
+
     /** Operand for iterator_to_array() iterator arg — CFG userType for HT-backed SPL (#26825). */
     public ?Operand $jitIteratorToArrayIteratorOperand = null;
 

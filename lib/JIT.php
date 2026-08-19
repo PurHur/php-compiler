@@ -12252,6 +12252,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateJsonEncodeFoldedString(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     break;
                     } finally {
                         // Peer VM clearOutgoingCallState + restorePendingOutboundCall (#15217 / #27242).
@@ -14417,6 +14421,33 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+    }
+
+    /**
+     * Stamp compile-time json_encode() JSON on the result CV so json_decode($j, true) can fold (#24137).
+     *
+     * @param CoreFunc\Internal|JIT\Call\Native|JIT\Call\ExternalMethod|JIT\Call\NestedClosureInvoke|null $toCall
+     */
+    private function propagateJsonEncodeFoldedString(Operand $result, $toCall): void
+    {
+        if (!$toCall instanceof CoreFunc\Internal || 'json_encode' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $folded = $this->context->jitJsonEncodeFoldedString;
+        $this->context->jitJsonEncodeFoldedString = null;
+        if (null === $folded || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeString = $folded;
+        $name = JIT\OperandName::resolve($result);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $this->context->namedVariableBindings[$resolved]->compileTimeString = $folded;
+        }
     }
 
     /**
