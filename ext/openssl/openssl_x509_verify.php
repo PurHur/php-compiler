@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_x509_verify() — X.509 signature verification (php-src ext/openssl/x509.c; #6595).
+ * openssl_x509_verify() — X.509 signature verification (php-src ext/openssl/openssl.c; #6595 VM, JIT/AOT #32535).
  */
 final class openssl_x509_verify extends Internal
 {
@@ -51,9 +51,14 @@ final class openssl_x509_verify extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_x509_verify() is not implemented for JIT in this compiler build (issue #6595)'
-        );
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'openssl_x509_verify() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::verify($context, $args[0], $args[1]);
     }
 
     private static function intArg(Variable $arg, int $position, string $paramName): int

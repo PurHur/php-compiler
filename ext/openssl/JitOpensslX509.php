@@ -14,13 +14,15 @@ use PHPLLVM\Value;
 /**
  * LLVM lowering for openssl_x509_parse() (#32496 leftover of #6274),
  * openssl_x509_fingerprint() (#32512 leftover of #6524),
- * openssl_x509_checkpurpose() (#32522 leftover of #20286), and
- * openssl_x509_check_private_key() (#32527 leftover of #20285).
+ * openssl_x509_checkpurpose() (#32522 leftover of #20286),
+ * openssl_x509_check_private_key() (#32527 leftover of #20285), and
+ * openssl_x509_verify() (#32535 leftover of #6595).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_checkpurpose) / check_cert / X509_verify_cert
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_check_private_key) / X509_check_private_key
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_verify) / X509_verify
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -219,6 +221,57 @@ final class JitOpensslX509
         }
 
         return self::boxedBool($context, VmOpensslX509Native::checkPrivateKeyPem($pem, $keyPem));
+    }
+
+    /**
+     * openssl_x509_verify() — bake {@see VmOpensslX509Native::verifyCertificatePem}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_x509_verify) / X509_verify
+     * VM {@see VmOpensslObjects::verifyCertificate}: int 1/0/-1; bool false when the cert cannot be loaded.
+     * A certificate PEM as $public_key is extracted to a PUBKEY PEM like the VM path.
+     */
+    public static function verify(
+        Context $context,
+        JITVariable $certificate,
+        JITVariable $publicKey
+    ): Value {
+        $pem = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_x509_verify() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32535)'
+            );
+        }
+        $keyPem = JitStringArg::compileTimeLiteral($publicKey);
+        if (null === $keyPem) {
+            throw new \LogicException(
+                'openssl_x509_verify() public_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32535)'
+            );
+        }
+
+        if (!VmOpensslX509Native::available()) {
+            return self::boxedFalse($context);
+        }
+        if (false === VmOpensslX509Native::normalizeCertificatePem($pem)) {
+            return self::boxedFalse($context);
+        }
+
+        $pubPem = $keyPem;
+        if (str_contains($keyPem, 'BEGIN CERTIFICATE')) {
+            $extracted = VmOpensslX509Native::extractPublicKeyPem($keyPem);
+            if (false === $extracted) {
+                return self::boxedFalse($context);
+            }
+            $pubPem = $extracted;
+        }
+
+        $verified = VmOpensslX509Native::verifyCertificatePem($pem, $pubPem);
+        if ($verified < 0) {
+            return self::boxedLong($context, -1);
+        }
+
+        return self::boxedLong($context, $verified);
     }
 
     private static function compileTimeBool(?JITVariable $arg, bool $default): ?bool

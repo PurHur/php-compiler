@@ -5702,6 +5702,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'extracertsfilename', 'openssl_pkcs7_sign'));
         self::assertSame(7, BuiltinParamNames::paramCountForInternalFunction('openssl_pkcs7_sign'));
         self::assertSame(5, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_pkcs7_sign'));
+
+        $verify = BuiltinParamNames::forFunction('openssl_x509_verify');
+        self::assertSame(['certificate', 'public_key'], $verify);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($verify, 'certificate', 'openssl_x509_verify'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($verify, 'public_key', 'openssl_x509_verify'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($verify, 'x509', 'openssl_x509_verify'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($verify, 'key', 'openssl_x509_verify'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('openssl_x509_verify'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_x509_verify'));
     }
 
     /** @covers issue #23343 */
