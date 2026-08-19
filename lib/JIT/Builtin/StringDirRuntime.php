@@ -14,6 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT embed link for directory handle ABI via DirHandleJitHelper PHP (#11811, #25955).
  *
+ * Type always-on leftover dropped (#32548): implementIfMissing uses getNamedFunction first
+ * so a drifted ABI cannot mint __compiler_opendir.1 (#31894 / #32122).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringPhpinfo #25931 / StreamSocketPair #22468).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\DirHandleJitHelper}; thin LLVM
  * bridges forward the ABI (#11811, #12870).
@@ -111,6 +113,8 @@ final class StringDirRuntime
             '__compiler_readdir' => $context->context->functionType($strPtr, false, $i64),
             default => $context->context->functionType($i32, false, $i64),
         };
+        // getNamedFunction first — leftover Type always-on addFunction without it
+        // minted __compiler_opendir.1 on ABI drift (#32548 / #32122).
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($name, $ft);

@@ -9,6 +9,8 @@ use PHPCompiler\JIT\Context;
 /**
  * Directory handle dispatch — embed and standalone route through DirHandleJitHelper PHP (#11811, #12870).
  *
+ * Type always-on empty shells dropped (#32548): do not treat a 0-block
+ * getNamedFunction hit as linked. StringDirRuntime declares module-locally.
  * php-src: ext/standard/dir.c — opendir/readdir/closedir/rewinddir
  */
 final class StringDirJit

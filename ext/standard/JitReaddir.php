@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringDir;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for readdir() via __compiler_readdir (issue #3235). */
+/** LLVM lowering for readdir() via __compiler_readdir (php-in-PHP StringDirRuntime; #32548). */
 final class JitReaddir
 {
     /** @return Value (entry string, or boolean false at EOF / invalid handle) */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        StringDir::ensureLinked($context);
         $entry = $context->builder->call(
             $context->lookupFunction('__compiler_readdir'),
             $handleLong

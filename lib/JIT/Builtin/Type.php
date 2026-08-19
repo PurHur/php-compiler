@@ -404,18 +404,13 @@ class Type extends Builtin {
         $fntypePclose = $this->context->context->functionType($i32, false, $i64);
         $fnPclose = $this->context->module->addFunction('__compiler_pclose', $fntypePclose);
         $this->context->registerFunction('__compiler_pclose', $fnPclose);
-        $fntypeOpendir = $this->context->context->functionType($i64, false, $strPtr);
-        $fnOpendir = $this->context->module->addFunction('__compiler_opendir', $fntypeOpendir);
-        $this->context->registerFunction('__compiler_opendir', $fnOpendir);
-        $fntypeReaddir = $this->context->context->functionType($strPtr, false, $i64);
-        $fnReaddir = $this->context->module->addFunction('__compiler_readdir', $fntypeReaddir);
-        $this->context->registerFunction('__compiler_readdir', $fnReaddir);
-        $fntypeClosedir = $this->context->context->functionType($i32, false, $i64);
-        $fnClosedir = $this->context->module->addFunction('__compiler_closedir', $fntypeClosedir);
-        $this->context->registerFunction('__compiler_closedir', $fnClosedir);
-        $fntypeRewinddir = $this->context->context->functionType($i32, false, $i64);
-        $fnRewinddir = $this->context->module->addFunction('__compiler_rewinddir', $fntypeRewinddir);
-        $this->context->registerFunction('__compiler_rewinddir', $fnRewinddir);
+        // __compiler_opendir / __compiler_readdir / __compiler_closedir /
+        // __compiler_rewinddir always-on shells removed (#32548): user-script
+        // opendir() stays StringOpendir / OpendirJitHelper; readdir/closedir/
+        // rewinddir stay StringDir::ensureLinked then ABI lookup.
+        // NestedJIT/AOT bridge is StringDirRuntime (getNamedFunction first +
+        // DirHandleJitHelper). Leftover Type addFunction vs Runtime ABI drift
+        // mints opendir.1 (#31894 / #32122).
         $fntypeIsResource = $this->context->context->functionType($i32, false, $i64);
         $fnIsResource = $this->context->module->addFunction('__compiler_is_resource', $fntypeIsResource);
         $this->context->registerFunction('__compiler_is_resource', $fnIsResource);
