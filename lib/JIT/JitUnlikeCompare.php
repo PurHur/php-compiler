@@ -15,7 +15,8 @@ use PHPLLVM\Value;
  *
  * php-src: Zend/zend_operators.c compare_function / zend_compare —
  * plain object vs number is E_NOTICE + legacy 1; array vs number/string is ±1;
- * array vs null/bool uses zend_is_true (#32520 leftover of #32503).
+ * array vs null/bool uses zend_is_true (#32520 leftover of #32503);
+ * variable arrays / boxed null must not materialize or skip the branch (#32528).
  * Object vs string without {@code __toString} is object-greater (#32514);
  * {@code null} literals are TYPE_VALUE + isNullConstant, not TYPE_NULL.
  * Object vs string == / != uses the same spaceship (#32515 leftover of #32503).
@@ -50,6 +51,10 @@ final class JitUnlikeCompare
         // Array == bool uses zend_is_true later; ordered compare vs null/bool is #32520.
         if ($ordered && ($leftArr || $rightArr)) {
             return self::arrayVsScalar($context, $opType, $left, $right, $leftArr);
+        }
+        // `$e = []` boxes as TYPE_VALUE; literal `[]` stays native (#32528 leftover of #32520).
+        if ($ordered && (JitValueBox::isValueOperand($left) || JitValueBox::isValueOperand($right))) {
+            return self::valueBoxOrdered($context, $opType, $left, $right);
         }
 
         return null;
@@ -238,37 +243,356 @@ final class JitUnlikeCompare
         // zend_compare IS_ARRAY vs IS_NULL / IS_FALSE / IS_TRUE uses zend_is_true
         // (empty array <=> null/false is 0; nonempty <=> true is 0). #32520 leftover of #32503.
         if (self::isNullOperand($other) || Variable::TYPE_NATIVE_BOOL === $other->type) {
-            $arrayLong = self::arrayTruthyI64($context, $array);
-            $i64 = $arrayLong->typeOf();
-            if (self::isNullOperand($other)) {
-                $otherLong = $i64->constInt(0, false);
-            } else {
-                $otherLong = $context->builder->zExt(
-                    $context->helper->loadValue($other),
-                    $i64
-                );
-            }
-            $cmp = self::longSpaceshipI64($context, $arrayLong, $otherLong);
-
-            return self::fromSpaceshipValue(
+            return self::fromArrayTruthySpaceship(
                 $context,
                 $opType,
-                $arrayOnLeft ? $cmp : self::negateCmp($context, $cmp)
+                $array,
+                self::isNullOperand($other)
+                    ? null
+                    : $context->helper->loadValue($other),
+                $arrayOnLeft
             );
+        }
+        if (JitValueBox::isValueOperand($other)) {
+            return self::arrayVsValueBox($context, $opType, $array, $other, $arrayOnLeft);
         }
 
         // zend_compare: IS_ARRAY vs number/string/resource → array is greater (#32503).
         return self::fromSpaceshipConst($context, $opType, $arrayOnLeft ? 1 : -1);
     }
 
-    private static function isNullOperand(Variable $var): bool
-    {
-        return Variable::TYPE_NULL === $var->type || ($var->isNullConstant ?? false);
+    /**
+     * Boxed null/bool (function return, assigned locals) are TYPE_VALUE, not
+     * isNullConstant / TYPE_NATIVE_BOOL (#32528 leftover of #32520).
+     *
+     * Do not {@see __value__readLong} on a bool tag (#8555 SIGSEGV). Bool payload
+     * is the first byte of {@code __value__.value} (see {@code __value__writeBool}).
+     */
+    private static function arrayVsValueBox(
+        Context $context,
+        int $opType,
+        Variable $array,
+        Variable $other,
+        bool $arrayOnLeft
+    ): Variable {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $other);
+        $i64 = $context->getTypeFromString('int64');
+        $arrayLong = self::arrayTruthyI64($context, $array);
+        $tag = 'arr_vbox_'.spl_object_id($context).'_'.spl_object_id($other);
+        $nullPtrBlock = BasicBlockHelper::append($context, $tag.'_nullptr');
+        $liveBlock = BasicBlockHelper::append($context, $tag.'_live');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $isNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $ptr,
+            $ptr->typeOf()->constNull()
+        );
+        $context->builder->branchIf($isNullPtr, $nullPtrBlock, $liveBlock);
+
+        $context->builder->positionAtEnd($nullPtrBlock);
+        $nullPtrCmp = $arrayOnLeft
+            ? self::longSpaceshipI64($context, $arrayLong, $i64->constInt(0, false))
+            : self::negateCmp(
+                $context,
+                self::longSpaceshipI64($context, $arrayLong, $i64->constInt(0, false))
+            );
+        $nullPtrEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($liveBlock);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($ptr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $useTruthy = $context->builder->or($isNull, $isBool);
+        $valueField = $context->builder->structGep($ptr, $map['value']);
+        $boolByte = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $valueField,
+                $i32->constInt(0, false),
+                $i64->constInt(0, false)
+            )
+        );
+        $boolLong = $context->builder->zExt($boolByte, $i64);
+        $otherLong = $context->builder->select(
+            $isNull,
+            $i64->constInt(0, false),
+            $boolLong
+        );
+        $truthyCmp = self::longSpaceshipI64($context, $arrayLong, $otherLong);
+        $oriented = $arrayOnLeft ? $truthyCmp : self::negateCmp($context, $truthyCmp);
+        $greater = $i64->constInt($arrayOnLeft ? 1 : -1, true);
+        $liveCmp = $context->builder->select($useTruthy, $oriented, $greater);
+        $liveEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, $tag.'_phi');
+        $phi->addIncoming($nullPtrCmp, $nullPtrEnd);
+        $phi->addIncoming($liveCmp, $liveEnd);
+
+        return self::fromSpaceshipValue($context, $opType, $phi);
     }
 
+    private static function fromArrayTruthySpaceship(
+        Context $context,
+        int $opType,
+        Variable $array,
+        ?Value $boolI1,
+        bool $arrayOnLeft
+    ): Variable {
+        $arrayLong = self::arrayTruthyI64($context, $array);
+        $i64 = $arrayLong->typeOf();
+        $otherLong = null === $boolI1
+            ? $i64->constInt(0, false)
+            : $context->builder->zExt($boolI1, $i64);
+        $cmp = self::longSpaceshipI64($context, $arrayLong, $otherLong);
+
+        return self::fromSpaceshipValue(
+            $context,
+            $opType,
+            $arrayOnLeft ? $cmp : self::negateCmp($context, $cmp)
+        );
+    }
+
+    private static function isNullOperand(Variable $var): bool
+    {
+        return Variable::TYPE_NULL === $var->type || $var->isNullConstant;
+    }
+
+    /**
+     * zend_is_true(IS_ARRAY) as i64 0/1.
+     *
+     * Native packed arrays use compile-time {@see Variable::$nextFreeElement}
+     * (same as {@see \PHPCompiler\VM\VmValueCompare::looseEqualArrayToNull}).
+     * Hashtable locals load the pointer — do not
+     * {@see HashTableWriteLlvm::materializeNativeArrayForCall} (GEP of
+     * KIND_VARIABLE {@code ->value} SIGSEGVs, #32528).
+     */
     private static function arrayTruthyI64(Context $context, Variable $array): Value
     {
-        $truth = $context->helper->loadValue($array->castTo(Variable::TYPE_NATIVE_BOOL));
+        $i64 = $context->getTypeFromString('int64');
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            $n = $i64->constInt(max(0, $array->nextFreeElement), false);
+            $truth = $context->builder->icmp(
+                Builder::INT_NE,
+                $n,
+                $i64->constInt(0, false)
+            );
+
+            return $context->builder->zExt($truth, $i64);
+        }
+        $ht = $context->helper->loadValue($array);
+        $fn = $context->lookupFunction('__hashtable__ptrIsNonEmpty');
+        $ht = $context->builder->pointerCast($ht, $fn->getParam(0)->typeOf());
+        $truth = $context->builder->call($fn, $ht);
+
+        return $context->builder->zExt($truth, $i64);
+    }
+
+    /**
+     * Assigned `$e = []` / boxed null are TYPE_VALUE, not native array (#32528).
+     */
+    private static function valueBoxOrdered(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?Variable {
+        $leftBox = JitValueBox::isValueOperand($left);
+        $rightBox = JitValueBox::isValueOperand($right);
+        if ($leftBox && (Variable::TYPE_NATIVE_BOOL === $right->type || self::isNullOperand($right))) {
+            return self::boxedArrayVsNativeScalar($context, $opType, $left, $right, true);
+        }
+        if ($rightBox && (Variable::TYPE_NATIVE_BOOL === $left->type || self::isNullOperand($left))) {
+            return self::boxedArrayVsNativeScalar($context, $opType, $right, $left, false);
+        }
+        if ($leftBox && $rightBox) {
+            return self::twoBoxedOrdered($context, $opType, $left, $right);
+        }
+
+        return null;
+    }
+
+    private static function boxedArrayVsNativeScalar(
+        Context $context,
+        int $opType,
+        Variable $boxed,
+        Variable $scalar,
+        bool $arrayOnLeft
+    ): Variable {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $arrayLong = self::boxedPtrHashtableTruthyI64($context, $ptr);
+        $i64 = $arrayLong->typeOf();
+        $otherLong = self::isNullOperand($scalar)
+            ? $i64->constInt(0, false)
+            : $context->builder->zExt($context->helper->loadValue($scalar), $i64);
+        $isHt = self::valuePtrIsHashtable($context, $ptr);
+        $truthyCmp = self::longSpaceshipI64($context, $arrayLong, $otherLong);
+        $oriented = $arrayOnLeft ? $truthyCmp : self::negateCmp($context, $truthyCmp);
+        $greater = $i64->constInt($arrayOnLeft ? 1 : -1, true);
+        $cmp = $context->builder->select($isHt, $oriented, $greater);
+
+        return self::fromSpaceshipValue($context, $opType, $cmp);
+    }
+
+    private static function twoBoxedOrdered(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): Variable {
+        $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
+        $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
+        $i64 = $context->getTypeFromString('int64');
+        $leftHt = self::valuePtrIsHashtable($context, $leftPtr);
+        $rightHt = self::valuePtrIsHashtable($context, $rightPtr);
+        $rightNullBool = self::valuePtrIsNullOrBool($context, $rightPtr);
+        $leftNullBool = self::valuePtrIsNullOrBool($context, $leftPtr);
+        $leftArrVsScalar = $context->builder->and($leftHt, $rightNullBool);
+        $rightArrVsScalar = $context->builder->and($rightHt, $leftNullBool);
+        $eitherHt = $context->builder->or($leftHt, $rightHt);
+
+        $leftTruthy = self::boxedPtrHashtableTruthyI64($context, $leftPtr);
+        $rightTruthy = self::boxedPtrHashtableTruthyI64($context, $rightPtr);
+        $rightOther = self::valuePtrNullBoolLong($context, $rightPtr);
+        $leftOther = self::valuePtrNullBoolLong($context, $leftPtr);
+        $cmpLeft = self::longSpaceshipI64($context, $leftTruthy, $rightOther);
+        $cmpRight = self::negateCmp(
+            $context,
+            self::longSpaceshipI64($context, $rightTruthy, $leftOther)
+        );
+        $arrGreater = $context->builder->select(
+            $leftHt,
+            $i64->constInt(1, true),
+            $i64->constInt(-1, true)
+        );
+        $truthyCmp = $context->builder->select($leftArrVsScalar, $cmpLeft, $cmpRight);
+        $arrPair = $context->builder->select(
+            $context->builder->or($leftArrVsScalar, $rightArrVsScalar),
+            $truthyCmp,
+            $arrGreater
+        );
+        $tag = 'two_vbox_'.spl_object_id($context);
+        $htBlock = BasicBlockHelper::append($context, $tag.'_ht');
+        $genBlock = BasicBlockHelper::append($context, $tag.'_gen');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branchIf($eitherHt, $htBlock, $genBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($genBlock);
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
+        $generic = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callValueSpaceship(
+            $context,
+            $leftPtr,
+            $rightPtr
+        );
+        $genEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, $tag.'_phi');
+        $phi->addIncoming($arrPair, $htEnd);
+        $phi->addIncoming($generic, $genEnd);
+
+        return self::fromSpaceshipValue($context, $opType, $phi);
+    }
+
+    private static function valuePtrKind(Context $context, Value $ptr): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($ptr, $context->structFieldMap['__value__']['type'])
+        );
+
+        return $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+    }
+
+    private static function valuePtrIsHashtable(Context $context, Value $ptr): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $kind = self::valuePtrKind($context, $ptr);
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+    }
+
+    private static function valuePtrIsNullOrBool(Context $context, Value $ptr): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $kind = self::valuePtrKind($context, $ptr);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+
+        return $context->builder->or($isNull, $isBool);
+    }
+
+    private static function valuePtrNullBoolLong(Context $context, Value $ptr): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $kind = self::valuePtrKind($context, $ptr);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $valueField = $context->builder->structGep(
+            $ptr,
+            $context->structFieldMap['__value__']['value']
+        );
+        $boolByte = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $valueField,
+                $i32->constInt(0, false),
+                $i64->constInt(0, false)
+            )
+        );
+
+        return $context->builder->select(
+            $isNull,
+            $i64->constInt(0, false),
+            $context->builder->zExt($boolByte, $i64)
+        );
+    }
+
+    private static function boxedPtrHashtableTruthyI64(Context $context, Value $ptr): Value
+    {
+        $read = $context->lookupFunction('__value__readHashtable');
+        $ht = $context->builder->call(
+            $read,
+            $context->builder->pointerCast($ptr, $read->getParam(0)->typeOf())
+        );
+        $fn = $context->lookupFunction('__hashtable__ptrIsNonEmpty');
+        $ht = $context->builder->pointerCast($ht, $fn->getParam(0)->typeOf());
+        $truth = $context->builder->call($fn, $ht);
 
         return $context->builder->zExt($truth, $context->getTypeFromString('int64'));
     }
