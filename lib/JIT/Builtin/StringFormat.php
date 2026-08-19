@@ -270,6 +270,11 @@ final class StringFormat
         $context->registerFunction($abiName, $fn);
     }
 
+    public static function ensureRuntimeHelpersPublic(Context $context): void
+    {
+        self::ensureRuntimeHelpers($context);
+    }
+
     private static function ensureRuntimeHelpers(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');

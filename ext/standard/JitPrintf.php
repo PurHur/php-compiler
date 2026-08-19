@@ -58,46 +58,24 @@ final class JitPrintf
             );
         }
 
-        $valueTy = $context->getTypeFromString('__value__');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $elemSize = $context->builder->ptrToInt(
-            $context->builder->gep(
-                $valueTy->pointerType(0)->constNull(),
-                $i32->constInt(1, false)
-            ),
-            $sizeT
-        );
-        $argvCountSize = $context->builder->intCast(
-            $i64->constInt($numArgs, false),
-            $sizeT
-        );
-        $argvBytes = $context->builder->mul($elemSize, $argvCountSize);
-        $argvRaw = $context->builder->call(
-            $context->lookupFunction('__mm__malloc'),
-            $argvBytes
-        );
-        $argvPtr = $context->builder->pointerCast(
-            $argvRaw,
-            $context->getTypeFromString('__value__*')
-        );
-        for ($i = 0; $i < $numArgs; ++$i) {
-            $slot = $context->builder->inBoundsGEP(
-                $argvPtr,
-                $i64->constInt($i, false)
-            );
-            JitSprintf::writeArg($context, $slot, $args[$i + 1]);
-        }
-        $argcVal = $i64->constInt($numArgs, false);
-        $written = $context->builder->call(
-            $context->lookupFunction('__compiler_printf'),
-            $fmt,
-            $argcVal,
-            $argvPtr
-        );
-        $context->builder->call($context->lookupFunction('__mm__free'), $argvRaw);
+        // Multi-arg: format via JitSprintf (direct snprintf), then echo the result.
+        \PHPCompiler\JIT\Builtin\StringFormat::ensureRuntimeHelpersPublic($context);
+        $formatted = JitSprintf::formatWithFmt($context, $fmt, ...array_slice($args, 1));
 
-        return $context->builder->intCast($written, $i64);
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $stringMap = $context->structFieldMap['__string__'];
+
+        $data = $context->builder->structGep($formatted, $stringMap['value']);
+        $len = $context->builder->load($context->builder->structGep($formatted, $stringMap['length']));
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_substr'),
+            $data,
+            $len
+        );
+
+        return $context->builder->zExt($len, $i64);
     }
 }

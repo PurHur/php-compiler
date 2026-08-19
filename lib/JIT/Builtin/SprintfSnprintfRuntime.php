@@ -162,6 +162,11 @@ final class SprintfSnprintfRuntime
         return $result;
     }
 
+    public static function nullTerminatedCopyPublic(Context $context, Value $strSep): Value
+    {
+        return self::nullTerminatedCopy($context, $strSep);
+    }
+
     private static function nullTerminatedCopy(Context $context, Value $strSep): Value
     {
         $stringMap = $context->structFieldMap['__string__'];
@@ -186,6 +191,11 @@ final class SprintfSnprintfRuntime
         $context->builder->store($i8->constInt(0, false), $nulPtr);
 
         return $context->builder->pointerCast($buf, $charPtr);
+    }
+
+    public static function ensureDeclsPublic(Context $context): void
+    {
+        self::ensureDecls($context);
     }
 
     private static function ensureDecls(Context $context): void
