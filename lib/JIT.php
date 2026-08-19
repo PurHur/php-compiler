@@ -16014,12 +16014,6 @@ class JIT {
         $this->assignOperand($result, $value, true);
     }
 
-    /**
-     * Rebind a NATIVE_LONG lvalue to a {@see __value__} stack slot and store $value.
-     *
-     * php-src locals are dynamically typed; keeping an int64 alloca and fpToSi-truncating
-     * float assigns made `$n = 0; $n = 0.7` store 0 (#23471).
-     */
     private function promoteNativeLongLvalueToValueBox(
         Operand $resultOp,
         Variable $result,

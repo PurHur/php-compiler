@@ -1179,6 +1179,10 @@ restart:
                         'right'
                     );
                 }
+                // Ordered compares (< > <= >=) are handled float-aware at the
+                // orderedValueToNativeLong check below; skip JitLongArg::lower
+                // which truncates doubles (#23471).
+                if (!self::isOrderedCompareOpcode($opcode->type)) {
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $__right = $this->context->builder->zExt($rightValue, $leftLong->typeOf());
@@ -1214,6 +1218,7 @@ restart:
                             goto return_bool;
                         }
                         break;
+                }
                 }
             }
             if (Variable::TYPE_NATIVE_DOUBLE === $rightType) {
@@ -1334,6 +1339,10 @@ restart:
                         'left'
                     );
                 }
+                // Ordered compares (< > <= >=) are handled float-aware at the
+                // orderedNativeLongToValue check below; skip JitLongArg::lower
+                // which truncates doubles (#23471).
+                if (!self::isOrderedCompareOpcode($opcode->type)) {
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
                     $__left = $this->context->builder->zExt($leftValue, $rightLong->typeOf());
@@ -1369,6 +1378,7 @@ restart:
                             goto return_bool;
                         }
                         break;
+                }
                 }
             }
             if (Variable::TYPE_NATIVE_DOUBLE === $leftType) {
