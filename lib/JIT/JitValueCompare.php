@@ -185,6 +185,11 @@ final class JitValueCompare
         return VmValueCompare::looseEqualHashtablePair($context, $leftHt, $rightHt);
     }
 
+    public static function spaceshipArrayPair(Context $context, Variable $left, Variable $right): Value
+    {
+        return VmValueCompare::spaceshipArrayPair($context, $left, $right);
+    }
+
     public static function runtimeValuePtr(Context $context, Variable $var): Value
     {
         return VmValueCompare::runtimeValuePtr($context, $var);

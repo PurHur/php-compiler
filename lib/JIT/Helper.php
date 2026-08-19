@@ -296,6 +296,16 @@ return_string:
             $result = $this->context->builder->xor($leftTruth, $rightTruth);
             goto return_bool;
         }
+        $arrayOrdered = $this->tryEmitArrayOrderedCompare(
+            $opcode,
+            $left,
+            $right,
+            $leftType,
+            $rightType
+        );
+        if (null !== $arrayOrdered) {
+            return $arrayOrdered;
+        }
         if (
             OpCode::TYPE_EQUAL === $opcode->type
             || OpCode::TYPE_IDENTICAL === $opcode->type
@@ -2200,6 +2210,15 @@ restart:
                 $result = $this->context->builder->xor($same, $trueVal);
                 goto return_bool;
             }
+            if (OpCode::TYPE_SPACESHIP === $opcode->type || self::isOrderedCompareOpcode($opcode->type)) {
+                $cmp = JitValueCompare::spaceshipArrayPair($this->context, $left, $right);
+                if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                    $result = $cmp;
+                    goto return_long;
+                }
+                $result = JitValueCompare::boolFromSpaceshipCmp($this->context, $opcode->type, $cmp);
+                goto return_bool;
+            }
         }
         $type = opcode_type_name($opcode->type);
         throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for type pair {$leftType} and {$rightType}");
@@ -2346,6 +2365,44 @@ return_bool:
             || OpCode::TYPE_GREATER_OR_EQUAL === $opcodeType
             || OpCode::TYPE_SMALLER === $opcodeType
             || OpCode::TYPE_SMALLER_OR_EQUAL === $opcodeType;
+    }
+
+    /**
+     * Packed native array / hashtable < > <= >= <=> (#32501 leftover of #5295).
+     *
+     * php-src: Zend/zend_operators.c zend_compare_arrays / zend_hash_compare.
+     */
+    private function tryEmitArrayOrderedCompare(
+        OpCode $opcode,
+        Variable $left,
+        Variable $right,
+        int $leftType,
+        int $rightType
+    ): ?Variable {
+        $leftArr = Variable::TYPE_HASHTABLE === $leftType || ArrayBuiltinHelper::isNativeArray($leftType);
+        $rightArr = Variable::TYPE_HASHTABLE === $rightType || ArrayBuiltinHelper::isNativeArray($rightType);
+        if (!$leftArr || !$rightArr) {
+            return null;
+        }
+        if (!ArrayBuiltinHelper::isNativeArray($leftType) && !ArrayBuiltinHelper::isNativeArray($rightType)) {
+            // Hashtable⊙hashtable ordered compare still uses __hashtable__compareSpaceship
+            // which SIGSEGVs on thin standalone AOT; leave as compile abort.
+            return null;
+        }
+        if (OpCode::TYPE_SPACESHIP !== $opcode->type && !self::isOrderedCompareOpcode($opcode->type)) {
+            return null;
+        }
+        $cmp = JitValueCompare::spaceshipArrayPair($this->context, $left, $right);
+        if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+            return $this->nativeLongResultVariable($cmp);
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            JitValueCompare::boolFromSpaceshipCmp($this->context, $opcode->type, $cmp)
+        );
     }
 
     /**

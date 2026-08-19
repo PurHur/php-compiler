@@ -753,6 +753,112 @@ final class VmValueCompare
     }
 
     /**
+     * zend_compare_arrays / zend_hash_compare for packed native arrays and hashtables (#32501).
+     *
+     * php-src: Zend/zend_operators.c zend_compare_arrays; leftover of #5295 / #23988.
+     * Packed native arrays compare element-wise (same key bag 0..n-1) — do not
+     * materialize through __hashtable__compareSpaceship (thin AOT SIGSEGV).
+     */
+    public static function spaceshipArrayPair(Context $context, Variable $left, Variable $right): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($left->type)
+            && ArrayBuiltinHelper::isNativeArray($right->type)
+        ) {
+            $native = self::spaceshipNativeArrayPair($context, $left, $right);
+            if (null !== $native) {
+                return $native;
+            }
+        }
+        // zend_compare_arrays count-first. `[]` is TYPE_HASHTABLE (135) vs packed
+        // `[0]` (65). Different compile-time nextFreeElement is enough (#32501).
+        $leftN = $left->nextFreeElement;
+        $rightN = $right->nextFreeElement;
+        $i64 = $context->getTypeFromString('int64');
+        if ($leftN !== $rightN) {
+            return $i64->constInt($leftN > $rightN ? 1 : -1, true);
+        }
+        if (0 === $leftN) {
+            return $i64->constInt(0, false);
+        }
+        throw new \LogicException(
+            'Array ordered compare requires packed native arrays with a known length (#32501)'
+        );
+    }
+
+    /**
+     * Packed native array <=> — count then per-index zend_compare (#32501).
+     */
+    private static function spaceshipNativeArrayPair(
+        Context $context,
+        Variable $left,
+        Variable $right
+    ): ?Value {
+        $leftN = $left->nextFreeElement;
+        $rightN = $right->nextFreeElement;
+        if (null === $leftN || null === $rightN) {
+            return null;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        if ($leftN !== $rightN) {
+            return $i64->constInt($leftN > $rightN ? 1 : -1, true);
+        }
+        if (0 === $leftN) {
+            return $i64->constInt(0, false);
+        }
+        $elemType = $left->type & ~Variable::IS_NATIVE_ARRAY;
+        if ($elemType !== ($right->type & ~Variable::IS_NATIVE_ARRAY)) {
+            return null;
+        }
+        $result = $i64->constInt(0, false);
+        $zero = $i64->constInt(0, false);
+        for ($i = 0; $i < $leftN; ++$i) {
+            $idx = Variable::fromConstantInt($context, $i);
+            $lElem = $left->dimFetch($idx);
+            $rElem = $right->dimFetch($idx);
+            $elemCmp = self::spaceshipNativeScalar($context, $elemType, $lElem, $rElem);
+            if (null === $elemCmp) {
+                return null;
+            }
+            $stillZero = $context->builder->icmp(Builder::INT_EQ, $result, $zero);
+            $result = $context->builder->select($stillZero, $elemCmp, $result);
+        }
+
+        return $result;
+    }
+
+    private static function spaceshipNativeScalar(
+        Context $context,
+        int $elemType,
+        Variable $left,
+        Variable $right
+    ): ?Value {
+        $i64 = $context->getTypeFromString('int64');
+        $neg = $i64->constInt(-1, true);
+        $pos = $i64->constInt(1, true);
+        $zero = $i64->constInt(0, false);
+        $l = $context->helper->loadValue($left);
+        $r = $context->helper->loadValue($right);
+        if (Variable::TYPE_NATIVE_LONG === $elemType) {
+            $lt = $context->builder->icmp(Builder::INT_SLT, $l, $r);
+            $gt = $context->builder->icmp(Builder::INT_SGT, $l, $r);
+        } elseif (Variable::TYPE_NATIVE_BOOL === $elemType) {
+            $lt = $context->builder->icmp(Builder::INT_ULT, $l, $r);
+            $gt = $context->builder->icmp(Builder::INT_UGT, $l, $r);
+        } elseif (Variable::TYPE_NATIVE_DOUBLE === $elemType) {
+            $lt = $context->builder->fcmp(Builder::REAL_OLT, $l, $r);
+            $gt = $context->builder->fcmp(Builder::REAL_OGT, $l, $r);
+        } else {
+            return null;
+        }
+
+        return $context->builder->select(
+            $gt,
+            $pos,
+            $context->builder->select($lt, $neg, $zero)
+        );
+    }
+
+    /**
      * Loose == on two {@see __hashtable__*} operands (#5033, Zend zend_compare_arrays / compare_function).
      */
     public static function looseEqualHashtablePair(Context $context, Value $leftHt, Value $rightHt): Value
