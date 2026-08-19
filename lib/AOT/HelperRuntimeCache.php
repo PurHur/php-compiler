@@ -188,6 +188,16 @@ final class HelperRuntimeCache
         // re-#27007 — prelinked StrrevJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // StrrevJitHelper into user module (peer #30812).
         'phpcompiler\\ext\\standard\\strrevjithelper::strrevargv' => true,
+        // re-#26890 — prelinked Base64JitHelper::decodeArgv unit.o SIGSEGVs under thin AOT
+        // (encodeArgv prelinked path stays green); NestedJIT decodeArgv into user module.
+        'phpcompiler\\ext\\standard\\base64jithelper::decodeargv' => true,
+        // re-#26868 — prelinked StrRot13JitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
+        // rot13Argv into user module (peer #26890 / #30812).
+        'phpcompiler\\ext\\standard\\strrot13jithelper::rot13argv' => true,
+        // re-#26899 — prelinked QuotPrintJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
+        // encode/decode into user module (peer #26868).
+        'phpcompiler\\ext\\standard\\quotprintjithelper::encode' => true,
+        'phpcompiler\\ext\\standard\\quotprintjithelper::decode' => true,
     ];
 
     private static bool $loggedHit = false;
