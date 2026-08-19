@@ -130,6 +130,8 @@ final class BuiltinInternalArgInfo
             'stream_context_set_options', 'stream_context_set_params' => 'true',
             // ext/standard/file.stub.php — absent from InternalArgInfo (#23406)
             'fsync', 'fdatasync' => 'bool',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#28521)
+            'disk_free_space', 'disk_total_space' => 'float|false',
             // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says array (#25508)
             'stream_context_create' => '',
             // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#27848)
