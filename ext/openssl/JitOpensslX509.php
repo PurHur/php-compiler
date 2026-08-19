@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -17,7 +18,8 @@ use PHPLLVM\Value;
  * openssl_x509_checkpurpose() (#32522 leftover of #20286),
  * openssl_x509_check_private_key() (#32527 leftover of #20285),
  * openssl_x509_verify() (#32535 leftover of #6595), and
- * openssl_x509_export() (#32557 leftover of #20273).
+ * openssl_x509_export() (#32557 leftover of #20273), and
+ * openssl_x509_export_to_file() (#32557 leftover of #20273).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -25,6 +27,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_check_private_key) / X509_check_private_key
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_verify) / X509_verify
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_export) / PEM_write_bio_X509 / X509_print
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_export_to_file)
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -34,6 +37,8 @@ use PHPLLVM\Value;
  */
 final class JitOpensslX509
 {
+    private static int $blockSerial = 0;
+
     public static function parse(Context $context, JITVariable $certificate, ?JITVariable $shortNames = null): Value
     {
         $pem = JitStringArg::compileTimeLiteral($certificate);
@@ -322,6 +327,90 @@ final class JitOpensslX509
         JitValueBox::publishAfterWrite($context, $outPtr);
 
         return self::boxedBool($context, true);
+    }
+
+    /**
+     * openssl_x509_export_to_file() — bake {@see VmOpensslX509Native::exportCertificatePem}, write via
+     * {@see \PHPCompiler\JIT\Builtin\StringFilePutContents} / __compiler_file_put_contents.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_x509_export_to_file)
+     * Certificate PEM and output path must be compile-time string literals (peer export() / SimpleXML asXML).
+     */
+    public static function exportToFile(
+        Context $context,
+        JITVariable $certificate,
+        JITVariable $outputFilename,
+        ?JITVariable $noText = null
+    ): Value {
+        $pem = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_x509_export_to_file() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32557)'
+            );
+        }
+        $path = JitStringArg::compileTimeLiteral($outputFilename);
+        if (null === $path) {
+            throw new \LogicException(
+                'openssl_x509_export_to_file() output_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32557)'
+            );
+        }
+        $noTextBool = self::compileTimeBool($noText, true);
+        if (null === $noTextBool) {
+            throw new \LogicException(
+                'openssl_x509_export_to_file() no_text must be a compile-time bool '
+                .'for JIT/AOT in this compiler build (issue #32557)'
+            );
+        }
+
+        if (!VmOpensslX509Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $exported = VmOpensslX509Native::exportCertificatePem($pem, $noTextBool);
+        if (false === $exported) {
+            return self::boxedFalse($context);
+        }
+
+        $pathStr = $context->builder->load($context->constantStringFromString($path));
+        $dataStr = $context->builder->load($context->constantStringFromString($exported));
+        $dataOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $dataStr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('__compiler_file_put_contents'),
+            $pathStr,
+            $dataOwned,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $failed = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_SLT,
+            $written,
+            $i64->constInt(0, false)
+        );
+
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_x509_export_file_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'ossl_x509_export_file_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_x509_export_file_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     private static function compileTimeBool(?JITVariable $arg, bool $default): ?bool

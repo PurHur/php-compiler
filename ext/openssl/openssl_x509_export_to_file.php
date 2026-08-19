@@ -77,8 +77,18 @@ final class openssl_x509_export_to_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_x509_export_to_file() is not implemented for JIT in this compiler build (issue #20273)'
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'openssl_x509_export_to_file() expects 2 or 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::exportToFile(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2] ?? null
         );
     }
 }

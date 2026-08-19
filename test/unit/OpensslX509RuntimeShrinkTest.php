@@ -19,6 +19,7 @@ final class OpensslX509RuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmOpensslX509Native::fingerprintCertificatePem', $source);
         $this->assertStringContainsString('VmOpensslX509Native::verifyCertificatePem', $source);
         $this->assertStringContainsString('VmOpensslX509Native::exportCertificatePem', $source);
+        $this->assertStringContainsString('__compiler_file_put_contents', $source);
         $this->assertStringContainsString('HashTableHelper::variableFromVmHashTable', $source);
         $this->assertStringContainsString('compile-time string literal', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
@@ -26,6 +27,7 @@ final class OpensslX509RuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_x509_fingerprint.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_x509_verify.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_x509_export.c');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_x509_export_to_file.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/OpensslX509Runtime.php');
     }
 
