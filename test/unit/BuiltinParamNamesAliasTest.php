@@ -3568,10 +3568,10 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'crc', 'crc32'));
     }
 
-    /** @covers issue #23335 / #24866 */
+    /** @covers issue #23335 / #24866 / #23694 */
     public function testStrcmpFamilyZendStubNamedParams(): void
     {
-        foreach (['strcmp', 'strcasecmp', 'strnatcmp', 'strnatcasecmp'] as $fn) {
+        foreach (['strcmp', 'strcasecmp', 'strcoll', 'strnatcmp', 'strnatcasecmp'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
             self::assertSame(['string1', 'string2'], $names);
             self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn));
