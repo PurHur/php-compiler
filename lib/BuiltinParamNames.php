@@ -1969,13 +1969,13 @@ final class BuiltinParamNames
             case 'class_alias':
                 return ['class', 'alias', 'autoload='];
             case 'class_exists':
-                return ['class', 'autoload'];
+                return ['class', 'autoload='];
             case 'interface_exists':
-                return ['interface', 'autoload'];
+                return ['interface', 'autoload='];
             case 'trait_exists':
-                return ['trait', 'autoload'];
+                return ['trait', 'autoload='];
             case 'enum_exists':
-                return ['enum', 'autoload'];
+                return ['enum', 'autoload='];
             case 'class_parents':
             case 'class_implements':
             case 'class_uses':

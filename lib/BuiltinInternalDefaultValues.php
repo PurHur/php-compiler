@@ -538,6 +538,16 @@ final class BuiltinInternalDefaultValues
         'class_exists' => [
             1 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — bool $autoload = true (#25030)
+        'interface_exists' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
+        'trait_exists' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
+        'enum_exists' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src Zend/zend_builtin_functions.stub.php — bool $allow_string = true (#25439)
         // Contrast is_a(..., bool $allow_string = false) which inference already matches.
         'is_subclass_of' => [
@@ -1086,15 +1096,19 @@ final class BuiltinInternalDefaultValues
         ?array $info,
         bool $isVariadic,
     ): bool {
-        if (null === $info || !$info['isOptional'] || $isVariadic) {
+        if (null === $info || $isVariadic) {
             return false;
         }
         $key = $callableLc.'::'.$index;
         if (isset(self::NO_DEFAULT_AVAILABLE[$key])) {
             return false;
         }
+        // php-src defaults on params InternalArgInfo marks required (trait_exists autoload — #25030).
         if (isset(self::EXPLICIT[$callableLc][$index])) {
             return true;
+        }
+        if (!$info['isOptional']) {
+            return false;
         }
 
         return null !== self::inferSpec($callableLc, $index, $info);
