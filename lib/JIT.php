@@ -11609,6 +11609,21 @@ class JIT {
                             $this->context,
                             $lcname
                         );
+                        if (str_contains($nameOp->value, '::')) {
+                            [$staticClass, $staticMethod] = explode('::', (string) $nameOp->value, 2);
+                            $nonStaticMsg = $this->nonStaticClassMethodCallableMessage(
+                                strtolower($staticClass),
+                                strtolower($staticMethod),
+                                $staticClass,
+                                $staticMethod
+                            );
+                            if (null !== $nonStaticMsg) {
+                                $this->context->scope->toCall = new JIT\Call\EmitCatchableError($nonStaticMsg);
+                                $this->context->scope->args = [];
+                                $this->context->scope->argOperands = [];
+                                break;
+                            }
+                        }
                         $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($nameOp);
@@ -11690,6 +11705,22 @@ class JIT {
                                 throw new \LogicException(
                                     'Call to undefined function '.$nameVar->compileTimeString.'()'
                                 );
+                            }
+                            if (str_contains($nameVar->compileTimeString, '::')) {
+                                [$staticClass, $staticMethod] = explode('::', $nameVar->compileTimeString, 2);
+                                $nonStaticMsg = $this->nonStaticClassMethodCallableMessage(
+                                    strtolower($staticClass),
+                                    strtolower($staticMethod),
+                                    $staticClass,
+                                    $staticMethod
+                                );
+                                if (null !== $nonStaticMsg) {
+                                    // $fn() / ['C','m']() — catchable Error, not self:: bind (#32299 / #31968).
+                                    $this->context->scope->toCall = new JIT\Call\EmitCatchableError($nonStaticMsg);
+                                    $this->context->scope->args = [];
+                                    $this->context->scope->argOperands = [];
+                                    break;
+                                }
                             }
                             $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                         }
@@ -20437,7 +20468,7 @@ class JIT {
         if (null === $slots) {
             return false;
         }
-        $this->initJitStaticCall($block, $slots[0], $slots[1]);
+        $this->initJitStaticCall($block, $slots[0], $slots[1], false, true);
 
         return true;
     }
@@ -22418,9 +22449,29 @@ class JIT {
         string $calledClassName,
         string $methodDisplay
     ): void {
+        $message = $this->nonStaticClassMethodCallableMessage(
+            $calledClassLc,
+            $methodLc,
+            $calledClassName,
+            $methodDisplay
+        );
+        if (null !== $message) {
+            throw new \LogicException($message);
+        }
+    }
+
+    /**
+     * Error text when a Class::method callable names a non-static method (zend_execute_API.c).
+     */
+    private function nonStaticClassMethodCallableMessage(
+        string $calledClassLc,
+        string $methodLc,
+        string $calledClassName,
+        string $methodDisplay
+    ): ?string {
         if ($this->context->type->object->isEnumClassLc(strtolower(ltrim($calledClassLc, '\\')))
             && 'cases' === $methodLc) {
-            return;
+            return null;
         }
         $visited = [];
         $current = strtolower(ltrim($calledClassLc, '\\'));
@@ -22432,12 +22483,11 @@ class JIT {
                     $vis = $this->context->type->object->methodVisibility($classId, $methodLc);
                     if (0 === ($vis & \PHPCfg\Func::FLAG_STATIC)) {
                         $declaringName = $this->context->type->object->classNameForId($classId);
-                        throw new \LogicException(
-                            'Non-static method '.$declaringName.'::'.$methodDisplay.'() cannot be called statically'
-                        );
+
+                        return 'Non-static method '.$declaringName.'::'.$methodDisplay.'() cannot be called statically';
                     }
 
-                    return;
+                    return null;
                 }
             }
             $parent = $this->context->type->object->parentClassLc($current);
@@ -22446,10 +22496,17 @@ class JIT {
             }
             $current = $parent;
         }
+
+        return null;
     }
 
-    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx, bool $parentScope = false): void
-    {
+    private function initJitStaticCall(
+        Block $block,
+        int $classOpIdx,
+        int $nameOpIdx,
+        bool $parentScope = false,
+        bool $fromDynamicCallable = false
+    ): void {
         $classOp = $block->getOperand($classOpIdx);
         $nameOp = $block->getOperand($nameOpIdx);
         // Scope can lose Literal operands while slot constants remain (sockets/vm spine
@@ -22572,11 +22629,28 @@ class JIT {
             : null;
         // Zend INIT_STATIC_METHOD_CALL: allow non-static when caller $this is instanceof
         // the called class (self::/static::/parent:: + compatible named Class::) (#28050, #1858).
-        $instanceScopeAllowsNonStatic = $callerInstanceMethod
+        // Dynamic $fn() / ['Class','m']() must Error — no instance-scope bind (#32299 / #31968).
+        $instanceScopeAllowsNonStatic = !$fromDynamicCallable
+            && $callerInstanceMethod
             && null !== $callerClassLc
             && $this->jitIsClassSameOrSubclassOf($callerClassLc, $declaringClassLc);
         if (!$instanceScopeAllowsNonStatic) {
-            $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
+            if ($fromDynamicCallable) {
+                $nonStaticMsg = $this->nonStaticClassMethodCallableMessage(
+                    $declaringClassLc,
+                    $methodLc,
+                    $className,
+                    $nameOp->value
+                );
+                if (null !== $nonStaticMsg) {
+                    $this->context->scope->toCall = new JIT\Call\EmitCatchableError($nonStaticMsg);
+                    $this->context->scope->args = [];
+
+                    return;
+                }
+            } else {
+                $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
+            }
         }
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $bindCallerThisForNonStatic = $instanceScopeAllowsNonStatic
