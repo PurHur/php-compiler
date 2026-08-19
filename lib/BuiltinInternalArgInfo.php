@@ -895,6 +895,9 @@ final class BuiltinInternalArgInfo
             'ini_parse_quantity' => 0 === $index ? 'string' : null,
             // ext/date/php_date.stub.php — hour required; ?int minute…year = null (#25147)
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
+            // ext/standard/basic_functions.stub.php — mixed ...$values (InternalArgInfo untyped variadic) (#28177)
+            'sprintf', 'printf' => 1 === $index ? 'mixed' : null,
+            'fprintf' => 2 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
             'fscanf' => 2 === $index ? 'mixed' : null,
             // ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
