@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\JitScalarTypeCoerce;
-use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
@@ -38,6 +37,12 @@ final class JitUnlikeCompare
         if (!$ordered && !$equal && !$identical) {
             return null;
         }
+        if (JitValueBox::isValueOperand($left) && JitValueBox::isValueOperand($right)) {
+            $boxed = self::tryLowerBoxedPair($context, $opType, $left, $right);
+            if (null !== $boxed) {
+                return $boxed;
+            }
+        }
         $leftObj = Variable::TYPE_OBJECT === $left->type;
         $rightObj = Variable::TYPE_OBJECT === $right->type;
         $leftArr = self::isArrayOperand($left);
@@ -61,6 +66,47 @@ final class JitUnlikeCompare
         }
 
         return null;
+    }
+
+    /**
+     * Resolve {@see __object__*} for compare lowering — native object, boxed script
+     * global, or LLVM slot already storing {@see __value__*} (#32540).
+     */
+    private static function loadObjectPtr(Context $context, Variable $obj): Value
+    {
+        if (JitValueBox::isValueOperand($obj)) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $obj)
+            );
+        }
+        if (Variable::TYPE_OBJECT !== $obj->type) {
+            throw new \LogicException(
+                'loadObjectPtr expected object operand: '.Variable::getStringType($obj->type)
+            );
+        }
+        $slotTy = $context->getStringFromType($obj->value->typeOf());
+        if ('__value__*' === $slotTy) {
+            $ptr = Variable::KIND_VARIABLE === $obj->kind
+                ? $context->builder->load($obj->value)
+                : $obj->value;
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::normalizeValuePtr($context, $ptr)
+            );
+        }
+        if ('__value__' === $slotTy) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::normalizeValuePtr(
+                    $context,
+                    JitValueBox::pointer($context, $obj->value)
+                )
+            );
+        }
+
+        return $context->helper->loadValue($obj);
     }
 
     private static function isCompareOp(int $opType): bool
@@ -132,7 +178,7 @@ final class JitUnlikeCompare
             return self::fromSpaceshipValue($context, $opType, $objectOnLeft ? $cmp : self::negateCmp($context, $cmp));
         }
         if (Variable::TYPE_NATIVE_DOUBLE === $otherType) {
-            $objPtr = $context->helper->loadValue($obj);
+            $objPtr = self::loadObjectPtr($context, $obj);
             $objDouble = JitScalarTypeCoerce::emitPlainObjectToScalar(
                 $context,
                 $objPtr,
@@ -145,7 +191,7 @@ final class JitUnlikeCompare
             return self::fromSpaceshipValue($context, $opType, $objectOnLeft ? $cmp : self::negateCmp($context, $cmp));
         }
         if (Variable::TYPE_NATIVE_LONG === $otherType) {
-            $objPtr = $context->helper->loadValue($obj);
+            $objPtr = self::loadObjectPtr($context, $obj);
             $objLong = JitScalarTypeCoerce::emitPlainObjectToScalar(
                 $context,
                 $objPtr,
@@ -171,6 +217,99 @@ final class JitUnlikeCompare
     }
 
     /**
+     * {@code zend_compare} object VALUE box vs string VALUE box (#32540).
+     *
+     * Defer {@see __value__readString} until a stringable class match — script-global
+     * string boxes SIGSEGV on eager read before stdClass fallback (#32540).
+     */
+    private static function objectVsStringBox(
+        Context $context,
+        int $opType,
+        Value $objBoxPtr,
+        Value $strBoxPtr,
+        bool $objectOnLeft
+    ): Variable {
+        $fallback = $objectOnLeft ? 1 : -1;
+        $objectBuiltin = $context->type->object;
+        $stringable = [];
+        foreach ($objectBuiltin->allClassNamesById() as $id => $name) {
+            $lc = strtolower(ltrim((string) $name, '\\'));
+            if ($objectBuiltin->classHasImplicitStringableLc($lc)) {
+                $stringable[(int) $id] = ltrim((string) $name, '\\');
+            }
+        }
+        if ([] === $stringable) {
+            return self::fromSpaceshipConst($context, $opType, $fallback);
+        }
+
+        $readObj = $context->lookupFunction('__value__readObject');
+        $objNative = $context->builder->call(
+            $readObj,
+            $context->builder->pointerCast($objBoxPtr, $readObj->getParam(0)->typeOf())
+        );
+        $obj = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objNative);
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objNative, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $tag = 'unlike_obj_strbox_'.spl_object_id($context);
+        $done = BasicBlockHelper::append($context, $tag.'_done');
+        $incoming = [];
+        $ids = array_keys($stringable);
+        $lastIdx = \count($ids) - 1;
+        $fallbackBlock = BasicBlockHelper::append($context, $tag.'_fallback');
+        $readStr = $context->lookupFunction('__value__readString');
+
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $fallbackBlock
+                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            $coerced = MagicMethodDispatch::coerceObjectToString($context, $obj, $stringable[$id]);
+            if (null === $coerced) {
+                $cmp = $i64->constInt($fallback, true);
+            } else {
+                $objStr = $context->helper->loadValue($coerced);
+                $strNative = $context->builder->call(
+                    $readStr,
+                    $context->builder->pointerCast($strBoxPtr, $readStr->getParam(0)->typeOf())
+                );
+                $otherStr = $strNative;
+                $cmp = JitStringCompare::strcmp(
+                    $context,
+                    $objectOnLeft ? $objStr : $otherStr,
+                    $objectOnLeft ? $otherStr : $objStr
+                );
+            }
+            $incoming[] = [$cmp, $context->builder->getInsertBlock()];
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $incoming[] = [$i64->constInt($fallback, true), $context->builder->getInsertBlock()];
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i64, $tag.'_phi');
+        foreach ($incoming as [$val, $block]) {
+            $phi->addIncoming($val, $block);
+        }
+
+        return self::fromSpaceshipValue($context, $opType, $phi);
+    }
+
+    /**
      * CompareStringableHelper: {@code __toString} then strcmp; else object is greater (#32514).
      */
     private static function objectVsString(
@@ -193,7 +332,7 @@ final class JitUnlikeCompare
             return self::fromSpaceshipConst($context, $opType, $fallback);
         }
 
-        $objPtr = $context->helper->loadValue($obj);
+        $objPtr = self::loadObjectPtr($context, $obj);
         $map = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($objPtr, $map['class_id'])
@@ -473,33 +612,17 @@ final class JitUnlikeCompare
         Variable $left,
         Variable $right
     ): Variable {
-        SpaceshipRuntime::ensureLinked($context);
         $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
         $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
         $i64 = $context->getTypeFromString('int64');
         $leftHt = self::valuePtrIsHashtable($context, $leftPtr);
         $rightHt = self::valuePtrIsHashtable($context, $rightPtr);
-        $bothHt = $context->builder->and($leftHt, $rightHt);
-        $eitherHt = $context->builder->or($leftHt, $rightHt);
-        // Hashtable⊙hashtable must use zend_compare_arrays (#32539); the unlike
-        // array-greater shortcut is only for ht vs null/bool/scalar (#32528/#32520).
-        $useHtShortcut = $context->builder->and($eitherHt, $context->builder->not($bothHt));
-
-        $tag = 'two_vbox_'.spl_object_id($context);
-        $genBlock = BasicBlockHelper::append($context, $tag.'_gen');
-        $htBlock = BasicBlockHelper::append($context, $tag.'_ht');
-        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
-        $shortcutCheck = BasicBlockHelper::append($context, $tag.'_shortcut');
-        $context->builder->branchIf($bothHt, $genBlock, $shortcutCheck);
-
-        $context->builder->positionAtEnd($shortcutCheck);
-        $context->builder->branchIf($useHtShortcut, $htBlock, $genBlock);
-
-        $context->builder->positionAtEnd($htBlock);
         $rightNullBool = self::valuePtrIsNullOrBool($context, $rightPtr);
         $leftNullBool = self::valuePtrIsNullOrBool($context, $leftPtr);
         $leftArrVsScalar = $context->builder->and($leftHt, $rightNullBool);
         $rightArrVsScalar = $context->builder->and($rightHt, $leftNullBool);
+        $eitherHt = $context->builder->or($leftHt, $rightHt);
+
         $leftTruthy = self::boxedPtrHashtableTruthyI64($context, $leftPtr);
         $rightTruthy = self::boxedPtrHashtableTruthyI64($context, $rightPtr);
         $rightOther = self::valuePtrNullBoolLong($context, $rightPtr);
@@ -520,11 +643,133 @@ final class JitUnlikeCompare
             $truthyCmp,
             $arrGreater
         );
-        $htEnd = $context->builder->getInsertBlock();
+        $i8 = $context->getTypeFromString('int8');
+        $leftKind = self::valuePtrKind($context, $leftPtr);
+        $rightKind = self::valuePtrKind($context, $rightPtr);
+        $objKind = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $strKind = $i8->constInt(Variable::TYPE_STRING & 0x7f, false);
+        $leftIsObj = $context->builder->icmp(Builder::INT_EQ, $leftKind, $objKind);
+        $rightIsObj = $context->builder->icmp(Builder::INT_EQ, $rightKind, $objKind);
+        $leftIsStr = $context->builder->icmp(Builder::INT_EQ, $leftKind, $strKind);
+        $rightIsStr = $context->builder->icmp(Builder::INT_EQ, $rightKind, $strKind);
+        $objStrUnlike = $context->builder->or(
+            $context->builder->and($leftIsObj, $rightIsStr),
+            $context->builder->and($leftIsStr, $rightIsObj)
+        );
+        $longKind = $i8->constInt(Variable::TYPE_NATIVE_LONG & 0x7f, false);
+        $leftIsLong = $context->builder->icmp(Builder::INT_EQ, $leftKind, $longKind);
+        $rightIsLong = $context->builder->icmp(Builder::INT_EQ, $rightKind, $longKind);
+        $objIntUnlike = $context->builder->or(
+            $context->builder->and($leftIsObj, $rightIsLong),
+            $context->builder->and($rightIsObj, $leftIsLong)
+        );
+        $tag = 'two_vbox_'.spl_object_id($context);
+        $htBlock = BasicBlockHelper::append($context, $tag.'_ht');
+        $preGenBlock = BasicBlockHelper::append($context, $tag.'_pre_gen');
+        $unlikeBlock = BasicBlockHelper::append($context, $tag.'_obj_str');
+        $objIntBlock = BasicBlockHelper::append($context, $tag.'_obj_int');
+        $objIntDispatchBlock = BasicBlockHelper::append($context, $tag.'_obj_int_dispatch');
+        $objIntLeftBlock = BasicBlockHelper::append($context, $tag.'_obj_int_l');
+        $objIntRightBlock = BasicBlockHelper::append($context, $tag.'_obj_int_r');
+        $genBlock = BasicBlockHelper::append($context, $tag.'_gen');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branchIf($eitherHt, $htBlock, $preGenBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        // zend_compare_arrays when BOTH are hashtables (#32536). The #32528
+        // arrGreater shortcut is only for unlike kinds (array vs null/bool/other).
+        $bothHt = $context->builder->and($leftHt, $rightHt);
+        $htCmpBlock = BasicBlockHelper::append($context, $tag.'_ht_cmp');
+        $htUnlikeBlock = BasicBlockHelper::append($context, $tag.'_ht_unlike');
+        $context->builder->branchIf($bothHt, $htCmpBlock, $htUnlikeBlock);
+
+        $context->builder->positionAtEnd($htCmpBlock);
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
+        $readHt = $context->lookupFunction('__value__readHashtable');
+        $leftHtPtr = $context->builder->call(
+            $readHt,
+            $context->builder->pointerCast($leftPtr, $readHt->getParam(0)->typeOf())
+        );
+        $rightHtPtr = $context->builder->call(
+            $readHt,
+            $context->builder->pointerCast($rightPtr, $readHt->getParam(0)->typeOf())
+        );
+        $htCmp = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+            $context,
+            $leftHtPtr,
+            $rightHtPtr
+        );
+        $htCmpEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($htUnlikeBlock);
+        $htUnlikeEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($preGenBlock);
+        $context->builder->branchIf($objStrUnlike, $unlikeBlock, $objIntBlock);
+
+        $context->builder->positionAtEnd($unlikeBlock);
+        $objOnLeft = $context->builder->and($leftIsObj, $rightIsStr);
+        $unlikeCmp = $context->builder->select(
+            $objOnLeft,
+            $i64->constInt(1, true),
+            $i64->constInt(-1, true)
+        );
+        $unlikeEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objIntBlock);
+        $context->builder->branchIf($objIntUnlike, $objIntDispatchBlock, $genBlock);
+
+        $context->builder->positionAtEnd($objIntDispatchBlock);
+        $objOnLeftInt = $context->builder->and($leftIsObj, $rightIsLong);
+        $context->builder->branchIf($objOnLeftInt, $objIntLeftBlock, $objIntRightBlock);
+
+        $context->builder->positionAtEnd($objIntLeftBlock);
+        $leftObjPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $leftPtr
+        );
+        $leftCoerced = JitScalarTypeCoerce::emitPlainObjectToScalar(
+            $context,
+            $leftObjPtr,
+            'int',
+            ErrorReporter::E_NOTICE
+        );
+        $rightLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $rightPtr
+        );
+        $objIntCmp = self::longSpaceshipI64($context, $leftCoerced, $rightLong);
+        $objIntLeftEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objIntRightBlock);
+        $rightObjPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $rightPtr
+        );
+        $rightCoerced = JitScalarTypeCoerce::emitPlainObjectToScalar(
+            $context,
+            $rightObjPtr,
+            'int',
+            ErrorReporter::E_NOTICE
+        );
+        $leftLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $leftPtr
+        );
+        $objIntCmpRight = self::negateCmp(
+            $context,
+            self::longSpaceshipI64($context, $rightCoerced, $leftLong)
+        );
+        $objIntRightEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($genBlock);
-        $generic = SpaceshipRuntime::callValueSpaceship(
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
+        $generic = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callValueSpaceship(
             $context,
             $leftPtr,
             $rightPtr
@@ -534,7 +779,11 @@ final class JitUnlikeCompare
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, $tag.'_phi');
-        $phi->addIncoming($arrPair, $htEnd);
+        $phi->addIncoming($htCmp, $htCmpEnd);
+        $phi->addIncoming($arrPair, $htUnlikeEnd);
+        $phi->addIncoming($unlikeCmp, $unlikeEnd);
+        $phi->addIncoming($objIntCmp, $objIntLeftEnd);
+        $phi->addIncoming($objIntCmpRight, $objIntRightEnd);
         $phi->addIncoming($generic, $genEnd);
 
         return self::fromSpaceshipValue($context, $opType, $phi);
@@ -700,5 +949,243 @@ final class JitUnlikeCompare
     private static function negateCmp(Context $context, Value $cmp): Value
     {
         return $context->builder->negate($cmp);
+    }
+
+    /**
+     * Script-global {@code $o} / {@code $s} are both TYPE_VALUE boxes — dispatch by
+     * tag; object-vs-string uses {@see objectVsString}, not {@see __value__spaceship}
+     * (runtime SIGSEGV on two boxed operands, #32540).
+     */
+    public static function tryLowerBoxedPair(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?Variable {
+        if (
+            !self::isCompareOp($opType)
+            && !self::isLooseEqualOp($opType)
+            && !self::isIdenticalOp($opType)
+        ) {
+            return null;
+        }
+        $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
+        $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
+        $i8 = $context->getTypeFromString('int8');
+        $leftTag = self::valuePtrKind($context, $leftPtr);
+        $rightTag = self::valuePtrKind($context, $rightPtr);
+        $objKind = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $strKind = $i8->constInt(Variable::TYPE_STRING & 0x7f, false);
+        $longKind = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $leftIsObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $leftTag,
+            $objKind
+        );
+        $rightIsObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $rightTag,
+            $objKind
+        );
+        $leftIsStr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $leftTag,
+            $strKind
+        );
+        $rightIsStr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $rightTag,
+            $strKind
+        );
+        $objVsStr = $context->builder->or(
+            $context->builder->and($leftIsObj, $rightIsStr),
+            $context->builder->and($rightIsObj, $leftIsStr)
+        );
+        $leftIsLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $leftTag,
+            $longKind
+        );
+        $rightIsLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $rightTag,
+            $longKind
+        );
+        $objVsLong = $context->builder->or(
+            $context->builder->and($leftIsObj, $rightIsLong),
+            $context->builder->and($rightIsObj, $leftIsLong)
+        );
+        $needsUnlike = $context->builder->or($objVsStr, $objVsLong);
+        $tag = 'vbox_pair_'.spl_object_id($context);
+        $unlikeBb = BasicBlockHelper::append($context, $tag.'_unlike');
+        $genBb = BasicBlockHelper::append($context, $tag.'_gen');
+        $doneBb = BasicBlockHelper::append($context, $tag.'_done');
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->branchIf($needsUnlike, $unlikeBb, $genBb);
+
+        $context->builder->positionAtEnd($unlikeBb);
+        if (self::isIdenticalOp($opType)) {
+            $unlikeVal = self::fromIdenticalConst($context, $opType, false)->value;
+        } else {
+            $readObj = $context->lookupFunction('__value__readObject');
+            $readLong = $context->lookupFunction('__value__readLong');
+            $strCaseBb = BasicBlockHelper::append($context, $tag.'_obj_str');
+            $longCaseBb = BasicBlockHelper::append($context, $tag.'_obj_long');
+            $unlikeJoinBb = BasicBlockHelper::append($context, $tag.'_unlike_join');
+            $joinTy = OpCode::TYPE_SPACESHIP === $opType ? $i64 : $i1;
+            $context->builder->branchIf($objVsStr, $strCaseBb, $longCaseBb);
+
+            $context->builder->positionAtEnd($strCaseBb);
+            $strLeftBb = BasicBlockHelper::append($context, $tag.'_str_left');
+            $strRightBb = BasicBlockHelper::append($context, $tag.'_str_right');
+            $strJoinBb = BasicBlockHelper::append($context, $tag.'_str_join');
+            $context->builder->branchIf($leftIsObj, $strLeftBb, $strRightBb);
+
+            $context->builder->positionAtEnd($strLeftBb);
+            $strLeftOutVar = self::objectVsStringBox(
+                $context,
+                $opType,
+                $leftPtr,
+                $rightPtr,
+                true
+            );
+            $strLeftOut = $strLeftOutVar->value;
+            $strLeftEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strJoinBb);
+
+            $context->builder->positionAtEnd($strRightBb);
+            $strRightOutVar = self::objectVsStringBox(
+                $context,
+                $opType,
+                $rightPtr,
+                $leftPtr,
+                false
+            );
+            $strRightOut = $strRightOutVar->value;
+            $strRightEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strJoinBb);
+
+            $context->builder->positionAtEnd($strJoinBb);
+            $strCasePhi = $context->builder->phi($joinTy, $tag.'_str_phi');
+            $strCasePhi->addIncoming($strLeftOut, $strLeftEnd);
+            $strCasePhi->addIncoming($strRightOut, $strRightEnd);
+            $strCaseOut = $strCasePhi;
+            $strCaseEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($unlikeJoinBb);
+
+            $context->builder->positionAtEnd($longCaseBb);
+            $longLeftBb = BasicBlockHelper::append($context, $tag.'_long_left');
+            $longRightBb = BasicBlockHelper::append($context, $tag.'_long_right');
+            $longJoinBb = BasicBlockHelper::append($context, $tag.'_long_join');
+            $context->builder->branchIf($leftIsObj, $longLeftBb, $longRightBb);
+            $context->builder->positionAtEnd($longLeftBb);
+            $longLeftOut = self::objectVsOther(
+                $context,
+                $opType,
+                new Variable(
+                    $context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $context->builder->call(
+                        $readObj,
+                        $context->builder->pointerCast($leftPtr, $readObj->getParam(0)->typeOf())
+                    )
+                ),
+                new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $context->builder->call(
+                        $readLong,
+                        $context->builder->pointerCast($rightPtr, $readLong->getParam(0)->typeOf())
+                    )
+                ),
+                true
+            );
+            if (null === $longLeftOut) {
+                $longLeftOut = self::fromSpaceshipConst($context, $opType, 0);
+            }
+            $longLeftEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($longJoinBb);
+            $context->builder->positionAtEnd($longRightBb);
+            $longRightOut = self::objectVsOther(
+                $context,
+                $opType,
+                new Variable(
+                    $context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $context->builder->call(
+                        $readObj,
+                        $context->builder->pointerCast($rightPtr, $readObj->getParam(0)->typeOf())
+                    )
+                ),
+                new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $context->builder->call(
+                        $readLong,
+                        $context->builder->pointerCast($leftPtr, $readLong->getParam(0)->typeOf())
+                    )
+                ),
+                false
+            );
+            if (null === $longRightOut) {
+                $longRightOut = self::fromSpaceshipConst($context, $opType, 0);
+            }
+            $longRightEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($longJoinBb);
+            $context->builder->positionAtEnd($longJoinBb);
+            $longPhi = $context->builder->phi($joinTy, $tag.'_long_phi');
+            $longPhi->addIncoming($longLeftOut->value, $longLeftEnd);
+            $longPhi->addIncoming($longRightOut->value, $longRightEnd);
+            $longCaseEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($unlikeJoinBb);
+
+            $context->builder->positionAtEnd($unlikeJoinBb);
+            $unlikePhi = $context->builder->phi($joinTy, $tag.'_unlike_phi');
+            $unlikePhi->addIncoming($strCaseOut, $strCaseEnd);
+            $unlikePhi->addIncoming($longPhi, $longCaseEnd);
+            $unlikeVal = $unlikePhi;
+        }
+        $unlikeEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($genBb);
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
+        $genericCmp = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callValueSpaceship(
+            $context,
+            $leftPtr,
+            $rightPtr
+        );
+        if (OpCode::TYPE_SPACESHIP === $opType) {
+            $genVal = $genericCmp;
+        } elseif (self::isLooseEqualOp($opType)) {
+            $zero = $genericCmp->typeOf()->constInt(0, false);
+            $eq = $context->builder->icmp(Builder::INT_EQ, $genericCmp, $zero);
+            $genVal = OpCode::TYPE_EQUAL === $opType
+                ? $eq
+                : $context->builder->xor($eq, $i1->constInt(1, false));
+        } else {
+            $genVal = JitValueCompare::identicalValueToValue($context, $left, $right);
+        }
+        $genEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        if (OpCode::TYPE_SPACESHIP === $opType) {
+            $phi = $context->builder->phi($i64, $tag.'_done_phi');
+            $phi->addIncoming($unlikeVal, $unlikeEnd);
+            $phi->addIncoming($genVal, $genEnd);
+
+            return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $phi);
+        }
+        $phi = $context->builder->phi($i1, $tag.'_done_phi');
+        $phi->addIncoming($unlikeVal, $unlikeEnd);
+        $phi->addIncoming($genVal, $genEnd);
+
+        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $phi);
     }
 }

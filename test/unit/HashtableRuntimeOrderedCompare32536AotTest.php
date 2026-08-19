@@ -9,16 +9,16 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: runtime boxed assoc <=> / < > matches Zend zend_hash_compare (#32539 leftover of #32524).
+ * AOT: assigned/returned hashtable <=> is Zend zend_compare_arrays (#32536 leftover of #32524/#32528).
  *
  * @see php-src Zend/zend_operators.c zend_compare_arrays
  *
  * @group llvm
  * @group aot
  */
-final class RuntimeHashtableOrderedCompare32539AotTest extends TestCase
+final class HashtableRuntimeOrderedCompare32536AotTest extends TestCase
 {
-    private const EXPECT = "-1\nt\n0\n-1\n";
+    private const EXPECT = "-1\nt\n0\n-1\n-1\nf\n";
 
     public function testVmRuntimeHashtableOrderedCompareMatchesZend(): void
     {
@@ -40,8 +40,11 @@ final class RuntimeHashtableOrderedCompare32539AotTest extends TestCase
         }
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/issue_runtime_hashtable_ordered_compare.php';
-        $bin = sys_get_temp_dir().'/phpc_issue_32539_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+        $bin = sys_get_temp_dir().'/phpc_issue_32536_'.getmypid().'.bin';
+        $cache = sys_get_temp_dir().'/phpc_issue_32536_cache_'.getmypid();
+        @mkdir($cache, 0777, true);
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR='.escapeshellarg($cache).' '
+            .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
@@ -55,5 +58,18 @@ final class RuntimeHashtableOrderedCompare32539AotTest extends TestCase
         } finally {
             @unlink($bin);
         }
+    }
+
+    public function testLiteralAndNullBoolShortcutsStillMatch(): void
+    {
+        $runtime = new Runtime();
+        $code = file_get_contents(
+            dirname(__DIR__).'/repro/issue_hashtable_ordered_compare.php'
+        );
+        $this->assertNotFalse($code);
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'issue_hashtable_ordered_compare.php'));
+        $out = (string) ob_get_clean();
+        $this->assertSame("-1\nt\nt\n0\neq\nneq\neq\n1\n", $out);
     }
 }

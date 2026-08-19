@@ -946,6 +946,10 @@ restart:
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_VALUE === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $right, $leftValue);
+                if (null !== $boxedObjEq) {
+                    return $boxedObjEq;
+                }
                 $result = JitStringCompare::identicalValueToString($this->context, $right, $leftValue);
                 goto return_bool;
             }
@@ -993,19 +997,46 @@ restart:
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $left, $rightValue);
+                if (null !== $boxedObjEq) {
+                    return $boxedObjEq;
+                }
+            }
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = JitStringCompare::identicalStringToValue(
                     $this->context,
                     $rightValue,
                     $left
                 );
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
                 goto return_bool;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $same = JitStringCompare::identicalStringToValue($this->context, $rightValue, $left);
-                $result = $this->context->builder->xor(
-                    $same,
-                    $this->context->getTypeFromString('int1')->constInt(1, false)
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $rightValue
                 );
+                $cmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::valuePtrFromVariable($this->context, $left),
+                    JitValueBox::pointer($this->context, $tmp)
+                );
+                $zero = $cmp->typeOf()->constInt(0, false);
+                $result = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
                 goto return_bool;
             }
             // VALUE < STRING — e.g. `$date[$i] < '0'` after offset fetch (#27239 Strptime emit).
@@ -1090,7 +1121,17 @@ restart:
                 $result = JitValueCompare::notIdenticalValueToValue($this->context, $left, $right);
                 goto return_bool;
             }
+            if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                $boxedSp = JitUnlikeCompare::tryLowerBoxedPair($this->context, $opcode->type, $left, $right);
+                if (null !== $boxedSp) {
+                    return $boxedSp;
+                }
+            }
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $boxedEq = JitUnlikeCompare::tryLowerBoxedPair($this->context, $opcode->type, $left, $right);
+                if (null !== $boxedEq) {
+                    return $boxedEq;
+                }
                 $equal = JitValueCompare::looseEqualOperands($this->context, $left, $right);
                 if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                     $result = $this->context->builder->xor(
@@ -1103,6 +1144,10 @@ restart:
                 goto return_bool;
             }
             if (self::isOrderedCompareOpcode($opcode->type)) {
+                $boxedOrd = JitUnlikeCompare::tryLowerBoxedPair($this->context, $opcode->type, $left, $right);
+                if (null !== $boxedOrd) {
+                    return $boxedOrd;
+                }
                 $result = JitValueCompare::orderedValueToValue(
                     $this->context,
                     $opcode->type,
@@ -1524,52 +1569,10 @@ restart:
         }
         if (OpCode::TYPE_SPACESHIP === $opcode->type) {
             if (JitValueBox::isValueOperand($left) && JitValueBox::isValueOperand($right)) {
-                Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $leftPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
-                $rightPtr = JitValueBox::valuePtrFromVariable($this->context, $right);
-                $map = $this->context->structFieldMap['__value__'];
-                $i8 = $this->context->getTypeFromString('int8');
-                $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
-                $leftKind = $this->context->builder->load(
-                    $this->context->builder->structGep($leftPtr, $map['type'])
-                );
-                $rightKind = $this->context->builder->load(
-                    $this->context->builder->structGep($rightPtr, $map['type'])
-                );
-                $bothObj = $this->context->builder->and(
-                    $this->context->builder->icmp(Builder::INT_EQ, $leftKind, $objTag),
-                    $this->context->builder->icmp(Builder::INT_EQ, $rightKind, $objTag)
-                );
-                $parentFn = BasicBlockHelper::parentFunction($this->context);
-                $objBb = $parentFn->appendBasicBlock('val_spaceship_obj');
-                $genBb = $parentFn->appendBasicBlock('val_spaceship_gen');
-                $doneBb = $parentFn->appendBasicBlock('val_spaceship_done');
-                $i64 = $this->context->getTypeFromString('int64');
-                $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
-                $this->context->builder->branchIf($bothObj, $objBb, $genBb);
-                $this->context->builder->positionAtEnd($objBb);
-                $leftObj = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readObject'),
-                    $leftPtr
-                );
-                $rightObj = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readObject'),
-                    $rightPtr
-                );
-                $objCmp = Builtin\SpaceshipRuntime::callObjectCompareSpaceship(
-                    $this->context,
-                    $leftObj,
-                    $rightObj
-                );
-                $this->context->builder->store($objCmp, $resultSlot);
-                $this->context->builder->branch($doneBb);
-                $this->context->builder->positionAtEnd($genBb);
-                $genCmp = Builtin\SpaceshipRuntime::callValueSpaceship($this->context, $leftPtr, $rightPtr);
-                $this->context->builder->store($genCmp, $resultSlot);
-                $this->context->builder->branch($doneBb);
-                $this->context->builder->positionAtEnd($doneBb);
-                $result = $this->context->builder->load($resultSlot);
-                goto return_long;
+                $boxedSp = JitUnlikeCompare::tryLowerBoxedPair($this->context, $opcode->type, $left, $right);
+                if (null !== $boxedSp) {
+                    return $boxedSp;
+                }
             }
             if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
                 Builtin\SpaceshipRuntime::ensureLinked($this->context);
@@ -1697,7 +1700,6 @@ restart:
                 );
                 $isObj = $this->context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
                 $i64 = $this->context->getTypeFromString('int64');
-                $one = $i64->constInt(1, true);
                 $parentFn = BasicBlockHelper::parentFunction($this->context);
                 $oneBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_one');
                 $genBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_gen');
@@ -1705,7 +1707,8 @@ restart:
                 $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
                 $this->context->builder->branchIf($isObj, $oneBb, $genBb);
                 $this->context->builder->positionAtEnd($oneBb);
-                $this->context->builder->store($one, $resultSlot);
+                // string left, boxed object right: string is smaller (#32540).
+                $this->context->builder->store($i64->constInt(-1, true), $resultSlot);
                 $this->context->builder->branch($doneBb);
                 $this->context->builder->positionAtEnd($genBb);
                 $tmp = JitValueBox::alloc($this->context);
@@ -2384,6 +2387,17 @@ return_bool:
 
             return $variable->value;
         }
+        // Assigned locals may keep {@code __object__*} / {@code __string__*} in the slot
+        // (not {@code __object__**}) — an extra load structGeps the wrong address (#32540).
+        $storageTy = $this->context->getStringFromType($variable->value->typeOf());
+        if (
+            '__object__*' === $storageTy
+            || '__string__*' === $storageTy
+            || '__hashtable__*' === $storageTy
+        ) {
+            return $variable->value;
+        }
+
         return $this->context->builder->load($variable->value);
     }
 
@@ -2431,13 +2445,18 @@ return_bool:
         }
         if (!ArrayBuiltinHelper::isNativeArray($leftType) && !ArrayBuiltinHelper::isNativeArray($rightType)) {
             // Hashtable⊙hashtable literals: zend_compare_arrays via compileTimeAssoc (#32524).
-            // Runtime tables still abort rather than call __hashtable__compareSpaceship
-            // (thin AOT SIGSEGV / miscompare, leftover of #32501).
+            // Runtime tables call __hashtable__compareSpaceship (kernel body is emitted even
+            // when __value__spaceship is already linked — #32536 leftover of #32501).
             $folded = self::foldCompileTimeAssocCompare($left, $right);
-            if (null === $folded) {
-                return null;
+            if (null !== $folded) {
+                $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
+            } else {
+                $cmp = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+                    $this->context,
+                    HashTableHelper::loadHashtablePointer($this->context, $left),
+                    HashTableHelper::loadHashtablePointer($this->context, $right)
+                );
             }
-            $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
             if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                 return $this->nativeLongResultVariable($cmp);
             }
@@ -2509,6 +2528,84 @@ return_bool:
         }
 
         return $var->type;
+    }
+
+    /**
+     * VALUE box tagged IS_OBJECT vs native string — {@code ==} must use zend_compare,
+     * not {@see VmStringCompare::identicalStringToValue} (#32540 leftover of #32515).
+     */
+    private function tryValueBoxObjectStringLooseEqual(
+        OpCode $opcode,
+        Variable $boxed,
+        Value $nativeStr
+    ): ?Variable {
+        if (
+            OpCode::TYPE_EQUAL !== $opcode->type
+            && OpCode::TYPE_IDENTICAL !== $opcode->type
+            && OpCode::TYPE_NOT_EQUAL !== $opcode->type
+            && OpCode::TYPE_NOT_IDENTICAL !== $opcode->type
+        ) {
+            return null;
+        }
+        $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $boxed);
+        $map = $this->context->structFieldMap['__value__'];
+        $i8 = $this->context->getTypeFromString('int8');
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($boxedPtr, $map['type'])
+        );
+        $isObj = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $tag = 'vbox_obj_str_eq_'.spl_object_id($this->context).'_'.spl_object_id($boxed);
+        $objBb = BasicBlockHelper::append($this->context, $tag.'_obj');
+        $strBb = BasicBlockHelper::append($this->context, $tag.'_str');
+        $doneBb = BasicBlockHelper::append($this->context, $tag.'_done');
+        $i1 = $this->context->getTypeFromString('int1');
+        $this->context->builder->branchIf($isObj, $objBb, $strBb);
+
+        $this->context->builder->positionAtEnd($objBb);
+        if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+            $objResult = OpCode::TYPE_IDENTICAL === $opcode->type
+                ? $i1->constInt(0, false)
+                : $i1->constInt(1, false);
+        } else {
+            Builtin\SpaceshipRuntime::ensureLinked($this->context);
+            $strTmp = JitValueBox::alloc($this->context);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                JitValueBox::pointer($this->context, $strTmp),
+                $nativeStr
+            );
+            $cmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                $this->context,
+                $boxedPtr,
+                JitValueBox::pointer($this->context, $strTmp)
+            );
+            $zero = $cmp->typeOf()->constInt(0, false);
+            $eq = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+            $objResult = OpCode::TYPE_EQUAL === $opcode->type
+                ? $eq
+                : $this->context->builder->xor($eq, $i1->constInt(1, false));
+        }
+        $objEnd = $this->context->builder->getInsertBlock();
+        $this->context->builder->branch($doneBb);
+
+        $this->context->builder->positionAtEnd($strBb);
+        $strResult = JitStringCompare::identicalStringToValue($this->context, $nativeStr, $boxed);
+        if (OpCode::TYPE_NOT_EQUAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+            $strResult = $this->context->builder->xor($strResult, $i1->constInt(1, false));
+        }
+        $strEnd = $this->context->builder->getInsertBlock();
+        $this->context->builder->branch($doneBb);
+
+        $this->context->builder->positionAtEnd($doneBb);
+        $phi = $this->context->builder->phi($i1, $tag.'_phi');
+        $phi->addIncoming($objResult, $objEnd);
+        $phi->addIncoming($strResult, $strEnd);
+
+        return new Variable($this->context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $phi);
     }
 
     public function tryFoldCoreIntBitwise(int $opType, Variable $left, Variable $right): ?int

@@ -70,6 +70,19 @@ final class SpaceshipRuntime
         );
     }
 
+    public static function callHashtableCompareSpaceship(Context $context, Value $leftHt, Value $rightHt): Value
+    {
+        self::ensureLinked($context);
+        $fn = $context->lookupFunction('__hashtable__compareSpaceship');
+        $params = $fn->typeOf()->getElementType()->getParameters();
+
+        return $context->builder->call(
+            $fn,
+            $context->builder->pointerCast($leftHt, $params[0]),
+            $context->builder->pointerCast($rightHt, $params[1])
+        );
+    }
+
     public static function compareHelper(Context $context, string $logical): LlvmFunction
     {
         self::ensureCompareJitHelperCompiled($context);
