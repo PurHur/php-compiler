@@ -392,6 +392,33 @@ final class LibcExtern
     }
 
     /**
+     * Module-local __errno_location(3) after Module.php always-on drop (#32643).
+     *
+     * Canonical int32* ABI. NestedJIT leaves (StringProcNice / JitFtok / SemRuntime)
+     * call this before lookupFunction('__errno_location'). Peer: ensurePosixFd (#31817).
+     * php-src: glibc errno.h / ext/standard/basic_functions.c strerror consumers.
+     */
+    public static function ensureErrnoLocationDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction('__errno_location');
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i32Ptr = $i32->pointerType(0);
+        $fn = $context->module->getNamedFunction('__errno_location');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                '__errno_location',
+                $context->context->functionType($i32Ptr, false)
+            );
+        }
+        $context->registerFunction('__errno_location', $fn);
+    }
+
+    /**
      * Define IR bodies for memset/memcpy/memmove on EMBED MCJIT (#98, #2055, #21109).
      *
      * Declared-only libc mem* often relocate to null under LLVM 9 MCJIT even after

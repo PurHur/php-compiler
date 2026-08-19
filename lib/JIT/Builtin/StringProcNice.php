@@ -16,7 +16,8 @@ use PHPLLVM\Value;
  *
  * User-script AOT + embed: {@see ProcNiceJitHelper} via {@see JitVmHelperLink}
  * (chroot #30558 / chdir #29219 shape).
- * NestedJIT leaf: module-local nice(3) + __errno_location (avoids re-entering the
+ * NestedJIT leaf: module-local nice(3) + LibcExtern::ensureErrnoLocationDecl (#32643;
+ * avoids re-entering the
  * helper bridge while NestedJIT compiles ProcNiceJitHelper `@proc_nice`).
  * SSOT (VM): {@see \PHPCompiler\ext\standard\VmProcNicePure}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(proc_nice)
@@ -108,6 +109,8 @@ final class StringProcNice
     private static function invokeCompilerNice(Context $context, Value $priorityI64): Value
     {
         self::ensureCompilerNiceDecl($context);
+        // __errno_location module-local after Module.php always-on drop (#32643).
+        \PHPCompiler\JIT\LibcExtern::ensureErrnoLocationDecl($context);
 
         $i32 = $context->getTypeFromString('int32');
         $zeroI32 = $i32->constInt(0, false);
@@ -177,18 +180,6 @@ final class StringProcNice
                 $context->registerFunction('nice', $fn);
                 $context->registerFunction(self::COMPILER_NICE, $fn);
             }
-        }
-
-        try {
-            $context->lookupFunction('__errno_location');
-        } catch (\Throwable $e) {
-            $i32 = $context->getTypeFromString('int32');
-            $i32Ptr = $i32->pointerType(0);
-            $fn = $context->module->addFunction(
-                '__errno_location',
-                $context->context->functionType($i32Ptr, false)
-            );
-            $context->registerFunction('__errno_location', $fn);
         }
     }
 }

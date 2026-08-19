@@ -49,15 +49,7 @@ final class ModuleAlwaysOnMathDeclsRuntimeShrinkTest extends TestCase
     /** @return list<string> */
     private function keptDecls(): array
     {
-        return [
-            'strlen',
-            'stat',
-            'access',
-            'lstat',
-            'mkdir',
-            'chmod',
-            '__errno_location',
-        ];
+        return [];
     }
 
     public function testModuleDropsDeadAlwaysOnMathDecls(): void
@@ -81,6 +73,8 @@ final class ModuleAlwaysOnMathDeclsRuntimeShrinkTest extends TestCase
     public function testModuleKeepsLiveAlwaysOnFsDecls(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringContainsString('#32643', $source);
+        $this->assertSame([], $this->keptDecls(), 'Module.php must not always-declare any libc symbol (#32643)');
         foreach ($this->keptDecls() as $sym) {
             $this->assertStringContainsString(
                 "lookupFunction('{$sym}')",

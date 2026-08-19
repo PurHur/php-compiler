@@ -1021,15 +1021,9 @@ class Module extends ModuleAbstract
         // M5TrivialEchoNative declare module-locally (LibcExtern rows also dropped).
         // nice(3) dropped (#30530 / #30615): StringProcNice NestedJIT leaf declares
         // module-locally; ProcNiceJitHelper uses @proc_nice (always-on JitProcNice LLVM removed).
-        try {
-            $context->lookupFunction('__errno_location');
-        } catch (\Throwable $e) {
-            $i32 = $context->getTypeFromString('int32');
-            $i32Ptr = $i32->pointerType(0);
-            $ft = $context->context->functionType($i32Ptr, false);
-            $fn = $context->module->addFunction('__errno_location', $ft);
-            $context->registerFunction('__errno_location', $fn);
-        }
+        // __errno_location dropped (#32643 / #30530 peer): StringProcNice / JitFtok /
+        // SemRuntime call LibcExtern::ensureErrnoLocationDecl before lookup; leftover
+        // Module always-on vs NestedJIT int32* drift minted __errno_location.1 (#31894 / #32122).
         // fnmatch(3) dropped from always-on Module decls (#30383): StringFnmatch
         // NestedJIT leaf declares fnmatch module-locally (chdir #29219 / rename #29141 shape).
         // chdir(2) dropped (#30530 / #29219): StringChdir NestedJIT leaf declares module-locally;

@@ -31,7 +31,8 @@ final class ProcNiceRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_nice', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('LibcExtern::', $source);
+        $this->assertStringContainsString('LibcExtern::ensureErrnoLocationDecl', $source);
+        $this->assertStringContainsString('#32643', $source);
     }
 
     public function testProcNiceJitHelperUsesHostProcNiceNotKernel(): void
