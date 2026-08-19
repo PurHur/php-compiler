@@ -728,6 +728,8 @@
             <file>./test/compliance/DomXpathAttrStarJITTest.php</file>
             <file>./test/compliance/DomXpathOrAndVMTest.php</file>
             <file>./test/compliance/DomXpathOrAndJITTest.php</file>
+            <file>./test/compliance/DomXpathThenChildnodesItemAotVMTest.php</file>
+            <file>./test/compliance/DomXpathThenChildnodesItemAotJITTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictVMTest.php</file>
             <file>./test/compliance/DomGetElementsByTagNameNullStrictJITTest.php</file>
             <file>./test/compliance/DomCreateNullStrictVMTest.php</file>
