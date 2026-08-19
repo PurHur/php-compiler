@@ -55,13 +55,16 @@ final class JitDomDocumentElement
                 $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
             }
 
-            return ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
                 $objectType,
                 $obj,
                 $docClass,
                 self::PROP_DOCUMENT_ELEMENT,
                 $docClassId
             );
+            JitDomGetNodePath::annotateDocumentElement($result);
+
+            return $result;
         }
 
         return self::boxNull($context);
@@ -79,15 +82,20 @@ final class JitDomDocumentElement
     public static function syncChildrenFromXmlPublic(
         \PHPCompiler\JIT\Context $context,
         Value $element,
-        string $xml
+        string $xml,
+        string $parentPath = ''
     ): void {
-        self::syncChildrenFromXml($context, $element, $xml);
+        if ('' === $parentPath) {
+            $parentPath = '/'.DomParseSimpleXmlJitHelper::rootTagArgv($xml);
+        }
+        self::syncChildrenFromXml($context, $element, $xml, $parentPath);
     }
 
     private static function syncChildrenFromXml(
         \PHPCompiler\JIT\Context $context,
         Value $element,
-        string $xml
+        string $xml,
+        string $parentPath
     ): void {
         // Include blank text / comments so childNodes->length matches Zend (#27260).
         $children = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
@@ -99,12 +107,22 @@ final class JitDomDocumentElement
         $prev = null;
         $first = null;
         $last = null;
-        foreach ($children as $node) {
+        foreach ($children as $idx => $node) {
             $child = match ($node['kind']) {
                 'comment' => JitDomCreateComment::materialize($context, $node['data']),
                 'text' => JitDomCreateTextNode::materialize($context, $node['data']),
                 default => JitDomCreateElement::materializeElementFromLiteral($context, $node['data']),
             };
+            $segment = DomParseSimpleXmlJitHelper::nodePathSegmentArgv($children, $idx);
+            if ('element' === $node['kind'] && null !== $segment && '' !== $segment) {
+                $childPath = rtrim($parentPath, '/').'/'.$segment;
+                JitDomGetNodePath::storeOn($context, $child, self::CLASS_ELEMENT, $childPath);
+                $inner = $node['inner'] ?? '';
+                if ('' !== $inner) {
+                    $outer = '<'.$node['data'].'>'.$inner.'</'.$node['data'].'>';
+                    self::syncChildrenFromXml($context, $child, $outer, $childPath);
+                }
+            }
             if ('element' === $node['kind'] && isset($node['open']) && \is_string($node['open'])) {
                 JitDomCreateElement::storeAttributesPresence(
                     $context,

@@ -180,6 +180,13 @@ final class DomInstanceMethodJit
         'dom\\node::hasattributes' => true,
         'dom\\element::hasattributes' => true,
         'dom\\htmlelement::hasattributes' => true,
+        'domnode::getnodepath' => true,
+        'domelement::getnodepath' => true,
+        'domdocument::getnodepath' => true,
+        'dom\\node::getnodepath' => true,
+        'dom\\element::getnodepath' => true,
+        'dom\\htmlelement::getnodepath' => true,
+        'dom\\document::getnodepath' => true,
         'domtext::clonenode' => true,
         'domtext::splittext' => true,
         'domcdatasection::splittext' => true,
@@ -692,6 +699,18 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::getnodepath' === $lc
+                || 'domelement::getnodepath' === $lc
+                || 'domdocument::getnodepath' === $lc
+                || 'dom\\node::getnodepath' === $lc
+                || 'dom\\element::getnodepath' === $lc
+                || 'dom\\htmlelement::getnodepath' === $lc
+                || 'dom\\document::getnodepath' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeGetNodePath();
+
+                return;
+            }
             if ('domtext::splittext' === $lc || 'domcdatasection::splittext' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomTextSplitText();
 
@@ -1007,6 +1026,13 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\node::hasattributes');
             self::ensureProxy($context, 'dom\\element::hasattributes');
             self::ensureProxy($context, 'dom\\htmlelement::hasattributes');
+            self::ensureProxy($context, 'domnode::getnodepath');
+            self::ensureProxy($context, 'domelement::getnodepath');
+            self::ensureProxy($context, 'domdocument::getnodepath');
+            self::ensureProxy($context, 'dom\\node::getnodepath');
+            self::ensureProxy($context, 'dom\\element::getnodepath');
+            self::ensureProxy($context, 'dom\\htmlelement::getnodepath');
+            self::ensureProxy($context, 'dom\\document::getnodepath');
             self::ensureProxy($context, 'domtext::clonenode');
             self::ensureProxy($context, 'domtext::splittext');
             self::ensureProxy($context, 'domcdatasection::splittext');
@@ -1150,13 +1176,13 @@ final class DomInstanceMethodJit
 
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
-        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes'],
+        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname'],
+        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getnodepath'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],

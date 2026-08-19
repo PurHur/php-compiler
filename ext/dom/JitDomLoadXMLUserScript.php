@@ -318,12 +318,13 @@ final class JitDomLoadXMLUserScript
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
+        JitDomGetNodePath::storeOn($context, $element, self::CLASS_ELEMENT, '/'.$tag);
         JitDomCreateElement::storeAttributesPresence(
             $context,
             $element,
             [] !== DomParseSimpleXmlJitHelper::rootAttributesArgv($xml)
         );
-        JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml);
+        JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml, '/'.$tag);
 
         $objectType = $context->type->object;
         $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
