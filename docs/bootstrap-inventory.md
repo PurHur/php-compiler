@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7637 |
-| Phase A inventory files (M2 ratio SSOT) | 7637 |
+| PHP files on vm.php path | 7638 |
+| Phase A inventory files (M2 ratio SSOT) | 7638 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24379 |
+| Source constructs flagged (warnings) | 24381 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1767,6 +1767,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslMethods.php` | 0 | 1 |
 | `ext/openssl/JitOpensslPbkdf2.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
+| `ext/openssl/JitOpensslX509.php` | 0 | 1 |
 | `ext/openssl/Module.php` | 0 | 67 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
@@ -1852,7 +1853,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_export_to_file.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_fingerprint.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_free.php` | 0 | 2 |
-| `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
+| `ext/openssl/openssl_x509_parse.php` | 0 | 3 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
 | `ext/openssl/phpc_openssl_cipher_decrypt.php` | 0 | 1 |
@@ -14690,10 +14691,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/JitHashContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 56)
-- new JITVariable (line 481)
-- new JITVariable (line 512)
-- 24 class method(s)
+- new ArgumentCountError (line 63)
+- new JITVariable (line 593)
+- new JITVariable (line 624)
+- 26 class method(s)
 
 ### `ext/hash/JitHashCryptoKernel.php`
 
@@ -21522,6 +21523,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/openssl/JitOpensslX509.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/openssl/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22130,6 +22136,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- new ArgumentCountError (line 48)
 - 3 class method(s)
 
 ### `ext/openssl/openssl_x509_read.php`
@@ -55139,14 +55146,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Helper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 201)
-- new Variable (line 205)
-- new Variable (line 207)
-- new Variable (line 2213)
-- new Variable (line 2217)
-- new Variable (line 2607)
-- new Variable (line 2629)
-- new Variable (line 2640)
+- new Variable (line 214)
+- new Variable (line 218)
+- new Variable (line 220)
+- new Variable (line 2226)
+- new Variable (line 2230)
+- new Variable (line 2620)
+- new Variable (line 2642)
+- new Variable (line 2653)
 - 18 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
@@ -55256,7 +55263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitArrayNumericOperandGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/JitArrayUserSetOps.php`
 
@@ -55363,7 +55370,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitObjectNumericOperandGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/JitOperandTypeLabel.php`
 
@@ -61494,7 +61501,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmArrayNumericOperandGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/VM/VmBoundMethodCallable.php`
 
@@ -61652,8 +61659,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmObjectNumericOperandGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
-- 6 closure(s)
+- 8 class method(s)
+- 7 closure(s)
 
 ### `lib/VM/VmObjectPropertyForeach.php`
 
