@@ -36,6 +36,8 @@
             <file>./test/compliance/ClosureUseDuplicate32153JITTest.php</file>
             <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013VMTest.php</file>
             <file>./test/compliance/ClassExistsReflectionAutoloadDefault25013JITTest.php</file>
+            <file>./test/compliance/ExistsSiblingsReflectionAutoloadDefault25030VMTest.php</file>
+            <file>./test/compliance/ExistsSiblingsReflectionAutoloadDefault25030JITTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedVMTest.php</file>
             <file>./test/compliance/PropertyHookIssetUninitBackedJITTest.php</file>
             <file>./test/compliance/DeclareTicksEchoCadenceVMTest.php</file>
