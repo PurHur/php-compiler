@@ -5711,6 +5711,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($verify, 'key', 'openssl_x509_verify'));
         self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('openssl_x509_verify'));
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_x509_verify'));
+
+        $export = BuiltinParamNames::forFunction('openssl_x509_export');
+        self::assertSame(['certificate', 'output', 'no_text='], $export);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($export, 'certificate', 'openssl_x509_export'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($export, 'output', 'openssl_x509_export'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($export, 'no_text', 'openssl_x509_export'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($export, 'x509', 'openssl_x509_export'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($export, 'out', 'openssl_x509_export'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($export, 'notext', 'openssl_x509_export'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('openssl_x509_export'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_x509_export'));
     }
 
     /** @covers issue #23343 */
