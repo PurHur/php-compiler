@@ -105,6 +105,13 @@ final class JitDomDocumentElement
                 'text' => JitDomCreateTextNode::materialize($context, $node['data']),
                 default => JitDomCreateElement::materializeElementFromLiteral($context, $node['data']),
             };
+            if ('element' === $node['kind'] && isset($node['open']) && \is_string($node['open'])) {
+                JitDomCreateElement::storeAttributesPresence(
+                    $context,
+                    $child,
+                    [] !== DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open'])
+                );
+            }
             self::ensureLinkProps($context);
             $parentJit = new JITVariable(
                 $context,

@@ -729,7 +729,7 @@ final class DomParseSimpleXmlJitHelper
                         $i = $close + \strlen('</'.$tag.'>');
                     }
                 }
-                $nodes[] = ['kind' => 'element', 'data' => strtolower($tag)];
+                $nodes[] = ['kind' => 'element', 'data' => strtolower($tag), 'open' => $el[0]];
 
                 continue;
             }
