@@ -1001,19 +1001,42 @@ restart:
                 if (null !== $boxedObjEq) {
                     return $boxedObjEq;
                 }
+            }
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = JitStringCompare::identicalStringToValue(
                     $this->context,
                     $rightValue,
                     $left
                 );
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
                 goto return_bool;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $same = JitStringCompare::identicalStringToValue($this->context, $rightValue, $left);
-                $result = $this->context->builder->xor(
-                    $same,
-                    $this->context->getTypeFromString('int1')->constInt(1, false)
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $rightValue
                 );
+                $cmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::valuePtrFromVariable($this->context, $left),
+                    JitValueBox::pointer($this->context, $tmp)
+                );
+                $zero = $cmp->typeOf()->constInt(0, false);
+                $result = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
                 goto return_bool;
             }
             // VALUE < STRING — e.g. `$date[$i] < '0'` after offset fetch (#27239 Strptime emit).
@@ -1677,7 +1700,6 @@ restart:
                 );
                 $isObj = $this->context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
                 $i64 = $this->context->getTypeFromString('int64');
-                $one = $i64->constInt(1, true);
                 $parentFn = BasicBlockHelper::parentFunction($this->context);
                 $oneBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_one');
                 $genBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_gen');
@@ -1685,7 +1707,8 @@ restart:
                 $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
                 $this->context->builder->branchIf($isObj, $oneBb, $genBb);
                 $this->context->builder->positionAtEnd($oneBb);
-                $this->context->builder->store($one, $resultSlot);
+                // string left, boxed object right: string is smaller (#32540).
+                $this->context->builder->store($i64->constInt(-1, true), $resultSlot);
                 $this->context->builder->branch($doneBb);
                 $this->context->builder->positionAtEnd($genBb);
                 $tmp = JitValueBox::alloc($this->context);
