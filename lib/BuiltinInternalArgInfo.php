@@ -593,6 +593,32 @@ final class BuiltinInternalArgInfo
             'gmp_setbit', 'gmp_clrbit' => 'void',
             // ext/random/random.stub.php — InternalArgInfo omits void (#23596)
             'mt_srand', 'srand' => 'void',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits mixed return (#28309)
+            'constant' => 'mixed',
+            // ext/standard/head.stub.php — InternalArgInfo omits void return (#28465)
+            'header' => 'void',
+            // ext/standard/head.stub.php — InternalArgInfo omits void return (#28221)
+            'header_remove' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits void return (#28220)
+            'ob_implicit_flush' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits returns (#28206)
+            'ob_get_contents' => 'string|false',
+            'ob_get_flush' => 'string|false',
+            'ob_get_length' => 'int|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits returns (#28208)
+            'get_cfg_var' => 'string|false',
+            'ini_restore' => 'void',
+            'register_shutdown_function' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return bool/false; Zend ?bool=null→int (#28207)
+            'ignore_user_abort' => 'int',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#28176)
+            'umask' => 'int',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#28175)
+            'php_ini_scanned_files' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return boolean; Zend bool (#28152)
+            'cli_set_process_title' => 'bool',
+            // ext/standard/assert.stub.php — InternalArgInfo return int; Zend bool (#28335)
+            'assert' => 'bool',
             default => null,
         };
     }
