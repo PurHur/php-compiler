@@ -161,6 +161,11 @@ final class BuiltinInternalArgInfo
             'debug_print_backtrace' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return empty; Zend void (#27998)
             'clearstatcache' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#28307, #27950)
+            'sleep' => 'int',
+            'time_nanosleep' => 'array|bool',
+            'time_sleep_until' => 'bool',
+            'usleep' => 'void',
             // ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324, #25580)
             'preg_grep' => 'array|false',
             'preg_match', 'preg_match_all' => 'int|false',
