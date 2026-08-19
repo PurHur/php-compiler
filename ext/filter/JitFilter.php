@@ -939,51 +939,35 @@ final class JitFilter
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $null = $context->getTypeFromString('__string__*')->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $strVal, $null);
-        $flagsVal = $flags ?? $context->getTypeFromString('int64')->constInt(0, false);
-
-        $id = (string) (++self::$blockSerial);
-        $failBlock = BasicBlockHelper::append($context, 'fvi_box_fail_'.$id);
-        $okBlock = BasicBlockHelper::append($context, 'fvi_box_ok_'.$id);
-        $mergeBlock = BasicBlockHelper::append($context, 'fvi_box_merge_'.$id);
-        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $hasString = $context->builder->icmp(Builder::INT_NE, $strVal, $strPtrTy->constNull());
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $falseVal = $context->constantFromBool(false);
 
+        $stringBlock = BasicBlockHelper::append($context, 'fvi_box_string');
+        $failBlock = BasicBlockHelper::append($context, 'fvi_box_fail');
+        $doneBlock = BasicBlockHelper::append($context, 'fvi_box_done');
+
+        $context->builder->branchIf($hasString, $stringBlock, $failBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $strVal);
+        $stringResult = self::validateIp($context, $strVar, $flags);
+        $stringTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
         $context->builder->positionAtEnd($failBlock);
         JitValueBox::writeBool($context, $slot, $falseVal);
-        $context->builder->branch($mergeBlock);
+        $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($okBlock);
-        $validated = $context->builder->call(
-            $context->lookupFunction('__compiler_filter_validate_ip'),
-            $strVal,
-            $flagsVal
-        );
-        $validatedNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
-        $invalidBlock = BasicBlockHelper::append($context, 'fvi_box_invalid_'.$id);
-        $validBlock = BasicBlockHelper::append($context, 'fvi_box_valid_'.$id);
-        $context->builder->branchIf($validatedNull, $invalidBlock, $validBlock);
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($ptr->typeOf());
+        $phi->addIncoming($stringResult, $stringTail);
+        $phi->addIncoming($ptr, $failBlock);
 
-        $context->builder->positionAtEnd($invalidBlock);
-        JitValueBox::writeBool($context, $slot, $falseVal);
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($validBlock);
-        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strVal);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $owned
-        );
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($mergeBlock);
-
-        return $ptr;
+        return $phi;
     }
 
     public static function validateMac(Context $context, JITVariable $value): Value
