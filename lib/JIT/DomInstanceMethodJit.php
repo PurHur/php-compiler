@@ -199,6 +199,11 @@ final class DomInstanceMethodJit
         'domdocument::issupported' => true,
         'dom\\node::issupported' => true,
         'dom\\element::issupported' => true,
+        'domnode::lookupprefix' => true,
+        'domelement::lookupprefix' => true,
+        'domdocument::lookupprefix' => true,
+        'dom\\node::lookupprefix' => true,
+        'dom\\element::lookupprefix' => true,
         'domtext::clonenode' => true,
         'domtext::splittext' => true,
         'domcdatasection::splittext' => true,
@@ -747,6 +752,16 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::lookupprefix' === $lc
+                || 'domelement::lookupprefix' === $lc
+                || 'domdocument::lookupprefix' === $lc
+                || 'dom\\node::lookupprefix' === $lc
+                || 'dom\\element::lookupprefix' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeLookupPrefix();
+
+                return;
+            }
             if ('domtext::splittext' === $lc || 'domcdatasection::splittext' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomTextSplitText();
 
@@ -1088,6 +1103,11 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::issupported');
             self::ensureProxy($context, 'dom\\node::issupported');
             self::ensureProxy($context, 'dom\\element::issupported');
+            self::ensureProxy($context, 'domnode::lookupprefix');
+            self::ensureProxy($context, 'domelement::lookupprefix');
+            self::ensureProxy($context, 'domdocument::lookupprefix');
+            self::ensureProxy($context, 'dom\\node::lookupprefix');
+            self::ensureProxy($context, 'dom\\element::lookupprefix');
             self::ensureProxy($context, 'domtext::clonenode');
             self::ensureProxy($context, 'domtext::splittext');
             self::ensureProxy($context, 'domcdatasection::splittext');
@@ -1234,7 +1254,7 @@ final class DomInstanceMethodJit
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath', 'getlineno'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'getlineno'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'lookupprefix', 'getlineno'],
         'domimplementation' => ['createdocumenttype', 'hasfeature'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],

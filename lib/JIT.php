@@ -20877,6 +20877,12 @@ class JIT {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
+            } elseif ('lookupprefix' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupprefix');
+                if ($this->context->functionIsRegistered('domnode::lookupprefix')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('getlineno' === $methodLc) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
                 if ($this->context->functionIsRegistered('domnode::getlineno')) {
@@ -21279,6 +21285,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::issupported');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::issupported');
                 }
+                if ('lookupprefix' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupprefix');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::lookupprefix');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::lookupprefix');
+                }
                 if ('getlineno' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getlineno');
@@ -21366,6 +21377,12 @@ class JIT {
                 }
                 if ('issupported' === $methodLc && $this->context->functionIsRegistered('domnode::issupported')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::issupported');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('lookupprefix' === $methodLc && $this->context->functionIsRegistered('domnode::lookupprefix')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21664,6 +21681,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::issupported');
             if ($this->context->functionIsRegistered('domnode::issupported')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::issupported');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('lookupprefix' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupprefix');
+            if ($this->context->functionIsRegistered('domnode::lookupprefix')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
