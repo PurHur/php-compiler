@@ -18319,6 +18319,9 @@ class JIT {
         if ($force || null !== $src->compileTimeDomChildIndex) {
             $dest->compileTimeDomChildIndex = $src->compileTimeDomChildIndex;
         }
+        if ($force || null !== $src->compileTimeDomNodePath) {
+            $dest->compileTimeDomNodePath = $src->compileTimeDomNodePath;
+        }
         if ($force || null !== $src->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $src->compileTimeDomTextData;
         }
@@ -21245,6 +21248,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::hasattributes');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::hasattributes');
                 }
+                if ('getnodepath' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getnodepath');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getnodepath');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::getnodepath');
+                }
                 // getElementsByTagName on documentElement temps (:object) — php-src element.c (#32454).
                 if ('getelementsbytagname' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
@@ -21311,6 +21319,12 @@ class JIT {
                 }
                 if ('hasattributes' === $methodLc && $this->context->functionIsRegistered('domnode::hasattributes')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::hasattributes');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('getnodepath' === $methodLc && $this->context->functionIsRegistered('domnode::getnodepath')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getnodepath');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21579,6 +21593,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::hasattributes');
             if ($this->context->functionIsRegistered('domnode::hasattributes')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::hasattributes');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('getnodepath' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getnodepath');
+            if ($this->context->functionIsRegistered('domnode::getnodepath')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getnodepath');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
@@ -24003,6 +24026,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomChildIndex && null === $dest->compileTimeDomChildIndex) {
             $dest->compileTimeDomChildIndex = $source->compileTimeDomChildIndex;
+        }
+        if (null !== $source->compileTimeDomNodePath && null === $dest->compileTimeDomNodePath) {
+            $dest->compileTimeDomNodePath = $source->compileTimeDomNodePath;
         }
         if (null !== $source->compileTimeDomTextData && null === $dest->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $source->compileTimeDomTextData;

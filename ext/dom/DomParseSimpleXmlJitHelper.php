@@ -734,11 +734,22 @@ final class DomParseSimpleXmlJitHelper
      * Compile-time only (host preg). Keeps inter-element whitespace so AOT
      * {@code childNodes->length} matches Zend when preserveWhiteSpace is default.
      *
-     * @return list<array{kind: 'comment'|'text'|'element', data: string}>
+     * @return list<array{kind: 'comment'|'text'|'element', data: string, inner?: string, open?: string}>
      */
     public static function directChildNodesArgv(string $xml): array
     {
-        $inner = self::rootInnerXmlArgv($xml);
+        return self::parseSiblingNodesArgv(self::rootInnerXmlArgv($xml));
+    }
+
+    /**
+     * Direct children of an element's inner markup (not a full document).
+     *
+     * Used by {@see JitDomGetNodePath} nested firstChild walks (#32474).
+     *
+     * @return list<array{kind: 'comment'|'text'|'element', data: string, inner?: string, open?: string}>
+     */
+    public static function parseSiblingNodesArgv(string $inner): array
+    {
         if ('' === $inner) {
             return [];
         }
@@ -756,13 +767,20 @@ final class DomParseSimpleXmlJitHelper
                 $tag = $el[1];
                 $selfClosing = '/' === ($el[3] ?? '');
                 $i += \strlen($el[0]);
+                $childInner = '';
                 if (!$selfClosing) {
                     $close = stripos($inner, '</'.$tag.'>', $i);
                     if (false !== $close) {
+                        $childInner = substr($inner, $i, $close - $i);
                         $i = $close + \strlen('</'.$tag.'>');
                     }
                 }
-                $nodes[] = ['kind' => 'element', 'data' => strtolower($tag), 'open' => $el[0]];
+                $nodes[] = [
+                    'kind' => 'element',
+                    'data' => strtolower($tag),
+                    'open' => $el[0],
+                    'inner' => $childInner,
+                ];
 
                 continue;
             }
@@ -777,6 +795,45 @@ final class DomParseSimpleXmlJitHelper
         }
 
         return $nodes;
+    }
+
+    /**
+     * xmlGetNodePath segment for one sibling (php-src node.c / libxml; #32474).
+     *
+     * @param list<array{kind: string, data: string}> $siblings
+     */
+    public static function nodePathSegmentArgv(array $siblings, int $index): ?string
+    {
+        $node = $siblings[$index] ?? null;
+        if (null === $node) {
+            return null;
+        }
+        if ('text' === $node['kind']) {
+            return 'text()';
+        }
+        if ('comment' === $node['kind']) {
+            return 'comment()';
+        }
+        if ('element' !== $node['kind']) {
+            return $node['data'] ?? null;
+        }
+        $name = $node['data'];
+        $same = 0;
+        $pos = 0;
+        foreach ($siblings as $i => $sib) {
+            if ('element' !== ($sib['kind'] ?? '') || ($sib['data'] ?? '') !== $name) {
+                continue;
+            }
+            ++$same;
+            if ($i === $index) {
+                $pos = $same;
+            }
+        }
+        if ($same > 1) {
+            return $name.'['.$pos.']';
+        }
+
+        return $name;
     }
 
     /**

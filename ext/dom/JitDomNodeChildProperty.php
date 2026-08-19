@@ -45,6 +45,7 @@ final class JitDomNodeChildProperty
             $objectType->lookup($slotClass)
         );
         self::annotateCompileTimeChild($result, $propName);
+        JitDomGetNodePath::annotateChildFetch($result, $propName);
 
         return $result;
     }

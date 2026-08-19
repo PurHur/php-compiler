@@ -240,6 +240,9 @@ final class VmDom
      */
     public const PROP_USER_SCRIPT_XMLNS_ATTR = '__phpcUserScriptXmlnsAttr';
 
+    /** xmlGetNodePath bake for thin-AOT (#32474). */
+    public const PROP_NODE_PATH = '__phpcNodePath';
+
     /**
      * Thin-AOT childNodes NodeList → owning node, for item() walks without DomRegistry (#27410).
      */
