@@ -1043,11 +1043,9 @@ class Type extends Builtin {
         // removed (#32636): JitFsGlobKernel declares module-locally (getNamedFunction first);
         // user-script glob()/scandir() stay FsGlobJitHelper / VmFsGlob (#27235/#27236).
         // __phpc_file_vec always-on shell removed (#32250): zero NestedJIT consumers.
-        $fnStat = $this->context->module->addFunction(
-            '__phpc_stat',
-            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_stat', $fnStat);
+        // __phpc_stat always-on shell removed (#32651): StatArrayRuntime declares
+        // module-locally (getNamedFunction first); user-script stat()/lstat() stay
+        // StatArrayJitHelper / VmFs::statInfo (php-src ext/standard/filestat.c).
         $fnStreamPath = $this->context->module->addFunction(
             '__phpc_stream_path',
             $this->context->context->functionType($strPtr, false, $i64)
@@ -1082,16 +1080,10 @@ class Type extends Builtin {
         // __compiler_localtime / __compiler_gmgetdate / __compiler_gmmktime always-on
         // shells removed (#32636): StringLocaltime / StringGmgetdate / StringGmmktime
         // own the ABI (getNamedFunction first); php-src ext/standard/datetime.c.
-        $fnMktime = $this->context->module->addFunction(
-            '__compiler_mktime',
-            $this->context->context->functionType($void, false, $i64, $i64, $i64, $i64, $i64, $i64, $i1, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_mktime', $fnMktime);
-        $fnGetrusage = $this->context->module->addFunction(
-            '__compiler_getrusage',
-            $this->context->context->functionType($void, false, $i64, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_getrusage', $fnGetrusage);
+        // __compiler_mktime / __compiler_getrusage always-on shells removed (#32651):
+        // StringMktime / StringGetrusageRuntime own the ABI (getNamedFunction first);
+        // user-script mktime()/getrusage() stay MktimeJitHelper / GetrusageJitHelper
+        // (php-src ext/date/php_date.c / ext/standard/basic_functions.c).
         $fnPendingFlush = $this->context->module->addFunction(
             '__phpc_response_headers_flush',
             $this->context->context->functionType($void, false)
