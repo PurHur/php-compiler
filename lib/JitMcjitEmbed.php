@@ -85,6 +85,12 @@ final class JitMcjitEmbed
             return self::appendMcjitBootstrapForNamespaced($code);
         }
 
+        // declare(strict_types=…) must remain the very first statement (php-src
+        // zend_compile_declare). Insert bootstrap after all leading declare()s (#32583).
+        if (preg_match('/^(<\?php\s*(?:declare\s*\([^)]*\)\s*;\s*)+)/si', $code, $m)) {
+            return $m[1].self::BOOTSTRAP_CLASS."\n".substr($code, \strlen($m[1]));
+        }
+
         return preg_replace(
             '/^<\?php\s*/',
             '<?php '.self::BOOTSTRAP_CLASS."\n",
