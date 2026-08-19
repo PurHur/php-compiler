@@ -68,6 +68,7 @@ final class DomInstanceMethodJit
         'domdocument::savehtml' => true,
         'domdocument::savehtmlfile' => true,
         'domdocument::getelementsbytagname' => true,
+        'domelement::getelementsbytagname' => true,
         'domdocument::getelementsbytagnamens' => true,
         'domdocument::appendchild' => true,
         'domnode::appendchild' => true,
@@ -549,6 +550,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domelement::getelementsbytagname' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetElementsByTagName();
+
+                return;
+            }
             if ('domdocument::getelementsbytagnamens' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentGetElementsByTagNameNS();
 
@@ -946,6 +952,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savehtml');
             self::ensureProxy($context, 'domdocument::savehtmlfile');
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
+            self::ensureProxy($context, 'domelement::getelementsbytagname');
             self::ensureProxy($context, 'domdocument::getelementsbytagnamens');
             self::ensureProxy($context, 'domdocument::appendchild');
             self::ensureProxy($context, 'domelement::appendchild');
@@ -1149,7 +1156,7 @@ final class DomInstanceMethodJit
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode'],
+        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],

@@ -36,6 +36,39 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Descendant-only tag count for DOMElement::getElementsByTagName (#32454).
+     *
+     * php-src ext/dom/element.c walks xmlFirstElementChild — the receiver itself
+     * is not in the live list. Pass root inner XML, not the full document.
+     */
+    public static function countDescendantTagArgv(string $innerXml, string $tag): int
+    {
+        $tag = strtolower($tag);
+        if ('*' === $tag) {
+            return self::countElementOpenTagsArgv($innerXml);
+        }
+
+        return self::countTagArgv($innerXml, $tag);
+    }
+
+    /** Preg-free count of start-tags (not {@code </}, comments, or PIs). */
+    public static function countElementOpenTagsArgv(string $xml): int
+    {
+        $count = 0;
+        $offset = 0;
+        $len = \strlen($xml);
+        while ($offset < $len && false !== ($pos = strpos($xml, '<', $offset))) {
+            $next = $xml[$pos + 1] ?? '';
+            if ('/' !== $next && '!' !== $next && '?' !== $next && '' !== $next) {
+                ++$count;
+            }
+            $offset = $pos + 1;
+        }
+
+        return $count;
+    }
+
+    /**
      * XPath 1.0 name-test count for compile-time XML (user-script AOT; #29139).
      *
      * Unprefixed tests match null/empty namespace only — not default-NS elements

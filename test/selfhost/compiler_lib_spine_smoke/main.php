@@ -6052,6 +6052,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomLivingDocumentCreateElementNS.ph
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentGetElementById.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentGetElementsByTagName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentGetElementsByTagNameNS.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetElementsByTagName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentAdoptNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentImportNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentLoad.php';

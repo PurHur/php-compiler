@@ -98,6 +98,40 @@ final class JitDomGetElementsByTagNameUserScript
         return self::boxNodeList($context, $count);
     }
 
+    /**
+     * DOMElement::getElementsByTagName() — descendants of documentElement (#32454).
+     *
+     * php-src: ext/dom/element.c PHP_METHOD(DOMElement, getElementsByTagName).
+     */
+    public static function tryInvokeFromElement(Context $context, JITVariable ...$args): ?Value
+    {
+        self::$lastNsUri = null;
+        self::$lastNsLocal = null;
+        if (\count($args) < 2) {
+            return null;
+        }
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                return null;
+            }
+            $tagLit = '';
+        } else {
+            $tagLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $tagLit) {
+                return null;
+            }
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml) {
+            return null;
+        }
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        $count = DomParseSimpleXmlJitHelper::countDescendantTagArgv($inner, $tagLit);
+        DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
+
+        return self::boxNodeList($context, $count);
+    }
+
     private static function boxNodeList(Context $context, int $length): Value
     {
         $objectType = $context->type->object;

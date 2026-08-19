@@ -68,6 +68,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'stream_get_contents_php_memory.phpt',
         'http_build_query_nested_27031.phpt',
         'cast_object_resource.phpt',
+        'cast_array_bool.phpt',
         'simplexml/load_string_child_property_cast.phpt',
         'static_property_closure_write_read_31965.phpt',
         'pow_operator_int_31966.phpt',
@@ -104,6 +105,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'ctor_untyped_prop_assign_32363.phpt',
         'method_prop_assign_32367.phpt',
         'coalesce_undef_echo_32445.phpt',
+        'object_int_float_cast_32452.phpt',
     ];
 
     /**

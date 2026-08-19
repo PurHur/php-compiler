@@ -68,6 +68,7 @@ final class DomInstanceMethodJitTest extends TestCase
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::hasattributens'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::removeattributens'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domdocument::getelementsbytagnamens'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::getelementsbytagname'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::haschildnodes'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domelement::haschildnodes'));
             $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('domnode::hasattributes'));

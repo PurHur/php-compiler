@@ -10215,7 +10215,8 @@ class JIT {
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
+                    $bool = ext\standard\JitZendScalarCast::emitBoolCast($this->context, $value);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $bool, true);
                     break;
                 case OpCode::TYPE_CAST_INT:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -20648,6 +20649,20 @@ class JIT {
                     return;
                 }
             }
+            // documentElement temps (:object) — Element getElementsByTagName SIGABRT via RuntimeIndirect (#32454).
+            if (
+                'getelementsbytagname' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
+                if ($this->context->functionIsRegistered('domelement::getelementsbytagname')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domelement::getelementsbytagname');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
@@ -21237,6 +21252,17 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::hasattributes');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::hasattributes');
                 }
+                // getElementsByTagName on documentElement temps (:object) — php-src element.c (#32454).
+                if ('getelementsbytagname' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::getelementsbytagname');
+                    if ($this->context->functionIsRegistered('domelement::getelementsbytagname')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domelement::getelementsbytagname');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                }
                 if ('substringdata' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::substringdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::substringdata');
@@ -21292,6 +21318,12 @@ class JIT {
                 }
                 if ('hasattributes' === $methodLc && $this->context->functionIsRegistered('domnode::hasattributes')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::hasattributes');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('getelementsbytagname' === $methodLc && $this->context->functionIsRegistered('domelement::getelementsbytagname')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domelement::getelementsbytagname');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
