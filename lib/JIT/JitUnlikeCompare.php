@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\JitScalarTypeCoerce;
+use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
@@ -472,17 +473,33 @@ final class JitUnlikeCompare
         Variable $left,
         Variable $right
     ): Variable {
+        SpaceshipRuntime::ensureLinked($context);
         $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
         $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
         $i64 = $context->getTypeFromString('int64');
         $leftHt = self::valuePtrIsHashtable($context, $leftPtr);
         $rightHt = self::valuePtrIsHashtable($context, $rightPtr);
+        $bothHt = $context->builder->and($leftHt, $rightHt);
+        $eitherHt = $context->builder->or($leftHt, $rightHt);
+        // Hashtable⊙hashtable must use zend_compare_arrays (#32539); the unlike
+        // array-greater shortcut is only for ht vs null/bool/scalar (#32528/#32520).
+        $useHtShortcut = $context->builder->and($eitherHt, $context->builder->not($bothHt));
+
+        $tag = 'two_vbox_'.spl_object_id($context);
+        $genBlock = BasicBlockHelper::append($context, $tag.'_gen');
+        $htBlock = BasicBlockHelper::append($context, $tag.'_ht');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $shortcutCheck = BasicBlockHelper::append($context, $tag.'_shortcut');
+        $context->builder->branchIf($bothHt, $genBlock, $shortcutCheck);
+
+        $context->builder->positionAtEnd($shortcutCheck);
+        $context->builder->branchIf($useHtShortcut, $htBlock, $genBlock);
+
+        $context->builder->positionAtEnd($htBlock);
         $rightNullBool = self::valuePtrIsNullOrBool($context, $rightPtr);
         $leftNullBool = self::valuePtrIsNullOrBool($context, $leftPtr);
         $leftArrVsScalar = $context->builder->and($leftHt, $rightNullBool);
         $rightArrVsScalar = $context->builder->and($rightHt, $leftNullBool);
-        $eitherHt = $context->builder->or($leftHt, $rightHt);
-
         $leftTruthy = self::boxedPtrHashtableTruthyI64($context, $leftPtr);
         $rightTruthy = self::boxedPtrHashtableTruthyI64($context, $rightPtr);
         $rightOther = self::valuePtrNullBoolLong($context, $rightPtr);
@@ -503,19 +520,11 @@ final class JitUnlikeCompare
             $truthyCmp,
             $arrGreater
         );
-        $tag = 'two_vbox_'.spl_object_id($context);
-        $htBlock = BasicBlockHelper::append($context, $tag.'_ht');
-        $genBlock = BasicBlockHelper::append($context, $tag.'_gen');
-        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
-        $context->builder->branchIf($eitherHt, $htBlock, $genBlock);
-
-        $context->builder->positionAtEnd($htBlock);
         $htEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($genBlock);
-        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
-        $generic = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callValueSpaceship(
+        $generic = SpaceshipRuntime::callValueSpaceship(
             $context,
             $leftPtr,
             $rightPtr

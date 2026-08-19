@@ -818,12 +818,18 @@ final class JitSpaceshipCompareKernel
         $context->builder->positionAtEnd($idxInit);
         $leftNext = $context->builder->load($context->builder->structGep($left, $htMap['nextFreeElement']));
         $rightNext = $context->builder->load($context->builder->structGep($right, $htMap['nextFreeElement']));
-        $idxSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('size_t'));
-        $context->builder->store($context->getTypeFromString('size_t')->constInt(0, false), $idxSlot);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zeroSize = $sizeT->constInt(0, false);
+        $hasPacked = $context->builder->and(
+            $context->builder->icmp(Builder::INT_UGT, $leftNext, $zeroSize),
+            $context->builder->icmp(Builder::INT_UGT, $rightNext, $zeroSize)
+        );
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zeroSize, $idxSlot);
 
         $idxHead = $fn->appendBasicBlock('ss_ht_idx_head');
         $strInit = $fn->appendBasicBlock('ss_ht_str_init');
-        $context->builder->branch($idxHead);
+        $context->builder->branchIf($hasPacked, $idxHead, $strInit);
 
         $context->builder->positionAtEnd($idxHead);
         $index = $context->builder->load($idxSlot);
@@ -844,7 +850,7 @@ final class JitSpaceshipCompareKernel
         $context->builder->branchIf($bothNull, $skipNull, $doCmp);
 
         $context->builder->positionAtEnd($doCmp);
-        $cmp = $context->builder->call($context->lookupFunction('__value__spaceship'), $lval, $rval);
+        $cmp = self::embeddedValueSpaceship($context, $fn, $lval, $rval);
         $nonZero = $context->builder->icmp(Builder::INT_NE, $cmp, $zero64);
         $retCmp = $fn->appendBasicBlock('ss_ht_idx_ret');
         $context->builder->branchIf($nonZero, $retCmp, $skipNull);
@@ -905,7 +911,7 @@ final class JitSpaceshipCompareKernel
         $context->builder->positionAtEnd($valCmpBlock);
         $lvalPtr = $context->builder->structGep($lnode, $nodeMap['value']);
         $rvalPtr = $context->builder->structGep($rnode, $nodeMap['value']);
-        $valCmp = $context->builder->call($context->lookupFunction('__value__spaceship'), $lvalPtr, $rvalPtr);
+        $valCmp = self::embeddedValueSpaceship($context, $fn, $lvalPtr, $rvalPtr);
         $valNonZero = $context->builder->icmp(Builder::INT_NE, $valCmp, $zero64);
         $valRet = $fn->appendBasicBlock('ss_ht_val_ret');
         $strAdvance = $fn->appendBasicBlock('ss_ht_str_advance');
@@ -928,6 +934,58 @@ final class JitSpaceshipCompareKernel
         $context->builder->positionAtEnd($strDone);
         $context->builder->returnValue($zero64);
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Compare two embedded {@see __value__} slots without re-entering full dispatch when both are long (#32539).
+     */
+    private static function embeddedValueSpaceship(
+        Context $context,
+        LlvmFunction $fn,
+        Value $leftPtr,
+        Value $rightPtr
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $lkind = self::valueKind($context, $leftPtr);
+        $rkind = self::valueKind($context, $rightPtr);
+        $bothLong = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $lkind, $i32->constInt(self::TYPE_LONG, false)),
+            $context->builder->icmp(Builder::INT_EQ, $rkind, $i32->constInt(self::TYPE_LONG, false))
+        );
+        $longBlock = $fn->appendBasicBlock(self::blockName('ss_ht_emb_long'));
+        $genericBlock = $fn->appendBasicBlock(self::blockName('ss_ht_emb_gen'));
+        $merge = $fn->appendBasicBlock(self::blockName('ss_ht_emb_merge'));
+        $context->builder->branchIf($bothLong, $longBlock, $genericBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $leftLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
+        $rightLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
+        $longLt = $context->builder->icmp(Builder::INT_SLT, $leftLong, $rightLong);
+        $longGt = $context->builder->icmp(Builder::INT_SGT, $leftLong, $rightLong);
+        $longCmp = $context->builder->select(
+            $longGt,
+            $i64->constInt(1, true),
+            $context->builder->select($longLt, $i64->constInt(-1, true), $i64->constInt(0, false))
+        );
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($genericBlock);
+        $genericCmp = $context->builder->call(
+            $context->lookupFunction('__value__spaceship'),
+            $leftPtr,
+            $rightPtr
+        );
+        $genericEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($i64, self::blockName('ss_ht_emb_phi'));
+        $phi->addIncoming($longCmp, $longEnd);
+        $phi->addIncoming($genericCmp, $genericEnd);
+
+        return $phi;
     }
 
     private static function slotContentToValue(Context $context, Value $content, Value $dest): void
