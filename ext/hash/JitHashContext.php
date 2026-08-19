@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\hash;
 
+use PHPCompiler\ext\standard\JitFileGetContents;
+use PHPCompiler\ext\standard\JitHash;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\HashContextEmbedBridge;
 use PHPCompiler\JIT\Builtin\HashContextRuntime;
-use PHPCompiler\JIT\Builtin\StringBin2hex;
 use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
@@ -20,9 +21,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for hash_init/update/final/copy (#7174, #3357). */
+/** LLVM lowering for hash_init/update/update_file/final/copy (#7174, #3357, #32464). */
 final class JitHashContext
 {
+    private static int $updateFileSerial = 0;
     private const INIT_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::init';
 
     private const UPDATE_HELPER = 'PHPCompiler\\ext\\hash\\HashContextJitHelper::update';
@@ -40,6 +42,7 @@ final class JitHashContext
         return match ($name) {
             'hash_init' => self::init($context, ...$args),
             'hash_update' => self::update($context, ...$args),
+            'hash_update_file' => self::updateFile($context, ...$args),
             'hash_final' => self::final($context, ...$args),
             'hash_copy' => self::copy($context, ...$args),
             default => throw new \LogicException($name.'() JIT dispatch missing (#3357)'),
@@ -120,37 +123,80 @@ final class JitHashContext
         $chunkStr = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_update', 1, 'data')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'hash_update', 1, 'data');
-        self::callHelper($context, self::UPDATE_HELPER, $handle, $chunkStr);
-        $bufPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
-        $map = $context->structFieldMap['__string__'];
-        $leftLen = $context->builder->load($context->builder->structGep($bufPtr, $map['length']));
-        $i64 = $context->getTypeFromString('int64');
-        $isEmpty = $context->builder->icmp(
-            Builder::INT_SLE,
-            $leftLen,
-            $i64->constInt(0, false)
-        );
-        $emptyBlock = BasicBlockHelper::append($context, 'hc_update_buf_empty');
-        $appendBlock = BasicBlockHelper::append($context, 'hc_update_buf_append');
-        $doneBlock = BasicBlockHelper::append($context, 'hc_update_buf_done');
-        $context->builder->branchIf($isEmpty, $emptyBlock, $appendBlock);
+        self::applyUpdateChunk($context, $obj, $handle, $chunkStr);
 
-        $context->builder->positionAtEnd($emptyBlock);
-        self::storeStringProperty($context, $obj, HashContextJitSupport::PROP_BUF, $chunkStr);
+        return self::returnTrue($context);
+    }
+
+    /**
+     * hash_update_file() — feed file bytes into HashContext (php-src ext/hash/hash.c; #32464 leftover of #3357).
+     *
+     * Optional $stream_context is accepted for stub parity; local paths ignore wrapper options
+     * (same as {@see hash_update_file::execute}).
+     */
+    public static function updateFile(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 2
+                    ? \sprintf('hash_update_file() expects at least 2 arguments, %d given', $argc)
+                    : \sprintf('hash_update_file() expects at most 3 arguments, %d given', $argc)
+            );
+
+            return $slot;
+        }
+        if (isset($args[2])) {
+            $rejected = self::rejectNonResourceOrNullStreamContext($context, $args[2]);
+            if (null !== $rejected) {
+                return $rejected;
+            }
+        }
+        HashContextEmbedBridge::ensureLinked($context);
+        $obj = self::readContextObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $path = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_update_file', 1, 'filename')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'hash_update_file', 1, 'filename');
+        $contentsPtr = JitFileGetContents::invoke($context, $path);
+
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($contentsPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $stringTag = $i8->constInt(JITVariable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
+
+        $id = (string) (++self::$updateFileSerial);
+        $failBlock = BasicBlockHelper::append($context, 'huf_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'huf_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'huf_done_'.$id);
+        $context->builder->branchIf($isString, $okBlock, $failBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $failResult = self::boxedFalse($context);
+        $failTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($appendBlock);
-        self::storeStringProperty(
-            $context,
-            $obj,
-            HashContextJitSupport::PROP_BUF,
-            self::appendStringPtr($context, $bufPtr, $chunkStr)
+        $context->builder->positionAtEnd($okBlock);
+        $chunkStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $contentsPtr
         );
+        self::applyUpdateChunk($context, $obj, $handle, $chunkStr);
+        $okResult = self::returnTrue($context);
+        $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($failResult->typeOf());
+        $phi->addIncoming($failResult, $failTail);
+        $phi->addIncoming($okResult, $okTail);
 
-        return self::returnTrue($context);
+        return $phi;
     }
 
     public static function final(Context $context, JITVariable ...$args): Value
@@ -205,34 +251,21 @@ final class JitHashContext
 
     /**
      * Thin standalone AOT (`isThinStandaloneAotMain`, #20200): HashContextJitHelper::finalize
-     * segfaults at execute (#3357). One-shot __compiler_hash / __compiler_hash_hmac on buffered
-     * data + inline bin2hex when $binary is false.
+     * segfaults at execute (#3357). One-shot {@see JitHash::hash} on mirrored __hcBuf
+     * (same __compiler_hash as hash_file; #32464).
      */
     private static function finalLoweringStandaloneAot(
         Context $context,
         JITVariable $ctxArg,
         Value $rawBool
     ): Value {
-        HashContextEmbedBridge::ensureLinked($context);
         StringHashCrypto::ensureLinked($context);
-        StringBin2hex::ensureLinked($context);
         $obj = self::readContextObject($context, $ctxArg);
-        $handle = self::loadHandle($context, $obj);
         $algoPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_ALGO);
         $dataPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
         $keyPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_KEY);
         $hmacFlag = self::loadNativeLongProperty($context, $obj, HashContextJitSupport::PROP_HMAC);
-        $map = $context->structFieldMap['__string__'];
-        $charPtr = $context->getTypeFromString('char*');
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $dataLen = $context->builder->load($context->builder->structGep($dataPtr, $map['length']));
-        $dataBytes = $context->builder->structGep($dataPtr, $map['value']);
-        $dataForHash = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $dataLen,
-            $context->builder->pointerCast($dataBytes, $charPtr)
-        );
         $isHmac = $context->builder->icmp(
             Builder::INT_NE,
             $hmacFlag,
@@ -240,63 +273,25 @@ final class JitHashContext
         );
         $hmacBb = BasicBlockHelper::append($context, 'hc_final_hmac');
         $plainBb = BasicBlockHelper::append($context, 'hc_final_plain');
-        $digestBb = BasicBlockHelper::append($context, 'hc_final_digest');
+        $doneBb = BasicBlockHelper::append($context, 'hc_final_done');
         $context->builder->branchIf($isHmac, $hmacBb, $plainBb);
 
         $context->builder->positionAtEnd($hmacBb);
-        $digestHmac = $context->builder->call(
-            $context->lookupFunction('__compiler_hash_hmac'),
-            $algoPtr,
-            $dataForHash,
-            $keyPtr,
-            $i32->constInt(1, false)
-        );
-        $context->builder->branch($digestBb);
-
-        $context->builder->positionAtEnd($plainBb);
-        $digestPlain = $context->builder->call(
-            $context->lookupFunction('__compiler_hash'),
-            $algoPtr,
-            $dataForHash,
-            $i32->constInt(1, false)
-        );
-        $context->builder->branch($digestBb);
-
-        $context->builder->positionAtEnd($digestBb);
-        $strPtrType = $context->getTypeFromString('__string__*');
-        $digestBinary = $context->builder->phi($strPtrType);
-        $digestBinary->addIncoming($digestHmac, $hmacBb);
-        $digestBinary->addIncoming($digestPlain, $plainBb);
-        self::callHelper($context, self::MARK_FINAL_HELPER, $handle);
-
-        $wantRawBb = BasicBlockHelper::append($context, 'hc_final_raw');
-        $hexBb = BasicBlockHelper::append($context, 'hc_final_hex');
-        $doneBb = BasicBlockHelper::append($context, 'hc_final_done');
-        $context->builder->branchIf($rawBool, $wantRawBb, $hexBb);
-
-        $context->builder->positionAtEnd($wantRawBb);
+        $hmacResult = JitHash::hashHmac($context, $algoPtr, $dataPtr, $keyPtr, $rawBool);
+        $hmacTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($hexBb);
-        $digestHex = $context->builder->call(
-            $context->lookupFunction('__compiler_bin2hex'),
-            $digestBinary
-        );
+        $context->builder->positionAtEnd($plainBb);
+        $plainResult = JitHash::hash($context, $algoPtr, $dataPtr, $rawBool);
+        $plainTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
-        $digestStr = $context->builder->phi($strPtrType);
-        $digestStr->addIncoming($digestBinary, $wantRawBb);
-        $digestStr->addIncoming($digestHex, $hexBb);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $digestStr
-        );
+        $phi = $context->builder->phi($plainResult->typeOf());
+        $phi->addIncoming($hmacResult, $hmacTail);
+        $phi->addIncoming($plainResult, $plainTail);
 
-        return $ptr;
+        return $phi;
     }
 
     public static function copy(Context $context, JITVariable ...$args): Value
@@ -357,6 +352,89 @@ final class JitHashContext
         );
 
         return self::boxObject($context, $dst);
+    }
+
+    private static function applyUpdateChunk(
+        Context $context,
+        Value $obj,
+        Value $handle,
+        Value $chunkStr
+    ): void {
+        // Thin standalone AOT: NestedJIT HashContextJitHelper::update segfaults at execute
+        // (peer finalize #3357 / #16075 / #20200). hash_finalStandaloneAot hashes __hcBuf.
+        if (!$context->isThinStandaloneAotMain()) {
+            self::callHelper($context, self::UPDATE_HELPER, $handle, $chunkStr);
+        }
+        $bufPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
+        $map = $context->structFieldMap['__string__'];
+        $leftLen = $context->builder->load($context->builder->structGep($bufPtr, $map['length']));
+        $i64 = $context->getTypeFromString('int64');
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_SLE,
+            $leftLen,
+            $i64->constInt(0, false)
+        );
+        $emptyBlock = BasicBlockHelper::append($context, 'hc_update_buf_empty');
+        $appendBlock = BasicBlockHelper::append($context, 'hc_update_buf_append');
+        $doneBlock = BasicBlockHelper::append($context, 'hc_update_buf_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $appendBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        self::storeStringProperty($context, $obj, HashContextJitSupport::PROP_BUF, $chunkStr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($appendBlock);
+        self::storeStringProperty(
+            $context,
+            $obj,
+            HashContextJitSupport::PROP_BUF,
+            self::appendStringPtr($context, $bufPtr, $chunkStr)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * Z_PARAM_RESOURCE_OR_NULL $stream_context — unused for local paths (#24563 / #32464).
+     *
+     * @return Value|null dummy slot when a compile-time TypeError was emitted
+     */
+    private static function rejectNonResourceOrNullStreamContext(Context $context, JITVariable $arg): ?Value
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return null;
+        }
+        $given = match ($arg->type) {
+            JITVariable::TYPE_NATIVE_LONG => 'int',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_STRING => 'string',
+            JITVariable::TYPE_HASHTABLE => 'array',
+            default => null,
+        };
+        if (null === $given) {
+            return null;
+        }
+        $slot = JitValueBox::alloc($context);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            'hash_update_file(): Argument #3 ($stream_context) must be of type resource or null, '.$given.' given'
+        );
+
+        return $slot;
+    }
+
+    private static function boxedFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function appendStringPtr(Context $context, Value $left, Value $right): Value

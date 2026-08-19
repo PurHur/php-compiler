@@ -14,7 +14,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /**
- * hash_update_file() — incremental hash from file contents (php-src ext/hash/hash.c; issue #14967).
+ * hash_update_file() — incremental hash from file contents (php-src ext/hash/hash.c; issue #14967, JIT/AOT #32464).
  *
  * Reflection / named-arg params match Zend stub `context,filename,stream_context` (#24563).
  */
