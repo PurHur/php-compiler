@@ -57,47 +57,132 @@ final class JitSprintf
             );
         }
 
-        $valueTy = $context->getTypeFromString('__value__');
-        $i32 = $context->getTypeFromString('int32');
+        // Multi-arg: direct libc snprintf — bypasses broken NestedJIT pack path.
+        // At compile time we know arg count and types, so we emit a single
+        // snprintf(buf, size, fmt_nul, typed1, typed2, ...) call.
+        \PHPCompiler\JIT\LibcExtern::ensureSnprintf($context);
+
         $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $elemSize = $context->builder->ptrToInt(
-            $context->builder->gep(
-                $valueTy->pointerType(0)->constNull(),
-                $i32->constInt(1, false)
-            ),
-            $sizeT
-        );
-        $argvCountSize = $context->builder->intCast(
-            $i64->constInt($numArgs, false),
-            $sizeT
-        );
-        $argvBytes = $context->builder->mul($elemSize, $argvCountSize);
-        $argvRaw = $context->builder->call(
+        $charPtr = $context->getTypeFromString('char*');
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        $fmtNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $fmt);
+
+        $bufSize = 1024;
+        $outBuf = $context->builder->call(
             $context->lookupFunction('__mm__malloc'),
-            $argvBytes
+            $sizeT->constInt($bufSize, false)
         );
-        $argvPtr = $context->builder->pointerCast(
-            $argvRaw,
-            $context->getTypeFromString('__value__*')
-        );
+        $outChar = $context->builder->pointerCast($outBuf, $charPtr);
+        $snprintfArgs = [
+            $outChar,
+            $sizeT->constInt($bufSize, false),
+            $fmtNul,
+        ];
+        $toFree = [];
         for ($i = 0; $i < $numArgs; ++$i) {
-            $slot = $context->builder->inBoundsGEP(
-                $argvPtr,
-                $i64->constInt($i, false)
-            );
-            self::writeArg($context, $slot, $args[$i + 1]);
+            $extracted = self::extractSnprintfArg($context, $args[$i + 1], $toFree);
+            $snprintfArgs[] = $extracted;
         }
-        $argcVal = $i64->constInt($numArgs, false);
-        $result = $context->builder->call(
-            $context->lookupFunction('__compiler_sprintf'),
-            $fmt,
-            $argcVal,
-            $argvPtr
+
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            ...$snprintfArgs
         );
-        $context->builder->call($context->lookupFunction('__mm__free'), $argvRaw);
+
+        $len = $context->builder->zExt($written, $i64);
+        $result = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $context->builder->pointerCast($outBuf, $i8p)
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $outBuf);
+        $context->builder->call($context->lookupFunction('__mm__free'), $fmtNul);
+        foreach ($toFree as $ptr) {
+            $context->builder->call($context->lookupFunction('__mm__free'), $ptr);
+        }
 
         return $result;
+    }
+
+    /**
+     * Extract a typed value from a JIT variable for use as a snprintf vararg.
+     *
+     * Returns i64 for longs/bools, double for floats, char* for strings.
+     * String args are NUL-terminated into a malloc'd buffer tracked in $toFree.
+     *
+     * @param Value[] $toFree collects malloc'd buffers to free after snprintf
+     */
+    private static function extractSnprintfArg(Context $context, JITVariable $arg, array &$toFree): Value
+    {
+        // When inference says native type but storage is __value__*, read from the box.
+        if (null === $arg->valueBoxAliasPtr
+            && \in_array($arg->type, [
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::TYPE_NATIVE_DOUBLE,
+                JITVariable::TYPE_NATIVE_BOOL,
+                JITVariable::TYPE_STRING,
+            ], true)
+            && \in_array(
+                $context->getStringFromType($arg->value->typeOf()),
+                ['__value__*', '__value__value*'],
+                true
+            )) {
+            $valuePtr = JitValueBox::normalizeValuePtr($context, $arg->value);
+            switch ($arg->type) {
+                case JITVariable::TYPE_NATIVE_DOUBLE:
+                    return $context->builder->call(
+                        $context->lookupFunction('__value__readDouble'),
+                        $valuePtr
+                    );
+                case JITVariable::TYPE_STRING:
+                    $strVal = $context->builder->call(
+                        $context->lookupFunction('__value__readString'),
+                        $valuePtr
+                    );
+                    $strSep = $context->builder->call(
+                        $context->lookupFunction('__string__separate'),
+                        $strVal
+                    );
+                    $nul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $strSep);
+                    $toFree[] = $nul;
+
+                    return $nul;
+                default:
+                    return $context->builder->call(
+                        $context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    );
+            }
+        }
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->helper->loadValue($arg);
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return $context->helper->loadValue($arg);
+            case JITVariable::TYPE_STRING:
+                $str = $context->helper->loadValue($arg);
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $str
+                );
+                $nul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $owned);
+                $toFree[] = $nul;
+
+                return $nul;
+            case JITVariable::TYPE_VALUE:
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                );
+            default:
+                return $context->helper->loadValue($arg);
+        }
     }
 
     public static function writeArg(Context $context, Value $slot, JITVariable $arg): void
