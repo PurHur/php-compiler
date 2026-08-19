@@ -1,5 +1,5 @@
 --TEST--
-AOT: DOMNode mutation/importNode null TypeError text (#30410 / #32558, ext/dom/node.c)
+stdlib DOM mutation/importNode(null) TypeError (#32558 leftover of #30410, ext/dom/node.c)
 --FILE--
 <?php
 error_reporting(E_ALL);

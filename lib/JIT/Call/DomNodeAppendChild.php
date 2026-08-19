@@ -32,12 +32,15 @@ final class DomNodeAppendChild implements Call
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_invoke_cont');
         if (
+            isset($args[1])
+            && JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::appendChild', 1, 'node')
+        ) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+        if (
             JitDomDocumentMethodKernel::shouldUse($context)
             && \count($args) >= 2
         ) {
-            if (JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::appendChild', 1, 'node')) {
-                return JitDomRequireDomNodeArg::boxNullResult($context);
-            }
             // Pin object identity before ParentNode::append mutates slots (#27480).
             $childObj = self::loadChildObject($context, $args[1]);
             $append = new DomNodeAppend();
