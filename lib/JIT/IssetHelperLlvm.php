@@ -202,9 +202,9 @@ final class IssetHelperLlvm
 
                 return self::compileStringOffsetIsSet($context, $strVar, $dim);
             }
-            $htVar = self::hashtableFromValueBox($context, $container);
-
-            return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+            // Runtime type-byte dispatch: VALUE boxes without static string inference may
+            // hold a string at runtime; probe the type byte and branch (#32622).
+            return self::compileValueBoxDimIsSet($context, $container, $dim, $dimOp, $containerOp);
         }
         if (Variable::TYPE_OBJECT === $container->type && null === $container->objectPropertySlot) {
             $propName = VmIsset::literalStringKey($dimOp);
@@ -330,6 +330,57 @@ final class IssetHelperLlvm
         $phi = $context->builder->phi($i1, 'isset_value_box_phi');
         $phi->addIncoming($i1->constInt(0, false), $missBlock);
         $phi->addIncoming($propIsset, $objEnd);
+
+        return $phi;
+    }
+
+    /**
+     * Runtime type-byte dispatch for isset($valueBox[$dim]) when static type is unknown (#32622).
+     *
+     * Branches: TYPE_STRING → string-offset isset, else → hashtable isset.
+     */
+    private static function compileValueBoxDimIsSet(
+        Context $context,
+        Variable $container,
+        Variable $dim,
+        ?Operand $dimOp,
+        ?Operand $containerOp
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+        );
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $strBlock = $fn->appendBasicBlock('isset_vbox_str');
+        $htBlock = $fn->appendBasicBlock('isset_vbox_ht');
+        $doneBlock = $fn->appendBasicBlock('isset_vbox_done');
+        $context->builder->branchIf($isString, $strBlock, $htBlock);
+
+        $context->builder->positionAtEnd($strBlock);
+        $strVar = self::stringFromValueBox($context, $container);
+        $strResult = self::compileStringOffsetIsSet($context, $strVar, $dim);
+        $strEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $htVar = self::hashtableFromValueBox($context, $container);
+        $htResult = self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1, 'isset_vbox_dim_phi');
+        $phi->addIncoming($strResult, $strEnd);
+        $phi->addIncoming($htResult, $htEnd);
 
         return $phi;
     }
