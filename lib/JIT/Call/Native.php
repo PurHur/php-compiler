@@ -147,8 +147,14 @@ class Native implements Call {
             $skipVariadicPackedTypeCheck = null !== $this->variadicArgIndex
                 && $index === $this->variadicArgIndex
                 && $this->variadicSlotUsesElementTypeChecks($index);
+            // By-ref params: skip caller-side type coercion — the callee receives the
+            // raw __value__* and handles its own RECV type check. Coercing here creates
+            // a fresh __value__ copy that disconnects from the caller's lvalue, so the
+            // callee's write never propagates back (Zend ZEND_SEND_REF, #24162).
+            $isByRefParam = isset($this->paramByRefByArg[$index]);
             if (
-                !$skipVariadicPackedTypeCheck
+                !$isByRefParam
+                && !$skipVariadicPackedTypeCheck
                 && isset($this->paramTypeConstraintsByArg[$index])
                 && !$this->skipImplicitNullableTypeCheck($index, $arg)
                 && !isset($this->paramByRefByArg[$index])
@@ -175,14 +181,14 @@ class Native implements Call {
                     );
                 }
             }
-            if (!$skipVariadicPackedTypeCheck && isset($this->paramIntersectionConstraintsByArg[$index])) {
+            if (!$isByRefParam && !$skipVariadicPackedTypeCheck && isset($this->paramIntersectionConstraintsByArg[$index])) {
                 \PHPCompiler\JIT\IntersectionParamCheck::enforce(
                     $context,
                     $arg,
                     $this->paramIntersectionConstraintsByArg[$index]
                 );
             }
-            if (!$skipVariadicPackedTypeCheck && isset($this->paramDnfConstraintsByArg[$index])) {
+            if (!$isByRefParam && !$skipVariadicPackedTypeCheck && isset($this->paramDnfConstraintsByArg[$index])) {
                 $prefix = $this->receiverPrefix();
                 $userIdx = $index - $prefix;
                 $paramName = $this->paramNames[$userIdx] ?? ('param'.$userIdx);
@@ -196,7 +202,7 @@ class Native implements Call {
                     $paramName
                 );
             }
-            if (!$skipVariadicPackedTypeCheck && isset($this->paramClassConstraintsByArg[$index])) {
+            if (!$isByRefParam && !$skipVariadicPackedTypeCheck && isset($this->paramClassConstraintsByArg[$index])) {
                 \PHPCompiler\JIT\ClassParamCheck::enforce(
                     $context,
                     $arg,
