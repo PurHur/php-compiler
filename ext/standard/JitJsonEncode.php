@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -136,11 +137,26 @@ final class JitJsonEncode
             $kind,
             $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
         );
+        $isJitBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $isVmBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+        );
+        $isBool = $context->builder->or($isJitBool, $isVmBool);
 
         $id = (string) (++self::$blockSerial);
         $htBlock = BasicBlockHelper::append($context, 'json_encode_boxed_ht_'.$id);
         $objCheck = BasicBlockHelper::append($context, 'json_encode_boxed_objchk_'.$id);
         $objBlock = BasicBlockHelper::append($context, 'json_encode_boxed_obj_'.$id);
+        $scalarCheck = BasicBlockHelper::append($context, 'json_encode_boxed_scalar_'.$id);
+        $boolCheck = BasicBlockHelper::append($context, 'json_encode_boxed_bool_'.$id);
+        $boolTrueBlock = BasicBlockHelper::append($context, 'json_encode_boxed_bool_true_'.$id);
+        $boolFalseBlock = BasicBlockHelper::append($context, 'json_encode_boxed_bool_false_'.$id);
         $valueBlock = BasicBlockHelper::append($context, 'json_encode_boxed_value_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'json_encode_boxed_done_'.$id);
         $context->builder->branchIf($isHt, $htBlock, $objCheck);
@@ -160,7 +176,33 @@ final class JitJsonEncode
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objCheck);
-        $context->builder->branchIf($isObj, $objBlock, $valueBlock);
+        $context->builder->branchIf($isObj, $objBlock, $scalarCheck);
+
+        $context->builder->positionAtEnd($scalarCheck);
+        $context->builder->branchIf($isBool, $boolCheck, $valueBlock);
+
+        $context->builder->positionAtEnd($boolCheck);
+        $i64 = $context->getTypeFromString('int64');
+        $boolLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolLong,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($isTrue, $boolTrueBlock, $boolFalseBlock);
+
+        $context->builder->positionAtEnd($boolTrueBlock);
+        $boolTrueResult = $context->builder->load($context->constantStringFromString('true'));
+        $boolTrueEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($boolFalseBlock);
+        $boolFalseResult = $context->builder->load($context->constantStringFromString('false'));
+        $boolFalseEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objBlock);
         $objVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $valuePtr);
@@ -182,6 +224,8 @@ final class JitJsonEncode
         $phi = $context->builder->phi($strPtr, 'json_encode_boxed_phi_'.$id);
         $phi->addIncoming($htResult, $htEnd);
         $phi->addIncoming($objResult, $objEnd);
+        $phi->addIncoming($boolTrueResult, $boolTrueEnd);
+        $phi->addIncoming($boolFalseResult, $boolFalseEnd);
         $phi->addIncoming($valueResult, $valueEnd);
 
         return $phi;

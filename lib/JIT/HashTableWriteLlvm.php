@@ -931,7 +931,10 @@ final class HashTableWriteLlvm
     ): void {
         $array->compileTimeEmptyArrayLiteral = false;
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
-            if (self::nativeArrayNeedsHashtablePromotion($array, $element)) {
+            if (
+                self::nativeArrayKeyRequiresHashtable($key)
+                || self::nativeArrayNeedsHashtablePromotion($array, $element)
+            ) {
                 self::promoteNativeArrayVariableToHashtable($context, $array);
             } else {
                 self::addNativeElement($context, $array, $element, $key);
@@ -1020,6 +1023,23 @@ final class HashTableWriteLlvm
         }
         $index = self::arrayKeyToIndex($context, $key);
         self::setAtIndex($context, $ht, $index, $element);
+    }
+
+    /**
+     * String/assoc keys cannot live in native packed storage — addNativeElement only supports
+     * numeric indices (zend_hash_real_init packed array vs HashTable, #26367 AOT call-arg follow-up).
+     */
+    private static function nativeArrayKeyRequiresHashtable(?Variable $key): bool
+    {
+        if (null === $key) {
+            return false;
+        }
+
+        return match ($key->type) {
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_DOUBLE => false,
+            default => true,
+        };
     }
 
     /** Native packed arrays inferred as scalar must widen when storing enum case objects (#5722, #5638). */
@@ -1471,7 +1491,10 @@ final class HashTableWriteLlvm
         Variable $key
     ): void {
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
-            if (self::nativeArrayNeedsHashtablePromotion($array, $element)) {
+            if (
+                self::nativeArrayKeyRequiresHashtable($key)
+                || self::nativeArrayNeedsHashtablePromotion($array, $element)
+            ) {
                 self::promoteNativeArrayVariableToHashtable($context, $array);
             } else {
                 self::addNativeElement($context, $array, $element, $key);
