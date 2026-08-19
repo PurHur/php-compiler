@@ -1015,6 +1015,67 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Element-scoped getElementsByTagNameNS — skip the document element (#32511).
+     *
+     * php-src ext/dom/element.c PHP_METHOD(DOMElement, getElementsByTagNameNS)
+     * walks xmlFirstElementChild; the receiver is not in the live list.
+     *
+     * @return list<array{local: string, prefix: string, qname: string, ns: string}>
+     */
+    public static function elementsByTagNameNSFromDescendantsArgv(
+        string $xml,
+        string $namespaceUri,
+        string $localName
+    ): array {
+        $matches = [];
+        $skipReceiver = true;
+        foreach (self::walkElementsInScopeNamespaces($xml) as $element) {
+            if ($skipReceiver) {
+                $skipReceiver = false;
+                continue;
+            }
+            $ns = $element['inScope'][$element['prefix']] ?? '';
+            $nsMatch = '*' === $namespaceUri || $ns === $namespaceUri;
+            $nameMatch = '*' === $localName || $element['local'] === $localName;
+            if ($nsMatch && $nameMatch) {
+                $matches[] = [
+                    'local' => $element['local'],
+                    'prefix' => $element['prefix'],
+                    'qname' => $element['qname'],
+                    'ns' => $ns,
+                ];
+            }
+        }
+
+        return $matches;
+    }
+
+    public static function countElementsByTagNameNSFromDescendantsArgv(
+        string $xml,
+        string $namespaceUri,
+        string $localName
+    ): int {
+        return \count(self::elementsByTagNameNSFromDescendantsArgv($xml, $namespaceUri, $localName));
+    }
+
+    /**
+     * @return null|array{local: string, prefix: string, qname: string, ns: string}
+     */
+    public static function nthElementByTagNameNSFromDescendantsArgv(
+        string $xml,
+        string $namespaceUri,
+        string $localName,
+        int $index
+    ): ?array {
+        if ($index < 0) {
+            return null;
+        }
+        $matches = self::elementsByTagNameNSFromDescendantsArgv($xml, $namespaceUri, $localName);
+
+        return $matches[$index] ?? null;
+    }
+
+    /**
      * @return null|array{local: string, prefix: string, qname: string, ns: string}
      */
     public static function nthElementByTagNameNSArgv(

@@ -86,9 +86,9 @@ final class JitDomNodeListItemUserScript
     }
 
     /**
-     * Materialize getElementsByTagNameNS() NodeList::item($index) (#32415).
+     * Materialize getElementsByTagNameNS() NodeList::item($index) (#32415, #32511).
      *
-     * php-src: ext/dom/nodelist.c php_dom_nodelist_item + php_dom.c NS helper.
+     * php-src: ext/dom/nodelist.c php_dom_nodelist_item + element.c xmlFirstElementChild.
      */
     private static function materializeNthNsMatch(
         Context $context,
@@ -98,12 +98,19 @@ final class JitDomNodeListItemUserScript
         int $index
     ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_ns_nth');
-        $match = DomParseSimpleXmlJitHelper::nthElementByTagNameNSArgv(
-            $xml,
-            $namespaceUri,
-            $localName,
-            $index
-        );
+        $match = JitDomGetElementsByTagNameUserScript::lastNsQueryFromElement()
+            ? DomParseSimpleXmlJitHelper::nthElementByTagNameNSFromDescendantsArgv(
+                $xml,
+                $namespaceUri,
+                $localName,
+                $index
+            )
+            : DomParseSimpleXmlJitHelper::nthElementByTagNameNSArgv(
+                $xml,
+                $namespaceUri,
+                $localName,
+                $index
+            );
         if (null === $match) {
             return self::boxNull($context);
         }
