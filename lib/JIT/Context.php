@@ -2509,6 +2509,26 @@ class Context {
                 return \PHPCompiler\ext\standard\boolval::stringTruthy($this, $slot);
             case '__string__*':
                 return \PHPCompiler\ext\standard\boolval::stringTruthy($this, $value);
+            case '__object__':
+            case '__object__*':
+                // zend_is_true / zend_std_cast_object_to_type(_IS_BOOL) → true (#32471 leftover of #32463).
+                return $this->constantFromBool(true);
+            case '__hashtable__':
+            case '__hashtable__*':
+                // zend_is_true(IS_ARRAY): zend_hash_num_elements ? true : false (#32455 / #32471).
+                $ht = $value;
+                if ('__hashtable__' === $this->getStringFromType($type)) {
+                    $slot = BasicBlockHelper::entryAlloca($this, $type);
+                    $this->builder->store($value, $slot);
+                    $ht = $slot;
+                }
+                $n = ArrayBuiltinHelper::getNumElements($this, $ht);
+
+                return $this->builder->icmp(
+                    $this->builder::INT_NE,
+                    $n,
+                    $n->typeOf()->constInt(0, false)
+                );
         }
         throw new \LogicException("Unknown bool cast from type: " . $this->getStringFromType($type));
     }

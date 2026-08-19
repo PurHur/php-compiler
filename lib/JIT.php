@@ -9517,17 +9517,10 @@ class JIT {
                         $value = $this->context->castToBool($this->context->helper->loadValue($from));
                     }
                     $__right = $value->typeOf()->constInt(1, false);
-                            
-                        
-
-                        
-
-                        
-
-                        $result = $this->context->builder->bitwiseXor($value, $__right);
-    
-
-                    $this->assignOperandValue($block->getOperand($op->arg1), $result);
+                    $result = $this->context->builder->bitwiseXor($value, $__right);
+                    // Force: php-cfg leaves `var_dump(!$o)` on a dead temp while ARG_SEND is
+                    // remapped to the not-result — empty usages skip the store (#32471 / #32293).
+                    $this->assignOperandValue($block->getOperand($op->arg1), $result, true);
                     break;
                 case OpCode::TYPE_CONCAT:
                     if (null === $op->arg2 || null === $op->arg3) {
