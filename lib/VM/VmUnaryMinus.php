@@ -15,7 +15,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
- * SSOT for JIT unary - lowering (#5083, zend_operators.c, #9976, #28761, #32317, #32442).
+ * SSOT for JIT unary - lowering (#5083, zend_operators.c, #9976, #28761, #32317, #32442, #32477).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitUnaryMinus}
  */
@@ -25,6 +25,14 @@ final class VmUnaryMinus
     {
         if (OpCode::TYPE_UNARY_MINUS !== $opcode->type) {
             throw new \InvalidArgumentException('Expected TYPE_UNARY_MINUS opcode');
+        }
+
+        // Do not coerce via unary + then negate: catchable TypeError must not
+        // continue into integer negate (#32477 leftover of #32452).
+        if (VmObjectNumericOperandGuard::guardUnary($context, $var)) {
+            $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+            return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $zero);
         }
 
         $constName = strtolower($var->compileTimeConstantName ?? '');
