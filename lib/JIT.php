@@ -9035,10 +9035,8 @@ class JIT {
                         $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
-                        } elseif ($forceBranchMerge) {
-                            $this->assignOperand($resultOp, $fetched, true);
                         } else {
-                            $this->assignOperand($resultOp, $fetched);
+                            $this->bindDimFetchReadResult($resultOp, $fetched, $forceBranchMerge);
                         }
                         break;
                     }
@@ -9083,10 +9081,8 @@ class JIT {
                         $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
-                        } elseif ($forceBranchMerge) {
-                            $this->assignOperand($resultOp, $fetched, true);
                         } else {
-                            $this->assignOperand($resultOp, $fetched);
+                            $this->bindDimFetchReadResult($resultOp, $fetched, $forceBranchMerge);
                         }
                         break;
                     }
@@ -16726,6 +16722,27 @@ class JIT {
         return null;
     }
 
+    private function bindDimFetchReadResult(Operand $resultOp, Variable $fetched, bool $forceBranchMerge): void
+    {
+        if (
+            Variable::TYPE_VALUE === $fetched->type
+            && $this->context->hasVariableOp($resultOp)
+            && Variable::TYPE_OBJECT === $this->context->getVariableFromOp($resultOp)->type
+        ) {
+            // Object-typed temps from fromOp are uninitialized __object__** slots — bind the
+            // HT value box directly so chained ->prop uses __value__readObject (#31938).
+            $this->context->setVariableOp($resultOp, $fetched);
+            $fetched->addref();
+
+            return;
+        }
+        if ($forceBranchMerge) {
+            $this->assignOperand($resultOp, $fetched, true);
+        } else {
+            $this->assignOperand($resultOp, $fetched);
+        }
+    }
+
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
@@ -16792,6 +16809,33 @@ class JIT {
                 }
                 // Method formals with `__value__` ABI (e.g. Router::dispatch $route) bind here
                 // without falling through to the markAssigned path (#31101 MiniWebApp stderr).
+                $this->markScopeVariableAssignedIfTracked($resultOp, $var);
+
+                return;
+            } elseif (
+                Variable::TYPE_VALUE === $value->type
+                && Variable::KIND_VARIABLE === $value->kind
+            ) {
+                // HT dim-fetch copies into stack __value__ slots — first-bind must copy the
+                // slot, not loadValue()+makeVariableFromValueOp (AOT abort / empty chain) (#31938).
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $slot,
+                    JIT\JitValueBox::valuePtrFromVariable($this->context, $value)
+                );
+                $var = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $var->addref();
+                $this->context->setVariableOp($resultOp, $var);
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $var);
+                }
                 $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
@@ -17808,37 +17852,62 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_VALUE === $value->type) {
+            if (
+                Variable::KIND_VARIABLE === $value->kind
+                && null === $value->objectPropertySlot
+                && null === $value->staticPropertyGlobal
+                && !$value->functionStaticGlobal
+            ) {
+                // `$y = $arr['o']` in a function: alias the HT value box instead of
+                // extracting into an uninitialized __object__** slot (#31938).
+                $this->context->setVariableOp($resultOp, $value);
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $value);
+                }
+                $this->markScopeVariableAssignedIfTracked($resultOp, $value);
+
+                return;
+            }
             $valuePtr = $this->valueBoxPointer($value);
             $map = $this->context->structFieldMap['__value__'];
             $typeByte = $this->context->builder->load(
                 $this->context->builder->structGep($valuePtr, $map['type'])
             );
             $i8 = $this->context->getTypeFromString('int8');
+            // Mask IS_REFCOUNTED — HT dim-fetch may store TYPE_OBJECT|0x80 (#21921, #31938).
+            $kind = $this->context->builder->and($typeByte, $i8->constInt(0x7f, false));
             $isLong = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
-                $typeByte,
+                $kind,
                 $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
             );
             $isBool = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
-                $typeByte,
+                $kind,
                 $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
             );
             $isStreamHandle = $this->context->builder->bitwiseOr($isLong, $isBool);
-            $objectBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value');
+            $promoteBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value');
             $handleBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_from_value');
             $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value_done');
-            $this->context->builder->branchIf($isStreamHandle, $handleBlock, $objectBlock);
-            $this->context->builder->positionAtEnd($objectBlock);
-            $obj = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readObject'),
-                $valuePtr
-            );
-            $result->free();
-            $this->context->builder->store($obj, $result->value);
+            $this->context->builder->branchIf($isStreamHandle, $handleBlock, $promoteBlock);
+            $this->context->builder->positionAtEnd($promoteBlock);
+            // FETCH_DIM_R into an object-typed CV/temp: keep the boxed zval (#31938).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
+            // Do not free() — object-typed slots from fromOp are uninitialized __object__**
+            // allocas; delref here segfaults under thin standalone AOT (#31938).
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $this->copyValueBoxJitFlags($result, $value, $force);
             $result->addref();
-            $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result)
-                ?? $this->recoverScriptGlobalAssignLvalueBySlot($resultOp, $result);
+            $globalTarget = null;
+            $assignResultName = JIT\OperandName::resolve($resultOp);
+            if (null !== $assignResultName && '' !== $assignResultName) {
+                $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result)
+                    ?? $this->recoverScriptGlobalAssignLvalueBySlot($resultOp, $result);
+            }
             if (null !== $globalTarget) {
                 JIT\JitValueBox::assignToPointer(
                     $this->context,
@@ -17851,10 +17920,10 @@ class JIT {
                 if (null === $globalName || '' === $globalName) {
                     $block = $this->context->jitEnclosingBlock;
                     if (null !== $block) {
-                        $slot = $block->slotForOperand($resultOp);
-                        if (null !== $slot) {
+                        $slotNum = $block->slotForOperand($resultOp);
+                        if (null !== $slotNum) {
                             foreach ($block->scopedOperands() as $scopeOp) {
-                                if ($block->slotForOperand($scopeOp) !== $slot) {
+                                if ($block->slotForOperand($scopeOp) !== $slotNum) {
                                     continue;
                                 }
                                 $scopeName = JIT\OperandName::resolve($scopeOp);
@@ -17873,7 +17942,7 @@ class JIT {
                     );
                 }
             }
-            JIT\BasicBlockHelper::branchToFreshContinue($this->context, 'after_assign_object_from_value_obj');
+            $this->context->builder->branch($doneBlock);
 
             $this->context->builder->positionAtEnd($handleBlock);
             $result->free();

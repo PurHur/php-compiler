@@ -447,8 +447,11 @@ class Object_ extends Type {
         $map = $this->context->structFieldMap['__value__'];
         $objPtr = $this->context->getTypeFromString('__object__*');
         $typeByte = $this->context->builder->load($this->context->builder->structGep($value, $map['type']));
-        $expected = $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_OBJECT, false);
-        $isObject = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $typeByte, $expected);
+        $i8 = $this->context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED — HT/object boxes may store TYPE_OBJECT|0x80 (#21921).
+        $kind = $this->context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $expected = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $isObject = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $kind, $expected);
         $ok = $fn->appendBasicBlock('read_obj_ok');
         $empty = $fn->appendBasicBlock('read_obj_empty');
         $merge = $fn->appendBasicBlock('read_obj_merge');

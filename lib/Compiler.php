@@ -3116,6 +3116,10 @@ class Compiler {
                         && $i + 1 < $opCount
                         && ($ops[$i + 1] instanceof Op\Expr\FuncCall || $ops[$i + 1] instanceof Op\Expr\NsFuncCall)
                         && $this->isDeferredHoistedConstFetchCallArgPrelude($child, $ops[$i + 1], $ops, $i)
+                        && !(
+                            $child instanceof Op\Expr\ConstFetch
+                            && $this->isVarExportReturnFlagAfterPropertyFetchPrelude($child, $ops, $i)
+                        )
                     ) {
                         // stream_supports($fp, STREAM_SUPPORT_READ) — FUNCCALL_INIT before const (#17697).
                         break;
@@ -43081,6 +43085,38 @@ class Compiler {
         }
 
         return $this->cfgOperandIsTrue($cfgCallOp->args[1] ?? null, $block);
+    }
+
+    /**
+     * var_export($arr['k']->prop, true) — hoisted true after PropertyFetch must compile eagerly;
+     * deferral to compileCallArgSends loses the return-flag slot under AOT (#31938).
+     *
+     * @param Op[] $ops
+     */
+    private function isVarExportReturnFlagAfterPropertyFetchPrelude(
+        Op\Expr $fetch,
+        array $ops,
+        int $fetchIndex
+    ): bool {
+        if (!$fetch instanceof Op\Expr\ConstFetch) {
+            return false;
+        }
+        $flagName = strtolower($this->staticNameFromOperand($fetch->name) ?? '');
+        if (!\in_array($flagName, ['true', 'false'], true)) {
+            return false;
+        }
+        $consumer = $ops[$fetchIndex + 1] ?? null;
+        if (!$consumer instanceof Op\Expr\FuncCall && !$consumer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if ('var_export' !== strtolower($this->resolveCfgFuncCallName($consumer) ?? '')) {
+            return false;
+        }
+        $prev = $ops[$fetchIndex - 1] ?? null;
+
+        return $prev instanceof Op\Expr\PropertyFetch
+            || $prev instanceof Op\Expr\NullsafePropertyFetch
+            || $prev instanceof Op\Expr\StaticPropertyFetch;
     }
 
     private function cfgOperandIsTrue(?Operand $operand, Block $block): bool
