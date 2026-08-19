@@ -355,6 +355,20 @@ final class JitSpaceshipCompareKernel
                     true
                 )
             )],
+            // zend_compare: IS_ARRAY vs IS_NULL/IS_FALSE uses zend_is_true
+            // (php-src Zend/zend_operators.c compare_function; leftover of #32536/#32539).
+            [self::TYPE_HASHTABLE, self::TYPE_NULL, fn () => self::hashtableTruthySpaceship($context, $left, true)],
+            [self::TYPE_NULL, self::TYPE_HASHTABLE, fn () => self::hashtableTruthySpaceship($context, $right, false)],
+            [self::TYPE_HASHTABLE, self::TYPE_BOOL, fn () => self::nativeI64Spaceship(
+                $context,
+                self::hashtableTruthyI64($context, $left),
+                self::readBoolAsLong($context, $right)
+            )],
+            [self::TYPE_BOOL, self::TYPE_HASHTABLE, fn () => self::nativeI64Spaceship(
+                $context,
+                self::readBoolAsLong($context, $left),
+                self::hashtableTruthyI64($context, $right)
+            )],
         ];
 
         $check = $context->builder->getInsertBlock();
@@ -1087,6 +1101,31 @@ final class JitSpaceshipCompareKernel
             $cmp,
             $context->getTypeFromString('int64')
         );
+    }
+
+    private static function hashtableTruthyI64(Context $context, Value $valuePtr): Value
+    {
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $fn = $context->lookupFunction('__hashtable__ptrIsNonEmpty');
+        $ht = $context->builder->pointerCast($ht, $fn->getParam(0)->typeOf());
+        $truth = $context->builder->call($fn, $ht);
+
+        return $context->builder->zExt($truth, $context->getTypeFromString('int64'));
+    }
+
+    private static function hashtableTruthySpaceship(Context $context, Value $htValue, bool $htOnLeft): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $cmp = self::nativeI64Spaceship(
+            $context,
+            self::hashtableTruthyI64($context, $htValue),
+            $i64->constInt(0, false)
+        );
+
+        return $htOnLeft ? $cmp : self::negateI64($context, $cmp);
     }
 
     private static function nativeI64Spaceship(Context $context, Value $left, Value $right): Value
