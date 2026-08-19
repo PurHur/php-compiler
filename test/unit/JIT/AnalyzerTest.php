@@ -143,6 +143,34 @@ class AnalyzerTest extends TestCase
         $this->assertFalse($analyzer->canEscape($init));
     }
 
+    public function testCanEscapeJumpIfOnPackedArrayDoesNotThrow(): void
+    {
+        // if ($a) is JumpIf on the array operand — not TYPE_CAST_BOOL (#32475 leftover of #32455).
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null, null]);
+        new Op\Stmt\JumpIf($init, new \PHPCfg\Block(), new \PHPCfg\Block());
+
+        $this->assertTrue($analyzer->canEscape($init));
+    }
+
+    public function testCanEscapeBooleanNotOnPackedArrayDoesNotThrow(): void
+    {
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null]);
+        new Op\Expr\BooleanNot($init);
+
+        $this->assertTrue($analyzer->canEscape($init));
+    }
+
+    public function testHasDynamicArrayAppendEmptyDoesNotThrow(): void
+    {
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null]);
+        new Op\Expr\Empty_($init);
+
+        $this->assertFalse($analyzer->hasDynamicArrayAppend($init, 1));
+    }
+
     private function makeOperand(array $keys): Operand
     {
         $values = [];

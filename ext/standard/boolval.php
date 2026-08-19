@@ -209,13 +209,24 @@ final class boolval extends Internal
         );
         $objectTruthy = $context->builder->or($isObject, $isEnum);
 
+        // Boxed arrays: JUMPIF uses this select path, not TYPE_CAST_BOOL (#32475).
+        // php-src: Zend/zend_operators.c convert_to_boolean IS_ARRAY.
+        $htPtr = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $arrayTruthy = $context->builder->call(
+            $context->lookupFunction('__hashtable__ptrIsNonEmpty'),
+            $htPtr
+        );
+
         $typedTruthy = $context->builder->select(
             $isBool,
             $boolTruthy,
             $context->builder->select(
                 $isInt,
                 $intTruthy,
-                $context->builder->select($objectTruthy, $true, $false)
+                $context->builder->select($objectTruthy, $true, $arrayTruthy)
             )
         );
 
