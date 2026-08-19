@@ -17,7 +17,7 @@ use PHPLLVM\LLVMAbstract\Type as LlvmType;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, #32444, zend_operators.c).
+ * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, #32444, #32452, zend_operators.c).
  *
  * Zend php-src: (int)/(float) on enum cases warn and yield legacy 1 / 1.0 (#5714, #7120).
  * intval/floatval JIT must use the same legacy paths (not backing extract).
@@ -46,6 +46,10 @@ final class JitZendScalarCast
                 return self::arrayToLong01($context, $arg);
             case JITVariable::TYPE_VALUE:
                 return self::valueBoxToInt($context, $arg);
+            case JITVariable::TYPE_OBJECT:
+                // Native `new stdClass` stays TYPE_OBJECT; boxed foreach already
+                // hits TYPE_VALUE (#10810). Zend IS_OBJECT → warning + 1 (#32452).
+                return self::nativeObjectToScalar($context, $v, 'int');
             default:
                 if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
                     return self::arrayToLong01($context, $arg);
@@ -84,6 +88,8 @@ final class JitZendScalarCast
                 );
             case JITVariable::TYPE_VALUE:
                 return self::valueBoxToFloat($context, $arg);
+            case JITVariable::TYPE_OBJECT:
+                return self::nativeObjectToScalar($context, $v, 'float');
             default:
                 if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
                     return $context->builder->siToFp(
@@ -93,6 +99,54 @@ final class JitZendScalarCast
                 }
                 throw new \LogicException('(float) cast unsupported operand type in JIT');
         }
+    }
+
+    /**
+     * Native TYPE_OBJECT (int)/(float) — enum legacy 1/1.0 then plain-object warning + 1 (#32452).
+     *
+     * php-src: Zend/zend_operators.c _zval_get_long_func / _zval_get_double_func IS_OBJECT.
+     * Boxed objects already use this pair from valueBoxToInt/valueBoxToFloat (#5714 / #10810).
+     *
+     * @param 'int'|'float' $kind
+     */
+    private static function nativeObjectToScalar(Context $context, Value $objPtr, string $kind): Value
+    {
+        $afterEnum = BasicBlockHelper::append($context, $kind.'_cast_native_obj_after_enum');
+        $done = BasicBlockHelper::append($context, $kind.'_cast_native_obj_done');
+        $enumVal = 'int' === $kind
+            ? JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
+                $context,
+                $objPtr,
+                $kind.'_cast_native_obj',
+                $afterEnum
+            )
+            : JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToDouble(
+                $context,
+                $objPtr,
+                $kind.'_cast_native_obj',
+                $afterEnum
+            );
+        $enumEnd = null;
+        if (null !== $enumVal) {
+            $enumEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($done);
+        }
+        $context->builder->positionAtEnd($afterEnum);
+        $plain = JitScalarTypeCoerce::emitPlainObjectToScalar($context, $objPtr, $kind);
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        if (null === $enumVal || null === $enumEnd) {
+            return $plain;
+        }
+        $resultTy = 'int' === $kind
+            ? $context->getTypeFromString('int64')
+            : $context->getTypeFromString('double');
+        $phi = $context->builder->phi($resultTy, $kind.'_cast_native_obj_phi');
+        $phi->addIncoming($enumVal, $enumEnd);
+        $phi->addIncoming($plain, $plainEnd);
+
+        return $phi;
     }
 
     /**
