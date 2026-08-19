@@ -19329,21 +19329,11 @@ class JIT {
         $errBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_err_'.$suffix);
         $this->context->builder->branchIf($isRes, $errBlock, $okBlock);
         $this->context->builder->positionAtEnd($errBlock);
-        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-        JIT\Builtin\TypeErrorRaise::emitRaise(
+        // Catchable inside active try/catch; fatal only when uncaught (#23777).
+        JIT\ExceptionBridge::emitTypeErrorAndAbort(
             $this->context,
             $increment ? 'Cannot increment resource' : 'Cannot decrement resource'
         );
-        // Standalone AOT: print Uncaught TypeError and exit 255 (php-src-strict); JIT uses abort.
-        if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
-            JIT\Builtin\TypeErrorRaise::ensureStandaloneBodies($this->context);
-            $this->context->builder->call(
-                $this->context->lookupFunction('phpc_jit_abort_if_pending_type_error')
-            );
-        } else {
-            $this->context->builder->call($this->context->lookupFunction('abort'));
-        }
         $this->context->builder->positionAtEnd($okBlock);
     }
 
