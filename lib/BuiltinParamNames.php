@@ -1402,7 +1402,8 @@ final class BuiltinParamNames
                 return ['x', 'y'];
             case 'random_int':
                 return ['min', 'max'];
-            // php-src ext/standard/php_mt_rand.c / random.stub.php — both params optional (0 or 2 args) (#24641)
+            // php-src ext/random/random.stub.php — both params optional (0 or 2 args) (#27983, #24641)
+            case 'rand':
             case 'mt_rand':
                 return ['min=', 'max='];
             // php-src ext/random/random.stub.php — seed=0, mode=MT_RAND_MT19937 (#23596)
