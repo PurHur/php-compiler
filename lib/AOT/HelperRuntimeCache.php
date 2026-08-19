@@ -166,6 +166,10 @@ final class HelperRuntimeCache
         // #30812 — prelinked WordwrapJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // VmWordwrap (strlen/substr) into the user module (peer #30790 / #30811).
         'phpcompiler\\ext\\standard\\wordwrapjithelper::wordwrapargv' => true,
+        // #3258 — prelinked GethostbynamelJitHelper unit.o leaves resolveHostnameIpv4List null
+        // under thin AOT (count() TypeError on gethostbyname/gethostbynamel); NestedJIT VmDns bundle.
+        'phpcompiler\\ext\\standard\\gethostbynameljithelper::ipcount' => true,
+        'phpcompiler\\ext\\standard\\gethostbynameljithelper::ipat' => true,
         // #30859 / re-#26992 — prelinked ChunkSplitJitHelper unit.o SIGSEGVs under thin AOT;
         // NestedJIT VmChunkSplit (strlen/substr) into the user module (peer #30811).
         'phpcompiler\\ext\\standard\\chunksplitjithelper::chunksplitargv' => true,
