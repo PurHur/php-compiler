@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7642 |
-| Phase A inventory files (M2 ratio SSOT) | 7642 |
+| PHP files on vm.php path | 7643 |
+| Phase A inventory files (M2 ratio SSOT) | 7643 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24387 |
+| Source constructs flagged (warnings) | 24390 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6691,6 +6691,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitStringCompare.php` | 0 | 1 |
 | `lib/JIT/JitUnaryMinus.php` | 0 | 1 |
 | `lib/JIT/JitUnaryPlus.php` | 0 | 1 |
+| `lib/JIT/JitUnlikeCompare.php` | 0 | 3 |
 | `lib/JIT/JitValueBox.php` | 0 | 1 |
 | `lib/JIT/JitValueCompare.php` | 0 | 1 |
 | `lib/JIT/JitValueNumeric.php` | 0 | 5 |
@@ -32008,7 +32009,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitScalarTypeCoerce.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 154)
+- new JITVariable (line 159)
 - 5 class method(s)
 - 1 closure(s)
 
@@ -55175,11 +55176,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 214)
 - new Variable (line 218)
 - new Variable (line 220)
-- new Variable (line 2207)
-- new Variable (line 2211)
-- new Variable (line 2634)
-- new Variable (line 2656)
-- new Variable (line 2667)
+- new Variable (line 2212)
+- new Variable (line 2216)
+- new Variable (line 2639)
+- new Variable (line 2661)
+- new Variable (line 2672)
 - 19 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
@@ -55464,6 +55465,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/JitUnlikeCompare.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 148)
+- new Variable (line 151)
+- 10 class method(s)
 
 ### `lib/JIT/JitValueBox.php`
 

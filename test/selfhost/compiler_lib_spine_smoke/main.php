@@ -6421,6 +6421,7 @@ require_once __DIR__.'/../../../lib/JIT/JitStringBuiltinArg.php';
 require_once __DIR__.'/../../../lib/JIT/JitStringCompare.php';
 require_once __DIR__.'/../../../lib/JIT/JitUnaryMinus.php';
 require_once __DIR__.'/../../../lib/JIT/JitUnaryPlus.php';
+require_once __DIR__.'/../../../lib/JIT/JitUnlikeCompare.php';
 require_once __DIR__.'/../../../lib/JIT/JitValueBox.php';
 require_once __DIR__.'/../../../lib/JIT/JitValueCompare.php';
 require_once __DIR__.'/../../../lib/JIT/JitValueNumeric.php';
