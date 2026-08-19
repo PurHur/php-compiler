@@ -6577,6 +6577,55 @@ apply_patch_file_direct() {
   return 1
 }
 
+apply_php_cfg_class_optional_param_order_overlay() {
+  if patch_already_applied "$PATCH_DIR/php-cfg-class-optional-param-order.patch"; then
+    echo "Skip php-cfg-class-optional-param-order.patch (already applied)"
+    return 0
+  fi
+  local class_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php"
+  local parser_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  # Fix Class_.php constructor: move optional $extends after required params
+  if grep -q '?Operand \$extends = null, array \$implements' "$class_file" 2>/dev/null; then
+    sed -i 's/?Operand $extends = null, array $implements, Block $stmts/array $implements, Block $stmts, ?Operand $extends = null/' "$class_file"
+  fi
+  # Fix Parser.php call site: reorder args to match new signature
+  if grep -q 'parseExprNode($node->extends),' "$parser_file" 2>/dev/null; then
+    python3 - "$parser_file" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+text = p.read_text()
+old = """        $this->block->children[] = new Op\\Stmt\\Class_(
+            $name,
+            $node->flags,
+            $this->parseExprNode($node->extends),
+            $this->parseExprList($node->implements),
+            $this->parseNodes($node->stmts, new Block()),
+            $this->mapAttributes($node)
+        );"""
+new = """        $this->block->children[] = new Op\\Stmt\\Class_(
+            $name,
+            $node->flags,
+            $this->parseExprList($node->implements),
+            $this->parseNodes($node->stmts, new Block()),
+            $this->parseExprNode($node->extends),
+            $this->mapAttributes($node)
+        );"""
+if old in text:
+    p.write_text(text.replace(old, new, 1))
+    print('Applied php-cfg-class-optional-param-order.patch (overlay)')
+elif 'parseExprList($node->implements),' in text and 'parseExprNode($node->extends)' in text:
+    print('Skip php-cfg-class-optional-param-order.patch (already applied)')
+else:
+    sys.stderr.write('php-cfg-class-optional-param-order: Parser anchor not found\n')
+    raise SystemExit(1)
+PY
+  else
+    echo "Skip php-cfg-class-optional-param-order.patch (already applied)"
+  fi
+  return 0
+}
+
 apply_patch() {
   local patch="$1"
   local patch_name
@@ -6596,6 +6645,10 @@ apply_patch() {
   if [[ "$(basename "$patch")" == "php-vendor-implicit-nullable-84.patch" ]]; then
     # Hunks go stale after php-cfg overlays rewrite the same signatures (#25042).
     apply_php_vendor_implicit_nullable_84_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-class-optional-param-order.patch" ]]; then
+    apply_php_cfg_class_optional_param_order_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-loop-resolver-continue-switch-warning.patch" ]]; then
