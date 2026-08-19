@@ -204,6 +204,11 @@ final class DomInstanceMethodJit
         'domdocument::lookupprefix' => true,
         'dom\\node::lookupprefix' => true,
         'dom\\element::lookupprefix' => true,
+        'domnode::lookupnamespaceuri' => true,
+        'domelement::lookupnamespaceuri' => true,
+        'domdocument::lookupnamespaceuri' => true,
+        'dom\\node::lookupnamespaceuri' => true,
+        'dom\\element::lookupnamespaceuri' => true,
         'domtext::clonenode' => true,
         'domtext::splittext' => true,
         'domcdatasection::splittext' => true,
@@ -762,6 +767,16 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::lookupnamespaceuri' === $lc
+                || 'domelement::lookupnamespaceuri' === $lc
+                || 'domdocument::lookupnamespaceuri' === $lc
+                || 'dom\\node::lookupnamespaceuri' === $lc
+                || 'dom\\element::lookupnamespaceuri' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeLookupNamespaceURI();
+
+                return;
+            }
             if ('domtext::splittext' === $lc || 'domcdatasection::splittext' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomTextSplitText();
 
@@ -1108,6 +1123,11 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::lookupprefix');
             self::ensureProxy($context, 'dom\\node::lookupprefix');
             self::ensureProxy($context, 'dom\\element::lookupprefix');
+            self::ensureProxy($context, 'domnode::lookupnamespaceuri');
+            self::ensureProxy($context, 'domelement::lookupnamespaceuri');
+            self::ensureProxy($context, 'domdocument::lookupnamespaceuri');
+            self::ensureProxy($context, 'dom\\node::lookupnamespaceuri');
+            self::ensureProxy($context, 'dom\\element::lookupnamespaceuri');
             self::ensureProxy($context, 'domtext::clonenode');
             self::ensureProxy($context, 'domtext::splittext');
             self::ensureProxy($context, 'domcdatasection::splittext');
@@ -1254,7 +1274,7 @@ final class DomInstanceMethodJit
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath', 'getlineno'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'lookupprefix', 'getlineno'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'lookupprefix', 'lookupnamespaceuri', 'getlineno'],
         'domimplementation' => ['createdocumenttype', 'hasfeature'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],

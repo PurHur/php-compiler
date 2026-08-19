@@ -20883,6 +20883,12 @@ class JIT {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
+            } elseif ('lookupnamespaceuri' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupnamespaceuri');
+                if ($this->context->functionIsRegistered('domnode::lookupnamespaceuri')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('getlineno' === $methodLc) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
                 if ($this->context->functionIsRegistered('domnode::getlineno')) {
@@ -21290,6 +21296,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::lookupprefix');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::lookupprefix');
                 }
+                if ('lookupnamespaceuri' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupnamespaceuri');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::lookupnamespaceuri');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::lookupnamespaceuri');
+                }
                 if ('getlineno' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getlineno');
@@ -21383,6 +21394,12 @@ class JIT {
                 }
                 if ('lookupprefix' === $methodLc && $this->context->functionIsRegistered('domnode::lookupprefix')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('lookupnamespaceuri' === $methodLc && $this->context->functionIsRegistered('domnode::lookupnamespaceuri')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupnamespaceuri');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -21690,6 +21707,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupprefix');
             if ($this->context->functionIsRegistered('domnode::lookupprefix')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupprefix');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('lookupnamespaceuri' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::lookupnamespaceuri');
+            if ($this->context->functionIsRegistered('domnode::lookupnamespaceuri')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::lookupnamespaceuri');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
