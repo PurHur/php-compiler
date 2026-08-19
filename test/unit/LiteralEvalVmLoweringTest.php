@@ -49,6 +49,13 @@ final class LiteralEvalVmLoweringTest extends TestCase
         self::assertFalse(Block::literalEvalSourceNeedsVm('$x = 1;'));
     }
 
+    /** @covers issue #31912 — ::class pseudo-constant must not force decl-eval VM path */
+    public function testClassPseudoConstantInEvalStringIsExpressionInline(): void
+    {
+        self::assertFalse(Block::literalEvalSourceNeedsVm('return self::class;'));
+        self::assertFalse(Block::literalEvalSourceNeedsVm('return static::class;'));
+    }
+
     public function testNonLiteralEvalStillRequiresVmLowering(): void
     {
         $runtime = new Runtime();
