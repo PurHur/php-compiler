@@ -1771,16 +1771,25 @@ restart:
                 return ArrayBuiltinHelper::arrayUnion($this->context, $left, $right);
             } elseif (OpCode::TYPE_SPACESHIP === $opcode->type) {
                 if (null === $folded) {
-                    throw new \LogicException("Reached end of switch, can't handle binary operation yet: TYPE_SPACESHIP for hashtable pair");
+                    $result = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+                        $this->context,
+                        $lhs,
+                        $rhs
+                    );
+                } else {
+                    $result = $this->context->getTypeFromString('int64')->constInt($folded, true);
                 }
-                $result = $this->context->getTypeFromString('int64')->constInt($folded, true);
                 goto return_long;
             } elseif (self::isOrderedCompareOpcode($opcode->type)) {
                 if (null === $folded) {
-                    $type = opcode_type_name($opcode->type);
-                    throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for hashtable pair");
+                    $cmp = \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callHashtableCompareSpaceship(
+                        $this->context,
+                        $lhs,
+                        $rhs
+                    );
+                } else {
+                    $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
                 }
-                $cmp = $this->context->getTypeFromString('int64')->constInt($folded, true);
                 $result = JitValueCompare::boolFromSpaceshipCmp($this->context, $opcode->type, $cmp);
                 goto return_bool;
             } else {
