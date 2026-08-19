@@ -9,7 +9,8 @@ namespace PHPCompiler\ext\filter;
  *
  * php-src: ext/filter/logical_filters.c — php_filter_validate_ip
  *
- * Keep free of VmFilter / VmInetPure / `\preg_match` / by-ref / `"\0"` / bool NestedJIT returns.
+ * Keep free of VmFilter / VmInetPure / `\preg_match` / by-ref / `"\0"` / bool NestedJIT returns,
+ * explode/implode, str_starts_with/str_contains, and mutable static spill (#32571).
  * Host SSOT for compile-time fold: {@see VmFilter::isValidIpAddress()}.
  */
 final class FilterIpValidate
@@ -24,20 +25,6 @@ final class FilterIpValidate
 
     private const FLAG_GLOBAL_RANGE = 0x10000000;
 
-    private static int $o0 = 0;
-
-    private static int $o1 = 0;
-
-    private static int $o2 = 0;
-
-    private static int $o3 = 0;
-
-    private static int $lastPriv = 0;
-
-    private static int $lastRes = 0;
-
-    private static int $lastGlob = 0;
-
     public static function isValid(string $s, int $flags = 0): bool
     {
         return 1 === self::isValidInt($s, $flags);
@@ -49,7 +36,8 @@ final class FilterIpValidate
             return 0;
         }
         // php-src php_filter_validate_ip rejects URI-style [IPv6] brackets (#29063).
-        $isV4 = self::parseIpv4($s);
+        $octets = self::parseIpv4Octets($s);
+        $isV4 = null !== $octets ? 1 : 0;
         $isV6 = 0;
         if (0 === $isV4) {
             $isV6 = self::isIpv6Text($s);
@@ -70,15 +58,16 @@ final class FilterIpValidate
         $noPriv = 0 !== ($flags & self::FLAG_NO_PRIV_RANGE);
         $noRes = 0 !== ($flags & self::FLAG_NO_RES_RANGE);
         $globalOnly = 0 !== ($flags & self::FLAG_GLOBAL_RANGE);
-        if (($noPriv || $noRes || $globalOnly) && 1 === $isV4) {
-            if (1 === self::ipv4SpecialFlags()) {
-                if ($noPriv && 1 === self::$lastPriv) {
+        if (($noPriv || $noRes || $globalOnly) && 1 === $isV4 && null !== $octets) {
+            $special = self::ipv4SpecialFlags($octets[0], $octets[1], $octets[2], $octets[3]);
+            if (1 === $special[3]) {
+                if ($noPriv && 1 === $special[0]) {
                     return 0;
                 }
-                if ($noRes && 1 === self::$lastRes) {
+                if ($noRes && 1 === $special[1]) {
                     return 0;
                 }
-                if ($globalOnly && 0 === self::$lastGlob) {
+                if ($globalOnly && 0 === $special[2]) {
                     return 0;
                 }
             }
@@ -129,7 +118,7 @@ final class FilterIpValidate
         if (0 === $len) {
             return null;
         }
-        if (\str_starts_with($addr, '::')) {
+        if (self::startsWith($addr, '::')) {
             return [0, 0];
         }
         $parsed0 = self::parseHextetFrom($addr, 0, $len);
@@ -185,47 +174,58 @@ final class FilterIpValidate
         return [$val, $i];
     }
 
-    /** @return int 1=parsed into self::$o0..$o3 */
-    private static function parseIpv4(string $s): int
+    /**
+     * @return array{0: int, 1: int, 2: int, 3: int}|null
+     */
+    private static function parseIpv4Octets(string $s): ?array
     {
-        $parts = \explode('.', $s);
-        if (4 !== \count($parts)) {
-            return 0;
-        }
-        for ($pi = 0; $pi < 4; ++$pi) {
-            $octet = $parts[$pi];
-            $olen = \strlen($octet);
-            if (0 === $olen || $olen > 3) {
-                return 0;
-            }
-            $val = 0;
-            for ($i = 0; $i < $olen; ++$i) {
-                $o = \ord($octet[$i]);
-                if ($o < 48 || $o > 57) {
-                    return 0;
+        $len = \strlen($s);
+        $o0 = $o1 = $o2 = $o3 = 0;
+        $start = 0;
+        $octets = 0;
+        for ($i = 0; $i <= $len; ++$i) {
+            if ($i === $len || '.' === $s[$i]) {
+                if ($octets >= 4) {
+                    return null;
                 }
-                $val = $val * 10 + ($o - 48);
+                $octetLen = $i - $start;
+                if (0 === $octetLen || $octetLen > 3) {
+                    return null;
+                }
+                $val = 0;
+                for ($j = $start; $j < $i; ++$j) {
+                    $o = \ord($s[$j]);
+                    if ($o < 48 || $o > 57) {
+                        return null;
+                    }
+                    $val = $val * 10 + ($o - 48);
+                }
+                if ($val > 255) {
+                    return null;
+                }
+                if (0 === $octets) {
+                    $o0 = $val;
+                } elseif (1 === $octets) {
+                    $o1 = $val;
+                } elseif (2 === $octets) {
+                    $o2 = $val;
+                } else {
+                    $o3 = $val;
+                }
+                ++$octets;
+                $start = $i + 1;
             }
-            if ($val > 255) {
-                return 0;
-            }
-            if (0 === $pi) {
-                self::$o0 = $val;
-            } elseif (1 === $pi) {
-                self::$o1 = $val;
-            } elseif (2 === $pi) {
-                self::$o2 = $val;
-            } else {
-                self::$o3 = $val;
-            }
+        }
+        if (4 !== $octets) {
+            return null;
         }
 
-        return 1;
+        return [$o0, $o1, $o2, $o3];
     }
 
     private static function isIpv6Text(string $s): int
     {
-        if ('' === $s || !\str_contains($s, ':')) {
+        if ('' === $s || !self::containsChar($s, ':')) {
             return 0;
         }
         $len = \strlen($s);
@@ -240,7 +240,7 @@ final class FilterIpValidate
                 return 0;
             }
         }
-        if (':' === $s[0] && !\str_starts_with($s, '::')) {
+        if (':' === $s[0] && !self::startsWith($s, '::')) {
             return 0;
         }
         $dbl = 0;
@@ -265,35 +265,62 @@ final class FilterIpValidate
         return 1;
     }
 
-    /** @return int 1 when address matches a special-purpose block */
-    private static function ipv4SpecialFlags(): int
+    /**
+     * @return array{0: int, 1: int, 2: int, 3: int} [lastPriv, lastRes, lastGlob, matched]
+     */
+    private static function ipv4SpecialFlags(int $ip0, int $ip1, int $ip2, int $ip3): array
     {
-        self::$lastPriv = 0;
-        self::$lastRes = 0;
-        self::$lastGlob = 0;
-        $ip0 = self::$o0;
-        $ip1 = self::$o1;
-        $ip2 = self::$o2;
+        $lastPriv = 0;
+        $lastRes = 0;
+        $lastGlob = 0;
         if (0 === $ip0) {
-            self::$lastRes = 1;
+            $lastRes = 1;
         } elseif (10 === $ip0) {
-            self::$lastPriv = 1;
+            $lastPriv = 1;
         } elseif (127 === $ip0) {
-            self::$lastRes = 1;
+            $lastRes = 1;
         } elseif (169 === $ip0 && 254 === $ip1) {
-            self::$lastRes = 1;
+            $lastRes = 1;
         } elseif (172 === $ip0 && $ip1 >= 16 && $ip1 <= 31) {
-            self::$lastPriv = 1;
+            $lastPriv = 1;
         } elseif (192 === $ip0 && 168 === $ip1) {
-            self::$lastPriv = 1;
+            $lastPriv = 1;
         } elseif ($ip0 >= 240 && $ip0 <= 255) {
-            self::$lastRes = 1;
+            $lastRes = 1;
         } elseif (192 === $ip0 && 88 === $ip1 && 99 === $ip2) {
-            self::$lastGlob = 1;
+            $lastGlob = 1;
         } else {
-            return 0;
+            return [0, 0, 0, 0];
         }
 
-        return 1;
+        return [$lastPriv, $lastRes, $lastGlob, 1];
+    }
+
+    private static function startsWith(string $s, string $prefix): bool
+    {
+        $pl = \strlen($prefix);
+        $sl = \strlen($s);
+        if ($sl < $pl) {
+            return false;
+        }
+        for ($i = 0; $i < $pl; ++$i) {
+            if ($s[$i] !== $prefix[$i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function containsChar(string $s, string $ch): bool
+    {
+        $len = \strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            if ($s[$i] === $ch) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
