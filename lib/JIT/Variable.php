@@ -824,6 +824,11 @@ final class Variable {
                             self::KIND_VALUE,
                             (new \PHPCompiler\ext\standard\boolval())->call($this->context, $this)
                         );
+                    case self::TYPE_HASHTABLE:
+                        return self::arrayToBool($this->context, $this, $type);
+                }
+                if (0 !== ($this->type & self::IS_NATIVE_ARRAY)) {
+                    return self::arrayToBool($this->context, $this, $type);
                 }
                 break;
             case self::TYPE_NATIVE_DOUBLE:
@@ -851,6 +856,19 @@ final class Variable {
                 break;
         }
         throw new \LogicException('Unhandlable cast operation to type: ' . $type);
+    }
+
+    /**
+     * Zend convert_to_boolean(IS_ARRAY): zend_hash_num_elements ? 1 : 0 (#32455).
+     * Runtime count — compile-time nextFreeElement misses `$a = [9]; (bool)$a` (#32444 peer).
+     */
+    private static function arrayToBool(Context $context, self $array, int $type): self
+    {
+        $count = \PHPCompiler\JIT\Builtin\ArrayCountRuntime::numElements($context, $array);
+        $zero = $count->typeOf()->constInt(0, false);
+        $truthy = $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $count, $zero);
+
+        return new self($context, $type, self::KIND_VALUE, $truthy);
     }
 
     public function addref(): void {
