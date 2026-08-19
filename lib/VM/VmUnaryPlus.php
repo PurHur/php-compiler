@@ -18,7 +18,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * SSOT for JIT unary + lowering (#4820, zend_operators.c, #9976).
+ * SSOT for JIT unary + lowering (#4820, zend_operators.c, #9976, #32477).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitUnaryPlus}
  */
@@ -58,11 +58,21 @@ final class VmUnaryPlus
             case Variable::TYPE_STRING:
                 return self::lowerStringOperand($context, $var);
             case Variable::TYPE_VALUE:
+                // Boxed IS_OBJECT: TypeError, not convert_to_long 0 (#32477).
+                VmObjectNumericOperandGuard::guardUnary($context, $var);
                 if (JitValueBox::isValueOperand($var)) {
                     return self::lowerValueBox($context, $var);
                 }
 
                 return self::lowerStringOperand($context, $var);
+            case Variable::TYPE_OBJECT:
+                // Zend unary + on objects without do_operation is TypeError (#32477).
+                if (VmObjectNumericOperandGuard::guardUnary($context, $var)) {
+                    $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+                    return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $zero);
+                }
+                break;
         }
 
         throw new \LogicException(

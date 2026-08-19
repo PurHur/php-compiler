@@ -219,6 +219,12 @@ return_string:
                 $this->context->getTypeFromString('int64')->constInt(0, false)
             );
         }
+        // object ⊙ scalar arithmetic: zend_type_error, not compiler abort (#32477).
+        if (JitObjectNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right)) {
+            return $this->nativeLongResultVariable(
+                $this->context->getTypeFromString('int64')->constInt(0, false)
+            );
+        }
         if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
             JitShiftOperandGuard::guardOperands($this->context, $opcode->type, $left, $right);
         }
