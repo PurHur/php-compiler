@@ -2187,6 +2187,44 @@ restart:
             );
             goto restart;
         }
+        // Native scalar vs TYPE_NULL — unlike types; do not fall through to spaceship
+        // paths that treat null as 0 (#29487 dom getElementById !== null).
+        if (Variable::TYPE_NULL === $rightType && Variable::TYPE_VALUE !== $leftType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $trueVal;
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NULL === $leftType && Variable::TYPE_VALUE !== $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $trueVal;
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NULL === $leftType && Variable::TYPE_NULL === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $trueVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+        }
         if (Variable::TYPE_NULL === $leftType && JitValueBox::isValueOperand($right)) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
                 $result = JitValueCompare::valueBoxIsNull($this->context, $right);

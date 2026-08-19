@@ -1230,7 +1230,9 @@ final class JitUnlikeCompare
             // boolFromSpaceshipCmp(__value__spaceship) which regresses `$e > $n`.
             $genVal = self::twoBoxedOrdered($context, $opType, $left, $right)->value;
         } else {
-            $genVal = JitValueCompare::identicalValueToValue($context, $left, $right);
+            $genVal = OpCode::TYPE_NOT_IDENTICAL === $opType
+                ? JitValueCompare::notIdenticalValueToValue($context, $left, $right)
+                : JitValueCompare::identicalValueToValue($context, $left, $right);
         }
         $genEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
