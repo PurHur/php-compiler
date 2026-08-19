@@ -307,6 +307,20 @@ final class JitFilter
         return self::loadFilterId($context, $options);
     }
 
+    /** @return int|null compile-time flags when $flags is null or const 0; else null */
+    private static function compileTimeFlagsInt(Context $context, ?Value $flags): ?int
+    {
+        if (null === $flags) {
+            return 0;
+        }
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($flags->value)) {
+            return null;
+        }
+
+        return (int) $lib->LLVMConstIntGetZExtValue($flags->value);
+    }
+
     private static function flagsNeedExtendedIntParse(Context $context, Value $flagsVal): bool
     {
         $lib = $context->llvm->lib;
@@ -815,7 +829,8 @@ final class JitFilter
 
         // Compile-time string + default flags — fold via VmFilter SSOT (#27207 / EMAIL #27068).
         $lit = $value->compileTimeString ?? \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($value);
-        if (null !== $lit && null === $flags) {
+        $flagsInt = self::compileTimeFlagsInt($context, $flags);
+        if (null !== $lit && 0 === $flagsInt) {
             if (!VmFilter::isValidIpAddress($lit, 0)) {
                 JitValueBox::writeBool($context, $slot, $falseVal);
 
