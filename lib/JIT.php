@@ -18833,6 +18833,10 @@ class JIT {
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
         $write = $this->context->getVariableFromOpInScopes($writeOp);
+        // Array ++/-- is zend_type_error, not Analyzer compile abort (#32554 leftover of #32486).
+        if (JIT\JitArrayNumericOperandGuard::guardIncDec($this->context, $read, $increment)) {
+            return;
+        }
         if (
             $write->isArrayAccessWritableOffset
             && null !== $write->writableArrayAccessReceiver

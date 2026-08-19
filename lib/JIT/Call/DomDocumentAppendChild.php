@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\dom\JitDomAppendChild;
 use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -19,17 +19,8 @@ final class DomDocumentAppendChild implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_ac_invoke_cont');
-        if (
-            isset($args[1])
-            && JitDomDocumentMethodKernel::emitTypeErrorIfCompileTimeNullDomNodeArg(
-                $context,
-                $args[1],
-                'DOMNode::appendChild',
-                1,
-                'node'
-            )
-        ) {
-            return JitDomDocumentMethodKernel::nullDomNodeArgReturn($context);
+        if (\count($args) >= 2 && JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::appendChild', 1, 'node')) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
         }
         JitDomAppendChild::invoke($context, $args[0], $args[1]);
 

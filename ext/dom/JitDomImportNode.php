@@ -35,14 +35,8 @@ final class JitDomImportNode
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_import_node_cont');
 
-        if (JitDomDocumentMethodKernel::emitTypeErrorIfCompileTimeNullDomNodeArg(
-            $context,
-            $args[1],
-            'DOMDocument::importNode',
-            1,
-            'node'
-        )) {
-            return JitDomDocumentMethodKernel::nullDomNodeArgReturn($context);
+        if (JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMDocument::importNode', 1, 'node')) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
         }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {

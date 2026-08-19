@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7652 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24426 |
+| Source constructs flagged (warnings) | 24418 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6653,7 +6653,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableValuesLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableWriteLlvm.php` | 0 | 26 |
 | `lib/JIT/HeaderCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/Helper.php` | 0 | 12 |
+| `lib/JIT/Helper.php` | 0 | 11 |
 | `lib/JIT/ImplementsHierarchyJitGuard.php` | 0 | 1 |
 | `lib/JIT/InArrayLlvm.php` | 0 | 2 |
 | `lib/JIT/InOperatorHelper.php` | 0 | 2 |
@@ -6700,7 +6700,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitStringCompare.php` | 0 | 1 |
 | `lib/JIT/JitUnaryMinus.php` | 0 | 1 |
 | `lib/JIT/JitUnaryPlus.php` | 0 | 1 |
-| `lib/JIT/JitUnlikeCompare.php` | 0 | 12 |
+| `lib/JIT/JitUnlikeCompare.php` | 0 | 5 |
 | `lib/JIT/JitValueBox.php` | 0 | 1 |
 | `lib/JIT/JitValueCompare.php` | 0 | 1 |
 | `lib/JIT/JitValueNumeric.php` | 0 | 5 |
@@ -10338,15 +10338,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomAppendChildUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 42)
-- new JITVariable (line 125)
+- new JITVariable (line 31)
+- new JITVariable (line 114)
+- new JITVariable (line 173)
 - new JITVariable (line 184)
-- new JITVariable (line 195)
+- new JITVariable (line 231)
 - new JITVariable (line 242)
-- new JITVariable (line 253)
-- new JITVariable (line 260)
-- new JITVariable (line 268)
-- new JITVariable (line 275)
+- new JITVariable (line 249)
+- new JITVariable (line 257)
+- new JITVariable (line 264)
 - 6 class method(s)
 
 ### `ext/dom/JitDomAppendData.php`
@@ -10489,7 +10489,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 93 class method(s)
+- 90 class method(s)
 
 ### `ext/dom/JitDomElementNavigationProperty.php`
 
@@ -10566,20 +10566,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomImportNode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 225)
+- new JITVariable (line 215)
 - 9 class method(s)
 
 ### `ext/dom/JitDomInsertBefore.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 121)
-- new JITVariable (line 122)
-- new JITVariable (line 123)
-- new JITVariable (line 231)
-- new JITVariable (line 232)
-- new JITVariable (line 233)
-- new JITVariable (line 240)
-- new JITVariable (line 266)
+- new JITVariable (line 111)
+- new JITVariable (line 112)
+- new JITVariable (line 113)
+- new JITVariable (line 221)
+- new JITVariable (line 222)
+- new JITVariable (line 223)
+- new JITVariable (line 230)
+- new JITVariable (line 256)
 - 5 class method(s)
 
 ### `ext/dom/JitDomInsertData.php`
@@ -10706,19 +10706,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomRemoveChild.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 84)
-- new JITVariable (line 95)
-- new JITVariable (line 101)
-- new JITVariable (line 128)
+- new JITVariable (line 75)
+- new JITVariable (line 86)
+- new JITVariable (line 92)
+- new JITVariable (line 119)
 - 5 class method(s)
 
 ### `ext/dom/JitDomReplaceChild.php`
 
 **Warnings** (review for bootstrap subset):
+- new JITVariable (line 95)
 - new JITVariable (line 114)
 - new JITVariable (line 133)
-- new JITVariable (line 152)
-- new JITVariable (line 232)
+- new JITVariable (line 213)
 - 6 class method(s)
 
 ### `ext/dom/JitDomReplaceChildLiveSlots.php`
@@ -32205,8 +32205,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSpaceshipCompareKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 42 class method(s)
-- 33 closure(s)
+- 39 class method(s)
+- 29 closure(s)
 
 ### `ext/standard/JitSplAutoload.php`
 
@@ -46918,8 +46918,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2815)
-- new ArgumentCountError (line 2826)
+- new ArgumentCountError (line 2813)
+- new ArgumentCountError (line 2824)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -50820,7 +50820,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SpaceshipRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/SplAutoloadDefaultRuntime.php`
 
@@ -53157,7 +53157,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/DomNodeAppendChild.php`
 
 **Warnings** (review for bootstrap subset):
-- new DomNodeAppend (line 51)
+- new DomNodeAppend (line 39)
 - 3 class method(s)
 
 ### `lib/JIT/Call/DomNodeBefore.php`
@@ -55245,15 +55245,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 214)
 - new Variable (line 218)
 - new Variable (line 220)
-- new Variable (line 2266)
-- new Variable (line 2270)
-- new Variable (line 2480)
-- new Variable (line 2492)
-- new Variable (line 2627)
-- new Variable (line 2864)
-- new Variable (line 2886)
-- new Variable (line 2897)
-- 22 class method(s)
+- new Variable (line 2297)
+- new Variable (line 2301)
+- new Variable (line 2488)
+- new Variable (line 2500)
+- new Variable (line 2791)
+- new Variable (line 2813)
+- new Variable (line 2824)
+- 21 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
 
@@ -55541,18 +55540,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitUnlikeCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 250)
-- new Variable (line 935)
-- new Variable (line 954)
-- new Variable (line 966)
-- new Variable (line 969)
-- new Variable (line 1140)
-- new Variable (line 1149)
-- new Variable (line 1169)
-- new Variable (line 1178)
-- new Variable (line 1244)
-- new Variable (line 1250)
-- 29 class method(s)
+- new Variable (line 754)
+- new Variable (line 773)
+- new Variable (line 785)
+- new Variable (line 788)
+- 27 class method(s)
 
 ### `lib/JIT/JitValueBox.php`
 

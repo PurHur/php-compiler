@@ -1,8 +1,7 @@
 --TEST--
-AOT: DOM mutation/importNode(null) TypeError not SIGSEGV (#32558, ext/dom/node.c)
+AOT: DOMNode mutation/importNode null TypeError text (#30410 / #32558, ext/dom/node.c)
 --FILE--
 <?php
-declare(strict_types=1);
 error_reporting(E_ALL);
 $d = new DOMDocument();
 $d->loadXML('<r><a/></r>');
