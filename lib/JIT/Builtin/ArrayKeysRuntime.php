@@ -105,13 +105,13 @@ final class ArrayKeysRuntime
                 $context->context->functionType($htPtr, false, $htPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_keys_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $keys = HashTableKeysLlvm::keys($context, $src);
-        $context->builder->returnValue($keys);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_KEYS, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_keys_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $keys = HashTableKeysLlvm::keys($context, $fn->getParam(0));
+            $context->builder->returnValue($keys);
+        });
         $context->registerFunction(self::ABI_KEYS, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function implementKeysFiltered(Context $context): void
@@ -149,15 +149,18 @@ final class ArrayKeysRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $valuePtr, $i1)
             );
 
-        $entry = $fn->appendBasicBlock('array_keys_matching_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $search = $fn->getParam(1);
-        $strict = $fn->getParam(2);
-        $keys = HashTableKeysMatchingLlvm::keysMatching($context, $src, $search, $strict);
-        $context->builder->returnValue($keys);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_KEYS_FILTERED, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_keys_matching_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $keys = HashTableKeysMatchingLlvm::keysMatching(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2)
+            );
+            $context->builder->returnValue($keys);
+        });
         $context->registerFunction(self::ABI_KEYS_FILTERED, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinked(Context $context, string $abiName): void

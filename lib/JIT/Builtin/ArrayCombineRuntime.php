@@ -95,16 +95,17 @@ final class ArrayCombineRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $htPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_combine_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $combined = HashTableCombineLlvm::combine(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1)
-        );
-        $context->builder->returnValue($combined);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_COMBINE, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_combine_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $combined = HashTableCombineLlvm::combine(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1)
+            );
+            $context->builder->returnValue($combined);
+        });
         $context->registerFunction(self::ABI_COMBINE, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

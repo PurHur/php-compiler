@@ -78,13 +78,13 @@ final class ArrayCountValuesRuntime
                 $context->context->functionType($htPtr, false, $htPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_count_values_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $counts = ArrayCountValuesLlvm::countValuesHashTable($context, $src);
-        $context->builder->returnValue($counts);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_COUNT, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_count_values_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $counts = ArrayCountValuesLlvm::countValuesHashTable($context, $fn->getParam(0));
+            $context->builder->returnValue($counts);
+        });
         $context->registerFunction(self::ABI_COUNT, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

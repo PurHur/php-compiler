@@ -118,12 +118,13 @@ final class ArrayMergeRuntime
                 $context->context->functionType($htPtr, false, $htPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_merge_single_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $merged = HashTableMergeLlvm::mergeSingle($context, $fn->getParam(0));
-        $context->builder->returnValue($merged);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_SINGLE, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_merge_single_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $merged = HashTableMergeLlvm::mergeSingle($context, $fn->getParam(0));
+            $context->builder->returnValue($merged);
+        });
         $context->registerFunction(self::ABI_SINGLE, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function emitTwoBridge(Context $context): void
@@ -137,16 +138,17 @@ final class ArrayMergeRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $htPtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_merge_two_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $merged = HashTableMergeLlvm::mergeTwo(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1)
-        );
-        $context->builder->returnValue($merged);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_TWO, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_merge_two_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $merged = HashTableMergeLlvm::mergeTwo(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1)
+            );
+            $context->builder->returnValue($merged);
+        });
         $context->registerFunction(self::ABI_TWO, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

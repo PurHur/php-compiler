@@ -84,16 +84,17 @@ final class ArrayChangeKeyCaseRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $i64)
             );
 
-        $entry = $fn->appendBasicBlock('array_change_key_case_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $changed = HashTableChangeKeyCaseLlvm::changeKeyCase(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1)
-        );
-        $context->builder->returnValue($changed);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_CHANGE, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_change_key_case_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $changed = HashTableChangeKeyCaseLlvm::changeKeyCase(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1)
+            );
+            $context->builder->returnValue($changed);
+        });
         $context->registerFunction(self::ABI_CHANGE, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void

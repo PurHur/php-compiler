@@ -123,17 +123,18 @@ final class ArrayPadRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $i64, $valuePtr)
             );
 
-        $entry = $fn->appendBasicBlock('array_pad_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $padded = HashTablePadLlvm::pad(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2)
-        );
-        $context->builder->returnValue($padded);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_PAD, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_pad_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $padded = HashTablePadLlvm::pad(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2)
+            );
+            $context->builder->returnValue($padded);
+        });
         $context->registerFunction(self::ABI_PAD, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function emitPadTypedBridge(Context $context): void
@@ -149,18 +150,19 @@ final class ArrayPadRuntime
                 $context->context->functionType($htPtr, false, $htPtr, $i64, $valuePtr, $i64)
             );
 
-        $entry = $fn->appendBasicBlock('array_pad_typed_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $padded = HashTablePadLlvm::padWithType(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3)
-        );
-        $context->builder->returnValue($padded);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_PAD_TYPED, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_pad_typed_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $padded = HashTablePadLlvm::padWithType(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2),
+                $fn->getParam(3)
+            );
+            $context->builder->returnValue($padded);
+        });
         $context->registerFunction(self::ABI_PAD_TYPED, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
