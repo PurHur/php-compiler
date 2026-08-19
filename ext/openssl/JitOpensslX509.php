@@ -15,14 +15,16 @@ use PHPLLVM\Value;
  * LLVM lowering for openssl_x509_parse() (#32496 leftover of #6274),
  * openssl_x509_fingerprint() (#32512 leftover of #6524),
  * openssl_x509_checkpurpose() (#32522 leftover of #20286),
- * openssl_x509_check_private_key() (#32527 leftover of #20285), and
- * openssl_x509_verify() (#32535 leftover of #6595).
+ * openssl_x509_check_private_key() (#32527 leftover of #20285),
+ * openssl_x509_verify() (#32535 leftover of #6595), and
+ * openssl_x509_export() (#32557 leftover of #20273).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_checkpurpose) / check_cert / X509_verify_cert
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_check_private_key) / X509_check_private_key
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_verify) / X509_verify
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_export) / PEM_write_bio_X509 / X509_print
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -272,6 +274,54 @@ final class JitOpensslX509
         }
 
         return self::boxedLong($context, $verified);
+    }
+
+    /**
+     * openssl_x509_export() — bake {@see VmOpensslX509Native::exportCertificatePem} into &$output.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_x509_export) / PEM_write_bio_X509 / X509_print
+     * By-ref $output is written via __value__writeString (peer {@see JitOpensslSign::sign}).
+     */
+    public static function export(
+        Context $context,
+        JITVariable $certificate,
+        JITVariable $output,
+        ?JITVariable $noText = null
+    ): Value {
+        $pem = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_x509_export() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32557)'
+            );
+        }
+        $noTextBool = self::compileTimeBool($noText, true);
+        if (null === $noTextBool) {
+            throw new \LogicException(
+                'openssl_x509_export() no_text must be a compile-time bool '
+                .'for JIT/AOT in this compiler build (issue #32557)'
+            );
+        }
+
+        if (!VmOpensslX509Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $exported = VmOpensslX509Native::exportCertificatePem($pem, $noTextBool);
+        if (false === $exported) {
+            return self::boxedFalse($context);
+        }
+
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $output);
+        $str = $context->builder->load($context->constantStringFromString($exported));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
     }
 
     private static function compileTimeBool(?JITVariable $arg, bool $default): ?bool
