@@ -1545,6 +1545,9 @@ final class BuiltinParamNames
             // php-src ext/openssl/openssl.stub.php
             case 'openssl_x509_check_private_key':
                 return ['certificate', 'private_key'];
+            // php-src ext/openssl/openssl.stub.php
+            case 'openssl_x509_verify':
+                return ['certificate', 'public_key'];
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says dn/privkey/configargs (#24663)
             case 'openssl_csr_new':
                 return ['distinguished_names', 'private_key', 'options=', 'extra_attributes='];
