@@ -259,6 +259,12 @@ final class JitLongArithOverflow
 
     private static function extractConstantLong(Context $context, Variable $var): ?int
     {
+        // KIND_VARIABLE (alloca-backed) locals are mutable at runtime; their
+        // compileTimeLong is set at the first assignment and becomes stale
+        // inside loops — folding $t+1 as 0+1 on every iteration (#32605).
+        if (Variable::KIND_VARIABLE === $var->kind) {
+            return null;
+        }
         // ConstFetch of PHP_INT_MIN/MAX is a load of a module global with
         // compileTimeLong — not KIND_CONSTANT_INT (#32309).
         if (null !== $var->compileTimeLong) {

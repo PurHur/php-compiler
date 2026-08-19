@@ -16025,15 +16025,31 @@ class JIT {
         Variable $result,
         Variable $value
     ): void {
+        // When the old lvalue was an i64 alloca, already-compiled loop headers
+        // still read from it. Write the long component of the value box back to
+        // the old alloca so backedges see the updated value (#32605).
+        $oldAlloca = null;
+        if (Variable::KIND_VARIABLE === $result->kind
+            && Variable::TYPE_NATIVE_LONG === $result->type
+            && null !== $result->value
+        ) {
+            $oldAlloca = $result->value;
+        }
         if (!$result->includeBinding) {
             $result->free();
         }
         $slot = JIT\JitValueBox::alloc($this->context);
+        $slotPtr = JIT\JitValueBox::pointer($this->context, $slot);
         JIT\JitValueBox::assignToPointer(
             $this->context,
-            JIT\JitValueBox::pointer($this->context, $slot),
+            $slotPtr,
             $value
         );
+        if (null !== $oldAlloca) {
+            $readLong = $this->context->lookupFunction('__value__readLong');
+            $longVal = $this->context->builder->call($readLong, $slotPtr);
+            $this->context->builder->store($longVal, $oldAlloca);
+        }
         $promoted = new Variable(
             $this->context,
             Variable::TYPE_VALUE,
@@ -19083,6 +19099,45 @@ class JIT {
                 return;
             }
             $cur = $this->context->helper->loadValue($read);
+            // When the write target is an i64 alloca (KIND_VARIABLE), store the
+            // incremented long directly back to the same alloca. Promoting to a
+            // __value__ box disconnects it from already-compiled loop headers that
+            // still read from the original i64 slot, causing infinite loops in
+            // functions with for/while (#32605).
+            if (Variable::KIND_VARIABLE === $write->kind
+                && Variable::TYPE_NATIVE_LONG === $write->type
+            ) {
+                $i64 = $this->context->getTypeFromString('int64');
+                $long = $this->context->builder->intCast($cur, $i64);
+                $one = $i64->constInt(1, false);
+                $newLong = $increment
+                    ? $this->context->builder->add($long, $one)
+                    : $this->context->builder->sub($long, $one);
+                if (!$prefix) {
+                    $oldVar = new Variable(
+                        $this->context,
+                        Variable::TYPE_NATIVE_LONG,
+                        Variable::KIND_VALUE,
+                        $cur
+                    );
+                    $this->assignOperand($resultOp, $oldVar, true);
+                }
+                $write->free();
+                $this->context->builder->store($newLong, $write->value);
+                $write->addref();
+                $write->compileTimeLong = null;
+                if ($prefix) {
+                    $newVar = new Variable(
+                        $this->context,
+                        Variable::TYPE_NATIVE_LONG,
+                        Variable::KIND_VALUE,
+                        $newLong
+                    );
+                    $this->assignOperand($resultOp, $newVar, true);
+                }
+
+                return;
+            }
             // Runtime long may be PHP_INT_MAX/MIN — promote via value box (#29144).
             $newVar = JIT\JitIncDec::promoteLongIntoValueBox($this->context, $cur, $increment);
             if (!$prefix) {
