@@ -207,7 +207,7 @@ final class JitValueBox
         if ('__object__*' === $context->getStringFromType($valueTy)) {
             return self::valuePtrFromObjectParam($context, $var->value);
         }
-        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $slot = self::alloc($context);
         $context->builder->store($var->value, $slot);
 
         return self::normalizeValuePtr($context, self::pointer($context, $slot));
@@ -482,9 +482,9 @@ final class JitValueBox
 
     private static function copyBetweenPointers(Context $context, Value $destPtr, Value $srcPtr): void
     {
-        // Prologue / ARG_RECV can seal the insert BB; never emit the dispatch chain after a
-        // terminator (e06_byref / untyped `$r = $v` module verify — terminator-in-middle).
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'value_copy_cont');
+        if (!BasicBlockHelper::unsealAndContinue($context)) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'value_copy_cont');
+        }
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($srcPtr, $map['type'])

@@ -16943,6 +16943,7 @@ class JIT {
                 $result->valueBoxAliasPtr,
                 $value
             );
+            JIT\JitValueBox::publishAfterWrite($this->context, $result->valueBoxAliasPtr);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $this->recordListUnpackAssignSlot($resultOp, $result);
 
@@ -17434,6 +17435,32 @@ class JIT {
             $value->type === $result->type
             && !($branchMergeTarget && Variable::TYPE_VALUE === $result->type)
         ) {
+            if (
+                Variable::TYPE_VALUE === $value->type
+                && Variable::KIND_VALUE === $value->kind
+                && '__value__' === $this->context->getStringFromType($value->value->typeOf())
+                && '__value__' === $this->context->getStringFromType($result->value->typeOf())
+            ) {
+                if (!$result->includeBinding) {
+                    $result->free();
+                }
+                $this->context->builder->store($value->value, $result->value);
+                $this->maybeCopyObjectPropertyBacking($result, $value, $force);
+                if (null === $result->objectPropertySlot) {
+                    $result->addref();
+                }
+                $this->copyValueBoxJitFlags($result, $value, $force);
+                $result->compileTimeConstantName = $value->compileTimeConstantName;
+                $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+                $this->syncCompileTimeString($result, $value, $force);
+                $this->syncCompileTimeFloat($result, $value, $force);
+                $this->syncCompileTimeBcmathNumber($result, $value, $force);
+                $this->syncCompileTimeDomTagName($result, $value, $force);
+                $this->syncCompileTimeDatePeriod($result, $value, $force);
+                $this->noteDateTimeZoneLocal($resultOp, $value);
+
+                return;
+            }
             if (null !== $result->staticPropertyGlobal && null !== $result->staticPropertyType) {
                 if (
                     !JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
