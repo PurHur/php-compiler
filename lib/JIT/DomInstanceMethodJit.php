@@ -187,6 +187,13 @@ final class DomInstanceMethodJit
         'dom\\element::getnodepath' => true,
         'dom\\htmlelement::getnodepath' => true,
         'dom\\document::getnodepath' => true,
+        'domnode::getlineno' => true,
+        'domelement::getlineno' => true,
+        'domdocument::getlineno' => true,
+        'dom\\node::getlineno' => true,
+        'dom\\element::getlineno' => true,
+        'dom\\htmlelement::getlineno' => true,
+        'dom\\document::getlineno' => true,
         'domnode::issupported' => true,
         'domelement::issupported' => true,
         'domdocument::issupported' => true,
@@ -718,6 +725,18 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::getlineno' === $lc
+                || 'domelement::getlineno' === $lc
+                || 'domdocument::getlineno' === $lc
+                || 'dom\\node::getlineno' === $lc
+                || 'dom\\element::getlineno' === $lc
+                || 'dom\\htmlelement::getlineno' === $lc
+                || 'dom\\document::getlineno' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeGetLineNo();
+
+                return;
+            }
             if ('domnode::issupported' === $lc
                 || 'domelement::issupported' === $lc
                 || 'domdocument::issupported' === $lc
@@ -1057,6 +1076,13 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\element::getnodepath');
             self::ensureProxy($context, 'dom\\htmlelement::getnodepath');
             self::ensureProxy($context, 'dom\\document::getnodepath');
+            self::ensureProxy($context, 'domnode::getlineno');
+            self::ensureProxy($context, 'domelement::getlineno');
+            self::ensureProxy($context, 'domdocument::getlineno');
+            self::ensureProxy($context, 'dom\\node::getlineno');
+            self::ensureProxy($context, 'dom\\element::getlineno');
+            self::ensureProxy($context, 'dom\\htmlelement::getlineno');
+            self::ensureProxy($context, 'dom\\document::getlineno');
             self::ensureProxy($context, 'domnode::issupported');
             self::ensureProxy($context, 'domelement::issupported');
             self::ensureProxy($context, 'domdocument::issupported');
@@ -1207,14 +1233,14 @@ final class DomInstanceMethodJit
 
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
-        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported'],
+        'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath', 'getlineno'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'getlineno'],
         'domimplementation' => ['createdocumenttype', 'hasfeature'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getnodepath'],
+        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getnodepath', 'getlineno'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],

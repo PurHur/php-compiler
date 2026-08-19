@@ -67,8 +67,10 @@ final class JitDomLoadXML
         }
 
         $xmlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $xmlSource = null;
         if (null !== $xmlLit) {
-            $xmlLit = ltrim(VmDom::stripLeadingUtf8Bom($xmlLit));
+            $xmlSource = VmDom::stripLeadingUtf8Bom($xmlLit);
+            $xmlLit = ltrim($xmlSource);
         }
         if (
             null !== $xmlLit
@@ -76,7 +78,7 @@ final class JitDomLoadXML
             && '<' === $xmlLit[0]
             && !JitDomLoadXMLUserScript::xmlContainsInterElementBlankText($xmlLit)
         ) {
-            JitDomLoadXMLUserScript::rememberCompileTimeXml($xmlLit);
+            JitDomLoadXMLUserScript::rememberCompileTimeXml($xmlLit, sourceXml: $xmlSource);
         }
 
         DomLoadXMLRuntime::ensureLinked($context);
