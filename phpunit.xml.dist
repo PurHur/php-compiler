@@ -233,6 +233,8 @@
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437JITTest.php</file>
+            <file>./test/compliance/LinkinfoReadlinkNamed23944VMTest.php</file>
+            <file>./test/compliance/LinkinfoReadlinkNamed23944JITTest.php</file>
             <file>./test/compliance/ExecPassthruSystemNamed23625VMTest.php</file>
             <file>./test/compliance/ExecPassthruSystemNamed23625JITTest.php</file>
             <file>./test/compliance/BaseConvertAddcslashesHashFileNamed23507VMTest.php</file>
@@ -1236,6 +1238,7 @@
             <file>./test/aot/GzwriteBytesAotTest.php</file>
             <file>./test/aot/ExtensionLoadedObStartNamed23359AotTest.php</file>
             <file>./test/aot/MetaphoneSoundexCountCharsNamed23437AotTest.php</file>
+            <file>./test/aot/LinkinfoReadlinkNamed23944AotTest.php</file>
             <file>./test/aot/BaseConvertAddcslashesHashFileNamed23507AotTest.php</file>
             <file>./test/aot/IsUploadedFileNamed28853AotTest.php</file>
             <file>./test/aot/MbChrOrdAotTest.php</file>

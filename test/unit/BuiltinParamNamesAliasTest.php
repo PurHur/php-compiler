@@ -3321,6 +3321,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'flags', 'fnmatch'));
     }
 
+    /** @covers issue #23944 */
+    public function testLinkinfoReadlinkZendStubNamedParams(): void
+    {
+        $linkinfo = BuiltinParamNames::forFunction('linkinfo');
+        self::assertSame(['path'], $linkinfo);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($linkinfo, 'path', 'linkinfo'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($linkinfo, 'filename', 'linkinfo'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('linkinfo'));
+        self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('linkinfo'));
+
+        $readlink = BuiltinParamNames::forFunction('readlink');
+        self::assertSame(['path'], $readlink);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($readlink, 'path', 'readlink'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($readlink, 'filename', 'readlink'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('readlink'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('readlink'));
+    }
+
     /** @covers issue #24885 */
     public function testMkdirReflectionOptionalDefaultsNamedParams(): void
     {
