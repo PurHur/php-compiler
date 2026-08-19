@@ -43,6 +43,12 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomNodeListLength::isDomNodeListLength($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj);
         }
+        if (\PHPCompiler\ext\dom\JitDomNamedNodeMap::isLength($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomNamedNodeMap::fetchLength($object, $obj);
+        }
+        if (\PHPCompiler\ext\dom\JitDomNamedNodeMap::isAttributesProperty($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomNamedNodeMap::fetchAttributes($object, $obj, $class);
+        }
         if (\PHPCompiler\ext\dom\JitDomDocumentElement::isDomDocumentElement($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj);
         }

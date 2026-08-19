@@ -503,6 +503,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomCreateDocument.php';
 require_once __DIR__.'/../../../ext/dom/JitDomIsSupported.php';
 require_once __DIR__.'/../../../ext/dom/JitDomLookupNamespaceURI.php';
 require_once __DIR__.'/../../../ext/dom/JitDomLookupPrefix.php';
+require_once __DIR__.'/../../../ext/dom/JitDomNamedNodeMap.php';
 require_once __DIR__.'/../../../ext/dom/JitDomSplitText.php';
 require_once __DIR__.'/../../../ext/dom/JitDomIsWhitespaceInElementContent.php';
 require_once __DIR__.'/../../../ext/dom/JitDomSubstringData.php';
@@ -6094,6 +6095,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomImplementationCreateDocument.php
 require_once __DIR__.'/../../../lib/JIT/Call/DomImplementationCreateDocumentType.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomImplementationHasFeature.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomInstanceMethod.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomNamedNodeMapItem.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeAfter.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeAppend.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeAppendChild.php';

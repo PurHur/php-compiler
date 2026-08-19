@@ -21214,6 +21214,8 @@ class JIT {
                 // (#21171 AOT, #18493, #24332).
                 if ('item' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnodelist::item');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnamednodemap::item');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\namednodemap::item');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtokenlist::item');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\tokenlist::item');
                 }
@@ -21392,11 +21394,29 @@ class JIT {
                     return;
                 }
                 // User-script AOT may omit DOMNodeList from allClassNamesById — still bind item().
-                if ('item' === $methodLc && $this->context->functionIsRegistered('domnodelist::item')) {
-                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnodelist::item');
-                    $this->context->scope->args = [$receiverVar];
+                // attributes->item must not steal the NodeList lowering (#32546).
+                if ('item' === $methodLc) {
+                    $itemHintLc = strtolower(str_replace('/', '\\', ltrim(
+                        (string) ($receiverVar->classUserType ?? $declaringClassLc),
+                        '\\'
+                    )));
+                    if (
+                        str_contains($itemHintLc, 'namednodemap')
+                        && $this->context->functionIsRegistered('domnamednodemap::item')
+                    ) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                            'domnamednodemap::item'
+                        );
+                        $this->context->scope->args = [$receiverVar];
 
-                    return;
+                        return;
+                    }
+                    if ($this->context->functionIsRegistered('domnodelist::item')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnodelist::item');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 if ('clonenode' === $methodLc && $this->context->functionIsRegistered('domnode::clonenode')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');

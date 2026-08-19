@@ -233,24 +233,64 @@ final class JitDomCreateElement
     }
 
     /**
-     * User-script AOT: non-null NamedNodeMap in attributes slot when the element
-     * has non-xmlns attributes (php-src xmlNode->properties != NULL) (#32458).
+     * User-script AOT: NamedNodeMap in attributes slot when the element has
+     * non-xmlns attributes (php-src xmlNode->properties != NULL) (#32458).
+     *
+     * Define {@code length} + pin Attrs **before** allocate() — fetching
+     * {@code $el->attributes->length} on an undersized dummy map SIGSEGVs (#32546,
+     * peer NodeList length #28672).
+     *
+     * @param list<array{qname: string, value: string}> $attrs
      */
     public static function storeAttributesPresence(
         Context $context,
         Value $element,
-        bool $present,
+        array $attrs,
         string $className = self::CLASS_ELEMENT
     ): void {
-        if (!$present) {
+        if ([] === $attrs) {
             return;
         }
         $objectType = $context->type->object;
         $elemClassId = $objectType->lookup($className);
         self::ensureElementPropertyLayout($objectType, $elemClassId);
         $mapClassId = $objectType->lookup('DOMNamedNodeMap');
+        JitDomNamedNodeMap::ensureLayout($objectType, $mapClassId);
         $map = $objectType->allocate($mapClassId);
         $objectType->markObjectConstructed($map);
+        $lengthVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt(\count($attrs), false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($map, 'DOMNamedNodeMap', VmDom::PROP_LENGTH),
+            $lengthVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        foreach ($attrs as $i => $pair) {
+            if ($i >= JitDomNamedNodeMap::MAX_PINNED_ATTRS) {
+                break;
+            }
+            $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
+                $context,
+                '',
+                $pair['qname'],
+                $pair['value']
+            );
+            $pin = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $attr
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($map, 'DOMNamedNodeMap', JitDomNamedNodeMap::pinProp($i)),
+                $pin,
+                JITVariable::TYPE_VALUE
+            );
+        }
         $mapJit = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
