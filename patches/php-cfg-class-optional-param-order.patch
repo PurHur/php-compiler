@@ -18,7 +18,7 @@
          $this->flags = $flags;
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -248,10 +248,10 @@
+@@ -256,9 +256,9 @@
          $this->block->children[] = new Op\Stmt\Class_(
              $name,
              $node->flags,
