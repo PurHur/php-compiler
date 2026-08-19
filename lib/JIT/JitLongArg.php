@@ -5,7 +5,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 final class JitLongArg {
     public static function lower(Context $context, Variable $arg, string $contextLabel = "argument"): Value {
-        if (null !== $arg->compileTimeLong) {
+        if (null !== $arg->compileTimeLong && !JitValueBox::isValueOperand($arg)) {
             return $context->constantFromInteger((int) $arg->compileTimeLong);
         }
         if (Variable::TYPE_NATIVE_LONG === $arg->type) return $context->helper->loadValue($arg);

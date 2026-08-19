@@ -265,6 +265,11 @@ final class JitLongArithOverflow
         if (Variable::KIND_VARIABLE === $var->kind) {
             return null;
         }
+        // TYPE_VALUE (boxed) variables backed by a heap __value__ box are
+        // also mutable at runtime; compileTimeLong is stale in loops (#32605).
+        if (JitValueBox::isValueOperand($var)) {
+            return null;
+        }
         // ConstFetch of PHP_INT_MIN/MAX is a load of a module global with
         // compileTimeLong — not KIND_CONSTANT_INT (#32309).
         if (null !== $var->compileTimeLong) {
