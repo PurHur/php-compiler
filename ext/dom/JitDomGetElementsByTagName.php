@@ -109,6 +109,61 @@ final class JitDomGetElementsByTagName
         );
     }
 
+    /**
+     * DOMElement::getElementsByTagName() — user-script AOT (#32454).
+     *
+     * php-src: ext/dom/element.c PHP_METHOD(DOMElement, getElementsByTagName).
+     */
+    public static function invokeFromElement(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMElement::getElementsByTagName() expects receiver and tag name');
+        }
+
+        if ($context->callerStrictTypes && JITVariable::TYPE_NULL === $args[1]->type) {
+            \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'DOMElement::getElementsByTagName(): Argument #1 ($qualifiedName) must be of type string, null given'
+            );
+
+            return self::boxNullResult($context);
+        }
+
+        if (
+            !$context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant)
+        ) {
+            self::loadStringArgElement($context, $args[1]);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_el_gebt_soft_null_cont');
+        }
+
+        if (JitDomGetElementsByTagNameUserScript::shouldUse($context)) {
+            $us = JitDomGetElementsByTagNameUserScript::tryInvokeFromElement($context, ...$args);
+            if (null !== $us) {
+                return $us;
+            }
+            throw new \LogicException(
+                'DOMElement::getElementsByTagName() user-script AOT requires compile-time qualifiedName and loadXML'
+            );
+        }
+
+        throw new \LogicException(
+            'DOMElement::getElementsByTagName() JIT helper is user-script AOT only in this build'
+        );
+    }
+
+    private static function loadStringArgElement(Context $context, JITVariable $arg): Value
+    {
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $arg,
+            'DOMElement::getElementsByTagName',
+            0,
+            'qualifiedName'
+        );
+    }
+
     private static function boxObjectResult(Context $context, Value $object): Value
     {
         $slot = JitValueBox::alloc($context);

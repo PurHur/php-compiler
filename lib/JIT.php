@@ -20648,6 +20648,20 @@ class JIT {
                     return;
                 }
             }
+            // documentElement temps (:object) — Element getElementsByTagName SIGABRT via RuntimeIndirect (#32454).
+            if (
+                'getelementsbytagname' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
+                if ($this->context->functionIsRegistered('domelement::getelementsbytagname')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domelement::getelementsbytagname');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
@@ -21232,6 +21246,17 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::haschildnodes');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::haschildnodes');
                 }
+                // getElementsByTagName on documentElement temps (:object) — php-src element.c (#32454).
+                if ('getelementsbytagname' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getelementsbytagname');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::getelementsbytagname');
+                    if ($this->context->functionIsRegistered('domelement::getelementsbytagname')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domelement::getelementsbytagname');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                }
                 if ('substringdata' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::substringdata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::substringdata');
@@ -21281,6 +21306,12 @@ class JIT {
                 }
                 if ('haschildnodes' === $methodLc && $this->context->functionIsRegistered('domnode::haschildnodes')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::haschildnodes');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('getelementsbytagname' === $methodLc && $this->context->functionIsRegistered('domelement::getelementsbytagname')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domelement::getelementsbytagname');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
