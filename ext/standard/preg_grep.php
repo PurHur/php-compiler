@@ -16,7 +16,11 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** preg_grep() — VM via VmPreg; JIT/AOT via JitPregGrep (issue #1180). */
+/**
+ * preg_grep() — VM via VmPreg; JIT/AOT via JitPregGrep (issue #1180).
+ *
+ * Excess/missing argc → ArgumentCountError (php-src ext/pcre/php_pcre.c; #28476 sibling).
+ */
 final class preg_grep extends Internal
 {
     public function __construct()
@@ -26,10 +30,8 @@ final class preg_grep extends Internal
 
     public function execute(Frame $frame): void
     {
+        $this->requireArgCountRange($frame, 'preg_grep', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
-        }
         // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226; ext/pcre/php_pcre.c).
         $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'preg_grep', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_grep', $pattern);
@@ -93,10 +95,10 @@ final class preg_grep extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'preg_grep', 2, 3)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
+        $argc = \count($args);
         // Soft-null outside strict_types; strict → TypeError (#31385 / peer token_get_all #31361).
         if (3 === $argc
             && $context->callerStrictTypes
