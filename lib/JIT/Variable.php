@@ -826,6 +826,14 @@ final class Variable {
                         );
                     case self::TYPE_HASHTABLE:
                         return self::arrayToBool($this->context, $this, $type);
+                    case self::TYPE_OBJECT:
+                        // zend_std_cast_object_to_type(_IS_BOOL) → 1 (#32463).
+                        return new self(
+                            $this->context,
+                            $type,
+                            self::KIND_VALUE,
+                            $this->context->constantFromBool(true)
+                        );
                 }
                 if (0 !== ($this->type & self::IS_NATIVE_ARRAY)) {
                     return self::arrayToBool($this->context, $this, $type);
