@@ -666,21 +666,10 @@ final class VmValueCompare
             throw new \LogicException('Expected two boxed __value__ operands');
         }
         SpaceshipRuntime::ensureLinked($context);
-        $readFn = $context->lookupFunction('__value__readObject');
-        $readTy = $readFn->getParam(0)->typeOf();
-        $leftObj = $context->builder->call(
-            $readFn,
-            $context->builder->pointerCast(self::runtimeValuePtr($context, $left), $readTy)
-        );
-        $rightObj = $context->builder->call(
-            $readFn,
-            $context->builder->pointerCast(self::runtimeValuePtr($context, $right), $readTy)
-        );
-        $cmpFn = $context->lookupFunction('__object__compareSpaceship');
-        $cmp = $context->builder->call(
-            $cmpFn,
-            $context->builder->pointerCast($leftObj, $cmpFn->getParam(0)->typeOf()),
-            $context->builder->pointerCast($rightObj, $cmpFn->getParam(1)->typeOf())
+        $cmp = SpaceshipRuntime::callValueSpaceship(
+            $context,
+            self::runtimeValuePtr($context, $left),
+            self::runtimeValuePtr($context, $right)
         );
         $zero = $cmp->typeOf()->constInt(0, false);
 
