@@ -13,6 +13,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_copy via CopyJitHelper PHP (#9585).
  *
+ * Type always-on leftover dropped (#32466): declareFunction uses getNamedFunction first
+ * so a drifted ABI cannot mint __compiler_copy.1 (#31894 / #32122).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer FsGlobVecRuntime #22205).
  * Replaces {@see StringFsDirJit::emitCopy} libc fread/fwrite/chmod LLVM.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::copy()}
@@ -85,6 +87,12 @@ final class CopyRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
@@ -94,6 +102,8 @@ final class CopyRuntime
         $i32 = $context->getTypeFromString('int32');
         $strPtr = $context->getTypeFromString('__string__*');
 
+        // getNamedFunction first — leftover Type always-on addFunction without it
+        // minted __compiler_copy.1 on ABI drift (#32466 / #32122).
         return $context->module->addFunction(
             $name,
             $context->context->functionType($i32, false, $strPtr, $strPtr)
