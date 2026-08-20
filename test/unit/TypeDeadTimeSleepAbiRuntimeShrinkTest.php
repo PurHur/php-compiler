@@ -42,7 +42,7 @@ final class TypeDeadTimeSleepAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_password_hash'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_strtr'", $type);
     }
 
     public function testRuntimeOwnerDeclaresTimeSleepAbisModuleLocally(): void
