@@ -1,5 +1,4 @@
 <?php
-// @differential-skip-aot: decrement-below-zero / post-echo truncation still broken (#23811 partial)
 //
 // String interpolation with live handles is guarded by g07a_int_string_resource_collision.php.
 //
