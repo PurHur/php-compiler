@@ -9,8 +9,8 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
 /**
- * copy() JIT routes through CopyJitHelper PHP not StringFsDirJit libc LLVM (#9585).
- * NestedJIT via JitVmHelperLink::ensureCompiled (#22231 / peer #22205).
+ * copy() JIT routes through CopyLibcRuntime stdio not StringFsDirJit (#9585, #32466).
+ * Thin AOT cannot use NestedJIT CopyJitHelper (peer TouchLibcRuntime #28995).
  */
 final class CopyRuntimeShrinkTest extends TestCase
 {
@@ -22,18 +22,16 @@ final class CopyRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('fopen')", $source);
     }
 
-    public function testCopyRuntimeUsesJitVmHelperLink(): void
+    public function testCopyRuntimeUsesCopyLibcRuntime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CopyRuntime.php');
-        $this->assertStringContainsString('CopyJitHelper::copyArgv', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringNotContainsString('parseAndCompile', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertStringNotContainsString("lookupFunction('fread')", $source);
-        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('CopyLibcRuntime::emit', $source);
+        $this->assertStringNotContainsString('CopyJitHelper::copyArgv', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertLessThan(130, \substr_count($source, "\n") + 1);
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CopyLibcRuntime.php');
+        $this->assertStringContainsString("lookupFunction('fread')", $libc);
+        $this->assertStringContainsString("lookupFunction('fwrite')", $libc);
         $jitCopy = (string) file_get_contents(__DIR__.'/../../ext/standard/JitCopy.php');
         $this->assertStringContainsString('CopyRuntime::ensureLinked', $jitCopy);
     }

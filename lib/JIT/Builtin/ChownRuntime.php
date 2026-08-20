@@ -4,36 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_chown/__compiler_chgrp via FsDirJitHelper PHP (#9585).
+ * JIT/AOT link for __compiler_chown/__compiler_chgrp via ChownLibcRuntime (#9585, #32466).
  *
  * Type always-on leftover dropped (#32466): declareFunction uses getNamedFunction first
  * so a drifted ABI cannot mint __compiler_chown.1 (#31894 / #32122).
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer CopyRuntime #22231 / #24473).
- * Replaces {@see StringFsDirJit::emitChown}/{@see StringFsDirJit::emitChgrp} libc LLVM.
+ * Thin libc chown/fchownat — NestedJIT ChownJitHelper cannot chown under AOT (#32466 / peer #28995).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/filestat.c — PHP_FUNCTION(chown), PHP_FUNCTION(chgrp)
  */
 final class ChownRuntime
 {
-    private const HELPER_PATH = '/ext/standard/ChownJitHelper.php';
-
-    private const CHOWN_HELPER = 'PHPCompiler\\ext\\standard\\ChownJitHelper::chownArgv';
-
-    private const CHGRP_HELPER = 'PHPCompiler\\ext\\standard\\ChownJitHelper::chgrpArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CHOWN_HELPER,
-        self::CHGRP_HELPER,
-    ];
-
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_chown',
@@ -60,9 +45,8 @@ final class ChownRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
-        self::implementIfMissing($context, '__compiler_chown', self::CHOWN_HELPER, self::implementChownBridge(...));
-        self::implementIfMissing($context, '__compiler_chgrp', self::CHGRP_HELPER, self::implementChgrpBridge(...));
+        self::implementIfMissing($context, '__compiler_chown', self::implementChownBridge(...));
+        self::implementIfMissing($context, '__compiler_chgrp', self::implementChgrpBridge(...));
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -75,7 +59,7 @@ final class ChownRuntime
     /**
      * @param callable(Context, LlvmFunction): void $emit
      */
-    private static function implementIfMissing(Context $context, string $name, string $helperLogical, callable $emit): void
+    private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -85,7 +69,7 @@ final class ChownRuntime
         }
 
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn, $helperLogical);
+        $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -116,73 +100,18 @@ final class ChownRuntime
         );
     }
 
-    private static function implementChownBridge(Context $context, LlvmFunction $fn, string $helperLogical): void
+    private static function implementChownBridge(Context $context, LlvmFunction $fn): void
     {
-        self::implementChxBridge($context, $fn, $helperLogical);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__compiler_chown', static function () use ($context, $fn): void {
+            ChownLibcRuntime::emitChown($context, $fn);
+        });
     }
 
-    private static function implementChgrpBridge(Context $context, LlvmFunction $fn, string $helperLogical): void
+    private static function implementChgrpBridge(Context $context, LlvmFunction $fn): void
     {
-        self::implementChxBridge($context, $fn, $helperLogical);
-    }
-
-    private static function implementChxBridge(Context $context, LlvmFunction $fn, string $helperLogical): void
-    {
-        $entry = $fn->appendBasicBlock('chx_bridge_entry');
-        $fail = $fn->appendBasicBlock('chx_bridge_fail');
-        $body = $fn->appendBasicBlock('chx_bridge_body');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $path = $fn->getParam(0);
-        $idValue = $fn->getParam(1);
-        $bad = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull()),
-            $context->builder->icmp(Builder::INT_EQ, $idValue, $valuePtr->constNull())
-        );
-        $context->builder->branchIf($bad, $fail, $body);
-
-        $context->builder->positionAtEnd($body);
-        // Helper takes int uid/gid (#32466) — coerce __value__* before NestedJIT call.
-        $idI64 = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $idValue
-        );
-        $ok = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, $helperLogical),
-            [$path, $idI64, $fn->getParam(2)]
-        );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $ok, $i32)
-        );
-
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($i32->constInt(0, false));
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after FsDirJitHelper chown/chgrp compile (#9585)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#24473'
-        );
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__compiler_chgrp', static function () use ($context, $fn): void {
+            ChownLibcRuntime::emitChgrp($context, $fn);
+        });
     }
 
     private static function registerLinkedRuntime(Context $context): void

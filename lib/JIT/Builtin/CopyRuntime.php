@@ -4,33 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_copy via CopyJitHelper PHP (#9585).
+ * JIT/AOT link for __compiler_copy via CopyLibcRuntime stdio (#9585, #32466).
  *
  * Type always-on leftover dropped (#32466): declareFunction uses getNamedFunction first
  * so a drifted ABI cannot mint __compiler_copy.1 (#31894 / #32122).
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer FsGlobVecRuntime #22205).
- * Replaces {@see StringFsDirJit::emitCopy} libc fread/fwrite/chmod LLVM.
+ * Thin libc fread/fwrite — NestedJIT CopyJitHelper cannot copy under AOT (#32466 / peer #28995).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::copy()}
  * php-src: ext/standard/file.c — PHP_FUNCTION(copy)
  */
 final class CopyRuntime
 {
-    private const HELPER_PATH = '/ext/standard/CopyJitHelper.php';
-
-    private const COPY_HELPER = 'PHPCompiler\\ext\\standard\\CopyJitHelper::copyArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::COPY_HELPER,
-    ];
-
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_copy',
@@ -56,7 +44,6 @@ final class CopyRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_copy', self::implementCopyBridge(...));
         self::registerLinkedRuntime($context);
 
@@ -112,55 +99,10 @@ final class CopyRuntime
 
     private static function implementCopyBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('copy_bridge_entry');
-        $fail = $fn->appendBasicBlock('copy_bridge_fail');
-        $body = $fn->appendBasicBlock('copy_bridge_body');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $from = $fn->getParam(0);
-        $to = $fn->getParam(1);
-        $bad = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $from, $strPtr->constNull()),
-            $context->builder->icmp(Builder::INT_EQ, $to, $strPtr->constNull())
-        );
-        $context->builder->branchIf($bad, $fail, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ok = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::COPY_HELPER),
-            [$from, $to]
-        );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $ok, $i32)
-        );
-
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($i32->constInt(0, false));
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after CopyJitHelper compile (#9585)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#22231'
-        );
+        // Thin libc stdio — NestedJIT CopyJitHelper cannot copy under AOT (#32466 / peer #28995).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__compiler_copy', static function () use ($context, $fn): void {
+            CopyLibcRuntime::emit($context, $fn);
+        });
     }
 
     private static function registerLinkedRuntime(Context $context): void
