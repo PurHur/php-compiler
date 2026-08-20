@@ -531,18 +531,10 @@ class Type extends Builtin {
         // bridge is OpensslDigestRuntime (getNamedFunction first; Type::initialize
         // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // openssl_digest.1 (#31894 / #32122).
-        // openssl_pbkdf2 — HMAC over __compiler_hash (hex) + LLVM hex-decode (#32410)
-        $fntypeOpensslPbkdf2 = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $i64,
-            $i64,
-            $strPtr
-        );
-        $fnOpensslPbkdf2 = $this->context->module->addFunction('__compiler_openssl_pbkdf2', $fntypeOpensslPbkdf2);
-        $this->context->registerFunction('__compiler_openssl_pbkdf2', $fnOpensslPbkdf2);
+        // __compiler_openssl_pbkdf2 always-on shell removed (#32869): NestedJIT/AOT
+        // bridge is OpensslPbkdf2Runtime (HMAC over __compiler_hash + LLVM hex-decode;
+        // getNamedFunction first; Type::initialize still ensureLinked). Leftover Type
+        // empty decls vs Runtime ABI drift mint openssl_pbkdf2.1 (#31894 / #32122).
         // __compiler_openssl_get_cipher_methods / __compiler_openssl_get_md_methods always-on
         // shells removed (#32451): user-script openssl_get_*_methods() stays
         // JitOpensslMethods / OpensslMethodsJitHelper / OpensslCipherRegistry.
@@ -1205,6 +1197,7 @@ class Type extends Builtin {
         OpensslEncryptRuntime::ensureLinked($this->context);
         OpensslSignRuntime::ensureLinked($this->context);
         OpensslDigestRuntime::ensureLinked($this->context);
+        OpensslPbkdf2Runtime::ensureLinked($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
