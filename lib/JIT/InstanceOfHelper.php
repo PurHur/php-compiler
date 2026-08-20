@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * instanceof lowering for literal and dynamic class operands (#4339, #10078).
+ * instanceof lowering for literal and dynamic class operands (#4339, #10078, #32766).
  *
  * SSOT: {@see \PHPCompiler\VM\InstanceOfClassName}, {@see \PHPCompiler\VM\InstanceOfJitHelper}
  */
@@ -62,11 +62,18 @@ final class InstanceOfHelper
                 $i1->constInt(0, false)
             );
         }
+        // Boxed / slotted locals (`$n = 'A'`) keep compileTimeString — fold like
+        // method_exists/is_a (#32701 / #32706) instead of a runtime value-box read that
+        // mis-lowers under thin AOT (#32766).
+        $classLit = JitStringArg::compileTimeLiteral($classVar) ?? $classVar->compileTimeString;
+        if (\is_string($classLit) && '' !== $classLit) {
+            return $context->type->object->emitInstanceOf($expr, $classLit);
+        }
         if (Variable::TYPE_STRING === $classVar->type) {
             return self::emitWithClassNameString(
                 $context,
                 $expr,
-                $context->helper->loadValue($classVar)
+                JitStringArg::lower($context, $classVar, 'instanceof class')
             );
         }
         if (Variable::TYPE_OBJECT === $classVar->type) {
@@ -166,14 +173,24 @@ final class InstanceOfHelper
 
     private static function emitWithClassNameString(Context $context, Variable $expr, Value $classNameStr): Variable
     {
+        // ensureStrcasecmpLinked builds a bridge body then clearInsertionPosition — restore
+        // the caller's block or subsequent compares become parentless (#32766).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StringCaseCompare::ensureStrcasecmpLinked($context);
-        // __compiler_strcasecmp after LibcExtern always-on drop (#31787).
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        // Match JitMethodExists::existsForRuntimeClassNameLiteralMethod — both sides are
+        // __string__.value GEPs from constantStringFromString / runtime __string__* (#32701).
         $objectType = $context->type->object;
         $i1 = $context->getTypeFromString('int1');
         $acc = $i1->constInt(0, false);
+        $classData = self::stringDataPtr($context, $classNameStr);
         foreach ($objectType->allClassNamesById() as $name) {
-            $lit = $context->builder->load($context->constantStringFromString($name));
-            $cmp = $context->builder->call($context->lookupFunction(StringCaseCompare::ABI_STRCASECMP), $classNameStr, $lit);
+            $lit = $context->builder->load($context->constantStringFromString((string) $name));
+            $cmp = $context->builder->call(
+                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
+                $classData,
+                self::stringDataPtr($context, $lit)
+            );
             $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $context->constantFromInteger(0, 'int32'));
             $check = $objectType->emitInstanceOf($expr, $name);
             $bool = self::nativeBoolValue($context, $check);
@@ -237,6 +254,9 @@ final class InstanceOfHelper
             return;
         }
 
+        // Bridge emission repositions the builder; restore so the caller's trunc/call
+        // stay inside the user function (#32766 parentless __instanceof__valueBoxRhsKind).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         JitVmHelperLink::ensureBridge(
@@ -250,7 +270,11 @@ final class InstanceOfHelper
             self::COMPILED_HELPERS,
             '#10078'
         );
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function callValueBoxRhsKind(Context $context, Value $typeByte): Value
@@ -262,6 +286,17 @@ final class InstanceOfHelper
         return $context->builder->call(
             $fn,
             $context->builder->trunc($typeByte, $i8)
+        );
+    }
+
+    /** `__string__.value` as i8* for `__compiler_strcasecmp` (peer JitMethodExists, #32766). */
+    private static function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+
+        return $context->builder->pointerCast(
+            $context->builder->structGep($strPtr, $map['value']),
+            $context->getTypeFromString('int8*')
         );
     }
 

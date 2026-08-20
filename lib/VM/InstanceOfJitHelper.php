@@ -33,14 +33,18 @@ final class InstanceOfJitHelper
     }
 
     /**
-     * Value-box RHS dispatch: string class name, object class, or invalid (#4339).
+     * Value-box RHS dispatch: string class name, object class, or invalid (#4339, #32766).
+     *
+     * Value boxes may store JIT tags with {@see \PHPCompiler\JIT\Variable::IS_REFCOUNTED}
+     * (TYPE_STRING=0x84, TYPE_OBJECT=0x85). Compare the low 7 bits — peer #32688 / #27108.
      */
     public static function valueBoxRhsKind(int $typeByte): int
     {
-        if (Variable::TYPE_STRING === $typeByte) {
+        $kind = $typeByte & 0x7f;
+        if (Variable::TYPE_STRING === $kind) {
             return self::RHS_KIND_STRING;
         }
-        if (Variable::TYPE_OBJECT === $typeByte) {
+        if (Variable::TYPE_OBJECT === $kind) {
             return self::RHS_KIND_OBJECT;
         }
 
