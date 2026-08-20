@@ -145,6 +145,12 @@ final class JitJsonEncode
             $kind,
             $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
         );
+        // JIT TYPE_NATIVE_DOUBLE (=3) collides with VM TYPE_BOOLEAN — disambiguate before bool (#32326).
+        $isNativeDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
+        );
         $isJitBool = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
@@ -162,6 +168,7 @@ final class JitJsonEncode
         $objCheck = BasicBlockHelper::append($context, 'json_encode_boxed_objchk_'.$id);
         $objBlock = BasicBlockHelper::append($context, 'json_encode_boxed_obj_'.$id);
         $scalarCheck = BasicBlockHelper::append($context, 'json_encode_boxed_scalar_'.$id);
+        $boolScalarCheck = BasicBlockHelper::append($context, 'json_encode_boxed_bool_scalar_'.$id);
         $boolCheck = BasicBlockHelper::append($context, 'json_encode_boxed_bool_'.$id);
         $boolTrueBlock = BasicBlockHelper::append($context, 'json_encode_boxed_bool_true_'.$id);
         $boolFalseBlock = BasicBlockHelper::append($context, 'json_encode_boxed_bool_false_'.$id);
@@ -190,6 +197,9 @@ final class JitJsonEncode
         $context->builder->branchIf($isObj, $objBlock, $scalarCheck);
 
         $context->builder->positionAtEnd($scalarCheck);
+        $context->builder->branchIf($isNativeDouble, $valueBlock, $boolScalarCheck);
+
+        $context->builder->positionAtEnd($boolScalarCheck);
         $context->builder->branchIf($isBool, $boolCheck, $valueBlock);
 
         $context->builder->positionAtEnd($boolCheck);
