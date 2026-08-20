@@ -17,9 +17,11 @@ use PHPLLVM\Value;
 /**
  * LLVM lowering for DOMNode::C14NFile() (#32964).
  *
- * Thin standalone AOT documentElement temps are not in NestedJIT DomRegistry.
- * Prefer compile-time loadXML → host C14N → {@see JitFilePutContents} (peer saveHTMLFile
- * shape). Fall back to DomC14NFileRuntime when markup is not available.
+ * Thin standalone AOT documentElement / createElement temps are not in NestedJIT DomRegistry.
+ * Prefer compile-time folds → host C14N → {@see JitFilePutContents} (peer saveHTMLFile shape):
+ * - loadXML literal + documentElement
+ * - createElement(+setAttribute) materialize (no DomRegistry ObjectEntry)
+ * Fall back to DomC14NFileRuntime when markup is not available.
  *
  * php-src: ext/dom/node.c PHP_METHOD(DOMNode, C14NFile)
  */
@@ -32,7 +34,8 @@ final class JitDomC14NFile
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_c14nfile_cont');
 
-        $folded = self::tryCompileTimeLoadXmlFold($context, ...$args);
+        $folded = self::tryCompileTimeLoadXmlFold($context, ...$args)
+            ?? self::tryCompileTimeCreateElementFold($context, ...$args);
         if (null !== $folded) {
             return $folded;
         }
@@ -68,8 +71,58 @@ final class JitDomC14NFile
             return null;
         }
 
+        return self::emitFilePutContents($context, $args[1], $payload);
+    }
+
+    /**
+     * createElement(+setAttribute) materialize — no DomRegistry; c14nFileArgv stubs -1 (#32964).
+     */
+    private static function tryCompileTimeCreateElementFold(Context $context, JITVariable ...$args): ?Value
+    {
+        $tag = $args[0]->compileTimeDomTagName
+            ?? JitDomHtmlDocumentSaveHtml::lastCreateElementTag();
+        if (null === $tag || '' === $tag) {
+            return null;
+        }
+        $exclusiveArg = $args[2] ?? null;
+        if (null !== $exclusiveArg && null === $exclusiveArg->compileTimeLong) {
+            // Runtime exclusive — do not guess.
+            return null;
+        }
+        $exclusive = self::compileTimeExclusiveFlag($exclusiveArg);
+        if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {
+            return null;
+        }
+        $doc = new \DOMDocument();
+        $el = @$doc->createElement($tag);
+        if (false === $el) {
+            return null;
+        }
+        foreach (DomUserScriptAttributeCacheLlvm::literalKeys($context) as [$ns, $local]) {
+            $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local);
+            if (null === $value || '' === $local) {
+                continue;
+            }
+            if ('' === $ns) {
+                @$el->setAttribute($local, $value);
+            } else {
+                @$el->setAttributeNS($ns, $local, $value);
+            }
+        }
+        // Host libxml C14N returns "" until the element is in a document (php-src / libxml).
+        @$doc->appendChild($el);
+        $payload = @$el->C14N($exclusive, false);
+        if (!\is_string($payload) || '' === $payload) {
+            return null;
+        }
+
+        return self::emitFilePutContents($context, $args[1], $payload);
+    }
+
+    private static function emitFilePutContents(Context $context, JITVariable $uriArg, string $payload): Value
+    {
         StringFilePutContents::ensureStandaloneBodies($context);
-        $path = self::loadStringArg($context, $args[1]);
+        $path = self::loadStringArg($context, $uriArg);
         $data = $context->builder->load($context->constantStringFromString($payload));
         $flags = $context->context->int64Type()->constInt(0, false);
 

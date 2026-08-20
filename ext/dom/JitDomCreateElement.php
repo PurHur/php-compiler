@@ -58,6 +58,8 @@ final class JitDomCreateElement
                     // Runtime $value — helper applies xmlEncode + text child (document.c).
                     return self::invokeViaHelper($context, ...$args);
                 }
+                // Seed C14NFile / saveHtml createElement folds (#32964 typed receiver).
+                JitDomHtmlDocumentSaveHtml::rememberCreateElementTag($nameLit);
                 $obj = self::materializeElementWithTextContent($context, $nameLit, $valueLit);
                 self::storeOwnerAndNullParent($context, $obj, $args[0]);
 
