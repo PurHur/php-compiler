@@ -54,6 +54,7 @@ final class JitDomChildNodeSiblingInsert
         $nextNull = $context->builder->icmp(Builder::INT_EQ, $next, $objPtrTy->constNull());
         $bbAppend = BasicBlockHelper::append($context, 'dom_cn_after_append');
         $bbInsert = BasicBlockHelper::append($context, 'dom_cn_after_insert');
+        $bbDone = BasicBlockHelper::append($context, 'dom_cn_after_done');
         $context->builder->branchIf($nextNull, $bbAppend, $bbInsert);
 
         $context->builder->positionAtEnd($bbInsert);
@@ -65,10 +66,16 @@ final class JitDomChildNodeSiblingInsert
             $nextJit
         );
         DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+        // Must terminate bbInsert — previously fell through by repositioning only,
+        // so subsequent user-script IR was unreachable (#32817).
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbAppend);
         self::insertAfterLast($context, $parent, $newChild, $anchor);
         DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function insertAfterLast(
