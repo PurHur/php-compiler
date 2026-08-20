@@ -760,6 +760,36 @@ final class JitOpensslX509
     }
 
     /**
+     * openssl_spki_export_challenge() — bake {@see VmOpensslSpkiNative::spkiExportChallenge}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_spki_export_challenge) /
+     * NETSCAPE_SPKI_get_challenge
+     * SPKAC argument is the base64 payload (with or without {@code SPKAC=} prefix); VM
+     * {@see VmOpenssl::spkiExportChallenge} normalizes via {@see VmOpensslSpkiNative::spkiCleanup}.
+     */
+    public static function spkiExportChallenge(Context $context, JITVariable $spkac): Value
+    {
+        $lit = JitStringArg::compileTimeLiteral($spkac);
+        if (null === $lit) {
+            throw new \LogicException(
+                'openssl_spki_export_challenge() spkac must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32792)'
+            );
+        }
+
+        if (!VmOpensslSpkiNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $challenge = VmOpensslSpkiNative::spkiExportChallenge($lit);
+        if (false === $challenge) {
+            return self::boxedFalse($context);
+        }
+
+        return self::boxedString($context, $challenge);
+    }
+
+    /**
      * openssl_x509_fingerprint() — bake {@see VmOpensslX509Native::fingerprintCertificatePem}.
      *
      * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest

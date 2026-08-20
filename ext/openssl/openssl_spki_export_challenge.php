@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_spki_export_challenge() — challenge from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423).
+ * openssl_spki_export_challenge() — challenge from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423 VM, JIT/AOT #32792).
  */
 final class openssl_spki_export_challenge extends Internal
 {
@@ -45,8 +45,12 @@ final class openssl_spki_export_challenge extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_spki_export_challenge() is not implemented for JIT in this compiler build (issue #6423)'
-        );
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'openssl_spki_export_challenge() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::spkiExportChallenge($context, $args[0]);
     }
 }
