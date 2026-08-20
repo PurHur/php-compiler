@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_csr_get_subject() — DN from CSR (php-src ext/openssl/xp.c; #6421).
+ * openssl_csr_get_subject() — DN from CSR (php-src ext/openssl/xp.c; #6421 VM, JIT/AOT #32692).
  */
 final class openssl_csr_get_subject extends Internal
 {
@@ -54,8 +54,13 @@ final class openssl_csr_get_subject extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_csr_get_subject() is not implemented for JIT in this compiler build (issue #6421)'
-        );
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                'openssl_csr_get_subject() expects 1 or 2 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::csrGetSubject($context, $args[0], $args[1] ?? null);
     }
 }
