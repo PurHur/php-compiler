@@ -7,9 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -17,9 +20,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * get_meta_tags() — extract meta name/content pairs from an HTML file (#3703, #4608).
+ * get_meta_tags() — extract meta name/content pairs from an HTML file (#3703, #4608, #33035).
  *
  * Excess/missing argc → Zend ArgumentCountError (#30723; php-src ext/standard/basic_functions.c).
+ * Thin AOT literal paths fold via {@see VmMetaTags} (#33035).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/php_meta_tags.c
  */
@@ -68,10 +72,53 @@ final class get_meta_tags extends Internal
         }
         $argc = \count($args);
 
+        // Thin AOT: NestedJIT string→array for MetaTagsJitHelper segfaults; fold literal paths
+        // via VmMetaTags host parse + HashTable materialize (peer gethostbynamel #24966 / #33035).
+        $pathLit = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
+        $useLit = false;
+        $foldLiteral = null !== $pathLit;
+        if ($argc >= 2) {
+            self::jitBoolArg($context, $args[1], 2, 'use_include_path');
+            if (null !== $args[1]->compileTimeLong) {
+                $useLit = 0 !== $args[1]->compileTimeLong;
+            } else {
+                $foldLiteral = false;
+            }
+        }
+        if ($foldLiteral) {
+            $parsed = VmMetaTags::getMetaTags($pathLit, $useLit);
+            if (false === $parsed) {
+                $slot = JitValueBox::alloc($context);
+                $ptr = JitValueBox::pointer($context, $slot);
+                JitValueBox::writeBool(
+                    $context,
+                    $slot,
+                    $context->getTypeFromString('int1')->constInt(0, false)
+                );
+
+                return $ptr;
+            }
+            $ht = HashTableHelper::alloc($context);
+            $set = $context->lookupFunction('__hashtable__setStringKeyString');
+            foreach ($parsed as $key => $value) {
+                $k = $context->builder->load($context->constantStringFromString((string) $key));
+                $v = $context->builder->load($context->constantStringFromString((string) $value));
+                $context->builder->call($set, $ht, $k, $v);
+            }
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $ptr,
+                $ht
+            );
+
+            return $ptr;
+        }
+
         $path = self::jitStringArg($context, $args[0], 1, 'filename');
         $useIncludePath = $context->constantFromBool(false);
         if ($argc >= 2) {
-            self::jitBoolArg($context, $args[1], 2, 'use_include_path');
             $useIncludePath = JitBoolArg::lower(
                 $context,
                 $args[1],

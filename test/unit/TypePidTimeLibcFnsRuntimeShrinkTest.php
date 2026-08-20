@@ -50,7 +50,7 @@ final class TypePidTimeLibcFnsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         // __compiler_env_local_* always-on shells dropped (#32729); keep unrelated sentinels.
-        $this->assertStringContainsString("registerFunction('__compiler_get_meta_tags'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_get_headers'", $type);
     }
 
     public function testNestedJitConsumersEnsureDroppedLibcBeforeLookup(): void
