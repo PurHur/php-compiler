@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -18,6 +19,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Replaces hex-table / entropy LLVM in this file; SSOT {@see \PHPCompiler\ext\standard\VmSession}.
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ProcessRuntime #21857).
  * php-src: ext/session/session.c — php_session_create_id
+ *
+ * Entropy: `__compiler_random_bytes` (user-script CSPRNG) + NestedJIT `sidFromEntropy`
+ * — NestedJIT `\random_bytes` inside SessionCreateIdJitHelper is still near-constant (#21900 / #33023).
  */
 final class SessionCreateIdRuntime
 {
@@ -28,6 +32,15 @@ final class SessionCreateIdRuntime
     private const CREATE_ID = 'PHPCompiler\\ext\\standard\\SessionCreateIdJitHelper::createIdNullable';
 
     private const CREATE_ID_WITH_PREFIX = 'PHPCompiler\\ext\\standard\\SessionCreateIdJitHelper::createIdWithPrefix';
+
+    /** php-src default session.sid_length (#10864). */
+    private const SID_LENGTH = 26;
+
+    /** php-src default session.sid_bits_per_character (#10864). */
+    private const SID_BITS_PER_CHAR = 5;
+
+    /** php-src bin_to_readable alphabet (64 glyphs; 5-bit uses first 32). */
+    private const BIN_MAP = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,-';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -124,8 +137,112 @@ final class SessionCreateIdRuntime
     {
         $entry = $fn->appendBasicBlock('srid_rand_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, self::RANDOM_ID));
+
+        // User-script `__compiler_random_bytes` is honest CSPRNG; NestedJIT random_bytes /
+        // binToReadable inside SessionCreateIdJitHelper corrupt entropy (#21900 / #33023).
+        StringRandomBytes::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $bytes = $context->builder->call(
+            $context->lookupFunction('__compiler_random_bytes'),
+            $i64->constInt(self::SID_LENGTH, false)
+        );
+        $result = self::emitBinToReadable($context, $fn, $bytes);
         $context->builder->returnValue($result);
+    }
+
+    /**
+     * php-src ext/session/session.c bin_to_readable() — sid_length=26, bits=5 (#10864 / #33023).
+     *
+     * @param Value $bytesStr `__string__*` of CSPRNG bytes (length >= sid_length)
+     * @return Value `__string__*` readable sid
+     */
+    private static function emitBinToReadable(Context $context, LlvmFunction $fn, $bytesStr)
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $strMap = $context->structFieldMap['__string__'];
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $outLen = $i64->constInt(self::SID_LENGTH, false);
+        $bits = $i64->constInt(self::SID_BITS_PER_CHAR, false);
+        $mask = $i64->constInt((1 << self::SID_BITS_PER_CHAR) - 1, false);
+        $eight = $i64->constInt(8, false);
+
+        $mapConst = $context->constantFromString(self::BIN_MAP);
+        $mapPtr = $context->builder->pointerCast($mapConst, $i8p);
+
+        $srcLen = $context->builder->load($context->builder->structGep($bytesStr, $strMap['length']));
+        $srcData = $context->builder->structGep($bytesStr, $strMap['value']);
+        $srcPtr = $context->builder->pointerCast($srcData, $i8p);
+
+        $out = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
+        $outData = $context->builder->structGep($out, $strMap['value']);
+        $outPtr = $context->builder->pointerCast($outData, $i8p);
+        $context->builder->store($outLen, $context->builder->structGep($out, $strMap['length']));
+
+        $pSlot = $context->builder->alloca($i64, 1, 'b2r_p');
+        $wSlot = $context->builder->alloca($i64, 1, 'b2r_w');
+        $haveSlot = $context->builder->alloca($i64, 1, 'b2r_have');
+        $iSlot = $context->builder->alloca($i64, 1, 'b2r_i');
+        $context->builder->store($zero, $pSlot);
+        $context->builder->store($zero, $wSlot);
+        $context->builder->store($zero, $haveSlot);
+        $context->builder->store($zero, $iSlot);
+
+        $loopHead = $fn->appendBasicBlock('b2r_loop_head');
+        $loopBody = $fn->appendBasicBlock('b2r_loop_body');
+        $loopDone = $fn->appendBasicBlock('b2r_loop_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $more = $context->builder->icmp(Builder::INT_SLT, $i, $outLen);
+        $context->builder->branchIf($more, $loopBody, $loopDone);
+
+        $context->builder->positionAtEnd($loopBody);
+        $whileHead = $fn->appendBasicBlock('b2r_while_head');
+        $whileCheckP = $fn->appendBasicBlock('b2r_while_check_p');
+        $whileLoad = $fn->appendBasicBlock('b2r_while_load');
+        $whileEnd = $fn->appendBasicBlock('b2r_while_end');
+        $context->builder->branch($whileHead);
+
+        $context->builder->positionAtEnd($whileHead);
+        $have = $context->builder->load($haveSlot);
+        $needBits = $context->builder->icmp(Builder::INT_SLT, $have, $bits);
+        $context->builder->branchIf($needBits, $whileCheckP, $whileEnd);
+
+        $context->builder->positionAtEnd($whileCheckP);
+        $p = $context->builder->load($pSlot);
+        $pOk = $context->builder->icmp(Builder::INT_SLT, $p, $srcLen);
+        $context->builder->branchIf($pOk, $whileLoad, $whileEnd);
+
+        $context->builder->positionAtEnd($whileLoad);
+        $bytePtr = $context->builder->inBoundsGep($srcPtr, $p);
+        $byte = $context->builder->load($bytePtr);
+        $byteZ = $context->builder->zExt($byte, $i64);
+        $w = $context->builder->load($wSlot);
+        $shifted = $context->builder->shl($byteZ, $have);
+        $context->builder->store($context->builder->or($w, $shifted), $wSlot);
+        $context->builder->store($context->builder->add($p, $one), $pSlot);
+        $context->builder->store($context->builder->add($have, $eight), $haveSlot);
+        $context->builder->branch($whileHead);
+
+        $context->builder->positionAtEnd($whileEnd);
+        $w2 = $context->builder->load($wSlot);
+        $idx = $context->builder->and($w2, $mask);
+        $mapCharPtr = $context->builder->inBoundsGep($mapPtr, $idx);
+        $mapChar = $context->builder->load($mapCharPtr);
+        $outCharPtr = $context->builder->inBoundsGep($outPtr, $i);
+        $context->builder->store($mapChar, $outCharPtr);
+        $context->builder->store($context->builder->lShr($w2, $bits), $wSlot);
+        $have2 = $context->builder->load($haveSlot);
+        $context->builder->store($context->builder->sub($have2, $bits), $haveSlot);
+        $context->builder->store($context->builder->add($i, $one), $iSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+
+        return $out;
     }
 
     private static function implementCreateIdApply(Context $context, LlvmFunction $fn): void
@@ -146,13 +263,8 @@ final class SessionCreateIdRuntime
         $context->builder->branchIf($isNull, $bbNull, $bbPrefix);
 
         $context->builder->positionAtEnd($bbNull);
-        $nullResultRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::RANDOM_ID),
-            []
-        );
-        $nullResult = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $nullResultRaw);
-        self::writeNullableStringResult($context, $fn, $outPtr, $nullResult, $nullResultRaw);
+        $nullResult = $context->builder->call($context->lookupFunction('phpc_session_random_id_string'));
+        self::writeNullableStringResult($context, $fn, $outPtr, $nullResult);
 
         $context->builder->positionAtEnd($bbPrefix);
         $len = $context->builder->call(
@@ -166,22 +278,14 @@ final class SessionCreateIdRuntime
         $context->builder->branchIf($isEmpty, $bbEmpty, $bbNonEmpty);
 
         $context->builder->positionAtEnd($bbEmpty);
-        $emptyResultRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::RANDOM_ID),
-            []
-        );
-        $emptyResult = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $emptyResultRaw);
-        self::writeNullableStringResult($context, $fn, $outPtr, $emptyResult, $emptyResultRaw);
+        $emptyResult = $context->builder->call($context->lookupFunction('phpc_session_random_id_string'));
+        self::writeNullableStringResult($context, $fn, $outPtr, $emptyResult);
 
         $context->builder->positionAtEnd($bbNonEmpty);
-        $resultRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::CREATE_ID_WITH_PREFIX),
-            [$prefix]
-        );
-        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
-        self::writeNullableStringResult($context, $fn, $outPtr, $result, $resultRaw);
+        // Prefix + CSPRNG sid in LLVM — avoid NestedJIT createIdWithPrefix → random_bytes (#33023).
+        $randSid = $context->builder->call($context->lookupFunction('phpc_session_random_id_string'));
+        $result = JitStringConcat::concat($context, $prefix, $randSid);
+        self::writeNullableStringResult($context, $fn, $outPtr, $result);
     }
 
     private static function implementCreateIdApplyBoxed(Context $context, LlvmFunction $fn): void
