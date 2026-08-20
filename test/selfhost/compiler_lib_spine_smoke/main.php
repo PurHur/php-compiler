@@ -3425,6 +3425,7 @@ require_once __DIR__.'/../../../ext/standard/UrlencodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UsortJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Utf8EndecDeprecation.php';
 require_once __DIR__.'/../../../ext/standard/Utf8JitHelper.php';
+require_once __DIR__.'/../../../ext/standard/VmUtf8Latin1.php';
 require_once __DIR__.'/../../../ext/standard/Utf8Latin1JitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ValueSortJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VarDumpJitHelper.php';

@@ -164,6 +164,11 @@ final class HelperRuntimeCache
         // VmConvertUu (strlen/substr/ord/chr) into the user module (peer #30790).
         'phpcompiler\\ext\\standard\\convertuujithelper::encode' => true,
         'phpcompiler\\ext\\standard\\convertuujithelper::decodeargv' => true,
+        // #32879 — prelinked Utf8Latin1JitHelper unit.o SIGSEGVs under thin AOT when the
+        // encode/decode return is used (echo/strlen); void discard OK. NestedJIT into the
+        // user module (peer #30811 ConvertUu / #30790 Soundex).
+        'phpcompiler\\ext\\standard\\utf8latin1jithelper::encode' => true,
+        'phpcompiler\\ext\\standard\\utf8latin1jithelper::decodeargv' => true,
         // #30812 — prelinked WordwrapJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // VmWordwrap (strlen/substr) into the user module (peer #30790 / #30811).
         'phpcompiler\\ext\\standard\\wordwrapjithelper::wordwrapargv' => true,
