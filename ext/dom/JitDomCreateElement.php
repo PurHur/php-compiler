@@ -213,6 +213,9 @@ final class JitDomCreateElement
         $nameStr = $context->builder->load($context->constantStringFromString($nameLit));
         self::storeStringProperty($context, $obj, $className, self::PROP_NODE_NAME, $nameStr);
         self::storeStringProperty($context, $obj, $className, self::PROP_TAG_NAME, $nameStr);
+        // Non-NS elements: localName === tagName (php-src dom_node_local_name_read; #33014).
+        // Must be in allocate() layout — late defineProperty aliases INNER_XML (#33014).
+        self::storeStringProperty($context, $obj, $className, VmDom::PROP_LOCAL_NAME, $nameStr);
         self::storeNullProperty($context, $obj, $className, self::PROP_ATTRIBUTES);
         // Always seed textContent/nodeValue — defineProperty alone leaves a null
         // __string__* and pure-user-script fetches segfault (#25475 / re-#23251).
@@ -440,6 +443,7 @@ final class JitDomCreateElement
         $objectType->markObjectConstructed($obj);
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_NODE_NAME, $nameStr);
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_TAG_NAME, $nameStr);
+        self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, VmDom::PROP_LOCAL_NAME, $nameStr);
         self::storeNullProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_ATTRIBUTES);
 
         return $obj;
@@ -470,6 +474,8 @@ final class JitDomCreateElement
             // initTextContentSlot / saveXML / getElementById helpers (#25475).
             VmDom::PROP_TEXT_CONTENT => JITVariable::TYPE_STRING,
             'nodeValue' => JITVariable::TYPE_STRING,
+            // localName before INNER_XML — late define aliases INNER_XML on fetch (#33014).
+            VmDom::PROP_LOCAL_NAME => JITVariable::TYPE_STRING,
             // ParentNode append/prepend → saveXML child markup (#26765).
             VmDom::PROP_USER_SCRIPT_INNER_XML => JITVariable::TYPE_STRING,
             // createElementNS nsDef on node-scoped saveXML (#32302).

@@ -527,11 +527,34 @@ final class DomParseSimpleXmlJitHelper
         $inner = false === $close
             ? substr($xml, $afterRoot)
             : substr($xml, $afterRoot, $close - $afterRoot);
+
+        return self::textContentFromInnerXmlArgv($inner);
+    }
+
+    /**
+     * Strip markup tags from element inner XML — Zend textContent for thin AOT (#33014).
+     */
+    public static function textContentFromInnerXmlArgv(string $inner): string
+    {
         if ('' === $inner) {
             return '';
         }
 
         return preg_replace('/<[^>]*>/', '', $inner) ?? '';
+    }
+
+    /**
+     * Open-tag attribute suffix (leading space) for saveXML xmlns/attr slot (#33014).
+     *
+     * Peer {@see parseElementMarkupArgv} {@code attrs} field.
+     */
+    public static function attrSuffixFromOpenTagArgv(string $openTag): string
+    {
+        if (!preg_match('/^<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $openTag, $root)) {
+            return '';
+        }
+
+        return rtrim($root[2] ?? '', " \t/");
     }
 
     /** First element child tag under the document element (#19268). */

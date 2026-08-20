@@ -119,7 +119,8 @@ final class JitDomDocumentElement
             $child = match ($node['kind']) {
                 'comment' => JitDomCreateComment::materialize($context, $node['data']),
                 'text' => JitDomCreateTextNode::materialize($context, $node['data']),
-                default => JitDomCreateElement::materializeElementFromLiteral($context, $node['data']),
+                // Seed textContent/INNER_XML/attrs like documentElement (#33014 / peer #25475).
+                default => self::materializeElementChild($context, $node),
             };
             $segment = DomParseSimpleXmlJitHelper::nodePathSegmentArgv($children, $idx);
             if ('element' === $node['kind'] && null !== $segment && '' !== $segment) {
@@ -127,7 +128,11 @@ final class JitDomDocumentElement
                 JitDomGetNodePath::storeOn($context, $child, self::CLASS_ELEMENT, $childPath);
                 $inner = $node['inner'] ?? '';
                 if ('' !== $inner) {
-                    $outer = '<'.$node['data'].'>'.$inner.'</'.$node['data'].'>';
+                    $openAttrs = '';
+                    if (isset($node['open']) && \is_string($node['open'])) {
+                        $openAttrs = DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($node['open']);
+                    }
+                    $outer = '<'.$node['data'].$openAttrs.'>'.$inner.'</'.$node['data'].'>';
                     self::syncChildrenFromXml($context, $child, $outer, $childPath);
                 }
             }
@@ -188,6 +193,34 @@ final class JitDomDocumentElement
             self::storeFirstLast($context, $element, $first, $last);
         }
         self::storeChildNodesLength($context, $element, \count($children), $first, $second);
+    }
+
+    /**
+     * Materialize a loadXML element child with textContent / INNER_XML / attr suffix (#33014).
+     *
+     * {@see materializeElementFromLiteral} alone left hollow firstChild slots so
+     * textContent/saveXML/getElementById diverged from Zend after setIdAttribute.
+     *
+     * @param array{kind: string, data: string, inner?: string, open?: string} $node
+     */
+    private static function materializeElementChild(
+        \PHPCompiler\JIT\Context $context,
+        array $node
+    ): Value {
+        $tag = $node['data'];
+        $inner = $node['inner'] ?? '';
+        $text = DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner);
+        $child = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        JitDomCreateElement::storeUserScriptInnerXml($context, $child, $inner);
+        if (isset($node['open']) && \is_string($node['open'])) {
+            JitDomCreateElement::storeUserScriptXmlnsAttr(
+                $context,
+                $child,
+                DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($node['open'])
+            );
+        }
+
+        return $child;
     }
 
     /**

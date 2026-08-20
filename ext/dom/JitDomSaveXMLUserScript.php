@@ -164,13 +164,16 @@ final class JitDomSaveXMLUserScript
             return self::serializeUserScriptNode($context, $objectType, $node, $elementClassId);
         }
 
+        // Node-scoped saveXML: always dump from element slots (#33014).
+        // useXmlLitTag + rootTagArgv reused the document-element open tag for
+        // firstChild / getElementById temps (wrong tag / dropped child attrs).
         return self::serializeElementNode(
             $context,
             $objectType,
             $node,
             $elementClassId,
-            true,
-            (string) $xmlLit
+            false,
+            null
         );
     }
 
