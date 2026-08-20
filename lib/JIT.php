@@ -9080,8 +9080,8 @@ class JIT {
                         break;
                     }
                     // VALUE box + CFG string: do not ensureHashtablePointer (#32764 / #22646 write).
-                    // String/object dims are array keys — never string-byte offsets (#32798;
-                    // function-static arrays are often CFG-typed string while the box holds a HT).
+                    // CFG often types function-static arrays as string while the box holds a HT
+                    // (#32800) — defer string-vs-HT to assign-time runtime tag dispatch.
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
@@ -9089,7 +9089,7 @@ class JIT {
                         && Variable::TYPE_STRING !== $dim->type
                         && Variable::TYPE_OBJECT !== $dim->type
                     ) {
-                        JIT\ValueBoxDimWrite::fetchStringOffsetWriteLvalue(
+                        JIT\ValueBoxDimWrite::fetchMaybeStringOrHtWriteLvalue(
                             $this->context,
                             $value,
                             $dim,
@@ -9639,9 +9639,13 @@ class JIT {
                         }
                         // In-place `$a[i].= …`: dest is CFG-dead (echo re-fetches) but must still
                         // commit into the FETCH_DIM_W hashtable (#32798 / ZEND_ASSIGN_DIM_OP).
+                        // Also covers CFG-string VALUE boxes that may hold a HT (#32800).
                         if (
                             (int) $op->arg1 === (int) $op->arg2
-                            && null !== $left->writableHt
+                            && (
+                                null !== $left->writableHt
+                                || null !== $left->writableRuntimeStringOrHtContainer
+                            )
                         ) {
                             JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $left);
                             $newVal = $this->compileConcatIntoNewString(
@@ -9763,7 +9767,10 @@ class JIT {
                     if (null !== $result->objectPropertySlot) {
                         $this->compileObjectPropertyConcatOp($result, $left, $right);
                     } elseif (
-                        null !== $result->writableHt
+                        (
+                            null !== $result->writableHt
+                            || null !== $result->writableRuntimeStringOrHtContainer
+                        )
                         && (
                             Variable::TYPE_VALUE === $result->type
                             || JIT\JitValueBox::isValueOperand($result)
@@ -9775,7 +9782,8 @@ class JIT {
                             $block->getOperand($op->arg2),
                             $block->getOperand($op->arg3)
                         );
-                        // assignOperand commits into the HT (setAtIndex / setAtStringKey).
+                        // assignOperand commits into the HT (setAtIndex / setAtStringKey)
+                        // or runtime string/HT tag (#32800).
                         $this->assignOperand($destOp, $newVal, true);
                         if (null !== ($newVal->compileTimeString ?? null)) {
                             $result = $this->context->getVariableFromOp($destOp);
@@ -17665,6 +17673,15 @@ class JIT {
                 $value
             );
             $this->syncDimWriteOrphanValueBox($result, $value);
+
+            return;
+        }
+        if (
+            null !== $result->writableRuntimeStringOrHtContainer
+            && null !== $result->writableRuntimeStringOrHtDim
+        ) {
+            // CFG-string VALUE box may hold HT (function-static string[], #32800).
+            JIT\ValueBoxDimWrite::assignByRuntimeTag($this->context, $result, $value);
 
             return;
         }

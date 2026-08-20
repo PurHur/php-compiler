@@ -2086,6 +2086,14 @@ final class HashTableWriteLlvm
      */
     public static function hydrateDimWriteLvalue(Context $context, Variable $lvalue): void
     {
+        if (
+            null !== $lvalue->writableRuntimeStringOrHtContainer
+            && null !== $lvalue->writableRuntimeStringOrHtDim
+        ) {
+            ValueBoxDimWrite::hydrateMaybeStringOrHtLvalue($context, $lvalue);
+
+            return;
+        }
         if (null === $lvalue->writableHt) {
             return;
         }

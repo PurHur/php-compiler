@@ -86,6 +86,16 @@ final class Variable {
     /** Boxed foreach / SplObjectStorage offset key for $arr[$key] = … (issue #86). */
     public ?Variable $writableValueBoxKey = null;
 
+    /**
+     * VALUE-box dim write when CFG types the container as string but the box may hold a
+     * hashtable (function-static `string[]` mis-typed as string, #32800). Assign-time
+     * runtime tag dispatch via {@see ValueBoxDimWrite::assignByRuntimeTag}.
+     */
+    public ?Variable $writableRuntimeStringOrHtContainer = null;
+
+    /** @see $writableRuntimeStringOrHtContainer */
+    public ?Variable $writableRuntimeStringOrHtDim = null;
+
     /** Writable ArrayAccess $obj[$key] assignment target (#3331, #4012). */
     public ?Variable $writableArrayAccessReceiver = null;
 
@@ -1306,8 +1316,10 @@ final class Variable {
      * Load a packed-list index as size_t. Literal long dims are stored to a stack slot
      * first so later LLVM blocks still see a stable index (#AOT array_fill reads).
      * Float dims on write emit Zend precision-loss E_DEPRECATED (#19730).
+     *
+     * Public for {@see ValueBoxDimWrite::assignByRuntimeTag} (#32800).
      */
-    private static function materializePackedIndex(
+    public static function materializePackedIndex(
         Context $context,
         self $dim,
         bool $forWrite = false,
