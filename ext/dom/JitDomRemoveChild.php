@@ -62,6 +62,9 @@ final class JitDomRemoveChild
     /**
      * Drop the removed child's tag from PROP_USER_SCRIPT_INNER_XML when the
      * loadXML seed is still pure user-script (saveXML sibling fidelity).
+     *
+     * item($N) ARG_SEND temps often drop compileTimeDomChildIndex — mirror
+     * {@see JitDomReplaceChild} lastFetched* fallbacks (#32903 / #32942).
      */
     private static function syncUserScriptInnerXmlAfterRemove(
         Context $context,
@@ -72,20 +75,29 @@ final class JitDomRemoveChild
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
-        $index = $childVar->compileTimeDomChildIndex ?? null;
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $index = $childVar->compileTimeDomChildIndex
+            ?? JitDomNodeListItem::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? null;
         if (null === $index) {
-            $oldTag = $childVar->compileTimeDomTagName ?? null;
+            $oldTag = $childVar->compileTimeDomTagName
+                ?? JitDomNodeListItem::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$lastFetchedTagName
+                ?? null;
             if (null !== $oldTag) {
-                $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
                 foreach ($nodes as $i => $node) {
                     if ('element' === $node['kind'] && strtolower($oldTag) === $node['data']) {
                         $index = $i;
                         break;
                     }
                 }
+            } elseif (1 === \count($nodes)) {
+                $index = 0;
             }
         }
         if (null === $index) {
+            // Multi-child without proven index: leave seeded INNER_XML (do not collapse).
             return;
         }
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, '');
