@@ -11,6 +11,7 @@ use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomGetNodePath;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomNodeChildProperty;
+use PHPCompiler\ext\dom\JitDomRemoveChild;
 use PHPCompiler\ext\dom\JitDomReplaceChild;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -48,9 +49,12 @@ final class DomNodeChildNodeMutationRuntime
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_remove');
             $parent = self::loadParentObject($context, $receiver);
-            // Only-child / full-replace: clear parent inner markup for saveXML (#26752).
-            JitDomCreateElement::storeUserScriptInnerXml($context, $parent, '');
-            self::syncChildNodesLengthSlot($context, $parent, 0);
+            $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
+            // ChildNode::remove ≡ parent->removeChild($this): LiveSlots unlink +
+            // in-place childNodes length so held lists stay live (#32823 / re-#32774).
+            // Prior path allocated a fresh length-0 list and blanked InnerXml.
+            JitDomRemoveChild::invoke($context, $parentVar, $receiver);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_remove_post');
 
             return self::nullValuePtr($context);
         }
@@ -280,38 +284,6 @@ final class DomNodeChildNodeMutationRuntime
         $phi->addIncoming($parentObj, $readBlock);
 
         return $phi;
-    }
-
-    private static function syncChildNodesLengthSlot(Context $context, Value $parent, int $length): void
-    {
-        $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
-        $listClassId = $objectType->lookup('DOMNodeList');
-        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
-            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, Variable::TYPE_VALUE);
-        }
-        if (!$objectType->hasProperty($listClassId, 'length')) {
-            $objectType->defineProperty($listClassId, 'length', Variable::TYPE_NATIVE_LONG);
-        }
-        $list = $objectType->allocate($listClassId);
-        $objectType->markObjectConstructed($list);
-        $lengthVar = new Variable(
-            $context,
-            Variable::TYPE_NATIVE_LONG,
-            Variable::KIND_VALUE,
-            $context->getTypeFromString('int64')->constInt($length, false)
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', 'length'),
-            $lengthVar,
-            Variable::TYPE_NATIVE_LONG
-        );
-        $listJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $list);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_NODES),
-            $listJit,
-            Variable::TYPE_VALUE
-        );
     }
 
     private static function receiverObject(Context $context, Variable $receiver): Value
