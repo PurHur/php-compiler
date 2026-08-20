@@ -69,14 +69,41 @@ final class JitDomImportNode
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_get_attr_cont');
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            // Fallback only: DomElementGetAttribute prefers live Attr / valueByKey first.
+            // Never return a hardcoded HTML id for an unrelated attribute name (#32956).
             $nameLit = null;
             if (JITVariable::TYPE_STRING === $args[1]->type) {
-                // Prefer compile-time id for importAttribute parity.
+                $nameLit = $args[1]->compileTimeString
+                    ?? \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($args[1]);
             }
-            $parsed = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
-                ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-            $idLit = $parsed['id'] ?? 'target';
-            $str = $context->builder->load($context->constantStringFromString($idLit));
+            $valueLit = '';
+            if (null !== $nameLit) {
+                $cached = DomUserScriptAttributeCacheLlvm::literalValue('', $nameLit);
+                if (null !== $cached) {
+                    $valueLit = $cached;
+                } else {
+                    $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+                    if (null !== $xml) {
+                        foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
+                            $qname = $pair['qname'];
+                            $pos = strpos($qname, ':');
+                            $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                            if ($nameLit === $qname || $nameLit === $local) {
+                                $valueLit = $pair['value'];
+                                break;
+                            }
+                        }
+                    } else {
+                        $parsed = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
+                            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+                        // Only the id attribute itself may use the HTML id stub (#19212).
+                        if (null !== $parsed && ('id' === $nameLit)) {
+                            $valueLit = $parsed['id'] ?? 'target';
+                        }
+                    }
+                }
+            }
+            $str = $context->builder->load($context->constantStringFromString($valueLit));
             $slot = JitValueBox::alloc($context);
             $ptr = JitValueBox::pointer($context, $slot);
             $context->builder->call(
