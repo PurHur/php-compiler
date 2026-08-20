@@ -103,6 +103,8 @@ final class JitDomDocumentElement
             // Empty elements still need a live NodeList — skipping left
             // DOMNode::$childNodes unset and ->length SIGSEGVd on AOT.
             self::storeChildNodesLength($context, $element, 0);
+            // Shallow cloneNode / empty markup must read firstChild as null (#32949).
+            self::clearFirstLast($context, $element);
 
             return;
         }
@@ -284,9 +286,13 @@ final class JitDomDocumentElement
         $nodeClassId = $objectType->lookup('DOMNode');
         $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
         // Parent edges stay on DOMNode (property fetch / LiveSlots loadChildEdge).
+        // DOMElement also declares first/last — createElement layout (#27476 / #28672).
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
                 $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
         // Sibling + parentNode on DOMElement — createElement / LiveSlots layout (#27476, #28672).
@@ -339,6 +345,32 @@ final class JitDomDocumentElement
                 $objectType->propertySlotFor($element, 'DOMElement', $prop),
                 $jit,
                 JITVariable::TYPE_VALUE
+            );
+        }
+    }
+
+    /** Null firstChild/lastChild for empty / shallow-clone elements (#32949). */
+    private static function clearFirstLast(
+        \PHPCompiler\JIT\Context $context,
+        Value $element
+    ): void {
+        self::ensureLinkProps($context);
+        $objectType = $context->type->object;
+        // Boxed null (not raw object nullptr) so === null / fetch match Zend (#32949).
+        $nullSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+        $nullPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $nullJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $nullSlot
+        );
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($element, self::CLASS_ELEMENT, $prop),
+                $nullJit,
+                JITVariable::TYPE_NULL
             );
         }
     }

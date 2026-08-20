@@ -18,7 +18,11 @@ use PHPLLVM\Value;
  * SSOT — NestedJIT DomRegistry clone would SIGSEGV on the returned object like
  * importNode before the user-script materialize path (#19212).
  *
- * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355)
+ * Materialize stores InnerXml for saveXML (#32355) and seeds LiveSlots via
+ * {@see JitDomDocumentElement::syncChildrenFromXmlPublic} so firstChild walks
+ * on the clone do not SIGSEGV (#32949).
+ *
+ * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949)
  */
 final class JitDomCloneNode
 {
@@ -65,14 +69,30 @@ final class JitDomCloneNode
             return null;
         }
 
-        $index = $receiver->compileTimeDomChildIndex ?? JitDomNodeChildProperty::$lastFetchedChildIndex;
-        $tagHint = $receiver->compileTimeDomTagName ?? JitDomNodeChildProperty::$lastFetchedTagName;
+        $index = $receiver->compileTimeDomChildIndex;
+        $tagHint = $receiver->compileTimeDomTagName;
+        // firstChild temps often drop Variable metadata — lastFetched* recovers them.
+        // documentElement stamps compileTimeDomNodePath without a child index; do NOT
+        // borrow lastFetchedChildIndex from a prior firstChild walk (#32949).
+        if (null === $index && null === $receiver->compileTimeDomNodePath) {
+            $index = JitDomNodeChildProperty::$lastFetchedChildIndex;
+            $tagHint = $tagHint ?? JitDomNodeChildProperty::$lastFetchedTagName;
+        }
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($inner);
         if (null !== $index && isset($chunks[$index])) {
             return self::specFromMarkup($chunks[$index], $deep);
         }
-        if (null !== $tagHint) {
+        if (null !== $tagHint && null !== $receiver->compileTimeDomChildIndex) {
+            foreach ($chunks as $chunk) {
+                $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunk);
+                if (null !== $parsed && strtolower($parsed['tag']) === strtolower($tagHint)) {
+                    return self::specFromMarkup($chunk, $deep);
+                }
+            }
+        }
+        // Also recover tag-only object temps (no nodePath, no child index on receiver).
+        if (null !== $tagHint && null === $receiver->compileTimeDomNodePath) {
             foreach ($chunks as $chunk) {
                 $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunk);
                 if (null !== $parsed && strtolower($parsed['tag']) === strtolower($tagHint)) {
@@ -162,6 +182,13 @@ final class JitDomCloneNode
         );
         JitDomCreateElement::storeUserScriptInnerXml($context, $obj, $spec['inner']);
         JitDomCreateElement::storeUserScriptXmlnsAttr($context, $obj, $spec['attrs']);
+        // saveXML reads InnerXml (#32355); firstChild/lastChild need LiveSlots like
+        // loadXML documentElement (#19455 / #23251). Without this, deep-clone walks
+        // SIGSEGV on AOT (re-#32355 / #32949).
+        $attrs = $spec['attrs'];
+        $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
+        $outer = '<'.$spec['tag'].$openAttrs.'>'.$spec['inner'].'</'.$spec['tag'].'>';
+        JitDomDocumentElement::syncChildrenFromXmlPublic($context, $obj, $outer);
 
         return $obj;
     }
