@@ -8687,6 +8687,21 @@ class JIT {
                                 }
                             }
                         }
+                        // String defaults often stay CFG-unknown; without TYPE_STRING,
+                        // ValueBoxDimWrite is skipped and ensureHashtablePointer clobbers
+                        // `static $s='abc'; $s[1]='Z'` to Array (#32814).
+                        if (VM\Variable::TYPE_STRING === $staticDefaultVm->type) {
+                            $stringType = Type::string();
+                            $destOp->type = $stringType;
+                            $typedSlot = $block->slotForOperand($destOp);
+                            if (null !== $typedSlot) {
+                                foreach ($block->scopedOperands() as $scopeOp) {
+                                    if ($block->slotForOperand($scopeOp) === $typedSlot) {
+                                        $scopeOp->type = $stringType;
+                                    }
+                                }
+                            }
+                        }
                         JIT\FunctionStaticHelper::emitLazyInit(
                             $this->context,
                             $storageKey,

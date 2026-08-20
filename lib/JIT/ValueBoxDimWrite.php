@@ -76,6 +76,10 @@ final class ValueBoxDimWrite
             $owned
         );
         $charPtr = StringOffsetHelper::dimFetch($context, $owned, $dimLong);
+        // Dim-fetch results on function-statics stay CFG-unknown (#32814); without a
+        // string type, fromValueOp tags the i8* as TYPE_VALUE and assignOperand skips
+        // dimAssign (local `$s[i]` works because php-types already typed the result string).
+        $resultOp->type = \PHPTypes\Type::string();
         $context->makeVariableFromValueOp($charPtr, $resultOp);
     }
 
