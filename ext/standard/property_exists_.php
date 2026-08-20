@@ -6,8 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -62,6 +63,7 @@ final class property_exists_ extends Internal
         }
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             self::emitJitTypeErrorAndAbort($context, \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null'));
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'property_exists_te_cont');
             $i1 = $context->getTypeFromString('int1');
 
             return $i1->constInt(0, false);
@@ -72,6 +74,7 @@ final class property_exists_ extends Internal
             JITVariable::TYPE_VALUE,
         ], true)) {
             self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($args[0]->type));
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'property_exists_te_cont');
             $i1 = $context->getTypeFromString('int1');
 
             return $i1->constInt(0, false);
@@ -113,10 +116,8 @@ final class property_exists_ extends Internal
 
     private static function emitJitTypeErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        // Catchable TypeError via pending path — not libc abort/SIGABRT (#33054 / #27447).
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
     }
 
     private static function jitTypeErrorMessage(int $type): string

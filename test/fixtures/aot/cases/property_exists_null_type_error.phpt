@@ -1,8 +1,12 @@
 --TEST--
-AOT: property_exists() — TypeError for null object_or_class (#4787, ext/standard/class.c)
+AOT: property_exists() — TypeError for null object_or_class is catchable (#33054 / #4787, ext/standard/class.c)
 --FILE--
 <?php
-property_exists(null, 'x');
+try {
+    var_export(property_exists(null, 'x'));
+    echo " NO_THROW\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
 --EXPECT--
---EXPECT_EXIT--
-134
+TypeError:property_exists(): Argument #1 ($object_or_class) must be of type object|string, null given
