@@ -228,8 +228,9 @@ final class JitSessionStorageKernel
         self::emitEnsureSessionDir($context);
         $pathStr = self::emitSessionFilePathString($context, $idLen);
         // LLVM wire encode for string-key scalars — NestedJIT encode sees strlen=0 on
-        // Variable::toString() from HashTable::find (#21900).
-        self::emitSessionWireSaveToPath($context, $session, $pathStr);
+        // Variable::toString() from HashTable::find (#21900 / #33005).
+        [$wirePtr, $wireLen] = self::emitSessionWireBuild($context, $session);
+        self::emitSessionWireWritePath($context, $pathStr, $wirePtr, $wireLen);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
@@ -586,15 +587,53 @@ final class JitSessionStorageKernel
     }
 
     /**
-     * Write php session wire via libc (#21900 / #21922).
+     * Encode $_SESSION to php session wire as {@see __string__*} (#33005 / #21900).
      *
-     * Walks {@see __hashtable__} strKeys; string/int/bool/null values (php-src mod_php.c).
+     * Empty HT → null (Zend 8.2 `session_encode()` returns false on empty active session).
      */
-    private static function emitSessionWireSaveToPath(Context $context, Value $sessionHt, Value $pathStr): void
+    public static function emitEncodeWireString(Context $context, Value $sessionHt): Value
+    {
+        [$wirePtr, $wireLen] = self::emitSessionWireBuild($context, $sessionHt);
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $outSlot = $context->builder->alloca($strPtr);
+        $context->builder->store($strPtr->constNull(), $outSlot);
+
+        $finalLen = $context->builder->load($wireLen);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $finalLen, $i64->constInt(0, false));
+        $bbEmpty = BasicBlockHelper::append($context, 'ss_wire_enc_empty');
+        $bbNonEmpty = BasicBlockHelper::append($context, 'ss_wire_enc_nonempty');
+        $bbJoin = BasicBlockHelper::append($context, 'ss_wire_enc_join');
+        $context->builder->branchIf($isEmpty, $bbEmpty, $bbNonEmpty);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $context->builder->branch($bbJoin);
+
+        $context->builder->positionAtEnd($bbNonEmpty);
+        $encoded = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $finalLen,
+            $wirePtr
+        );
+        $context->builder->store($encoded, $outSlot);
+        $context->builder->branch($bbJoin);
+
+        $context->builder->positionAtEnd($bbJoin);
+
+        return $context->builder->load($outSlot);
+    }
+
+    /**
+     * Build php session wire bytes into a stack buffer (#21900 / #21922 / #33005).
+     *
+     * Leaves the builder at the post-walk block. Returns `[i8* wirePtr, i64* wireLenSlot]`.
+     *
+     * @return array{0: Value, 1: Value}
+     */
+    private static function emitSessionWireBuild(Context $context, Value $sessionHt): array
     {
         LibcExtern::register($context);
-        // Module-local open/close/write after LibcExtern always-on drop (#31817).
-        LibcExtern::ensurePosixFd($context);
+        LibcExtern::ensureSnprintf($context);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -660,8 +699,6 @@ final class JitSessionStorageKernel
             $context->constantFromString('%.*s|s:%lld:"%.*s";'),
             $i8p
         );
-        // snprintf(3) via LibcExtern::ensureSnprintf after always-on drop (#32092).
-        LibcExtern::ensureSnprintf($context);
         $wrote = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $dst,
@@ -779,10 +816,30 @@ final class JitSessionStorageKernel
         $context->builder->branch($bbHead);
 
         $context->builder->positionAtEnd($bbDone);
+
+        return [$wirePtr, $wireLen];
+    }
+
+    /** Write a built wire buffer to the session file path (#21900). */
+    private static function emitSessionWireWritePath(
+        Context $context,
+        Value $pathStr,
+        Value $wirePtr,
+        Value $wireLen
+    ): void {
+        LibcExtern::register($context);
+        LibcExtern::ensurePosixFd($context);
+        LibcExtern::ensureMemcpyDecl($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strMap = $context->structFieldMap['__string__'];
+
         $finalLen = $context->builder->load($wireLen);
-        $pathMap = $strMap;
-        $pathLen = $context->builder->load($context->builder->structGep($pathStr, $pathMap['length']));
-        $pathBytes = $context->builder->structGep($pathStr, $pathMap['value']);
+        $pathLen = $context->builder->load($context->builder->structGep($pathStr, $strMap['length']));
+        $pathBytes = $context->builder->structGep($pathStr, $strMap['value']);
         $pathC = $context->builder->alloca($i8->arrayType(640));
         $pathCPtr = $context->builder->pointerCast(
             $context->builder->inBoundsGEP($pathC, $i32->constInt(0, false), $i64->constInt(0, false)),

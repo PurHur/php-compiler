@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** session_encode/decode JIT routes through SessionEncodeJitHelper PHP not LLVM wire (#9440, #22076). */
+/** session_encode LLVM wire (#33005); decode NestedJIT helper (#9440, #22076). */
 final class SessionEncodeRuntimeShrinkTest extends TestCase
 {
     public function testSessionEncodeRuntimeUsesJitHelperNotLlvmWireLoop(): void
@@ -18,14 +18,14 @@ final class SessionEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SessionEncodeJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('implementEncodeWireBridge', $source);
+        $this->assertStringContainsString('emitEncodeWireString', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('emitEncodeWire', $source);
         $this->assertStringNotContainsString('emitDecodeWire', $source);
         $this->assertStringNotContainsString('__phpc_unser_parse_item', $source);
         $this->assertStringNotContainsString('__compiler_serialize_value', $source);
-        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(370, \substr_count($source, "\n") + 1);
     }
 
     public function testSessionEncodeJitHelperRoundTripMatchesVmSessionSerializer(): void
