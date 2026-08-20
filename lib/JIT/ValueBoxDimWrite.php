@@ -16,6 +16,11 @@ use PHPCfg\Operand;
  * allocates an empty hashtable and {@see __value__writeHashtable} clobbers the string, so
  * `$s='abc'; $s[1]='Z'` becomes `array(1 => 'Z')` under thin AOT.
  *
+ * Script locals use {@see Variable::$functionStaticGlobal}. #32814 routed those to the string
+ * path whenever CFG was not a pure array — unions that include array (untyped static by-value
+ * copy #32830) and unknown CFG with a hashtable in the box (json_decode) then SIGSEGV. Skip the
+ * string path when {@see containerCfgMayBeArray} or {@see Variable::$valueBoxHashtable}.
+ *
  * php-src: Zend/zend_execute.c — zend_assign_to_string_offset / ZEND_ASSIGN_DIM
  */
 final class ValueBoxDimWrite
@@ -93,5 +98,31 @@ final class ValueBoxDimWrite
     public static function containerCfgIsArray(?\PHPTypes\Type $type): bool
     {
         return null !== $type && \PHPTypes\Type::TYPE_ARRAY === $type->type;
+    }
+
+    /**
+     * True when CFG is array or a union/intersection that includes array (#32830).
+     */
+    public static function containerCfgMayBeArray(?\PHPTypes\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if (\PHPTypes\Type::TYPE_ARRAY === $type->type) {
+            return true;
+        }
+        if (
+            \PHPTypes\Type::TYPE_UNION !== $type->type
+            && \PHPTypes\Type::TYPE_INTERSECTION !== $type->type
+        ) {
+            return false;
+        }
+        foreach ($type->subTypes ?? [] as $sub) {
+            if (self::containerCfgMayBeArray($sub)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -9100,7 +9100,9 @@ class JIT {
                     // Array-default function-statics are retyped to TYPE_ARRAY in DECLARE (#32806);
                     // do not skip script-local string dims via functionStaticGlobal (#32804 regression).
                     // String-default function-statics often stay CFG-unknown: take ValueBoxDimWrite
-                    // for functionStaticGlobal unless CFG says array (#32814).
+                    // for functionStaticGlobal unless CFG says / may be array (#32814 / #32830).
+                    // valueBoxHashtable: script global holding a HT (json_decode) must not take the
+                    // string path when CFG is unknown (#32830).
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
@@ -9108,7 +9110,9 @@ class JIT {
                             JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
                             || (
                                 $value->functionStaticGlobal
+                                && !$value->valueBoxHashtable
                                 && !JIT\ValueBoxDimWrite::containerCfgIsArray($containerOp->type ?? null)
+                                && !JIT\ValueBoxDimWrite::containerCfgMayBeArray($containerOp->type ?? null)
                             )
                         )
                         && Variable::TYPE_STRING !== $dim->type
@@ -16631,6 +16635,20 @@ class JIT {
             $value
         );
         JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
+        // Keep HT provenance on the script-global box so FETCH_DIM_W skips string path (#32830).
+        if (Variable::TYPE_HASHTABLE === $value->type || $value->valueBoxHashtable) {
+            $globalVar->valueBoxHashtable = true;
+        } elseif (
+            Variable::TYPE_STRING === $value->type
+            || Variable::TYPE_NATIVE_LONG === $value->type
+            || Variable::TYPE_NATIVE_DOUBLE === $value->type
+            || Variable::TYPE_NATIVE_BOOL === $value->type
+            || Variable::TYPE_NULL === $value->type
+        ) {
+            $globalVar->valueBoxHashtable = false;
+        } elseif (Variable::TYPE_VALUE === $value->type) {
+            $globalVar->valueBoxHashtable = $value->valueBoxHashtable;
+        }
         $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
         $this->syncCompileTimeString($globalVar, $value, false);
         $this->syncCompileTimeBcmathNumber($globalVar, $value, false);
@@ -17642,6 +17660,22 @@ class JIT {
                 JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
                 $value
             );
+            // Script globals stay TYPE_VALUE; remember HT contents so FETCH_DIM_W does not
+            // take the string-offset path (#32830; json_decode / static array by-value copy).
+            if (Variable::TYPE_HASHTABLE === $value->type || $value->valueBoxHashtable) {
+                $result->valueBoxHashtable = true;
+            } elseif (
+                Variable::TYPE_STRING === $value->type
+                || Variable::TYPE_NATIVE_LONG === $value->type
+                || Variable::TYPE_NATIVE_DOUBLE === $value->type
+                || Variable::TYPE_NATIVE_BOOL === $value->type
+                || Variable::TYPE_NULL === $value->type
+            ) {
+                $result->valueBoxHashtable = false;
+            } elseif (Variable::TYPE_VALUE === $value->type) {
+                // copyBoxedStaticForRead / other VALUE temps may already carry the flag (#32830).
+                $result->valueBoxHashtable = $value->valueBoxHashtable;
+            }
             $this->invalidateScriptGlobalCompileTimeMetadata($result);
             $this->syncCompileTimeBcmathNumber($result, $value, false);
             $this->syncCompileTimeDomTagName($result, $value, false);
