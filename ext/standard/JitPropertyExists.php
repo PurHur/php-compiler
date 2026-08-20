@@ -77,20 +77,22 @@ final class JitPropertyExists
             $context->builder->structGep($valuePtr, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // Value-box tags may include IS_REFCOUNTED; compare the low 7 bits (#32688 / #27108).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
 
         $nullBlock = BasicBlockHelper::append($context, 'prop_exists_null');
@@ -277,6 +279,9 @@ final class JitPropertyExists
     ): Value {
         if (null !== $propLiteral) {
             // ARRAY_AS_PROPS flags are runtime — fold only via PHP helper (#31039).
+            // Dynamic props (stdClass / AllowDynamicProperties) stay on the LLVM table: NestedJIT
+            // ObjectEntry.properties is empty for AOT-native objects (#32688), while defineProperty
+            // during `$o->x = …` updates the compile-time prop table that propertyExistsFromScope reads.
             $isSplArray = self::isSplArrayStorageClassId($context, $classId);
             $splBlock = BasicBlockHelper::append($context, 'prop_exists_spl_array');
             $normBlock = BasicBlockHelper::append($context, 'prop_exists_not_spl_array');
