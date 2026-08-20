@@ -13,11 +13,14 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::C14N() (#19467, #22378, #32961).
+ * LLVM lowering for DOMNode::C14N() (#19467, #22378, #32961, #32962).
  *
  * Thin standalone AOT documentElement temps lose DomRegistry identity — the live
- * helper returns an empty/wrong box and echo prints "Object". When loadXML stamped
- * compileTimeDomNodePath (peer getNodePath #32474), fold C14N via host DOMDocument.
+ * helper returned a Variable object box and echo printed "Object". Fold pure loadXML
+ * C14N via host DOMDocument (peer getNodePath #32474):
+ * - annotated compileTimeDomNodePath (#32961)
+ * - DOMDocument receiver / documentElement without path (#32962)
+ * Relative-NS failure stays Zend `false` via boxBoolFalse / ?string null bridge.
  */
 final class JitDomC14N
 {
@@ -37,15 +40,24 @@ final class JitDomC14N
             throw new \LogicException('DOMNode::C14N() expects receiver');
         }
 
-        $folded = self::tryCompileTimeFold($args[0], $args[1] ?? null);
+        $exclusiveArg = $args[1] ?? null;
+        if (self::exclusivePreventsFold($exclusiveArg)) {
+            $folded = null;
+        } else {
+            $folded = self::tryFoldCompileTime($args[0]);
+        }
         if (null !== $folded) {
+            if (false === $folded) {
+                return self::boxBoolFalse($context);
+            }
+
             return self::boxStringResult($context, $folded);
         }
 
         DomC14NRuntime::ensureLinked($context);
-        $exclusive = self::exclusiveAsI64($context, $args[1] ?? null);
+        $exclusive = self::exclusiveAsI64($context, $exclusiveArg);
 
-        // ABI returns __value__* (string or bool false for relative-NS failure; #22378).
+        // ABI returns __value__* (string or bool false; #22378 / #32962).
         return $context->builder->call(
             $context->lookupFunction(DomC14NRuntime::ABI_NAME),
             self::loadObjectArg($context, $args[0]),
@@ -54,31 +66,41 @@ final class JitDomC14N
     }
 
     /**
-     * Fold documentElement / annotated-node C14N from the last pure loadXML (#32961).
+     * @return string|false|null folded payload, false for relative-NS, null if not foldable
      */
-    private static function tryCompileTimeFold(JITVariable $receiver, ?JITVariable $exclusiveArg): ?string
+    private static function tryFoldCompileTime(JITVariable $receiver): string|false|null
     {
-        if (null !== $exclusiveArg) {
-            // Only fold the default inclusive C14N() — exclusive needs live namespaces.
-            if (null !== $exclusiveArg->compileTimeLong && 0 !== $exclusiveArg->compileTimeLong) {
-                return null;
-            }
-            if (JITVariable::TYPE_NATIVE_BOOL === $exclusiveArg->type
-                && null === $exclusiveArg->compileTimeLong
-            ) {
-                // Non-constant exclusive — do not fold.
-                return null;
-            }
-        }
-
-        $path = $receiver->compileTimeDomNodePath;
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $path || null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+        $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return null;
         }
         if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {
             return null;
         }
+
+        $path = $receiver->compileTimeDomNodePath;
+        if (null !== $path && '' !== $path) {
+            return self::foldAnnotatedPath($xml, $path, $receiver);
+        }
+
+        $class = strtolower(str_replace('/', '\\', ltrim((string) $receiver->classUserType, '\\')));
+        $isDocument = '' !== $class
+            && str_contains($class, 'document')
+            && !str_contains($class, 'element');
+        if ($isDocument) {
+            return self::foldHostC14N($xml, null);
+        }
+
+        // documentElement / :object temps after loadXML — root element (#32962).
+        return self::foldHostC14N($xml, $receiver);
+    }
+
+    /**
+     * @return string|false|null
+     */
+    private static function foldAnnotatedPath(string $xml, string $path, JITVariable $receiver): string|false|null
+    {
         $doc = new \DOMDocument();
         if (!@$doc->loadXML($xml)) {
             return null;
@@ -87,12 +109,48 @@ final class JitDomC14N
         if (null === $node) {
             return null;
         }
-        $canonical = $node->C14N();
+        $canonical = @$node->C14N();
+        if (false === $canonical) {
+            return false;
+        }
         if (!\is_string($canonical)) {
             return null;
         }
 
         return $canonical;
+    }
+
+    /**
+     * @return string|false|null
+     */
+    private static function foldHostC14N(string $xml, ?JITVariable $elementReceiver): string|false|null
+    {
+        $doc = new \DOMDocument();
+        if (!@$doc->loadXML($xml)) {
+            return null;
+        }
+        if (null === $elementReceiver) {
+            $payload = @$doc->C14N();
+        } else {
+            $el = $doc->documentElement;
+            if (null === $el) {
+                return null;
+            }
+            if (null !== $elementReceiver->compileTimeDomTagName && '' !== $elementReceiver->compileTimeDomTagName) {
+                $list = $doc->getElementsByTagName($elementReceiver->compileTimeDomTagName);
+                $idx = $elementReceiver->compileTimeDomChildIndex ?? 0;
+                $candidate = $list->item((int) $idx);
+                if ($candidate instanceof \DOMElement) {
+                    $el = $candidate;
+                }
+            }
+            $payload = @$el->C14N();
+        }
+        if (false === $payload) {
+            return false;
+        }
+
+        return (string) $payload;
     }
 
     private static function nodeForCompileTimePath(
@@ -111,13 +169,11 @@ final class JitDomC14N
         if ($path === $rootPath || (null !== $tagHint && $path === '/'.$tagHint)) {
             return $el;
         }
-        // Nested paths: walk element children by segment (peer firstChild annotations).
         $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => '' !== $s));
         if ([] === $segments) {
             return $doc;
         }
         $cur = $el;
-        // First segment is the documentElement tag.
         array_shift($segments);
         foreach ($segments as $segment) {
             $found = null;
@@ -139,21 +195,17 @@ final class JitDomC14N
         return $cur;
     }
 
-    private static function boxStringResult(Context $context, string $lit): Value
+    /** True when exclusive is non-default / non-constant — skip inclusive loadXML fold. */
+    private static function exclusivePreventsFold(?JITVariable $arg): bool
     {
-        $str = $context->builder->load($context->constantStringFromString($lit));
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $owned
-        );
-
-        return JitValueBox::normalizeValuePtr($context, $slot);
+        if (null === $arg) {
+            return false;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return 0 !== $arg->compileTimeLong;
+        }
+        // Non-constant exclusive flag — exclusive C14N needs live namespaces (#32961).
+        return true;
     }
 
     private static function exclusiveAsI64(Context $context, ?JITVariable $arg): Value
@@ -176,8 +228,36 @@ final class JitDomC14N
             return $context->context->int64Type()->constInt(0 !== $arg->compileTimeLong ? 1 : 0, false);
         }
 
-        // Non-constant exclusive flag: default inclusive (0). Issue repros use literal true/false.
         return $context->context->int64Type()->constInt(0, false);
+    }
+
+    private static function boxStringResult(Context $context, string $lit): Value
+    {
+        $str = $context->builder->load($context->constantStringFromString($lit));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function boxBoolFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $slot),
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

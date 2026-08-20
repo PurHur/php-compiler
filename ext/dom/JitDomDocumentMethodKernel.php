@@ -889,7 +889,9 @@ final class JitDomDocumentMethodKernel
 
     public static function ensureC14NBridge(Context $context): void
     {
-        self::ensureContextBridge(
+        // ?string helper → __value__* (null = relative-NS false). Peer string bridge (#19352);
+        // Variable return was NestedJIT'd as __object__* and echoed as "Object" (#32962).
+        self::ensureContextNullableStringFalseValueBridge(
             $context,
             DomC14NRuntime::ABI_NAME,
             'dom_node_c14n_user_script',
@@ -897,7 +899,6 @@ final class JitDomDocumentMethodKernel
                 $context->getTypeFromString('__object__*'),
                 $context->getTypeFromString('int64'),
             ],
-            $context->getTypeFromString('__value__*'),
             'PHPCompiler\\ext\\dom\\DomC14NJitHelper::c14nArgv',
             '/ext/dom/DomC14NJitHelper.php'
         );
@@ -1822,6 +1823,92 @@ final class JitDomDocumentMethodKernel
         $context->registerFunction($abi, $fn);
 
         // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
+    }
+
+    /**
+     * Context helper returning {@see ?string} → `__value__*` (null → bool false).
+     *
+     * Used by DOMNode::C14N() so relative-NS failure stays Zend `false` (#22378) while
+     * NestedJIT returns a native string pointer instead of a Variable object (#32962).
+     *
+     * @param list<\PHPLLVM\Type> $paramTypes
+     */
+    private static function ensureContextNullableStringFalseValueBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        array $paramTypes,
+        string $helperLogical,
+        string $helperPath
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#32962');
+        $ft = $context->context->functionType($valuePtr, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abi, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $vmCtx = $context->builder->call(VmActiveContextLlvm::lookupAbi($context));
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $vmCtx,
+                $helperFn->getParam(0)->typeOf()
+            ),
+        ];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i + 1)->typeOf()
+            );
+        }
+        $string = $context->builder->call($helperFn, ...$args);
+        $string = JitNestedHelperCoerce::coerceBridgeResult($context, $string, $strPtr);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $string,
+            $strPtr->constNull()
+        );
+        $falseBlock = $fn->appendBasicBlock('dom_c14n_bridge_false');
+        $strBlock = $fn->appendBasicBlock('dom_c14n_bridge_string');
+        $doneBlock = $fn->appendBasicBlock('dom_c14n_bridge_done');
+        $context->builder->branchIf($isNull, $falseBlock, $strBlock);
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $destPtr,
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($strBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $string
+        );
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
+        $context->registerFunction($abi, $fn);
+
         self::restoreInsertAfterBridge($context, $savedBlock);
     }
 

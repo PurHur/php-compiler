@@ -6,35 +6,28 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
-use PHPCompiler\VM\Variable;
 
 /**
- * DOMNode::C14N() helper for user-script AOT (#19467, #22378).
+ * DOMNode::C14N() helper for user-script AOT (#19467, #22378, #32962).
  *
- * Receivers from user-script AOT are often shadow ObjectEntries (id not in DomRegistry).
- * Resolve via {@see DomRegistry::entry()} before calling VmDom — never pass an unregistered
- * shadow into nested-compiled VmDom::c14n (corrupt string / abort).
+ * Prefer {@see DomRegistry::entry()} when present; otherwise use the receiver (LiveSlots /
+ * NestedJIT). Native {@see ?string} return (null = relative-NS false) — NestedJIT of
+ * {@see \PHPCompiler\VM\Variable} returned `__object__*` and echo printed "Object" (#32962).
+ * Peer string ABI: {@see DomXPathEvaluateJitHelper::evaluateStringArgv}.
  *
- * Returns a boxed Variable so relative-NS failure can be boolean false (not empty string).
+ * Pure loadXML user scripts prefer compile-time fold in {@see JitDomC14N} (empty NestedJIT
+ * DomRegistry); this helper covers non-foldable receivers.
  */
 final class DomC14NJitHelper
 {
-    public static function c14nArgv(Context $ctx, ObjectEntry $node, int $exclusive): Variable
+    public static function c14nArgv(Context $ctx, ObjectEntry $node, int $exclusive): ?string
     {
-        $out = new Variable();
-        $canonical = DomRegistry::entry($node->id);
-        if (null === $canonical) {
-            $out->string('');
-
-            return $out;
-        }
+        $canonical = DomRegistry::entry($node->id) ?? $node;
         $payload = VmDom::c14n($ctx, $canonical, 0 !== $exclusive, false, null, null, null, 'DOMNode::C14N');
         if (false === $payload) {
-            $out->bool(false);
-        } else {
-            $out->string($payload);
+            return null;
         }
 
-        return $out;
+        return $payload;
     }
 }
