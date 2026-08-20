@@ -26,8 +26,9 @@ use PHPLLVM\Value;
  * openssl_pkey_export() (#32705 leftover of #6295),
  * openssl_pkey_export_to_file() (#32705 leftover of #20287),
  * openssl_public_encrypt() (#32713 leftover of #6666),
- * openssl_private_encrypt() (#32757 leftover of #6666), and
- * openssl_private_decrypt() (#32759 leftover of #6666).
+ * openssl_private_encrypt() (#32757 leftover of #6666),
+ * openssl_private_decrypt() (#32759 leftover of #6666), and
+ * openssl_public_decrypt() (#32761 leftover of #6666).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -44,6 +45,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_public_encrypt) / EVP_PKEY_encrypt
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_private_encrypt) / EVP_PKEY_sign
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_private_decrypt) / EVP_PKEY_decrypt
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_public_decrypt) / EVP_PKEY_verify_recover
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -534,6 +536,7 @@ final class JitOpensslX509
     }
 
     /**
+    /**
      * openssl_private_decrypt() — bake {@see VmOpensslPkeyNative::decrypt} into &$decrypted.
      *
      * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_private_decrypt) / EVP_PKEY_decrypt
@@ -595,6 +598,68 @@ final class JitOpensslX509
         return self::boxedBool($context, true);
     }
 
+    /**
+     * openssl_public_decrypt() — bake {@see VmOpensslPkeyNative::publicDecrypt} into &$decrypted.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_public_decrypt) / EVP_PKEY_verify_recover
+     * By-ref $decrypted is written via __value__writeString (peer {@see self::privateEncrypt}).
+     *
+     * PKCS#1 type-1 private-encrypt ciphertext is deterministic for a fixed key+data;
+     * repros assert bool + plaintext match (leftover of #6666 / #32761).
+     */
+    public static function publicDecrypt(
+        Context $context,
+        JITVariable $data,
+        JITVariable $decrypted,
+        JITVariable $key,
+        ?JITVariable $padding = null
+    ): Value {
+        $cipher = JitStringArg::compileTimeLiteral($data);
+        if (null === $cipher) {
+            throw new \LogicException(
+                'openssl_public_decrypt() data must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32761)'
+            );
+        }
+        $pem = JitStringArg::compileTimeLiteral($key);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_public_decrypt() key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32761)'
+            );
+        }
+        $pad = OpensslConstants::OPENSSL_PKCS1_PADDING;
+        if (null !== $padding) {
+            $padLit = self::compileTimeInt($padding);
+            if (null === $padLit) {
+                throw new \LogicException(
+                    'openssl_public_decrypt() padding must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #32761)'
+                );
+            }
+            $pad = $padLit;
+        }
+
+        if (!VmOpensslPkeyNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $plain = VmOpensslPkeyNative::publicDecrypt($cipher, $pem, $pad);
+        if (false === $plain) {
+            return self::boxedFalse($context);
+        }
+
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $decrypted);
+        $str = $context->builder->load($context->constantStringFromString($plain));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
+    }
 
     /**
      * openssl_x509_fingerprint() — bake {@see VmOpensslX509Native::fingerprintCertificatePem}.
