@@ -671,13 +671,12 @@ class Type extends Builtin {
         // NestedJIT/AOT bridge is OpensslMethodsRuntime (getNamedFunction first +
         // JitVmHelperLink::ensureBridge). Leftover Type addFunction vs Runtime ABI
         // drift mints openssl_get_cipher_methods.1 (#31894 / #32122).
+        // __compiler_microtime_string / __compiler_microtime_float always-on shells
+        // removed (#32683): user-script microtime() stays JitDate / MicrotimeJitHelper.
+        // NestedJIT/AOT bridge is StringMicrotime (getNamedFunction first +
+        // JitVmHelperLink::ensureBridge). Leftover Type addFunction vs Runtime ABI
+        // drift mints microtime_float.1 (#31894 / #32122).
         $double = $this->context->getTypeFromString('double');
-        $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
-        $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);
-        $this->context->registerFunction('__compiler_microtime_string', $fnMicrotimeStr);
-        $fntypeMicrotimeFloat = $this->context->context->functionType($double, false);
-        $fnMicrotimeFloat = $this->context->module->addFunction('__compiler_microtime_float', $fntypeMicrotimeFloat);
-        $this->context->registerFunction('__compiler_microtime_float', $fnMicrotimeFloat);
         $fntypePhpversion = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnPhpversion = $this->context->module->addFunction('__compiler_phpversion', $fntypePhpversion);
         $this->context->registerFunction('__compiler_phpversion', $fnPhpversion);
@@ -715,18 +714,12 @@ class Type extends Builtin {
             $fntypeExtensionFuncs
         );
         $this->context->registerFunction('__compiler_get_extension_funcs', $fnExtensionFuncs);
-        $fntypeGettimeofdayArray = $this->context->context->functionType($htPtr, false);
-        $fnGettimeofdayArray = $this->context->module->addFunction(
-            '__compiler_gettimeofday_array',
-            $fntypeGettimeofdayArray
-        );
-        $this->context->registerFunction('__compiler_gettimeofday_array', $fnGettimeofdayArray);
-        $fntypeGettimeofdayFloat = $this->context->context->functionType($double, false);
-        $fnGettimeofdayFloat = $this->context->module->addFunction(
-            '__compiler_gettimeofday_float',
-            $fntypeGettimeofdayFloat
-        );
-        $this->context->registerFunction('__compiler_gettimeofday_float', $fnGettimeofdayFloat);
+        // __compiler_gettimeofday_array / __compiler_gettimeofday_float always-on
+        // shells removed (#32683): user-script gettimeofday() stays JitGettimeofday /
+        // GettimeofdayJitHelper (php-src ext/standard/microtime.c). NestedJIT/AOT
+        // bridge is StringGettimeofday (getNamedFunction first + JitVmHelperLink).
+        // Leftover Type addFunction vs Runtime ABI drift mints gettimeofday_array.1
+        // (#31894 / #32122).
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         // Match JitDate::hrtime / StringHrtimeRuntime: i64 on 64-bit (writeLong), double on 32-bit
         // (writeDouble). Hardcoding double broke AOT module verify via writeLong (#26910).

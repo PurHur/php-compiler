@@ -16,7 +16,7 @@ final class JitGettimeofday
 {
     public static function call(Context $context, Value $asFloat): Value
     {
-        StringGettimeofday::ensureLinked($context);
+        StringGettimeofday::ensureLinked($context); // #32683 — Type always-on gettimeofday ABI dropped
 
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
