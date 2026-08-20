@@ -148,6 +148,11 @@ final class JitDomInsertBefore
             ? '<'.$newTag.'/>'
             : '<'.$newTag.'>'.$newInner.'</'.$newTag.'>';
         $parentInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        // Already applied this insert into the fold source (invoke can re-enter) (#32972).
+        $open = '<'.$newTag;
+        if (str_starts_with(ltrim($parentInner), $open)) {
+            return;
+        }
         $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
         $index = $refChildVar->compileTimeDomChildIndex
             ?? JitDomNodeListItem::$lastFetchedChildIndex
@@ -181,6 +186,7 @@ final class JitDomInsertBefore
         }
         $parent = self::loadObjectArg($context, $parentVar);
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

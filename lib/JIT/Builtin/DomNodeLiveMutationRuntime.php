@@ -1007,6 +1007,7 @@ final class DomNodeLiveMutationRuntime
         }
         $receiverObj = self::receiverObject($context, $receiver);
         JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, $inner);
+        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner);
 
         return true;
     }
@@ -1096,6 +1097,14 @@ final class DomNodeLiveMutationRuntime
             $propVar,
             Variable::TYPE_STRING
         );
+        // Refresh C14N fold source from the known compile-time merge (#32972).
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            $oldInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+            $delta = implode('', $pieces);
+            $newInner = 'prepend' === $kind ? $delta.$oldInner : $oldInner.$delta;
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner);
+        }
     }
 
     private static function ensureStringMutationBridge(Context $context, string $kind): void

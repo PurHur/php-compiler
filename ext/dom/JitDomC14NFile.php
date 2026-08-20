@@ -58,7 +58,10 @@ final class JitDomC14NFile
     {
         $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($args[0])
             ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+        if (null === $xml
+            || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            || JitDomLoadXMLUserScript::treeMutatedSinceLoad()
+        ) {
             return null;
         }
         $exclusive = self::compileTimeExclusiveFlag($args[2] ?? null);

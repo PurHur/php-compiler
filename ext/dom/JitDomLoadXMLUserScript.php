@@ -43,6 +43,12 @@ final class JitDomLoadXMLUserScript
     /** True when loadXML used the compile-time user-script path (no DomLoadXMLRuntime tree). */
     private static bool $lastLoadWasPureUserScript = false;
 
+    /**
+     * Set when appendChild/insertBefore/replaceChild/removeChild (etc.) rewrote the
+     * live tree after a pure loadXML — C14N/C14NFile must not fold the original literal (#32972).
+     */
+    private static bool $treeMutatedSinceLoad = false;
+
     /** Document class that owns PROP_DOCUMENT_ELEMENT for the last pure materialize (#27108). */
     private static ?string $lastDocumentClass = null;
 
@@ -55,6 +61,17 @@ final class JitDomLoadXMLUserScript
     public static function lastCompileTimeXmlSource(): ?string
     {
         return self::$lastCompileTimeXmlSource ?? self::$lastCompileTimeXml;
+    }
+
+    public static function treeMutatedSinceLoad(): bool
+    {
+        return self::$treeMutatedSinceLoad;
+    }
+
+    /** Call after LiveSlots / InnerXml tree mutations (#32972). */
+    public static function markTreeMutatedSinceLoad(): void
+    {
+        self::$treeMutatedSinceLoad = true;
     }
 
     /**
@@ -131,6 +148,37 @@ final class JitDomLoadXMLUserScript
     public static function markLastLoadPureUserScript(): void
     {
         self::$lastLoadWasPureUserScript = true;
+        self::$treeMutatedSinceLoad = false;
+    }
+
+    /**
+     * Rebuild {@see $lastCompileTimeXml} after a root-inner rewrite so C14N fold
+     * sees appendChild/insertBefore/replaceChild/removeChild (#32972).
+     */
+    public static function refreshCompileTimeXmlWithRootInner(string $newInner): void
+    {
+        $xml = self::$lastCompileTimeXml;
+        if (null === $xml || '' === trim($xml)) {
+            return;
+        }
+        $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($xml);
+        if (null === $parsed) {
+            return;
+        }
+        $tag = $parsed['tag'];
+        $attrs = $parsed['attrs'];
+        self::$lastCompileTimeXml = '<'.$tag.$attrs.'>'.$newInner.'</'.$tag.'>';
+        // Fold may use the refreshed literal.
+        self::$treeMutatedSinceLoad = false;
+        self::$lastLoadWasPureUserScript = true;
+    }
+
+    /**
+     * @deprecated Use {@see markTreeMutatedSinceLoad()} or {@see refreshCompileTimeXmlWithRootInner()}.
+     */
+    public static function invalidateCompileTimeXmlFold(): void
+    {
+        self::markTreeMutatedSinceLoad();
     }
 
     public static function rememberCompileTimeXml(string $xml, string $documentClass = self::CLASS_DOCUMENT, ?string $sourceXml = null): void
@@ -138,6 +186,7 @@ final class JitDomLoadXMLUserScript
         self::$lastCompileTimeXml = $xml;
         self::$lastCompileTimeXmlSource = $sourceXml ?? $xml;
         self::$lastLoadWasPureUserScript = false;
+        self::$treeMutatedSinceLoad = false;
         self::$lastDocumentClass = $documentClass;
         JitDomXPathRegisterUserScript::reset();
     }
@@ -147,6 +196,7 @@ final class JitDomLoadXMLUserScript
     {
         self::$lastCompileTimeXml = $xml;
         self::$lastCompileTimeXmlSource = $sourceXml ?? $xml;
+        self::$treeMutatedSinceLoad = false;
         if (null === self::$xmlByReceiver) {
             self::$xmlByReceiver = new \SplObjectStorage();
         }

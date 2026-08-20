@@ -72,7 +72,10 @@ final class JitDomC14N
     {
         $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
             ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+        if (null === $xml
+            || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            || JitDomLoadXMLUserScript::treeMutatedSinceLoad()
+        ) {
             return null;
         }
         if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {

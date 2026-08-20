@@ -217,6 +217,7 @@ final class JitDomReplaceChild
                 $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, $replacement);
                 if (null !== $inner) {
                     JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+                    JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner);
 
                     return;
                 }
@@ -228,6 +229,7 @@ final class JitDomReplaceChild
 
         // createElement-only trees / only-child: single-tag inner (legacy #27216).
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $replacement);
+        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($replacement);
     }
 
     /** Null parent/sibling LLVM slots on the detached node (ext/dom/node.c; #19240). */
