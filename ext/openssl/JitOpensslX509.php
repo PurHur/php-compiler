@@ -18,8 +18,9 @@ use PHPLLVM\Value;
  * openssl_x509_checkpurpose() (#32522 leftover of #20286),
  * openssl_x509_check_private_key() (#32527 leftover of #20285),
  * openssl_x509_verify() (#32535 leftover of #6595), and
- * openssl_x509_export() (#32557 leftover of #20273), and
- * openssl_x509_export_to_file() (#32557 leftover of #20273).
+ * openssl_x509_export() (#32557 leftover of #20273),
+ * openssl_x509_export_to_file() (#32557 leftover of #20273), and
+ * openssl_csr_get_subject() (#32692 leftover of #6421).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -28,6 +29,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_verify) / X509_verify
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_export) / PEM_write_bio_X509 / X509_print
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_export_to_file)
+ * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_csr_get_subject) / X509_REQ_get_subject_name
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -68,6 +70,45 @@ final class JitOpensslX509
         $htVar = HashTableHelper::variableFromVmHashTable(
             $context,
             VmOpensslObjects::variableFromPhpValue($parsed)->toArray()
+        );
+
+        return $htVar->value;
+    }
+
+    /**
+     * openssl_csr_get_subject() — bake {@see VmOpensslCsrNative::getSubject}.
+     *
+     * php-src: ext/openssl/xp.c PHP_FUNCTION(openssl_csr_get_subject) / X509_REQ_get_subject_name
+     */
+    public static function csrGetSubject(Context $context, JITVariable $csr, ?JITVariable $shortNames = null): Value
+    {
+        $pem = JitStringArg::compileTimeLiteral($csr);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_csr_get_subject() csr must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32692)'
+            );
+        }
+        $short = self::compileTimeBool($shortNames, true);
+        if (null === $short) {
+            throw new \LogicException(
+                'openssl_csr_get_subject() short_names must be a compile-time bool '
+                .'for JIT/AOT in this compiler build (issue #32692)'
+            );
+        }
+
+        if (!VmOpensslCsrNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $subject = VmOpensslCsrNative::getSubject($pem, $short);
+        if (false === $subject) {
+            return self::boxedFalse($context);
+        }
+
+        $htVar = HashTableHelper::variableFromVmHashTable(
+            $context,
+            VmOpensslObjects::variableFromPhpValue($subject)->toArray()
         );
 
         return $htVar->value;
