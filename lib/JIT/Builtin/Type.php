@@ -222,7 +222,6 @@ class Type extends Builtin {
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
-        $voidTy = $this->context->getTypeFromString('void');
         // Leftover always-on libc decls removed (#32202 / peer Type $libcFns #32173):
         // getenv(3)/putenv(3) — StringGetenv::ensureLibcGetenv / BootstrapCompileSmokeM3Emit::
         //   ensureLibcPutenv after LibcExtern drops (#31637 / #31582). User-script getenv()/
@@ -234,14 +233,10 @@ class Type extends Builtin {
         // fopen/fwrite/fclose — LibcExtern::ensureStdioFile (#31764). User-script fopen()
         //   stays on JitStreamIoKernel / StreamIoJitHelper.
         // lseek(2) — zero NestedJIT lookupFunction consumers.
-        foreach (
-            [
-                '__compiler_env_local_lookup' => [$i8p, false, $i8p],
-                '__compiler_env_register_putenv' => [$voidTy, false, $i8p],
-            ] as $abiName => [$ret, $vararg, $param]
-        ) {
-            $this->ensureExternalFunction($abiName, $this->context->context->functionType($ret, $vararg, $param));
-        }
+        // __compiler_env_local_lookup / __compiler_env_register_putenv always-on shells
+        // removed (#32729): EnvLocalRuntime / JitEnvLocalKernel own the ABI
+        // (getNamedFunction first; Type::register still ensureLinked). Leftover Type
+        // empty decls vs Runtime ABI drift mints env_local_lookup.1 (#31894 / #32122).
         $fntypeReadfile = $this->context->context->functionType(
             $i64,
             false,
@@ -1428,19 +1423,6 @@ class Type extends Builtin {
         SessionEncodeRuntime::ensureLinked($this->context);
         DefineRuntime::ensureLinked($this->context);
         RewriteVarsRuntime::ensureLinked($this->context);
-    }
-
-    private function ensureExternalFunction(string $name, $fnType): void
-    {
-        if (null !== $this->context->module->getNamedFunction($name)) {
-            return;
-        }
-        try {
-            $this->context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $this->context->module->addFunction($name, $fnType);
-            $this->context->registerFunction($name, $fn);
-        }
     }
 
 }

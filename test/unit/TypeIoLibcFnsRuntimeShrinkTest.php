@@ -49,10 +49,10 @@ final class TypeIoLibcFnsRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-declare libc {$sym} in a table (#32202)"
             );
         }
-        $this->assertStringContainsString("'__compiler_env_local_lookup' =>", $type);
-        $this->assertStringContainsString("'__compiler_env_register_putenv' =>", $type);
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
+        // __compiler_env_local_* always-on shells dropped (#32729); keep unrelated sentinels.
+        $this->assertStringContainsString("registerFunction('__compiler_number_format'", $type);
     }
 
     public function testNoNestedJitLookupFunctionRemainsForLseek(): void

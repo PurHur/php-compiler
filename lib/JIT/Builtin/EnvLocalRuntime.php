@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
  * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814, #13431, #19809).
  *
  * Thin orchestrator — NestedJIT bridges live in {@see JitEnvLocalKernel}.
+ * Type always-on shells dropped (#32729); this runtime owns the ABI.
  */
 final class EnvLocalRuntime
 {
