@@ -89,8 +89,12 @@ final class JitDateTimeConstruct
         self::storeParsedInto($context, $obj, $className, $parsed);
         ReflectionSetup::markConstructed($context, $obj);
         // Foreach DatePeriod snapshot (#26772) — stamp compile-time instant on $this.
-        $args[0]->compileTimeLong = $parsed['timestamp'];
-        $args[0]->compileTimeString = $parsed['timezone'];
+        // Zone id must not reuse compileTimeString: that is the New_ class-name hint.
+        // Stamping the IANA id here made `$d` look like a string, so later
+        // getTimestamp/format called __value__readObject on a string box and SIGSEGV'd
+        // (peer DateTimeZone compileTimeTimezoneName, #29732).
+        $args[0]->compileTimeDateTimeTimestamp = $parsed['timestamp'];
+        $args[0]->compileTimeTimezoneName = $parsed['timezone'];
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(

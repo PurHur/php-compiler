@@ -164,6 +164,14 @@ final class Variable {
     public ?string $compileTimeTimezoneName = null;
 
     /**
+     * Unix timestamp from DateTime::__construct when $datetime is a compile-time string (#32691).
+     *
+     * Must not reuse {@see $compileTimeLong}: assignToPointer treats compileTimeLong as
+     * "this value is an integer" and would writeLong a DateTime local.
+     */
+    public ?int $compileTimeDateTimeTimestamp = null;
+
+    /**
      * DateInterval::__construct() parse when $duration is a compile-time string (#26772).
      *
      * @var array{y:int,m:int,d:int,h:int,i:int,s:int,f:float,invert:int}|null

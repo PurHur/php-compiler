@@ -27,11 +27,17 @@ final class DateTimeFormatJitHelper
         string $function = 'DateTime::format',
         int $formatArgIndex = 0
     ): Value {
-        $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $obj = null;
         $objectType = $context->type->object;
-        $timestamp = $context->helper->loadValue(
-            $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::TS_PROPERTY)
-        );
+        if (null !== $receiver->compileTimeDateTimeTimestamp) {
+            $timestamp = $i64->constInt($receiver->compileTimeDateTimeTimestamp, true);
+        } else {
+            $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
+            $timestamp = $context->helper->loadValue(
+                $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::TS_PROPERTY)
+            );
+        }
 
         // Thin AOT under PROFILE=8.4: NestedJIT formatStateArgv civil digests segfault
         // (#27192). Common compile-time literals use the same UTC civil IR as date()/gmdate()
@@ -45,14 +51,24 @@ final class DateTimeFormatJitHelper
         }
 
         DateTimeFormatRuntime::ensureLinked($context);
-        $microsecond = $context->helper->loadValue(
-            $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::MICROSECOND_PROPERTY)
-        );
-        $tzVar = $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::TZ_PROPERTY);
-        $tzPtr = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            JitValueBox::valuePtrFromVariable($context, $tzVar)
-        );
+        if (null === $obj && null !== $receiver->compileTimeTimezoneName) {
+            $microsecond = $i64->constInt(0, false);
+            $tzPtr = $context->builder->load(
+                $context->constantStringFromString($receiver->compileTimeTimezoneName)
+            );
+        } else {
+            if (null === $obj) {
+                $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
+            }
+            $microsecond = $context->helper->loadValue(
+                $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::MICROSECOND_PROPERTY)
+            );
+            $tzVar = $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::TZ_PROPERTY);
+            $tzPtr = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $tzVar)
+            );
+        }
         // Soft-null on 8.4 — Zend deprecate+coerce (#21536, reverts #20693 TypeError).
         $formatPtr = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,

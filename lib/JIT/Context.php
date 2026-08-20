@@ -130,6 +130,20 @@ class Context {
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
     /**
+     * New DateTime / DateTimeImmutable result — construct stamps unix instant (#29732 peer).
+     */
+    public ?Operand $lastDateTimeNewResultOp = null;
+
+    public ?Variable $lastDateTimeNewResultVar = null;
+
+    /**
+     * Local name → unix instant + zone for DateTime / DateTimeImmutable (#32691).
+     *
+     * @var array<string, array{timestamp: int, timezone: ?string}>
+     */
+    public array $dateTimeLocalInstants = [];
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;
