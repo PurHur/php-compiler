@@ -73,8 +73,10 @@ final class TypeDeadMicrotimeGettimeofdayAbiRuntimeShrinkTest extends TestCase
         $gettimeofday = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGettimeofday.php');
         $this->assertStringContainsString('StringGettimeofday::ensureLinked', $gettimeofday);
         $this->assertStringContainsString('#32683', $gettimeofday);
-        $this->assertStringContainsString("lookupFunction('__compiler_gettimeofday_float')", $gettimeofday);
-        $this->assertStringContainsString("lookupFunction('__compiler_gettimeofday_array')", $gettimeofday);
+        $this->assertStringContainsString("lookupFunction('__hashtable__alloc')", $gettimeofday);
+        $this->assertStringContainsString('DefaultTimezoneCivilRuntime::ensureLinked', $gettimeofday);
+        $this->assertStringContainsString('StringMicrotime::invokeFloat', $gettimeofday);
+        $this->assertStringContainsString('JitDate::time', $gettimeofday);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
