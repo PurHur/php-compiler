@@ -276,6 +276,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src type.stub.php — doubleval alias absent from InternalArgInfo (#26110). */
+    public function testDoublevalStubReturnAndMixedParam(): void
+    {
+        $this->assertSame('float', BuiltinInternalArgInfo::returnTypeLabelForFunction('doubleval'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('doubleval', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('doubleval', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('value', $info['name']);
+        $this->assertSame('mixed', $info['type']);
+        $this->assertFalse($info['isOptional']);
+    }
+
     /** php-src string.stub.php — InternalArgInfo omits |false (#25442). */
     public function testStrposFamilyReturnTypeIncludesFalse(): void
     {
