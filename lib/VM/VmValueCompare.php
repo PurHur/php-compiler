@@ -197,10 +197,12 @@ final class VmValueCompare
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
         $double = $context->getTypeFromString('double');
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $falseVal = $i1->constInt(0, false);
 
+        // Branch on the type tag *before* any __value__read* — eager readString on a
+        // TYPE_NATIVE_DOUBLE box SIGSEGVs (#32860 leftover of #31967 / #9972).
         $enumCaseTag = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
         $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTag);
         $objectTag = $i8->constInt(VmVariable::TYPE_OBJECT, false);
@@ -209,6 +211,34 @@ final class VmValueCompare
 
         $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTag);
+        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
+        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
+
+        $falseBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_false');
+        $doubleCheckBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_double_check');
+        $doubleBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_double');
+        $longCheckBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_long_check');
+        $longBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_long');
+        $boolCheckBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_bool_check');
+        $boolBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_bool');
+        $nullCheckBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_null_check');
+        $nullBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_null');
+        $stringCheckBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_string_check');
+        $stringBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_string');
+        $doneBb = BasicBlockHelper::append($context, 'leq_vbox_dbl_done');
+
+        $context->builder->branchIf($isEnumOrObject, $falseBb, $doubleCheckBb);
+
+        $context->builder->positionAtEnd($doubleCheckBb);
+        $context->builder->branchIf($isDouble, $doubleBb, $longCheckBb);
+
+        $context->builder->positionAtEnd($doubleBb);
         $storedDouble = $context->builder->call(
             $context->lookupFunction('__value__readDouble'),
             $valuePtr
@@ -219,9 +249,13 @@ final class VmValueCompare
             $storedDouble,
             $nativeDouble
         );
+        $doubleEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
-        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
+        $context->builder->positionAtEnd($longCheckBb);
+        $context->builder->branchIf($isLong, $longBb, $boolCheckBb);
+
+        $context->builder->positionAtEnd($longBb);
         $storedLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
@@ -232,9 +266,13 @@ final class VmValueCompare
             $context->builder->sitofp($storedLong, $double),
             $nativeDouble
         );
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
-        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $context->builder->positionAtEnd($boolCheckBb);
+        $context->builder->branchIf($isBool, $boolBb, $nullCheckBb);
+
+        $context->builder->positionAtEnd($boolBb);
         $boolMatches = VmFloatCompare::relationalCompare(
             $context,
             OpCode::TYPE_EQUAL,
@@ -244,18 +282,26 @@ final class VmValueCompare
             ),
             $nativeDouble
         );
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $context->builder->positionAtEnd($nullCheckBb);
+        $context->builder->branchIf($isNull, $nullBb, $stringCheckBb);
+
+        $context->builder->positionAtEnd($nullBb);
         $nullMatches = VmFloatCompare::relationalCompare(
             $context,
             OpCode::TYPE_EQUAL,
             $nativeDouble,
             $context->constantFromFloat(0.0)
         );
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
-        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
+        $context->builder->positionAtEnd($stringCheckBb);
+        $context->builder->branchIf($isString, $stringBb, $falseBb);
+
+        $context->builder->positionAtEnd($stringBb);
         $storedStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),
             $valuePtr
@@ -269,26 +315,22 @@ final class VmValueCompare
                 $nativeDouble
             )
         );
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $scalarMatches = $context->builder->select(
-            $isDouble,
-            $doubleMatches,
-            $context->builder->select(
-                $isLong,
-                $longMatches,
-                $context->builder->select(
-                    $isBool,
-                    $boolMatches,
-                    $context->builder->select(
-                        $isNull,
-                        $nullMatches,
-                        $context->builder->select($isString, $stringMatches, $falseVal)
-                    )
-                )
-            )
-        );
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->branch($doneBb);
 
-        return $context->builder->select($isEnumOrObject, $falseVal, $scalarMatches);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i1, 'leq_vbox_dbl_phi');
+        $phi->addIncoming($doubleMatches, $doubleEnd);
+        $phi->addIncoming($longMatches, $longEnd);
+        $phi->addIncoming($boolMatches, $boolEnd);
+        $phi->addIncoming($nullMatches, $nullEnd);
+        $phi->addIncoming($stringMatches, $stringEnd);
+        $phi->addIncoming($falseVal, $falseBb);
+
+        return $phi;
     }
 
     public static function looseEqualNativeDoubleToValue(
