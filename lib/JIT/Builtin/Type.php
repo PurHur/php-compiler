@@ -503,21 +503,11 @@ class Type extends Builtin {
         );
         $fnHashHkdf = $this->context->module->addFunction('__compiler_hash_hkdf', $fntypeHashHkdf);
         $this->context->registerFunction('__compiler_hash_hkdf', $fnHashHkdf);
-        $fntypeHashEquals = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
-        $fnHashEquals = $this->context->module->addFunction('__compiler_hash_equals', $fntypeHashEquals);
-        $this->context->registerFunction('__compiler_hash_equals', $fnHashEquals);
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeHashHmacAlgos = $this->context->context->functionType($htPtr, false);
-        $fnHashHmacAlgos = $this->context->module->addFunction(
-            '__compiler_hash_hmac_algos',
-            $fntypeHashHmacAlgos
-        );
-        $this->context->registerFunction('__compiler_hash_hmac_algos', $fnHashHmacAlgos);
-        $fnHashAlgos = $this->context->module->addFunction(
-            '__compiler_hash_algos',
-            $fntypeHashHmacAlgos
-        );
-        $this->context->registerFunction('__compiler_hash_algos', $fnHashAlgos);
+        // __compiler_hash_equals / __compiler_hash_hmac_algos / __compiler_hash_algos
+        // always-on shells removed (#32875): NestedJIT/AOT bridges are StringHashEquals /
+        // StringHashHmacAlgos / StringHashAlgos (JitVmHelperLink::ensureBridge;
+        // Type::initialize still ensureLinked). Leftover Type empty decls vs Runtime
+        // ABI drift mint hash_equals.1 (#31894 / #32122).
         // __compiler_openssl_sign / __compiler_openssl_verify always-on shells removed
         // (#32866): NestedJIT/AOT bridge is OpensslSignRuntime (getNamedFunction first;
         // Type::initialize still ensureLinked). Leftover Type empty decls vs Runtime
@@ -1198,6 +1188,9 @@ class Type extends Builtin {
         OpensslSignRuntime::ensureLinked($this->context);
         OpensslDigestRuntime::ensureLinked($this->context);
         OpensslPbkdf2Runtime::ensureLinked($this->context);
+        StringHashEquals::ensureLinked($this->context);
+        StringHashHmacAlgos::ensureLinked($this->context);
+        StringHashAlgos::ensureLinked($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
