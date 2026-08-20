@@ -20,6 +20,17 @@ final class InstanceOfRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('valueBoxRhsKind', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
         $this->assertStringContainsString('jitRhsTypeIsInvalidClass', $source);
+        // #32766 — restore insert after case-compare link; length-checked strncasecmp; i8* via stringDataPtr.
+        $this->assertStringContainsString('restoreInsertBlock', $source);
+        $this->assertStringContainsString('stringDataPtr', $source);
+        $this->assertStringContainsString('ensureStrncasecmpLinked', $source);
+        $this->assertStringContainsString('ABI_STRNCASECMP', $source);
+        $this->assertStringContainsString('#32766', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/ensureBridge\([\s\S]*?clearInsertionPosition\(\)/',
+            $source,
+            'ensureValueBoxBridgeLinked must not clear insert after ensureBridge (#32766)'
+        );
     }
 
     public function testInstanceOfHelperSharesErrorMessageWithVm(): void
@@ -54,6 +65,15 @@ final class InstanceOfRuntimeShrinkTest extends TestCase
         $this->assertSame(
             InstanceOfJitHelper::RHS_KIND_INVALID,
             InstanceOfJitHelper::valueBoxRhsKind(VmVariable::TYPE_ARRAY)
+        );
+        // JIT IS_REFCOUNTED bit must not flip string/object to invalid (#32766).
+        $this->assertSame(
+            InstanceOfJitHelper::RHS_KIND_STRING,
+            InstanceOfJitHelper::valueBoxRhsKind(JitVariable::TYPE_STRING)
+        );
+        $this->assertSame(
+            InstanceOfJitHelper::RHS_KIND_OBJECT,
+            InstanceOfJitHelper::valueBoxRhsKind(JitVariable::TYPE_OBJECT)
         );
     }
 }
