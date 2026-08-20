@@ -5,11 +5,14 @@ declare(strict_types=1);
 /**
  * Session id string stored in module globals. LLVM entry `__phpc_session_id_apply`
  * fills a caller {@see __value__} out-slot (#1183).
+ *
+ * Thin AOT: {@see ensureLinked} — Type::register early-returns on STANDALONE (#32989).
  */
 
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\VmSession;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -24,10 +27,34 @@ final class SessionId
 
     public const APPLY_BOXED = 2;
 
+    private const APPLY_ABI = '__phpc_session_id_apply';
+
+    /** Thin user-script AOT: materialize apply body on first use (#32989 / peer #27258). */
+    public static function ensureLinked(Context $context): void
+    {
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        $probe = $context->module->getNamedFunction(self::APPLY_ABI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::APPLY_ABI, $probe);
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
+
+            return;
+        }
+        self::implement($context);
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+    }
+
     public static function implement(Context $context): void
     {
         SessionStorageGlobals::ensureGlobals($context);
         SessionStorageGlobals::implementEnsureDefaults($context);
+
+        $probe = $context->module->getNamedFunction(self::APPLY_ABI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::APPLY_ABI, $probe);
+
+            return;
+        }
 
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
@@ -41,8 +68,8 @@ final class SessionId
             $context->getTypeFromString('__value__*'),
             $context->getTypeFromString('__value__*')
         );
-        $fn = $context->module->addFunction('__phpc_session_id_apply', $sig);
-        $context->registerFunction('__phpc_session_id_apply', $fn);
+        $fn = null !== $probe ? $probe : $context->module->addFunction(self::APPLY_ABI, $sig);
+        $context->registerFunction(self::APPLY_ABI, $fn);
 
         $strMap = $context->structFieldMap['__string__'];
         $valMap = $context->structFieldMap['__value__'];

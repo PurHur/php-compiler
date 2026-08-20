@@ -47,4 +47,22 @@ final class SessionStorageGlobalsStandaloneTest extends TestCase
         $defaults = $ctx->lookupFunction('__phpc_session_ensure_defaults');
         $this->assertGreaterThan(0, $defaults->countBasicBlocks());
     }
+
+    public function testEnsureLinkedIsIdempotentAndCallableFromJitInvoke(): void
+    {
+        $id = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionId.php');
+        $name = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionName.php');
+        $mod = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionModuleName.php');
+        $this->assertStringContainsString('Sid::ensureLinked', $id);
+        $this->assertStringContainsString('Sname::ensureLinked', $name);
+        $this->assertStringContainsString('Smod::ensureLinked', $mod);
+
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        SessionId::ensureLinked($ctx);
+        SessionId::ensureLinked($ctx);
+        SessionName::ensureLinked($ctx);
+        $fn = $ctx->lookupFunction('__phpc_session_id_apply');
+        $this->assertGreaterThan(0, $fn->countBasicBlocks());
+    }
 }

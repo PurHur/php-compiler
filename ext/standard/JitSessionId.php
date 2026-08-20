@@ -29,6 +29,9 @@ final class JitSessionId
             throw new \LogicException('session_id() accepts at most one argument');
         }
 
+        // STANDALONE Type::register skips SessionId::implement (#32989).
+        Sid::ensureLinked($context);
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
 
