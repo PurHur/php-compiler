@@ -6,8 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -111,12 +112,14 @@ final class property_exists_ extends Internal
         throw new \TypeError(\sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, EnumCaseSupport::typeNameForTypeErrorActual($objectOrClass)));
     }
 
+    /**
+     * Catchable under AOT try/catch; fatal when uncaught (#33054 / #27447).
+     * Bare pending-raise + libc abort() SIGABRTs inside try — use ExceptionBridge.
+     */
     private static function emitJitTypeErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'property_exists_te_cont');
     }
 
     private static function jitTypeErrorMessage(int $type): string

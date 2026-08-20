@@ -9,8 +9,8 @@ use PHPCompiler\ext\spl\ArrayObjectBuiltin;
 use PHPCompiler\ext\spl\RecursiveArrayIteratorBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringPropertyExists;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -201,12 +201,14 @@ final class JitPropertyExists
         );
     }
 
+    /**
+     * Catchable under AOT try/catch; fatal when uncaught (#33054 / #27447).
+     * Bare pending-raise + libc abort() SIGABRTs inside try — use ExceptionBridge.
+     */
     private static function emitTypeErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'prop_exists_te_cont');
     }
 
     private static function scalarTypeError(int $type): string
