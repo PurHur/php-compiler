@@ -10,7 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_libcrypt via LibcryptJitHelper PHP (#9275, #14182, #22886).
+ * JIT/AOT link for __compiler_libcrypt via LibcryptJitHelper PHP (#9275, #14182, #22886, #32851).
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * an empty shell (#32851 / peer #32843) — leftover Type decls mint libcrypt.1
+ * (#31894 / #32122).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ParseUrl #22861 / Modf #22519).
  * Replaces libc crypt(3) LLVM in {@see LibcryptThinRuntime}. SSOT: host crypt() via helper.

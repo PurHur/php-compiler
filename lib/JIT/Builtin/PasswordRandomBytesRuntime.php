@@ -9,7 +9,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Production random_bytes bridge for password_hash nested JIT (#9275, #22313).
+ * Production random_bytes bridge for password_hash nested JIT (#9275, #22313, #32851).
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * an empty shell (#32851 / peer #32843) — leftover Type decls mint password_random_bytes.1
+ * (#31894 / #32122).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer FtokRuntime #22300).
  * Avoids user-script __compiler_random_bytes null stub during AOT password crypto.
