@@ -27,8 +27,9 @@ use PHPLLVM\Value;
  * openssl_pkey_export_to_file() (#32705 leftover of #20287),
  * openssl_public_encrypt() (#32713 leftover of #6666),
  * openssl_private_encrypt() (#32757 leftover of #6666),
- * openssl_private_decrypt() (#32759 leftover of #6666), and
- * openssl_public_decrypt() (#32761 leftover of #6666).
+ * openssl_private_decrypt() (#32759 leftover of #6666),
+ * openssl_public_decrypt() (#32761 leftover of #6666), and
+ * openssl_dh_compute_key() (#32771 leftover of #6596).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -46,6 +47,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_private_encrypt) / EVP_PKEY_sign
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_private_decrypt) / EVP_PKEY_decrypt
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_public_decrypt) / EVP_PKEY_verify_recover
+ * php-src: ext/openssl/openssl_backend_v3.c — PHP_FUNCTION(openssl_dh_compute_key) / EVP_PKEY_derive
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -659,6 +661,44 @@ final class JitOpensslX509
         JitValueBox::publishAfterWrite($context, $outPtr);
 
         return self::boxedBool($context, true);
+    }
+
+    /**
+     * openssl_dh_compute_key() — bake {@see VmOpensslPkeyDeriveNative::dhComputeKey}.
+     *
+     * php-src: ext/openssl/openssl_backend_v3.c PHP_FUNCTION(openssl_dh_compute_key) / EVP_PKEY_derive
+     * Peer public key is raw encoded bytes; private key is PEM (same coerce surface as VM).
+     */
+    public static function dhComputeKey(
+        Context $context,
+        JITVariable $publicKey,
+        JITVariable $privateKey
+    ): Value {
+        $pub = JitStringArg::compileTimeLiteral($publicKey);
+        if (null === $pub) {
+            throw new \LogicException(
+                'openssl_dh_compute_key() public_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32771)'
+            );
+        }
+        $pem = JitStringArg::compileTimeLiteral($privateKey);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_dh_compute_key() private_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32771)'
+            );
+        }
+
+        if (!VmOpensslPkeyDeriveNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $shared = VmOpensslPkeyDeriveNative::dhComputeKey($pem, $pub);
+        if (false === $shared) {
+            return self::boxedFalse($context);
+        }
+
+        return self::boxedString($context, $shared);
     }
 
     /**
