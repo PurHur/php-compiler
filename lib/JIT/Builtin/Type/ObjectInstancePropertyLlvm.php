@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
+use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\MethodVisibility;
 use PHPLLVM;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -179,6 +183,53 @@ final class ObjectInstancePropertyLlvm
                     Variable::TYPE_NATIVE_DOUBLE,
                 ], true)) {
                     $llvmType .= '*';
+                    // Unset / never-assigned typed natives store null void* (#33007). Raise
+                    // before casting null→scalar* (UB → 0). isset must not use this path —
+                    // {@see Object_::propertyIsSet} checks the slot directly.
+                    if (!$forWrite && $object->propertySlotRequiresTypedInitGuard($classId, $propset[3])) {
+                        $voidPtr = $context->getTypeFromString('void*');
+                        $loadedVoid = $context->builder->pointerCast($loaded, $voidPtr);
+                        $isNull = $context->builder->icmp(
+                            \PHPLLVM\Builder::INT_EQ,
+                            $loadedVoid,
+                            $voidPtr->constNull()
+                        );
+                        $fn = $context->builder->getInsertBlock()->getParent();
+                        assert($fn instanceof \PHPLLVM\Value\Function_);
+                        $raiseBb = $fn->appendBasicBlock('typed_native_prop_uninit_'.$classId.'_'.$propset[3]);
+                        $okBb = $fn->appendBasicBlock('typed_native_prop_ok_'.$classId.'_'.$propset[3]);
+                        $context->builder->branchIf($isNull, $raiseBb, $okBb);
+
+                        $context->builder->positionAtEnd($raiseBb);
+                        $message = sprintf(
+                            'Typed property %s::$%s must not be accessed before initialization',
+                            MethodVisibility::formatAnonymousScopeForMessage($className),
+                            $propset[1]
+                        );
+                        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+                            TryCatchHelper::emitCatchableClassError($context, 'Error', $message, null);
+                            $stillOpen = BasicBlockHelper::tryGetInsertBlock($context);
+                            if (null !== $stillOpen && null === $stillOpen->getTerminator()) {
+                                TypedPropertyUninitGuard::emitRaiseAndTerminate($context);
+                            }
+                        } else {
+                            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+                            ErrorRaise::registerDeclarations($context);
+                            ErrorRaise::ensureLinked($context);
+                            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                                ErrorRaise::ensureStandaloneBodies($context);
+                            }
+                            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+                            ErrorRaise::emitRaise($context, $message);
+                            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+                            }
+                            TypedPropertyUninitGuard::emitRaiseAndTerminate($context);
+                        }
+
+                        $context->builder->positionAtEnd($okBb);
+                        $loaded = $context->builder->load($slot);
+                    }
                 }
                 $typed = $context->builder->pointerCast(
                     $loaded,

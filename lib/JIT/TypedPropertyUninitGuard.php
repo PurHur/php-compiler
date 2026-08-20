@@ -77,26 +77,32 @@ final class TypedPropertyUninitGuard
             $context->builder->branchIf($isUndef, $raiseBlock, $okBlock);
 
             $context->builder->positionAtEnd($raiseBlock);
-            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-            ErrorRaise::registerDeclarations($context);
-            ErrorRaise::ensureLinked($context);
-            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-                ErrorRaise::ensureStandaloneBodies($context);
-            }
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-            ErrorRaise::emitRaise(
-                $context,
-                sprintf(
-                    'Typed property %s::$%s must not be accessed before initialization',
-                    MethodVisibility::formatAnonymousScopeForMessage((string) $declaringClass),
-                    $var->objectPropertyName
-                )
+            $message = sprintf(
+                'Typed property %s::$%s must not be accessed before initialization',
+                MethodVisibility::formatAnonymousScopeForMessage((string) $declaringClass),
+                $var->objectPropertyName
             );
-            // Thin user-script AOT skips end-of-main abort (#21467); abort here.
-            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+            // Inside try: catchable Error (Zend). Outside: pending + abort for thin AOT (#21467 / #33007).
+            if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+                TryCatchHelper::emitCatchableClassError($context, 'Error', $message, null);
+                $stillOpen = BasicBlockHelper::tryGetInsertBlock($context);
+                if (null !== $stillOpen && null === $stillOpen->getTerminator()) {
+                    self::emitRaiseAndTerminate($context);
+                }
+            } else {
+                $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+                ErrorRaise::registerDeclarations($context);
+                ErrorRaise::ensureLinked($context);
+                if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                    ErrorRaise::ensureStandaloneBodies($context);
+                }
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+                ErrorRaise::emitRaise($context, $message);
+                if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                    $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+                }
+                self::emitRaiseAndTerminate($context);
             }
-            self::emitRaiseAndTerminate($context);
         } else {
             assert(null !== $undefWarnBlock);
             $context->builder->branchIf($isUndef, $undefWarnBlock, $okBlock);
@@ -420,7 +426,7 @@ final class TypedPropertyUninitGuard
     }
 
     /** Pending Error is thrown when the JIT function returns ({@see Func\JIT::execute}). */
-    private static function emitRaiseAndTerminate(Context $context): void
+    public static function emitRaiseAndTerminate(Context $context): void
     {
         self::emitUnreachableFunctionReturn($context);
     }
