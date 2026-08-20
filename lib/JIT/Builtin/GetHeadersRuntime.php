@@ -11,8 +11,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_get_headers via GetHeadersJitHelper PHP (#9212, #24633).
+ * JIT/AOT link for __compiler_get_headers via GetHeadersJitHelper PHP (#9212, #24633, #33042).
  *
+ * Owns ABI module-locally (getNamedFunction first, addFunction if absent). Do not re-add
+ * Type always-on shells — leftover decls mint get_headers.1 (#31894 / #32122).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StreamFstat #24586 / StringQuotPrint #24620).
  * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
  * (thin AOT: "Current basic block has no parent function", #27317 / peer #27088).

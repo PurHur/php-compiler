@@ -151,17 +151,11 @@ class Type extends Builtin {
         // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // error_log.1 (#31894 / #32122). User-script error_log() stays
         // ErrorLogJitHelper / VmErrorLog.
-        $fntypeGetHeaders = $this->context->context->functionType(
-            $this->context->getTypeFromString('__hashtable__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int1')
-        );
-        $fnGetHeaders = $this->context->module->addFunction(
-            '__compiler_get_headers',
-            $fntypeGetHeaders
-        );
-        $this->context->registerFunction('__compiler_get_headers', $fnGetHeaders);
+        // __compiler_get_headers always-on shell removed (#33042): GetHeadersRuntime
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // get_headers.1 (#31894 / #32122). User-script get_headers() stays
+        // GetHeadersJitHelper / VmHttpHeaders (#27317).
         // __compiler_file_put_contents always-on shell removed (#33043): StringFilePutContents
         // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
         // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
@@ -1010,6 +1004,7 @@ class Type extends Builtin {
         MimeContentTypeRuntime::ensureLinked($this->context);
         MetaTagsRuntime::ensureLinked($this->context);
         StringErrorLog::ensureLinked($this->context);
+        GetHeadersRuntime::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
