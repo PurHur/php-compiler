@@ -9,11 +9,14 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for addcslashes/stripcslashes via CslashesJitHelper PHP (#5652, #9578, #21617).
+ * JIT/AOT link for addcslashes/stripcslashes via CslashesJitHelper PHP (#5652, #9578, #21617, #32893).
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
  * env clear — no hand-rolled NestedJit compile loop). Peer: StringAddslashes #18391 / StringQuotemeta #21589 /
  * StringStrRepeat #21601.
+ * Module-local ABI owner (ensureBridge getNamedFunction first): Builtin\Type no longer
+ * always-declares empty shells (#32893 / peer #32879) — leftover Type decls mint
+ * addcslashes.1 (#31894 / #32122).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(addcslashes) / PHP_FUNCTION(stripcslashes)
  */
