@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkey_export_to_file() — write private key PEM to path (php-src ext/openssl/openssl.c; #20287).
+ * openssl_pkey_export_to_file() — write private key PEM to path (php-src ext/openssl/openssl.c; #20287 VM, JIT/AOT #32705).
  *
  * Reflection / named-arg params match Zend stub `key,output_filename,passphrase,options`
  * (not InternalArgInfo `outfilename`/`config_args`; #24492).
@@ -97,8 +97,24 @@ final class openssl_pkey_export_to_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkey_export_to_file() is not implemented for JIT in this compiler build (issue #20287)'
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'openssl_pkey_export_to_file() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(
+                'openssl_pkey_export_to_file() expects at most 4 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::pkeyExportToFile(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2] ?? null,
+            $args[3] ?? null
         );
     }
 }
