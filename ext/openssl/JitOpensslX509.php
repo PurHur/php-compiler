@@ -36,7 +36,8 @@ use PHPLLVM\Value;
  * openssl_spki_export_challenge() (#32792 leftover of #6423);
  * openssl_spki_new() (#32892 leftover of #8690);
  * openssl_pkcs12_export() (#32948 leftover of #6420);
- * openssl_pkcs12_export_to_file() (#32948 leftover of #6420).
+ * openssl_pkcs12_export_to_file() (#32948 leftover of #6420);
+ * openssl_seal() / openssl_open() (#32979 leftover of #6523).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -996,6 +997,174 @@ final class JitOpensslX509
     }
 
     /**
+     * openssl_seal() — bake {@see VmOpensslSealNative::seal} into &$sealed_data / &$encrypted_keys / &$iv.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_seal) (EVP_Seal semantics)
+     * Data, public-key PEM list, and cipher_algo must be compile-time literals. Session key /
+     * IV are non-deterministic — baked outputs are fixed for that compile (peer #32713).
+     *
+     * @return Value boxed int length, or false
+     */
+    public static function seal(
+        Context $context,
+        JITVariable $data,
+        JITVariable $sealedData,
+        JITVariable $encryptedKeys,
+        JITVariable $publicKeys,
+        JITVariable $cipherAlgo,
+        ?JITVariable $iv = null
+    ): Value {
+        $plain = JitStringArg::compileTimeLiteral($data);
+        if (null === $plain) {
+            throw new \LogicException(
+                'openssl_seal() data must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32979)'
+            );
+        }
+        $pubs = self::compileTimeStringList($publicKeys);
+        if (null === $pubs) {
+            throw new \LogicException(
+                'openssl_seal() public_key must be a compile-time array of string literals '
+                .'for JIT/AOT in this compiler build (issue #32979)'
+            );
+        }
+        $cipher = JitStringArg::compileTimeLiteral($cipherAlgo);
+        if (null === $cipher) {
+            throw new \LogicException(
+                'openssl_seal() cipher_algo must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32979)'
+            );
+        }
+        $assignIv = null !== $iv;
+
+        if (!VmOpensslSealNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $result = VmOpensslSealNative::seal($plain, $pubs, $cipher, $assignIv);
+        if (false === $result) {
+            return self::boxedFalse($context);
+        }
+
+        $sealedPtr = JitValueBox::valuePtrFromVariable($context, $sealedData);
+        $sealedStr = $context->builder->load($context->constantStringFromString($result['sealed']));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $sealedPtr,
+            $sealedStr
+        );
+        JitValueBox::publishAfterWrite($context, $sealedPtr);
+
+        $ekeysHt = new \PHPCompiler\VM\HashTable();
+        foreach ($result['encrypted_keys'] as $encryptedKey) {
+            $ekeyVar = new \PHPCompiler\VM\Variable();
+            $ekeyVar->string($encryptedKey);
+            $ekeysHt->append($ekeyVar);
+        }
+        $ekeysJit = HashTableHelper::variableFromVmHashTable($context, $ekeysHt);
+        $ekeysOutPtr = JitValueBox::valuePtrFromVariable($context, $encryptedKeys);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ekeysOutPtr,
+            $context->helper->loadValue($ekeysJit)
+        );
+        JitValueBox::publishAfterWrite($context, $ekeysOutPtr);
+
+        if ($assignIv) {
+            $ivPtr = JitValueBox::valuePtrFromVariable($context, $iv);
+            $ivStr = $context->builder->load($context->constantStringFromString($result['iv']));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ivPtr,
+                $ivStr
+            );
+            JitValueBox::publishAfterWrite($context, $ivPtr);
+        }
+
+        return self::boxedLong($context, $result['length']);
+    }
+
+    /**
+     * openssl_open() — bake {@see VmOpensslSealNative::open} into &$output.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_open) (EVP_Open semantics)
+     * Sealed data, encrypted key, private-key PEM, cipher_algo, and optional IV must be
+     * compile-time string literals (thin AOT has no PHP FFI).
+     */
+    public static function open(
+        Context $context,
+        JITVariable $data,
+        JITVariable $output,
+        JITVariable $encryptedKey,
+        JITVariable $privateKey,
+        JITVariable $cipherAlgo,
+        ?JITVariable $iv = null
+    ): Value {
+        $sealed = JitStringArg::compileTimeLiteral($data);
+        if (null === $sealed) {
+            throw new \LogicException(
+                'openssl_open() data must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32979)'
+            );
+        }
+        $ekey = JitStringArg::compileTimeLiteral($encryptedKey);
+        if (null === $ekey) {
+            throw new \LogicException(
+                'openssl_open() encrypted_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32979)'
+            );
+        }
+        $pem = JitStringArg::compileTimeLiteral($privateKey);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_open() private_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32979)'
+            );
+        }
+        $cipher = JitStringArg::compileTimeLiteral($cipherAlgo);
+        if (null === $cipher) {
+            throw new \LogicException(
+                'openssl_open() cipher_algo must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32979)'
+            );
+        }
+        $ivLit = null;
+        if (null !== $iv) {
+            if (JITVariable::TYPE_NULL === $iv->type || ($iv->isNullConstant ?? false)) {
+                $ivLit = null;
+            } else {
+                $ivLit = JitStringArg::compileTimeLiteral($iv);
+                if (null === $ivLit) {
+                    throw new \LogicException(
+                        'openssl_open() iv must be a compile-time string literal or null '
+                        .'for JIT/AOT in this compiler build (issue #32979)'
+                    );
+                }
+            }
+        }
+
+        if (!VmOpensslSealNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $plain = VmOpensslSealNative::open($sealed, $ekey, $pem, $cipher, $ivLit);
+        if (false === $plain) {
+            return self::boxedFalse($context);
+        }
+
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $output);
+        $str = $context->builder->load($context->constantStringFromString($plain));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
+    }
+
+    /**
      * openssl_spki_verify() — bake {@see VmOpensslSpkiNative::spkiVerify}.
      *
      * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_spki_verify) / NETSCAPE_SPKI_verify
@@ -1482,7 +1651,9 @@ final class JitOpensslX509
     }
 
     /**
-     * Compile-time string list for $ca_info. Empty omitted-arg is handled by the caller.
+     * Compile-time string list for $ca_info / openssl_seal() $public_key.
+     * Accepts TYPE_HASHTABLE, native arrays, or boxed TYPE_VALUE with compileTimeArray
+     * (INIT_ARRAY args to builtins are often value-boxed — #32979).
      *
      * @return list<string>|null
      */
@@ -1491,7 +1662,10 @@ final class JitOpensslX509
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
             return null;
         }
-        if (JITVariable::TYPE_HASHTABLE !== $arg->type) {
+        $isArrayShape = JITVariable::TYPE_HASHTABLE === $arg->type
+            || JITVariable::TYPE_VALUE === $arg->type
+            || 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY);
+        if (!$isArrayShape) {
             return null;
         }
         if ($arg->compileTimeEmptyArrayLiteral) {

@@ -50,7 +50,7 @@ final class TypeDeadIncludePathAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_convert_uuencode'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_utf8_strlen'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_file_get_contents'", $type);
         $this->assertStringContainsString('IncludePathRuntime::ensureLinked', $type);
     }

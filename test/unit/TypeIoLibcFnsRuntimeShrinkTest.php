@@ -52,7 +52,7 @@ final class TypeIoLibcFnsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         // __compiler_env_local_* always-on shells dropped (#32729); keep unrelated sentinels.
-        $this->assertStringContainsString("registerFunction('__compiler_convert_uuencode'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_utf8_strlen'", $type);
     }
 
     public function testNoNestedJitLookupFunctionRemainsForLseek(): void

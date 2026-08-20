@@ -65,7 +65,7 @@ final class JitDomLoadXMLUserScript
      *
      * {@see lastCompileTimeXml()} is the *last* loadXML literal — with two documents
      * that steals C14N of the earlier document. Only fall back when a single distinct
-     * literal is remembered (or none yet and last is set from the sole load).
+     * literal is remembered.
      */
     public static function unambiguousCompileTimeXml(): ?string
     {
@@ -178,12 +178,8 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
-     * Rebuild compile-time XML after a root-inner rewrite so C14N fold
+     * Rebuild {@see $lastCompileTimeXml} after a root-inner rewrite so C14N fold
      * sees appendChild/insertBefore/replaceChild/removeChild (#32972 / #32978).
-     *
-     * Updates {@see $lastCompileTimeXml}, the optional node Variable's
-     * {@see JITVariable::$compileTimeDomLoadXml}, and any document receivers
-     * still bound to the pre-refresh literal.
      */
     public static function refreshCompileTimeXmlWithRootInner(string $newInner, ?JITVariable $node = null): void
     {
@@ -197,26 +193,91 @@ final class JitDomLoadXMLUserScript
         }
         $tag = $parsed['tag'];
         $attrs = $parsed['attrs'];
-        $newXml = '<'.$tag.$attrs.'>'.$newInner.'</'.$tag.'>';
+        self::commitRefreshedCompileTimeXml(
+            '<'.$tag.$attrs.'>'.$newInner.'</'.$tag.'>',
+            $xml,
+            $newInner,
+            $node
+        );
+    }
+
+    /**
+     * Apply setAttribute on the document element of the compile-time XML so C14N
+     * fold sees the new attr (#32981; peer #32972 root-inner refresh).
+     */
+    public static function refreshCompileTimeXmlRootAttributeSet(string $name, string $value): void
+    {
+        self::mutateCompileTimeXmlRootAttribute(static function (\DOMElement $root) use ($name, $value): void {
+            @$root->setAttribute($name, $value);
+        });
+    }
+
+    /**
+     * Apply removeAttribute on the document element of the compile-time XML (#32981).
+     */
+    public static function refreshCompileTimeXmlRootAttributeRemove(string $name): void
+    {
+        self::mutateCompileTimeXmlRootAttribute(static function (\DOMElement $root) use ($name): void {
+            @$root->removeAttribute($name);
+        });
+    }
+
+    /**
+     * @param callable(\DOMElement):void $mutate
+     */
+    private static function mutateCompileTimeXmlRootAttribute(callable $mutate): void
+    {
+        $xml = self::$lastCompileTimeXml;
+        if (null === $xml || '' === trim($xml)) {
+            return;
+        }
+        if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {
+            return;
+        }
+        $doc = new \DOMDocument();
+        if (!@$doc->loadXML($xml)) {
+            return;
+        }
+        $root = $doc->documentElement;
+        if (!$root instanceof \DOMElement) {
+            return;
+        }
+        $mutate($root);
+        $new = @$doc->saveXML($root);
+        if (!\is_string($new) || '' === $new) {
+            return;
+        }
+        self::commitRefreshedCompileTimeXml($new);
+    }
+
+    /** Keep lastCompileTimeXml + per-receiver/token maps in sync after a fold refresh. */
+    private static function commitRefreshedCompileTimeXml(
+        string $newXml,
+        ?string $oldXml = null,
+        ?string $newInner = null,
+        ?JITVariable $node = null
+    ): void {
+        $old = $oldXml ?? self::$lastCompileTimeXml;
         self::$lastCompileTimeXml = $newXml;
-        if (null !== self::$xmlByReceiver) {
-            foreach (self::$xmlByReceiver as $doc) {
-                if (self::$xmlByReceiver[$doc] === $xml) {
-                    self::$xmlByReceiver[$doc] = $newXml;
-                    $doc->compileTimeDomLoadXml = $newXml;
-                }
-            }
-        }
-        foreach (self::$xmlByToken as $token => $bound) {
-            if ($bound === $xml) {
-                self::$xmlByToken[$token] = $newXml;
-            }
-        }
-        // Update every Variable that still carries the pre-refresh literal (temps + CVs).
-        self::rewriteCompileTimeDomLoadXmlLiteral($xml, $newXml, $newInner, $node);
         // Fold may use the refreshed literal.
         self::$treeMutatedSinceLoad = false;
         self::$lastLoadWasPureUserScript = true;
+        if (null !== $old) {
+            foreach (self::$xmlByToken as $token => $xml) {
+                if ($xml === $old) {
+                    self::$xmlByToken[$token] = $newXml;
+                }
+            }
+            if (null !== self::$xmlByReceiver) {
+                foreach (self::$xmlByReceiver as $receiver) {
+                    if (self::$xmlByReceiver[$receiver] === $old) {
+                        self::$xmlByReceiver[$receiver] = $newXml;
+                        $receiver->compileTimeDomLoadXml = $newXml;
+                    }
+                }
+            }
+            self::rewriteCompileTimeDomLoadXmlLiteral($old, $newXml, $newInner, $node);
+        }
     }
 
     /**
@@ -226,29 +287,29 @@ final class JitDomLoadXMLUserScript
     private static function rewriteCompileTimeDomLoadXmlLiteral(
         string $oldXml,
         string $newXml,
-        string $newInner,
+        ?string $newInner,
         ?JITVariable $node
     ): void {
-        $contexts = [];
         if (null !== $node) {
             $node->compileTimeDomLoadXml = $newXml;
-            $node->compileTimeDomInnerXml = $newInner;
+            if (null !== $newInner) {
+                $node->compileTimeDomInnerXml = $newInner;
+            }
         }
-        // Walk xmlByReceiver docs' contexts via a Context passed only through $node —
-        // store last Context used by rememberCompileTimeXmlFor.
-        if (null !== self::$lastRememberContext) {
-            $contexts[] = self::$lastRememberContext;
+        if (null === self::$lastRememberContext) {
+            return;
         }
-        foreach ($contexts as $context) {
-            if (!isset($context->namedVariableBindings) || !\is_array($context->namedVariableBindings)) {
+        $context = self::$lastRememberContext;
+        if (!isset($context->namedVariableBindings) || !\is_array($context->namedVariableBindings)) {
+            return;
+        }
+        foreach ($context->namedVariableBindings as $bound) {
+            if (!$bound instanceof JITVariable) {
                 continue;
             }
-            foreach ($context->namedVariableBindings as $bound) {
-                if (!$bound instanceof JITVariable) {
-                    continue;
-                }
-                if ($bound->compileTimeDomLoadXml === $oldXml) {
-                    $bound->compileTimeDomLoadXml = $newXml;
+            if ($bound->compileTimeDomLoadXml === $oldXml) {
+                $bound->compileTimeDomLoadXml = $newXml;
+                if (null !== $newInner) {
                     $bound->compileTimeDomInnerXml = $newInner;
                 }
             }
@@ -285,8 +346,6 @@ final class JitDomLoadXMLUserScript
         self::$treeMutatedSinceLoad = false;
         self::$lastRememberContext = $context;
         $document->compileTimeDomLoadXml = $xml;
-        // Method receivers are often ARG_SEND temps — stamp every named local that
-        // still aliases this LLVM value so later $doc->documentElement sees it (#32978).
         self::propagateCompileTimeDomLoadXmlToAliases($context, $document, $xml);
         if (null === self::$xmlByReceiver) {
             self::$xmlByReceiver = new \SplObjectStorage();
@@ -316,14 +375,10 @@ final class JitDomLoadXMLUserScript
                 $bound->compileTimeDomLoadXml = $xml;
                 continue;
             }
-            // Same LLVM SSA value as the method receiver temp.
             if (null !== $docVal && $bound->value === $docVal) {
                 $bound->compileTimeDomLoadXml = $xml;
                 continue;
             }
-            // ARG_SEND temps often do not share PHP Value identity with the CV.
-            // Stamp unstamped document locals created before this loadXML (typical
-            // `$d = new DOMDocument(); $d->loadXML(...)` shape).
             if (null !== $bound->compileTimeDomLoadXml) {
                 continue;
             }
