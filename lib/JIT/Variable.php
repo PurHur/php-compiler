@@ -1430,7 +1430,7 @@ final class Variable {
      *
      * @return bool true when a TypeError was emitted (caller should return a dummy)
      */
-    private static function emitIllegalStringOffsetDimGuard(Context $context, self $dim): bool
+    public static function emitIllegalStringOffsetDimGuard(Context $context, self $dim): bool
     {
         if (self::TYPE_HASHTABLE === $dim->type) {
             HashTableHelper::emitIllegalOffsetType(
@@ -1481,7 +1481,7 @@ final class Variable {
     /**
      * Coerce a compile-time numeric string dim to native long for string-offset LLVM (#22895).
      */
-    private static function coerceStringOffsetDimToLong(Context $context, self $dim): self
+    public static function coerceStringOffsetDimToLong(Context $context, self $dim): self
     {
         if (self::TYPE_STRING !== $dim->type || null === $dim->compileTimeString) {
             return $dim;

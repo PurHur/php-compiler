@@ -9079,6 +9079,20 @@ class JIT {
                         }
                         break;
                     }
+                    // VALUE box + CFG string: do not ensureHashtablePointer (#32764 / #22646 write).
+                    if (
+                        $forWrite
+                        && Variable::TYPE_VALUE === $value->type
+                        && JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
+                    ) {
+                        JIT\ValueBoxDimWrite::fetchStringOffsetWriteLvalue(
+                            $this->context,
+                            $value,
+                            $dim,
+                            $resultOp
+                        );
+                        break;
+                    }
                     if ($value->type === Variable::TYPE_HASHTABLE) {
                         // SimpleXMLElement::xpath() node-set: fold `$n[$i]` to compile-time SXE (#26911).
                         if (!$forWrite) {
