@@ -158,49 +158,12 @@ class Type extends Builtin {
         );
         $fnVarDump = $this->context->module->addFunction('__compiler_var_dump', $fntypeVarDump);
         $this->context->registerFunction('__compiler_var_dump', $fnVarDump);
-        $fntypeIniSet = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnIniSet = $this->context->module->addFunction('__compiler_ini_set', $fntypeIniSet);
-        $this->context->registerFunction('__compiler_ini_set', $fnIniSet);
-        $fntypeIniGet = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnIniGet = $this->context->module->addFunction('__compiler_ini_get', $fntypeIniGet);
-        $this->context->registerFunction('__compiler_ini_get', $fnIniGet);
-        $fnIniCfgGet = $this->context->module->addFunction('__compiler_ini_cfg_get', $fntypeIniGet);
-        $this->context->registerFunction('__compiler_ini_cfg_get', $fnIniCfgGet);
-        $fntypeIniRestore = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnIniRestore = $this->context->module->addFunction('__compiler_ini_restore', $fntypeIniRestore);
-        $this->context->registerFunction('__compiler_ini_restore', $fnIniRestore);
-        $fntypeErrorReporting = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('int32'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnErrorReporting = $this->context->module->addFunction('__compiler_error_reporting', $fntypeErrorReporting);
-        $this->context->registerFunction('__compiler_error_reporting', $fnErrorReporting);
-        $fntypeSilence = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false
-        );
-        $fnBeginSilence = $this->context->module->addFunction('__compiler_begin_silence', $fntypeSilence);
-        $this->context->registerFunction('__compiler_begin_silence', $fnBeginSilence);
-        $fnEndSilence = $this->context->module->addFunction('__compiler_end_silence', $fntypeSilence);
-        $this->context->registerFunction('__compiler_end_silence', $fnEndSilence);
+        // __compiler_ini_{get,cfg_get,set,restore} / __compiler_error_reporting /
+        // __compiler_begin_silence / __compiler_end_silence always-on shells removed
+        // (#32779): IniRuntime / SilenceRuntime own the ABI (getNamedFunction first;
+        // Type::register still ensureLinked via IniRuntime). Leftover Type empty decls
+        // vs Runtime ABI drift mints ini_get.1 / begin_silence.1 (#31894 / #32122).
+        // User-script ini_get()/ini_set()/@ stay IniJitHelper / ErrorSilenceJitHelper.
         $fntypeStripTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
