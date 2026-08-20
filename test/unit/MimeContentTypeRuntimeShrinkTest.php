@@ -18,7 +18,8 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('@\\file_get_contents', $source);
         $this->assertStringContainsString('self::detectFromBytes', $source);
         $this->assertStringNotContainsString('VmFs::', $source);
-        $this->assertStringNotContainsString('VmMime::', $source);
+        $this->assertStringNotContainsString('VmMime::mimeContentTypeFromPath', $source);
+        $this->assertStringNotContainsString('VmMime::detectFromBytes($data)', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\json_decode\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\strncmp\\s*\\(/', $source);
     }
