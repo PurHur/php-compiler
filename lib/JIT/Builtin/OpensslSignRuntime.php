@@ -11,10 +11,15 @@ use PHPCompiler\ext\openssl\VmOpensslSignNative;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for openssl_sign()/openssl_verify() via OpensslSignJitHelper PHP (#3324, #16454, #22911).
+ * JIT/AOT link for openssl_sign()/openssl_verify() via OpensslSignJitHelper PHP (#3324, #16454, #22911, #32866).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer OpensslEncrypt #22683).
  * Thin LLVM bridges forward the ABI. SSOT: {@see \PHPCompiler\ext\openssl\VmOpensslSignNative}
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * empty shells (#32866 / peer #32859) — leftover Type decls mint openssl_sign.1
+ * (#31894 / #32122).
+ *
  * php-src: ext/openssl/openssl.c
  */
 final class OpensslSignRuntime
@@ -90,10 +95,44 @@ final class OpensslSignRuntime
             return;
         }
 
-        $fn = $context->lookupFunction($name);
+        $fn = self::declareAbi($context, $name, $probe);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareAbi(Context $context, string $name, ?LlvmFunction $probe): LlvmFunction
+    {
+        if (null !== $probe) {
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+
+        $ft = match ($name) {
+            '__compiler_openssl_sign' => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $strPtr,
+                $i64
+            ),
+            '__compiler_openssl_verify' => $context->context->functionType(
+                $i32,
+                false,
+                $strPtr,
+                $strPtr,
+                $strPtr,
+                $i64
+            ),
+            default => throw new \LogicException(
+                'OpensslSignRuntime unknown ABI '.$name.' (#32866)'
+            ),
+        };
+
+        return $context->module->addFunction($name, $ft);
     }
 
     private static function implementSignBridge(Context $context, LlvmFunction $fn): void
