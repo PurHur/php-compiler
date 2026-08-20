@@ -35,12 +35,34 @@ final class HashTableReadLlvm
         $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
 
         // TYPE_ENUM_CASE is not in JitValueBox::copyFromPointer — keep the object arm.
-        // Everything else (null/bool/double/long/string/ht/object) goes through the shared
-        // typed copy so null/bool/float slots are not misread as int(0) (#24232).
+        // String slots: writeString without separate — strkey / export pair keys use
+        // node pointers that __string__separate empties (#26367 / peer foreach key).
+        $stringBlock = BasicBlockHelper::append($context, 'ht_rb_string_'.$tag);
         $enumCaseBlock = BasicBlockHelper::append($context, 'ht_rb_enum_case_'.$tag);
         $copyBlock = BasicBlockHelper::append($context, 'ht_rb_copy_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_rb_done_'.$tag);
 
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'ht_rb_after_string_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $entryPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $str
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
         $isEnumCase = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,

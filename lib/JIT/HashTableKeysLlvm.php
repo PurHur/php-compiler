@@ -70,9 +70,8 @@ final class HashTableKeysLlvm
             $context->lookupFunction('__value__readHashtable'),
             JitValueBox::valuePtrFromVariable($context, $pair)
         );
-        $keyVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $zero);
         $outIdx = $context->builder->load($outIdxSlot);
-        HashTableHelper::setAtIndex($context, $dest, $outIdx, $keyVar);
+        self::appendExportedPairKey($context, $dest, $outIdx, $pairHt, $zero);
         $context->builder->store($context->builder->addNoSignedWrap($outIdx, $one), $outIdxSlot);
         $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
         $context->builder->branch($head);
@@ -80,5 +79,73 @@ final class HashTableKeysLlvm
         $context->builder->positionAtEnd($done);
 
         return $dest;
+    }
+
+    /** Copy export pair key slot [0] without value-box re-separate (#26367). */
+    private static function appendExportedPairKey(
+        Context $context,
+        Value $dest,
+        Value $outIdx,
+        Value $pairHt,
+        Value $zero
+    ): void {
+        $keyEntry = HashTableHelper::listEntryPointer($context, $pairHt, $zero);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($keyEntry, $valueMap['type'])
+        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+
+        $tag = (string) self::nextSeq();
+        $stringBlock = BasicBlockHelper::append($context, 'ht_keys_pair_str_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'ht_keys_pair_long_'.$tag);
+        $fallback = BasicBlockHelper::append($context, 'ht_keys_pair_fb_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_keys_pair_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'ht_keys_pair_after_str_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $keyEntry
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $dest,
+            $outIdx,
+            $str
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $fallback);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $outIdx,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $keyEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($fallback);
+        $keyVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $zero);
+        HashTableHelper::setAtIndex($context, $dest, $outIdx, $keyVar);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
     }
 }

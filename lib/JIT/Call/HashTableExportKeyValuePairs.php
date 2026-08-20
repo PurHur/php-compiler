@@ -120,15 +120,10 @@ final class HashTableExportKeyValuePairs implements Call
         $context->builder->branchIf($isNull, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        // Pass `__string__*` via separate — i8*/__string__init round-trip breaks NestedJIT
-        // string keys so exportKeyValuePairs yields empty and json_encode prints {} (#26977 /
-        // peer MathBaseConvertRuntime #26884).
+        // Peer foreach compileKeyHashtable: writeString(keyStr) without separate or
+        // __string__init (strkey node length can be stale while the pointer is valid).
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-        $keyOwned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $keyStr
-        );
-        $keyVar = self::stringPtrValueBox($context, $keyOwned);
+        $keyVar = self::stringPtrValueBox($context, $keyStr);
         $valField = $context->builder->structGep($node, $nodeMap['value']);
         $valVar = self::valueBoxFromEntry($context, $valField);
         self::appendPair($context, $result, $outIdxSlot, $keyVar, $valVar);
@@ -177,7 +172,7 @@ final class HashTableExportKeyValuePairs implements Call
     private static function valueBoxFromEntry(Context $context, Value $entryPtr): Variable
     {
         $slot = JitValueBox::alloc($context);
-        JitValueBox::copyFromPointer($context, $slot, $entryPtr);
+        JitValueBox::copyIntoPointer($context, JitValueBox::pointer($context, $slot), $entryPtr);
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }

@@ -87,9 +87,11 @@ final class JsonEncodeNestedJitHelper
             } elseif (0 === $t) {
                 $out .= 'null';
             } elseif (3 === $t) {
-                $out .= $val->toBool() ? 'true' : 'false';
-            } elseif (2 === $t) {
+                // exportKeyValuePairs stores JIT TYPE_NATIVE_DOUBLE=3 (not VM bool=3).
                 $out .= (string) $val->toFloat();
+            } elseif (2 === $t) {
+                // exportKeyValuePairs stores JIT TYPE_NATIVE_BOOL=2 (not VM float=2) (#26367).
+                $out .= $val->toBool() ? 'true' : 'false';
             } elseif (4 === $t) {
                 $out .= self::quote($val->toString());
             } else {

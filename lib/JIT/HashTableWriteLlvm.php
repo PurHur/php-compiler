@@ -120,10 +120,11 @@ final class HashTableWriteLlvm
         $hashtableBlock = BasicBlockHelper::append($context, 'ht_idx_vb_ht_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_idx_vb_done_'.$tag);
 
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
         $checkLong = BasicBlockHelper::append($context, 'ht_idx_vb_check_long_'.$tag);
         $context->builder->branchIf($isString, $stringBlock, $checkLong);
@@ -138,11 +139,17 @@ final class HashTableWriteLlvm
         $context->builder->branchIf($isLong, $longBlock, $checkBool);
 
         $context->builder->positionAtEnd($checkBool);
-        $isBool = $context->builder->icmp(
+        $isJitBool = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
         );
+        $isVmBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_BOOLEAN, false)
+        );
+        $isBool = $context->builder->or($isJitBool, $isVmBool);
         $checkDouble = BasicBlockHelper::append($context, 'ht_idx_vb_check_double_'.$tag);
         $context->builder->branchIf($isBool, $boolBlock, $checkDouble);
 
@@ -212,15 +219,12 @@ final class HashTableWriteLlvm
             $context->lookupFunction('__value__readString'),
             $valuePtr
         );
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
+        // exportKeyValuePairs keys are already separated before boxing; re-separate yields "" (#26367).
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
             $ht,
             $index,
-            $owned
+            $str
         );
         $context->builder->branch($done);
 
