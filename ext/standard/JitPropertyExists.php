@@ -77,20 +77,24 @@ final class JitPropertyExists
             $context->builder->structGep($valuePtr, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // Value-box tags may include IS_REFCOUNTED; compare the low 7 bits
+        // (same as JitMethodExists / #27108). Raw TYPE_OBJECT is 5; AOT stores
+        // TYPE_OBJECT|0x80 (0x85), which skipped the object arm and aborted (#32688).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
         );
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(JITVariable::TYPE_STRING & 0x7f, false)
         );
 
         $nullBlock = BasicBlockHelper::append($context, 'prop_exists_null');
@@ -130,13 +134,8 @@ final class JitPropertyExists
         $context->builder->branchIf($isString, $stringBlock, $errBlock);
 
         $context->builder->positionAtEnd($stringBlock);
-        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
-        if (null !== $classLiteral) {
-            // Runtime helper — autoloads like zend_lookup_class (#26407).
-            $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
-        } else {
-            $strResult = $i1->constInt(0, false);
-        }
+        // Boxed class string — helper autoloads like zend_lookup_class (#26407).
+        $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
         $context->builder->store($strResult, $resultSlot);
         $context->builder->branch($mergeBlock);
 
