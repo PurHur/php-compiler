@@ -153,12 +153,20 @@ final class JitUnlikeCompare
             if (Variable::TYPE_VALUE === $otherType && !$other->isNullConstant) {
                 return null;
             }
+            // Thin-AOT nullable TYPE_OBJECT slots (e.g. documentElement) store a null
+            // pointer when unset — treat as PHP null for === / !== (#32736).
+            if (Variable::TYPE_NULL === $otherType || $other->isNullConstant) {
+                return self::objectPtrComparedToNull($context, $opType, $obj);
+            }
 
             return self::fromIdenticalConst($context, $opType, false);
         }
         // php-cfg types `null` as a __value__ box (TYPE_VALUE 134) with isNullConstant,
         // not TYPE_NULL 0 — leftover of #32503 (#32514).
         if (Variable::TYPE_NULL === $otherType || $other->isNullConstant) {
+            if (self::isLooseEqualOp($opType)) {
+                return self::objectPtrComparedToNull($context, $opType, $obj);
+            }
             $cmpConst = $objectOnLeft ? 1 : -1;
 
             return self::fromSpaceshipConst($context, $opType, $cmpConst);
@@ -937,6 +945,27 @@ final class JitUnlikeCompare
             Variable::TYPE_NATIVE_BOOL,
             Variable::KIND_VALUE,
             $i1->constInt($bit ? 1 : 0, false)
+        );
+    }
+
+    /**
+     * TYPE_OBJECT slot may hold a null pointer (unset documentElement) — compare as PHP null (#32736).
+     */
+    private static function objectPtrComparedToNull(Context $context, int $opType, Variable $obj): Variable
+    {
+        $ptr = self::loadObjectPtr($context, $obj);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $ptr, $objPtrTy->constNull());
+        $i1 = $context->getTypeFromString('int1');
+        $bit = (OpCode::TYPE_IDENTICAL === $opType || OpCode::TYPE_EQUAL === $opType)
+            ? $isNull
+            : $context->builder->xor($isNull, $i1->constInt(1, false));
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $bit
         );
     }
 

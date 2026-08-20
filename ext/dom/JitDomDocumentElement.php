@@ -7,12 +7,13 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
-use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMDocument / Dom\XMLDocument::$documentElement (#18478, #19455, #23251, #27108). */
+/**
+ * LLVM lowering for DOMDocument / Dom\XMLDocument::$documentElement
+ * (#18478, #19455, #23251, #27108, #32736).
+ */
 final class JitDomDocumentElement
 {
     private const CLASS_DOCUMENT = 'DOMDocument';
@@ -43,31 +44,30 @@ final class JitDomDocumentElement
             );
         }
 
-        // Prefer the documentElement pinned at loadXML / loadHTML / createFromString
-        // (#26757, #27108, #29487). Pure user-script loadHTML also pins html root.
-        if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
-            || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
-            || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-        ) {
-            $docClass = JitDomLoadXMLUserScript::lastDocumentClass() ?? self::CLASS_DOCUMENT;
-            $docClassId = $objectType->lookup($docClass);
-            if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
-                $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
-            }
-
-            $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
-                $objectType,
-                $obj,
-                $docClass,
-                self::PROP_DOCUMENT_ELEMENT,
-                $docClassId
-            );
-            JitDomGetNodePath::annotateDocumentElement($result);
-
-            return $result;
+        // Always read the TYPE_OBJECT slot (loadXML / loadHTML / appendChild setRoot).
+        // An empty document stores a null pointer — {@see JitUnlikeCompare} treats
+        // TYPE_OBJECT+nullptr as PHP null for === / == (#32736). Do not host-fold
+        // via !lastLoadWasPureUserScript() (defaults true and skipped the slot).
+        $docClass = JitDomLoadXMLUserScript::lastDocumentClass() ?? self::CLASS_DOCUMENT;
+        $docClassId = $objectType->lookup($docClass);
+        if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
         }
 
-        return self::boxNull($context);
+        $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            $docClass,
+            self::PROP_DOCUMENT_ELEMENT,
+            $docClassId
+        );
+        if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
+            || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
+        ) {
+            JitDomGetNodePath::annotateDocumentElement($result);
+        }
+
+        return $result;
     }
 
     /**
@@ -327,19 +327,5 @@ final class JitDomDocumentElement
                 JITVariable::TYPE_VALUE
             );
         }
-    }
-
-    private static function boxNull(\PHPCompiler\JIT\Context $context): JITVariable
-    {
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_VALUE,
-            JITVariable::KIND_VALUE,
-            JitValueBox::normalizeValuePtr($context, $ptr)
-        );
     }
 }
