@@ -1351,10 +1351,23 @@ class Context {
         $this->functionProxies['splobjectstorage::getinfo'] = new Call\SplObjectStorageMethod('getinfo');
         $this->functionProxies['splobjectstorage::setinfo'] = new Call\SplObjectStorageMethod('setinfo');
         // ArrayIterator / RecursiveArrayIterator — `__spl_ht` for thin AOT foreach (#26783, #26775).
+        // Seed Countable + ArrayAccess so count()/offset* candidates resolve (#32910).
+        $this->type->object->lookup('ArrayIterator');
+        $this->type->object->lookup('RecursiveArrayIterator');
         $this->functionProxies['arrayiterator::__construct'] = new Call\ArrayIteratorConstruct('ArrayIterator');
         $this->functionProxies['recursivearrayiterator::__construct'] = new Call\ArrayIteratorConstruct(
             'RecursiveArrayIterator'
         );
+        foreach (['count', 'append', 'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset'] as $aiMethod) {
+            $this->functionProxies['arrayiterator::'.strtolower($aiMethod)] = new Call\ArrayIteratorMethod(
+                $aiMethod,
+                'ArrayIterator'
+            );
+            $this->functionProxies['recursivearrayiterator::'.strtolower($aiMethod)] = new Call\ArrayIteratorMethod(
+                $aiMethod,
+                'RecursiveArrayIterator'
+            );
+        }
         // ArrayObject — same `__spl_ht` construct + count/ArrayAccess/getArrayCopy (#26823).
         $this->type->object->lookup('ArrayObject');
         $this->functionProxies['arrayobject::__construct'] = new Call\ArrayIteratorConstruct('ArrayObject');
@@ -1493,13 +1506,14 @@ class Context {
         ] as $pqMethod) {
             $this->functionProxies['splpriorityqueue::'.$pqMethod] = new Call\SplPriorityQueueMethod($pqMethod);
         }
-        // SplDoublyLinkedList / SplQueue / SplStack — `__spl_ht` deque (#26790, #27311, #28704).
+        // SplDoublyLinkedList / SplQueue / SplStack — `__spl_ht` deque (#26790, #27311, #28704, #32910).
         foreach ([
             'spldoublylinkedlist' => 'SplDoublyLinkedList',
             'splqueue' => 'SplQueue',
             'splstack' => 'SplStack',
         ] as $dllLc => $dllClass) {
-            $dllMethods = ['__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom'];
+            $this->type->object->lookup($dllClass);
+            $dllMethods = ['__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count'];
             if ('splqueue' === $dllLc) {
                 $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);
             }
