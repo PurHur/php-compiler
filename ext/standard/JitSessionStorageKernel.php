@@ -1131,10 +1131,10 @@ final class JitSessionStorageKernel
         $context->builder->branchIf($hasId, $bbWork, $bbDone);
 
         $context->builder->positionAtEnd($bbWork);
-        // Thin AOT keeps __phpc_setcookie_add as a no-op *_link_stub (#21900). Print
-        // CGI Set-Cookie from session globals (not __string__init — buffer-backed
-        // strings mis-feed %.*s). NestedJIT PendingHeaders upgrade still TODO.
-        if (self::pendingSetcookieIsThinLinkStub($context)) {
+        // Thin AOT: always printf Set-Cookie from session globals. PendingHeaders
+        // NestedJIT setcookie/addSetcookie aborts under session_write_close (#1974 /
+        // peer #21900 link-stub bypass).
+        if ($context->isThinStandaloneAotMain() || self::pendingSetcookieIsThinLinkStub($context)) {
             self::emitSetcookiePrintfFromGlobals($context, $idLen);
         } else {
             $nameStr = self::bufferToString(

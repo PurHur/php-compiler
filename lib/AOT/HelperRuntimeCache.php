@@ -153,6 +153,7 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::addheader' => true,
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::removeheader' => true,
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::listheaderstable' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::snapshotheaderstable' => true,
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::flushresponseheaders' => true,
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::addsetcookie' => true,
         // #30790 — prelinked Soundex/Levenshtein unit.o SIGSEGVs under thin AOT; NestedJIT

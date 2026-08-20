@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\HttpResponseCode;
+use PHPCompiler\JIT\Builtin\PendingHeadersRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
@@ -102,6 +103,9 @@ final class header_ extends Internal
         if ([] === $args) {
             throw new \LogicException('header() requires one to three arguments');
         }
+        // Thin AOT otherwise keeps Type::register no-op ABI shells (#20932); header()+exit
+        // then emits no CGI Status (005-SessionsWeb POST flash, #1974).
+        PendingHeadersRuntime::ensureLinked($context);
         $line = self::jitHeaderArg($context, $args[0]);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $codeArg = $args[2];

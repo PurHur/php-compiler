@@ -568,12 +568,17 @@ final class JitSuperglobalRefreshKernel
     }
 
     /**
-     * Type::register declares empty ABI shells; lookup alone is not enough (#20932 regression).
-     * Fill thin-AOT link stubs so ScriptExit / helper-runtime units resolve pending-header ABI.
+     * NestedJIT PendingHeaders at compileToFile (not Type::initialize — #13571).
+     * User-script header() lowering is inside NestedJitCompileScope so implement()
+     * no-ops there; linking here replaces thin ret stubs (#1974 / #20932).
      */
     private static function ensureHeaderQueueExternal(Context $context): void
     {
-        PendingHeadersRuntime::ensureThinAotLinkStubs($context);
+        // NestedJIT the real helper — Type::initialize skips it on thin AOT (#13571)
+        // and user-script header() lowering is inside NestedJitCompileScope so
+        // implement() no-ops there. compileToFile is the first inactive-scope
+        // chance; link stubs would leave header()+exit with empty CGI output (#1974).
+        PendingHeadersRuntime::ensureLinked($context);
     }
 
     /** Real POST populate before user-script refresh LLVM emit (#15624). */

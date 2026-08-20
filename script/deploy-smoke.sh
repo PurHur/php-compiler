@@ -50,7 +50,7 @@ Usage: script/deploy-smoke.sh [--example 001|002|003|005|006|007|009]
   009  examples/009-FastCGIWeb (FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 #2359; health ok + PATH_INFO /ping diagnostics)
 
 003 execute smoke is default on (DEPLOY_SMOKE_003_EXECUTE=1); set DEPLOY_SMOKE_003_EXECUTE=0 to skip (#1530, #745).
-005 requires SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #1893).
+005 runs when SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (default on #1974; set 0 to skip — #1893).
 006 requires FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2028).
 007 runs when THROWSWEB_DEPLOY_SMOKE_GATE=1 (default-on #2388; set 0 to skip — #2124).
 009 requires FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2359).

@@ -786,7 +786,7 @@ final class Doctor
         $serveAotDefault = $defaults['SESSIONS_WEB_SERVE_AOT_SMOKE_GATE'] ?? '1';
         $linkDefault = $defaults['SESSIONS_WEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['SESSIONS_WEB_AOT_SMOKE_GATE'] ?? '0';
-        $deployDefault = $defaults['SESSIONS_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
+        $deployDefault = $defaults['SESSIONS_WEB_DEPLOY_SMOKE_GATE'] ?? '1';
 
         $smokeOn = self::gateEnabled('SESSIONS_WEB_SMOKE_GATE', $smokeDefault);
         $serveAotOn = self::gateEnabled('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE', $serveAotDefault);
@@ -850,12 +850,12 @@ final class Doctor
         fwrite(STDOUT, "      Shell:   SESSIONS_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh\n");
         $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
         $deployNote = $deployOn
-            ? '#1893 ✅ · ci-local when gate=1 (#1967)'
-            : 'opt-in default 0 — #1893 · #1962';
+            ? '#1893 ✅ · default-on #1974'
+            : 'set gate=1 — deploy CGI session flash (#1893)';
         fwrite(STDOUT, "  [{$deployStatus}] Stage 4 Deploy CGI — SESSIONS_WEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
-        fwrite(STDOUT, "      Run:     SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all\n");
-        fwrite(STDOUT, "      Or:      SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005\n");
-        fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 005/006 with hints when gates=0; #2077)\n");
+        fwrite(STDOUT, "      Run:     make deploy-smoke-all\n");
+        fwrite(STDOUT, "      Or:      ./script/deploy-smoke.sh --example 005\n");
+        fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 006 with hints when gate=0; #2077)\n");
 
         $rebuild005Default = $defaults['REBUILD_EXAMPLES_005_SYNC_GATE'] ?? '1';
         $rebuild005On = self::gateEnabled('REBUILD_EXAMPLES_005_SYNC_GATE', $rebuild005Default);

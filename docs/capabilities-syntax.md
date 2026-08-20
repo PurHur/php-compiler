@@ -45,7 +45,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Lowered at parse time via php-cfg MagicStringResolver; compliance PHPT |
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
 | Magic constants `__DIR__`, `__FILE__` | yes | yes | yes | [#707](https://github.com/PurHur/php-compiler/issues/707) | VM script stack on include; JIT uses per-unit script path; compliance PHPT; bootstrap AOT |
-| Magic constant `__LINE__` | yes | yes | yes | [#715](https://github.com/PurHur/php-compiler/issues/715) | Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units; compliance PHPT |
+| Magic constant `__LINE__` | yes | yes | yes | [#715](https://github.com/PurHur/php-compiler/issues/715) | Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units; compliance PHPT; AOT PHPT |
 | Literal `include`/`require` with `__DIR__` | yes | yes | yes | [#475](https://github.com/PurHur/php-compiler/issues/475) | Compile-time inlining via IncludeHelper; two-file PHPT + MiniWebApp JIT gate (#587) |
 | foreach by-reference (`&$v`) | yes | yes | yes | [#1222](https://github.com/PurHur/php-compiler/issues/1222) | Packed and string-keyed arrays; VM + JIT/AOT lowering (#1222, #4364); AOT: borrowed hashtable entry refs skip valueDelref (IteratorHelper); AOT PHPT: foreach_by_ref.phpt, foreach_by_ref_assoc.phpt |
 | foreach over Iterator / IteratorAggregate objects | yes | yes | yes | [#4067](https://github.com/PurHur/php-compiler/issues/4067) | VM + JIT/AOT call rewind/valid/current/key/next (Zend zend_iterators.c parity); IteratorProtocolHelper + IteratorHelper (#4011); IteratorAggregate::getIterator(); TypeError for non-iterable objects; compliance foreach_iterator_jit.phpt |
@@ -150,7 +150,7 @@ ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), trac
 | AOT project link (`phpc build --project`) | n/a | n/a | yes | [#1946](https://github.com/PurHur/php-compiler/issues/1946) | ExamplesCompileTest link-before-execute (#1946); SESSIONS_WEB_AOT_LINK_GATE opt-in |
 | AOT CLI execute (two-request session flash) | n/a | n/a | yes | [#1891](https://github.com/PurHur/php-compiler/issues/1891) | SessionsWebAotExecuteTest; SESSIONS_WEB_AOT_SMOKE_GATE default-on (#1923) |
 
-_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](https://github.com/PurHur/php-compiler/issues/1938); link [#1946](https://github.com/PurHur/php-compiler/issues/1946); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891). Opt-in ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE`._
+_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](https://github.com/PurHur/php-compiler/issues/1938); link [#1946](https://github.com/PurHur/php-compiler/issues/1946); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891). Default-on ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE` (#1974)._
 ## File upload reference (`examples/006-FileUploadWeb`)
 
 Nested `$_FILES` and `move_uploaded_file()` for the multipart upload north-star example.

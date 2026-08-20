@@ -1197,7 +1197,7 @@ function capabilityCell($value): string
  */
 function builtinCapabilityCurations(): array
 {
-    $persistenceNote = 'AOT CGI file persistence (#1938); two-process model; opt-in SESSIONS_WEB_AOT_SMOKE_GATE / SESSIONS_WEB_DEPLOY_SMOKE_GATE';
+    $persistenceNote = 'AOT CGI file persistence (#1938); two-process model; default-on SESSIONS_WEB_AOT_SMOKE_GATE / SESSIONS_WEB_DEPLOY_SMOKE_GATE (#1974)';
 
     return [
         'session_start' => [
@@ -1822,7 +1822,7 @@ function renderSessionsWebNorthStarMarkdown(array $rows): string
     $lines[] = '';
     $lines[] = '_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](' . CAPABILITY_ISSUE_URL_BASE
         . '1938); link [#1946](' . CAPABILITY_ISSUE_URL_BASE . '1946); execute [#1891](' . CAPABILITY_ISSUE_URL_BASE
-        . '1891). Opt-in ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE`._';
+        . '1891). Default-on ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE` (#1974)._';
     $lines[] = '';
 
     return implode("\n", $lines);

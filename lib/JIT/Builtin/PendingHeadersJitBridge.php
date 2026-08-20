@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
@@ -28,6 +29,12 @@ final class PendingHeadersJitBridge
 {
     private const G_SAPI_STARTED = '__phpc_sapi_output_started';
 
+    private const G_LLVM_HDR_COUNT = '__phpc_pending_hdr_llvm_count';
+
+    private const G_LLVM_HDR_LINES = '__phpc_pending_hdr_llvm_lines';
+
+    private const LLVM_HDR_CAP = 256;
+
     private const HELPER_PATH = '/ext/standard/PendingHeadersJitHelper.php';
 
     private const RESET_HELPER = 'PHPCompiler\\ext\\standard\\PendingHeadersJitHelper::reset';
@@ -42,6 +49,8 @@ final class PendingHeadersJitBridge
 
     private const LIST_TABLE_HELPER = 'PHPCompiler\\ext\\standard\\PendingHeadersJitHelper::listHeadersTable';
 
+    private const SNAPSHOT_HEADERS_HELPER = 'PHPCompiler\\ext\\standard\\PendingHeadersJitHelper::snapshotHeadersTable';
+
     private const FLUSH_HELPER = 'PHPCompiler\\ext\\standard\\PendingHeadersJitHelper::flushResponseHeaders';
 
     private const ADD_SETCOOKIE_HELPER = 'PHPCompiler\\ext\\standard\\PendingHeadersJitHelper::addSetcookie';
@@ -54,6 +63,7 @@ final class PendingHeadersJitBridge
         self::ADD_HEADER_HELPER,
         self::REMOVE_HEADER_HELPER,
         self::LIST_TABLE_HELPER,
+        self::SNAPSHOT_HEADERS_HELPER,
         self::FLUSH_HELPER,
         self::ADD_SETCOOKIE_HELPER,
     ];
@@ -84,9 +94,14 @@ final class PendingHeadersJitBridge
 
         $probe = $context->module->getNamedFunction('__phpc_pending_header_reset');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
+            if (!self::isThinLinkStub($probe)) {
+                self::registerLinkedRuntime($context);
 
-            return;
+                return;
+            }
+            // User-script lowering runs inside NestedJitCompileScope, so the first
+            // ensureLinked is a no-op; compileToFile then fills ret stubs (#1974).
+            self::clearThinLinkStubBodies($context);
         }
 
         $restore = self::captureInsertBlock($context);
@@ -100,11 +115,13 @@ final class PendingHeadersJitBridge
         self::implementAddHeaderBridge($context);
         self::implementRemoveHeaderBridge($context);
         self::implementListBridge($context);
-        self::implementVoidBridge($context, '__phpc_response_headers_flush', self::FLUSH_HELPER);
+        self::implementFlushBridge($context);
         self::implementSetcookieBridge($context);
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restore);
-        $context->builder->clearInsertionPosition();
+        if (null === $restore) {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
@@ -226,6 +243,12 @@ final class PendingHeadersJitBridge
         $context->builder->positionAtEnd($entry);
         $context->builder->call(self::helperFunction($context, self::RESET_HELPER));
         $i32 = $context->getTypeFromString('int32');
+        self::ensureLlvmHeaderGlobals($context);
+        $countPtr = $context->builder->pointerCast(
+            $context->module->getNamedGlobal(self::G_LLVM_HDR_COUNT),
+            $i32->pointerType(0)
+        );
+        $context->builder->store($i32->constInt(0, false), $countPtr);
         $sapi = $context->module->getNamedGlobal(self::G_SAPI_STARTED);
         if (null !== $sapi) {
             $context->builder->store(
@@ -283,16 +306,45 @@ final class PendingHeadersJitBridge
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $voidTy = $context->getTypeFromString('void');
         $ft = $context->context->functionType($voidTy, false, $strPtr, $i32);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('ph_add_bridge_entry');
+        $storeBb = $fn->appendBasicBlock('ph_add_llvm_store');
+        $doneBb = $fn->appendBasicBlock('ph_add_done');
         $context->builder->positionAtEnd($entry);
         $context->builder->call(
             self::helperFunction($context, self::ADD_HEADER_HELPER),
             $fn->getParam(0),
             JitNestedHelperCoerce::scalarToI64($context, $fn->getParam(1), $i32)
         );
+        // Dual-write into LLVM globals — NestedJIT static $headers[] is lost before flush (#1974).
+        self::ensureLlvmHeaderGlobals($context);
+        $countPtr = $context->builder->pointerCast(
+            $context->module->getNamedGlobal(self::G_LLVM_HDR_COUNT),
+            $i32->pointerType(0)
+        );
+        $count = $context->builder->load($countPtr);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_ULT, $count, $i32->constInt(self::LLVM_HDR_CAP, false)),
+            $storeBb,
+            $doneBb
+        );
+        $context->builder->positionAtEnd($storeBb);
+        $lines = $context->module->getNamedGlobal(self::G_LLVM_HDR_LINES);
+        $slot = $context->builder->inBoundsGEP(
+            $lines,
+            $i32->constInt(0, false),
+            $context->builder->zExt($count, $i64)
+        );
+        $context->builder->store($fn->getParam(0), $slot);
+        $context->builder->store(
+            $context->builder->add($count, $i32->constInt(1, false)),
+            $countPtr
+        );
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -401,6 +453,161 @@ final class PendingHeadersJitBridge
         $context->registerFunction($abiName, $fn);
     }
 
+    private static function implementFlushBridge(Context $context): void
+    {
+        $abiName = '__phpc_response_headers_flush';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        LibcExtern::ensurePrintf($context);
+        HttpResponseRuntime::ensureLinked($context);
+
+        $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $ft = $context->context->functionType($voidTy, false);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock('ph_flush_entry');
+        $alreadyBb = $fn->appendBasicBlock('ph_flush_already');
+        $bodyBb = $fn->appendBasicBlock('ph_flush_body');
+        $afterStatusBb = $fn->appendBasicBlock('ph_flush_after_status');
+        $headersBb = $fn->appendBasicBlock('ph_flush_headers');
+        $loopBb = $fn->appendBasicBlock('ph_flush_loop');
+        $loopBodyBb = $fn->appendBasicBlock('ph_flush_loop_body');
+        $afterHeadersBb = $fn->appendBasicBlock('ph_flush_after_headers');
+        $blankBb = $fn->appendBasicBlock('ph_flush_blank');
+        $markBb = $fn->appendBasicBlock('ph_flush_mark');
+
+        $context->builder->positionAtEnd($entry);
+        $wroteAlloca = $context->builder->alloca($i32);
+        $context->builder->store($i32->constInt(0, false), $wroteAlloca);
+        $flushedRaw = $context->builder->call(self::helperFunction($context, self::IS_FLUSHED_HELPER));
+        $flushedI32 = JitNestedHelperCoerce::i64ToScalar($context, $flushedRaw, $i32);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $flushedI32, $i32->constInt(0, false)),
+            $alreadyBb,
+            $bodyBb
+        );
+
+        $context->builder->positionAtEnd($alreadyBb);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($bodyBb);
+        $status = HttpResponseRuntime::loadStatusRaw($context);
+        $ge100 = $context->builder->icmp(Builder::INT_SGE, $status, $i32->constInt(100, false));
+        $le599 = $context->builder->icmp(Builder::INT_SLE, $status, $i32->constInt(599, false));
+        $statusOk = $context->builder->and($ge100, $le599);
+        $printStatusBb = $fn->appendBasicBlock('ph_flush_print_status');
+        $context->builder->branchIf($statusOk, $printStatusBb, $afterStatusBb);
+
+        $context->builder->positionAtEnd($printStatusBb);
+        $statusFmt = $context->builder->pointerCast(
+            $context->constantFromString("Status: %d\r\n"),
+            $charPtr
+        );
+        $context->builder->call($context->lookupFunction('printf'), $statusFmt, $status);
+        $context->builder->store($i32->constInt(1, false), $wroteAlloca);
+        $context->builder->branch($afterStatusBb);
+
+        $context->builder->positionAtEnd($afterStatusBb);
+        self::ensureLlvmHeaderGlobals($context);
+        $countPtr = $context->builder->pointerCast(
+            $context->module->getNamedGlobal(self::G_LLVM_HDR_COUNT),
+            $i32->pointerType(0)
+        );
+        $hdrCount = $context->builder->load($countPtr);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $hdrCount, $i32->constInt(0, false)),
+            $headersBb,
+            $afterHeadersBb
+        );
+
+        $context->builder->positionAtEnd($headersBb);
+        $lines = $context->module->getNamedGlobal(self::G_LLVM_HDR_LINES);
+        $idxAlloca = $context->builder->alloca($i32);
+        $context->builder->store($i32->constInt(0, false), $idxAlloca);
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($loopBb);
+        $idx = $context->builder->load($idxAlloca);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_ULT, $idx, $hdrCount),
+            $loopBodyBb,
+            $afterHeadersBb
+        );
+
+        $context->builder->positionAtEnd($loopBodyBb);
+        $slot = $context->builder->inBoundsGEP(
+            $lines,
+            $i32->constInt(0, false),
+            $context->builder->zExt($idx, $i64)
+        );
+        $line = $context->builder->load($slot);
+        $strMap = $context->structFieldMap['__string__'];
+        $len = $context->builder->load($context->builder->structGep($line, $strMap['length']));
+        $data = $context->builder->structGep($line, $strMap['value']);
+        $lineFmt = $context->builder->pointerCast(
+            $context->constantFromString("%.*s\r\n"),
+            $charPtr
+        );
+        $context->builder->call($context->lookupFunction('printf'), $lineFmt, $len, $data);
+        $context->builder->store($i32->constInt(1, false), $wroteAlloca);
+        $context->builder->store(
+            $context->builder->add($idx, $i32->constInt(1, false)),
+            $idxAlloca
+        );
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($afterHeadersBb);
+        $wrote = $context->builder->load($wroteAlloca);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $wrote, $i32->constInt(0, false)),
+            $blankBb,
+            $markBb
+        );
+
+        $context->builder->positionAtEnd($blankBb);
+        $blankFmt = $context->builder->pointerCast(
+            $context->constantFromString("\r\n"),
+            $charPtr
+        );
+        $context->builder->call($context->lookupFunction('printf'), $blankFmt);
+        $context->builder->branch($markBb);
+
+        $context->builder->positionAtEnd($markBb);
+        $context->builder->store($i32->constInt(0, false), $countPtr);
+        $context->builder->call(self::helperFunction($context, self::FLUSH_HELPER));
+        $sapi = $context->module->getNamedGlobal(self::G_SAPI_STARTED);
+        if (null !== $sapi) {
+            $context->builder->store(
+                $i32->constInt(1, false),
+                $context->builder->pointerCast($sapi, $i32->pointerType(0))
+            );
+        }
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function ensureLlvmHeaderGlobals(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        if (null === $context->module->getNamedGlobal(self::G_LLVM_HDR_COUNT)) {
+            $g = $context->module->addGlobal($i32, self::G_LLVM_HDR_COUNT);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_LLVM_HDR_LINES)) {
+            $arrTy = $strPtr->arrayType(self::LLVM_HDR_CAP);
+            $g = $context->module->addGlobal($arrTy, self::G_LLVM_HDR_LINES);
+            $g->setInitializer($arrTy->constNull());
+        }
+    }
+
     private static function implementVoidBridge(Context $context, string $abiName, string $helperLogical): void
     {
         $probe = $context->module->getNamedFunction($abiName);
@@ -466,6 +673,30 @@ final class PendingHeadersJitBridge
                 throw new \LogicException($name.' missing after PendingHeadersJitBridge (#9545)');
             }
             $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function isThinLinkStub(LlvmFunction $fn): bool
+    {
+        foreach ($fn->getBasicBlocks() as $block) {
+            if (false !== strpos($block->getName(), '_link_stub')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function clearThinLinkStubBodies(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $fn = $context->module->getNamedFunction($abiName);
+            if (null === $fn || 0 === $fn->countBasicBlocks() || !self::isThinLinkStub($fn)) {
+                continue;
+            }
+            foreach (array_reverse($fn->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
         }
     }
 
