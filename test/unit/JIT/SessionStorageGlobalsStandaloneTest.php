@@ -85,4 +85,12 @@ final class SessionStorageGlobalsStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $linked->countBasicBlocks(), $fnName);
         }
     }
+
+    public function testSessionStatusIcmpUsesI8ActiveGlobal(): void
+    {
+        $src = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionStatus.php');
+        $this->assertStringContainsString("getTypeFromString('int8')", $src);
+        $this->assertStringContainsString('$i8->constInt(0, false)', $src);
+        $this->assertStringNotContainsString('$i64->constInt(0, false)', $src);
+    }
 }

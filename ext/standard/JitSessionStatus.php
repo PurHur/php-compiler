@@ -17,12 +17,15 @@ final class JitSessionStatus
     {
         SessionStorageGlobals::ensureGlobals($context);
 
+        // activeGlobal is i8 (#5750 / SessionStorageGlobals::ensureGlobals); icmp must match
+        // peer SessionId / JitSessionLifecycleKernel — not i64 (#32999).
+        $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
         $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $activeNonZero = $context->builder->icmp(
             Builder::INT_NE,
             $active,
-            $i64->constInt(0, false)
+            $i8->constInt(0, false)
         );
 
         return $context->builder->select(
