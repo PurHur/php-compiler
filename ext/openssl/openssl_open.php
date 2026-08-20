@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_open() — decrypt openssl_seal() output (php-src ext/openssl/openssl.c; #6523).
+ * openssl_open() — decrypt openssl_seal() output (php-src ext/openssl/openssl.c; #6523 VM, JIT/AOT #32979).
  *
  * Reflection / named args: Zend stub `data`, `&$output`, `string $encrypted_key`, `$private_key`,
  * `string $cipher_algo`, `?string $iv = null`: `bool` (InternalArgInfo still says opendata/ekey/privkey/method
@@ -65,8 +65,21 @@ final class openssl_open extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_open() is not implemented for JIT in this compiler build (issue #6523)'
+        $argc = \count($args);
+        if ($argc < 5 || $argc > 6) {
+            throw new \ArgumentCountError(
+                'openssl_open() expects at least 5 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::open(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3],
+            $args[4],
+            6 === $argc ? $args[5] : null
         );
     }
 }
