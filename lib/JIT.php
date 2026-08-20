@@ -8092,6 +8092,7 @@ class JIT {
                     ) {
                         $paramVar = $this->context->getVariableFromOp($param->result);
                         $this->context->bindVariableByName($paramName, $paramVar);
+                        $this->syncJitParamVariableToSlotOperands($block, $param->result, $paramVar);
                         // Typed string formals may skip ARG_RECV overwrite (#24137); still
                         // mark assigned so undef-var guards stay quiet (#31101 MiniWebApp).
                         JIT\UndefinedVariableHelper::markAssigned(
@@ -8233,13 +8234,23 @@ class JIT {
                     }
                     $rhsSlot = $this->assignRhsSlot($op);
                     $rhsOperand = $block->getOperand($rhsSlot);
+                    $formalRhs = $this->tryResolveFormalParamVariableForRhs($block, $rhsOperand);
                     if (isset($this->context->coalesceMergeSlotOperands[(int) $rhsSlot])) {
                         $value = $this->materializeCoalesceMergeSlotArgSend(
                             $block,
                             $this->context->coalesceMergeSlotOperands[(int) $rhsSlot]
                         );
+                    } elseif (null !== $formalRhs) {
+                        $value = $formalRhs;
                     } else {
                         $value = $this->context->getVariableFromOp($rhsOperand);
+                        $rhsName = JIT\OperandName::resolve($rhsOperand);
+                        if (null !== $rhsName && '' !== $rhsName) {
+                            $resolvedRhs = $this->context->resolveRefAliasName($rhsName);
+                            if (isset($this->context->namedVariableBindings[$resolvedRhs])) {
+                                $value = $this->context->namedVariableBindings[$resolvedRhs];
+                            }
+                        }
                         // `@$undef` / `$a = $undef` TYPE_ASSIGN RHS: ZEND_CHECK_UNDEFINED_VAR
                         // even when the CV is already in namedVariableBindings (#32041).
                         if ($rhsOperand instanceof Operand) {
@@ -8272,6 +8283,7 @@ class JIT {
                             }
                         }
                     }
+                    $value = $this->resolveAssignRhsFromFormalParam($block, $rhsOperand, $value);
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
                         $this->emitJitReturnFromValue($func, $block, $value);
                         break;
@@ -13925,6 +13937,54 @@ class JIT {
 
     /** Match/phi merge may leave TYPE_ASSIGN arg3 null; rhs lives in arg1 (#13092). */
     /** AssignOp peephole may leave arg2 null; lvalue lives in arg1 (#13062, #6438). */
+    /** Resolve `$v` RHS from a callee formal CV before Temporary null-box fallback (#32654). */
+    private function tryResolveFormalParamVariableForRhs(Block $block, Operand $rhsOperand): ?Variable
+    {
+        if (null === $block->func) {
+            return null;
+        }
+        $rhsName = JIT\OperandName::resolve($rhsOperand);
+        if (null !== $rhsName && '' !== $rhsName) {
+            $resolvedRhs = $this->context->resolveRefAliasName($rhsName);
+            if (isset($this->context->namedVariableBindings[$resolvedRhs])) {
+                return $this->context->namedVariableBindings[$resolvedRhs];
+            }
+        }
+        $rhsSlotNum = $block->slotForOperand($rhsOperand);
+        if (null === $rhsSlotNum) {
+            return null;
+        }
+        foreach ($block->func->params as $param) {
+            if ($block->slotForOperand($param->result) !== $rhsSlotNum) {
+                continue;
+            }
+            $pname = JIT\OperandName::resolve($param->result);
+            if (null !== $pname && '' !== $pname) {
+                $resolved = $this->context->resolveRefAliasName($pname);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    return $this->context->namedVariableBindings[$resolved];
+                }
+            }
+            if ($this->context->hasVariableOp($param->result)) {
+                return $this->context->getVariableFromOp($param->result);
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private function resolveAssignRhsFromFormalParam(
+        Block $block,
+        Operand $rhsOperand,
+        Variable $value
+    ): Variable {
+        $formal = $this->tryResolveFormalParamVariableForRhs($block, $rhsOperand);
+
+        return null !== $formal ? $formal : $value;
+    }
+
     private function binaryOpLeftSlot(OpCode $op): int
     {
         if (null !== $op->arg2) {
@@ -17563,6 +17623,10 @@ class JIT {
             ) {
                 if (!$result->includeBinding) {
                     $result->free();
+                }
+                JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
+                if (!JIT\BasicBlockHelper::unsealAndContinue($this->context)) {
+                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'assign_same_type_cont');
                 }
                 $this->context->builder->store($value->value, $result->value);
                 $this->maybeCopyObjectPropertyBacking($result, $value, $force);
@@ -23908,6 +23972,24 @@ class JIT {
         if (null !== $name && '' !== $name) {
             $this->context->bindVariableByName($name, $paramVar);
         }
+        $this->syncJitParamVariableToSlotOperands($block, $paramOperand, $paramVar);
+    }
+
+    /** Rebind every scoped operand sharing a formal slot (#27624, e06_byref `$r = $v`). */
+    private function syncJitParamVariableToSlotOperands(
+        Block $block,
+        Operand $paramOperand,
+        Variable $paramVar
+    ): void {
+        $slot = $block->slotForOperand($paramOperand);
+        if (null === $slot) {
+            return;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            if ($block->slotForOperand($scopeOp) === $slot) {
+                $this->context->setVariableOp($scopeOp, $paramVar);
+            }
+        }
     }
 
     /**
@@ -23960,19 +24042,24 @@ class JIT {
         if (null === $refIdx) {
             return false;
         }
-        $rhsSlot = $block->slotForOperand($rhsOperand);
-        if (null !== $rhsSlot) {
-            foreach ($block->func->params as $param) {
-                if (
-                    $block->slotForOperand($param->result) === $rhsSlot
-                    && $this->context->hasVariableOp($param->result)
-                ) {
-                    $value = $this->context->getVariableFromOp($param->result);
-                    break;
+        $formalRhs = $this->tryResolveFormalParamVariableForRhs($block, $rhsOperand);
+        if (null !== $formalRhs) {
+            $value = $formalRhs;
+        } else {
+            $rhsSlot = $block->slotForOperand($rhsOperand);
+            if (null !== $rhsSlot) {
+                foreach ($block->func->params as $param) {
+                    if (
+                        $block->slotForOperand($param->result) === $rhsSlot
+                        && $this->context->hasVariableOp($param->result)
+                    ) {
+                        $value = $this->context->getVariableFromOp($param->result);
+                        break;
+                    }
                 }
+            } elseif ($this->context->hasVariableOp($rhsOperand)) {
+                $value = $this->context->getVariableFromOp($rhsOperand);
             }
-        } elseif ($this->context->hasVariableOp($rhsOperand)) {
-            $value = $this->context->getVariableFromOp($rhsOperand);
         }
         $destBinding = $this->resolveByRefFormalAssignDestBinding($block, $destOp, $args, $thisParamOffset, $refIdx);
         if (null === $destBinding) {
