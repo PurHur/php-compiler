@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkcs12_export() — export PKCS#12 keystore (php-src ext/openssl/pkcs12.c; #6420).
+ * openssl_pkcs12_export() — export PKCS#12 keystore (php-src ext/openssl/pkcs12.c; #6420 VM, JIT/AOT #32948).
  */
 final class openssl_pkcs12_export extends Internal
 {
@@ -58,8 +58,20 @@ final class openssl_pkcs12_export extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkcs12_export() is not implemented for JIT in this compiler build (issue #6420)'
+        $argc = \count($args);
+        if ($argc < 4 || $argc > 5) {
+            throw new \ArgumentCountError(
+                'openssl_pkcs12_export() expects 4 or 5 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::pkcs12Export(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3],
+            5 === $argc ? $args[4] : null
         );
     }
 }

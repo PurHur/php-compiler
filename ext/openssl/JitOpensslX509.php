@@ -34,7 +34,9 @@ use PHPLLVM\Value;
  * openssl_spki_verify() (#32776 leftover of #8690);
  * openssl_spki_export() (#32787 leftover of #6423);
  * openssl_spki_export_challenge() (#32792 leftover of #6423);
- * openssl_spki_new() (#32892 leftover of #8690).
+ * openssl_spki_new() (#32892 leftover of #8690);
+ * openssl_pkcs12_export() (#32948 leftover of #6420);
+ * openssl_pkcs12_export_to_file() (#32948 leftover of #6420).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -58,6 +60,8 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_export) / NETSCAPE_SPKI_get_pubkey
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_export_challenge) / NETSCAPE_SPKI_get_challenge
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_new) / NETSCAPE_SPKI_sign
+ * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_export) / PKCS12_create
+ * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_export_to_file)
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -824,6 +828,171 @@ final class JitOpensslX509
         }
 
         return self::boxedString($context, $spkac);
+    }
+
+    /**
+     * openssl_pkcs12_export() — bake {@see VmOpensslPkcs12Native::createPkcs12} into &$output.
+     *
+     * php-src: ext/openssl/pkcs12.c PHP_FUNCTION(openssl_pkcs12_export) / PKCS12_create
+     * By-ref $output is written via __value__writeString (peer {@see self::pkeyExport}).
+     *
+     * Cert PEM, private-key PEM, and passphrase must be compile-time string literals.
+     * Options must be omitted/null (thin AOT does not bake friendly_name/extracerts).
+     * PKCS#12 MAC salt is non-deterministic — baked blob is fixed for that compile.
+     */
+    public static function pkcs12Export(
+        Context $context,
+        JITVariable $certificate,
+        JITVariable $output,
+        JITVariable $privateKey,
+        JITVariable $passphrase,
+        ?JITVariable $options = null
+    ): Value {
+        $certPem = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $certPem) {
+            throw new \LogicException(
+                'openssl_pkcs12_export() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+        $keyPem = JitStringArg::compileTimeLiteral($privateKey);
+        if (null === $keyPem) {
+            throw new \LogicException(
+                'openssl_pkcs12_export() private_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+        $pass = JitStringArg::compileTimeLiteral($passphrase);
+        if (null === $pass) {
+            throw new \LogicException(
+                'openssl_pkcs12_export() passphrase must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+        if (null !== $options && JITVariable::TYPE_NULL !== $options->type && !($options->isNullConstant ?? false)) {
+            throw new \LogicException(
+                'openssl_pkcs12_export() options must be omitted or null '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+
+        if (!VmOpensslPkcs12Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $blob = VmOpensslPkcs12Native::createPkcs12($certPem, $keyPem, $pass);
+        if (false === $blob) {
+            return self::boxedFalse($context);
+        }
+
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $output);
+        $str = $context->builder->load($context->constantStringFromString($blob));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
+    }
+
+    /**
+     * openssl_pkcs12_export_to_file() — bake {@see VmOpensslPkcs12Native::createPkcs12}, write via
+     * {@see \PHPCompiler\JIT\Builtin\StringFilePutContents} / __compiler_file_put_contents.
+     *
+     * php-src: ext/openssl/pkcs12.c PHP_FUNCTION(openssl_pkcs12_export_to_file)
+     */
+    public static function pkcs12ExportToFile(
+        Context $context,
+        JITVariable $certificate,
+        JITVariable $outputFilename,
+        JITVariable $privateKey,
+        JITVariable $passphrase,
+        ?JITVariable $options = null
+    ): Value {
+        $certPem = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $certPem) {
+            throw new \LogicException(
+                'openssl_pkcs12_export_to_file() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+        $path = JitStringArg::compileTimeLiteral($outputFilename);
+        if (null === $path) {
+            throw new \LogicException(
+                'openssl_pkcs12_export_to_file() output_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+        $keyPem = JitStringArg::compileTimeLiteral($privateKey);
+        if (null === $keyPem) {
+            throw new \LogicException(
+                'openssl_pkcs12_export_to_file() private_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+        $pass = JitStringArg::compileTimeLiteral($passphrase);
+        if (null === $pass) {
+            throw new \LogicException(
+                'openssl_pkcs12_export_to_file() passphrase must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+        if (null !== $options && JITVariable::TYPE_NULL !== $options->type && !($options->isNullConstant ?? false)) {
+            throw new \LogicException(
+                'openssl_pkcs12_export_to_file() options must be omitted or null '
+                .'for JIT/AOT in this compiler build (issue #32948)'
+            );
+        }
+
+        if (!VmOpensslPkcs12Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $blob = VmOpensslPkcs12Native::createPkcs12($certPem, $keyPem, $pass);
+        if (false === $blob) {
+            return self::boxedFalse($context);
+        }
+
+        $pathStr = $context->builder->load($context->constantStringFromString($path));
+        $dataStr = $context->builder->load($context->constantStringFromString($blob));
+        $dataOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $dataStr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('__compiler_file_put_contents'),
+            $pathStr,
+            $dataOwned,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $failed = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_SLT,
+            $written,
+            $i64->constInt(0, false)
+        );
+
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_pkcs12_export_file_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'ossl_pkcs12_export_file_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkcs12_export_file_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     /**
