@@ -24,7 +24,7 @@ final class StringOffsetHelper
         }
         $ty = $context->getStringFromType($var->value->typeOf());
 
-        return 'i8*' === $ty || 'char*' === $ty;
+        return 'i8*' === $ty || 'char*' === $ty || 'int8*' === $ty;
     }
 
     public static function emitIncDecError(Context $context): void

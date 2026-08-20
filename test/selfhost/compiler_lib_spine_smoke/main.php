@@ -6525,6 +6525,7 @@ require_once __DIR__.'/../../../lib/JIT/SimpleXmlInstanceMethodJit.php';
 require_once __DIR__.'/../../../lib/JIT/SplAutoloadCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/StaticPropertyVisibilityJitGuard.php';
 require_once __DIR__.'/../../../lib/JIT/StringOffsetHelper.php';
+require_once __DIR__.'/../../../lib/JIT/ValueBoxDimWrite.php';
 require_once __DIR__.'/../../../lib/JIT/SuperglobalInit.php';
 require_once __DIR__.'/../../../lib/JIT/TryCatchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/TryCatchState.php';
