@@ -25,7 +25,8 @@ use PHPLLVM\Value;
  * openssl_csr_export_to_file() (#32697 leftover of #6421),
  * openssl_pkey_export() (#32705 leftover of #6295),
  * openssl_pkey_export_to_file() (#32705 leftover of #20287), and
- * openssl_public_encrypt() (#32713 leftover of #6666).
+ * openssl_public_encrypt() (#32713 leftover of #6666), and
+ * openssl_private_encrypt() (#32757 leftover of #6666).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -40,6 +41,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkey_export) / PEM_write_bio_PrivateKey
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkey_export_to_file)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_public_encrypt) / EVP_PKEY_encrypt
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_private_encrypt) / EVP_PKEY_sign
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -450,6 +452,69 @@ final class JitOpensslX509
         }
 
         $cipher = VmOpensslPkeyNative::encrypt($plain, $pem, $pad);
+        if (false === $cipher) {
+            return self::boxedFalse($context);
+        }
+
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $encrypted);
+        $str = $context->builder->load($context->constantStringFromString($cipher));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
+    }
+
+    /**
+     * openssl_private_encrypt() — bake {@see VmOpensslPkeyNative::privateEncrypt} into &$encrypted.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_private_encrypt) / EVP_PKEY_sign
+     * By-ref $encrypted is written via __value__writeString (peer {@see self::publicEncrypt}).
+     *
+     * PKCS#1 type-1 private encrypt is deterministic for a fixed key+data; still assert
+     * bool + non-empty ciphertext in repros (peer #32713).
+     */
+    public static function privateEncrypt(
+        Context $context,
+        JITVariable $data,
+        JITVariable $encrypted,
+        JITVariable $key,
+        ?JITVariable $padding = null
+    ): Value {
+        $plain = JitStringArg::compileTimeLiteral($data);
+        if (null === $plain) {
+            throw new \LogicException(
+                'openssl_private_encrypt() data must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32757)'
+            );
+        }
+        $pem = JitStringArg::compileTimeLiteral($key);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_private_encrypt() key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32757)'
+            );
+        }
+        $pad = OpensslConstants::OPENSSL_PKCS1_PADDING;
+        if (null !== $padding) {
+            $padLit = self::compileTimeInt($padding);
+            if (null === $padLit) {
+                throw new \LogicException(
+                    'openssl_private_encrypt() padding must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #32757)'
+                );
+            }
+            $pad = $padLit;
+        }
+
+        if (!VmOpensslPkeyNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $cipher = VmOpensslPkeyNative::privateEncrypt($plain, $pem, $pad);
         if (false === $cipher) {
             return self::boxedFalse($context);
         }
