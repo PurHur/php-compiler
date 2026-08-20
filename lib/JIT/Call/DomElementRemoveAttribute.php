@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\dom\JitDomAttributeNodeNS;
+use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
+use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -17,6 +19,29 @@ final class DomElementRemoveAttribute implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_invoke_cont');
+        // Keep createElement attr bag + loadXML C14N fold in sync (#32981).
+        if (\count($args) >= 2) {
+            $name = $args[1]->compileTimeString;
+            if (null !== $name && 'xmlns' !== $name) {
+                $id = $args[0]->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+                if (null !== $id) {
+                    JitDomCreateElementAttrs::remove($id, $name);
+                }
+                $attrs = $args[0]->compileTimeDomAttributes ?? [];
+                if (isset($attrs[$name])) {
+                    unset($attrs[$name]);
+                    $args[0]->compileTimeDomAttributes = $attrs;
+                }
+                $path = $args[0]->compileTimeDomNodePath ?? null;
+                $nested = null !== $path && '' !== $path
+                    && substr_count(trim($path, '/'), '/') >= 1;
+                if ($nested) {
+                    JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+                } else {
+                    JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeRemove($name);
+                }
+            }
+        }
 
         return JitDomAttributeNodeNS::invokeRemoveAttribute($context, ...$args);
     }

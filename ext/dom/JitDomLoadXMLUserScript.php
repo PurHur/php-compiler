@@ -167,10 +167,80 @@ final class JitDomLoadXMLUserScript
         }
         $tag = $parsed['tag'];
         $attrs = $parsed['attrs'];
-        self::$lastCompileTimeXml = '<'.$tag.$attrs.'>'.$newInner.'</'.$tag.'>';
+        self::commitRefreshedCompileTimeXml('<'.$tag.$attrs.'>'.$newInner.'</'.$tag.'>');
+    }
+
+    /**
+     * Apply setAttribute on the document element of the compile-time XML so C14N
+     * fold sees the new attr (#32981; peer #32972 root-inner refresh).
+     */
+    public static function refreshCompileTimeXmlRootAttributeSet(string $name, string $value): void
+    {
+        self::mutateCompileTimeXmlRootAttribute(static function (\DOMElement $root) use ($name, $value): void {
+            @$root->setAttribute($name, $value);
+        });
+    }
+
+    /**
+     * Apply removeAttribute on the document element of the compile-time XML (#32981).
+     */
+    public static function refreshCompileTimeXmlRootAttributeRemove(string $name): void
+    {
+        self::mutateCompileTimeXmlRootAttribute(static function (\DOMElement $root) use ($name): void {
+            @$root->removeAttribute($name);
+        });
+    }
+
+    /**
+     * @param callable(\DOMElement):void $mutate
+     */
+    private static function mutateCompileTimeXmlRootAttribute(callable $mutate): void
+    {
+        $xml = self::$lastCompileTimeXml;
+        if (null === $xml || '' === trim($xml)) {
+            return;
+        }
+        if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {
+            return;
+        }
+        $doc = new \DOMDocument();
+        if (!@$doc->loadXML($xml)) {
+            return;
+        }
+        $root = $doc->documentElement;
+        if (!$root instanceof \DOMElement) {
+            return;
+        }
+        $mutate($root);
+        $new = @$doc->saveXML($root);
+        if (!\is_string($new) || '' === $new) {
+            return;
+        }
+        self::commitRefreshedCompileTimeXml($new);
+    }
+
+    /** Keep lastCompileTimeXml + per-receiver/token maps in sync after a fold refresh. */
+    private static function commitRefreshedCompileTimeXml(string $newXml): void
+    {
+        $old = self::$lastCompileTimeXml;
+        self::$lastCompileTimeXml = $newXml;
         // Fold may use the refreshed literal.
         self::$treeMutatedSinceLoad = false;
         self::$lastLoadWasPureUserScript = true;
+        if (null !== $old) {
+            foreach (self::$xmlByToken as $token => $xml) {
+                if ($xml === $old) {
+                    self::$xmlByToken[$token] = $newXml;
+                }
+            }
+            if (null !== self::$xmlByReceiver) {
+                foreach (self::$xmlByReceiver as $receiver) {
+                    if (self::$xmlByReceiver[$receiver] === $old) {
+                        self::$xmlByReceiver[$receiver] = $newXml;
+                    }
+                }
+            }
+        }
     }
 
     /**
