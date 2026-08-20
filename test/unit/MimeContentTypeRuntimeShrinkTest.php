@@ -8,11 +8,11 @@ use PHPCompiler\ext\standard\MimeContentTypeJitHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * mime_content_type JIT routes through MimeContentTypeJitHelper PHP (#9236 / #25544 / #33034).
+ * mime_content_type JIT routes through MimeContentTypeJitHelper PHP (#9236 / #25544 / #33034 / #33039).
  *
  * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #25541).
  * Runtime owns ABI module-locally with insert-block save/restore (peer StringFileGetContents).
- * Sniff is same-file (NestedJIT cannot call VmMime across HELPER_PATH).
+ * Sniff is same-file (NestedJIT cannot call VmMime across HELPER_PATH); no NestedJIT strncmp (#33039).
  */
 final class MimeContentTypeRuntimeShrinkTest extends TestCase
 {
@@ -21,9 +21,11 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/MimeContentTypeJitHelper.php');
         $this->assertStringContainsString('@\\file_get_contents', $source);
         $this->assertStringContainsString('self::detectFromBytes', $source);
-        $this->assertStringContainsString('#33034', $source);
-        $this->assertStringNotContainsString('VmMime::', $source);
+        $this->assertStringContainsString('#33039', $source);
+        $this->assertStringNotContainsString('VmMime::detectFromBytes(', $source);
         $this->assertStringNotContainsString('VmFs::fileGetContents', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\strncmp\\s*\\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\strncasecmp\\s*\\(/', $source);
     }
 
     public function testMimeContentTypeRuntimeUsesJitVmHelperLink(): void
@@ -57,6 +59,7 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
         \file_put_contents($path, "<?php echo 1;\n");
 
         $this->assertSame('text/x-php', MimeContentTypeJitHelper::mimeContentType($path));
+        $this->assertSame('text/plain', MimeContentTypeJitHelper::mimeContentType('/etc/hosts'));
         $this->assertNull(MimeContentTypeJitHelper::mimeContentType('/no/such/phpc-mime-'.bin2hex(random_bytes(4))));
 
         @\unlink($path);
