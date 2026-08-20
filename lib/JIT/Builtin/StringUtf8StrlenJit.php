@@ -10,8 +10,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM body for __compiler_utf8_strlen on {@see __string__*} (#158, restored #27051).
+ * LLVM body for __compiler_utf8_strlen on {@see __string__*} (#158, restored #27051, #33001).
  *
+ * Owns the ABI module-locally: {@see getNamedFunction} first, then {@see addFunction}
+ * if absent. Do not re-add empty always-on shells in {@see Type} — leftover decls mint
+ * utf8_strlen.1 (#31894 / #32122).
  * NestedJIT Utf8JitHelper→VmString mis-reads {@see __string__*} as boxed {@see __value__*}
  * under thin AOT (silent 0). Algorithm matches {@see \PHPCompiler\ext\standard\VmString::utf8CharLength}.
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strlen)
@@ -27,12 +30,25 @@ final class StringUtf8StrlenJit
             return;
         }
 
-        $fn = null !== $probe
-            ? $probe
-            : $context->lookupFunction('__compiler_utf8_strlen');
+        $fn = self::declareAbi($context, $probe);
         self::emitBody($context, $fn);
         $context->registerFunction('__compiler_utf8_strlen', $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareAbi(Context $context, ?LlvmFunction $probe): LlvmFunction
+    {
+        if (null !== $probe) {
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->module->addFunction(
+            '__compiler_utf8_strlen',
+            $context->context->functionType($i64, false, $strPtr)
+        );
     }
 
     private static function emitBody(Context $context, LlvmFunction $fn): void

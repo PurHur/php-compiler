@@ -10,9 +10,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM body for __compiler_utf8_valid on {@see __string__*} (#4571, restored #27051).
+ * LLVM body for __compiler_utf8_valid on {@see __string__*} (#4571, restored #27051, #33001).
  *
- * Peer {@see StringUtf8StrlenJit}: NestedJIT Utf8JitHelper ABI hole under thin AOT.
+ * Owns the ABI module-locally: {@see getNamedFunction} first, then {@see addFunction}
+ * if absent. Do not re-add empty always-on shells in {@see Type} — leftover decls mint
+ * utf8_valid.1 (#31894 / #32122). Peer {@see StringUtf8StrlenJit}.
  * Algorithm matches {@see \PHPCompiler\ext\standard\VmString::isValidUtf8}.
  * php-src: ext/mbstring/mbstring.c — mb_check_encoding UTF-8 path
  */
@@ -27,12 +29,25 @@ final class StringUtf8ValidJit
             return;
         }
 
-        $fn = null !== $probe
-            ? $probe
-            : $context->lookupFunction('__compiler_utf8_valid');
+        $fn = self::declareAbi($context, $probe);
         self::emitBody($context, $fn);
         $context->registerFunction('__compiler_utf8_valid', $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareAbi(Context $context, ?LlvmFunction $probe): LlvmFunction
+    {
+        if (null !== $probe) {
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->module->addFunction(
+            '__compiler_utf8_valid',
+            $context->context->functionType($i64, false, $strPtr)
+        );
     }
 
     private static function emitBody(Context $context, LlvmFunction $fn): void

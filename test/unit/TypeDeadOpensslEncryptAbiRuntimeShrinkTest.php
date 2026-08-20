@@ -44,7 +44,7 @@ final class TypeDeadOpensslEncryptAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_utf8_strlen'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_readfile'", $type);
         $this->assertStringContainsString('OpensslEncryptRuntime::ensureLinked', $type);
     }
 

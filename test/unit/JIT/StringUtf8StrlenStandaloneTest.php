@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #158 / #27051: AOT standalone must define __compiler_utf8_strlen on __string__*.
+ * Issue #158 / #27051 / #33001: AOT standalone must define __compiler_utf8_strlen on __string__*.
  *
  * @group aot-lint
  */
@@ -32,6 +32,9 @@ final class StringUtf8StrlenStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('__compiler_utf8_strlen');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
+        $valid = $ctx->lookupFunction('__compiler_utf8_valid');
+        $this->assertNotNull($valid);
+        $this->assertGreaterThan(0, $valid->countBasicBlocks());
     }
 
     public function testStringUtf8RuntimeDelegatesToLlvmAbiBodies(): void
@@ -40,5 +43,8 @@ final class StringUtf8StrlenStandaloneTest extends TestCase
         $this->assertStringContainsString('StringUtf8StrlenJit::implement', $source);
         $this->assertStringContainsString('StringUtf8ValidJit::implement', $source);
         $this->assertStringContainsString('#27051', $source);
+        $this->assertStringContainsString('#33001', $source);
+        $strlen = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringUtf8StrlenJit.php');
+        $this->assertStringContainsString('declareAbi', $strlen);
     }
 }

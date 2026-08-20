@@ -8,11 +8,13 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for __compiler_utf8_strlen / __compiler_utf8_valid (#9246, #9273, #27051).
+ * JIT/AOT link for __compiler_utf8_strlen / __compiler_utf8_valid (#9246, #9273, #27051, #33001).
  *
+ * Owns the ABI module-locally via {@see StringUtf8StrlenJit} / {@see StringUtf8ValidJit}
+ * (`getNamedFunction` first, `addFunction` if absent). Do not re-add empty always-on shells
+ * in {@see Type} — leftover decls mint utf8_strlen.1 / utf8_valid.1 (#31894 / #32122).
  * Thin AOT cannot use NestedJIT Utf8JitHelper→VmString: that path treats {@see __string__*}
- * args as boxed {@see __value__*} and returns 0 (#27051). ABI bodies are LLVM walks on
- * {@see __string__*} ({@see StringUtf8StrlenJit} / {@see StringUtf8ValidJit}); PHP SSOT remains
+ * args as boxed {@see __value__*} and returns 0 (#27051). PHP SSOT remains
  * {@see \PHPCompiler\ext\standard\VmString} / {@see \PHPCompiler\ext\standard\Utf8JitHelper}.
  * php-src: ext/standard/utf8.c, ext/mbstring/mbstring.c
  */
