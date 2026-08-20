@@ -26,7 +26,8 @@ final class StringErrorLogRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(100, \substr_count($source, "\n") + 1);
+        // Insert-block restore (#33044 / peer #27317) adds a few lines over the prior 100-line cap.
+        $this->assertLessThan(130, \substr_count($source, "\n") + 1);
     }
 
     public function testErrorLogJitHelperDelegatesToVmErrorLog(): void
