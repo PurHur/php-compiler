@@ -167,7 +167,9 @@ final class JitDomAppendChildLiveSlots
         self::storeChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, $childJit);
         // +1 in place — absolute writeChildNodesList(..., 2) left loadXML-seeded
         // held `$list = $parent->childNodes` stale at length 2 (#29048 / re-#28509).
-        self::incrementChildNodesLengthInPlace($context, $parent, $curFirst, $child);
+        // Pin __phpcItem1 to first->next (second child), never the new last (#32784).
+        $pin1 = self::loadSibling($context, $curFirst, VmDom::PROP_NEXT_SIBLING, 'dom_acls_pin1');
+        self::incrementChildNodesLengthInPlace($context, $parent, $curFirst, $pin1);
         self::storeParentNode($context, $child, $parent);
         $context->builder->branch($bbDone);
 
