@@ -65,7 +65,7 @@ final class OpensslSignRuntime
         if (!self::opensslEvRuntimeAvailable()) {
             self::implementStubBridges($context);
         } else {
-            self::ensureJitHelperCompiled($context);
+            \PHPCompiler\ext\openssl\JitOpensslSignKernel::ensureEvpLeaves($context);
             self::implementIfMissing($context, '__compiler_openssl_sign', self::implementSignBridge(...));
             self::implementIfMissing($context, '__compiler_openssl_verify', self::implementVerifyBridge(...));
         }
@@ -100,28 +100,27 @@ final class OpensslSignRuntime
     {
         $entry = $fn->appendBasicBlock('ossl_sign_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::SIGN_HELPER),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
+        $result = $context->builder->call(
+            $context->lookupFunction(\PHPCompiler\ext\openssl\JitOpensslSignKernel::EVP_SIGN),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
         );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
-        );
+        $context->builder->returnValue($result);
     }
 
     private static function implementVerifyBridge(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('ossl_verify_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::VERIFY_HELPER),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
+        $result = $context->builder->call(
+            $context->lookupFunction(\PHPCompiler\ext\openssl\JitOpensslSignKernel::EVP_VERIFY),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2),
+            $fn->getParam(3)
         );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $context->getTypeFromString('int32'))
-        );
+        $context->builder->returnValue($result);
     }
 
     private static function implementStubBridges(Context $context): void
