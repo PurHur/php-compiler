@@ -293,6 +293,20 @@ final class JitValueBox
         $destPtr = self::normalizeValuePtr($context, $destPtr);
         switch ($value->type) {
             case Variable::TYPE_VALUE:
+                if (
+                    Variable::KIND_VALUE === $value->kind
+                    && '__value__' === $context->getStringFromType($value->value->typeOf())
+                ) {
+                    $slot = self::alloc($context);
+                    $context->builder->store($value->value, $slot);
+                    self::copyIntoPointer(
+                        $context,
+                        $destPtr,
+                        self::pointer($context, $slot)
+                    );
+
+                    return;
+                }
                 self::copyIntoPointer(
                     $context,
                     $destPtr,
@@ -483,7 +497,7 @@ final class JitValueBox
     private static function copyBetweenPointers(Context $context, Value $destPtr, Value $srcPtr): void
     {
         if (!BasicBlockHelper::unsealAndContinue($context)) {
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'value_copy_cont');
+            BasicBlockHelper::ensureOpenInsertBlockReplacingVoidReturn($context, 'value_copy_cont');
         }
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
