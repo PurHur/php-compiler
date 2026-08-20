@@ -59,6 +59,10 @@ final class JitDomGetNodePath
         $result->compileTimeDomLineNo = JitDomGetLineNo::rootLineNo(
             JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml
         );
+        // Drop stale firstChild/lastChild hints so documentElement->cloneNode()
+        // does not borrow a prior child index (#32949).
+        JitDomNodeChildProperty::$lastFetchedChildIndex = null;
+        JitDomNodeChildProperty::$lastFetchedTagName = null;
         self::$lastParentPath = $path;
         self::$lastParentInner = $inner;
         self::$lastChildFetchWasFirstChild = false;
