@@ -78,6 +78,28 @@ final class TypeDeadJsonAbiRuntimeShrinkTest extends TestCase
         }
     }
 
+    /**
+     * After Type shell drop, JsonEncodeArrayLlvm self-looks up __compiler_json_encode_array
+     * while the bridge body is still being emitted (#32326 InfNan AOT).
+     */
+    public function testJsonEncodeArrayBridgeRegistersBeforeBodyEmit(): void
+    {
+        $encode = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncode.php');
+        $this->assertStringContainsString('Register before body emit', $encode);
+        $bridgeStart = strpos($encode, 'private static function implementJsonEncodeArrayBridge');
+        $this->assertNotFalse($bridgeStart);
+        $bridge = substr($encode, $bridgeStart, 1200);
+        $reg = strpos($bridge, 'registerFunction($abiName, $fn)');
+        $scope = strpos($bridge, 'scopeLoweringToFunction');
+        $this->assertNotFalse($reg);
+        $this->assertNotFalse($scope);
+        $this->assertLessThan(
+            $scope,
+            $reg,
+            'registerFunction must precede scopeLoweringToFunction (#32897 follow-up / #32326)'
+        );
+    }
+
     public function testTypeInitializeStillEnsureLinksJsonRuntimes(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');

@@ -269,6 +269,8 @@ final class StringJsonDecode
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
+        // Register before body emit — Type empty shells used to pre-register (#32897 follow-up).
+        $context->registerFunction($abiName, $fn);
 
         self::ensureJitHelperCompiled($context);
 
@@ -467,7 +469,6 @@ final class StringJsonDecode
         $phi->addIncoming($castHt, $bbArrayOk);
 
         $context->builder->returnValue($context->builder->pointerCast($phi, $valuePtr));
-        $context->registerFunction($abiName, $fn);
     }
 
     /**

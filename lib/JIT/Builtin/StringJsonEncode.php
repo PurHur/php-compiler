@@ -25,6 +25,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_json_encode_* via JsonEncodeNestedJitHelper PHP
  * (#9267, #13239, #20816, #27020). Type always-on shells dropped (#32897).
+ * Bridges registerFunction before body emit so JsonEncodeArrayLlvm self-lookup
+ * works without Type predecls (#32326 InfNan AOT).
  *
  * Embed + thin standalone AOT: {@see JsonEncodeNestedJitHelper} via {@see JitVmHelperLink}
  * (Context-free NestedJIT path — avoids `$ctx->runtime->vm` SIGSEGV on thin AOT).
@@ -143,6 +145,9 @@ final class StringJsonEncode
         $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        // Register before body emit: JsonEncodeArrayLlvm → encodeBoxedValue self-calls
+        // this ABI. Type empty shells used to pre-register it (#32897 follow-up / #32326).
+        $context->registerFunction($abiName, $fn);
 
         BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
             $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::HT_BRIDGE_ENTRY);
@@ -151,7 +156,6 @@ final class StringJsonEncode
                 JsonEncodeArrayLlvm::encode($context, $fn->getParam(0), $fn->getParam(1))
             );
         });
-        $context->registerFunction($abiName, $fn);
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
@@ -182,6 +186,8 @@ final class StringJsonEncode
         $double = $context->getTypeFromString('double');
         $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        // Register before body emit — recursive/self lookups while lowering (#32897 follow-up).
+        $context->registerFunction($abiName, $fn);
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::VALUE_BRIDGE_ENTRY);
         $floatBb = $fn->appendBasicBlock('json_enc_val_float');
@@ -297,7 +303,6 @@ final class StringJsonEncode
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $result, $strPtr)
         );
-        $context->registerFunction($abiName, $fn);
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
