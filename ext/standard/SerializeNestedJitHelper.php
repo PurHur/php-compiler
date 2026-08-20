@@ -59,7 +59,35 @@ final class SerializeNestedJitHelper
             $val = $pair[1];
             $t = $val->type & 0x7f;
             if (6 === $t || 7 === $t) {
-                $body .= self::encodeHashtable($val->toArray(), $flags) ?? 'N;';
+                // NestedJIT: $val->toArray() SIGABRTs on pair values (#27031 / #32911 follow-up).
+                // Peer JsonEncodeNestedJitHelper #27182: value-foreach packed chunks.
+                $inner = '';
+                $in = 0;
+                $had = '0';
+                foreach ($val as $elem) {
+                    $had = '1';
+                    $inner .= 'i:'.((string) $in).';';
+                    $et = $elem->type & 0x7f;
+                    if (1 === $et) {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    } elseif (0 === $et) {
+                        $inner .= 'N;';
+                    } elseif (3 === $et) {
+                        $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
+                    } elseif (4 === $et) {
+                        $inner .= self::quote($elem->toString());
+                    } elseif (2 === $et) {
+                        $inner .= 'd:'.((string) $elem->toFloat()).';';
+                    } else {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    }
+                    ++$in;
+                }
+                if ('1' === $had) {
+                    $body .= 'a:'.((string) $in).':{'.$inner.'}';
+                } else {
+                    $body .= 'N;';
+                }
             } elseif (1 === $t) {
                 $body .= 'i:'.((string) $val->toInt()).';';
             } elseif (0 === $t) {
@@ -71,8 +99,32 @@ final class SerializeNestedJitHelper
             } elseif (4 === $t) {
                 $body .= self::quote($val->toString());
             } else {
-                // Peer #27182: helper-runtime / NestedJIT may lack type 6/7 on values.
-                $body .= 'i:'.((string) $val->toInt()).';';
+                // #27182: NestedJIT nested HTs often lack type 6/7 — value-foreach.
+                $inner = '';
+                $in = 0;
+                $had = '0';
+                foreach ($val as $elem) {
+                    $had = '1';
+                    $inner .= 'i:'.((string) $in).';';
+                    $et = $elem->type & 0x7f;
+                    if (1 === $et) {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    } elseif (0 === $et) {
+                        $inner .= 'N;';
+                    } elseif (3 === $et) {
+                        $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
+                    } elseif (4 === $et) {
+                        $inner .= self::quote($elem->toString());
+                    } else {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    }
+                    ++$in;
+                }
+                if ('1' === $had) {
+                    $body .= 'a:'.((string) $in).':{'.$inner.'}';
+                } else {
+                    $body .= 'N;';
+                }
             }
             ++$n;
         }
