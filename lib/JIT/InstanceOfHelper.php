@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
-use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\VM\InstanceOfClassName;
 use PHPCompiler\VM\InstanceOfJitHelper;
 use PHPCfg\Operand;
@@ -62,13 +61,10 @@ final class InstanceOfHelper
                 $i1->constInt(0, false)
             );
         }
-        // Boxed / slotted locals (`$n = 'A'`) keep compileTimeString — fold like
-        // method_exists/is_a (#32701 / #32706) instead of a runtime value-box read that
-        // mis-lowers under thin AOT (#32766).
-        $classLit = JitStringArg::compileTimeLiteral($classVar) ?? $classVar->compileTimeString;
-        if (\is_string($classLit) && '' !== $classLit) {
-            return $context->type->object->emitInstanceOf($expr, $classLit);
-        }
+        // Do not fold via compileTimeString here. Assigned literals (`$n = 'A'`) and
+        // call results can share CFG temps; a stale compileTimeString from an earlier
+        // assign mis-folds instanceof to the wrong class. Runtime resolve via
+        // emitWithClassNameString (length-aware ASCII CI compare) matches Zend (#32766).
         if (Variable::TYPE_STRING === $classVar->type) {
             return self::emitWithClassNameString(
                 $context,
@@ -173,53 +169,23 @@ final class InstanceOfHelper
 
     private static function emitWithClassNameString(Context $context, Variable $expr, Value $classNameStr): Variable
     {
-        // ensureStr*casecmpLinked may clearInsertionPosition — restore the caller's block
-        // or subsequent compares become parentless (#32766 / #32775).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        StringCaseCompare::ensureStrncasecmpLinked($context);
-        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-
-        // __string__init memcpy is length-exact (no trailing NUL). Plain strcasecmp reads
-        // past the payload and misses under thin AOT; peer new $class / #4242 uses
-        // length-checked strncasecmp against allDeclaredClassLowerNames (#32775).
+        // Length-aware ASCII case-insensitive compare on __string__* — never
+        // __compiler_strcasecmp/strncasecmp on .value (those bridges strlen()
+        // non-NUL-terminated payloads) (#32766 / #32785; supersedes #32775 attempt).
         $objectType = $context->type->object;
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $strncasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRNCASECMP);
-        $strMap = $context->structFieldMap['__string__'];
-        $nameLen = $context->builder->load(
-            $context->builder->structGep($classNameStr, $strMap['length'])
-        );
-        $src = self::stringDataPtr($context, $classNameStr);
-        $rhsClassId = $i64->constInt(-1, false);
-        foreach ($objectType->allDeclaredClassLowerNames() as $declLc) {
-            $classId = $objectType->classIdForLowerName($declLc);
-            if (null === $classId) {
-                continue;
-            }
-            $litLen = \strlen($declLc);
-            $lenOk = $context->builder->icmp(
-                Builder::INT_EQ,
-                $nameLen,
-                $i64->constInt($litLen, false)
+        $i1 = $context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        foreach ($objectType->allClassNamesById() as $name) {
+            $lit = $context->builder->load(
+                $context->constantStringFromString((string) $name)
             );
-            $cmp = $context->builder->call(
-                $strncasecmp,
-                $src,
-                $context->pointerFromStringConstant($declLc),
-                $sizeT->constInt($litLen, false)
-            );
-            $charsOk = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $isMatch = $context->builder->and($lenOk, $charsOk);
-            $rhsClassId = $context->builder->select(
-                $isMatch,
-                $context->constantFromInteger($classId, 'int64'),
-                $rhsClassId
-            );
+            $isMatch = JitStringCompare::asciiCaseInsensitiveIdentical($context, $classNameStr, $lit);
+            $check = $objectType->emitInstanceOf($expr, $name);
+            $bool = self::nativeBoolValue($context, $check);
+            $acc = $context->builder->select($isMatch, $bool, $acc);
         }
 
-        return self::emitWithRhsClassId($context, $expr, $rhsClassId);
+        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $acc);
     }
 
     private static function emitWithRhsClassId(Context $context, Variable $expr, Value $rhsClassId): Variable
@@ -308,17 +274,6 @@ final class InstanceOfHelper
         return $context->builder->call(
             $fn,
             $context->builder->trunc($typeByte, $i8)
-        );
-    }
-
-    /** `__string__.value` as i8* for `__compiler_strcasecmp` (peer JitMethodExists, #32766). */
-    private static function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-
-        return $context->builder->pointerCast(
-            $context->builder->structGep($strPtr, $map['value']),
-            $context->getTypeFromString('int8*')
         );
     }
 

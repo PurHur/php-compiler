@@ -39,6 +39,15 @@ final class JitStringCompare
         return VmStringCompare::identical($context, $leftStr, $rightStr);
     }
 
+    /** ASCII case-insensitive {@see __string__*} equality (#32766). */
+    public static function asciiCaseInsensitiveIdentical(
+        Context $context,
+        Value $leftStr,
+        Value $rightStr
+    ): Value {
+        return VmStringCompare::asciiCaseInsensitiveIdentical($context, $leftStr, $rightStr);
+    }
+
     public static function identicalValueToString(
         Context $context,
         Variable $boxed,
