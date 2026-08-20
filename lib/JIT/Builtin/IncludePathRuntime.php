@@ -15,11 +15,13 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245, #20877).
+ * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245, #20877, #32793).
  *
  * Embed + thin standalone AOT: NestedJIT {@see IncludePathJitHelper} /
  * {@see IncludePathResolveJitHelper} via {@see JitVmHelperLink}
  * (Serialize #20773 / getenv #20644 shape — no thin stub fork).
+ * Owns `__compiler_*include_path*` ABI module-locally (getNamedFunction first) after Type
+ * always-on shells dropped (#32793 / #32122 name.1 class).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  * php-src: ext/standard/streams.c — php_stream_resolve_include_path
