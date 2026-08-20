@@ -22269,7 +22269,7 @@ class JIT {
                     $declaringClassLc = 'domnode';
                 }
             } elseif ('c14n' === $methodLc || 'c14nfile' === $methodLc) {
-                // Untyped documentElement path: without remap, C14N prints "Object" (#32961 / #32962).
+                // Untyped documentElement path (#32961 / #32962 / #32964).
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::'.$methodLc);
                 if ($this->context->functionIsRegistered('domnode::'.$methodLc)) {
                     $className = 'DOMNode';
