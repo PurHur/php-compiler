@@ -14,6 +14,8 @@ use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomInsertBeforeLiveSlots;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
+use PHPCompiler\ext\dom\JitDomNodeChildProperty;
+use PHPCompiler\ext\dom\JitDomNodeListItem;
 use PHPCompiler\ext\dom\JitDomParentChildLinkLayout;
 use PHPCompiler\ext\dom\JitDomReplaceChildLiveSlots;
 use PHPCompiler\ext\standard\JitStringConcat;
@@ -959,6 +961,10 @@ final class DomNodeLiveMutationRuntime
      *
      * LiveSlots already rewrites first/last/childNodes; concat would append a fresh
      * {@code <tag/>} and leave saveXML wrong while childNodes stay correct.
+     *
+     * item($N) ARG_SEND temps often drop compileTimeDomChildIndex (#32903 / #32947) —
+     * fall back to {@see JitDomNodeListItem} / {@see JitDomNodeChildProperty} stamps
+     * like removeChild/insertBefore/replaceChild.
      */
     private static function trySyncUserScriptInnerXmlMoveToEnd(
         Context $context,
@@ -972,13 +978,20 @@ final class DomNodeLiveMutationRuntime
         if (null === $xml || '' === trim($xml)) {
             return false;
         }
-        $index = $childArg->compileTimeDomChildIndex ?? null;
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $index = $childArg->compileTimeDomChildIndex
+            ?? JitDomNodeListItem::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? null;
         if (null === $index) {
-            $tag = $childArg->compileTimeDomTagName ?? null;
+            $tag = $childArg->compileTimeDomTagName
+                ?? JitDomNodeListItem::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$lastFetchedTagName
+                ?? null;
             if (null === $tag || '' === $tag) {
                 return false;
             }
-            foreach (DomParseSimpleXmlJitHelper::directChildNodesArgv($xml) as $i => $node) {
+            foreach ($nodes as $i => $node) {
                 if ('element' === $node['kind'] && strtolower($tag) === strtolower($node['data'])) {
                     $index = $i;
                     break;
