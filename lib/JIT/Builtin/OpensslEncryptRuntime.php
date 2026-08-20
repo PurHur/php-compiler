@@ -11,10 +11,15 @@ use PHPCompiler\ext\openssl\VmOpensslCipherNative;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for openssl_encrypt()/openssl_decrypt() via OpensslEncryptJitHelper PHP (#21065, AEAD #21135, #22683).
+ * JIT/AOT link for openssl_encrypt()/openssl_decrypt() via OpensslEncryptJitHelper PHP (#21065, AEAD #21135, #22683, #32859).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer OpensslDigest #22554).
  * Peer of {@see OpensslSignRuntime}. SSOT: {@see \PHPCompiler\ext\openssl\VmOpensslCipherNative}
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * empty shells (#32859 / peer #32855) — leftover Type decls mint openssl_encrypt.1
+ * (#31894 / #32122).
+ *
  * php-src: ext/openssl/openssl.c
  */
 final class OpensslEncryptRuntime
@@ -104,10 +109,53 @@ final class OpensslEncryptRuntime
             return;
         }
 
-        $fn = $context->lookupFunction($name);
+        $fn = self::declareAbi($context, $name, $probe);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareAbi(Context $context, string $name, ?LlvmFunction $probe): LlvmFunction
+    {
+        if (null !== $probe) {
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        $ft = match ($name) {
+            '__compiler_openssl_encrypt' => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $strPtr,
+                $strPtr,
+                $i64,
+                $strPtr,
+                $strPtr,
+                $i64,
+                $i64
+            ),
+            '__compiler_openssl_decrypt' => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $strPtr,
+                $strPtr,
+                $i64,
+                $strPtr,
+                $strPtr,
+                $strPtr
+            ),
+            '__compiler_openssl_encrypt_take_tag' => $context->context->functionType($strPtr, false),
+            '__compiler_openssl_encrypt_tag_is_null' => $context->context->functionType($i64, false),
+            default => throw new \LogicException(
+                'OpensslEncryptRuntime unknown ABI '.$name.' (#32859)'
+            ),
+        };
+
+        return $context->module->addFunction($name, $ft);
     }
 
     private static function implementEncryptBridge(Context $context, LlvmFunction $fn): void

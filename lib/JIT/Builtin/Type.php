@@ -524,46 +524,11 @@ class Type extends Builtin {
         $fntypeOpensslVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr, $strPtr, $i64);
         $fnOpensslVerify = $this->context->module->addFunction('__compiler_openssl_verify', $fntypeOpensslVerify);
         $this->context->registerFunction('__compiler_openssl_verify', $fnOpensslVerify);
-        // openssl_encrypt/decrypt — NestedJIT OpensslEncryptJitHelper (#21065, AEAD #21135)
-        $fntypeOpensslEncrypt = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $strPtr,
-            $i64,
-            $strPtr,
-            $strPtr,
-            $i64,
-            $i64
-        );
-        $fnOpensslEncrypt = $this->context->module->addFunction('__compiler_openssl_encrypt', $fntypeOpensslEncrypt);
-        $this->context->registerFunction('__compiler_openssl_encrypt', $fnOpensslEncrypt);
-        $fntypeOpensslDecrypt = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $strPtr,
-            $i64,
-            $strPtr,
-            $strPtr,
-            $strPtr
-        );
-        $fnOpensslDecrypt = $this->context->module->addFunction('__compiler_openssl_decrypt', $fntypeOpensslDecrypt);
-        $this->context->registerFunction('__compiler_openssl_decrypt', $fnOpensslDecrypt);
-        $fntypeOpensslEncryptTakeTag = $this->context->context->functionType($strPtr, false);
-        $fnOpensslEncryptTakeTag = $this->context->module->addFunction(
-            '__compiler_openssl_encrypt_take_tag',
-            $fntypeOpensslEncryptTakeTag
-        );
-        $this->context->registerFunction('__compiler_openssl_encrypt_take_tag', $fnOpensslEncryptTakeTag);
-        $fntypeOpensslEncryptTagIsNull = $this->context->context->functionType($i64, false);
-        $fnOpensslEncryptTagIsNull = $this->context->module->addFunction(
-            '__compiler_openssl_encrypt_tag_is_null',
-            $fntypeOpensslEncryptTagIsNull
-        );
-        $this->context->registerFunction('__compiler_openssl_encrypt_tag_is_null', $fnOpensslEncryptTagIsNull);
+        // __compiler_openssl_encrypt / __compiler_openssl_decrypt /
+        // __compiler_openssl_encrypt_take_tag / __compiler_openssl_encrypt_tag_is_null
+        // always-on shells removed (#32859): NestedJIT/AOT bridge is OpensslEncryptRuntime
+        // (getNamedFunction first; Type::initialize still ensureLinked). Leftover Type
+        // empty decls vs Runtime ABI drift mint openssl_encrypt.1 (#31894 / #32122).
         // openssl_digest — NestedJIT OpensslDigestJitHelper (#21081)
         $fntypeOpensslDigest = $this->context->context->functionType(
             $strPtr,
@@ -1247,6 +1212,7 @@ class Type extends Builtin {
         LibcryptRuntime::ensureLinked($this->context);
         PasswordRandomBytesRuntime::ensureLinked($this->context);
         PasswordCryptoRuntime::ensureLinked($this->context);
+        OpensslEncryptRuntime::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);
