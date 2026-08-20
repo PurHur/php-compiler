@@ -11593,6 +11593,39 @@ class JIT {
 
                         return $origBasicBlock;
                     }
+                    // Seal JUMPIF on the BB that defined $condition (#32912 / peer #32880).
+                    // Property-fetch conditions leave insert on prop_value_done — using the
+                    // pre-condition $branchBlock orphans the real branchIf. Seal with self-br
+                    // stubs so lastOpenBasicBlock cannot resume into an open test BB while
+                    // arms lower; retarget via LLVMSetSuccessor after arms compile.
+                    if (!$func instanceof PHPLLVM\Value\Function_) {
+                        throw new \LogicException('TYPE_JUMPIF expects an LLVM function');
+                    }
+                    $jumpIfTestBlock = $builder->getInsertBlock() ?? $branchBlock;
+                    self::$blockNumber++;
+                    $tmpIf = $func->appendBasicBlock('jumpif_tmp_if_' . self::$blockNumber);
+                    self::$blockNumber++;
+                    $tmpElse = $func->appendBasicBlock('jumpif_tmp_else_' . self::$blockNumber);
+                    $builder->positionAtEnd($jumpIfTestBlock);
+                    $existingTerm = $jumpIfTestBlock->getTerminator();
+                    if (null !== $existingTerm) {
+                        if (JIT\BasicBlockHelper::isPrematureVoidReturn($this->context, $existingTerm)) {
+                            try {
+                                $existingTerm->eraseFromParent();
+                            } catch (\Throwable) {
+                            }
+                        } else {
+                            JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'jumpif_test_resume');
+                            $jumpIfTestBlock = $builder->getInsertBlock() ?? $jumpIfTestBlock;
+                        }
+                        $builder->positionAtEnd($jumpIfTestBlock);
+                    }
+                    $builder->branchIf($condition, $tmpIf, $tmpElse);
+                    $builder->positionAtEnd($tmpIf);
+                    $builder->branch($tmpIf);
+                    $builder->positionAtEnd($tmpElse);
+                    $builder->branch($tmpElse);
+                    $builder->clearInsertionPosition();
                     $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
                     if ($this->context->inlineIncludeDepth > 0) {
                         $exitAfterIfBranch = $this->context->inlineIncludeExitBlock;
@@ -11606,13 +11639,27 @@ class JIT {
                     }
                     $ifEntry = $this->jitBranchEntryBlock($op->block1, $func);
                     $elseEntry = $this->jitBranchEntryBlock($op->block2, $func);
-                    $builder->positionAtEnd($branchBlock);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $branchBlock, $block);
-                        $this->jitReleaseJumpIfAnonValueBoxes($block, $op);
-                        $this->jitReleasePendingWeakReferenceGetResult();
+                    $tmpTerm = $jumpIfTestBlock->getTerminator();
+                    if (
+                        null !== $tmpTerm
+                        && $tmpTerm instanceof \PHPLLVM\LLVMAbstract\Value
+                        && $ifEntry instanceof \PHPLLVM\LLVMAbstract\BasicBlock
+                        && $elseEntry instanceof \PHPLLVM\LLVMAbstract\BasicBlock
+                    ) {
+                        $lib = $this->context->llvm->lib;
+                        $lib->LLVMSetSuccessor($tmpTerm->value, 0, $ifEntry->block);
+                        $lib->LLVMSetSuccessor($tmpTerm->value, 1, $elseEntry->block);
+                    } else {
+                        $builder->positionAtEnd($jumpIfTestBlock);
+                        if (null !== $tmpTerm) {
+                            try {
+                                $tmpTerm->eraseFromParent();
+                            } catch (\Throwable) {
+                            }
+                        }
+                        $builder->positionAtEnd($jumpIfTestBlock);
+                        $builder->branchIf($condition, $ifEntry, $elseEntry);
                     }
-                    $builder->branchIf($condition, $ifEntry, $elseEntry);
                     if (null !== $ternaryMergeReturn) {
                         unset($this->context->coalesceAssignTargets[$ternaryMergeReturn]);
                     }
