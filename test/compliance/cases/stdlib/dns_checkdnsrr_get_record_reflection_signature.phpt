@@ -9,6 +9,7 @@ foreach (['checkdnsrr', 'dns_check_record', 'dns_get_record'] as $fn) {
         echo $p->getName(),
             ' byref=', (int) $p->isPassedByReference(),
             ' opt=', (int) $p->isOptional(),
+            ' type=', ($p->hasType() ? (string) $p->getType() : '-'),
             ' defAvail=', (int) $p->isDefaultValueAvailable();
         if ($p->isDefaultValueAvailable()) {
             echo ' ', var_export($p->getDefaultValue(), true);
@@ -32,16 +33,16 @@ echo 'named_dns=', var_export(is_array($r), true),
 ?>
 --EXPECT--
 == checkdnsrr ==
-hostname byref=0 opt=0 defAvail=0
-type byref=0 opt=1 defAvail=1 'MX'
+hostname byref=0 opt=0 type=string defAvail=0
+type byref=0 opt=1 type=string defAvail=1 'MX'
 == dns_check_record ==
-hostname byref=0 opt=0 defAvail=0
-type byref=0 opt=1 defAvail=1 'MX'
+hostname byref=0 opt=0 type=string defAvail=0
+type byref=0 opt=1 type=string defAvail=1 'MX'
 == dns_get_record ==
-hostname byref=0 opt=0 defAvail=0
-type byref=0 opt=1 defAvail=1 268435456
-authoritative_name_servers byref=1 opt=1 defAvail=1 NULL
-additional_records byref=1 opt=1 defAvail=1 NULL
-raw byref=0 opt=1 defAvail=1 false
+hostname byref=0 opt=0 type=string defAvail=0
+type byref=0 opt=1 type=int defAvail=1 268435456
+authoritative_name_servers byref=1 opt=1 type=- defAvail=1 NULL
+additional_records byref=1 opt=1 type=- defAvail=1 NULL
+raw byref=0 opt=1 type=bool defAvail=1 false
 named_check=true
 named_dns=true auth=true add=true

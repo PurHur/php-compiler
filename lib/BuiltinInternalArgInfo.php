@@ -1655,8 +1655,12 @@ final class BuiltinInternalArgInfo
             'header_register_callback' => 0 === $index ? 'callable' : null,
             // ext/standard/basic_functions.stub.php — ?array $options = null (InternalArgInfo array) (#25381)
             'stream_context_get_default' => 0 === $index ? '?array' : null,
-            // ext/standard/basic_functions.stub.php — trailing bool $raw = false (#23358)
-            'dns_get_record' => 4 === $index ? 'bool' : null,
+            // ext/standard/basic_functions.stub.php — by-ref out params untyped; $raw bool (#28745, #23358)
+            'dns_get_record' => match ($index) {
+                2, 3 => '',
+                4 => 'bool',
+                default => null,
+            },
             // ext/standard/file.stub.php — ?int $length = null (#24846)
             'fwrite' => 2 === $index ? '?int' : null,
             'fgets' => 1 === $index ? '?int' : null,
