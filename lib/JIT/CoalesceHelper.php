@@ -30,11 +30,16 @@ final class CoalesceHelper
     public static function compileBranch(
         JIT $jit,
         Function_ $func,
-        Block $branchBlock
+        Block $branchBlock,
+        ?BasicBlock $entryBlock = null
     ): BasicBlock {
         $saved = $branchBlock->syntheticCfgBranch ?? false;
         $branchBlock->syntheticCfgBranch = true;
         try {
+            if (null !== $entryBlock) {
+                return $jit->compileSubBlockAtEntry($func, $branchBlock, $entryBlock);
+            }
+
             return $jit->compileSubBlock($func, $branchBlock);
         } finally {
             $branchBlock->syntheticCfgBranch = $saved;

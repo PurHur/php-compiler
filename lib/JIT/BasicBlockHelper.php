@@ -283,9 +283,11 @@ final class BasicBlockHelper
     }
 
     /**
-     * Keep emitting on the current (or last) BB of the active function after a premature
-     * terminator. php-llvm cannot classify ReturnInst (LLVMIsAReturnInst is a ValueRef);
-     * erase any terminator so `$this->x = $rhs` stays reachable (#32349).
+     * Keep emitting after a premature {@code ret void} terminator (#32349).
+     *
+     * Only {@code ret void} is erased. Erasing a real {@code br} (e.g. ?? test BB
+     * sealed before ??= arms) orphans arm entries and forces the write path (#32880).
+     * Non-void terminators append a fresh continuation via {@see ensureOpenInsertBlock}.
      */
     public static function unsealAndContinue(Context $context): bool
     {
@@ -294,6 +296,11 @@ final class BasicBlockHelper
             $term = $insert->getTerminator();
             if (null === $term) {
                 return true;
+            }
+            if (!self::isVoidReturnTerminator($context, $term)) {
+                self::ensureOpenInsertBlock($context, 'unseal_cont');
+
+                return null !== self::tryGetInsertBlock($context);
             }
             try {
                 $term->eraseFromParent();
@@ -315,7 +322,10 @@ final class BasicBlockHelper
 
     /**
      * Resume lowering on the basic block that defined $def, unsealing a premature
-     * terminator so later stores dominate (#32349 ctor promotion VALUE slot).
+     * {@code ret void} so later stores dominate (#32349 ctor promotion VALUE slot).
+     *
+     * Non-void terminators are left intact (#32880); returns false so callers can
+     * open a fresh continuation instead of orphaning branch targets.
      */
     public static function continueAfterDefiningValue(Context $context, Value $def): bool
     {
@@ -337,6 +347,9 @@ final class BasicBlockHelper
         }
         $term = $bb->getTerminator();
         if (null !== $term) {
+            if (!self::isVoidReturnTerminator($context, $term)) {
+                return false;
+            }
             try {
                 $term->eraseFromParent();
             } catch (\Throwable) {
