@@ -974,6 +974,12 @@ final class DomNodeLiveMutationRuntime
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return false;
         }
+        // createTextNode / character-data stand-ins are never same-parent moves (#33000).
+        // Sticky lastFetchedChildIndex from firstChild would steal the index and rewrite
+        // INNER_XML to the root child markup (saveXML → <a><a>1</a></a>).
+        if (null !== self::compileTimeChildTextData($childArg)) {
+            return false;
+        }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || '' === trim($xml)) {
             return false;
@@ -1015,19 +1021,39 @@ final class DomNodeLiveMutationRuntime
     /**
      * xmlNodeDump of a createElement child: empty → {@code <tag/>}, else paired
      * with escaped text / inner markup (#32361 / php-src document.c).
+     *
+     * createTextNode stand-ins (#33000): escaped character data when no element tag.
      */
     private static function compileTimeChildElementMarkup(Variable $arg): ?string
     {
         $tag = $arg->compileTimeDomTagName ?? null;
-        if (null === $tag || '' === $tag) {
+        if (null !== $tag && '' !== $tag) {
+            $inner = $arg->compileTimeDomInnerXml ?? '';
+            if ('' === $inner) {
+                return '<'.$tag.'/>';
+            }
+
+            return '<'.$tag.'>'.$inner.'</'.$tag.'>';
+        }
+        $text = self::compileTimeChildTextData($arg);
+        if (null === $text) {
             return null;
         }
-        $inner = $arg->compileTimeDomInnerXml ?? '';
-        if ('' === $inner) {
-            return '<'.$tag.'/>';
+
+        return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Raw createTextNode / splitText payload for INNER_XML + C14N fold (#33000).
+     */
+    private static function compileTimeChildTextData(Variable $arg): ?string
+    {
+        $tag = $arg->compileTimeDomTagName ?? null;
+        if (null !== $tag && '' !== $tag) {
+            return null;
         }
 
-        return '<'.$tag.'>'.$inner.'</'.$tag.'>';
+        return $arg->compileTimeDomTextData;
     }
 
     /**
@@ -1049,6 +1075,7 @@ final class DomNodeLiveMutationRuntime
             return;
         }
         $pieces = [];
+        $rawTexts = [];
         foreach ($extraArgs as $arg) {
             if (Variable::TYPE_STRING === $arg->type) {
                 $lit = $arg->compileTimeString ?? null;
@@ -1066,6 +1093,10 @@ final class DomNodeLiveMutationRuntime
                 return;
             }
             $pieces[] = $markup;
+            $text = self::compileTimeChildTextData($arg);
+            if (null !== $text) {
+                $rawTexts[] = $text;
+            }
         }
         $objectType = $context->type->object;
         $classId = $objectType->lookup('DOMElement');
@@ -1073,8 +1104,43 @@ final class DomNodeLiveMutationRuntime
             $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, Variable::TYPE_STRING);
         }
         $receiverObj = self::receiverObject($context, $receiver);
+        // Refresh C14N fold from the *receiver* document's loadXML (#32972 / #32987 / #33000).
+        $xml = $receiver->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $childIndex = $receiver->compileTimeDomChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? null;
+        $delta = implode('', $pieces);
+        // Nested firstChild/lastChild + createTextNode: slot often lacks loadXML-seeded
+        // inner ("1"), so runtime load+concat yields only the delta (#33000).
+        if (
+            null !== $xml
+            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            && null !== $childIndex
+            && [] !== $rawTexts
+            && \count($rawTexts) === \count($pieces)
+        ) {
+            $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+            $seedInner = '';
+            $node = $nodes[$childIndex] ?? null;
+            if (null !== $node && 'element' === ($node['kind'] ?? '')) {
+                $seedInner = $node['inner'] ?? '';
+            }
+            $newInner = 'prepend' === $kind ? $delta.$seedInner : $seedInner.$delta;
+            JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, $newInner);
+            foreach ($rawTexts as $rawText) {
+                JitDomLoadXMLUserScript::refreshCompileTimeXmlAppendTextToChild(
+                    $childIndex,
+                    $rawText,
+                    'prepend' === $kind
+                );
+            }
+
+            return;
+        }
         $deltaStr = $context->builder->load(
-            $context->constantStringFromString(implode('', $pieces))
+            $context->constantStringFromString($delta)
         );
         $existingVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
@@ -1097,17 +1163,12 @@ final class DomNodeLiveMutationRuntime
             $propVar,
             Variable::TYPE_STRING
         );
-        // Refresh C14N fold from the *receiver* document's loadXML (#32972 / #32987).
-        // lastCompileTimeXml is the globally last loadXML and is wrong with two docs.
-        $xml = $receiver->compileTimeDomLoadXml
-            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
-            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-            $oldInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
-            $delta = implode('', $pieces);
-            $newInner = 'prepend' === $kind ? $delta.$oldInner : $oldInner.$delta;
-            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner, $receiver);
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
         }
+        $oldInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        $newInner = 'prepend' === $kind ? $delta.$oldInner : $oldInner.$delta;
+        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner, $receiver);
     }
 
     private static function ensureStringMutationBridge(Context $context, string $kind): void
