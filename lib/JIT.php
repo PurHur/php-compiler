@@ -9101,9 +9101,12 @@ class JIT {
                     // do not skip script-local string dims via functionStaticGlobal (#32804 regression).
                     // String-default function-statics often stay CFG-unknown: take ValueBoxDimWrite
                     // for functionStaticGlobal unless CFG says array (#32814).
+                    // valueBoxHashtable means the box holds a HT (e.g. $b = A::$a copy, #32830) —
+                    // string-offset writes would __value__readString → NULL → SIGSEGV.
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
+                        && !$value->valueBoxHashtable
                         && (
                             JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
                             || (
@@ -17642,6 +17645,9 @@ class JIT {
                 JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
                 $value
             );
+            // Script globals reuse functionStaticGlobal; keep valueBoxHashtable so
+            // FETCH_DIM_W does not take ValueBoxDimWrite (#32830 / #32814).
+            $this->copyValueBoxJitFlags($result, $value);
             $this->invalidateScriptGlobalCompileTimeMetadata($result);
             $this->syncCompileTimeBcmathNumber($result, $value, false);
             $this->syncCompileTimeDomTagName($result, $value, false);
