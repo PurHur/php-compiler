@@ -119,7 +119,9 @@ final class JitSessionStorageKernel
         }
 
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $emit): void {
+            $emit($context, $fn);
+        });
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }

@@ -55,32 +55,34 @@ final class JitSessionLifecycleKernel
 
         SessionCreateIdRuntime::ensureRandomIdStringLinked($context);
 
-        $entry = $fn->appendBasicBlock('sgen_bridge_entry');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__phpc_session_generate_new_id', static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('sgen_bridge_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $zeroI64 = $i64->constInt(0, false);
+            $strPtr = $context->getTypeFromString('__string__*');
+            $i64 = $context->getTypeFromString('int64');
+            $zeroI64 = $i64->constInt(0, false);
 
-        $idStr = $context->builder->call($context->lookupFunction('phpc_session_random_id_string'));
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $idStr, $strPtr->constNull());
-        $bbEmpty = BasicBlockHelper::append($context, 'sgen_empty');
-        $bbCopy = BasicBlockHelper::append($context, 'sgen_copy');
-        $bbDone = BasicBlockHelper::append($context, 'sgen_done');
-        $context->builder->branchIf($isNull, $bbEmpty, $bbCopy);
+            $idStr = $context->builder->call($context->lookupFunction('phpc_session_random_id_string'));
+            $isNull = $context->builder->icmp(Builder::INT_EQ, $idStr, $strPtr->constNull());
+            $bbEmpty = BasicBlockHelper::append($context, 'sgen_empty');
+            $bbCopy = BasicBlockHelper::append($context, 'sgen_copy');
+            $bbDone = BasicBlockHelper::append($context, 'sgen_done');
+            $context->builder->branchIf($isNull, $bbEmpty, $bbCopy);
 
-        $context->builder->positionAtEnd($bbEmpty);
-        self::emitStoreSessionIdLen($context, $zeroI64);
-        self::emitNulTerminateIdAt($context, $zeroI64);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbEmpty);
+            self::emitStoreSessionIdLen($context, $zeroI64);
+            self::emitNulTerminateIdAt($context, $zeroI64);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbCopy);
-        self::emitCopyIdStringToGlobals($context, $idStr);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbCopy);
+            self::emitCopyIdStringToGlobals($context, $idStr);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbDone);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+            $context->builder->positionAtEnd($bbDone);
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        });
     }
 
     private static function implementStandaloneRuntime(Context $context): void
@@ -90,67 +92,69 @@ final class JitSessionLifecycleKernel
             return;
         }
 
-        $entry = $fn->appendBasicBlock('ssr_entry');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__phpc_session_start_apply', static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('ssr_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $zeroI8 = $i8->constInt(0, false);
-        $oneI8 = $i8->constInt(1, false);
-        $zeroI64 = $i64->constInt(0, false);
-        $outPtr = $fn->getParam(0);
+            $i8 = $context->getTypeFromString('int8');
+            $i32 = $context->getTypeFromString('int32');
+            $i64 = $context->getTypeFromString('int64');
+            $zeroI8 = $i8->constInt(0, false);
+            $oneI8 = $i8->constInt(1, false);
+            $zeroI64 = $i64->constInt(0, false);
+            $outPtr = $fn->getParam(0);
 
-        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
-        $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
-        $bbInactive = BasicBlockHelper::append($context, 'ssr_inactive');
-        $bbCheckHeaders = BasicBlockHelper::append($context, 'ssr_check_headers');
-        $bbHeadersFail = BasicBlockHelper::append($context, 'ssr_headers_fail');
-        $bbStart = BasicBlockHelper::append($context, 'ssr_start');
-        $bbDone = BasicBlockHelper::append($context, 'ssr_done');
-        $context->builder->branchIf($isActive, $bbInactive, $bbCheckHeaders);
+            $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
+            $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
+            $bbInactive = BasicBlockHelper::append($context, 'ssr_inactive');
+            $bbCheckHeaders = BasicBlockHelper::append($context, 'ssr_check_headers');
+            $bbHeadersFail = BasicBlockHelper::append($context, 'ssr_headers_fail');
+            $bbStart = BasicBlockHelper::append($context, 'ssr_start');
+            $bbDone = BasicBlockHelper::append($context, 'ssr_done');
+            $context->builder->branchIf($isActive, $bbInactive, $bbCheckHeaders);
 
-        $context->builder->positionAtEnd($bbInactive);
-        // php-src: session already active → true (+ E_NOTICE); not false.
-        SessionStart::emitWriteBool($context, $outPtr, true);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbInactive);
+            // php-src: session already active → true (+ E_NOTICE); not false.
+            SessionStart::emitWriteBool($context, $outPtr, true);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbCheckHeaders);
-        $headersSent = $context->builder->call($context->lookupFunction('__phpc_headers_sent'));
-        $headersSentNonZero = $context->builder->icmp(Builder::INT_NE, $headersSent, $i32->constInt(0, false));
-        $context->builder->branchIf($headersSentNonZero, $bbHeadersFail, $bbStart);
+            $context->builder->positionAtEnd($bbCheckHeaders);
+            $headersSent = $context->builder->call($context->lookupFunction('__phpc_headers_sent'));
+            $headersSentNonZero = $context->builder->icmp(Builder::INT_NE, $headersSent, $i32->constInt(0, false));
+            $context->builder->branchIf($headersSentNonZero, $bbHeadersFail, $bbStart);
 
-        $context->builder->positionAtEnd($bbHeadersFail);
-        SessionStart::emitHeadersSentWarning($context);
-        SessionStart::emitWriteBool($context, $outPtr, false);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbHeadersFail);
+            SessionStart::emitHeadersSentWarning($context);
+            SessionStart::emitWriteBool($context, $outPtr, false);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbStart);
-        SessionStorageGlobals::emitCallEnsureDefaults($context);
-        $idLen = $context->builder->load(SessionStorageGlobals::$idLenGlobal);
-        $noExistingId = $context->builder->icmp(Builder::INT_EQ, $idLen, $zeroI64);
-        $cookieOk = $context->builder->call($context->lookupFunction('phpc_session_apply_incoming_cookie'));
-        $cookieFailed = $context->builder->icmp(Builder::INT_EQ, $cookieOk, $i32->constInt(0, false));
-        $needNewId = $context->builder->and($cookieFailed, $noExistingId);
-        $bbNewId = BasicBlockHelper::append($context, 'ssr_new_id');
-        $bbAfterCookie = BasicBlockHelper::append($context, 'ssr_after_cookie');
-        $context->builder->branchIf($needNewId, $bbNewId, $bbAfterCookie);
+            $context->builder->positionAtEnd($bbStart);
+            SessionStorageGlobals::emitCallEnsureDefaults($context);
+            $idLen = $context->builder->load(SessionStorageGlobals::$idLenGlobal);
+            $noExistingId = $context->builder->icmp(Builder::INT_EQ, $idLen, $zeroI64);
+            $cookieOk = $context->builder->call($context->lookupFunction('phpc_session_apply_incoming_cookie'));
+            $cookieFailed = $context->builder->icmp(Builder::INT_EQ, $cookieOk, $i32->constInt(0, false));
+            $needNewId = $context->builder->and($cookieFailed, $noExistingId);
+            $bbNewId = BasicBlockHelper::append($context, 'ssr_new_id');
+            $bbAfterCookie = BasicBlockHelper::append($context, 'ssr_after_cookie');
+            $context->builder->branchIf($needNewId, $bbNewId, $bbAfterCookie);
 
-        $context->builder->positionAtEnd($bbNewId);
-        $context->builder->call($context->lookupFunction('__phpc_session_generate_new_id'));
-        $context->builder->call($context->lookupFunction('phpc_session_emit_setcookie'));
-        $context->builder->branch($bbAfterCookie);
+            $context->builder->positionAtEnd($bbNewId);
+            $context->builder->call($context->lookupFunction('__phpc_session_generate_new_id'));
+            $context->builder->call($context->lookupFunction('phpc_session_emit_setcookie'));
+            $context->builder->branch($bbAfterCookie);
 
-        $context->builder->positionAtEnd($bbAfterCookie);
-        self::emitEnsureSessionTable($context);
-        $context->builder->call($context->lookupFunction('phpc_session_load_from_disk'));
-        $context->builder->store($oneI8, SessionStorageGlobals::$activeGlobal);
-        SessionStart::emitWriteBool($context, $outPtr, true);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbAfterCookie);
+            self::emitEnsureSessionTable($context);
+            $context->builder->call($context->lookupFunction('phpc_session_load_from_disk'));
+            $context->builder->store($oneI8, SessionStorageGlobals::$activeGlobal);
+            SessionStart::emitWriteBool($context, $outPtr, true);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbDone);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+            $context->builder->positionAtEnd($bbDone);
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        });
     }
 
     private static function implementStandaloneWriteClose(Context $context): void
@@ -163,6 +167,7 @@ final class JitSessionLifecycleKernel
         self::emitActiveGuardedLifecycle(
             $context,
             $fn,
+            '__phpc_session_write_close_apply',
             static function (Context $context, Value $outPtr): void {
                 $i8 = $context->getTypeFromString('int8');
                 $context->builder->call($context->lookupFunction('phpc_session_save_to_disk'));
@@ -179,47 +184,49 @@ final class JitSessionLifecycleKernel
             return;
         }
 
-        $entry = $fn->appendBasicBlock('srid_entry');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__phpc_session_regenerate_id_apply', static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('srid_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $i8 = $context->getTypeFromString('int8');
-        $zeroI8 = $i8->constInt(0, false);
-        $outPtr = $fn->getParam(0);
-        $deleteOld = $fn->getParam(1);
+            $i8 = $context->getTypeFromString('int8');
+            $zeroI8 = $i8->constInt(0, false);
+            $outPtr = $fn->getParam(0);
+            $deleteOld = $fn->getParam(1);
 
-        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
-        $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
-        $bbInactive = BasicBlockHelper::append($context, 'srid_inactive');
-        $bbRotate = BasicBlockHelper::append($context, 'srid_rotate');
-        $bbDone = BasicBlockHelper::append($context, 'srid_done');
-        $context->builder->branchIf($isActive, $bbRotate, $bbInactive);
+            $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
+            $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
+            $bbInactive = BasicBlockHelper::append($context, 'srid_inactive');
+            $bbRotate = BasicBlockHelper::append($context, 'srid_rotate');
+            $bbDone = BasicBlockHelper::append($context, 'srid_done');
+            $context->builder->branchIf($isActive, $bbRotate, $bbInactive);
 
-        $context->builder->positionAtEnd($bbInactive);
-        // php-src PHP_FUNCTION(session_regenerate_id) — E_WARNING when inactive (#31444).
-        JitBuiltinWarning::emit($context, VmSession::REGENERATE_NO_SESSION_WARNING);
-        SessionStart::emitWriteBool($context, $outPtr, false);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbInactive);
+            // php-src PHP_FUNCTION(session_regenerate_id) — E_WARNING when inactive (#31444).
+            JitBuiltinWarning::emit($context, VmSession::REGENERATE_NO_SESSION_WARNING);
+            SessionStart::emitWriteBool($context, $outPtr, false);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbRotate);
-        $context->builder->call($context->lookupFunction('phpc_session_save_to_disk'));
-        $shouldUnlink = $context->builder->icmp(Builder::INT_NE, $deleteOld, $zeroI8);
-        $bbUnlink = BasicBlockHelper::append($context, 'srid_unlink');
-        $bbAfterUnlink = BasicBlockHelper::append($context, 'srid_after_unlink');
-        $context->builder->branchIf($shouldUnlink, $bbUnlink, $bbAfterUnlink);
+            $context->builder->positionAtEnd($bbRotate);
+            $context->builder->call($context->lookupFunction('phpc_session_save_to_disk'));
+            $shouldUnlink = $context->builder->icmp(Builder::INT_NE, $deleteOld, $zeroI8);
+            $bbUnlink = BasicBlockHelper::append($context, 'srid_unlink');
+            $bbAfterUnlink = BasicBlockHelper::append($context, 'srid_after_unlink');
+            $context->builder->branchIf($shouldUnlink, $bbUnlink, $bbAfterUnlink);
 
-        $context->builder->positionAtEnd($bbUnlink);
-        $context->builder->call($context->lookupFunction('phpc_session_unlink_file'));
-        $context->builder->branch($bbAfterUnlink);
+            $context->builder->positionAtEnd($bbUnlink);
+            $context->builder->call($context->lookupFunction('phpc_session_unlink_file'));
+            $context->builder->branch($bbAfterUnlink);
 
-        $context->builder->positionAtEnd($bbAfterUnlink);
-        $context->builder->call($context->lookupFunction('__phpc_session_generate_new_id'));
-        $context->builder->call($context->lookupFunction('phpc_session_emit_setcookie'));
-        SessionStart::emitWriteBool($context, $outPtr, true);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbAfterUnlink);
+            $context->builder->call($context->lookupFunction('__phpc_session_generate_new_id'));
+            $context->builder->call($context->lookupFunction('phpc_session_emit_setcookie'));
+            SessionStart::emitWriteBool($context, $outPtr, true);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbDone);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+            $context->builder->positionAtEnd($bbDone);
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        });
     }
 
     private static function implementStandaloneAbort(Context $context): void
@@ -232,6 +239,7 @@ final class JitSessionLifecycleKernel
         self::emitActiveGuardedLifecycle(
             $context,
             $fn,
+            '__phpc_session_abort_apply',
             static function (Context $context, Value $outPtr): void {
                 $i8 = $context->getTypeFromString('int8');
                 $context->builder->store($i8->constInt(0, false), SessionStorageGlobals::$activeGlobal);
@@ -250,6 +258,7 @@ final class JitSessionLifecycleKernel
         self::emitActiveGuardedLifecycle(
             $context,
             $fn,
+            '__phpc_session_reset_apply',
             static function (Context $context, Value $outPtr): void {
                 $context->builder->call($context->lookupFunction('phpc_session_load_from_disk'));
                 SessionStart::emitWriteBool($context, $outPtr, true);
@@ -267,6 +276,7 @@ final class JitSessionLifecycleKernel
         self::emitActiveGuardedLifecycle(
             $context,
             $fn,
+            '__phpc_session_unset_apply',
             static function (Context $context, Value $outPtr): void {
                 $empty = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
                 $sgSession = self::sgSessionPtr($context);
@@ -289,6 +299,7 @@ final class JitSessionLifecycleKernel
         self::emitActiveGuardedLifecycle(
             $context,
             $fn,
+            '__phpc_session_destroy_apply',
             static function (Context $context, Value $outPtr): void {
                 $i8 = $context->getTypeFromString('int8');
                 $i64 = $context->getTypeFromString('int64');
@@ -310,33 +321,35 @@ final class JitSessionLifecycleKernel
     /**
      * @param callable(Context, Value): void $activeBody
      */
-    private static function emitActiveGuardedLifecycle(Context $context, LlvmFunction $fn, callable $activeBody): void
+    private static function emitActiveGuardedLifecycle(Context $context, LlvmFunction $fn, string $fnName, callable $activeBody): void
     {
-        $entry = $fn->appendBasicBlock('slc_entry');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $fnName, static function () use ($context, $fn, $activeBody): void {
+            $entry = $fn->appendBasicBlock('slc_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $i8 = $context->getTypeFromString('int8');
-        $zeroI8 = $i8->constInt(0, false);
-        $outPtr = $fn->getParam(0);
+            $i8 = $context->getTypeFromString('int8');
+            $zeroI8 = $i8->constInt(0, false);
+            $outPtr = $fn->getParam(0);
 
-        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
-        $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
-        $bbInactive = BasicBlockHelper::append($context, 'slc_inactive');
-        $bbActive = BasicBlockHelper::append($context, 'slc_active');
-        $bbDone = BasicBlockHelper::append($context, 'slc_done');
-        $context->builder->branchIf($isActive, $bbActive, $bbInactive);
+            $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
+            $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
+            $bbInactive = BasicBlockHelper::append($context, 'slc_inactive');
+            $bbActive = BasicBlockHelper::append($context, 'slc_active');
+            $bbDone = BasicBlockHelper::append($context, 'slc_done');
+            $context->builder->branchIf($isActive, $bbActive, $bbInactive);
 
-        $context->builder->positionAtEnd($bbInactive);
-        SessionStart::emitWriteBool($context, $outPtr, false);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbInactive);
+            SessionStart::emitWriteBool($context, $outPtr, false);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbActive);
-        $activeBody($context, $outPtr);
-        $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbActive);
+            $activeBody($context, $outPtr);
+            $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbDone);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+            $context->builder->positionAtEnd($bbDone);
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        });
     }
 
     private static function emitEnsureSessionTable(Context $context): void
