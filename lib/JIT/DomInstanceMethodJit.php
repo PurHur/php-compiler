@@ -145,6 +145,15 @@ final class DomInstanceMethodJit
         'domattr::isid' => true,
         'dom\\attr::isid' => true,
         'domelement::toggleattribute' => true,
+        'domelement::insertadjacentelement' => true,
+        'domelement::insertadjacenttext' => true,
+        'domelement::insertadjacenthtml' => true,
+        'dom\\element::insertadjacentelement' => true,
+        'dom\\element::insertadjacenttext' => true,
+        'dom\\element::insertadjacenthtml' => true,
+        'dom\\htmlelement::insertadjacentelement' => true,
+        'dom\\htmlelement::insertadjacenttext' => true,
+        'dom\\htmlelement::insertadjacenthtml' => true,
         'domtext::substringdata' => true,
         'domcomment::substringdata' => true,
         'domcdatasection::substringdata' => true,
@@ -658,6 +667,33 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domelement::insertadjacentelement' === $lc
+                || 'dom\\element::insertadjacentelement' === $lc
+                || 'dom\\htmlelement::insertadjacentelement' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomElementInsertAdjacentElement();
+
+                return;
+            }
+            if ('domelement::insertadjacenttext' === $lc
+                || 'dom\\element::insertadjacenttext' === $lc
+                || 'dom\\htmlelement::insertadjacenttext' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomElementInsertAdjacentText();
+
+                return;
+            }
+            if ('domelement::insertadjacenthtml' === $lc
+                || 'dom\\element::insertadjacenthtml' === $lc
+                || 'dom\\htmlelement::insertadjacenthtml' === $lc
+            ) {
+                if (!preg_match('/^(dom(?:\\\\[a-z0-9_]+|[a-z0-9_]*))::([a-z0-9_]+)$/', $lc, $adjMatches)) {
+                    return;
+                }
+                $context->functionProxies[$lc] = new Call\DomInstanceMethod($adjMatches[1], $adjMatches[2]);
+
+                return;
+            }
             if ('domtext::substringdata' === $lc
                 || 'domcomment::substringdata' === $lc
                 || 'domcdatasection::substringdata' === $lc
@@ -1102,6 +1138,15 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::replacechildren');
             self::ensureProxy($context, 'domdocumentfragment::replacechildren');
             self::ensureProxy($context, 'domelement::toggleattribute');
+            self::ensureProxy($context, 'domelement::insertadjacentelement');
+            self::ensureProxy($context, 'domelement::insertadjacenttext');
+            self::ensureProxy($context, 'domelement::insertadjacenthtml');
+            self::ensureProxy($context, 'dom\\element::insertadjacentelement');
+            self::ensureProxy($context, 'dom\\element::insertadjacenttext');
+            self::ensureProxy($context, 'dom\\element::insertadjacenthtml');
+            self::ensureProxy($context, 'dom\\htmlelement::insertadjacentelement');
+            self::ensureProxy($context, 'dom\\htmlelement::insertadjacenttext');
+            self::ensureProxy($context, 'dom\\htmlelement::insertadjacenthtml');
             self::ensureProxy($context, 'domtext::substringdata');
             self::ensureProxy($context, 'domcomment::substringdata');
             self::ensureProxy($context, 'domcdatasection::substringdata');
@@ -1328,7 +1373,7 @@ final class DomInstanceMethodJit
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getelementsbytagnamens', 'getnodepath', 'getlineno'],
+        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getelementsbytagnamens', 'getnodepath', 'getlineno', 'insertadjacentelement', 'insertadjacenttext', 'insertadjacenthtml'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],
