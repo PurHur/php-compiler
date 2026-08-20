@@ -18,14 +18,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241, #16565, #23143, #23540).
+ * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241, #16565, #23143, #23540, #32941).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see VarDumpJitHelper} (php-in-PHP).
  * Thin standalone AOT: scalar LLVM bridge (int/float) — NestedJIT of the helper
  * segfaults on `$ctx->runtime->vm` class-id layout (#23540 / #16075). Non-scalar
  * thin AOT aborts with a stderr diagnostic (not silent SIGABRT).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
- * php-src: ext/standard/var.c — php_var_dump_ex
+ * php-src: ext/standard/var.c — php_var_dump_ex / PHP_FUNCTION(var_dump)
  */
 final class StringVarDump
 {

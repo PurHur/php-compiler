@@ -20,15 +20,16 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240, #16565, #22668, #23540).
+ * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240, #16565, #22668, #23540, #32941).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see PrintRJitHelper} (php-in-PHP).
  * Thin standalone AOT: scalar LLVM bridge (bool/null/int/float/string) — NestedJIT of the helper
  * segfaults or throws without Runtime->vm (#23540 / #24220 / #24259). Non-scalar thin AOT aborts
  * with a stderr diagnostic (peer StringVarDump).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
  * Thin standalone AOT publishes sg_vm_context before NestedJIT (#17391 / #23540) on the embed path.
- * php-src: ext/standard/var.c — php_print_r_ex / zend_print_zval_r
+ * php-src: ext/standard/var.c — php_print_r_ex / zend_print_zval_r / PHP_FUNCTION(print_r)
  */
 final class StringPrintR
 {
