@@ -162,6 +162,7 @@ final class JitDate
 
     public static function microtime(Context $context, Value $asFloat): Value
     {
+        StringMicrotime::ensureLinked($context); // #32683 — Type always-on microtime ABI dropped
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
         $isFloat = $context->builder->icmp(
