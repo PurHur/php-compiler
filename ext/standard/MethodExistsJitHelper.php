@@ -15,7 +15,8 @@ use PHPCompiler\Web\Superglobals;
  */
 final class MethodExistsJitHelper
 {
-    public static function existsArgv(Variable $objectOrClass, string $method): bool
+    /** 1/0 — NestedJIT `: bool` was i1 ABI with `ret i64 0` (#32701 leftover of #31966). */
+    public static function existsArgv(Variable $objectOrClass, string $method): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -24,6 +25,6 @@ final class MethodExistsJitHelper
             );
         }
 
-        return VmReflection::methodExists($ctx, $objectOrClass, $method);
+        return VmReflection::methodExists($ctx, $objectOrClass, $method) ? 1 : 0;
     }
 }
