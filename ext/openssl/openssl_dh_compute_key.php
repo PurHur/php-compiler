@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_dh_compute_key() — DH shared secret from raw peer public bytes (php-src ext/openssl/openssl_backend_v3.c; #6596).
+ * openssl_dh_compute_key() — DH shared secret from raw peer public bytes (php-src ext/openssl/openssl_backend_v3.c; #6596 VM, JIT/AOT #32771).
  */
 final class openssl_dh_compute_key extends Internal
 {
@@ -57,8 +57,12 @@ final class openssl_dh_compute_key extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_dh_compute_key() is not implemented for JIT in this compiler build (issue #6596)'
-        );
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'openssl_dh_compute_key() expects exactly 2 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::dhComputeKey($context, $args[0], $args[1]);
     }
 }
