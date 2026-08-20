@@ -43,7 +43,7 @@ final class TypeDeadOpensslMethodsAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_convert_uuencode'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_hash'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_random_bytes'", $type);
     }
 
     public function testRuntimeOwnerDeclaresOpensslMethodsAbisModuleLocally(): void

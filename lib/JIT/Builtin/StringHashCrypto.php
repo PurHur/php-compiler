@@ -10,6 +10,8 @@ use PHPCompiler\JIT\Context;
  * JIT/AOT link for hash() / hash_hmac() / hash_pbkdf2() / hash_equals() / hash_hmac_algos().
  *
  * LLVM lowering via {@see StringHashCryptoJit}.
+ * Module-local ABI owner for hash/hmac/pbkdf2/hkdf (#32876): Type::initialize ensureLinked
+ * this facade so Builtin\Type no longer always-declares empty shells (#31894 / #32122).
  */
 final class StringHashCrypto
 {
