@@ -8673,19 +8673,13 @@ class JIT {
                     $staticVar = $this->ensureJitFunctionStatic($storageKey);
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $staticDefaultVm = $block->constants[$op->arg3];
-                        // php-cfg types `static $a = ['x']` as scalar string while the default is
-                        // string[] — that sent dim writes into ValueBoxDimWrite (#32800 / #32806).
+                        // php-cfg often mistypes function-static defaults (string[] as string,
+                        // or leaves string defaults CFG-unknown). Retype so FETCH_DIM_W picks
+                        // HT vs ValueBoxDimWrite correctly (#32800 / #32806 / #32814 / #32830).
                         if (VM\Variable::TYPE_ARRAY === $staticDefaultVm->type) {
-                            $arrayType = new Type(Type::TYPE_ARRAY);
-                            $destOp->type = $arrayType;
-                            $typedSlot = $block->slotForOperand($destOp);
-                            if (null !== $typedSlot) {
-                                foreach ($block->scopedOperands() as $scopeOp) {
-                                    if ($block->slotForOperand($scopeOp) === $typedSlot) {
-                                        $scopeOp->type = $arrayType;
-                                    }
-                                }
-                            }
+                            $this->retypeFunctionStaticOperand($block, $destOp, new Type(Type::TYPE_ARRAY));
+                        } elseif (VM\Variable::TYPE_STRING === $staticDefaultVm->type) {
+                            $this->retypeFunctionStaticOperand($block, $destOp, Type::string());
                         }
                         JIT\FunctionStaticHelper::emitLazyInit(
                             $this->context,
@@ -9095,25 +9089,16 @@ class JIT {
                         break;
                     }
                     // VALUE box + CFG string: do not ensureHashtablePointer (#32764 / #22646 write).
-                    // String/object dims are array keys — never string-byte offsets (#32798;
-                    // function-static arrays are often CFG-typed string while the box holds a HT).
-                    // Array-default function-statics are retyped to TYPE_ARRAY in DECLARE (#32806);
-                    // do not skip script-local string dims via functionStaticGlobal (#32804 regression).
-                    // String-default function-statics often stay CFG-unknown: take ValueBoxDimWrite
-                    // for functionStaticGlobal unless CFG says array (#32814).
-                    // valueBoxHashtable means the box holds a HT (e.g. $b = A::$a copy, #32830) —
-                    // string-offset writes would __value__readString → NULL → SIGSEGV.
+                    // String/object dims are array keys — never string-byte offsets (#32798).
+                    // Array/string function-static defaults are retyped in DECLARE (#32806 / #32814).
+                    // Do NOT assume functionStaticGlobal + unknown CFG is a string: script locals
+                    // also set that flag, and value-boxed arrays (untyped static copy, json_decode)
+                    // then SEGV in __value__readString (#32830 / follow-up to #32837).
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
+                        && JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
                         && !$value->valueBoxHashtable
-                        && (
-                            JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
-                            || (
-                                $value->functionStaticGlobal
-                                && !JIT\ValueBoxDimWrite::containerCfgIsArray($containerOp->type ?? null)
-                            )
-                        )
                         && Variable::TYPE_STRING !== $dim->type
                         && Variable::TYPE_OBJECT !== $dim->type
                     ) {
@@ -26774,6 +26759,24 @@ class JIT {
         }
 
         return $this->context->jitFunctionStaticVariables[$storageKey];
+    }
+
+    /**
+     * Retype a DECLARE_FUNCTION_STATIC operand (and same-slot aliases) so FETCH_DIM_W
+     * can distinguish HT vs string-offset paths (#32806 / #32814).
+     */
+    private function retypeFunctionStaticOperand($block, Operand $destOp, Type $type): void
+    {
+        $destOp->type = $type;
+        $typedSlot = $block->slotForOperand($destOp);
+        if (null === $typedSlot) {
+            return;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            if ($block->slotForOperand($scopeOp) === $typedSlot) {
+                $scopeOp->type = $type;
+            }
+        }
     }
 
     private function initJitFunctionStaticValueGlobal(PHPLLVM\Value $global): void
