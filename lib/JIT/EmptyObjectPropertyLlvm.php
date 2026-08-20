@@ -136,6 +136,13 @@ final class EmptyObjectPropertyLlvm
      */
     private static function compileEmptyFromFetchedValue(Context $context, Variable $fetched): Value
     {
+        // Script-global string boxes: compileTimeString survives assign; empty() must not
+        // use boxedTruthyScalar's missing IS_STRING path (#32919).
+        if (null !== $fetched->compileTimeString) {
+            $truthy = '' !== $fetched->compileTimeString && '0' !== $fetched->compileTimeString;
+
+            return $context->constantFromBool(!$truthy);
+        }
         if (Variable::TYPE_VALUE !== $fetched->type) {
             $truthy = (new boolval())->call($context, $fetched);
 

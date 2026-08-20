@@ -544,6 +544,34 @@ class JIT {
     }
 
     /**
+     * JUMPIF condition → i1. Script-global string boxes keep compileTimeString after
+     * assign; use zend_is_true(IS_STRING) rules instead of boxedTruthyScalar (#32919).
+     * php-src: Zend/zend_operators.c zend_is_true / convert_to_boolean IS_STRING.
+     */
+    private function jitJumpIfConditionToBool(Variable $condVar): \PHPLLVM\Value
+    {
+        if (null !== $condVar->compileTimeString) {
+            return $this->context->constantFromBool(
+                self::phpStringIsTruthy($condVar->compileTimeString)
+            );
+        }
+        if (Variable::TYPE_STRING === $condVar->type) {
+            return \PHPCompiler\ext\standard\boolval::stringTruthy(
+                $this->context,
+                $this->context->helper->loadValue($condVar)
+            );
+        }
+
+        return $this->context->castToBool($this->context->helper->loadValue($condVar));
+    }
+
+    /** zend_is_true for IS_STRING: non-empty and not "0". */
+    private static function phpStringIsTruthy(string $s): bool
+    {
+        return '' !== $s && '0' !== $s;
+    }
+
+    /**
      * Match `echo match(...)` — JUMPIF chain where arms assign into a shared merge ECHO slot (#24143).
      *
      * php-cfg seeds the result with NULL then fans out IDENTICAL+JUMPIF arms; the else of the outer
@@ -11453,11 +11481,13 @@ class JIT {
                             }
                         }
                     }
-                    $condition = $this->context->castToBool(
-                        $this->context->helper->loadValue(
-                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'branch condition'))
-                        )
+                    $condVar = $this->context->getVariableFromOp(
+                        $this->operandAt($block, $op->arg1, 'branch condition')
                     );
+                    // {main} script-global strings are __value__ boxes; boxedTruthyScalar
+                    // historically lacked IS_STRING and treated them as falsy (#32919).
+                    // Prefer compile-time / native-string truthiness when available.
+                    $condition = $this->jitJumpIfConditionToBool($condVar);
                     if ($isTernaryEchoMerge) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
