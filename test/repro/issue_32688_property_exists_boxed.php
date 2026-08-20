@@ -6,7 +6,7 @@ class C {
 $c = new C;
 var_dump(property_exists($c, 'x'));
 $o = new stdClass();
-$o->dyn = 1;
-echo property_exists($o, 'dyn') ? '1' : '0';
-echo property_exists($o, 'missing') ? '1' : '0';
+$o->x = 1;
+echo property_exists($o, 'x') ? '1' : '0';
+echo property_exists($o, 'y') ? '1' : '0';
 echo "\n";
