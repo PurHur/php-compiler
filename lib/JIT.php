@@ -9080,10 +9080,14 @@ class JIT {
                         break;
                     }
                     // VALUE box + CFG string: do not ensureHashtablePointer (#32764 / #22646 write).
+                    // String/object dims are array keys — never string-byte offsets (#32798;
+                    // function-static arrays are often CFG-typed string while the box holds a HT).
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
                         && JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
+                        && Variable::TYPE_STRING !== $dim->type
+                        && Variable::TYPE_OBJECT !== $dim->type
                     ) {
                         JIT\ValueBoxDimWrite::fetchStringOffsetWriteLvalue(
                             $this->context,
@@ -9633,6 +9637,23 @@ class JIT {
                             JIT\StringOffsetHelper::emitAssignOpError($this->context);
                             break;
                         }
+                        // In-place `$a[i].= …`: dest is CFG-dead (echo re-fetches) but must still
+                        // commit into the FETCH_DIM_W hashtable (#32798 / ZEND_ASSIGN_DIM_OP).
+                        if (
+                            (int) $op->arg1 === (int) $op->arg2
+                            && null !== $left->writableHt
+                        ) {
+                            JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $left);
+                            $newVal = $this->compileConcatIntoNewString(
+                                $left,
+                                $right,
+                                $leftOp,
+                                $rightOp
+                            );
+                            $this->assignOperand($destOp, $newVal, true);
+                            $this->maybeRefreshIncludeBindingsBeforeUse();
+                            break;
+                        }
                         // Always use entry-alloca for dead-operand concat results.
                         // assignOperand creates KIND_VALUE variables whose free() is a
                         // no-op, leaking the allocated string and corrupting the heap on
@@ -9737,8 +9758,29 @@ class JIT {
                     }
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                    // FETCH_DIM_W orphan — ZEND_ASSIGN_DIM_OP for .= (#32798 / leftover #32789).
+                    JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $left);
                     if (null !== $result->objectPropertySlot) {
                         $this->compileObjectPropertyConcatOp($result, $left, $right);
+                    } elseif (
+                        null !== $result->writableHt
+                        && (
+                            Variable::TYPE_VALUE === $result->type
+                            || JIT\JitValueBox::isValueOperand($result)
+                        )
+                    ) {
+                        $newVal = $this->compileConcatIntoNewString(
+                            $left,
+                            $right,
+                            $block->getOperand($op->arg2),
+                            $block->getOperand($op->arg3)
+                        );
+                        // assignOperand commits into the HT (setAtIndex / setAtStringKey).
+                        $this->assignOperand($destOp, $newVal, true);
+                        if (null !== ($newVal->compileTimeString ?? null)) {
+                            $result = $this->context->getVariableFromOp($destOp);
+                            $result->compileTimeString = $newVal->compileTimeString;
+                        }
                     } elseif (Variable::TYPE_VALUE === $result->type || JIT\JitValueBox::isValueOperand($result)) {
                         $newVal = $this->compileConcatIntoNewString(
                             $left,
@@ -10741,15 +10783,24 @@ class JIT {
                         JIT\StringOffsetHelper::emitAssignOpError($this->context);
                         break;
                     }
+                    $powLeft = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    // FETCH_DIM_W orphan — ZEND_ASSIGN_DIM_OP for **= (#32798 / leftover #32789).
+                    JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $powLeft);
                     $pow = new \PHPCompiler\ext\standard\pow();
                     $this->context->powReturnValueBox = true;
                     $powResult = $pow->call(
                         $this->context,
-                        $this->context->getVariableFromOp($block->getOperand($op->arg2)),
+                        $powLeft,
                         $this->context->getVariableFromOp($block->getOperand($op->arg3))
                     );
                     $this->context->powReturnValueBox = false;
-                    $this->assignOperandValue($block->getOperand($op->arg1), $powResult, true);
+                    $powDest = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    if (null !== $powDest->writableHt) {
+                        JIT\JitValueBox::copyFromPointer($this->context, $powDest->value, $powResult);
+                        JIT\HashTableHelper::commitDimWriteLvalue($this->context, $powDest);
+                    } else {
+                        $this->assignOperandValue($block->getOperand($op->arg1), $powResult, true);
+                    }
                     break;
                 case OpCode::TYPE_POST_INC:
                     $this->compileIncDecOp($block, $op, true, false);
