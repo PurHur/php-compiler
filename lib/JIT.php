@@ -8590,6 +8590,7 @@ class JIT {
                                 Variable::TYPE_VALUE === $srcVar->type
                                 && null === $srcVar->valueBoxAliasPtr
                                 && !$srcVar->borrowedValueEntry
+                                && null === $srcVar->writableHt
                             ) {
                                 $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
                                     $this->context,
@@ -8612,6 +8613,7 @@ class JIT {
                         Variable::TYPE_VALUE === $srcVar->type
                         && null === $srcVar->valueBoxAliasPtr
                         && !$srcVar->borrowedValueEntry
+                        && null === $srcVar->writableHt
                     ) {
                         $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
                             $this->context,

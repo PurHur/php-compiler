@@ -28,6 +28,18 @@ final class JitReferencableCheck
         if (null !== $arg->valueBoxAliasPtr) {
             return true;
         }
+        // FETCH_DIM_W / []= lvalue markers — Zend MAKE_REF on $r =& $a[0] (zend_execute.c).
+        if (null !== $arg->writableHt) {
+            if (null !== $arg->writableIndex || null !== $arg->writableStringKey || null !== $arg->writableObjectKey) {
+                return true;
+            }
+            if (null !== $arg->writableValueBoxKey) {
+                return true;
+            }
+        }
+        if (null !== $arg->writableArrayAccessReceiver && null !== $arg->writableArrayAccessKey) {
+            return true;
+        }
 
         return false;
     }

@@ -13,6 +13,7 @@ use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\UsortKeyedLlvm;
+use PHPCompiler\JIT\UsortPackedLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
@@ -148,14 +149,11 @@ final class UsortRuntime
             );
         }
 
-        self::ensureLinked($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $sorted = $context->builder->call(
-            $context->lookupFunction(self::ABI_USORT_CLOSURE),
-            $ht,
-            JitValueBox::valuePtrFromVariable($context, $callback)
-        );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $sorted);
+        UsortPackedLlvm::sortPackedWithClosure($context, $ht, $callback);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
     private static function sortKeysWithClosure(Context $context, JITVariable $array, JITVariable $callback): void
