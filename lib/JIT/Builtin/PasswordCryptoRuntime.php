@@ -10,13 +10,17 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908, #22934).
+ * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908, #22934, #32855).
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * empty shells for the six password crypto ABIs (#32855 / peer #32851) — leftover Type decls
+ * mint password_hash.1 (#31894 / #32122).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Libcrypt #22886 / OpensslSign #22911).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\PasswordJitHelper}; thin LLVM
  * bridges forward the ABI (#9908, #12869).
  * SSOT: {@see \PHPCompiler\ext\standard\VmPassword}
- * php-src: ext/standard/password.c
+ * php-src: ext/standard/password.c / crypt.c
  */
 final class PasswordCryptoRuntime
 {
@@ -84,12 +88,46 @@ final class PasswordCryptoRuntime
         LibcryptRuntime::ensureLinked($context);
         PasswordRandomBytesRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
-        self::implementIfMissing($context, '__compiler_password_hash', self::implementHashBridge(...));
-        self::implementIfMissing($context, '__compiler_password_verify', self::implementVerifyBridge(...));
-        self::implementIfMissing($context, '__compiler_crypt', self::implementCryptBridge(...));
-        self::implementIfMissing($context, '__compiler_password_get_info', self::implementGetInfoBridge(...));
-        self::implementIfMissing($context, '__compiler_password_needs_rehash', self::implementNeedsRehashBridge(...));
-        self::implementIfMissing($context, '__compiler_password_algos', self::implementAlgosBridge(...));
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        self::implementIfMissing(
+            $context,
+            '__compiler_password_hash',
+            static fn () => $context->context->functionType($strPtr, false, $strPtr, $i64, $i64),
+            self::implementHashBridge(...)
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_password_verify',
+            static fn () => $context->context->functionType($i32, false, $strPtr, $strPtr),
+            self::implementVerifyBridge(...)
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_crypt',
+            static fn () => $context->context->functionType($strPtr, false, $strPtr, $strPtr),
+            self::implementCryptBridge(...)
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_password_get_info',
+            static fn () => $context->context->functionType($htPtr, false, $strPtr),
+            self::implementGetInfoBridge(...)
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_password_needs_rehash',
+            static fn () => $context->context->functionType($i32, false, $strPtr, $i64, $i64),
+            self::implementNeedsRehashBridge(...)
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_password_algos',
+            static fn () => $context->context->functionType($htPtr, false),
+            self::implementAlgosBridge(...)
+        );
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -100,10 +138,17 @@ final class PasswordCryptoRuntime
     }
 
     /**
+     * Declare the ABI module-locally when absent — never lookupFunction against a Type empty shell (#32855).
+     *
+     * @param callable(): mixed                     $typeFactory
      * @param callable(Context, LlvmFunction): void $emit
      */
-    private static function implementIfMissing(Context $context, string $name, callable $emit): void
-    {
+    private static function implementIfMissing(
+        Context $context,
+        string $name,
+        callable $typeFactory,
+        callable $emit
+    ): void {
         $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($name, $probe);
@@ -111,7 +156,9 @@ final class PasswordCryptoRuntime
             return;
         }
 
-        $fn = $context->lookupFunction($name);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($name, $typeFactory());
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
