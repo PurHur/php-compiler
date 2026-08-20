@@ -82,8 +82,9 @@ final class StringGetenv
     public static function implement(Context $context): void
     {
         // NestedJIT must not recurse into GetenvLookupJitHelper; helper-runtime .o is OK (#23970).
-        // Do not treat Type.php's empty declaration (countBasicBlocks>0, no terminator) as a
+        // Do not treat a leftover empty declaration (countBasicBlocks>0, no terminator) as a
         // completed body — that left U __compiler_getenv at argv-driver link (#26756).
+        // Type.php always-on shells for this ABI are gone (#32665).
         if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
             return;
         }

@@ -23,7 +23,7 @@ final class StringGetenvRuntimeStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('__compiler_getenv');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
-        // Type.php declares __compiler_getenv before ensureStandaloneBodies; an empty
+        // StringGetenv owns the ABI after Type always-on drop (#32665); an empty
         // entry block must not satisfy "body present" (#26756 / argv-driver link).
         $this->assertTrue(
             JitVmHelperLink::hasNamedBridgeEntry($fn, 'getenv_bridge_entry'),

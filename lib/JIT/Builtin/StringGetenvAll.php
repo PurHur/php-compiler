@@ -37,7 +37,7 @@ final class StringGetenvAll
 
     public static function implement(Context $context): void
     {
-        // Peer StringGetenv (#26756): empty Type.php declarations are not completed bodies.
+        // Peer StringGetenv (#26756 / #32665): leftover empty declarations are not completed bodies.
         if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
             return;
         }
