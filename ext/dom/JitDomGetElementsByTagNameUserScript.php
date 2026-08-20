@@ -22,6 +22,13 @@ final class JitDomGetElementsByTagNameUserScript
     /** Last NS query was DOMElement::getElementsByTagNameNS (skip document element; #32511). */
     private static bool $lastNsFromElement = false;
 
+    private static ?string $lastTagQuery = null;
+
+    public static function lastTagQuery(): ?string
+    {
+        return self::$lastTagQuery;
+    }
+
     public static function shouldUse(Context $context): bool
     {
         return JitDomLoadHTMLUserScript::shouldUse($context);
@@ -47,6 +54,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
+        self::$lastTagQuery = null;
         if (\count($args) < 2) {
             return null;
         }
@@ -63,11 +71,13 @@ final class JitDomGetElementsByTagNameUserScript
                 return null;
             }
         }
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml) {
+        $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
+            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        if (null === $markup) {
             return null;
         }
-        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tagLit);
+        self::$lastTagQuery = $tagLit;
+        $count = DomParseSimpleXmlJitHelper::countTagArgv($markup, $tagLit);
         // Preserve live appendChild increments when re-querying the same tag (#28605).
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
 

@@ -62,6 +62,13 @@ final class JitDomNodeListItemUserScript
         if (0 !== $index) {
             return null;
         }
+        $tagQuery = JitDomGetElementsByTagNameUserScript::lastTagQuery();
+        $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
+            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        if (null !== $tagQuery && null !== $markup) {
+            return self::materializeNthQueryMatch($context, $markup, $tagQuery, $index);
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return null;
         }
@@ -143,6 +150,17 @@ final class JitDomNodeListItemUserScript
             return self::boxNull($context);
         }
         $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $tag, $position) ?? '';
+        $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        if (null !== $htmlLit && $htmlLit === $xml) {
+            $text = VmDom::decodeHtmlCharacterReferences($text);
+            $from = \PHPCompiler\ext\iconv\CharsetEngine::canonicalize(self::htmlLoadDecodeEncoding($htmlLit));
+            if (null !== $from && 'UTF-8' !== $from) {
+                $converted = \PHPCompiler\ext\iconv\CharsetEngine::convert($from, 'UTF-8', $text);
+                if (false !== $converted) {
+                    $text = $converted;
+                }
+            }
+        }
         $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag) as $attrPair) {
             $qname = $attrPair['qname'];
@@ -219,5 +237,18 @@ final class JitDomNodeListItemUserScript
         $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /** Mirror VmDom::loadHTML charset selection for compile-time HTML NodeList text (#22023). */
+    private static function htmlLoadDecodeEncoding(string $html): string
+    {
+        if (1 === preg_match('/<meta\b[^>]*charset\s*=\s*["\']?([^"\'>\s;]+)/i', $html, $m)) {
+            return $m[1];
+        }
+        if (1 === preg_match('/<\?xml\b[^>]*encoding\s*=\s*["\']([^"\']+)/i', $html, $m)) {
+            return $m[1];
+        }
+
+        return 'ISO-8859-1';
     }
 }

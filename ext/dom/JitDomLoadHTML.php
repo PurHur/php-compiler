@@ -65,7 +65,10 @@ final class JitDomLoadHTML
         );
 
         if (JitDomLoadHTMLUserScript::shouldUse($context)) {
-            return JitDomLoadHTMLUserScript::invoke($context, ...$args);
+            $optionsArg = $args[2] ?? null;
+            if (JitDomLoadHTMLUserScript::canHandleAtCompileTime($context, $args[1], $optionsArg)) {
+                return JitDomLoadHTMLUserScript::invoke($context, ...$args);
+            }
         }
 
         DomLoadHTMLRuntime::ensureLinked($context);

@@ -86,6 +86,23 @@ final class JitDomLoadHTMLUserScript
         return JitDomDocumentMethodKernel::shouldUse($context);
     }
 
+    /**
+     * Pure-LLVM loadHTML only handles id-bearing single elements (and NOIMPLIED fragments).
+     * Bare UTF-8 / meta charset / xml encoding prologue need VmDom::loadHTML (#22023 / #22022).
+     */
+    public static function canHandleAtCompileTime(
+        Context $context,
+        JITVariable $htmlArg,
+        ?JITVariable $optionsArg = null
+    ): bool {
+        self::rememberCompileTimeOptions($context, $optionsArg);
+        if (null !== self::tryParseCompileTimeHtml($htmlArg)) {
+            return true;
+        }
+
+        return self::hasCompileTimeFragmentLoad($htmlArg);
+    }
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 2) {
