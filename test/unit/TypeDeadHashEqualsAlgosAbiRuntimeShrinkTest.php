@@ -43,7 +43,7 @@ final class TypeDeadHashEqualsAlgosAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_file_get_contents'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_mime_content_type'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_hash'", $type);
         $this->assertStringContainsString('StringHashEquals::ensureLinked', $type);
         $this->assertStringContainsString('StringHashHmacAlgos::ensureLinked', $type);
