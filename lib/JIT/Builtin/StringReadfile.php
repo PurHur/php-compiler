@@ -11,8 +11,11 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188, #19966, #29915).
+ * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188, #19966, #29915, #33021).
  *
+ * Owns the ABI module-locally: {@see getNamedFunction} first, then {@see addFunction}
+ * if absent. Do not re-add empty always-on shells in {@see Type} — leftover decls mint
+ * readfile.1 (#31894 / #32122).
  * Always {@see JitVmHelperLink} → helper → `@readfile` → NestedJIT
  * whitelist {@see \PHPCompiler\ext\standard\readfile} → {@see JitReadfileLibc}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::readfile()}.
@@ -66,9 +69,14 @@ final class StringReadfile
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
+        // Declare ABI module-locally when Type no longer always-on (#33021).
         $fn = null !== $probe
             ? $probe
-            : $context->lookupFunction(self::ABI);
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($i64, false, $strPtr)
+            );
+        $context->registerFunction(self::ABI, $fn);
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
         $failBb = $fn->appendBasicBlock('readfile_bridge_fail');

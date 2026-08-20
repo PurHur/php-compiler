@@ -42,7 +42,7 @@ final class TypeDeadConvertUuAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_readfile'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_file_get_contents'", $type);
         $this->assertStringContainsString('StringConvertUu::ensureLinked', $type);
     }
 
