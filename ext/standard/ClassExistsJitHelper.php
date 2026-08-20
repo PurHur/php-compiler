@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * class_exists() / is_a() / is_subclass_of() for compiled JIT/AOT modules (#16185, #26406).
+ * class_exists() / is_a() / is_subclass_of() for compiled JIT/AOT modules (#16185, #26406, #32706).
  *
  * SSOT: {@see VmReflection::classExists()} / {@see VmReflection::isAString()} / {@see VmReflection::isSubclassOf()}
- * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(is_a) / is_subclass_of (+ autoload)
+ * php-src: Zend/zend_builtin_functions.c
+ *
+ * Helpers return int 0/1 — NestedJIT `: bool` was i1 ABI with `ret i64 0` (#32701/#32706).
  */
 final class ClassExistsJitHelper
 {
-    public static function existsArgv(string $name): bool
+    public static function existsArgv(string $name): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -27,11 +30,11 @@ final class ClassExistsJitHelper
             $ctx,
             VmReflection::normalizeGlobalIntrospectionName($name),
             true
-        );
+        ) ? 1 : 0;
     }
 
-    /** is_a($child, $class, true) string subject — autoloads (#26406). */
-    public static function isAStringArgv(string $childName, string $className): bool
+    /** is_a($child, $class, true) — runtime string subject (#26406, #32706). */
+    public static function isAStringArgv(Variable $childName, string $className): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -40,11 +43,11 @@ final class ClassExistsJitHelper
             );
         }
 
-        return VmReflection::isAString($ctx, $childName, $className);
+        return VmReflection::isAString($ctx, $childName->resolveIndirect()->toString(), $className) ? 1 : 0;
     }
 
-    /** is_subclass_of($child, $parent) string subject — autoloads (#26406). */
-    public static function isSubclassOfStringArgv(string $childName, string $parentName): bool
+    /** is_subclass_of($child, $parent) — runtime string subject (#26406, #32706). */
+    public static function isSubclassOfStringArgv(Variable $childName, string $parentName): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -53,6 +56,6 @@ final class ClassExistsJitHelper
             );
         }
 
-        return VmReflection::isSubclassOf($ctx, $childName, $parentName);
+        return VmReflection::isSubclassOf($ctx, $childName->resolveIndirect()->toString(), $parentName) ? 1 : 0;
     }
 }

@@ -6,14 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringClassExists;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -112,29 +115,134 @@ final class is_a_ extends Internal
             $args[1],
             'is_a() class name'
         );
-        if (JITVariable::TYPE_STRING === $args[0]->type) {
-            $this->jitString($context, $args[0], 'is_a() subject');
-            $i1 = $context->getTypeFromString('int1');
-            $falseVal = $i1->constInt(0, false);
-            if ($allowStringKnownFalse) {
-                return $falseVal;
-            }
-            // Runtime helper — autoloads like zend_lookup_class (#26406). Compile-time
-            // fold would skip registered autoloaders for not-yet-loaded class strings.
-            $childStr = JitStringArg::lower($context, $args[0], 'is_a() subject');
-            $classStr = $context->builder->load($context->constantStringFromString($className));
-            $match = StringClassExists::invokeIsAString($context, $childStr, $classStr);
-
-            return $context->builder->select(
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            return $context->helper->loadValue(
+                ReflectionBuiltinHelper::emitInstanceOf($context, $args[0], $className)
+            );
+        }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            return $this->invokeFromValueBox(
+                $context,
+                $args[0],
+                $className,
                 $allowString,
-                $match,
-                $falseVal
+                $allowStringKnownFalse
+            );
+        }
+        if (JITVariable::TYPE_STRING === $args[0]->type) {
+            return $this->invokeStringSubject(
+                $context,
+                $args[0],
+                $className,
+                $allowString,
+                $allowStringKnownFalse
             );
         }
 
-        return $context->helper->loadValue(
-            ReflectionBuiltinHelper::emitInstanceOf($context, $args[0], $className)
+        return $context->getTypeFromString('int1')->constInt(0, false);
+    }
+
+    private function invokeStringSubject(
+        Context $context,
+        JITVariable $subject,
+        string $className,
+        Value $allowString,
+        bool $allowStringKnownFalse
+    ): Value {
+        $this->jitString($context, $subject, 'is_a() subject');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        if ($allowStringKnownFalse) {
+            return $falseVal;
+        }
+        $childLit = JitStringArg::compileTimeLiteral($subject);
+        if (null !== $childLit) {
+            $match = ReflectionBuiltinHelper::classIsInstanceOfLiteral($context, $childLit, $className);
+
+            return $context->builder->select($allowString, $match, $falseVal);
+        }
+        StringClassExists::ensureLinked($context);
+        $childBox = JitValueBox::valuePtrFromVariable($context, $subject);
+        $classStr = $context->builder->load($context->constantStringFromString($className));
+        $match = StringClassExists::invokeIsAString($context, $childBox, $classStr);
+
+        return $context->builder->select($allowString, $match, $falseVal);
+    }
+
+    private function invokeFromValueBox(
+        Context $context,
+        JITVariable $subject,
+        string $className,
+        Value $allowString,
+        bool $allowStringKnownFalse
+    ): Value {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $subject);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $typeField)
         );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
+        );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_STRING & 0x7f, false)
+        );
+
+        $objectBlock = BasicBlockHelper::append($context, 'is_a_box_obj');
+        $notObject = BasicBlockHelper::append($context, 'is_a_box_not_obj');
+        $stringBlock = BasicBlockHelper::append($context, 'is_a_box_str');
+        $falseBlock = BasicBlockHelper::append($context, 'is_a_box_false');
+        $mergeBlock = BasicBlockHelper::append($context, 'is_a_box_merge');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+
+        $context->builder->branchIf($isObject, $objectBlock, $notObject);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $obj
+        );
+        $objResult = $context->helper->loadValue(
+            ReflectionBuiltinHelper::emitInstanceOf($context, $objVar, $className)
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($notObject);
+        $context->builder->branchIf($isString, $stringBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strResult = $this->invokeStringSubject(
+            $context,
+            $subject,
+            $className,
+            $allowString,
+            $allowStringKnownFalse
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($objResult, $objectBlock);
+        $phi->addIncoming($strResult, $stringBlock);
+        $phi->addIncoming($falseVal, $falseBlock);
+
+        return $phi;
     }
 
     private static function jitAllowStringKnownFalse(Context $context, JITVariable $arg): bool

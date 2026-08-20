@@ -88,6 +88,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'property_exists_static_31966.phpt',
         'property_exists_boxed_instance_32688.phpt',
         'method_exists_class_string_32701.phpt',
+        'is_a_class_string_32706.phpt',
         'property_exists_stdclass_peer_class_prop.phpt',
         'function_static_string_write_31966.phpt',
         'function_static_array_inc_32305.phpt',

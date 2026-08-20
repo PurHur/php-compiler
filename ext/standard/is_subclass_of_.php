@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -125,10 +126,16 @@ final class is_subclass_of_ extends Internal
         if ($allowStringKnownFalse) {
             return $falseVal;
         }
-        // Runtime helper — autoloads like zend_lookup_class (#26406).
-        $childStr = JitStringArg::lower($context, $args[0], 'is_subclass_of() child class');
+        $childLit = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $childLit) {
+            $match = ReflectionBuiltinHelper::classIsSubclassOfLiteral($context, $childLit, $parentName);
+
+            return $context->builder->select($allowString, $match, $falseVal);
+        }
+        StringClassExists::ensureLinked($context);
+        $childBox = JitValueBox::valuePtrFromVariable($context, $args[0]);
         $parentStr = $context->builder->load($context->constantStringFromString($parentName));
-        $match = StringClassExists::invokeIsSubclassOfString($context, $childStr, $parentStr);
+        $match = StringClassExists::invokeIsSubclassOfString($context, $childBox, $parentStr);
 
         return $context->builder->select(
             $allowString,

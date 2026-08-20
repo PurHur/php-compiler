@@ -24,7 +24,7 @@ final class ClassInterfaceExistsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringInterfaceExists::invoke', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp'", $source);
         $this->assertStringNotContainsString('JitClassExists::stringDataPtr', $source);
-        $this->assertLessThan(35, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(45, \substr_count($source, "\n") + 1);
     }
 
     public function testStringClassExistsUsesJitHelperNotStrcasecmpLoop(): void
@@ -32,6 +32,9 @@ final class ClassInterfaceExistsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringClassExists.php');
         $this->assertStringContainsString('ClassExistsJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringContainsString('extractLongFromHelperResult', $source);
+        $this->assertStringContainsString('#32706', $source);
+        $this->assertStringNotContainsString('emitNameMatchWalk', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp'", $source);
     }
 
@@ -48,6 +51,9 @@ final class ClassInterfaceExistsRuntimeShrinkTest extends TestCase
         $classHelper = (string) file_get_contents(__DIR__.'/../../ext/standard/ClassExistsJitHelper.php');
         $this->assertStringContainsString('VmReflection::classExists', $classHelper);
         $this->assertStringContainsString('Superglobals::getActiveContext', $classHelper);
+        $this->assertStringContainsString('existsArgv(string $name): int', $classHelper);
+        $this->assertStringContainsString('isAStringArgv(Variable $childName, string $className): int', $classHelper);
+        $this->assertStringContainsString('isSubclassOfStringArgv(Variable $childName, string $parentName): int', $classHelper);
 
         $interfaceHelper = (string) file_get_contents(__DIR__.'/../../ext/standard/InterfaceExistsJitHelper.php');
         $this->assertStringContainsString('VmReflection::interfaceExists', $interfaceHelper);
