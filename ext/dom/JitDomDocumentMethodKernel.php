@@ -907,7 +907,7 @@ final class JitDomDocumentMethodKernel
 
     public static function ensureC14NFileBridge(Context $context): void
     {
-        self::ensureBridge(
+        self::ensureContextBridge(
             $context,
             DomC14NFileRuntime::ABI_NAME,
             'dom_node_c14n_file_user_script',
