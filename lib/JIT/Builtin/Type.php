@@ -481,9 +481,14 @@ class Type extends Builtin {
         // NestedJIT/AOT bridge is StringStrtr (getNamedFunction first; Type::initialize
         // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // strtr.1 (#31894 / #32122).
-        $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
-        $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
-        $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);
+        // __compiler_convert_uuencode / __compiler_convert_uudecode always-on shells
+        // removed (#32982): NestedJIT/AOT bridge is StringConvertUu (getNamedFunction
+        // first via JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked).
+        // Thin AOT already calls StringConvertUu::ensureLinked from
+        // ext/standard/JitConvertUuencode.php / JitConvertUudecode.php. Leftover Type
+        // empty decls vs Runtime ABI drift mint convert_uuencode.1 / convert_uudecode.1
+        // (#31894 / #32122). User-script convert_uuencode()/convert_uudecode() stays
+        // ConvertUuJitHelper / VmConvertUu / VmString.
         // __compiler_quoted_printable_encode / __compiler_quoted_printable_decode
         // always-on shells removed (#32882): NestedJIT/AOT bridge is StringQuotPrint
         // (JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked). Leftover
@@ -493,14 +498,6 @@ class Type extends Builtin {
         // (#32879): NestedJIT/AOT bridge is StringUtf8Latin1 (getNamedFunction first;
         // Type::initialize still ensureLinked). Leftover Type empty decls vs Runtime
         // ABI drift mint utf8_encode.1 (#31894 / #32122).
-        $fntypeUudecode = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $strPtr,
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnUudecode = $this->context->module->addFunction('__compiler_convert_uudecode', $fntypeUudecode);
-        $this->context->registerFunction('__compiler_convert_uudecode', $fnUudecode);
         // __compiler_addcslashes / __compiler_stripcslashes always-on shells removed
         // (#32893): NestedJIT/AOT bridge is StringCslashes (JitVmHelperLink::ensureBridge;
         // Type::initialize still ensureLinked / ensureStripcslashes). Leftover Type empty
@@ -1034,6 +1031,7 @@ class Type extends Builtin {
         StringPrintR::ensureLinked($this->context);
         StringVarDump::ensureLinked($this->context);
         StringStripTags::ensureLinked($this->context);
+        StringConvertUu::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);

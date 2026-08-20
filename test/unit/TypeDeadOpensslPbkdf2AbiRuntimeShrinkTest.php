@@ -41,7 +41,7 @@ final class TypeDeadOpensslPbkdf2AbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_convert_uuencode'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_utf8_strlen'", $type);
         $this->assertStringContainsString('OpensslPbkdf2Runtime::ensureLinked', $type);
     }
 

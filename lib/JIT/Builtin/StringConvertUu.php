@@ -12,11 +12,16 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper + VmConvertUu (#13227, #30811).
+ * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper + VmConvertUu (#13227, #30811, #32982).
  *
+ * Owns the ABI module-locally: {@see getNamedFunction} first, then
+ * {@see JitVmHelperLink::ensureBridge} (addFunction if absent). Do not re-add empty
+ * always-on shells in {@see Type} — leftover decls mint convert_uuencode.1 /
+ * convert_uudecode.1 (#31894 / #32122).
  * NestedJIT bundle peer {@see StringSoundex} / #30790 — solo ConvertUuJitHelper NestedJIT
- * SIGSEGVs under thin user-script AOT (#30811).
- * php-src: ext/standard/uuencode.c
+ * SIGSEGVs under thin user-script AOT (#30811). Peer shrink: StringStripTags #32971 /
+ * StringQuotPrint #32882 / StringCslashes #32893.
+ * php-src: ext/standard/uuencode.c — PHP_FUNCTION(convert_uuencode) / convert_uudecode
  */
 final class StringConvertUu
 {
