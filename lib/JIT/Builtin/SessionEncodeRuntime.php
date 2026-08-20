@@ -20,6 +20,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Replaces former ~530-line LLVM wire/apply bodies with thin bridges into {@see VmSessionSerializer} SSOT.
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SessionCreateIdRuntime #21941 / FunctionExistsRuntime #22016).
+ * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
+ * so BasicBlockHelper::append does not steal into the in-flight user fn (#32994 / peer #27211).
  * php-src: ext/session/session.c — php_session_encode / php_session_decode
  */
 final class SessionEncodeRuntime
@@ -38,16 +40,13 @@ final class SessionEncodeRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        // Save before StorageKernel/NestedJIT — they clear the insert block (#32994).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         StringUnserialize::ensureLinked($context);
         SessionStorageGlobals::ensureGlobals($context);
         // Merge bridge for session_decode apply (#26088).
         \PHPCompiler\ext\standard\JitSessionStorageKernel::ensureLinked($context);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_session_encode_wire', self::implementEncodeWireBridge(...));
@@ -56,11 +55,7 @@ final class SessionEncodeRuntime
         self::implementIfMissing($context, '__phpc_session_decode_apply', self::implementDecodeApplyBridge(...));
         self::registerLinkedRuntime($context);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     /**
@@ -76,7 +71,10 @@ final class SessionEncodeRuntime
         }
 
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user fn (#32994 / #27211).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $emit): void {
+            $emit($context, $fn);
+        });
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }

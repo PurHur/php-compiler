@@ -40,25 +40,18 @@ final class SessionCreateIdRuntime
     {
         // Create-id ABI only — do not pull SessionLifecycleRuntime (session_start AOT
         // NestedJIT still segfaults on master; create_id must link standalone) (#27258).
+        // Save before StringRandomBytes/NestedJIT — they clear the insert block (#32994).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         SessionStorageGlobals::ensureGlobals($context);
         StringRandomBytes::ensureLinked($context);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_session_random_id_string', self::implementRandomIdString(...));
         self::implementIfMissing($context, '__phpc_session_create_id_apply', self::implementCreateIdApply(...));
         self::implementIfMissing($context, '__phpc_session_create_id_apply_boxed', self::implementCreateIdApplyBoxed(...));
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     /** Thin user-script AOT: materialize ABI bodies on first use (#27258 / peer #12910). */
@@ -90,7 +83,10 @@ final class SessionCreateIdRuntime
         }
 
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user fn (#32994 / peer #27211).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $emit): void {
+            $emit($context, $fn);
+        });
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }

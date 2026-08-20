@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\SessionEncodeRuntime;
+use PHPCompiler\JIT\Builtin\SessionGcRuntime;
 use PHPCompiler\JIT\Builtin\SessionId;
 use PHPCompiler\JIT\Builtin\SessionName;
 use PHPCompiler\JIT\Builtin\SessionStorageGlobals;
@@ -53,9 +55,18 @@ final class SessionStorageGlobalsStandaloneTest extends TestCase
         $id = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionId.php');
         $name = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionName.php');
         $mod = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionModuleName.php');
+        $encode = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionEncode.php');
+        $decode = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionDecode.php');
+        $gc = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionGc.php');
         $this->assertStringContainsString('Sid::ensureLinked', $id);
         $this->assertStringContainsString('Sname::ensureLinked', $name);
         $this->assertStringContainsString('Smod::ensureLinked', $mod);
+        $this->assertStringContainsString('SessionEncodeRuntime::ensureLinked', $encode);
+        $this->assertStringContainsString('SessionEncodeRuntime::ensureLinked', $decode);
+        $this->assertStringContainsString('SessionGcRuntime::ensureLinked', $gc);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $encode);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $decode);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $gc);
 
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
@@ -64,5 +75,14 @@ final class SessionStorageGlobalsStandaloneTest extends TestCase
         SessionName::ensureLinked($ctx);
         $fn = $ctx->lookupFunction('__phpc_session_id_apply');
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
+
+        SessionEncodeRuntime::ensureLinked($ctx);
+        SessionEncodeRuntime::ensureLinked($ctx);
+        SessionGcRuntime::ensureLinked($ctx);
+        SessionGcRuntime::ensureLinked($ctx);
+        foreach (['__phpc_session_encode_apply', '__phpc_session_decode_apply', '__phpc_session_gc_apply'] as $fnName) {
+            $linked = $ctx->lookupFunction($fnName);
+            $this->assertGreaterThan(0, $linked->countBasicBlocks(), $fnName);
+        }
     }
 }

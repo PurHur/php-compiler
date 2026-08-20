@@ -17,6 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StatCache #25882 / ResolveSidecar #25860).
  * Replaces LLVM file-scan in SessionStorageRuntime and session GC apply logic here.
+ * Thin AOT call-site {@see ensureLinked} scopes bridge emit to the ABI fn (#32994 / peer #27211).
  * php-src: ext/session/session.c — php_session_gc
  */
 final class SessionGcRuntime
@@ -32,6 +33,9 @@ final class SessionGcRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        // Save before StorageRuntime/NestedJIT — they clear the insert block (#32994).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         CallArgv::implement($context);
         SessionStorageGlobals::ensureGlobals($context);
         SessionStorageRuntime::ensureLinked($context);
@@ -40,12 +44,15 @@ final class SessionGcRuntime
         self::implementIfMissing($context, 'phpc_session_gc_expired_files', self::implementGcExpiredFilesBridge(...));
         self::implementIfMissing($context, '__phpc_session_gc_apply', self::implementGcApplyBridge(...));
         self::registerLinkedRuntime($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     public static function ensureGcExpiredFilesLinked(Context $context): void
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_session_gc_expired_files', self::implementGcExpiredFilesBridge(...));
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -72,7 +79,10 @@ final class SessionGcRuntime
         }
 
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user fn (#32994 / #27211).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $emit): void {
+            $emit($context, $fn);
+        });
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }
