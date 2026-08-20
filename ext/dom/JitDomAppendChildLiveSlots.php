@@ -13,14 +13,16 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT LLVM slot sync for Element DOMNode::appendChild() (#27476).
+ * Thin-AOT LLVM slot sync for Element DOMNode::appendChild() (#27476, #32929).
  *
  * Peer {@see JitDomInsertBefore}: skip NestedJIT for createElement nodes.
  * Parent firstChild/lastChild use DOMElement (createElement layout). DOMNode
  * first/last on an Element allocation aliases tagName/nodeName (#32361 / #24973).
  * Sibling/parentNode on children use DOMElement (DOMNode sibling aliases parentNode).
- * Move detection uses first/last identity — parentNode slots are unreliable after
- * lastChild stores on thin AOT (#27476).
+ * Move detection uses first/last identity **or** non-null prev/next siblings —
+ * parentNode slots are unreliable after lastChild stores on thin AOT (#27476).
+ * Middle-child moves that only checked first/last took the fresh-append path and
+ * SIGSEGV'd when walking childNodes (#32929).
  *
  * Reference: php-src ext/dom/node.c dom_node_append_child.
  * Peer: {@see JitDomInsertBefore}.
@@ -32,26 +34,38 @@ final class JitDomAppendChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_live_slots');
         self::ensureLayout($context);
 
-        $objectType = $context->type->object;
-        $voidPtr = $context->getTypeFromString('void*');
         $objPtrTy = $context->getTypeFromString('__object__*');
 
         $childJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $child);
         $nullBox = self::nullValueVar($context);
 
-        // Detect same-parent move without parentNode: thin-AOT lastChild stores can
-        // clear sibling parentNode slots (#27476). If child is already first or last,
-        // this is a reparent-within-parent (php-src dom_node_append_child move path).
+        // Detect same-parent membership without parentNode (#27476 / #32929):
+        // first/last identity OR already linked via prev/next (middle children).
         $curFirst0 = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_acls_chk_first');
         $curLast0 = self::loadChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, 'dom_acls_chk_last');
         $isFirstChild = $context->builder->icmp(Builder::INT_EQ, $curFirst0, $child);
         $isLastChild = $context->builder->icmp(Builder::INT_EQ, $curLast0, $child);
-        $isMove = $context->builder->or($isFirstChild, $isLastChild);
+        $chkPrev = self::loadSibling($context, $child, VmDom::PROP_PREVIOUS_SIBLING, 'dom_acls_chk_prev');
+        $chkNext = self::loadSibling($context, $child, VmDom::PROP_NEXT_SIBLING, 'dom_acls_chk_next');
+        $hasPrev = $context->builder->icmp(Builder::INT_NE, $chkPrev, $objPtrTy->constNull());
+        $hasNext = $context->builder->icmp(Builder::INT_NE, $chkNext, $objPtrTy->constNull());
+        $isLinked = $context->builder->or($hasPrev, $hasNext);
+        $isMember = $context->builder->or($context->builder->or($isFirstChild, $isLastChild), $isLinked);
 
+        $bbDone = BasicBlockHelper::append($context, 'dom_acls_done');
+        $bbAlreadyLast = BasicBlockHelper::append($context, 'dom_acls_already_last');
+        $bbNotLast = BasicBlockHelper::append($context, 'dom_acls_not_last');
+        // php-src: appendChild of already-last child is a no-op (still returns child).
+        $context->builder->branchIf($isLastChild, $bbAlreadyLast, $bbNotLast);
+
+        $context->builder->positionAtEnd($bbAlreadyLast);
+        self::storeParentNode($context, $child, $parent);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbNotLast);
         $bbMove = BasicBlockHelper::append($context, 'dom_acls_move');
         $bbFresh = BasicBlockHelper::append($context, 'dom_acls_fresh');
-        $bbDone = BasicBlockHelper::append($context, 'dom_acls_done');
-        $context->builder->branchIf($isMove, $bbMove, $bbFresh);
+        $context->builder->branchIf($isMember, $bbMove, $bbFresh);
 
         // ---- Same-parent move ----
         $context->builder->positionAtEnd($bbMove);
@@ -128,8 +142,11 @@ final class JitDomAppendChildLiveSlots
             new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $tail)
         );
         self::storeChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, $childJit);
+        // Same-parent move keeps length; only refresh pins (do not allocate a fresh
+        // length=2 list — that collapsed 3+ children and stale held lists, #32929).
         $newFirst = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_acls_nfirst');
-        self::writeChildNodesList($context, $parent, 2, $newFirst, $child);
+        $pin1 = self::loadSibling($context, $newFirst, VmDom::PROP_NEXT_SIBLING, 'dom_acls_move_pin1');
+        self::refreshChildNodesPinsInPlace($context, $parent, $newFirst, $pin1);
         self::storeParentNode($context, $child, $parent);
         $context->builder->branch($bbDone);
 
@@ -345,6 +362,70 @@ final class JitDomAppendChildLiveSlots
             $nextJit,
             JITVariable::TYPE_NATIVE_LONG
         );
+        $ownerJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $owner);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER),
+            $ownerJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem0'),
+            self::objectOrNullVar($context, $item0),
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem1'),
+            self::objectOrNullVar($context, $item1),
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /**
+     * Same-parent appendChild move: refresh `__phpcItem*` pins on the existing
+     * childNodes list without changing length (#32929 / peer #32784).
+     */
+    private static function refreshChildNodesPinsInPlace(
+        Context $context,
+        Value $owner,
+        Value $item0,
+        Value $item1
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_acls_refresh_pins');
+        $objectType = $context->type->object;
+        $listClassId = $objectType->lookup('DOMNodeList');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        if (!$objectType->hasProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER)) {
+            $objectType->defineProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        }
+        foreach (['__phpcItem0', '__phpcItem1'] as $prop) {
+            if (!$objectType->hasProperty($listClassId, $prop)) {
+                $objectType->defineProperty($listClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+
+        $existing = self::loadChildNodesListObject($context, $owner);
+        $missing = $context->builder->icmp(Builder::INT_EQ, $existing, $objPtrTy->constNull());
+        $bbSeed = BasicBlockHelper::append($context, 'dom_acls_refresh_seed');
+        $bbPins = BasicBlockHelper::append($context, 'dom_acls_refresh_set');
+        $bbDone = BasicBlockHelper::append($context, 'dom_acls_refresh_done');
+        $context->builder->branchIf($missing, $bbSeed, $bbPins);
+
+        $context->builder->positionAtEnd($bbSeed);
+        $item1Null = $context->builder->icmp(Builder::INT_EQ, $item1, $objPtrTy->constNull());
+        $bbSeed1 = BasicBlockHelper::append($context, 'dom_acls_refresh_seed1');
+        $bbSeed2 = BasicBlockHelper::append($context, 'dom_acls_refresh_seed2');
+        $context->builder->branchIf($item1Null, $bbSeed1, $bbSeed2);
+        $context->builder->positionAtEnd($bbSeed1);
+        self::writeChildNodesList($context, $owner, 1, $item0, null);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbSeed2);
+        self::writeChildNodesList($context, $owner, 2, $item0, $item1);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbPins);
         $ownerJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $owner);
         $objectType->propertyStore(
             $objectType->propertySlotFor($existing, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER),
