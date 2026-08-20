@@ -8,11 +8,14 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for class_exists() / is_a() / is_subclass_of() via ClassExistsJitHelper (#16185, #26406).
  *
  * SSOT: {@see \PHPCompiler\ext\standard\ClassExistsJitHelper}.
+ * NestedJIT of `: bool` emitted `ret i64 0` into an i1 helper (#32706 leftover of #32701);
+ * helpers return int (0/1) and this bridge truncs to i1.
  * php-src: Zend/zend_builtin_functions.c — class_exists / is_a / is_subclass_of
  */
 final class StringClassExists
@@ -91,103 +94,51 @@ final class StringClassExists
 
     private static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureHelpersCompiled($context);
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i1, false, $strPtr)
-            );
-
-        $entry = $fn->appendBasicBlock('class_exists_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, '#16185');
-        $raw = JitNestedHelperCoerce::callHelper(
+        self::implementStringBridge(
             $context,
-            $helperFn,
-            [$fn->getParam(0)]
+            self::ABI,
+            'class_exists_bridge_entry',
+            self::INVOKE_HELPER,
+            '#16185',
+            1
         );
-        $exists = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($exists);
-
-        $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 
     private static function implementIsA(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_IS_A);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_IS_A, $probe);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureHelpersCompiled($context);
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI_IS_A,
-                $context->context->functionType($i1, false, $strPtr, $strPtr)
-            );
-
-        $entry = $fn->appendBasicBlock('is_a_string_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_IS_A, '#26406');
-        $raw = JitNestedHelperCoerce::callHelper(
+        self::implementStringBridge(
             $context,
-            $helperFn,
-            [$fn->getParam(0), $fn->getParam(1)]
+            self::ABI_IS_A,
+            'is_a_string_bridge_entry',
+            self::INVOKE_IS_A,
+            '#26406',
+            2
         );
-        $match = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($match);
-
-        $context->registerFunction(self::ABI_IS_A, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 
     private static function implementIsSubclassOf(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_IS_SUBCLASS);
+        self::implementStringBridge(
+            $context,
+            self::ABI_IS_SUBCLASS,
+            'is_subclass_of_string_bridge_entry',
+            self::INVOKE_IS_SUBCLASS,
+            '#26406',
+            2
+        );
+    }
+
+    private static function implementStringBridge(
+        Context $context,
+        string $abi,
+        string $entryName,
+        string $helperLogical,
+        string $ticket,
+        int $stringArgc
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_IS_SUBCLASS, $probe);
+            $context->registerFunction($abi, $probe);
 
             return;
         }
@@ -202,31 +153,42 @@ final class StringClassExists
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
+        $paramTys = 2 === $stringArgc ? [$strPtr, $strPtr] : [$strPtr];
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
-                self::ABI_IS_SUBCLASS,
-                $context->context->functionType($i1, false, $strPtr, $strPtr)
+                $abi,
+                $context->context->functionType($i1, false, ...$paramTys)
             );
 
-        $entry = $fn->appendBasicBlock('is_subclass_of_string_bridge_entry');
-        $context->builder->positionAtEnd($entry);
+        $savedLowering = $context->loweringLlvmFunction;
+        $savedActive = $context->activeFunction;
+        $context->activeFunction = $abi;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        try {
+            $entry = $fn->appendBasicBlock($entryName);
+            $context->builder->positionAtEnd($entry);
 
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_IS_SUBCLASS, '#26406');
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            $helperFn,
-            [$fn->getParam(0), $fn->getParam(1)]
-        );
-        $match = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($match);
+            $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, $ticket);
+            $callArgs = [$fn->getParam(0)];
+            if (2 === $stringArgc) {
+                $callArgs[] = $fn->getParam(1);
+            }
+            $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, $callArgs);
+            $i64 = $context->getTypeFromString('int64');
+            $asI64 = JitNestedHelperCoerce::extractLongFromHelperResult($context, $raw, $i64);
+            $asI1 = JitNestedHelperCoerce::coerceHelperScalarResult($context, $asI64, $i1);
+            $context->builder->returnValue($asI1);
 
-        $context->registerFunction(self::ABI_IS_SUBCLASS, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+            $context->registerFunction($abi, $fn);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 }

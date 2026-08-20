@@ -112,15 +112,32 @@ final class is_a_ extends Internal
             $args[1],
             'is_a() class name'
         );
-        if (JITVariable::TYPE_STRING === $args[0]->type) {
-            $this->jitString($context, $args[0], 'is_a() subject');
-            $i1 = $context->getTypeFromString('int1');
-            $falseVal = $i1->constInt(0, false);
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $childLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        // Boxed locals (`$n = 'C'`) are TYPE_VALUE; emitInstanceOf would SIGSEGV (#32706).
+        if (
+            JITVariable::TYPE_OBJECT !== $args[0]->type
+            && \is_string($childLit)
+            && '' !== $childLit
+        ) {
             if ($allowStringKnownFalse) {
                 return $falseVal;
             }
-            // Runtime helper — autoloads like zend_lookup_class (#26406). Compile-time
-            // fold would skip registered autoloaders for not-yet-loaded class strings.
+            $folded = ReflectionBuiltinHelper::classIsInstanceOfLiteral(
+                $context,
+                $childLit,
+                $className
+            );
+
+            return $context->builder->select($allowString, $folded, $falseVal);
+        }
+        if (JITVariable::TYPE_STRING === $args[0]->type) {
+            $this->jitString($context, $args[0], 'is_a() subject');
+            if ($allowStringKnownFalse) {
+                return $falseVal;
+            }
+            // Runtime helper — autoloads like zend_lookup_class (#26406).
             $childStr = JitStringArg::lower($context, $args[0], 'is_a() subject');
             $classStr = $context->builder->load($context->constantStringFromString($className));
             $match = StringClassExists::invokeIsAString($context, $childStr, $classStr);

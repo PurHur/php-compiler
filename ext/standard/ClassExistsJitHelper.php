@@ -10,11 +10,13 @@ use PHPCompiler\Web\Superglobals;
  * class_exists() / is_a() / is_subclass_of() for compiled JIT/AOT modules (#16185, #26406).
  *
  * SSOT: {@see VmReflection::classExists()} / {@see VmReflection::isAString()} / {@see VmReflection::isSubclassOf()}
- * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(is_a) / is_subclass_of (+ autoload)
+ * php-src: Zend/zend_builtin_functions.c — class_exists / is_a / is_subclass_of
+ *
+ * Returns int 1/0: NestedJIT `: bool` was i1 ABI with `ret i64 0` (#32706 leftover of #32701).
  */
 final class ClassExistsJitHelper
 {
-    public static function existsArgv(string $name): bool
+    public static function existsArgv(string $name): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -27,11 +29,11 @@ final class ClassExistsJitHelper
             $ctx,
             VmReflection::normalizeGlobalIntrospectionName($name),
             true
-        );
+        ) ? 1 : 0;
     }
 
     /** is_a($child, $class, true) string subject — autoloads (#26406). */
-    public static function isAStringArgv(string $childName, string $className): bool
+    public static function isAStringArgv(string $childName, string $className): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -40,11 +42,11 @@ final class ClassExistsJitHelper
             );
         }
 
-        return VmReflection::isAString($ctx, $childName, $className);
+        return VmReflection::isAString($ctx, $childName, $className) ? 1 : 0;
     }
 
     /** is_subclass_of($child, $parent) string subject — autoloads (#26406). */
-    public static function isSubclassOfStringArgv(string $childName, string $parentName): bool
+    public static function isSubclassOfStringArgv(string $childName, string $parentName): int
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
@@ -53,6 +55,6 @@ final class ClassExistsJitHelper
             );
         }
 
-        return VmReflection::isSubclassOf($ctx, $childName, $parentName);
+        return VmReflection::isSubclassOf($ctx, $childName, $parentName) ? 1 : 0;
     }
 }
