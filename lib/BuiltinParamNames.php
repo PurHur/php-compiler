@@ -1112,6 +1112,9 @@ final class BuiltinParamNames
                 return ['format', 'values'];
             case 'sscanf':
                 return ['string', 'format', 'vars'];
+            // php-src ext/standard/basic_functions.stub.php — int $category, string $locales, string ...$rest (#24376)
+            case 'setlocale':
+                return ['category', 'locales', 'rest'];
             case 'vfscanf':
             case 'fscanf':
                 return ['stream', 'format', 'vars'];

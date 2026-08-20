@@ -6496,4 +6496,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #24376 */
+    public function testSetlocaleZendStubReflectionAndNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('setlocale');
+        self::assertSame(['category', 'locales', 'rest'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'category', 'setlocale'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'locales', 'setlocale'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'rest', 'setlocale'));
+        self::assertSame(
+            ['category', 'locales', 'rest'],
+            BuiltinParamNames::paramNamesForInternalFunction('setlocale')
+        );
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('setlocale'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('setlocale'));
+        self::assertSame(2, BuiltinParamNames::variadicParamIndexForFunction('setlocale'));
+    }
+
 }
