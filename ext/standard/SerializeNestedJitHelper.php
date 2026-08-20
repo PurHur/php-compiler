@@ -59,14 +59,27 @@ final class SerializeNestedJitHelper
             $val = $pair[1];
             $t = $val->type & 0x7f;
             if (6 === $t || 7 === $t) {
-                // NestedJIT: $val->toArray() SIGABRTs on pair values (#27031 / #32911 follow-up).
-                // Peer JsonEncodeNestedJitHelper #27182: value-foreach packed chunks.
+                // NestedJIT: $val->toArray() SIGABRTs on pair values (#27031 / #32925).
+                // Key=>value foreach preserves assoc string keys (#32927); packed stays i:N.
                 $inner = '';
                 $in = 0;
                 $had = '0';
-                foreach ($val as $elem) {
+                foreach ($val as $ik => $elem) {
                     $had = '1';
-                    $inner .= 'i:'.((string) $in).';';
+                    if (\is_int($ik)) {
+                        $inner .= 'i:'.((string) $ik).';';
+                    } elseif (\is_string($ik)) {
+                        $inner .= self::quote($ik);
+                    } elseif (\is_object($ik)) {
+                        $ikt = $ik->type & 0x7f;
+                        if (1 === $ikt) {
+                            $inner .= 'i:'.((string) $ik->toInt()).';';
+                        } else {
+                            $inner .= self::quote($ik->toString());
+                        }
+                    } else {
+                        $inner .= 'i:'.((string) $in).';';
+                    }
                     $et = $elem->type & 0x7f;
                     if (1 === $et) {
                         $inner .= 'i:'.((string) $elem->toInt()).';';
@@ -99,13 +112,26 @@ final class SerializeNestedJitHelper
             } elseif (4 === $t) {
                 $body .= self::quote($val->toString());
             } else {
-                // #27182: NestedJIT nested HTs often lack type 6/7 — value-foreach.
+                // #27182: NestedJIT nested HTs often lack type 6/7 — same key=>value walk.
                 $inner = '';
                 $in = 0;
                 $had = '0';
-                foreach ($val as $elem) {
+                foreach ($val as $ik => $elem) {
                     $had = '1';
-                    $inner .= 'i:'.((string) $in).';';
+                    if (\is_int($ik)) {
+                        $inner .= 'i:'.((string) $ik).';';
+                    } elseif (\is_string($ik)) {
+                        $inner .= self::quote($ik);
+                    } elseif (\is_object($ik)) {
+                        $ikt = $ik->type & 0x7f;
+                        if (1 === $ikt) {
+                            $inner .= 'i:'.((string) $ik->toInt()).';';
+                        } else {
+                            $inner .= self::quote($ik->toString());
+                        }
+                    } else {
+                        $inner .= 'i:'.((string) $in).';';
+                    }
                     $et = $elem->type & 0x7f;
                     if (1 === $et) {
                         $inner .= 'i:'.((string) $elem->toInt()).';';
@@ -115,6 +141,8 @@ final class SerializeNestedJitHelper
                         $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
                     } elseif (4 === $et) {
                         $inner .= self::quote($elem->toString());
+                    } elseif (2 === $et) {
+                        $inner .= 'd:'.((string) $elem->toFloat()).';';
                     } else {
                         $inner .= 'i:'.((string) $elem->toInt()).';';
                     }
