@@ -66,25 +66,13 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mint sscanf.1 / vfscanf.1
         // (#31894 / #32122). User-script sscanf()/fscanf() stay SscanfJitHelper /
         // JitVfscanf.
-        $fntypePack = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnPack = $this->context->module->addFunction('__compiler_pack', $fntypePack);
-        $this->context->registerFunction('__compiler_pack', $fnPack);
-        $fntypeUnpack = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnUnpack = $this->context->module->addFunction('__compiler_unpack', $fntypeUnpack);
-        $this->context->registerFunction('__compiler_unpack', $fnUnpack);
+        // __compiler_pack / __compiler_unpack always-on shells removed (#32936):
+        // StringPack / StringUnpack own the ABI (getNamedFunction first, then
+        // addFunction if absent; Type::initialize still ensureLinked). Thin AOT
+        // already calls PackJitRuntime / UnpackJitRuntime from JitPack / JitUnpack.
+        // Leftover Type empty decls vs Runtime ABI drift mint pack.1 / unpack.1
+        // (#31894 / #32122). User-script pack()/unpack() stay PackJitHelper /
+        // UnpackJitHelper.
         $fntypeVarExport = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1055,6 +1043,8 @@ class Type extends Builtin {
         StringXmlrpc::ensureLinked($this->context);
         StringFormat::ensureLinked($this->context);
         Sscanf::ensureLinked($this->context);
+        StringPack::ensureLinked($this->context);
+        StringUnpack::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);

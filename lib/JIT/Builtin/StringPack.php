@@ -11,8 +11,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062, #22842).
+ * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062, #22842, #32936).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (PackEngineEncode →
  * PackJitHelper) in one NestedJIT scope (#22981 / #22990 / #26862).
  * Ieee754 excluded from NestedJIT — float NestedJIT OOMs thin AOT and pulled
@@ -20,6 +21,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * via bit ops; PackJitEngine (not NestedJIT'd) uses Ieee754 for host float formats.
  * PackJitEngine is not NestedJIT'd — its specs/list-assign path yields empty output;
  * PackJitHelper::packFromBlob fast-paths instead (#22990).
+ * php-src: ext/standard/pack.c — PHP_FUNCTION(pack)
  */
 final class StringPack
 {
