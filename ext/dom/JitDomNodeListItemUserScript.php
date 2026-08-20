@@ -133,6 +133,18 @@ final class JitDomNodeListItemUserScript
     }
 
     /**
+     * Compile-time NodeList::item($index) for foreach snapshot (#32707).
+     */
+    public static function materializeItemAtCompileTime(
+        Context $context,
+        string $xml,
+        string $tag,
+        int $index
+    ): Value {
+        return self::materializeNthQueryMatch($context, $xml, $tag, $index);
+    }
+
+    /**
      * Materialize //tag NodeList::item($index) from compile-time XML (#27275).
      *
      * Seeds DomUserScriptAttributeCacheLlvm so getAttribute() works on the result.
