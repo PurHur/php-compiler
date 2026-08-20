@@ -125,8 +125,10 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
             $this->assertStringNotContainsString('emitThinAotBridge', $source);
             $this->assertStringNotContainsString('__phpc_glob_vec', $source);
             $this->assertStringNotContainsString('__phpc_scandir_vec', $source);
-            $this->assertStringContainsString('#32006', $source);
         }
+        $this->assertStringContainsString('#32006', $gi);
+        $this->assertStringContainsString('#33009', $di);
+        $this->assertStringContainsString('StringFsGlob::ensureLinked', $di);
         $this->assertStringContainsString('GlobIteratorSnapshotJitHelper', $gi);
         $this->assertStringContainsString('DirectoryIteratorSnapshotJitHelper', $di);
         $this->assertLessThan(85, \substr_count($gi, "\n") + 1);
@@ -138,11 +140,12 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringDirFactory.php');
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('DirSnapshotJitHelper', $source);
+        $this->assertStringContainsString('StringFsGlob::ensureLinked', $source);
         $this->assertStringNotContainsString('JitFsGlobKernel::implement', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('emitThinAotBridge', $source);
         $this->assertStringNotContainsString('__phpc_scandir_vec', $source);
-        $this->assertStringContainsString('#32027', $source);
+        $this->assertStringContainsString('#33009', $source);
         $this->assertLessThan(95, \substr_count($source, "\n") + 1);
     }
 }

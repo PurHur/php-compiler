@@ -14,7 +14,7 @@ use PHPLLVM\Value;
  * dir() factory snapshot for JIT/AOT (#30757, #32027).
  *
  * Always NestedJIT {@see \PHPCompiler\ext\standard\DirSnapshotJitHelper} via
- * {@see JitVmHelperLink} (peer glob/scandir #29986 / iterator snapshots #32006 — no thin-AOT libc fork).
+ * {@see JitVmHelperLink} (FsGlob scandir leaf #29986 / #33009 — no thin-AOT libc fork).
  * php-src: ext/standard/dir.c — PHP_FUNCTION(dir)
  */
 final class StringDirFactory
@@ -59,7 +59,8 @@ final class StringDirFactory
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
-        StringDir::ensureLinked($context);
+        // FsGlob leaf for NestedJIT scandir inside DirSnapshotJitHelper (#33009).
+        StringFsGlob::ensureLinked($context);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         JitVmHelperLink::ensureBridge(
@@ -71,7 +72,7 @@ final class StringDirFactory
             self::HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#32027'
+            '#33009'
         );
 
         if (null !== $savedInsert) {

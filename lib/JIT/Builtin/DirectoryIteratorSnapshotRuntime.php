@@ -13,7 +13,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
  * JIT/AOT ABI for DirectoryIterator construct snapshot (#27289, #32006).
  *
  * Always NestedJIT {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper} via
- * {@see JitVmHelperLink} (peer glob/scandir #29986 — no thin-AOT libc fork).
+ * {@see JitVmHelperLink} (FsGlob scandir leaf #29986 / #33009 — no thin-AOT libc fork).
  * Linked at Type init (not mid-construct) so NestedJIT cannot orphan the user insert block.
  * php-src: ext/spl/spl_directory.c — spl_filesystem_dir_open
  */
@@ -50,7 +50,8 @@ final class DirectoryIteratorSnapshotRuntime
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
-        StringDir::ensureLinked($context);
+        // FsGlob leaf for NestedJIT scandir inside DirectoryIteratorSnapshotJitHelper (#33009).
+        StringFsGlob::ensureLinked($context);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
@@ -63,7 +64,7 @@ final class DirectoryIteratorSnapshotRuntime
             self::HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#32006'
+            '#33009'
         );
 
         if (null !== $savedInsert) {

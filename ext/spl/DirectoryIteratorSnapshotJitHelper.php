@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
-use PHPCompiler\ext\standard\DirHandleJitHelper;
+use PHPCompiler\ext\standard\FsGlobJitHelper;
 
 /**
- * Thin directory snapshot for AOT DirectoryIterator (#27289).
+ * Thin directory snapshot for AOT DirectoryIterator (#27289, #33009).
  *
- * Uses only {@see DirHandleJitHelper} (already NestedJIT'd by StringDir) — do not call
- * {@see \PHPCompiler\ext\standard\VmDir} here (pulls a huge NestedJIT closure / OOM).
+ * Uses {@see FsGlobJitHelper::scandirArgv} (NestedJIT whitelist → libc scandir vec, peer #29986).
+ * Do not call {@see \PHPCompiler\ext\standard\DirHandleJitHelper} / {@see \PHPCompiler\ext\standard\VmDir}
+ * here — NestedJIT DirHandle→VmDirPure listing returns empty under thin AOT (#33009).
  *
  * Return type is `array` (not HashTable): NestedJIT maps class HashTable to object ABI
  * (peer HashAlgosJitHelper #20652). `array` → `__hashtable__*`.
@@ -26,23 +27,21 @@ final class DirectoryIteratorSnapshotJitHelper
      */
     public static function entriesArgv(string $path, int $flags): array
     {
-        $handle = DirHandleJitHelper::opendirArgv($path);
-        if ($handle < 0) {
+        // SCANDIR_SORT_NONE — DirectoryIterator matches opendir/readdir order (#14859).
+        $entries = FsGlobJitHelper::scandirArgv($path, \SCANDIR_SORT_NONE);
+        if (null === $entries) {
             return [];
         }
-        $skipDots = 0 !== ($flags & self::FLAG_SKIP_DOTS);
+        if (0 === ($flags & self::FLAG_SKIP_DOTS)) {
+            return $entries;
+        }
         $out = [];
-        while (true) {
-            $name = DirHandleJitHelper::readdirArgv($handle);
-            if (null === $name) {
-                break;
-            }
-            if ($skipDots && ('.' === $name || '..' === $name)) {
+        foreach ($entries as $name) {
+            if ('.' === $name || '..' === $name) {
                 continue;
             }
             $out[] = $name;
         }
-        DirHandleJitHelper::closedirArgv($handle);
 
         return $out;
     }
