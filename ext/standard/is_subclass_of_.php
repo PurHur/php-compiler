@@ -125,6 +125,16 @@ final class is_subclass_of_ extends Internal
         if ($allowStringKnownFalse) {
             return $falseVal;
         }
+        $childLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (\is_string($childLit) && '' !== $childLit) {
+            $folded = ReflectionBuiltinHelper::classIsSubclassOfLiteral(
+                $context,
+                $childLit,
+                $parentName
+            );
+
+            return $context->builder->select($allowString, $folded, $falseVal);
+        }
         // Runtime helper — autoloads like zend_lookup_class (#26406).
         $childStr = JitStringArg::lower($context, $args[0], 'is_subclass_of() child class');
         $parentStr = $context->builder->load($context->constantStringFromString($parentName));
