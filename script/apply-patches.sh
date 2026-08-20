@@ -69,7 +69,10 @@ patch_already_applied() {
       grep -q "case 'Expr_NullsafePropertyFetch':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     php-types-static-var.patch)
-      grep -q "case 'Terminal_StaticVar':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      # Fixed shape keeps the full default type (#32806); reject the old ->subTypes peel.
+      grep -q "case 'Terminal_StaticVar':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null \
+        && grep -q 'return \[\$resolved\[\$op->defaultVar\]\];' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null \
+        && ! grep -q 'defaultVar]->subTypes ??' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     php-types-nullable-return.patch)
       grep -q 'CfgType\\Nullable' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -6531,6 +6534,40 @@ repair_php_llvm_token_type_kind_typo_in_prelinked() {
   fi
 }
 
+apply_php_types_static_var_array_type_repair() {
+  # Old php-types-static-var.patch peeled ->subTypes, typing string[] statics as string (#32806).
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
+  if ! grep -q "case 'Terminal_StaticVar':" "$target" 2>/dev/null; then
+    return 0
+  fi
+  if ! grep -q 'defaultVar]->subTypes ??' "$target" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path, encoding='utf-8').read()
+old = "return $resolved[$op->defaultVar]->subTypes ?? [$resolved[$op->defaultVar]];"
+new = "return [$resolved[$op->defaultVar]];"
+if old not in text:
+    sys.exit(0)
+# Keep a short comment near the case for the next reader.
+text = text.replace(
+    "case 'Terminal_StaticVar':\n                if (null !== $op->defaultVar) {",
+    "case 'Terminal_StaticVar':\n                // Keep the default's full type (string[] stays array). Using ->subTypes here\n"
+    "                // typed `static $a=['x']` as string and broke AOT dim writes (#32800 / #32806).\n"
+    "                if (null !== $op->defaultVar) {",
+    1,
+)
+text = text.replace(old, new, 1)
+open(path, 'w', encoding='utf-8').write(text)
+print('Repaired php-types-static-var Terminal_StaticVar array type (#32806)')
+PY
+}
+
 # Apply a patch file with git/patch(1) only — no overlay dispatch (avoids recursion).
 apply_patch_file_direct() {
   local patch="$1"
@@ -7205,6 +7242,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-missing-parent-no-echo.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"
+  apply_php_types_static_var_array_type_repair
   apply_patch "$PATCH_DIR/php-types-static-var.patch"
   apply_patch "$PATCH_DIR/php-types-nullable-return.patch"
   # Never type needs mixed-reserved + nullable-return fromTypeDecl arms (#8738).

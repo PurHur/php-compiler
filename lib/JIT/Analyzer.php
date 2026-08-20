@@ -245,6 +245,17 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
+            } elseif ($op instanceof Op\Terminal\StaticVar) {
+                // Function-static CVs are now typed as their default (string[] stays array;
+                // #32806). Follow the default like Assign — do not abort Analyzer.
+                if (null === $op->defaultVar) {
+                    return null;
+                }
+                $newSize = $this->computeStaticArraySize($op->defaultVar, $seen);
+                if (null === $newSize) {
+                    return null;
+                }
+                $size = max($size, $newSize);
             } elseif ($op instanceof Op\Phi) {
                 $phiSize = null;
                 foreach ($op->vars as $var) {
