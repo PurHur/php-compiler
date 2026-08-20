@@ -57,45 +57,12 @@ class Type extends Builtin {
         // sprintf.1 / number_format.1 (#31894 / #32122; float→string path #31963).
         // User-script sprintf()/printf()/number_format() stay SprintfJitHelper /
         // NumberFormatRuntime.
-        $fntypeSscanf = $this->context->context->functionType(
-            $this->context->getTypeFromString('int64'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__**')
-        );
-        $fnSscanf = $this->context->module->addFunction('__compiler_sscanf', $fntypeSscanf);
-        $this->context->registerFunction('__compiler_sscanf', $fnSscanf);
-        $fntypeSscanfArray = $this->context->context->functionType(
-            $this->context->getTypeFromString('__value__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnSscanfArray = $this->context->module->addFunction('__compiler_sscanf_array', $fntypeSscanfArray);
-        $this->context->registerFunction('__compiler_sscanf_array', $fnSscanfArray);
-        $fntypeSscanfEx = $this->context->context->functionType(
-            $this->context->getTypeFromString('int64'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__**'),
-            $this->context->getTypeFromString('size_t*')
-        );
-        $fnSscanfEx = $this->context->module->addFunction('__compiler_sscanf_ex', $fntypeSscanfEx);
-        $this->context->registerFunction('__compiler_sscanf_ex', $fnSscanfEx);
-        $fntypeVfscanf = $this->context->context->functionType(
-            $this->context->getTypeFromString('int64'),
-            false,
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__**')
-        );
-        $fnVfscanf = $this->context->module->addFunction('__compiler_vfscanf', $fntypeVfscanf);
-        $this->context->registerFunction('__compiler_vfscanf', $fnVfscanf);
+        // __compiler_sscanf / __compiler_sscanf_array / __compiler_sscanf_ex /
+        // __compiler_vfscanf always-on shells removed (#32935): Sscanf →
+        // StringSscanfByRef / StringSscanfArray / StringVfscanf own the ABI
+        // (getNamedFunction first; Type::initialize still ensureLinked). Leftover Type
+        // empty decls vs Runtime ABI drift mint sscanf.1 / vfscanf.1 (#31894 / #32122).
+        // User-script sscanf()/fscanf() stay SscanfJitHelper / JitVfscanf.
         $fntypePack = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1084,6 +1051,7 @@ class Type extends Builtin {
         StringJsonDecode::ensureLinked($this->context);
         StringXmlrpc::ensureLinked($this->context);
         StringFormat::ensureLinked($this->context);
+        Sscanf::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
