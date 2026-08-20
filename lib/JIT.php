@@ -9690,6 +9690,35 @@ class JIT {
                             $this->maybeRefreshIncludeBindingsBeforeUse();
                             break;
                         }
+                        // In-place `$s .= …` on a function-static: php-cfg may mark the
+                        // static CV dead even when RETURN still reads it. Ephemeral alloca
+                        // concat then never writes the module box (#32889 / leftover #31966).
+                        if (
+                            (int) $op->arg1 === (int) $op->arg2
+                            && $left->functionStaticGlobal
+                        ) {
+                            $newVal = $this->compileConcatIntoNewString(
+                                $left,
+                                $right,
+                                $leftOp,
+                                $rightOp
+                            );
+                            JIT\JitValueBox::assignToPointer(
+                                $this->context,
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $left),
+                                $newVal
+                            );
+                            JIT\JitValueBox::publishAfterWrite(
+                                $this->context,
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $left)
+                            );
+                            $this->context->setVariableOp($destOp, $left);
+                            if (null !== ($newVal->compileTimeString ?? null)) {
+                                $left->compileTimeString = $newVal->compileTimeString;
+                            }
+                            $this->maybeRefreshIncludeBindingsBeforeUse();
+                            break;
+                        }
                         // Always use entry-alloca for dead-operand concat results.
                         // assignOperand creates KIND_VALUE variables whose free() is a
                         // no-op, leaking the allocated string and corrupting the heap on

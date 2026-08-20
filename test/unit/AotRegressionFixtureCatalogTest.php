@@ -96,6 +96,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'function_static_string_dim_assign_32800.phpt',
         'local_string_dim_assign_32806.phpt',
         'function_static_string_dim_assign_32814.phpt',
+        'function_static_string_concat_32889.phpt',
         'dom_childnode_replacewith_live_held_32822.phpt',
         'dom_nodelist_item_loop_32831.phpt',
         'dom_parentnode_append_multi_live_held_32838.phpt',
