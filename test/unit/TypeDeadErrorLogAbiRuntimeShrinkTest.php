@@ -31,8 +31,8 @@ final class TypeDeadErrorLogAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (get_headers until #33042; file_put_contents until #33043).
-        $this->assertStringContainsString("registerFunction('__compiler_get_headers'", $type);
+        // Next leftover sentinel (#33042 dropped get_headers; #33043 dropped file_put_contents).
+        $this->assertStringContainsString("registerFunction('__compiler_fwrite'", $type);
         $this->assertStringContainsString('StringErrorLog::ensureLinked', $type);
     }
 

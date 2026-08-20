@@ -42,7 +42,7 @@ final class TypeDeadCslashesAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_get_headers'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_fwrite'", $type);
         $this->assertStringContainsString('StringCslashes::ensureStandaloneBodies', $type);
     }
 
