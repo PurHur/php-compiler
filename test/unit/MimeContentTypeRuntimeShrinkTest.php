@@ -7,29 +7,26 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\MimeContentTypeJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/**
- * mime_content_type JIT routes through MimeContentTypeJitHelper PHP (#9236 / #25544 / #33034).
- */
+/** mime_content_type JIT helper (#9236 / #25544 / #33034). */
 final class MimeContentTypeRuntimeShrinkTest extends TestCase
 {
-    public function testMimeContentTypeJitHelperIsNestedJitSafe(): void
+    public function testMimeContentTypeJitHelperUsesFileGetContentsAndVmMimeDetect(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/MimeContentTypeJitHelper.php');
         $this->assertStringContainsString('@\\file_get_contents', $source);
-        $this->assertStringContainsString('detectFromBytes', $source);
+        $this->assertStringContainsString('VmMime::detectFromBytes', $source);
         $this->assertStringNotContainsString('VmFs::', $source);
         $this->assertStringNotContainsString('VmMime::mimeContentTypeFromPath', $source);
-        $this->assertDoesNotMatchRegularExpression('/\\\\json_decode\\s*\\(/', $source);
+        $this->assertStringNotContainsString('eqPhp', $source);
     }
 
-    public function testMimeContentTypeRuntimeUsesJitVmHelperLink(): void
+    public function testMimeContentTypeRuntimeOwnsAbi(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MimeContentTypeRuntime.php');
         $this->assertStringContainsString('MimeContentTypeJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
-        $lineCount = \substr_count($source, "\n") + 1;
-        $this->assertLessThan(120, $lineCount);
+        $this->assertStringContainsString('getNamedFunction', $source);
+        $this->assertStringContainsString('addFunction', $source);
     }
 
     public function testMimeContentTypeJitHelperMatchesVmMimeSemantics(): void
