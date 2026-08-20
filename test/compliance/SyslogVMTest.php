@@ -21,6 +21,10 @@ final class SyslogVMTest extends BaseTest
             __DIR__.'/cases/stdlib/syslog_call.phpt',
             'syslog_call.phpt'
         );
+        yield 'openlog_named_flags.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/openlog_named_flags.phpt',
+            'openlog_named_flags.phpt'
+        );
     }
 
     public function setUp(): void

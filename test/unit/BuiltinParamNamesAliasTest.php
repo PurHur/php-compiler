@@ -2804,6 +2804,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'phpinfo'));
     }
 
+    /** @covers issue #24379 */
+    public function testOpenlogZendStubNamedPrefixFlagsParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('openlog');
+        self::assertSame(['prefix', 'flags', 'facility'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'prefix', 'openlog'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'openlog'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'facility', 'openlog'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $ident / $option)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ident', 'openlog'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'option', 'openlog'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('openlog'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('openlog'));
+    }
+
     /** @covers issue #24508 */
     public function testPhpcreditsZendStubNamedFlagsParam(): void
     {
