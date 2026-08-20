@@ -7397,6 +7397,11 @@ verify_critical_language_patches() {
   if ! grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null; then
     missing+=("php-types-throw-expr")
   fi
+  # php-src ext/dom/php_dom.stub.php — removeAttributeNode(): DOMAttr (not PHP 5 bool) (#32707)
+  if ! grep -qF "'DOMElement::removeAttributeNode' => ['DOMAttr'" \
+    "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null; then
+    missing+=("php-types-dom-removeattributenode-return")
+  fi
   local trycatch="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
   if grep -q 'function parseStmt_TryCatch' "$parser" 2>/dev/null; then
     if ! grep -q '\$elseBlock ?? \$endBlock' "$parser" 2>/dev/null; then
