@@ -344,6 +344,7 @@ final class StringVarExport
             );
 
         $savedBuilder = $context->builder;
+        $savedIntrinsicBuilder = $context->intrinsic->builder;
         $context->builder = $context->context->builderCreate();
         $b = $context->builder;
 
@@ -541,6 +542,9 @@ final class StringVarExport
         $b->returnValue($phi);
 
         $context->builder->clearInsertionPosition();
+        // #32750: memcpy above retargeted intrinsic->builder; restore or later
+        // calls emit parentless @memcpy (module verify fails).
+        $context->intrinsic->builder = $savedIntrinsicBuilder;
         $context->builder = $savedBuilder;
         $context->registerFunction($name, $fn);
     }
@@ -592,6 +596,7 @@ final class StringVarExport
             );
 
         $savedBuilder = $context->builder;
+        $savedIntrinsicBuilder = $context->intrinsic->builder;
         $context->builder = $context->context->builderCreate();
         $b = $context->builder;
 
@@ -738,6 +743,8 @@ final class StringVarExport
         $b->returnValue($result);
 
         $context->builder->clearInsertionPosition();
+        // #32750: same intrinsic->builder restore as float-decimal helper.
+        $context->intrinsic->builder = $savedIntrinsicBuilder;
         $context->builder = $savedBuilder;
         $context->registerFunction($name, $fn);
     }
