@@ -111,6 +111,8 @@ final class DomNodeChildNodeMutationRuntime
                 // replaceWith: LiveSlots + InnerXml sibling-preserving rewrite (#32822 /
                 // peer replaceChild #32784). storeInnerXmlFromArgs alone wiped siblings
                 // and left held childNodes pins on the old node.
+                // Multi-arg: ReplaceChild for arg0, then after() for arg1..N — peer
+                // after/before multi LiveSlots (#32848 / #32887).
                 $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
                 JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
                     $context,
@@ -118,6 +120,20 @@ final class DomNodeChildNodeMutationRuntime
                     $extraArgs[0],
                     $receiver
                 );
+                $afterAnchor = $extraArgs[0];
+                $tail = \array_slice($extraArgs, 1);
+                foreach ($tail as $newChildVar) {
+                    JitDomChildNodeSiblingInsert::invokeAfter(
+                        $context,
+                        $parentVar,
+                        $newChildVar,
+                        $afterAnchor
+                    );
+                    $afterAnchor = $newChildVar;
+                }
+                // Overwrite single-arg InnerXml from ReplaceChild with the full
+                // replacement markup (keeps non-replaced siblings for saveXML).
+                self::trySyncReplaceWithInnerXml($context, $receiver, $parent, $extraArgs);
             }
 
             return self::nullValuePtr($context);
@@ -184,6 +200,45 @@ final class DomNodeChildNodeMutationRuntime
             return false;
         }
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+
+        return true;
+    }
+
+    /**
+     * Replace the receiver's direct-child chunk with all replaceWith args (#32887).
+     *
+     * Peer {@see trySyncSiblingInsertInnerXml}: multi-arg markup must replace the
+     * old node in place (not wipe the parent to only the new tags).
+     *
+     * @param list<Variable> $extraArgs
+     */
+    private static function trySyncReplaceWithInnerXml(
+        Context $context,
+        Variable $receiver,
+        Value $parent,
+        array $extraArgs
+    ): bool {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return false;
+        }
+        $markup = self::compileTimeMarkupFromArgs($extraArgs);
+        if (null === $markup || '' === $markup) {
+            return false;
+        }
+        $parentInner = self::compileTimeParentInnerXml();
+        if (null === $parentInner) {
+            return false;
+        }
+        $index = self::resolveReceiverChunkIndex($receiver, $parentInner);
+        if (null === $index) {
+            return false;
+        }
+        $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($parentInner);
+        if ($index < 0 || $index >= \count($chunks)) {
+            return false;
+        }
+        $chunks[$index] = $markup;
+        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, implode('', $chunks));
 
         return true;
     }
