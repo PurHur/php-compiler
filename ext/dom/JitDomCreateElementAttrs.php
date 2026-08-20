@@ -50,6 +50,15 @@ final class JitDomCreateElementAttrs
         self::$attrsById[$id][$name] = $value;
     }
 
+    /** Drop a compile-time attr so C14N fold matches removeAttribute (#32981). */
+    public static function remove(int $id, string $name): void
+    {
+        if (!isset(self::$attrsById[$id])) {
+            return;
+        }
+        unset(self::$attrsById[$id][$name]);
+    }
+
     /** @return array<string, string> */
     public static function get(int $id): array
     {
