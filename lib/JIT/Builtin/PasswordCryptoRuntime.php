@@ -10,13 +10,18 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908, #22934).
+ * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908, #22934, #32855).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Libcrypt #22886 / OpensslSign #22911).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\PasswordJitHelper}; thin LLVM
  * bridges forward the ABI (#9908, #12869).
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * empty shells (#32855 / peer #32851) — leftover Type decls mint password_hash.1
+ * (#31894 / #32122).
+ *
  * SSOT: {@see \PHPCompiler\ext\standard\VmPassword}
- * php-src: ext/standard/password.c
+ * php-src: ext/standard/password.c · crypt(): ext/standard/crypt.c
  */
 final class PasswordCryptoRuntime
 {
@@ -111,10 +116,62 @@ final class PasswordCryptoRuntime
             return;
         }
 
-        $fn = $context->lookupFunction($name);
+        $fn = self::declareAbi($context, $name, $probe);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareAbi(Context $context, string $name, ?LlvmFunction $probe): LlvmFunction
+    {
+        if (null !== $probe) {
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+
+        $ft = match ($name) {
+            '__compiler_password_hash' => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $i64,
+                $i64
+            ),
+            '__compiler_password_verify' => $context->context->functionType(
+                $i32,
+                false,
+                $strPtr,
+                $strPtr
+            ),
+            '__compiler_crypt' => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $strPtr
+            ),
+            '__compiler_password_get_info' => $context->context->functionType(
+                $htPtr,
+                false,
+                $strPtr
+            ),
+            '__compiler_password_needs_rehash' => $context->context->functionType(
+                $i32,
+                false,
+                $strPtr,
+                $i64,
+                $i64
+            ),
+            '__compiler_password_algos' => $context->context->functionType($htPtr, false),
+            default => throw new \LogicException(
+                'PasswordCryptoRuntime unknown ABI '.$name.' (#32855)'
+            ),
+        };
+
+        return $context->module->addFunction($name, $ft);
     }
 
     private static function implementHashBridge(Context $context, LlvmFunction $fn): void

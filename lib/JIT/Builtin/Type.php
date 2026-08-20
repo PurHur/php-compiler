@@ -635,41 +635,13 @@ class Type extends Builtin {
         // removed (#32851): NestedJIT/AOT bridges are PasswordRandomBytesRuntime /
         // LibcryptRuntime (getNamedFunction first; Type::initialize still ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint password_random_bytes.1 /
-        // libcrypt.1 (#31894 / #32122). password_hash/verify/crypt/* stay always-on —
-        // PasswordCryptoRuntime still lookupFunctions those ABIs (follow-up shrink).
-        $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $i64);
-        $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
-        $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);
-        $fntypePasswordVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
-        $fnPasswordVerify = $this->context->module->addFunction('__compiler_password_verify', $fntypePasswordVerify);
-        $this->context->registerFunction('__compiler_password_verify', $fnPasswordVerify);
-        $fntypeCrypt = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
-        $fnCrypt = $this->context->module->addFunction('__compiler_crypt', $fntypeCrypt);
-        $this->context->registerFunction('__compiler_crypt', $fnCrypt);
-        $fntypePasswordGetInfo = $this->context->context->functionType($htPtr, false, $strPtr);
-        $fnPasswordGetInfo = $this->context->module->addFunction(
-            '__compiler_password_get_info',
-            $fntypePasswordGetInfo
-        );
-        $this->context->registerFunction('__compiler_password_get_info', $fnPasswordGetInfo);
-        $fntypePasswordNeedsRehash = $this->context->context->functionType(
-            $this->context->getTypeFromString('int32'),
-            false,
-            $strPtr,
-            $i64,
-            $i64
-        );
-        $fnPasswordNeedsRehash = $this->context->module->addFunction(
-            '__compiler_password_needs_rehash',
-            $fntypePasswordNeedsRehash
-        );
-        $this->context->registerFunction('__compiler_password_needs_rehash', $fnPasswordNeedsRehash);
-        $fntypePasswordAlgos = $this->context->context->functionType($htPtr, false);
-        $fnPasswordAlgos = $this->context->module->addFunction(
-            '__compiler_password_algos',
-            $fntypePasswordAlgos
-        );
-        $this->context->registerFunction('__compiler_password_algos', $fnPasswordAlgos);
+        // libcrypt.1 (#31894 / #32122).
+        // __compiler_password_hash / __compiler_password_verify / __compiler_crypt /
+        // __compiler_password_get_info / __compiler_password_needs_rehash /
+        // __compiler_password_algos always-on shells removed (#32855): NestedJIT/AOT
+        // bridge is PasswordCryptoRuntime (getNamedFunction first; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // password_hash.1 (#31894 / #32122).
         $fntypeStrtr = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr);
         $fnStrtr = $this->context->module->addFunction('__compiler_strtr', $fntypeStrtr);
         $this->context->registerFunction('__compiler_strtr', $fnStrtr);
@@ -1274,6 +1246,7 @@ class Type extends Builtin {
         StringVersionCompare::ensureLinked($this->context);
         LibcryptRuntime::ensureLinked($this->context);
         PasswordRandomBytesRuntime::ensureLinked($this->context);
+        PasswordCryptoRuntime::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);

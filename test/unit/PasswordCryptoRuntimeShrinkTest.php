@@ -40,7 +40,7 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('emitPasswordHash', $source);
         $this->assertStringNotContainsString('BCRYPT_ITOA64', $source);
-        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
     }
 
     public function testPasswordJitHelperDelegatesToVmPassword(): void
