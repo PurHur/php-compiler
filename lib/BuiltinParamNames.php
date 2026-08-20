@@ -1049,6 +1049,18 @@ final class BuiltinParamNames
                 return ['arg'];
             case 'escapeshellcmd':
                 return ['command'];
+            // php-src ext/standard/basic_functions.stub.php / exec.c — InternalArgInfo still says cmd (#23597)
+            case 'shell_exec':
+                return ['command'];
+            // php-src ext/standard/file.stub.php — InternalArgInfo still says fp (#23597)
+            case 'fstat':
+            case 'fpassthru':
+                return ['stream'];
+            // php-src ext/standard/filestat.c / file.stub.php — InternalArgInfo still says path (#23597)
+            case 'disk_free_space':
+            case 'diskfreespace':
+            case 'disk_total_space':
+                return ['directory'];
             // php-src ext/standard/basic_functions.stub.php / exec.c — InternalArgInfo still return_value (#23625)
             case 'exec':
                 return ['command', 'output=', 'result_code='];

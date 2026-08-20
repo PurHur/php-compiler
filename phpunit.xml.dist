@@ -245,6 +245,8 @@
             <file>./test/compliance/LinkinfoReadlinkNamed23944JITTest.php</file>
             <file>./test/compliance/ExecPassthruSystemNamed23625VMTest.php</file>
             <file>./test/compliance/ExecPassthruSystemNamed23625JITTest.php</file>
+            <file>./test/compliance/ShellFstatDiskNamed23597VMTest.php</file>
+            <file>./test/compliance/ShellFstatDiskNamed23597JITTest.php</file>
             <file>./test/compliance/BaseConvertAddcslashesHashFileNamed23507VMTest.php</file>
             <file>./test/compliance/BaseConvertAddcslashesHashFileNamed23507JITTest.php</file>
             <file>./test/compliance/DebugPrintBacktraceVoid28909VMTest.php</file>

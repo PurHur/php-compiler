@@ -3736,6 +3736,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('system'));
     }
 
+    /** @covers issue #23597 */
+    public function testShellFstatDiskZendStubNamedParams(): void
+    {
+        $shell = BuiltinParamNames::forFunction('shell_exec');
+        self::assertSame(['command'], $shell);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($shell, 'command', 'shell_exec'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($shell, 'cmd', 'shell_exec'));
+
+        foreach (['fstat', 'fpassthru'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['stream'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'stream', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'fp', $fn));
+        }
+
+        foreach (['disk_free_space', 'diskfreespace', 'disk_total_space'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['directory'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'directory', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'path', $fn));
+        }
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
