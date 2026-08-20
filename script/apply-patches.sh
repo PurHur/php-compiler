@@ -71,6 +71,10 @@ patch_already_applied() {
     php-types-static-var.patch)
       grep -q "case 'Terminal_StaticVar':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-static-var-array-default.patch)
+      # Full default type (not subTypes) — string[] statics must stay arrays (#32806).
+      grep -q 'string\[\] stays string\[\]' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     php-types-nullable-return.patch)
       grep -q 'CfgType\\Nullable' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
@@ -7206,6 +7210,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-types-static-var.patch"
+  apply_patch "$PATCH_DIR/php-types-static-var-array-default.patch"
   apply_patch "$PATCH_DIR/php-types-nullable-return.patch"
   # Never type needs mixed-reserved + nullable-return fromTypeDecl arms (#8738).
   apply_patch "$PATCH_DIR/php-types-never-type.patch"

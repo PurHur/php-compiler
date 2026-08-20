@@ -281,12 +281,15 @@ class TypeReconstructor
             case 'Expr_MethodCall':
                 return $this->resolveMethodCall($op->var, $op->name, $op, $resolved);
             case 'Terminal_StaticVar':
+                // Keep the default's full type (string[] stays string[]). Peeling subTypes
+                // typed `static $a=['x']` as string so CFG-string dim writes took the
+                // string-offset arm on a hashtable box (#32800 / #32806).
                 if (null !== $op->defaultVar) {
                     if (!isset($resolved[$op->defaultVar])) {
                         return false;
                     }
 
-                    return $resolved[$op->defaultVar]->subTypes ?? [$resolved[$op->defaultVar]];
+                    return [$resolved[$op->defaultVar]];
                 }
 
                 return [Type::null()];

@@ -289,6 +289,7 @@ class Analyzer
                 || $op instanceof Op\Expr\PostDec
                 || $op instanceof FirstClassCallable
                 || $op instanceof Op\Terminal\Const_
+                || $op instanceof Op\Terminal\StaticVar
                 || $op instanceof Op\Iterator\Reset
                 || $op instanceof Op\Iterator\Valid
                 || $op instanceof Op\Iterator\Key
@@ -296,6 +297,7 @@ class Analyzer
                 || $op instanceof Op\Iterator\Next) {
                 // Dynamic / non-literal writes (foreach Iterator\\Value, AssignRef, calls) —
                 // cannot prove a fixed packed size (#24010 nested foreach).
+                // Function-static CVs are VALUE/HT boxes even when CFG-typed string[] (#32806).
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));
