@@ -10,6 +10,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
  * JIT/AOT link for __compiler_time_nanosleep / __compiler_time_sleep_until via SleepJitHelper (#9378, #21289).
+ * Type.php always-on empty shells dropped (#32721 / re-#32122); this file owns the ABI.
  *
  * Same {@see JitVmHelperLink::ensureBridge} shape as {@see MathSleep} (#15212) — no hand-rolled
  * NestedJIT; NestedJitCompileScope comes from JitVmHelperLink.
